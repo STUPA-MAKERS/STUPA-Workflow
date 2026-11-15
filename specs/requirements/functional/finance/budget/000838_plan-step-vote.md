@@ -20,7 +20,7 @@ implementation:
   - backend/app/modules/budget/tree/plans.py
   - backend/app/modules/budget/plan_rules.py
   - backend/app/modules/budget/plan_router.py
-  - backend/app/modules/voting/service.py
+  - backend/app/modules/voting/service
   - backend/app/modules/livevote/router.py
   - backend/app/modules/livevote/vote_build.py
   - backend/app/modules/meetings/agenda_service.py

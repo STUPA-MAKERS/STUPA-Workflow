@@ -1278,10 +1278,8 @@ export class AdminApiService {
     });
   }
 
-  /** PUT /admin/meeting-settings — replaces both values (minutes before the start). */
-  putMeetingSettings(
-    body: Pick<MeetingSettings, 'openLeadMinutes' | 'confirmLeadMinutes'>,
-  ): Observable<MeetingSettings> {
+  /** PUT /admin/meeting-settings — replaces the value (minutes before the start). */
+  putMeetingSettings(body: Pick<MeetingSettings, 'openLeadMinutes'>): Observable<MeetingSettings> {
     if (this.mock) {
       this.store.meetingSettings = { ...this.store.meetingSettings, ...body };
       return of(structuredCopy(this.store.meetingSettings));

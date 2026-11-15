@@ -113,9 +113,6 @@ class MeetingPatch(FrozenCamelModel, frozen=True):
     #: ``publicJoin`` off voids the open requests and removes the admitted guests.
     public_join: bool | None = Field(default=None, alias="publicJoin")
     guests_mode: GuestsMode | None = Field(default=None, alias="guestsMode")
-    #: The lead confirms an early open: ``status: live`` before ``confirmUntil``. The
-    #: field alone changes nothing.
-    confirm_early: bool = Field(default=False, alias="confirmEarly")
 
     @model_validator(mode="after")
     def _at_least_one(self) -> MeetingPatch:
@@ -319,10 +316,9 @@ class MeetingOut(FrozenCamelModel, frozen=True):
     #: When this is false the guests only watch, and the mode control is locked.
     guests_vote_allowed: bool = Field(default=False, alias="guestsVoteAllowed")
     #: The open window of a planned meeting with a date (UTC). ``opensAt`` is the
-    #: earliest open. Before ``confirmUntil`` the open needs ``confirmEarly``. Both are
-    #: ``None`` for a meeting without a date and for a live or closed meeting.
+    #: earliest open. It is ``None`` for a meeting without a date and for a live or
+    #: closed meeting.
     opens_at: _datetime | None = Field(default=None, alias="opensAt")
-    confirm_until: _datetime | None = Field(default=None, alias="confirmUntil")
 
 
 TimelineDirection = Literal["past", "upcoming"]

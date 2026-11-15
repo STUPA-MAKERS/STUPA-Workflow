@@ -22,7 +22,7 @@ implementation:
   - backend/app/modules/budget/tree/fiscal_years.py
   - backend/app/modules/budget/tree/allocations.py
   - backend/app/modules/budget/tree/revert.py
-  - backend/app/modules/voting/service.py
+  - backend/app/modules/voting/service
 scope:
   - backend/app/modules/budget
   - backend/app/modules/voting

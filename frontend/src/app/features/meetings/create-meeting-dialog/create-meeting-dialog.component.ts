@@ -41,7 +41,8 @@ import { AdminOptionsService } from '../../../pages/admin/admin-options.service'
 import {
   firstMeetingOptions,
   lateInviteDays,
-  MEETING_LOCATION_MAX,
+  locationError,
+  locationTooLong,
   meetingFormOptions,
   meetingKindOptions,
 } from '../meeting-kind.util';
@@ -131,12 +132,8 @@ export class CreateMeetingDialogComponent {
   readonly kindOptions = computed(() => meetingKindOptions(this.i18n));
   readonly formOptions = computed(() => meetingFormOptions(this.i18n));
   /** The place is too long for the server. */
-  readonly locationTooLong = computed(() => this.location().trim().length > MEETING_LOCATION_MAX);
-  readonly locationError = computed(() =>
-    this.locationTooLong()
-      ? this.i18n.translate('meetings.location.tooLong', { max: MEETING_LOCATION_MAX })
-      : '',
-  );
+  readonly locationTooLong = computed(() => locationTooLong(this.location()));
+  readonly locationError = computed(() => locationError(this.i18n, this.location()));
   /** What the chosen Gremium allows: a guest ballot only with its switch and no quorum. */
   readonly defaults = signal<MeetingDefaults | null>(null);
   /** The invitation period that the date misses, else `null`. It never blocks the save (§ 000918). */

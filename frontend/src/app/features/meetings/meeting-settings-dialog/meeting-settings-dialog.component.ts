@@ -40,7 +40,8 @@ import { MeetingGuestsService } from '../meeting-guests.service';
 import {
   firstMeetingOptions,
   lateInviteDays,
-  MEETING_LOCATION_MAX,
+  locationError,
+  locationTooLong,
   meetingFormOptions,
   meetingKindOptions,
 } from '../meeting-kind.util';
@@ -132,12 +133,8 @@ export class MeetingSettingsDialogComponent {
   readonly kindOptions = computed(() => meetingKindOptions(this.i18n));
   readonly formOptions = computed(() => meetingFormOptions(this.i18n));
   /** The place is too long for the server. */
-  readonly locationTooLong = computed(() => this.location().trim().length > MEETING_LOCATION_MAX);
-  readonly locationError = computed(() =>
-    this.locationTooLong()
-      ? this.i18n.translate('meetings.location.tooLong', { max: MEETING_LOCATION_MAX })
-      : '',
-  );
+  readonly locationTooLong = computed(() => locationTooLong(this.location()));
+  readonly locationError = computed(() => locationError(this.i18n, this.location()));
   /** The invitation periods of the Gremium, read for a planned meeting. */
   readonly defaults = signal<MeetingDefaults | null>(null);
   /**

@@ -9,12 +9,11 @@ import { InputComponent, SectionComponent } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../../admin-api.service';
 import { MAX_LEAD_MINUTES, type MeetingSettings } from '../../admin.models';
 
-type Body = Pick<MeetingSettings, 'openLeadMinutes' | 'confirmLeadMinutes'>;
+type Body = Pick<MeetingSettings, 'openLeadMinutes'>;
 
 /** The edit state. The fields hold the text of the inputs, so a bad entry stays visible. */
 interface Draft {
   readonly open: string;
-  readonly confirm: string;
 }
 
 /** A whole number in [0, MAX_LEAD_MINUTES], else `null`. */
@@ -26,19 +25,16 @@ function minutes(text: string): number | null {
 }
 
 function draftOf(s: MeetingSettings): Draft {
-  return { open: String(s.openLeadMinutes), confirm: String(s.confirmLeadMinutes) };
+  return { open: String(s.openLeadMinutes) };
 }
 
 /**
  * "Sitzung eröffnen" on the deadlines page: the open window of a planned meeting.
  *
- * Two settings of `GET/PUT /admin/meeting-settings` (permission `admin.deadlines`), both
- * in minutes before the planned start:
- *
- * - `openLeadMinutes` (default 60): before it the meeting does not open; the server
- *   refuses with 409 `meeting_too_early`.
- * - `confirmLeadMinutes` (default 10): before it the open asks in an extra dialog. It
- *   is never larger than `openLeadMinutes` (the server answers 422 otherwise).
+ * One setting of `GET/PUT /admin/meeting-settings` (permission `admin.deadlines`), in
+ * minutes before the planned start: `openLeadMinutes` (default 60). Before it the meeting
+ * does not open; the server refuses with 409 `meeting_too_early`
+ * (§F/meetings/meetings/000092).
  *
  * The section shows nothing without `admin.deadlines` and nothing after a 403, like the
  * guest settings below it. It shares the section layout (the stylesheet) of the guest
@@ -62,32 +58,22 @@ export class MeetingWindowSettingsComponent {
     load: () => this.api.getMeetingSettings(),
     put: (body) => this.api.putMeetingSettings(body),
     draftOf,
-    initial: { open: '', confirm: '' },
+    initial: { open: '' },
     body: () => this.body(),
-    unchanged: (b, s) =>
-      b.openLeadMinutes === s.openLeadMinutes && b.confirmLeadMinutes === s.confirmLeadMinutes,
+    unchanged: (b, s) => b.openLeadMinutes === s.openLeadMinutes,
   });
   readonly saving = this.form.saving;
   protected readonly draft = this.form.draft;
 
   protected readonly openLead = computed(() => minutes(this.draft().open));
-  protected readonly confirmLead = computed(() => minutes(this.draft().confirm));
   protected readonly openError = computed(() =>
     this.openLead() === null ? this.i18n.translate('admin.meetingWindow.range', { max: MAX_LEAD_MINUTES }) : '',
   );
-  protected readonly confirmError = computed(() => {
-    const confirm = this.confirmLead();
-    if (confirm === null) return this.i18n.translate('admin.meetingWindow.range', { max: MAX_LEAD_MINUTES });
-    const open = this.openLead();
-    return open !== null && confirm > open ? this.i18n.translate('admin.meetingWindow.order') : '';
-  });
 
   /** The body of the PUT, or `null` while a field is invalid. */
   private readonly body = computed<Body | null>(() => {
     const open = this.openLead();
-    const confirm = this.confirmLead();
-    if (open === null || confirm === null || this.confirmError()) return null;
-    return { openLeadMinutes: open, confirmLeadMinutes: confirm };
+    return open === null ? null : { openLeadMinutes: open };
   });
 
   /** The section has changes that are not saved. The deadlines page then shows "Speichern". */

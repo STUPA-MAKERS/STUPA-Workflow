@@ -4765,12 +4765,6 @@
           "type": "INTEGER"
         },
         {
-          "name": "confirm_lead_minutes",
-          "nullable": false,
-          "primaryKey": false,
-          "type": "INTEGER"
-        },
-        {
           "name": "default_quorum_percent",
           "nullable": true,
           "primaryKey": false,
@@ -4808,12 +4802,6 @@
         },
         {
           "name": "invite_days_extraordinary",
-          "nullable": false,
-          "primaryKey": false,
-          "type": "INTEGER"
-        },
-        {
-          "name": "protocol_draft_days",
           "nullable": false,
           "primaryKey": false,
           "type": "INTEGER"

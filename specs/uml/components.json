@@ -1066,7 +1066,7 @@
       "to": "shared"
     },
     {
-      "count": 12,
+      "count": 11,
       "from": "protocol",
       "to": "voting"
     },
@@ -1256,17 +1256,17 @@
       "to": "shared"
     },
     {
-      "count": 3,
+      "count": 9,
       "from": "voting",
       "to": "applications"
     },
     {
-      "count": 6,
+      "count": 12,
       "from": "voting",
       "to": "audit"
     },
     {
-      "count": 18,
+      "count": 23,
       "from": "voting",
       "to": "auth"
     },
@@ -1276,7 +1276,7 @@
       "to": "budget"
     },
     {
-      "count": 2,
+      "count": 3,
       "from": "voting",
       "to": "delegations"
     },
@@ -1301,7 +1301,7 @@
       "to": "notifications"
     },
     {
-      "count": 20,
+      "count": 29,
       "from": "voting",
       "to": "shared"
     },

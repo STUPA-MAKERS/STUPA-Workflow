@@ -340,10 +340,8 @@ class MeetingGuest(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 #: The open window of a meeting: the earliest open is `open_lead_minutes` before the
-#: planned start. Up to `confirm_lead_minutes` before the start the open needs an extra
-#: confirmation. Both are defaults that the deadlines page changes.
+#: planned start. It is a default that the deadlines page changes.
 DEFAULT_OPEN_LEAD_MINUTES = 60
-DEFAULT_CONFIRM_LEAD_MINUTES = 10
 #: One week. A larger lead time makes the window useless.
 MAX_LEAD_MINUTES = 10080
 #: The values that the form of a new Gremium starts with. They come from the
@@ -357,7 +355,6 @@ DEFAULT_CIRCULAR_MIN_DAYS = 3
 #: The periods of the Geschäftsordnung (§F/administration/admin/000917).
 DEFAULT_INVITE_DAYS_ORDINARY = 7
 DEFAULT_INVITE_DAYS_EXTRAORDINARY = 3
-DEFAULT_PROTOCOL_DRAFT_DAYS = 14
 DEFAULT_LATE_EXCUSE_DAYS = 7
 DEFAULT_ABSENCE_LIMIT = 3
 MAX_PERIOD_DAYS = 365
@@ -368,9 +365,7 @@ class MeetingSettings(Base):
     """Platform settings of meetings (single row id=1).
 
     `open_lead_minutes` is the earliest open of a meeting, in minutes before its
-    planned start. `confirm_lead_minutes` is the end of the early window: before it
-    the open needs an extra confirmation. It is never larger than
-    `open_lead_minutes`.
+    planned start.
 
     The `default_*` columns are the values that the form of a new Gremium starts
     with. A change never touches a Gremium that exists.
@@ -381,11 +376,6 @@ class MeetingSettings(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     open_lead_minutes: Mapped[int] = mapped_column(
         Integer, server_default=str(DEFAULT_OPEN_LEAD_MINUTES), default=DEFAULT_OPEN_LEAD_MINUTES
-    )
-    confirm_lead_minutes: Mapped[int] = mapped_column(
-        Integer,
-        server_default=str(DEFAULT_CONFIRM_LEAD_MINUTES),
-        default=DEFAULT_CONFIRM_LEAD_MINUTES,
     )
     default_quorum_percent: Mapped[int | None] = mapped_column(
         Integer,
@@ -421,12 +411,6 @@ class MeetingSettings(Base):
         server_default=str(DEFAULT_INVITE_DAYS_EXTRAORDINARY),
         default=DEFAULT_INVITE_DAYS_EXTRAORDINARY,
     )
-    #: The days after a meeting until the draft of its protocol is due.
-    protocol_draft_days: Mapped[int] = mapped_column(
-        Integer,
-        server_default=str(DEFAULT_PROTOCOL_DRAFT_DAYS),
-        default=DEFAULT_PROTOCOL_DRAFT_DAYS,
-    )
     #: The days after the close in which a member can still give an excuse.
     late_excuse_days: Mapped[int] = mapped_column(
         Integer, server_default=str(DEFAULT_LATE_EXCUSE_DAYS), default=DEFAULT_LATE_EXCUSE_DAYS
@@ -457,7 +441,4 @@ class MeetingSettings(Base):
     __table_args__ = (
         CheckConstraint("id = 1", name="singleton"),
         CheckConstraint(f"open_lead_minutes BETWEEN 0 AND {MAX_LEAD_MINUTES}", name="open_lead"),
-        CheckConstraint(
-            "confirm_lead_minutes BETWEEN 0 AND open_lead_minutes", name="confirm_lead"
-        ),
     )

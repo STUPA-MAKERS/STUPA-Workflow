@@ -237,9 +237,8 @@ class LifecycleOps(HandoverOps):
             ConflictError: The status change is not ``planned`` to ``live`` or ``live``
                 to ``closed`` (``invalid_status_transition``), the meeting still has an
                 open vote on close (``open_vote``), the start has no protokollant, the
-                start is before the open window (``meeting_too_early``) or early and not
-                confirmed (``early_open_unconfirmed``), or the meeting is closed and
-                the patch changes its planning.
+                start is before the open window (``meeting_too_early``), or the
+                meeting is closed and the patch changes its planning.
         """
         wants_public = payload.public_join is not None or payload.guests_mode is not None
         wants_manage = (
@@ -325,7 +324,7 @@ class LifecycleOps(HandoverOps):
         now = datetime.now(UTC)
         if status_change and payload.status == "live":
             window = (await self._open_windows([meeting]))[meeting.id]
-            check_open(window, now=now, confirmed=payload.confirm_early)
+            check_open(window, now=now)
         guest_events = (
             await self._apply_public(meeting, payload, principal, now) if wants_public else None
         )

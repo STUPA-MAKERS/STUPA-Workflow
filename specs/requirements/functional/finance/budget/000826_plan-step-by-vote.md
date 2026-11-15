@@ -14,7 +14,7 @@ tests:
 implementation:
   - backend/app/modules/budget/tree/plans.py
   - backend/app/modules/budget/plan_rules.py
-  - backend/app/modules/voting/service.py
+  - backend/app/modules/voting/service
   - frontend/src/app/features/voting/vote-cast.component.ts
 scope:
   - backend/app/modules/budget

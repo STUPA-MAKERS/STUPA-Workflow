@@ -454,7 +454,6 @@ async def get_meeting_settings() -> dict:
     """Get the open window of meetings.
 
     `openLeadMinutes` is the earliest open of a meeting before its planned start.
-    `confirmLeadMinutes` ends the early part: before it the open needs `confirmEarly`.
     Requires admin.deadlines.
     """
     return await api().get("/admin/meeting-settings")
@@ -462,17 +461,12 @@ async def get_meeting_settings() -> dict:
 
 @group.tool
 async def update_meeting_settings(settings: S.MeetingSettingsUpdate) -> dict:
-    """Replace the open window of meetings. Send both fields.
+    """Replace the open window of meetings.
 
-    `confirmLeadMinutes` must not be larger than `openLeadMinutes` (422). The change
-    applies to every planned meeting at once. Requires admin.deadlines.
+    The change applies to every planned meeting at once. Requires admin.deadlines.
     """
     return await api().put(
-        "/admin/meeting-settings",
-        json={
-            "openLeadMinutes": settings.openLeadMinutes,
-            "confirmLeadMinutes": settings.confirmLeadMinutes,
-        },
+        "/admin/meeting-settings", json={"openLeadMinutes": settings.openLeadMinutes}
     )
 
 

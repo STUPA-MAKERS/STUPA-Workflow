@@ -15,10 +15,10 @@ import pytest
 from app.modules.applications.decision import CODE_AMOUNT_EXCEEDS, CODE_NOT_ALLOWED, DecisionIn
 from app.modules.auth.principal import Principal
 from app.modules.flow.schemas import TransitionOut
-from app.modules.voting import service as voting_service
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteCreateInternal
 from app.modules.voting.service import VotingService
+from app.modules.voting.service import close as voting_service
 from app.shared.errors import ConflictError, ValidationProblem
 from tests._support.flow_fakes import fake_session, result
 from tests.unit.modules.voting.test_voting_service_unit import (

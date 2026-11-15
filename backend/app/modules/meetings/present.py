@@ -121,6 +121,30 @@ async def meeting_present(session: AsyncSession, meeting: Meeting) -> int:
     return (await present_count(session, meeting.id)).total
 
 
+def fixed_present(vote: object) -> tuple[int | None, int | None]:
+    """Return the present members and the seats that a closed vote fixed.
+
+    A vote that is not closed has none, and a vote that closed before a column existed
+    has none for this column. ``vote`` is a ``voting.Vote``; this module does not import
+    its model.
+    """
+    if getattr(vote, "status", None) != "closed":
+        return None, None
+    return getattr(vote, "present_members", None), getattr(vote, "present_seats", None)
+
+
+def quorum_present(fixed: tuple[int | None, int | None], here: Present) -> int:
+    """Return the present count that the quorum of a meeting vote compares.
+
+    The count is the present members plus the pool substitutes on a seat. A value that
+    the vote fixed at its close wins; ``here``, the count of the meeting now, fills each
+    value that the vote does not have. This is the one place of the rule: the vote
+    service and the reload path of a meeting call it.
+    """
+    members, seats = fixed
+    return (here.members if members is None else members) + (here.seats if seats is None else seats)
+
+
 def fix_counts(meeting: Meeting, here: Present, eligible: int) -> None:
     """Store the present count and the member count of a closing meeting."""
     for column, value in (("present_count", here.total), ("eligible_count", eligible)):

@@ -348,7 +348,6 @@ export function mapMeeting(wire: MeetingOutWire): Meeting {
     location: wire.location ?? null,
     form: wire.form ?? 'presence',
     opensAt: wire.opensAt ?? null,
-    confirmUntil: wire.confirmUntil ?? null,
   };
 }
 

@@ -437,9 +437,8 @@ async def patch_meeting(
     The status runs only planned, live, closed (409 ``invalid_status_transition``
     otherwise). The close answers 409 ``open_vote`` while a vote of the meeting is
     open, and it cancels the draft votes of the meeting. The start has an open window
-    (``opensAt``/``confirmUntil`` of the meeting): before ``opensAt`` it answers 409
-    ``meeting_too_early``, and before ``confirmUntil`` it needs ``confirmEarly``, else
-    409 ``early_open_unconfirmed``.
+    (``opensAt`` of the meeting): before ``opensAt`` it answers 409
+    ``meeting_too_early``.
 
     The close of an ordinary meeting sends the mail ``absence_limit`` to the persons
     with ``session.manage`` for each member whose unexcused absences of the term reach
