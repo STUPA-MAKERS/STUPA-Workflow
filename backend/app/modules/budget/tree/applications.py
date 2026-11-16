@@ -121,7 +121,8 @@ class AssignmentOps(BudgetTreeServiceBase):
                 method fails with a 422 instead of leaving ``fiscal_year_id``
                 NULL. This mirrors the behavior of bookings.
                 `cost_centre_income` (422) for a Kostenstelle that is income in
-                the year (001030).
+                the year (001030). `cost_centre_not_leaf` (422) for a node with
+                Kostenstellen below it (001031).
         """
         app = await self._get_application(application_id, for_update=True)
         if await in_budget_vote_state(self.session, app):
@@ -140,6 +141,7 @@ class AssignmentOps(BudgetTreeServiceBase):
             else None
         )
         await self._refuse_income(node, fy_id)
+        await self._refuse_not_leaf(node)
         app.budget_id = budget_id
         app.fiscal_year_id = fy_id
         await self._audit(

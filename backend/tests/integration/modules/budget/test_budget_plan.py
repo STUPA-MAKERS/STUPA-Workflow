@@ -49,10 +49,12 @@ from app.modules.budget.tree_schemas import (
     BudgetNodeUpdate,
     BudgetTreeNodeOut,
     ExpenseCreate,
+    ExpenseUpdate,
     FiscalYearCreate,
     FiscalYearOut,
     FiscalYearUpdate,
     MoveFiscalYearRequest,
+    TransferCreate,
 )
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.models import FormVersion
@@ -3240,3 +3242,86 @@ async def test_the_tree_names_the_years_where_a_node_is_income(session: AsyncSes
     assert income[t.inc.id] == (t.fy.id,)
     assert income[t.exp.id] == ()
     assert income[t.top.id] == ()
+
+
+async def test_an_antrag_is_not_assigned_to_a_cost_centre_with_children(
+    session: AsyncSession,
+) -> None:
+    """An Antrag takes a leaf only, never a Titel or a Haushalt with nodes below it.
+
+    Rule: §F/finance/budget/001031.
+    """
+    t = await _tree(session)
+    await _in_force(t)
+    app_id = await _antrag(session)
+    for node in (t.exp, t.top):
+        with pytest.raises(ValidationProblem) as exc:
+            await t.svc.assign_budget(
+                app_id, AssignBudgetRequest(budgetId=node.id, fiscalYearId=t.fy.id)
+            )
+        assert _code(exc) == "cost_centre_not_leaf"
+        await session.rollback()
+    done = await t.svc.assign_budget(
+        app_id, AssignBudgetRequest(budgetId=t.exp_b.id, fiscalYearId=t.fy.id)
+    )
+    assert done.budget_id == t.exp_b.id
+
+
+async def test_a_booking_is_not_made_on_a_cost_centre_with_children(
+    session: AsyncSession,
+) -> None:
+    """A booking and its move take a leaf only; an income booking on an income leaf works.
+
+    Rule: §F/finance/budget/001032.
+    """
+    t = await _tree(session)
+    await _in_force(t)
+
+    def booking(budget_id: uuid.UUID, kind: str = "expense") -> ExpenseCreate:
+        return ExpenseCreate.model_validate(
+            {
+                "budgetId": str(budget_id),
+                "fiscalYearId": str(t.fy.id),
+                "amount": "5",
+                "description": "x",
+                "kind": kind,
+            }
+        )
+
+    with pytest.raises(ValidationProblem) as exc:
+        await t.svc.book_expense(booking(t.exp.id), actor="tester")
+    assert _code(exc) == "cost_centre_not_leaf"
+    await session.rollback()
+    booked = await t.svc.book_expense(booking(t.exp_a.id), actor="tester")
+    with pytest.raises(ValidationProblem) as moved:
+        await t.svc.update_expense(booked.id, ExpenseUpdate(budgetId=t.exp.id))
+    assert _code(moved) == "cost_centre_not_leaf"
+    await session.rollback()
+    income = await t.svc.book_expense(booking(t.inc.id, "income"), actor="tester")
+    assert income.budget_id == t.inc.id
+
+
+async def test_a_transfer_is_not_made_on_a_cost_centre_with_children(
+    session: AsyncSession,
+) -> None:
+    """Each leg of a transfer must be a leaf.
+
+    Rule: §F/finance/budget/001032.
+    """
+    t = await _tree(session)
+    await _in_force(t)
+
+    def transfer(to: uuid.UUID) -> TransferCreate:
+        return TransferCreate(
+            fromBudgetId=t.exp_a.id,
+            toBudgetId=to,
+            fiscalYearId=t.fy.id,
+            amount=D(1),
+            description="t",
+        )
+
+    with pytest.raises(ValidationProblem) as exc:
+        await t.svc.create_transfer(transfer(t.exp.id), actor="tester")
+    assert _code(exc) == "cost_centre_not_leaf"
+    await session.rollback()
+    assert (await t.svc.create_transfer(transfer(t.exp_b.id), actor="tester")).transfer_id

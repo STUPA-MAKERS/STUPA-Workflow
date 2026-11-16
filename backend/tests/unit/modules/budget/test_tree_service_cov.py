@@ -477,6 +477,7 @@ async def test_book_expense_standalone_with_actor() -> None:
         result(node),
         result(top),
         result(fy),
+        result(),
         result(sub_ref("u-1", "Alice", "a@x")),
     )
     svc = BudgetTreeService(sess)
@@ -715,6 +716,7 @@ async def test_update_expense_rebooks_within_same_top_level() -> None:
         result(new),
         result(top),
         result(fy),
+        result(),
         result(new),
         result(),
         gets=[expense],

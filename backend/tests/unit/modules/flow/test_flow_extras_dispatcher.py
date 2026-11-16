@@ -260,6 +260,27 @@ async def test_assign_budget_skips_an_income_cost_centre(
     assert calls == []
 
 
+async def test_assign_budget_skips_a_cost_centre_with_children(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Leave the Antrag as it is when the cost center has cost centers below it.
+
+    Rule: §F/finance/budget/001031.
+    """
+    calls = _stub_audit(monkeypatch)
+    app_id, node_id, fy_id = uuid4(), uuid4(), uuid4()
+    app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None,
+        current_state_id=None)
+    node = SimpleNamespace(id=node_id, parent_id=None)
+    session = _Session(store={app_id: app, node_id: node}, active_fy=(fy_id,))
+    session.parents = {node_id}  # type: ignore[attr-defined]
+    await FlowExtrasActionDispatcher(_maker(session)).dispatch(
+        [_action("assignBudget", budgetId=str(node_id), application_id=app_id)]
+    )
+    assert app.budget_id is None
+    assert calls == []
+
+
 async def test_assign_budget_picks_current_of_several_fiscal_years(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

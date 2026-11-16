@@ -398,6 +398,30 @@ class BudgetTreeServiceBase:
                 errors=[{"field": "budgetId", "msg": "income Kostenstelle in this year"}],
             )
 
+    async def is_leaf(self, node: Budget) -> bool:
+        """Tell if a Kostenstelle has no active Kostenstelle below it (001031)."""
+        child = await self.session.scalar(
+            select(Budget.id)
+            .where(Budget.parent_id == node.id, Budget.active.is_(True))
+            .limit(1)
+        )
+        return child is None
+
+    async def _refuse_not_leaf(self, node: Budget | None) -> None:
+        """Refuse an Antrag or a booking on a node with Kostenstellen below it.
+
+        An Antrag (001031) and a booking (001032) take only a leaf. No node passes.
+
+        Raises:
+            ValidationProblem: `cost_centre_not_leaf` (422).
+        """
+        if node is not None and not await self.is_leaf(node):
+            raise ValidationProblem(
+                "Choose a Kostenstelle without a Kostenstelle below it.",
+                code="cost_centre_not_leaf",
+                errors=[{"field": "budgetId", "msg": "has Kostenstellen below it"}],
+            )
+
     async def _require_choosable(
         self, top: Budget, fy: FiscalYear, *, late: bool = False, on: date | None = None
     ) -> None:
