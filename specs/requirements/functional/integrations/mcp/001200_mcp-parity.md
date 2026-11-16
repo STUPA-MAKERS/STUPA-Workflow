@@ -2,7 +2,7 @@
 id: "001200"
 title: The MCP server has a tool for every app function
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:

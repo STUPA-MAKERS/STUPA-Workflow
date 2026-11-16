@@ -2,7 +2,7 @@
 id: "001201"
 title: The MCP leaves out a closed list of functions
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:
