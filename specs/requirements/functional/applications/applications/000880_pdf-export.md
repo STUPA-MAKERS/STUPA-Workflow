@@ -2,9 +2,9 @@
 id: "000880"
 title: An Antrag downloads as PDF
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-13
+updated: 2026-11-16
 implementation:
   - backend/app/modules/documents
   - frontend/src/app/pages/applications
@@ -17,8 +17,8 @@ scope:
 
 # An Antrag downloads as PDF
 
-The three-dot menu of the Antrag detail page must have the action "Als PDF herunterladen". The
-action must download `GET /api/applications/{id}/pdf`. Each person who can read the Antrag
+The three-dot menu of the Antrag detail page must have the action "Als PDF öffnen" (001082). The
+action must open `GET /api/applications/{id}/pdf` in the file viewer (001080). Each person who can read the Antrag
 must be able to download it: a reader with `application.read`, an applicant, an observer and
 the creator. The PDF must show the current version of the Antrag. The download must stream
 through the API and never use a presigned URL (000178).
