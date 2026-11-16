@@ -1,3 +1,4 @@
+import { TestBed } from '@angular/core/testing';
 import type { CdkDragDrop } from '@angular/cdk/drag-drop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
@@ -107,6 +108,21 @@ describe('TodoBoardSettingsComponent', () => {
     expect(api.archiveBoard).toHaveBeenCalledWith('b-1');
     expect(archived).toHaveBeenCalled();
     expect(cmp.open()).toBe(false);
+  });
+
+  it('says so when the members do not load or the archive fails', async () => {
+    const free = board({ kind: 'free', gremiumId: null });
+    const { api, cmp, toast, archived } = await setup(free);
+    api.entries.mockReturnValueOnce(refuse(undefined) as never);
+    cmp.open.set(false);
+    cmp.open.set(true);
+    TestBed.flushEffects();
+    expect(toast.error).toHaveBeenLastCalledWith('Die Einstellung konnte nicht gespeichert werden.');
+    api.archiveBoard.mockReturnValueOnce(refuse('board_archived') as never);
+    cmp.archiveBoard();
+    expect(toast.error).toHaveBeenCalledTimes(2);
+    expect(archived).not.toHaveBeenCalled();
+    expect(cmp.open()).toBe(true);
   });
 
   it('saves a new name, keeps the old one for an empty or the same name', async () => {
