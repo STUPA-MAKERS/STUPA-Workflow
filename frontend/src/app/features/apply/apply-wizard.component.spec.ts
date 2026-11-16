@@ -1,6 +1,6 @@
 import { computed, signal } from '@angular/core';
-import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
-import { BehaviorSubject, of, throwError } from 'rxjs';
+import { ActivatedRoute, NavigationEnd, Router, convertToParamMap, provideRouter, type Event } from '@angular/router';
+import { type Subject, of, throwError } from 'rxjs';
 import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
@@ -139,7 +139,7 @@ interface SetupOpts {
   freetexts?: Record<string, Record<string, string>>;
   /** The query params of the route, for example `{ type: 't1' }` (old link). */
   query?: Record<string, string>;
-  /** The path params of the route, for example `{ type: 'foerderantrag' }`. */
+  /** The params of the child route, for example `{ type: 'foerderantrag' }`. */
   params?: Record<string, string>;
   prefill?: jest.Mock;
 }
@@ -161,8 +161,15 @@ async function setup(opts: SetupOpts = {}) {
     freetexts: signal(opts.freetexts ?? {}),
     attachmentLimits: signal({ maxFileBytes: 10, maxDraftFiles: 20, maxDraftBytes: 50 }),
   };
-  const params$ = new BehaviorSubject(convertToParamMap(opts.params ?? {}));
-  const query$ = new BehaviorSubject(convertToParamMap(opts.query ?? {}));
+  const url = { type: opts.params?.['type'] ?? null };
+  const route = {
+    get snapshot() {
+      return {
+        firstChild: url.type ? { paramMap: convertToParamMap({ type: url.type }) } : null,
+        queryParamMap: convertToParamMap(opts.query ?? {}),
+      };
+    },
+  };
   const navigate = jest.spyOn(Router.prototype, 'navigate').mockResolvedValue(true);
   const view = await render(ApplyWizardComponent, {
     providers: [
@@ -171,14 +178,17 @@ async function setup(opts: SetupOpts = {}) {
       { provide: ApiClient, useValue: api },
       { provide: BrandingService, useValue: branding },
       { provide: ToastService, useValue: toast },
-      { provide: ActivatedRoute, useValue: { paramMap: params$, queryParamMap: query$ } },
+      { provide: ActivatedRoute, useValue: route },
     ],
     componentProviders: [{ provide: DraftAttachmentsService, useValue: drafts }],
   });
   const comp = view.fixture.componentInstance;
   /** The browser buttons: only the type segment of the URL changes. */
+  const router = view.fixture.debugElement.injector.get(Router);
   const urlTo = (type: string | null) => {
-    params$.next(convertToParamMap(type ? { type } : {}));
+    url.type = type;
+    const path = type ? `/apply/${type}` : '/apply';
+    (router.events as Subject<Event>).next(new NavigationEnd(1, path, path));
     view.fixture.detectChanges();
   };
   return { ...view, comp, create, drafts, toast, navigate, urlTo };

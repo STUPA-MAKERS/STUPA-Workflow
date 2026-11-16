@@ -1,4 +1,4 @@
-import type { Routes, UrlMatchResult, UrlSegment } from '@angular/router';
+import type { Routes } from '@angular/router';
 import { authGuard } from '@core/auth/auth.guard';
 import { homeRedirectGuard } from '@core/auth/home-redirect.guard';
 import { featureMatch } from '@core/features/feature.guard';
@@ -8,18 +8,6 @@ import {
   BUDGET_PERMISSIONS,
   VOTING_GREMIUM_PERMISSIONS,
 } from './layout/nav.service';
-
-/**
- * `/apply` and `/apply/<type>` are one route (spec 001170), so the wizard stays the same
- * component while "Weiter" and the browser buttons change the type segment, and keeps its
- * answers and files. `/apply/confirmation` is its own route.
- */
-export function applyMatcher(segments: readonly UrlSegment[]): UrlMatchResult | null {
-  if (segments[0]?.path !== 'apply' || segments.length > 2) return null;
-  const type = segments[1];
-  if (type?.path === 'confirmation') return null;
-  return { consumed: [...segments], posParams: type ? { type } : {} };
-}
 
 /**
  * Routing skeleton. `authGuard` protects the OIDC areas. Some areas also need an RBAC
@@ -40,6 +28,9 @@ export function applyMatcher(segments: readonly UrlSegment[]): UrlMatchResult | 
  * route data, because route data wins over a `?frame=` query parameter in the input
  * binding. The redirects keep old bookmarks and shared links working. The old German URLs
  * (spec 000592) have no route here: `LegacyUrlSerializer` reads them as their English URLs.
+ * `/apply/<type>` (spec 001170) is a child without a component of `apply`, so the wizard
+ * stays the same instance while "Weiter" and the browser buttons change the type, and keeps
+ * its answers and files. `apply/confirmation` comes first, or `:type` would match it.
  * A route of a feature with a switch has `featureMatch`: while the feature is off, the route
  * does not match and the catch-all route shows "Seite nicht gefunden".
  */
@@ -55,18 +46,22 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/home.component').then((m) => m.HomeComponent),
       },
       {
-        matcher: applyMatcher,
-        data: { title: 'apply.title', footer: true },
-        loadComponent: () =>
-          import('./features/apply/apply-wizard.component').then((m) => m.ApplyWizardComponent),
-      },
-      {
         path: 'apply/confirmation',
         data: { title: 'apply.confirm.heading', contextual: true, footer: true },
         loadComponent: () =>
           import('./features/apply/apply-confirmation.component').then(
             (m) => m.ApplyConfirmationComponent,
           ),
+      },
+      {
+        path: 'apply',
+        data: { title: 'apply.title', footer: true },
+        loadComponent: () =>
+          import('./features/apply/apply-wizard.component').then((m) => m.ApplyWizardComponent),
+        children: [
+          { path: '', children: [] },
+          { path: ':type', children: [] },
+        ],
       },
       {
         path: 'login',

@@ -9,14 +9,14 @@ import {
   untracked,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { combineLatest } from 'rxjs';
+import { filter, startWith } from 'rxjs';
 import {
   FormControl,
   FormGroup,
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
@@ -346,7 +346,7 @@ export class ApplyWizardComponent {
   });
 
   private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
-  /** The type segment of the URL (`/apply/<key>`). */
+  /** The type segment of the URL (`/apply/<key>`, the child route `:type`). */
   private urlType: string | null = null;
   /** The type of an old link (`/apply?type=<id>`, spec 001173). */
   private oldUrlType: string | null = null;
@@ -355,6 +355,21 @@ export class ApplyWizardComponent {
 
   constructor() {
     this.auth.ensureLoaded().subscribe();
+    this.router.events
+      .pipe(
+        filter((e) => e instanceof NavigationEnd),
+        startWith(null),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(() => {
+        const snap = this.route.snapshot;
+        const type = snap.firstChild?.paramMap.get('type') ?? null;
+        const oldType = snap.queryParamMap.get('type');
+        if (type === this.urlType && oldType === this.oldUrlType) return;
+        this.urlType = type;
+        this.oldUrlType = oldType;
+        if (this.typesLoaded) this.openFromUrl(false);
+      });
     this.api.applicationTypes().subscribe({
       next: (t) => {
         this.types.set(t.filter((x) => x.active));
@@ -363,13 +378,6 @@ export class ApplyWizardComponent {
       },
       error: () => this.toast.error(this.i18n.translate('apply.error.typesLoad')),
     });
-    combineLatest([this.route.paramMap, this.route.queryParamMap])
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(([params, query]) => {
-        this.urlType = params.get('type');
-        this.oldUrlType = query.get('type');
-        if (this.typesLoaded) this.openFromUrl(false);
-      });
     this.contactForm.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.touchModel());
@@ -411,7 +419,8 @@ export class ApplyWizardComponent {
    * - `/apply`: the type step. On the first open the type of the last autosave of this
    *   tab comes back; when its autosave is past the type step, the URL gets its key.
    *
-   * The browser buttons change only the URL, so the step follows it here: back to
+   * The browser buttons change only the URL, so the step follows it here when the type in
+   * the URL changes (a navigation to the same URL changes nothing): back to
    * `/apply` shows the type step with the type still chosen, forward shows the details.
    */
   private openFromUrl(first: boolean): void {
