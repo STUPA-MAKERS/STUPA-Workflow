@@ -2,7 +2,7 @@
 id: "001042"
 title: A plan line can set the Ansatz and the Ist of the year before by hand
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:
