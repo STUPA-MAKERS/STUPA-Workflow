@@ -2,7 +2,7 @@
 id: "001060"
 title: A free board belongs to no single Gremium
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation: null

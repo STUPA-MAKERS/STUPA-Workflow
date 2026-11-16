@@ -2,7 +2,7 @@
 id: "001068"
 title: A manager archives a free board and only an admin deletes it
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation: null

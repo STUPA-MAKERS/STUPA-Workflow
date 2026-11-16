@@ -2,7 +2,7 @@
 id: "001075"
 title: A card moves between a free board and other shared boards
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation: null

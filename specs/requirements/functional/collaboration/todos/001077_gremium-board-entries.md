@@ -2,7 +2,7 @@
 id: "001077"
 title: A board of a Gremium takes more Gremien and persons
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation: null

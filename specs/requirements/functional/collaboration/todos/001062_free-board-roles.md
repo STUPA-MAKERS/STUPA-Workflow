@@ -2,7 +2,7 @@
 id: "001062"
 title: Each member entry of a free board has a role
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation: null

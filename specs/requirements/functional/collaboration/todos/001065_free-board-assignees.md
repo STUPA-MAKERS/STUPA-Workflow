@@ -2,7 +2,7 @@
 id: "001065"
 title: Assignees of a free board are its members who edit
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation: null

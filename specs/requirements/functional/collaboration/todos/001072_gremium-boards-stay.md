@@ -2,7 +2,7 @@
 id: "001072"
 title: The board of a Gremium stays its own kind
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation: null

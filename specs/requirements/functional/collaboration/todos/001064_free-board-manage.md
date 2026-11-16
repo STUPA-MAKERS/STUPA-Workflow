@@ -2,7 +2,7 @@
 id: "001064"
 title: Members with Verwalten and admins manage a free board
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation: null

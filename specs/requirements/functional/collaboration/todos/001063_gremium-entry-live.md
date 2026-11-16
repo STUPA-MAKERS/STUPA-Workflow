@@ -2,7 +2,7 @@
 id: "001063"
 title: A Gremium entry stands for the members of the Gremium at the time of the read
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation: null

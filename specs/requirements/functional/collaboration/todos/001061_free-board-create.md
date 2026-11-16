@@ -2,7 +2,7 @@
 id: "001061"
 title: Admins and holders of todo.create_board create a free board
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation: null

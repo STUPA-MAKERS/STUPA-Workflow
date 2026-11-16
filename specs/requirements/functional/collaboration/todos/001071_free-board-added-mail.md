@@ -2,7 +2,7 @@
 id: "001071"
 title: A person added to a free board by name gets a mail
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation: null

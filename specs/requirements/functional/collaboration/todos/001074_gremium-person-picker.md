@@ -2,7 +2,7 @@
 id: "001074"
 title: One search field picks Gremien and persons
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation: null

@@ -2,7 +2,7 @@
 id: "001067"
 title: Free boards show in the board picker after the boards of the Gremien
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation: null

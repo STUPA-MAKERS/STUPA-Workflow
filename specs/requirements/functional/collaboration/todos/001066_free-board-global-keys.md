@@ -2,7 +2,7 @@
 id: "001066"
 title: todo.all and todo.read_all reach free boards
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation: null

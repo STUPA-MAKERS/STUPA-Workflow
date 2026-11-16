@@ -2,7 +2,7 @@
 id: "001069"
 title: A card of a free board goes on the agenda of each of its Gremien
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation: null

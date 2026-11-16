@@ -2,7 +2,7 @@
 id: "001078"
 title: Board rights depend on the board kind and its entries
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation: null

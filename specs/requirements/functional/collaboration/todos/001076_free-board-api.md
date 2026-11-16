@@ -2,7 +2,7 @@
 id: "001076"
 title: Free boards are created and managed through the API and MCP
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation: null

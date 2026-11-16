@@ -2,7 +2,7 @@
 id: "001070"
 title: The To-Dos tab of a Gremium shows only the board of the Gremium
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation: null
