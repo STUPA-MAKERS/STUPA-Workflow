@@ -912,6 +912,11 @@ function mockNoStart(): boolean {
   }
 }
 
+/** The planned meeting as the mock serves it: without its times while `mockNoStart` is set. */
+function plannedMeeting(): MeetingOutWire {
+  return mockNoStart() ? { ...MOCK_PLANNED_MEETING, startTime: null, endTime: null } : MOCK_PLANNED_MEETING;
+}
+
 const MOCK_MEETING_ID = 'd0000000-0000-0000-0000-000000000001';
 const MOCK_PROTOCOL_ID = 'e0000000-0000-0000-0000-000000000099';
 
@@ -1020,8 +1025,8 @@ const MOCK_PLANNED_MEETING: MeetingOutWire = {
   id: 'd0000000-0000-0000-0000-000000000002',
   title: 'Haushaltsausschuss 19.06.',
   date: '2026-06-19',
-  startTime: mockNoStart() ? null : '17:30:00',
-  endTime: mockNoStart() ? null : '19:00:00',
+  startTime: '17:30:00',
+  endTime: '19:00:00',
   status: 'planned',
   gremiumId: null,
   gremiumName: 'Haushaltsausschuss',
@@ -1990,7 +1995,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         ),
       );
     }
-    if (p.endsWith('/meetings')) return ok([MOCK_MEETING, MOCK_PLANNED_MEETING]);
+    if (p.endsWith('/meetings')) return ok([MOCK_MEETING, plannedMeeting()]);
     if (p.endsWith('/delegations')) {
       const meetingId = req.params.get('meetingId');
       return ok(MOCK_DELEGATIONS.filter((d) => !meetingId || d.meetingId === meetingId));
@@ -2003,7 +2008,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith(`/meetings/${MOCK_PLANNED_MEETING.id}/agenda`)) return ok([...MOCK_PLANNED_AGENDA]);
     if (/\/meetings\/[^/]+\/agenda$/.test(p)) return ok([...MOCK_AGENDA]);
     if (/\/meetings\/[^/]+\/protocol$/.test(p)) return ok(MOCK_PROTOCOL);
-    if (p.endsWith(`/meetings/${MOCK_PLANNED_MEETING.id}`)) return ok(MOCK_PLANNED_MEETING);
+    if (p.endsWith(`/meetings/${MOCK_PLANNED_MEETING.id}`)) return ok(plannedMeeting());
     if (/\/meetings\/[^/]+$/.test(p)) return ok(MOCK_MEETING);
     if (/\/applications\/[^/]+\/form$/.test(p)) return ok(MOCK_EFFECTIVE_FORM);
     if (p.endsWith(`/applications/${MOCK_OBSERVED_ID}`)) {
