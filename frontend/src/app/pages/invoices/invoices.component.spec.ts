@@ -9,7 +9,6 @@ import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ToastService } from '@stupa-makers/ui-kit';
-import * as downloadUtil from '@stupa-makers/ui-kit';
 
 /**
  * The kit re-exports `downloadBlob` through getters, which a spy cannot replace. A plain copy of
@@ -1461,16 +1460,16 @@ describe('InvoicesComponent (list/detail)', () => {
     expect(c.editing()).toBe(row);
     c.onRowMenu({ id: 'delete', label: '' }, row);
     expect(c.confirmDelete()).toBe(row);
-    const blob = jest.spyOn(downloadUtil, 'downloadBlob').mockImplementation(() => undefined);
+    const open = jest.spyOn(TestBed.inject(FileOpenService), 'open').mockImplementation(() => undefined);
     c.onRowMenu({ id: 'file', label: '' }, row);
-    http.expectOne((r) => r.url.endsWith('/api/invoices/i-1/file')).flush(new Blob(['x']));
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ url: expect.stringMatching(/\/invoices\/i-1\/file$/) }));
     c.onRowMenu({ id: 'paid', label: '' }, row);
     http.expectOne((r) => r.url.endsWith('/api/invoices/i-1') && r.method === 'PATCH').flush(inv({ status: 'paid' }));
     lastInvoicesReq(http).flush(page([inv({ status: 'paid' })]));
     c.onRowMenu({ id: 'other', label: '' }, row);
     expect(c.rowMenuLabel(row)).toBe('Aktionen für Rechnung R-001');
     expect(c.rowMenuLabel(inv({ number: null, supplier: null }))).toBe('Aktionen für Rechnung ');
-    blob.mockRestore();
+    open.mockRestore();
     navigate.mockRestore();
   });
 

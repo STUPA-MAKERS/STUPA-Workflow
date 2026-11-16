@@ -37,9 +37,12 @@ export class FileOpenService {
   /** The file in the viewer; null while it is closed. */
   readonly shown = this.shownFile.asReadonly();
 
-  /** The viewer can show the file: a PDF or a raster image. */
+  /**
+   * The viewer can show the file: a PDF or a raster image. An SVG is no raster image: the
+   * server never serves it inline (001083), so it downloads.
+   */
   canView(file: OpenableFile): boolean {
-    return fileViewerKind(this.item(file, file.url)) !== 'other';
+    return !isSvg(file) && fileViewerKind(this.item(file, file.url)) !== 'other';
   }
 
   /**
@@ -87,6 +90,10 @@ export class FileOpenService {
   private newTab(url: string): void {
     clickLink({ href: url, target: '_blank', rel: 'noopener' });
   }
+}
+
+function isSvg(file: OpenableFile): boolean {
+  return file.mime === 'image/svg+xml' || /\.svg$/i.test(file.name);
 }
 
 /** Click a link that is not in the page. A popup blocker lets it pass after a user click. */

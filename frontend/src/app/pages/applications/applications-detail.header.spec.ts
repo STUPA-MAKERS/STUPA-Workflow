@@ -342,7 +342,7 @@ describe('ApplicationsDetailComponent — header', () => {
       const { detectChanges } = await setup();
       await openMenu(detectChanges);
       const items = screen.getAllByRole('menuitem').map((el) => el.textContent?.trim());
-      expect(items).toEqual(['Status setzen', 'Beobachter:innen', 'Versionen vergleichen', 'Als PDF herunterladen', 'Löschen']);
+      expect(items).toEqual(['Status setzen', 'Beobachter:innen', 'Versionen vergleichen', 'Als PDF öffnen', 'Löschen']);
       expect(screen.getByRole('menuitem', { name: 'Löschen' })).toHaveClass('rm__item--danger');
     });
 
@@ -352,7 +352,7 @@ describe('ApplicationsDetailComponent — header', () => {
       expect(screen.getAllByRole('menuitem').map((el) => el.textContent?.trim())).toEqual([
         'Beobachter:innen',
         'Versionen vergleichen',
-        'Als PDF herunterladen',
+        'Als PDF öffnen',
         'Anonymisierung beantragen',
       ]);
       await userEvent.click(screen.getByRole('menuitem', { name: 'Anonymisierung beantragen' }));
