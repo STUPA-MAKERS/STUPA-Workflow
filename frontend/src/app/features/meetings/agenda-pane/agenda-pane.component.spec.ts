@@ -402,6 +402,19 @@ describe('AgendaPaneComponent', () => {
       expect(container.querySelector('.ap__plan-end')).toHaveTextContent('Dauer ca. 35 Min.');
     });
 
+    it('planRowsLive: shows the recorded time of a reached item without "ca." (§ 001143)', async () => {
+      await setup({
+        meeting: meeting({ status: 'live', date: '2026-06-12', startTime: '18:00', currentAgendaItemId: 't-2' }),
+        agenda: [
+          { ...TIMED[0], startedAt: '2026-06-12T16:04:00Z' },
+          { ...TIMED[1], startedAt: '2026-06-12T16:09:00Z' },
+          TIMED[2],
+        ],
+      });
+      expect(screen.getByText('18:04 · 5 Min.')).toBeInTheDocument();
+      expect(screen.getByText('18:09 · 30 Min.')).toBeInTheDocument();
+    });
+
     it('planRowsNone: shows no plan without any duration (§ 001141)', async () => {
       const { container } = await setup({ meeting: meeting({ status: 'planned' }) });
       expect(container.querySelector('.ap__plan-end')).toBeNull();

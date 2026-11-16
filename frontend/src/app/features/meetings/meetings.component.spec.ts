@@ -2306,6 +2306,18 @@ describe('MeetingsComponent — methods', () => {
       http.expectNone('/api/meetings/m-1');
     });
 
+    it('sets the duration of a TOP, and does nothing without a meeting (§ 001140)', async () => {
+      const { cmp, http } = await loaded();
+      cmp.meeting.set({ ...MEETING_MODEL });
+      cmp.setDuration(AGENDA_ITEM() as never, 15);
+      const req = http.expectOne('/api/meetings/m-1/agenda/t-1/duration');
+      expect(req.request.body).toEqual({ minutes: 15 });
+      req.flush([AGENDA_ITEM({ estimatedMinutes: 15 })]);
+      cmp.meeting.set(null);
+      cmp.setDuration(AGENDA_ITEM() as never, null);
+      http.expectNone('/api/meetings/m-1/agenda/t-1/duration');
+    });
+
     /** The tick is on the agenda, so the page reads it again. */
     it('ticks the item that the room leaves with "Nächster TOP", in the same request', async () => {
       const { cmp, http } = await loaded();
