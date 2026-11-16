@@ -2,7 +2,7 @@
 id: "001081"
 title: A PDF on a phone opens in the system viewer
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:
