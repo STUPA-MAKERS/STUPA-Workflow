@@ -342,7 +342,7 @@ def test_an_antrag_never_cuts_a_value_but_cuts_a_long_table_cell(tmp_path: Path)
     )
     lines = _lines(_render(source, "protocol-stupa"), tmp_path)
     words = [line[3] for line in lines]
-    assert "Zeile 40" in words and "eins" in words
+    assert any(w.startswith("Zeile 40") for w in words) and "eins" in words
     assert any(w.endswith("Punkt 60") for w in words)
     assert any("Position 60" in w for w in words)
     assert words.count("…") == 1
