@@ -2,7 +2,7 @@
 id: "001185"
 title: The blocks of step 1 have one even spacing
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:

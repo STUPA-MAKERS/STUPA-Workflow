@@ -2,7 +2,7 @@
 id: "001184"
 title: Step 1 has no general text, only the group texts
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:

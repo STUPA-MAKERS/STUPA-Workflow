@@ -2,7 +2,7 @@
 id: "001180"
 title: Admins group the Antragsarten
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:

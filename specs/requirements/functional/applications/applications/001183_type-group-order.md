@@ -2,7 +2,7 @@
 id: "001183"
 title: Admins set the order of the groups and of the Antragsarten
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:
