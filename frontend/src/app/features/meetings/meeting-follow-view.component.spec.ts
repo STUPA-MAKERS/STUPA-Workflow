@@ -456,6 +456,20 @@ describe('MeetingFollowViewComponent', () => {
       expect(within(dock).getByText('3 TOPs')).toBeInTheDocument();
     });
 
+    /** § 000101: the row of the Antrag stands above the title, as on the page of the lead. */
+    it('shows the row of the Antrag above the sheet, not below the title', async () => {
+      const { context, container } = await setup({
+        meeting: member({ status: 'closed', closedAt: '2026-10-15T19:12:00Z', currentAgendaItemId: 't-3' }),
+      });
+      context();
+      const lists = container.querySelectorAll('app-todo-linked-list');
+      expect(lists).toHaveLength(1);
+      const sheet = container.querySelector('app-top-sheet')!;
+      expect(sheet.contains(lists[0])).toBe(false);
+      expect(lists[0].compareDocumentPosition(sheet) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(within(lists[0] as HTMLElement).getByText(/^Antrag · Abstimmung/)).toBeInTheDocument();
+    });
+
     it('opens on the first item without an item of the room, and names one item', async () => {
       const { context } = await setup({
         meeting: member({ status: 'closed', closedAt: null, startedAt: null, currentAgendaItemId: null }),
@@ -553,6 +567,19 @@ describe('MeetingFollowViewComponent', () => {
       expect(document.querySelector('app-top-sheet')).not.toBeNull();
       await userEvent.click(screen.getByRole('button', { name: 'Weniger anzeigen' }));
       expect(screen.getByText(/^Lea Hoffmann stellt den Antrag vor\./)).toBeInTheDocument();
+    });
+
+    /** § 000101: the row of the Antrag stands above the title of the phone. */
+    it('shows the row of the Antrag above the title of the item', async () => {
+      const { context, container } = await setup({
+        meeting: member({ status: 'closed', closedAt: '2026-10-15T19:12:00Z', currentAgendaItemId: 't-3' }),
+        media: PHONE,
+      });
+      context();
+      const title = screen.getByRole('heading', { level: 2, name: 'Antrag Kulturfestival' });
+      const list = container.querySelector('app-todo-linked-list')!;
+      expect(list.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(container.querySelectorAll('app-todo-linked-list')).toHaveLength(1);
     });
 
     /** The agenda opens from the header as a bottom sheet. */

@@ -74,6 +74,19 @@ export function usedIn(node: BudgetTreeNode, fiscalYearId: string): boolean {
  * or that has a booking or an Antrag in that year. `yearsOf` names the fiscal years the
  * picker works in, by budget; the first with a plan in force counts.
  */
+/**
+ * The forest without each Kostenstelle that is income in the fiscal year, and without the
+ * nodes below it: an Antrag takes only a Kostenstelle on the expense side (spec 001030).
+ */
+export function withoutIncome(
+  forest: readonly BudgetTreeNode[],
+  fiscalYearId: string,
+): readonly BudgetTreeNode[] {
+  return forest
+    .filter((n) => !n.incomeIn?.includes(fiscalYearId))
+    .map((n) => ({ ...n, children: withoutIncome(n.children, fiscalYearId) }));
+}
+
 export function pickable(
   forest: readonly BudgetTreeNode[],
   yearsOf: (top: BudgetTreeNode) => readonly string[],

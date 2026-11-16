@@ -97,6 +97,15 @@ class TreeViewOps(BudgetTreeServiceBase):
         )
         return hit is not None
 
+    async def _income_in(self, nodes: Sequence[Budget]) -> Mapping[object, Sequence[object]]:
+        """Return the fiscal years in which each node is income (001030)."""
+        titel = await self.income_titel_paths()
+        years: dict[object, Sequence[object]] = {
+            n.id: [fy for fy, path in titel if plan_rules.is_below_path(n.tree_path, (path,))]
+            for n in nodes
+        }
+        return years
+
     async def _planned_in(self) -> Mapping[object, Sequence[object]]:
         """Return the fiscal years in which the Haushaltsplan counts each cost center.
 
@@ -240,6 +249,7 @@ class TreeViewOps(BudgetTreeServiceBase):
             {n.id: bool(n.plan_enabled) for n in nodes},
             await self._planned_in(),
             {n.id: bool(n.plan_coverable_default) for n in nodes},
+            await self._income_in(nodes),
         )
         scoped = (
             forest

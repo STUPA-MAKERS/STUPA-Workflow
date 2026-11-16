@@ -2,6 +2,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  Injector,
   computed,
   effect,
   inject,
@@ -48,6 +49,8 @@ import { VoteCardComponent } from './vote-card/vote-card.component';
 import { CalendarSubscribeComponent } from './calendar-subscribe/calendar-subscribe.component';
 import { MeetingHeadComponent } from './meeting-head/meeting-head.component';
 import { firstMeetingLink } from './meeting-kind.util';
+import { topLead } from './top-application-lead.util';
+import { TodoLinkedListComponent } from '../todos/linked-list/todo-linked-list.component';
 import { clock, shortTime, weekdayDate } from '@shared/date-format';
 
 /** The length of the protocol excerpt on a phone, in characters. */
@@ -93,6 +96,7 @@ const EXCERPT_LENGTH = 160;
     SideSheetComponent,
     AgendaPaneComponent,
     TopSheetComponent,
+    TodoLinkedListComponent,
     LateExcuseDialogComponent,
     ParticipantAttendanceComponent,
     ParticipantVoteComponent,
@@ -175,6 +179,12 @@ export class MeetingFollowViewComponent {
   protected readonly shownTop = computed<AgendaItem | null>(
     () => this.agenda()[this.shownIndex()] ?? null,
   );
+
+  /**
+   * The row of the application or the Haushaltsplan of the shown item (`topLead`). It stands
+   * above the title, as on the meeting page of the lead.
+   */
+  protected readonly topLeadRow = topLead(this.shownTop, inject(Injector), this.i18n);
 
   /** The sheet shows the item that the room handles now. */
   protected readonly showsNow = computed(
