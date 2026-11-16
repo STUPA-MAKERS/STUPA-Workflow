@@ -131,13 +131,14 @@ const url =
   (r: { url: string }) =>
     r.url === `/api/applications/${id}${suffix}`;
 
-/** Flush the effective-form request used for data-field labels. */
+/** Flush the effective-form request used for data-field labels; the type asks for money (001033). */
 function flushForm(http: HttpTestingController, id = 'app-1') {
   http
     .expectOne((r) => r.url === `/api/applications/${id}/form`)
     .flush({
       applicationTypeId: 't1',
       formVersionId: 'fv1',
+      hasBudget: true,
       sections: [
         { key: 'main', label: { de: 'Antrag' }, fields: [{ key: 'amount', type: 'currency', label: { de: 'Betrag' } }] },
       ],
