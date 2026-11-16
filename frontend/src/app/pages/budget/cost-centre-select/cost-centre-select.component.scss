@@ -248,9 +248,11 @@
 .ccs__opt--disabled {
   cursor: default;
 }
-.ccs__opt--disabled .ccs__optName,
-.ccs__opt--disabled .ccs__free {
+.ccs__opt.ccs__opt--disabled .ccs__optName,
+.ccs__opt.ccs__opt--disabled .ccs__free {
   color: var(--color-text-muted);
+  font-style: italic;
+  font-weight: var(--fw-regular);
 }
 .ccs__opt--head .ccs__optName {
   color: var(--color-text);
