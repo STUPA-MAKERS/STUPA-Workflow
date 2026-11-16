@@ -9,11 +9,17 @@
   @include surface.context(1);
 }
 
+.bp__nodeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  padding-inline-start: calc(var(--bp-depth, 0) * 1.25rem);
+}
 .bp__node {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding-inline-start: calc(var(--bp-depth, 0) * 1.25rem);
 }
 .bp__name {
   overflow-wrap: anywhere;
@@ -233,4 +239,34 @@
 }
 .bp__skNote {
   width: 8em;
+}
+
+/* The plan tree (001130). A row with children has a chevron that opens and closes it, and a
+   line for each level above a row runs through the column of the chevrons, so a row shows
+   where it belongs also far below its Titel. The rows of the tree stand 2px apart, and a line
+   reaches 1px into each gap, so the lines do not break. The first line belongs to the Titel:
+   in the list beside the plan a Titel has depth 1 below the top-level row, on a phone 0. */
+.tn {
+  position: relative;
+}
+.bp__tree .tn::before {
+  content: '';
+  position: absolute;
+  inset-block: -1px;
+  inset-inline-start: calc(4px + var(--bp-g0, 1) * 20px + 0.875rem);
+  width: max(0px, calc((var(--tn-depth, 1) - var(--bp-g0, 1)) * 20px));
+  background: repeating-linear-gradient(to right, var(--color-border-strong) 0 1px, transparent 1px 20px);
+  pointer-events: none;
+}
+.bp__phoneTree {
+  --bp-g0: 0;
+  overflow: visible;
+}
+/* A Haushaltstitel has a long name. It breaks into a second line before it is cut. */
+.bp__treeName {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
 }

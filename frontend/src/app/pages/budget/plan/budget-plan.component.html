@@ -82,7 +82,7 @@
           <div class="bd__chips">
             <ng-container *ngTemplateOutlet="pickers" />
           </div>
-          <nav class="bd__tree" appScrollFade="y" [attr.aria-label]="'budget.dash.tree' | t">
+          <nav class="bd__tree bp__tree" appScrollFade="y" [attr.aria-label]="'budget.dash.tree' | t">
             <div class="tn" [class.tn--on]="!sel()">
               <span class="tn__chev" aria-hidden="true"></span>
               <button type="button" class="tn__main" [attr.aria-current]="sel() ? null : 'true'" (click)="selectId('')">
@@ -101,25 +101,9 @@
                   <span class="mono">{{ money(group.total) }}</span>
                 }
               </p>
-              @for (row of listRows(); track row.id) {
+              @for (row of treeRows(); track row.id) {
                 @if (groupOf(row) === group.side) {
-                  <div class="tn" [class.tn--on]="row.id === selId()" [style.--tn-depth]="row.depth + 1">
-                    <span class="tn__chev" aria-hidden="true"></span>
-                    <button
-                      type="button"
-                      class="tn__main"
-                      [attr.aria-current]="row.id === selId() ? 'true' : null"
-                      (click)="selectId(row.id)"
-                    >
-                      <span class="tn__line">
-                        <span class="tn__name ell">{{ row.name }}</span>
-                        @if (!row.active) {
-                          <app-status-text kind="muted">{{ 'budget.cc.inactive' | t }}</app-status-text>
-                        }
-                        <span class="tn__amt mono">{{ money(row.amount) }}</span>
-                      </span>
-                    </button>
-                  </div>
+                  <ng-container *ngTemplateOutlet="treeRow; context: { $implicit: row }" />
                 }
               }
             }
@@ -205,6 +189,43 @@
   </div>
 }
 
+<ng-template #treeRow let-row let-base="base">
+  <div
+    class="tn"
+    [class.tn--on]="row.id === selId()"
+    [style.--tn-depth]="row.depth + (base ?? 1)"
+  >
+    @if (row.hasChildren) {
+      <button
+        type="button"
+        class="tn__chev"
+        [attr.aria-expanded]="isOpen(row)"
+        [attr.aria-label]="(isOpen(row) ? 'budget.dash.collapse' : 'budget.dash.expand') | t: { name: row.name }"
+        [disabled]="!!query().trim()"
+        (click)="toggle(row)"
+      >
+        <app-icon [name]="isOpen(row) ? 'down' : 'right'" [size]="17" />
+      </button>
+    } @else {
+      <span class="tn__chev" aria-hidden="true"></span>
+    }
+    <button
+      type="button"
+      class="tn__main"
+      [attr.aria-current]="row.id === selId() ? 'true' : null"
+      (click)="selectId(row.id)"
+    >
+      <span class="tn__line">
+        <span class="tn__name bp__treeName">{{ row.name }}</span>
+        @if (!row.active) {
+          <app-status-text kind="muted">{{ 'budget.cc.inactive' | t }}</app-status-text>
+        }
+        <span class="tn__amt mono">{{ money(row.amount) }}</span>
+      </span>
+    </button>
+  </div>
+</ng-template>
+
 <ng-template #modes>
   <app-segmented width="equal" size="control" [ariaLabel]="'budget.view.label' | t" [options]="modeOptions()" value="plan" (valueChange)="setMode($event)" />
 </ng-template>
@@ -289,7 +310,13 @@
   @for (group of groups(); track group.side) {
     @let sideRows = rowsOf(group.side);
     <app-section class="bd__sec" size="lg" [heading]="group.heading">
-      @if (sideRows.length) {
+      @if (sideRows.length && treeOnPhone()) {
+        <div class="bd__tree bp__tree bp__phoneTree">
+          @for (row of sideRows; track row.id) {
+            <ng-container *ngTemplateOutlet="treeRow; context: { $implicit: row, base: 0 }" />
+          }
+        </div>
+      } @else if (sideRows.length) {
         <ng-container *ngTemplateOutlet="table; context: { $implicit: sideRows, nested: true }" />
       } @else {
         <app-empty-state rows="1" [heading]="(query().trim() ? 'budget.dash.searchNone' : 'budget.plan.noLines') | t" />
@@ -460,7 +487,17 @@
 <ng-template #table let-rows let-nested="nested">
   <app-data-table class="bp__table" surface="rowgroup" [loading]="load().kind === 'loading'" [columns]="columns()" [rows]="rows" [rowKey]="rowId" [clickable]="true" (rowClick)="select($event)">
     <ng-template appCell="node" let-row>
-      <span class="bp__node" [style.--bp-depth]="nested ? $any(row).depth : 0">
+      <span class="bp__nodeRow" [style.--bp-depth]="nested ? $any(row).depth : 0">
+      @if (nested) {
+        @if ($any(row).hasChildren) {
+          <button type="button" class="tn__chev" [attr.aria-expanded]="isOpen($any(row))" [attr.aria-label]="(isOpen($any(row)) ? 'budget.dash.collapse' : 'budget.dash.expand') | t: { name: $any(row).name }" [disabled]="!!query().trim()" (click)="$event.stopPropagation(); toggle($any(row))">
+            <app-icon [name]="isOpen($any(row)) ? 'down' : 'right'" [size]="17" />
+          </button>
+        } @else {
+          <span class="tn__chev" aria-hidden="true"></span>
+        }
+      }
+      <span class="bp__node">
         <span class="bp__name">{{ $any(row).name }}</span>
         <span class="bp__sub">
           <span class="bp__path mono">{{ $any(row).pathKey | simplifyPath }}</span>
@@ -477,6 +514,7 @@
             <app-status-text kind="warn">{{ 'budget.plan.marks.blockedBadge' | t: { amount: money($any(row).blocked) } }}</app-status-text>
           }
         </span>
+      </span>
       </span>
     </ng-template>
     <ng-template appCell="amount" let-row>
