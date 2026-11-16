@@ -307,7 +307,7 @@ class ApplicationTypeOps(ConfigServiceBase):
         if _swap(groups, row, by):
             await self._audit(actor, AuditAction.CONFIG_CHANGE, "application_type_group", row.id)
             await self.session.flush()
-        return [_group_out(item) for item in groups]
+        return [_group_out(item) for item in sorted(groups, key=lambda g: g.position)]
 
     async def _groups(self) -> list[ApplicationTypeGroup]:
         """Return every group in its order; equal positions fall back to the create time."""
