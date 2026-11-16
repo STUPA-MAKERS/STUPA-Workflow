@@ -66,10 +66,11 @@ def file_response(
         ``mime`` is in ``INLINE_MIMES``, else the answer as before.
     """
     preview = inline and mime in INLINE_MIMES
-    headers = dict(extra or {})
-    if preview:
-        headers["Content-Disposition"] = content_disposition("inline", name)
-        headers.update(PREVIEW_HEADERS)
-        return Response(content=data, media_type=mime, headers=headers)
-    headers["Content-Disposition"] = content_disposition(disposition, name)
-    return Response(content=data, media_type=fallback_mime or mime, headers=headers)
+    kind: Literal["attachment", "inline"] = "inline" if preview else disposition
+    headers = {
+        **(extra or {}),
+        "Content-Disposition": content_disposition(kind, name),
+        **(PREVIEW_HEADERS if preview else {}),
+    }
+    media_type = mime if preview else (fallback_mime or mime)
+    return Response(content=data, media_type=media_type, headers=headers)
