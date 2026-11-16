@@ -2,7 +2,7 @@
 id: "001079"
 title: The file viewer lies above everything
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:

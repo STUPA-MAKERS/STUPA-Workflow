@@ -2,7 +2,7 @@
 id: "001084"
 title: The file viewer is dark frosted glass
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation:

@@ -2,7 +2,7 @@
 id: "001082"
 title: A button that opens a file says Öffnen
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:

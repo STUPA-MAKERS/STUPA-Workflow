@@ -2,7 +2,7 @@
 id: "001083"
 title: A file that the viewer shows has a sandboxed inline preview
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:

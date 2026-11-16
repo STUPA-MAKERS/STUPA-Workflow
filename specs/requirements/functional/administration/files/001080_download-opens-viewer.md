@@ -2,7 +2,7 @@
 id: "001080"
 title: A download of a viewable file opens the file viewer
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:
