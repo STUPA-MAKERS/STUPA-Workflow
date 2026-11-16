@@ -12,7 +12,7 @@ Idempotent. A fresh database already has the table and the columns from the
 privileges in ``deploy/db/roles.sql`` give the ``app`` role access to the new table.
 
 Revision ID: b7e2c4a91f03
-Revises: a3f1c7e2d905
+Revises: 9f610130db84
 Create Date: 2026-11-16 17:00:00
 """
 
@@ -23,7 +23,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "b7e2c4a91f03"
-down_revision: str | None = "a3f1c7e2d905"
+down_revision: str | None = "9f610130db84"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
