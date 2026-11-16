@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import subprocess
+import sys
 from pathlib import Path
 from types import ModuleType
 
@@ -17,6 +18,8 @@ def _load() -> ModuleType:
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
+    # The dataclass of the script looks its module up in sys.modules.
+    sys.modules["ci_scope"] = module
     spec.loader.exec_module(module)
     return module
 
