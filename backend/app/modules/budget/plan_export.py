@@ -17,7 +17,7 @@ from decimal import Decimal
 from typing import Literal, Protocol
 from uuid import UUID
 
-from app.modules.budget.plan_rules import PlanState, Side
+from app.modules.budget.plan_rules import PlanState, Side, compared_with
 
 Group = Literal["income", "expense", "none"]
 
@@ -85,6 +85,8 @@ class _Line(Protocol):
     def coverable(self) -> bool: ...
     @property
     def blocked(self) -> Decimal: ...
+    @property
+    def predecessor_id(self) -> UUID | None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -196,10 +198,32 @@ class PlanExport:
         return sums.get("income", _ZERO) - sums.get("expense", _ZERO)
 
 
-def _actual(node: _Node, side: Side | None, prev_fiscal_year_id: UUID | None) -> Decimal | None:
+@dataclass(frozen=True, slots=True)
+class _YearBefore:
+    """What a row compares with in the year before (001040)."""
+
+    #: The lines of the version in force of the year before, by cost center.
+    lines: Mapping[UUID, _Line]
+    #: The year before, for the booked amounts.
+    fiscal_year_id: UUID | None
+    #: The cost center of the year before that each line compares with.
+    against: Mapping[UUID, UUID | None]
+    #: Every node of the tree by id, for the booked amounts of a Vorgänger.
+    nodes: Mapping[UUID, _Node]
+
+
+def _all_nodes(node: _Node) -> dict[UUID, _Node]:
+    return {node.id: node, **{k: v for c in node.children for k, v in _all_nodes(c).items()}}
+
+
+def _actual(
+    node: _Node | None, side: Side | None, prev_fiscal_year_id: UUID | None
+) -> Decimal | None:
     """Return the booked amount of the year before: the income for the income side."""
     if prev_fiscal_year_id is None or side is None:
         return None
+    if node is None:
+        return _ZERO
     view = next((v for v in node.by_fiscal_year if v.fiscal_year_id == prev_fiscal_year_id), None)
     if view is None:
         return _ZERO
@@ -216,26 +240,26 @@ def _rows(
     depth: int,
     lines: Mapping[UUID, _Line],
     base: Mapping[UUID, _Line],
-    prev: Mapping[UUID, _Line],
-    prev_fiscal_year_id: UUID | None,
+    before: _YearBefore,
 ) -> tuple[tuple[Side | None, ExportRow], ...]:
     """Return the row of a node and of each node below it that has a line."""
     line = lines.get(node.id)
     if line is None:
         return ()
     below = tuple(
-        pair
-        for child in node.children
-        for pair in _rows(child, depth + 1, lines, base, prev, prev_fiscal_year_id)
+        pair for child in node.children for pair in _rows(child, depth + 1, lines, base, before)
     )
+    against = before.against.get(node.id)
     row = ExportRow(
         key=line.path_key or node.path_key,
         name=line.name or node.name,
         depth=depth,
         amount=line.amount,
         base=_amount_of(base, node.id),
-        prev=_amount_of(prev, node.id),
-        actual=_actual(node, line.side, prev_fiscal_year_id),
+        prev=None if against is None else _amount_of(before.lines, against),
+        actual=None
+        if against is None
+        else _actual(before.nodes.get(against), line.side, before.fiscal_year_id),
         transferable=line.transferable,
         coverable=line.coverable,
         blocked=line.blocked,
@@ -276,15 +300,19 @@ def build_export(
         prev_fiscal_year_id: The year before, for the booked amounts.
 
     A cost center without a line is not in the file. A group without a line is left
-    out, so a decided plan has no group "Ohne Seite".
+    out, so a decided plan has no group "Ohne Seite". A line with a Vorgänger shows the
+    Ansatz and the Ist of the Vorgänger as the figures of the year before (001040).
     """
     by_id = {line.budget_id: line for line in lines}
     base_by_id = {line.budget_id: line for line in base}
-    prev_by_id = {line.budget_id: line for line in prev}
+    before = _YearBefore(
+        lines={line.budget_id: line for line in prev},
+        fiscal_year_id=prev_fiscal_year_id,
+        against=compared_with([(line.budget_id, line.predecessor_id) for line in lines]),
+        nodes=_all_nodes(top),
+    )
     pairs = tuple(
-        pair
-        for child in top.children
-        for pair in _rows(child, 0, by_id, base_by_id, prev_by_id, prev_fiscal_year_id)
+        pair for child in top.children for pair in _rows(child, 0, by_id, base_by_id, before)
     )
     grouped: tuple[tuple[Group, tuple[ExportRow, ...]], ...] = tuple(
         (group, tuple(row for side, row in pairs if (side or "none") == group)) for group in GROUPS
