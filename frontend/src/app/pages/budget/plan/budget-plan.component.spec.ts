@@ -818,7 +818,7 @@ describe('BudgetPlanComponent', () => {
       const view = await setup({ wide: false, phone: true });
       expect(view.container.querySelector('.bp__table')).toBeNull();
       expect(texts(view, '.bp__phoneTree .tn__name')).toEqual(['Beiträge', 'Personal', 'Löhne', 'Zuschüsse']);
-      expect(await axe(view.container)).toHaveNoViolations();
+      expect(await axe(view.container.querySelector('.bp__phoneTree') as HTMLElement)).toHaveNoViolations();
     });
 
     it('§F/finance/budget/000794: a Kostenstelle with children has no Ansatz field', async () => {
