@@ -4633,6 +4633,12 @@
           "type": "DATETIME"
         },
         {
+          "name": "estimated_minutes",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
           "name": "id",
           "nullable": false,
           "primaryKey": true,

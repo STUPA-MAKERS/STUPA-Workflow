@@ -204,9 +204,16 @@ class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
     #: the first time. NULL means that the meeting never reached the item. The protocol
     #: PDF shows the time above the TOP.
     started_at: Mapped[_datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: The estimated duration in whole minutes, 1 to 480 (spec 001140). NULL means no
+    #: estimate: the time plan of the agenda counts the item as 0 minutes (spec 001141).
+    estimated_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("meeting_id", "application_id", name="uq_agenda_meeting_application"),
+        CheckConstraint(
+            "estimated_minutes BETWEEN 1 AND 480",
+            name="estimated_minutes",
+        ),
         Index("ix_agenda_meeting", "meeting_id"),
         Index(
             "uq_agenda_meeting_todo",

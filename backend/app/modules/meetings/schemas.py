@@ -101,6 +101,11 @@ class AgendaItemOut(FrozenCamelModel, frozen=True):
     non_public: bool = Field(default=False, alias="nonPublic")
     #: The time of the done mark ("TOP abhaken"). None for an item that is not done.
     done_at: _datetime | None = Field(default=None, alias="doneAt")
+    #: The time of the first move of the live meeting to the item (spec 000870). The
+    #: time plan shows it for a reached item (spec 001143).
+    started_at: _datetime | None = Field(default=None, alias="startedAt")
+    #: The estimated duration in minutes (spec 001140). None means no estimate.
+    estimated_minutes: int | None = Field(default=None, alias="estimatedMinutes")
     #: Current application status as an i18n label.
     state_label: dict[str, str] | None = Field(default=None, alias="stateLabel")
     #: The requested amount of the application (the decision proposal of the vote

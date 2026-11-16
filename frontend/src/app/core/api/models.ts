@@ -470,6 +470,10 @@ export interface AgendaItem {
   readonly nonPublic?: boolean;
   /** The done mark ("TOP abhaken"): the time of the tick, or `null`. Set by hand only. */
   readonly doneAt?: string | null;
+  /** The time of the first move of the live meeting to the item (§ 000870), or `null`. */
+  readonly startedAt?: IsoDateTime | null;
+  /** The estimated duration in minutes (§ 001140), or `null`. */
+  readonly estimatedMinutes?: number | null;
   readonly stateLabel?: I18nMap | null;
   /** The requested amount of the application, for the decision proposal. */
   readonly amount?: string | null;

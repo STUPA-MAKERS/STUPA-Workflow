@@ -272,6 +272,31 @@ describe('AgendaItemDialogComponent', () => {
     req.flush([]);
   });
 
+  /** §001140: every kind shows the field "Dauer"; a value goes with the add. */
+  it('topDuration: sends the estimated duration of a new item', async () => {
+    const { http, fixture } = await setup();
+    flushApps(http, fixture);
+    expect(screen.getByLabelText(/Dauer/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: 'Freitext' }));
+    expect(screen.getByLabelText(/Dauer/)).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText(/Titel/), 'Bericht');
+    await userEvent.type(screen.getByLabelText(/Dauer/), '15');
+    await userEvent.click(submitButton());
+    const req = http.expectOne('/api/meetings/m-1/agenda');
+    expect(req.request.body).toEqual({ title: 'Bericht', nonPublic: false, estimatedMinutes: 15 });
+    req.flush([]);
+  });
+
+  /** §001140: a duration outside 1 to 480 keeps the add off. */
+  it('topDuration: refuses a duration outside 1 to 480', async () => {
+    const { http, fixture } = await setup();
+    flushApps(http, fixture);
+    await userEvent.click(screen.getByRole('radio', { name: 'Freitext' }));
+    await userEvent.type(screen.getByLabelText(/Titel/), 'Bericht');
+    await userEvent.type(screen.getByLabelText(/Dauer/), '481');
+    expect(submitButton()).toBeDisabled();
+  });
+
   /** The to-do kind is offered only with todo.write in the gremium. */
   it('accepts only the known kinds', async () => {
     const { http, fixture, cmp } = await setup();
