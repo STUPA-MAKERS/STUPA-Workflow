@@ -46,6 +46,7 @@ class _Line:
     transferable: bool = False
     coverable: bool = False
     blocked: Decimal = D(0)
+    predecessor_id: uuid.UUID | None = None
 
 
 def _head(number: int = 0, state: PlanState = "draft", prev: str | None = "2025") -> ExportHead:
@@ -104,6 +105,29 @@ def test_the_rows_follow_the_tree_and_the_sides() -> None:
     assert none.rows[0].actual is None
     assert [r.marks for r in expense.rows] == ["übertragbar, deckungsfähig", "deckungsfähig"]
     assert none.label == "Ohne Seite"
+
+
+def test_a_predecessor_takes_the_figures_of_the_year_before() -> None:
+    """A line with a Vorgänger shows its Ansatz and its Ist; the line of that cost center none.
+
+    Rule: §F/finance/budget/001040.
+    """
+    lines = (
+        _Line(_GRANTS.id, D("60"), side="expense"),
+        _Line(_OFFICE.id, D("20"), side="expense"),
+        _Line(_OPEN.id, D("40"), side="expense", predecessor_id=_OFFICE.id),
+    )
+    export = build_export(
+        _head(),
+        _TOP,
+        lines,
+        prev=(_Line(_OFFICE.id, D("25"), side="expense"),),
+        prev_fiscal_year_id=_PREV,
+    )
+    rows = {r.key: r for r in export.groups[0].rows}
+    assert (rows["VS-9"].prev, rows["VS-9"].actual) == (D("25"), D("30"))
+    assert (rows["VS-8-1"].prev, rows["VS-8-1"].actual) == (None, None)
+    assert rows["VS-8"].prev is None
 
 
 def test_a_plan_without_lines_has_no_group_and_a_balance_of_zero() -> None:

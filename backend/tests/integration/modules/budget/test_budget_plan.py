@@ -26,6 +26,7 @@ from app.modules.budget.form_options import budget_field_options
 from app.modules.budget.plan_models import BudgetPlan, BudgetPlanLine, BudgetPlanVersion
 from app.modules.budget.plan_schemas import (
     PlanCreate,
+    PlanLinePredecessorSet,
     PlanLineRename,
     PlanLineSet,
     PlanNodeCreate,
@@ -803,6 +804,73 @@ async def test_a_version_exports_with_the_year_before_and_the_version_before(
     monkeypatch.setattr(t.svc, "get_tree", no_tree)
     with pytest.raises(NotFoundError):
         await t.svc.plan_export(draft.id, today)
+
+
+def _predecessors(version: PlanVersionOut) -> dict[uuid.UUID, uuid.UUID | None]:
+    return {line.budget_id: line.predecessor_id for line in version.lines}
+
+
+async def test_a_line_compares_with_its_predecessor(session: AsyncSession) -> None:
+    """A draft line names a line of the plan in force of the year before as its Vorgänger.
+
+    Rule: §F/finance/budget/001040.
+    """
+    today = date(2026, 11, 16)
+    t = await _tree(session)
+    await _in_force(t)
+    await t.svc.book_expense(
+        ExpenseCreate(budgetId=t.exp_a.id, fiscalYearId=t.fy.id, amount=D(25), description="x"),
+        actor="tester",
+    )
+    nxt = await t.svc.create_fiscal_year(t.top.id, FiscalYearCreate(year=2027))
+    await session.commit()
+    draft = _version(await t.svc.get_plan(t.top.id, nxt.id))
+
+    def wants(budget_id: uuid.UUID | None) -> PlanLinePredecessorSet:
+        return PlanLinePredecessorSet(predecessorId=budget_id)
+
+    plan = await t.svc.set_predecessor(draft.id, t.exp_b.id, wants(t.exp_a.id))
+    assert _predecessors(_version(plan))[t.exp_b.id] == t.exp_a.id
+    rows = {
+        r.name: (r.prev, r.actual)
+        for g in (await t.svc.plan_export(draft.id, today)).groups
+        for r in g.rows
+    }
+    assert rows["AKs"] == (D(60), D(25))
+    assert rows["Fachschaften"] == (None, None)
+
+    for budget_id, bad in (
+        (t.inc.id, t.exp_a.id),
+        (t.exp_a.id, uuid.uuid4()),
+    ):
+        with pytest.raises(ValidationProblem) as exc:
+            await t.svc.set_predecessor(draft.id, budget_id, wants(bad))
+        assert _code(exc) == "plan_predecessor_invalid"
+    with pytest.raises(ConflictError) as conflict:
+        await t.svc.set_predecessor(draft.id, t.exp_a.id, wants(t.exp_a.id))
+    assert _code(conflict) == "plan_predecessor_taken"
+    with pytest.raises(ValidationProblem) as exc:
+        await t.svc.set_predecessor(draft.id, uuid.uuid4(), wants(None))
+    assert _code(exc) == "plan_line_missing"
+
+    plan = await t.svc.set_predecessor(draft.id, t.exp_b.id, wants(None))
+    assert _predecessors(_version(plan))[t.exp_b.id] is None
+    await t.svc.set_predecessor(draft.id, t.exp_b.id, wants(t.exp_a.id))
+    await t.svc.set_plan_state(draft.id, PlanStateSet(state="in_force"))
+    await session.commit()
+    with pytest.raises(ConflictError) as conflict:
+        await t.svc.set_predecessor(draft.id, t.exp_b.id, wants(None))
+    assert _code(conflict) == "plan_version_locked"
+
+    nachtrag = _version(await t.svc.create_nachtrag(t.top.id, nxt.id))
+    assert _predecessors(nachtrag)[t.exp_b.id] == t.exp_a.id
+    plan = await t.svc.set_line(nachtrag.id, t.exp.id, PlanLineSet(side="income"))
+    assert _predecessors(_version(plan))[t.exp_b.id] is None
+
+    later = await t.svc.create_fiscal_year(t.top.id, FiscalYearCreate(year=2028))
+    await session.commit()
+    copy = _version(await t.svc.get_plan(t.top.id, later.id))
+    assert set(_predecessors(copy).values()) <= {None}
 
 
 async def test_a_line_with_bookings_is_not_removed(session: AsyncSession) -> None:

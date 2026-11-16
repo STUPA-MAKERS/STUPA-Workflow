@@ -22,6 +22,8 @@ export interface PlanRow {
   readonly prev: number | null;
   /** The booked amount of the year before. `null` when there is no year before. */
   readonly actual: number | null;
+  /** The Kostenstelle of the year before that the row compares with instead of its own (001040). */
+  readonly predecessorId: Uuid | null;
   readonly note: string;
   readonly transferable: boolean;
   readonly coverable: boolean;
@@ -49,21 +51,38 @@ const lineMap = (version: PlanVersion | null): ReadonlyMap<Uuid, PlanLine> =>
   new Map((version?.lines ?? []).map((l) => [l.budgetId, l] as const));
 
 /** The booked amount of a Kostenstelle in a fiscal year: income for the income side. */
-function actualOf(node: BudgetTreeNode, side: Side | null, fiscalYearId: Uuid | null): number | null {
-  const view = node.byFiscalYear.find((a) => a.fiscalYearId === fiscalYearId);
+function actualOf(node: BudgetTreeNode | undefined, side: Side | null, fiscalYearId: Uuid | null): number | null {
+  const view = node?.byFiscalYear.find((a) => a.fiscalYearId === fiscalYearId);
   if (!fiscalYearId || !side) return null;
   return Number(side === 'income' ? (view?.income ?? 0) : (view?.expended ?? 0));
 }
+
+/**
+ * The Kostenstelle of the year before that each line compares with (001040). A line with a
+ * Vorgänger compares with it. A line without one compares with its own Kostenstelle, unless
+ * another line names that Kostenstelle as its Vorgänger: a line of the year before compares
+ * with one line only, so the sums of the year before count it once.
+ */
+export function comparedWith(lines: readonly Pick<PlanLine, 'budgetId' | 'predecessorId'>[]): ReadonlyMap<Uuid, Uuid | null> {
+  const taken = new Set(lines.flatMap((l) => (l.predecessorId ? [l.predecessorId] : [])));
+  return new Map(lines.map((l) => [l.budgetId, l.predecessorId ?? (taken.has(l.budgetId) ? null : l.budgetId)] as const));
+}
+
+const allNodes = (node: BudgetTreeNode): readonly BudgetTreeNode[] => [node, ...node.children.flatMap(allNodes)];
+const nodesById = (node: BudgetTreeNode): ReadonlyMap<Uuid, BudgetTreeNode> => new Map(allNodes(node).map((n) => [n.id, n] as const));
 
 /** The rows of a version in tree order. A Kostenstelle without a line is not in the plan. */
 export function planRows(source: PlanRowSource): readonly PlanRow[] {
   const lines = lineMap(source.version);
   const base = lineMap(source.base);
   const prev = lineMap(source.prev);
+  const against = comparedWith(source.version.lines);
+  const nodes = nodesById(source.top);
   const rowsOf = (node: BudgetTreeNode, depth: number): readonly PlanRow[] => {
     const line = lines.get(node.id);
     if (!line) return [];
     const below = node.children.flatMap((c) => rowsOf(c, depth + 1));
+    const other = against.get(node.id) ?? null;
     const row: PlanRow = {
       id: node.id,
       parentId: depth === 0 ? null : node.parentId,
@@ -74,8 +93,9 @@ export function planRows(source: PlanRowSource): readonly PlanRow[] {
       depth,
       amount: Number(line.amount),
       base: base.has(node.id) ? Number(base.get(node.id)?.amount) : null,
-      prev: prev.has(node.id) ? Number(prev.get(node.id)?.amount) : null,
-      actual: actualOf(node, line.side, source.prevFiscalYearId),
+      prev: other && prev.has(other) ? Number(prev.get(other)?.amount) : null,
+      actual: other ? actualOf(nodes.get(other), line.side, source.prevFiscalYearId) : null,
+      predecessorId: line.predecessorId ?? null,
       note: line.note ?? '',
       transferable: line.transferable,
       coverable: line.coverable,

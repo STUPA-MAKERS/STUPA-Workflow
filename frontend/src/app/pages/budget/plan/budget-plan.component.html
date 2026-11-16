@@ -373,6 +373,18 @@
             [disabled]="!editable()"
           />
         }
+        @if (canCopy() && row.side) {
+          <app-select
+            [name]="'line-predecessor-' + row.id"
+            [label]="'budget.plan.line.predecessor' | t"
+            [placeholder]="'budget.plan.line.predecessorNone' | t"
+            [options]="predecessorOptions(row)"
+            [ngModel]="row.predecessorId ?? ''"
+            (ngModelChange)="savePredecessor(row, $event)"
+            [disabled]="!editable()"
+            data-testid="bp-predecessor"
+          />
+        }
         @if (!row.hasChildren) {
           <app-currency-input
             [name]="'line-amount-' + row.id"

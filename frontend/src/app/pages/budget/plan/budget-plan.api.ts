@@ -81,6 +81,11 @@ export interface PlanLine {
   readonly transferable: boolean;
   readonly coverable: boolean;
   readonly blocked: string;
+  /**
+   * The Kostenstelle of the line of the year before that the line compares with instead
+   * of its own (001040). `null` or missing compares with its own Kostenstelle.
+   */
+  readonly predecessorId?: Uuid | null;
 }
 
 /** One version of a Haushaltsplan: the Stammplan (number 0) or a Nachtrag. */
@@ -180,6 +185,11 @@ export class BudgetPlanApi {
   /** Give the Kostenstelle of a draft line a new name or key. It applies when the version comes into force. */
   renameLine(versionId: Uuid, budgetId: Uuid, body: { readonly name?: string; readonly key?: string }): Observable<BudgetPlan> {
     return this.http.put<BudgetPlan>(`${this.lineUrl(versionId, budgetId)}/name`, body, { context: skipLoading() });
+  }
+
+  /** Name the Vorgänger of a draft line in the year before, or clear it with `null` (001040). */
+  setPredecessor(versionId: Uuid, budgetId: Uuid, predecessorId: Uuid | null): Observable<BudgetPlan> {
+    return this.http.put<BudgetPlan>(`${this.lineUrl(versionId, budgetId)}/predecessor`, { predecessorId }, { context: skipLoading() });
   }
 
   deleteLine(versionId: Uuid, budgetId: Uuid): Observable<BudgetPlan> {

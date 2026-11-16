@@ -60,19 +60,6 @@ def _open_step(version: PlanVersionOut) -> str | None:
 class PlanExportOps(PlanOps, TreeViewOps):
     """Collect what the file of a plan version holds."""
 
-    async def _year_before(self, fy: FiscalYear) -> FiscalYear | None:
-        return (
-            await self.session.scalars(
-                select(FiscalYear).where(
-                    FiscalYear.budget_id == fy.budget_id, FiscalYear.year == fy.year - 1
-                )
-            )
-        ).one_or_none()
-
-    async def _plan_in(self, fy: FiscalYear | None) -> PlanOut | None:
-        plan = await self._plan_of(fy.id) if fy is not None else None
-        return await self._plan_out(plan, fy.budget_id) if plan is not None and fy else None
-
     async def plan_export(self, version_id: UUID, today: date) -> PlanExport:
         """Return a version of a Haushaltsplan as the rows of a file.
 

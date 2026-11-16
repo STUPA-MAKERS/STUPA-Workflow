@@ -326,3 +326,12 @@ def test_a_draft_must_not_give_two_cost_centres_one_path_key() -> None:
     assert not plan_rules.path_key_clash({one: "VS-82", two: "VS-9"}, now)
     assert plan_rules.path_key_clash({one: "VS-9", two: "VS-91"}, now)
     assert plan_rules.path_key_clash({one: "VS-7", two: "VS-7"}, now)
+
+
+def test_a_predecessor_takes_its_line_of_the_year_before_from_its_own_cost_center() -> None:
+    """A line of the year before compares with one line only.
+
+    Rule: §F/finance/budget/001040.
+    """
+    a, b, c = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    assert plan_rules.compared_with([(a, None), (b, a), (c, None)]) == {a: None, b: a, c: c}

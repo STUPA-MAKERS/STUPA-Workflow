@@ -50,7 +50,7 @@ import type { Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { SimplifyPathPipe } from '@shared/budget-path';
+import { SimplifyPathPipe, simplifyPathKey } from '@shared/budget-path';
 import { formatMoney } from '@shared/format-money';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 import { pageItemTitle } from '../../../layout/page-title.service';
@@ -162,6 +162,8 @@ const WRITE_ERRORS: Readonly<Record<string, TranslationKey>> = {
   plan_marks_income: 'budget.plan.error.marksIncome',
   plan_not_enabled: 'budget.plan.error.notEnabled',
   plan_copy_source_invalid: 'budget.plan.error.copySource',
+  plan_predecessor_invalid: 'budget.plan.error.predecessorInvalid',
+  plan_predecessor_taken: 'budget.plan.error.predecessorTaken',
   plan_line_node_invalid: 'budget.plan.error.lineNode',
   plan_amount_too_large: 'budget.plan.error.amountTooLarge',
   plan_empty: 'budget.plan.error.empty',
@@ -1368,6 +1370,32 @@ export class BudgetPlanComponent {
   /** Save the side of the line of a Titel. The answer holds the lines without the Vermerke that an income side takes off. */
   saveSide(row: PlanRow, side: string | null): void {
     if (side === 'income' || side === 'expense') this.saveLine(row, { side });
+  }
+
+  /** The lines of the plan in force of the year before, by Kostenstelle. */
+  private readonly prevLines = computed(() => inForce(this.prevPlan()?.versions ?? [])?.lines ?? []);
+
+  /**
+   * The choices for the Vorgänger of a row (001040): the lines of the plan in force of the
+   * year before on the side of the row. A line that another row names is not choosable.
+   */
+  predecessorOptions(row: PlanRow): SelectOption[] {
+    const taken = new Set(this.rows().flatMap((r) => (r.id !== row.id && r.predecessorId ? [r.predecessorId] : [])));
+    return this.prevLines()
+      .filter((l) => l.side === row.side)
+      .map((l) => {
+        const node = findNode(this.tree(), l.budgetId);
+        const key = simplifyPathKey(l.pathKey ?? node?.pathKey ?? '');
+        return { value: l.budgetId, label: `${key} · ${l.name ?? node?.name ?? ''}`, disabled: taken.has(l.budgetId) };
+      });
+  }
+
+  /** Name the Vorgänger of a draft line, or clear it with the empty choice (001040). */
+  savePredecessor(row: PlanRow, value: string | null): void {
+    const version = this.version();
+    const predecessorId = (value || null) as Uuid | null;
+    if (!version || !this.editable() || predecessorId === row.predecessorId) return;
+    this.write(this.api.setPredecessor(version.id, row.id, predecessorId), null, null, false);
   }
 
   /** The presses of the Vermerk switches whose save runs, by line and Vermerk. */

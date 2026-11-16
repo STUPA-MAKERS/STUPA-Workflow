@@ -100,6 +100,16 @@ class PlanLineRename(FrozenStrictCamelModel, frozen=True):
     key: str | None = Field(default=None, min_length=1, max_length=64)
 
 
+class PlanLinePredecessorSet(FrozenStrictCamelModel, frozen=True):
+    """Name the Vorgänger of a draft line, or clear it with `None` (spec 001040).
+
+    The Vorgänger is the cost center of a line of the plan in force of the year
+    before on the same side.
+    """
+
+    predecessor_id: UUID | None = Field(alias="predecessorId")
+
+
 class PlanStateSet(FrozenStrictCamelModel, frozen=True):
     """Bring a version into force, or move a version in progress back to draft."""
 
@@ -195,6 +205,9 @@ class PlanLineOut(FrozenCamelModel, frozen=True):
     transferable: bool = False
     coverable: bool = False
     blocked: Decimal = Decimal(0)
+    #: The cost center of the line of the year before that the line compares with
+    #: instead of its own (spec 001040). `None` compares with its own cost center.
+    predecessor_id: UUID | None = Field(default=None, alias="predecessorId")
 
 
 class PlanMeetingOut(FrozenCamelModel, frozen=True):
