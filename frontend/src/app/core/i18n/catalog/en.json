@@ -4113,7 +4113,6 @@
   "meetings.agenda.planActual": "{time}",
   "meetings.agenda.planMinutes": "{n} min",
   "meetings.agenda.planEnd": "End approx. {time}",
-  "meetings.agenda.planEndOver": "End approx. {time} · after the meeting end {end}",
   "meetings.agenda.planTotal": "Duration approx. {n} min",
   "meetings.agenda.duration": "Duration",
   "meetings.agenda.durationUnit": "min",

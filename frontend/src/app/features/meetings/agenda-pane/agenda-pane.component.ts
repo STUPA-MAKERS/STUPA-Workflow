@@ -259,10 +259,7 @@ export class AgendaPaneComponent {
   protected readonly planEnd = computed(() => {
     const plan = this.plan();
     if (plan.end !== null && plan.total !== null) {
-      const end = this.meeting().endTime;
-      return plan.overrun && end
-        ? this.i18n.translate('meetings.agenda.planEndOver', { time: planClock(plan.end), end: end.slice(0, 5) })
-        : this.i18n.translate('meetings.agenda.planEnd', { time: planClock(plan.end) });
+      return this.i18n.translate('meetings.agenda.planEnd', { time: planClock(plan.end) });
     }
     if (plan.total !== null) return this.i18n.translate('meetings.agenda.planTotal', { n: plan.total });
     return null;
