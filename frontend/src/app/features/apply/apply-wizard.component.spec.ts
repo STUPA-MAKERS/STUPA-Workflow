@@ -1,6 +1,6 @@
 import { computed, signal } from '@angular/core';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { BehaviorSubject, of, throwError } from 'rxjs';
 import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
@@ -13,7 +13,7 @@ import { DraftAttachmentsService, type DraftFile } from './draft-attachments.ser
 import { FormlyDraftFilesType } from './draft-files/formly-draft-files.type';
 
 const TYPES: ApplicationType[] = [
-  { id: 't1', name: 'Förderantrag', active: true, hasBudget: true, activeFormVersionId: 'v1', key: null, gremiumId: null },
+  { id: 't1', name: 'Förderantrag', active: true, hasBudget: true, activeFormVersionId: 'v1', key: 'foerderantrag', gremiumId: null },
   { id: 't2', name: 'Alt', active: false, hasBudget: false, activeFormVersionId: 'v2', key: null, gremiumId: null },
 ];
 
@@ -137,8 +137,10 @@ interface SetupOpts {
   types?: () => ReturnType<ApiClient['applicationTypes']>;
   effectiveForm?: () => ReturnType<ApiClient['effectiveForm']>;
   freetexts?: Record<string, Record<string, string>>;
-  /** The query params of the route, for example `{ type: 't1' }`. */
+  /** The query params of the route, for example `{ type: 't1' }` (old link). */
   query?: Record<string, string>;
+  /** The path params of the route, for example `{ type: 'foerderantrag' }`. */
+  params?: Record<string, string>;
   prefill?: jest.Mock;
 }
 
@@ -159,6 +161,9 @@ async function setup(opts: SetupOpts = {}) {
     freetexts: signal(opts.freetexts ?? {}),
     attachmentLimits: signal({ maxFileBytes: 10, maxDraftFiles: 20, maxDraftBytes: 50 }),
   };
+  const params$ = new BehaviorSubject(convertToParamMap(opts.params ?? {}));
+  const query$ = new BehaviorSubject(convertToParamMap(opts.query ?? {}));
+  const navigate = jest.spyOn(Router.prototype, 'navigate').mockResolvedValue(true);
   const view = await render(ApplyWizardComponent, {
     providers: [
       provideRouter([]),
@@ -166,16 +171,17 @@ async function setup(opts: SetupOpts = {}) {
       { provide: ApiClient, useValue: api },
       { provide: BrandingService, useValue: branding },
       { provide: ToastService, useValue: toast },
-      ...(opts.query
-        ? [{ provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(opts.query) } } }]
-        : []),
+      { provide: ActivatedRoute, useValue: { paramMap: params$, queryParamMap: query$ } },
     ],
     componentProviders: [{ provide: DraftAttachmentsService, useValue: drafts }],
   });
-  const router = view.fixture.debugElement.injector.get(Router);
-  const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
   const comp = view.fixture.componentInstance;
-  return { ...view, comp, create, drafts, toast, navigate };
+  /** The browser buttons: only the type segment of the URL changes. */
+  const urlTo = (type: string | null) => {
+    params$.next(convertToParamMap(type ? { type } : {}));
+    view.fixture.detectChanges();
+  };
+  return { ...view, comp, create, drafts, toast, navigate, urlTo };
 }
 
 type Setup = Awaited<ReturnType<typeof setup>>;
@@ -645,15 +651,98 @@ describe('ApplyWizardComponent', () => {
     await waitFor(() => expect(s.comp.currentStep()).toBe('review'));
   });
 
-  it('picks the type a link names (`?type=`), before the type of the last autosave', async () => {
-    sessionStorage.setItem(DRAFT_LAST_TYPE, 'unknown');
+  /** §001173 */
+  it('replaces an old type id link with the key URL', async () => {
+    sessionStorage.setItem(DRAFT_LAST_TYPE, 't1');
     const s = await setup({ query: { type: 't1' } });
-    await waitFor(() => expect(s.comp.typeId()).toBe('t1'));
+    expect(s.navigate).toHaveBeenCalledWith(['/apply', 'foerderantrag'], { replaceUrl: true });
+    expect(s.comp.typeId()).toBeNull();
   });
 
-  it('ignores a type in the link that is not active', async () => {
+  /** §001171 */
+  it('sends an old link to a type that is not active back to the type step', async () => {
     const s = await setup({ query: { type: 't2' } });
+    expect(s.navigate).toHaveBeenCalledWith(['/apply'], { replaceUrl: true });
+    expect(s.toast.error).toHaveBeenCalledWith('Diese Antragsart gibt es nicht oder sie nimmt keine Anträge mehr an.');
     expect(s.comp.typeId()).toBeNull();
+  });
+
+  /** §001170 */
+  it('opens the type that the URL names past the type step', async () => {
+    sessionStorage.setItem(DRAFT_LAST_TYPE, 'unknown');
+    const s = await setup({ params: { type: 'foerderantrag' } });
+    await waitFor(() => expect(s.comp.typeId()).toBe('t1'));
+    expect(s.comp.currentStep()).toBe('details');
+    expect(s.navigate).not.toHaveBeenCalled();
+  });
+
+  /** §001170 */
+  it('opens the type that the URL names on the step of its autosave', async () => {
+    sessionStorage.setItem(`${DRAFT_PREFIX}t1`, JSON.stringify({ v: 1, model: { title: 'X' }, step: 'review' }));
+    const s = await setup({ form: PLAIN, loggedIn: true, params: { type: 'foerderantrag' } });
+    await waitFor(() => expect(s.comp.currentStep()).toBe('review'));
+  });
+
+  /** §001170 */
+  it('takes the type id in the URL too', async () => {
+    const s = await setup({ params: { type: 't1' } });
+    await waitFor(() => expect(s.comp.typeId()).toBe('t1'));
+    expect(s.comp.currentStep()).toBe('details');
+  });
+
+  /** §001171 */
+  it('sends an unknown type key back to the type step', async () => {
+    const s = await setup({ params: { type: 'gibt-es-nicht' } });
+    expect(s.navigate).toHaveBeenCalledWith(['/apply'], { replaceUrl: true });
+    expect(s.toast.error).toHaveBeenCalledWith('Diese Antragsart gibt es nicht oder sie nimmt keine Anträge mehr an.');
+    expect(s.comp.typeId()).toBeNull();
+    expect(s.comp.activeIndex()).toBe(0);
+  });
+
+  /** §001170 */
+  it('puts the key of the type into the URL on Weiter', async () => {
+    const s = await setup();
+    await pickType(s);
+    expect(s.navigate).not.toHaveBeenCalled();
+    s.comp.next();
+    expect(s.navigate).toHaveBeenCalledWith(['/apply', 'foerderantrag'], { replaceUrl: false });
+    expect(s.comp.currentStep()).toBe('details');
+    s.navigate.mockClear();
+    s.fixture.detectChanges();
+    await userEvent.type(field(/Titel/), 'Party');
+    s.comp.next();
+    expect(s.navigate).not.toHaveBeenCalled();
+  });
+
+  /** §001170 */
+  it('leads Zurück to the type step back to /apply with the type kept', async () => {
+    const s = await setup();
+    await pickType(s);
+    s.comp.next();
+    s.comp.prev();
+    expect(s.navigate).toHaveBeenLastCalledWith(['/apply'], { replaceUrl: false });
+    expect(s.comp.currentStep()).toBe('type');
+    expect(s.comp.typeId()).toBe('t1');
+  });
+
+  /** §001170 */
+  it('follows the browser buttons between /apply and /apply/<key>', async () => {
+    const s = await setup({ params: { type: 'foerderantrag' } });
+    await waitFor(() => expect(s.comp.currentStep()).toBe('details'));
+    s.urlTo(null);
+    expect(s.comp.currentStep()).toBe('type');
+    expect(s.comp.typeId()).toBe('t1');
+    s.urlTo('foerderantrag');
+    expect(s.comp.currentStep()).toBe('details');
+  });
+
+  /** §001170 */
+  it('puts the key into the URL when the autosave of /apply is past the type step', async () => {
+    sessionStorage.setItem(DRAFT_LAST_TYPE, 't1');
+    sessionStorage.setItem(`${DRAFT_PREFIX}t1`, JSON.stringify({ v: 1, model: { title: 'X' }, step: 'review' }));
+    const s = await setup({ form: PLAIN, loggedIn: true });
+    await waitFor(() => expect(s.comp.currentStep()).toBe('review'));
+    expect(s.navigate).toHaveBeenCalledWith(['/apply', 'foerderantrag'], { replaceUrl: true });
   });
 
   it('ignores a broken autosave and an unknown last type', async () => {

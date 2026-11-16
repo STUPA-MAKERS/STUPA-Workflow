@@ -156,6 +156,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/applications/000882](requirements/functional/applications/applications/000882_pdf-no-pii-without-right.md) | The Antrag PDF shows only what the reader may see | approved |
 | [F/applications/applications/000883](requirements/functional/applications/applications/000883_pdf-name.md) | The Antrag PDF is named after the Antrag | approved |
 | [F/applications/applications/000888](requirements/functional/applications/applications/000888_pdf-signatures.md) | The Antrag PDF of an Antragsart can end with a signature section | approved |
+| [F/applications/applications/001170](requirements/functional/applications/applications/001170_apply-type-in-url.md) | The chosen Antragsart stands in the apply URL | draft |
+| [F/applications/applications/001171](requirements/functional/applications/applications/001171_apply-unknown-type.md) | An apply link to an unknown Antragsart opens the type step | draft |
+| [F/applications/applications/001172](requirements/functional/applications/applications/001172_public-type-key.md) | The public list of Antragstypen gives the key | draft |
+| [F/applications/applications/001173](requirements/functional/applications/applications/001173_apply-old-type-link.md) | An old apply link with the type id still works | draft |
 | [F/applications/dashboard/000421](requirements/functional/applications/dashboard/000421_dashboard.md) | The start page is a work list with a side sheet | approved |
 | [F/applications/dashboard/000550](requirements/functional/applications/dashboard/000550_start-due-cards.md) | Start shows the due cards of the person | approved |
 | [F/applications/dashboard/000650](requirements/functional/applications/dashboard/000650_start-apply-button-tab-line.md) | Antrag stellen stands in the tab line of the desktop start page | approved |

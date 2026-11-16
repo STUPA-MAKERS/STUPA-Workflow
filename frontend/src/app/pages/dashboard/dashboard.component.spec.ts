@@ -414,7 +414,7 @@ describe('DashboardComponent', () => {
       });
       expect(cmp(fixture).newUser()).toBe(true);
       const card = screen.getByRole('region', { name: 'Antrag stellen' });
-      expect(within(card).getByRole('link', { name: 'Förderantrag' })).toHaveAttribute('href', '/apply?type=t1');
+      expect(within(card).getByRole('link', { name: 'Förderantrag' })).toHaveAttribute('href', '/apply/t1');
       expect(within(card).getByRole('link', { name: 'Reisekosten' })).toBeInTheDocument();
       expect(within(card).queryByRole('link', { name: 'Alt' })).not.toBeInTheDocument();
       await router.navigateByUrl('/?tab=mine');

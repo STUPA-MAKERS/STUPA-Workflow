@@ -1,4 +1,4 @@
-import type { Routes } from '@angular/router';
+import type { Routes, UrlMatchResult, UrlSegment } from '@angular/router';
 import { authGuard } from '@core/auth/auth.guard';
 import { homeRedirectGuard } from '@core/auth/home-redirect.guard';
 import { featureMatch } from '@core/features/feature.guard';
@@ -8,6 +8,18 @@ import {
   BUDGET_PERMISSIONS,
   VOTING_GREMIUM_PERMISSIONS,
 } from './layout/nav.service';
+
+/**
+ * `/apply` and `/apply/<type>` are one route (spec 001170), so the wizard stays the same
+ * component while "Weiter" and the browser buttons change the type segment, and keeps its
+ * answers and files. `/apply/confirmation` is its own route.
+ */
+export function applyMatcher(segments: UrlSegment[]): UrlMatchResult | null {
+  if (segments[0]?.path !== 'apply' || segments.length > 2) return null;
+  const type = segments[1];
+  if (type?.path === 'confirmation') return null;
+  return { consumed: segments, posParams: type ? { type } : {} };
+}
 
 /**
  * Routing skeleton. `authGuard` protects the OIDC areas. Some areas also need an RBAC
@@ -43,7 +55,7 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/home.component').then((m) => m.HomeComponent),
       },
       {
-        path: 'apply',
+        matcher: applyMatcher,
         data: { title: 'apply.title', footer: true },
         loadComponent: () =>
           import('./features/apply/apply-wizard.component').then((m) => m.ApplyWizardComponent),

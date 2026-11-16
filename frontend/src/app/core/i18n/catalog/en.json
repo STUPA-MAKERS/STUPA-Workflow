@@ -335,6 +335,7 @@
   "apply.steps.contact": "Contact",
   "apply.steps.review": "Review & submit",
   "apply.error.typesLoad": "Application types could not be loaded.",
+  "apply.error.typeUnknown": "This application type does not exist or no longer takes applications.",
   "apply.error.formLoad": "The form could not be loaded.",
   "apply.error.submit": "The application could not be submitted.",
   "apply.type.title": "Choose application type",
