@@ -504,16 +504,11 @@ export class CostCentreSelectComponent {
       const menu = this.menu()?.nativeElement;
       if (!menu) return;
       showInTopLayer(menu);
-      // The first place gives the list the width of its field. Its height is known only
-      // at that width, because the names wrap in a narrower list: so place it again.
       this.place(menu);
+      this.placed.set(true);
       this.afterRender(() => {
-        this.place(menu);
-        this.placed.set(true);
-        this.afterRender(() => {
-          menu.querySelector<HTMLInputElement>('input')?.focus();
-          this.reveal();
-        });
+        menu.querySelector<HTMLInputElement>('input')?.focus();
+        this.reveal();
       });
     });
   }
@@ -533,10 +528,18 @@ export class CostCentreSelectComponent {
     if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'nearest' });
   }
 
-  /** Under the field (above it when the room below is too small), inside the viewport. */
+  /**
+   * Under the field (above it when the room below is too small), inside the viewport.
+   *
+   * The list takes the width of its field before it is measured, because the names wrap in
+   * a narrower list: a height measured there sends the list above the field for no reason.
+   */
   private place(menu: HTMLElement): void {
+    const field = this.trigger().nativeElement.getBoundingClientRect();
+    const width = Math.min(Math.max(field.width, MIN_WIDTH), window.innerWidth - 2 * EDGE);
+    menu.style.setProperty('width', `${width}px`);
     this.position.set(
-      placeAtField(this.trigger().nativeElement.getBoundingClientRect(), menu.scrollHeight, {
+      placeAtField(field, menu.scrollHeight, {
         gap: GAP,
         edge: EDGE,
         maxHeight: MAX_HEIGHT,
