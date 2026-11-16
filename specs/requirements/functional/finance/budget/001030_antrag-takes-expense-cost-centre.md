@@ -12,7 +12,7 @@ tests:
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_the_form_options_leave_out_income_cost_centres"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_the_tree_names_the_years_where_a_node_is_income"
   - "backend/tests/unit/modules/flow/test_flow_extras_dispatcher.py:test_assign_budget_skips_an_income_cost_centre"
-  - "frontend/src/app/pages/budget/cost-centre/cost-centre.util.spec.ts:expenseOnly"
+  - "frontend/src/app/pages/budget/cost-centre/cost-centre.util.spec.ts:CostCentreUtil"
   - "frontend/src/app/pages/budget/cost-centre-select/cost-centre-select.component.spec.ts:CostCentreSelectComponent"
 implementation:
   - backend/app/modules/budget/plan_rules.py

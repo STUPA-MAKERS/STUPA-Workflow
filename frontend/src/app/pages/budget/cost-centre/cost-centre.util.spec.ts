@@ -1,5 +1,5 @@
 import { node, TOP } from '../plan/budget-plan.fixtures';
-import { NAME_MAX, activeOnly, costCentreError, findNode, keyProblem, pickable, usedIn, withDescendants } from './cost-centre.util';
+import { NAME_MAX, activeOnly, costCentreError, findNode, keyProblem, pickable, usedIn, withDescendants, withoutIncome } from './cost-centre.util';
 
 describe('CostCentreUtil', () => {
   it('names the message of a problem code, else the fallback', () => {
@@ -44,6 +44,19 @@ describe('CostCentreUtil', () => {
     expect(ids(pickable([planned], () => ['', 'other']))).toEqual(['p', 'in', 'in-out', 'in-in', 'out', 'used']);
     expect(ids(pickable([planned], () => []))).toEqual(['p', 'in', 'in-out', 'in-in', 'out', 'used']);
     expect(ids(pickable([planned], () => ['other', 'fy']))).toEqual(['p', 'in', 'in-in', 'used']);
+  });
+
+  it('§F/finance/budget/001030: an Antrag picker offers no Kostenstelle that is income in the year', () => {
+    const top = node({
+      id: 'top',
+      children: [
+        node({ id: 'inc', incomeIn: ['fy'], children: [node({ id: 'inc-a', incomeIn: ['fy'] })] }),
+        node({ id: 'exp', children: [node({ id: 'exp-a' })] }),
+      ],
+    });
+    const ids = (forest: readonly ReturnType<typeof node>[]) => forest.flatMap(withDescendants).map((n) => n.id);
+    expect(ids(withoutIncome([top], 'fy'))).toEqual(['top', 'exp', 'exp-a']);
+    expect(ids(withoutIncome([top], 'other'))).toEqual(['top', 'inc', 'inc-a', 'exp', 'exp-a']);
   });
 
   it('walks a node and the nodes below it in tree order', () => {

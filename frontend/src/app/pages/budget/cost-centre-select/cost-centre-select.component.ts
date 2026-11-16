@@ -34,7 +34,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { simplifyPathKey } from '@shared/budget-path';
 import { nodeColors } from '../budget-color.util';
 import type { BudgetTreeNode } from '../budget-tree.api';
-import { pickable } from '../cost-centre/cost-centre.util';
+import { pickable, withoutIncome } from '../cost-centre/cost-centre.util';
 import { formatMoney } from '@shared/format-money';
 import { costCentreFigures, findBudgetNode } from '../expense-display.util';
 
@@ -139,6 +139,9 @@ export class CostCentreSelectComponent {
   readonly fiscalYearId = input('');
   /** The fiscal year per top-level budget, for the budgets the form has no year of. */
   readonly fiscalYears = input<ReadonlyMap<string, string>>(new Map());
+  /** Offer no Kostenstelle that is income in `fiscalYearId`: the picker of an Antrag
+   *  (spec 001030). */
+  readonly expenseOnly = input(false, { transform: booleanAttribute });
   /** The text when the tree has no cost centre. */
   readonly emptyLabel = input('');
   /** The extra top choice with the value `''`, or '' for none. */
@@ -216,11 +219,15 @@ export class CostCentreSelectComponent {
   /**
    * The cost centres of the list: no inactive one, and for a fiscal year with a plan in
    * force only the cost centres of that plan or with a booking or an application in it.
-   * The field still names a pick that the list no longer offers.
+   * With `expenseOnly` no cost centre that is income in the fiscal year. The field still
+   * names a pick that the list no longer offers.
    */
-  private readonly offered = computed(() =>
-    pickable(this.nodes(), (top) => [this.fiscalYearId(), this.fiscalYears().get(top.id) ?? '']),
-  );
+  private readonly offered = computed(() => {
+    const nodes = this.expenseOnly()
+      ? withoutIncome(this.nodes(), this.fiscalYearId())
+      : this.nodes();
+    return pickable(nodes, (top) => [this.fiscalYearId(), this.fiscalYears().get(top.id) ?? '']);
+  });
 
   /** The groups of the list: every top-level budget with a hit, its choices below. */
   protected readonly groups = computed<readonly CostCentreGroup[]>(() => {

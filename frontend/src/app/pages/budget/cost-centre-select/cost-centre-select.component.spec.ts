@@ -86,6 +86,7 @@ const TREE: BudgetTreeNode[] = [
       [value]="value()"
       [fiscalYearId]="fy()"
       [fiscalYears]="years()"
+      [expenseOnly]="expense()"
       (picked)="value.set($event); picks.push($event)"
       (opened)="opens = opens + 1"
     />
@@ -96,6 +97,7 @@ class Host {
   readonly nodes = signal<BudgetTreeNode[]>(TREE);
   readonly value = signal('');
   readonly fy = signal('');
+  readonly expense = signal(false);
   readonly years = signal<ReadonlyMap<string, string>>(new Map([['qsm', 'fy-q']]));
   readonly picks: string[] = [];
   opens = 0;
@@ -161,6 +163,32 @@ describe('CostCentreSelectComponent', () => {
     await tick();
     expect(names().join('|')).toContain('Nicht im Plan');
     expect(names().join('|')).not.toContain('Stillgelegt');
+  });
+
+  it('§F/finance/budget/001030: offers no income Kostenstelle of the year for an Antrag', async () => {
+    const tree = [
+      NODE('vsm', null, 'VSM', 'VSM', 'VS-Mittel', {
+        children: [
+          NODE('inc', 'vsm', '1', 'VSM-1', 'Beiträge', { incomeIn: ['fy-v'] }),
+          NODE('exp', 'vsm', '8', 'VSM-8', 'Zuschüsse'),
+        ],
+      }),
+    ];
+    const names = () => screen.getAllByRole('option').map((o) => o.textContent ?? '').join('|');
+    const { field, tick, user, host } = await setup((h) => {
+      h.nodes.set(tree);
+      h.fy.set('fy-v');
+    });
+    await user.click(field());
+    await tick();
+    expect(names()).toContain('Beiträge');
+    await user.keyboard('{Escape}');
+    host.expense.set(true);
+    await tick();
+    await user.click(field());
+    await tick();
+    expect(names()).not.toContain('Beiträge');
+    expect(names()).toContain('Zuschüsse');
   });
 
   /** An id that the tree does not hold shows the placeholder. */

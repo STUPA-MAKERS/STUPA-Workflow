@@ -448,6 +448,7 @@
         [nodes]="assignTree()"
         [value]="budgetChoice()"
         [fiscalYearId]="fiscalChoice()"
+        expenseOnly
         (picked)="budgetChoice.set($event)"
       />
     }
