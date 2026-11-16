@@ -119,18 +119,11 @@ async def my_profile(
     row = (
         await db.execute(select(PrincipalRow).where(PrincipalRow.sub == principal.sub))
     ).scalar_one_or_none()
-    id_token: str | None = None
-    cookie = request.cookies.get(settings.session_cookie_name)
-    if row is not None and cookie and principal.scope_permissions is None:
-        session_row = await sessions.load_principal_session(
-            db,
-            secret=settings.session_secret,
-            cookie_value=cookie,
-            now=datetime.now(UTC),
-            max_age=sessions.SESSION_COOKIE_MAX_AGE,
-        )
-        if session_row is not None and session_row.principal_id == row.id:
-            id_token = session_row.id_token
+    id_token = (
+        await _own_session_id_token(request, db, settings, row.id)
+        if row is not None and principal.scope_permissions is None
+        else None
+    )
     claims = profile.person_claims(
         profile.id_token_claims(id_token),
         sub=principal.sub,
@@ -145,6 +138,25 @@ async def my_profile(
         last_login=row.last_login if row is not None else None,
         claims=tuple(ProfileClaim(key=k, value=v) for k, v in claims),
     )
+
+
+async def _own_session_id_token(
+    request: Request, db: DbSession, settings: Settings, principal_id: UUID
+) -> str | None:
+    """Return the `id_token` of the session cookie when the session is the principal's."""
+    cookie = request.cookies.get(settings.session_cookie_name)
+    if not cookie:
+        return None
+    session_row = await sessions.load_principal_session(
+        db,
+        secret=settings.session_secret,
+        cookie_value=cookie,
+        now=datetime.now(UTC),
+        max_age=sessions.SESSION_COOKIE_MAX_AGE,
+    )
+    if session_row is None or session_row.principal_id != principal_id:
+        return None
+    return session_row.id_token
 
 
 async def _has_reported_tickets(db: DbSession, sub: str) -> bool:
