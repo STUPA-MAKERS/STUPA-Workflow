@@ -43,6 +43,16 @@ describe('BrandingService', () => {
     expect(svc.homeHeading()).toBe('StuPa Portal');
   });
 
+  /** Spec 001096: the texts name the platform by the short name of the branding. */
+  it('passes the short name of the branding to the texts', () => {
+    expect(svc.shortName()).toBe('STUPA');
+    svc.init();
+    http.expectOne('/api/site-config').flush({ version: 1, branding: { appShortName: ' AStA ' } });
+    TestBed.tick();
+    expect(svc.shortName()).toBe('AStA');
+    expect(i18n.translate('login.accountName')).toBe('AStA-Konto');
+  });
+
   it('trims the configured name and falls back when it is blank', () => {
     svc.init();
     http.expectOne('/api/site-config').flush({ version: 1, branding: { appName: '   ' } });

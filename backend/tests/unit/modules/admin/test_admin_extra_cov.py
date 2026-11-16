@@ -19,11 +19,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.modules.admin.site_config_service import (
-    DEFAULT_APP_NAME,
-    DEFAULT_APP_SHORT_NAME,
-    SiteConfigService,
-)
+from app.modules.admin.page_head import DEFAULT_APP_NAME, DEFAULT_APP_SHORT_NAME
+from app.modules.admin.site_config_service import SiteConfigService
 from app.modules.audit.actions import AuditAction
 from app.modules.gremien import gremium_roles as gr
 from app.modules.gremien.gremium_roles import (

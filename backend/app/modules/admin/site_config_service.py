@@ -21,6 +21,7 @@ from typing import Any, Literal
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.admin.page_head import app_name, app_short_name, description, render_page_head
 from app.modules.admin.schemas import (
     AttachmentLimitsOut,
     HelpTicketsSettings,
@@ -38,6 +39,7 @@ from app.modules.config_revision.service import (
     ConfigRevisionService,
 )
 from app.modules.files.scanner import scan_or_raise
+from app.modules.site_config.brand_images import MASKABLE_SIZES, IconPurpose, has_icon_mark
 from app.modules.site_config.branding import (
     Branding,
     HelpSettings,
@@ -55,11 +57,6 @@ from app.modules.site_config.models import SiteConfigVersion
 from app.modules.site_config.reads import branding_of
 from app.settings import Settings, get_settings
 from app.shared.errors import ConflictError
-
-#: Fallback app names for the case where the config leaves them empty. They match the
-#: defaults in ``frontend/public/manifest.webmanifest``.
-DEFAULT_APP_NAME = "STUPA Antragsplattform"
-DEFAULT_APP_SHORT_NAME = "STUPA"
 
 #: The manifest colour per theme: the surface of the bottom bar (``--color-surface-3`` of
 #: the ui-kit tokens). Chrome cannot draw an installed Android app under the system
@@ -79,88 +76,63 @@ MANIFEST_COLORS: dict[str, str] = {
 #: The colour schemes that the manifest route serves.
 ManifestScheme = Literal["light", "dark", "contrast"]
 
-#: The icon of a manifest shortcut: the app icon at 96 px, the size that Android asks for.
-_SHORTCUT_ICON: dict[str, Any] = {
-    "src": "icons/icon-96x96.png",
-    "sizes": "96x96",
-    "type": "image/png",
-}
+#: The sizes of the ``any`` icons in the manifest.
+_MANIFEST_ICON_SIZES: tuple[int, ...] = (72, 96, 128, 144, 152, 192, 384, 512)
 
-#: The static manifest fields, that is everything except name and short_name.
+#: The static manifest fields, that is everything except the names, the description, the
+#: icons and the colours.
 #: They are the single source of truth for the PWA manifest that the API serves.
 #: The fixed ``id`` keeps an installed app the same app when ``start_url`` changes.
 #: The shortcut names are German like ``lang`` and equal those of
 #: ``frontend/public/manifest.webmanifest``. ``launch_handler`` opens an app link in
 #: the running app, not in a second window.
 _MANIFEST_BASE: dict[str, Any] = {
-    "description": (
-        "Antragsplattform des Studierendenparlaments — Anträge, Abstimmungen, "
-        "Sitzungsprotokolle und Budget."
-    ),
     "lang": "de",
     "id": "/",
     "display": "standalone",
     "scope": "./",
     "start_url": "./",
-    "icons": [
-        {"src": "icons/icon-72x72.png", "sizes": "72x72", "type": "image/png", "purpose": "any"},
-        {"src": "icons/icon-96x96.png", "sizes": "96x96", "type": "image/png", "purpose": "any"},
-        {
-            "src": "icons/icon-128x128.png",
-            "sizes": "128x128",
-            "type": "image/png",
-            "purpose": "any",
-        },
-        {
-            "src": "icons/icon-144x144.png",
-            "sizes": "144x144",
-            "type": "image/png",
-            "purpose": "any",
-        },
-        {
-            "src": "icons/icon-152x152.png",
-            "sizes": "152x152",
-            "type": "image/png",
-            "purpose": "any",
-        },
-        {
-            "src": "icons/icon-192x192.png",
-            "sizes": "192x192",
-            "type": "image/png",
-            "purpose": "any",
-        },
-        {
-            "src": "icons/icon-384x384.png",
-            "sizes": "384x384",
-            "type": "image/png",
-            "purpose": "any",
-        },
-        {
-            "src": "icons/icon-512x512.png",
-            "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "any",
-        },
-        {
-            "src": "icons/icon-maskable-192x192.png",
-            "sizes": "192x192",
-            "type": "image/png",
-            "purpose": "maskable",
-        },
-        {
-            "src": "icons/icon-maskable-512x512.png",
-            "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "maskable",
-        },
-    ],
-    "shortcuts": [
-        {"name": "Neuer Antrag", "url": "apply", "icons": [_SHORTCUT_ICON]},
-        {"name": "Meine To-Dos", "url": "todos", "icons": [_SHORTCUT_ICON]},
-        {"name": "Sitzungen", "url": "meetings", "icons": [_SHORTCUT_ICON]},
-    ],
     "launch_handler": {"client_mode": ["navigate-existing", "auto"]},
 }
+
+#: The shortcuts of the manifest: name and target.
+_SHORTCUTS: tuple[tuple[str, str], ...] = (
+    ("Neuer Antrag", "apply"),
+    ("Meine To-Dos", "todos"),
+    ("Sitzungen", "meetings"),
+)
+
+
+def _icon(prefix: str, query: str, size: int, purpose: IconPurpose) -> dict[str, str]:
+    kind = "icon-maskable" if purpose == "maskable" else "icon"
+    return {
+        "src": f"{prefix}{kind}-{size}x{size}.png{query}",
+        "sizes": f"{size}x{size}",
+        "type": "image/png",
+        "purpose": purpose,
+    }
+
+
+def manifest_icons(branding: Branding, version: int) -> dict[str, Any]:
+    """Return the icons and the shortcuts of the manifest.
+
+    With a Bildmarke the icons come from the branding image route, each with ``?v=`` of
+    the version, so an installed app fetches a new icon after a save
+    (§ F/administration/admin/001092). Without one they are the built-in icons of the
+    frontend build (``frontend/public/icons``). The paths are relative to
+    ``/manifest.webmanifest``, that is to the root.
+    """
+    prefix, query = (
+        ("api/branding/icons/", f"?v={version}") if has_icon_mark(branding) else ("icons/", "")
+    )
+    shortcut = {k: v for k, v in _icon(prefix, query, 96, "any").items() if k != "purpose"}
+    return {
+        "icons": [
+            *(_icon(prefix, query, size, "any") for size in _MANIFEST_ICON_SIZES),
+            *(_icon(prefix, query, size, "maskable") for size in MASKABLE_SIZES),
+        ],
+        "shortcuts": [{"name": name, "url": url, "icons": [shortcut]} for name, url in _SHORTCUTS],
+    }
 
 
 class SiteConfigService:
@@ -414,18 +386,32 @@ class SiteConfigService:
     async def manifest(self, scheme: ManifestScheme = "light") -> dict[str, Any]:
         """Build the PWA manifest from the active branding config.
 
-        ``name`` and ``short_name`` come from the config. An empty value falls
-        back to the default. ``theme_color`` and ``background_color`` follow
+        ``name``, ``short_name`` and ``description`` come from the config. An empty
+        value falls back to the default (``page_head``). The icons follow the Bildmarke
+        (``manifest_icons``). ``theme_color`` and ``background_color`` follow
         ``scheme``. All other fields are static.
         """
-        branding = branding_of(await self._active())
+        active = await self._active()
+        branding = branding_of(active)
         return {
-            "name": branding.app_name.strip() or DEFAULT_APP_NAME,
-            "short_name": branding.app_short_name.strip() or DEFAULT_APP_SHORT_NAME,
+            "name": app_name(branding),
+            "short_name": app_short_name(branding),
+            "description": description(branding),
             **_MANIFEST_BASE,
+            **manifest_icons(branding, active.version if active else 0),
             "theme_color": MANIFEST_COLORS[scheme],
             "background_color": MANIFEST_COLORS[scheme],
         }
+
+    async def branding_and_version(self) -> tuple[Branding, int]:
+        """Return the active branding and its version (0 without one)."""
+        active = await self._active()
+        return branding_of(active), active.version if active else 0
+
+    async def page_head(self, base_url: str) -> str:
+        """Render the branded page head of the app shell (``page_head``)."""
+        branding, version = await self.branding_and_version()
+        return render_page_head(branding, base_url=base_url, version=version)
 
 
 def _with_sections_of(branding: Branding, source: Branding) -> dict[str, Any]:

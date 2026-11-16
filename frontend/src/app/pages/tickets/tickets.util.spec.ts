@@ -9,9 +9,12 @@ import {
 } from './tickets.util';
 import { personName } from '@shared/person-label.util';
 
-/** The German texts with their parameters filled in. */
+/** The German texts with their parameters filled in; `{shortName}` as I18nService fills it. */
 const t: Translate = (key, params = {}) =>
-  Object.entries(params).reduce((text, [k, v]) => text.replace(`{${k}}`, String(v)), de[key] as string);
+  Object.entries({ shortName: 'STUPA', ...params }).reduce(
+    (text, [k, v]) => text.replace(`{${k}}`, String(v)),
+    de[key] as string,
+  );
 
 const MARA = { principalId: 'p1', displayName: 'Mara Keller' };
 const JONAS = { principalId: 'p2', displayName: 'Jonas Albrecht' };
