@@ -972,7 +972,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/shared/git/000434](style/shared/git/000434_environments.md) | Dev follows development, production follows tags | approved |
 | [S/shared/git/000436](style/shared/git/000436_release-flow.md) | A release goes from development to main by pull request | approved |
 | [S/shared/git/000477](style/shared/git/000477_readme-links-git-specs.md) | The README links to the git specs | approved |
-| [S/shared/git/000628](style/shared/git/000628_required-checks.md) | The branches development and main require the CI checks | approved |
+| [S/shared/git/000628](style/shared/git/000628_required-checks.md) | The branches development and main require the CI checks | draft |
 | [S/shared/testing/000044](style/shared/testing/000044_test-first.md) | A change comes with its tests | approved |
 | [S/shared/testing/000045](style/shared/testing/000045_coverage-gates.md) | Coverage gates hold | approved |
 | [S/shared/testing/000046](style/shared/testing/000046_critical-modules.md) | Critical modules have full branch coverage | approved |
@@ -984,6 +984,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/shared/testing/000476](style/shared/testing/000476_fake-principal.md) | Test doubles of Principal model the admin bypass | approved |
 | [S/shared/testing/000641](style/shared/testing/000641_query-test-on-postgres.md) | A test of a database query runs on Postgres | approved |
 | [S/shared/testing/000642](style/shared/testing/000642_session-fake-ratchet.md) | A CI ratchet lowers the fake sessions in tests | approved |
+| [S/shared/testing/001240](style/shared/testing/001240_changed-parts.md) | CI runs only the jobs of the changed parts | draft |
+| [S/shared/testing/001241](style/shared/testing/001241_green-base.md) | The base of a change is the newest green CI run before it | draft |
+| [S/shared/testing/001242](style/shared/testing/001242_full-runs.md) | Main, a manual run and a change of the CI run every job | draft |
+| [S/shared/testing/001243](style/shared/testing/001243_part-table.md) | A part also runs for a change of a file that it reads | draft |
+| [S/shared/testing/001244](style/shared/testing/001244_gate-job.md) | One gate job sums up the CI run | draft |
 | [S/shared/tooling/000067](style/shared/tooling/000067_nix-dev-shell.md) | Commands run in the Nix dev shell | approved |
 | [S/shared/writing/000034](style/shared/writing/000034_ste-english.md) | Repository texts are written in STE English | approved |
 | [S/shared/writing/000035](style/shared/writing/000035_stupa-in-capitals.md) | STUPA is written in capitals | approved |
