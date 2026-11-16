@@ -150,6 +150,103 @@ async def tickets_delete_blocked_sender(block_id: str) -> dict:
     return await api().delete(f"/tickets/blocked-senders/{block_id}")
 
 
+@group.tool
+async def tickets_note_edit(
+    ticket_id: str, note_id: str, body: str, mentions: list[str] | None = None
+) -> dict:
+    """Change an own note of a ticket (403 `not_note_author` otherwise).
+
+    `mentions` None keeps the stored mentions; a list replaces them, and only a person
+    that the list adds gets the mail `ticket_mentioned`.
+    """
+    return await api().patch(
+        f"/tickets/{ticket_id}/notes/{note_id}", json=params(body=body, mentions=mentions)
+    )
+
+
+@group.tool
+async def tickets_note_delete(ticket_id: str, note_id: str) -> dict:
+    """Delete an own note of a ticket and its files (403 `not_note_author` otherwise)."""
+    await api().delete(f"/tickets/{ticket_id}/notes/{note_id}")
+    return {"deleted": True}
+
+
+@group.tool
+async def tickets_counts() -> dict:
+    """Count the tickets per status (`ticket.manage`)."""
+    return await api().get("/tickets/counts")
+
+
+@group.tool
+async def tickets_assignees() -> list:
+    """List the possible assignees: the active holders of `ticket.manage`, by name."""
+    return await api().get("/tickets/assignees")
+
+
+@group.tool
+async def tickets_report(
+    kind: Literal["bug", "question", "idea", "barrier"],
+    title: str,
+    body: str,
+    file_paths: list[str] | None = None,
+) -> dict:
+    """Report a problem, a question, an idea or an accessibility barrier as the caller.
+
+    The account of the caller is the reporter; the report and the answers show up in
+    `tickets_mine`. Ask the user before you send a report. Files work as in
+    `tickets_note`.
+
+    Args:
+        title: 1 to 200 characters.
+        body: 1 to 10000 characters.
+    """
+    return await post_message(
+        "/tickets",
+        {"kind": kind, "title": title, "body": body, "context": {"route": "mcp"}},
+        file_paths,
+    )
+
+
+@group.tool
+async def tickets_mine(
+    status: list[Literal["new", "in_progress", "done", "rejected"]] | None = None,
+    kind: list[Literal["bug", "question", "idea", "barrier"]] | None = None,
+    q: str | None = None,
+) -> dict:
+    """List the tickets that the caller reported, newest first."""
+    return await api().get("/tickets/mine", params=params(status=status, kind=kind, q=q))
+
+
+@group.tool
+async def tickets_mine_get(ticket_id: str) -> dict:
+    """Read an own ticket: the report, its files, the public notes and the status changes."""
+    return await api().get(f"/tickets/mine/{ticket_id}")
+
+
+@group.tool
+async def tickets_mine_note(
+    ticket_id: str, body: str = "", file_paths: list[str] | None = None
+) -> dict:
+    """Write a message on an own ticket; it is public and the team gets a mail.
+
+    A blocked sender gets 403 `sender_blocked`. Files work as in `tickets_note`.
+    """
+    return await post_message(f"/tickets/mine/{ticket_id}/notes", {"body": body}, file_paths)
+
+
+@group.tool
+async def tickets_mine_note_edit(ticket_id: str, note_id: str, body: str) -> dict:
+    """Change an own message on an own ticket (403 `not_note_author` otherwise)."""
+    return await api().patch(f"/tickets/mine/{ticket_id}/notes/{note_id}", json={"body": body})
+
+
+@group.tool
+async def tickets_mine_note_delete(ticket_id: str, note_id: str) -> dict:
+    """Delete an own message on an own ticket and its files."""
+    await api().delete(f"/tickets/mine/{ticket_id}/notes/{note_id}")
+    return {"deleted": True}
+
+
 def register(mcp: FastMCP) -> None:
     """Register the ticket tool group."""
     group.register(mcp)

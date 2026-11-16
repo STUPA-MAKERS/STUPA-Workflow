@@ -388,6 +388,9 @@ class ApplicationTypeCreate(WireModel, frozen=True):
     hasBudget: bool = False
     pdfSignatures: bool = False
     comparisonOffers: dict[str, Any] | None = None
+    groupId: str | None = Field(
+        default=None, description="The group of Antragsarten in step 1 of the apply wizard"
+    )
 
 
 class ApplicationTypeUpdate(WireModel, frozen=True):
@@ -396,6 +399,80 @@ class ApplicationTypeUpdate(WireModel, frozen=True):
     hasBudget: bool | None = None
     pdfSignatures: bool | None = None
     comparisonOffers: dict[str, Any] | None = None
+    groupId: str | None = Field(
+        default=None, description="The group of Antragsarten in step 1 of the apply wizard"
+    )
+
+
+class ApplicationTypeGroupCreate(WireModel, frozen=True):
+    nameI18n: I18nMap = Field(description="The name by language; German is required")
+    textI18n: I18nMap | None = Field(default=None, description="The text under the name")
+
+
+class ApplicationTypeGroupUpdate(WireModel, frozen=True):
+    nameI18n: I18nMap | None = None
+    textI18n: I18nMap | None = None
+
+
+class GremiumInfoLink(WireModel, frozen=True):
+    label: str = Field(description="1 to 80 characters")
+    url: str = Field(description="An http(s) or mailto address")
+
+
+class AppointmentIn(WireModel, frozen=True):
+    """A Termin of the Kalender with its invitations."""
+
+    title: str = Field(description="1 to 200 characters")
+    startsOn: str = Field(description="ISO date YYYY-MM-DD")
+    endsOn: str = Field(description="ISO date YYYY-MM-DD, not before startsOn")
+    startTime: str | None = Field(default=None, description="HH:MM; none for a whole day")
+    endTime: str | None = Field(default=None, description="HH:MM")
+    place: str | None = Field(default=None, description="Up to 200 characters")
+    description: str | None = Field(default=None, description="Up to 5000 characters")
+    forAll: bool = Field(default=False, description="Invite every account")
+    public: bool = Field(default=False, description="Show the Termin on the public calendar")
+    gremiumIds: list[str] = Field(default_factory=list, description="Invited Gremien")
+    principalIds: list[str] = Field(default_factory=list, description="Invited persons")
+
+
+class ExternalCalendarIn(WireModel, frozen=True):
+    name: str = Field(description="1 to 120 characters")
+    url: str = Field(description="The http(s) address of the ICS feed")
+    gremiumId: str | None = Field(default=None, description="The Gremium that reads it; none: all")
+    intervalMinutes: Literal[15, 60, 360, 1440] = 60
+
+
+class PollOptionIn(WireModel, frozen=True):
+    label: str | None = Field(default=None, description="The text of a text option")
+    start: str | None = Field(default=None, description="ISO date-time of a date option")
+    end: str | None = Field(default=None, description="ISO date-time, optional end")
+
+
+class GremiumVoteCreate(WireModel, frozen=True):
+    """A poll (Umfrage) or an Umlaufverfahren of a Gremium, without a meeting."""
+
+    kind: Literal["poll", "circular"] = "poll"
+    eligibleGroup: str = Field(description="The Gremium")
+    question: str = Field(description="1 to 2000 characters")
+    closesAt: str = Field(
+        description="ISO date-time of the end; a poll at least one hour ahead, an "
+        "Umlaufverfahren at least `minDays` of `get_circular_vote_rules` days ahead"
+    )
+    draft: bool = Field(default=False, description="Keep it a draft; else it opens at once")
+    mode: Literal["single", "multi", "date"] | None = Field(
+        default=None, description="Poll only: one choice, several choices or a date poll"
+    )
+    options: list[PollOptionIn] | None = Field(
+        default=None, description="Poll only: 2 to 20 options"
+    )
+    maxChoices: int | None = Field(default=None, description="Poll only, mode `multi`")
+
+
+class PollPatch(WireModel, frozen=True):
+    question: str | None = None
+    options: list[PollOptionIn] | None = None
+    maxChoices: int | None = None
+    closesAt: str | None = None
 
 
 class UiLanguageCreate(WireModel, frozen=True):
@@ -574,6 +651,11 @@ class MeetingCreate(WireModel, frozen=True):
     title: str
     date: str | None = Field(default=None, description="ISO date")
     startTime: str | None = Field(default=None, description="HH:MM")
+    endTime: str | None = Field(
+        default=None,
+        description="HH:MM, the planned end, after `startTime`; the time plan of the agenda "
+        "and the calendar use it",
+    )
     protokollantId: str | None = None
     publicJoin: bool | None = Field(
         default=None,
@@ -611,6 +693,21 @@ class MeetingPatch(WireModel, frozen=True):
     )
     date: str | None = None
     startTime: str | None = None
+    endTime: str | None = Field(
+        default=None,
+        description="HH:MM, the planned end, after `startTime`; the time plan of the agenda "
+        "and the calendar use it",
+    )
+    currentAgendaItemId: str | None = Field(
+        default=None,
+        description="Live meeting: the agenda item that the room is on now (the lead or the "
+        "protokollant)",
+    )
+    completeAgendaItemId: str | None = Field(
+        default=None,
+        description="The item that the room leaves (\"Nächster TOP\"): its done mark is set "
+        "in the same step; needs `currentAgendaItemId` in the same patch",
+    )
     protokollantId: str | None = None
     publicJoin: bool | None = Field(
         default=None,
@@ -841,6 +938,23 @@ class TodoLinkIn(WireModel, frozen=True):
 TodoEntryRole = Literal["read", "edit", "manage"]
 
 
+TodoLabelColor = Literal["green", "blue", "violet", "amber", "red", "gray"]
+
+
+class TodoEventIn(WireModel, frozen=True):
+    """The event data of a card (Veranstaltung)."""
+
+    startsOn: str | None = Field(default=None, description="ISO date YYYY-MM-DD")
+    endsOn: str | None = Field(default=None, description="ISO date YYYY-MM-DD")
+    startTime: str | None = Field(default=None, description="HH:MM")
+    endTime: str | None = Field(default=None, description="HH:MM")
+    place: str | None = Field(default=None, description="Up to 200 characters")
+    participants: int | None = Field(default=None, description="Expected number of participants")
+    seriesId: str | None = Field(
+        default=None, description="The Reihe of the event (see `todo_series`)"
+    )
+
+
 class TodoBoardEntryIn(WireModel, frozen=True):
     gremiumId: str | None = Field(default=None, description="A gremium; or set principalId")
     principalId: str | None = Field(default=None, description="A person; or set gremiumId")
@@ -862,6 +976,12 @@ class TodoCardCreate(WireModel, frozen=True):
     )
     labelIds: list[str] | None = Field(default=None, description="Label ids of the same board")
     links: list[TodoLinkIn] | None = None
+    checklist: list[str] | None = Field(
+        default=None, description="The texts of the first checklist items (subtasks), up to 100"
+    )
+    event: TodoEventIn | None = Field(
+        default=None, description="Event data: the card is an Event (Veranstaltung) for good"
+    )
 
 
 class TodoCardPatch(WireModel, frozen=True):
