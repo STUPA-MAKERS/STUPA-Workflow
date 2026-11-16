@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
-implementation: null
+tests:
+  - "backend/tests/integration/modules/todos/test_todos_free_boards.py:test_a_global_key_reads_a_free_board"
+implementation:
+  - backend/app/modules/todos/access.py
 scope:
   - backend/app/modules/todos
   - frontend/src/app/pages/todos

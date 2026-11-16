@@ -342,11 +342,13 @@ class MeetingGremiumOut(FrozenCamelModel, frozen=True):
     The source is visibility, not membership. A Gremium appears exactly when the
     principal can read at least one meeting there. A pool substitute or a
     delegation recipient without a membership can therefore filter their Gremium. A
-    member of a Gremium without meetings does not get the entry.
+    member of a Gremium without meetings does not get the entry. ``logo_url`` is the
+    square logo of the Gremium for the shared picker (spec 001074), else null.
     """
 
     id: UUID
     name: str
+    logo_url: str | None = None
 
 
 #: Upper limit for the reason of an excuse. The reason is personal data, so keep it short.

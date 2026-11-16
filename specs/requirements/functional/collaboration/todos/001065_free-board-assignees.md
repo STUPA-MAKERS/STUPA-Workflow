@@ -5,7 +5,8 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
-implementation: null
+implementation:
+  - backend/app/modules/todos/access.py
 scope:
   - backend/app/modules/todos
   - frontend/src/app/pages/todos

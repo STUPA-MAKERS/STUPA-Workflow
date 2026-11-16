@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
-implementation: null
+tests:
+  - "backend/tests/integration/modules/todos/test_todos_free_boards.py:test_the_roles_of_the_entries_and_the_live_gremium"
+implementation:
+  - backend/app/modules/todos/access.py
 scope:
   - backend/app/modules/todos
   - frontend/src/app/pages/todos

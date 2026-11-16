@@ -5,7 +5,12 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
-implementation: null
+tests:
+  - "backend/tests/integration/modules/todos/test_todos_free_boards.py:test_a_gremium_board_takes_entries_and_every_member_edits"
+  - "frontend/src/app/pages/todos/board-settings/todo-board-settings.component.spec.ts:TodoBoardSettingsComponent"
+implementation:
+  - backend/app/modules/todos/service.py
+  - frontend/src/app/pages/todos/board-settings/todo-board-settings.component.ts
 scope:
   - backend/app/modules/todos
   - frontend/src/app/pages/todos

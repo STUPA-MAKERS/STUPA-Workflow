@@ -94,12 +94,14 @@ import {
   type BoardFilter,
 } from '../../features/todos/todos.util';
 import { TodoArchiveSheetComponent } from './archive-sheet/todo-archive-sheet.component';
+import { TodoArchivedBoardsComponent } from './archived-boards/todo-archived-boards.component';
 import { TodoBoardPickerComponent } from './board-picker/todo-board-picker.component';
 import { TodoBoardRowsComponent, type RowDrop, type RowLead } from './board-rows/todo-board-rows.component';
 import { TodoBoardSettingsComponent } from './board-settings/todo-board-settings.component';
 import { TodoBoardSkeletonComponent } from './board-skeleton/todo-board-skeleton.component';
 import { TodoBoardViewComponent, boardDropId, type BoardMove } from './board-view/todo-board-view.component';
 import { TodoListViewComponent } from './list-view/todo-list-view.component';
+import { TodoNewBoardDialogComponent } from './new-board-dialog/todo-new-board-dialog.component';
 import { isoDay } from '@shared/date-format';
 import { pageItemTitle } from '../../layout/page-title.service';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
@@ -190,6 +192,7 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
     ScrollFadeDirective,
     SwipeBackDirective,
     TodoArchiveSheetComponent,
+    TodoArchivedBoardsComponent,
     TodoBoardPickerComponent,
     TodoBoardRowsComponent,
     TodoBoardSkeletonComponent,
@@ -197,6 +200,7 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
     TodoBoardViewComponent,
     TodoCardDetailComponent,
     TodoListViewComponent,
+    TodoNewBoardDialogComponent,
     TodoNewDialogComponent,
     TodoMoveSheetComponent,
     TodoTransferDialogComponent,
@@ -295,6 +299,12 @@ export class TodosComponent implements OnDestroy {
   readonly newColumn = signal<Uuid | null>(null);
   readonly settingsOpen = signal(false);
   readonly archiveOpen = signal(false);
+  /** "Neues Board" (spec 001061) and "Archivierte Boards" (spec 001068). */
+  readonly newBoardOpen = signal(false);
+  readonly archivedBoardsOpen = signal(false);
+  /** The person reads an archived free board: the picker offers the list. */
+  readonly hasArchivedBoards = signal(false);
+  readonly canCreateBoard = computed(() => this.auth.can('todo.create_board'));
   readonly today = signal(isoDay(new Date()));
 
   private readonly drawer = viewChild<ElementRef<HTMLElement>>('drawer');
@@ -564,6 +574,10 @@ export class TodosComponent implements OnDestroy {
    */
   constructor() {
     pageItemTitle(() => this.board()?.name);
+    this.api.archivedBoards().subscribe({
+      next: (list) => this.hasArchivedBoards.set(list.length > 0),
+      error: () => this.hasArchivedBoards.set(false),
+    });
     this.api.boards().subscribe({
       next: (boards) => {
         this.boards.set(boards);
@@ -1305,6 +1319,27 @@ export class TodosComponent implements OnDestroy {
     this.wrote();
     this.board.set(board);
     this.boards.update((list) => list.map((b) => (b.id === board.id ? { ...b, name: board.name } : b)));
+  }
+
+  /** A new free board: the picker reads the boards again and the page opens it. */
+  onBoardCreated(board: TodoBoard): void {
+    this.refreshBoards();
+    void this.router.navigate(['/todos', board.id]);
+  }
+
+  /** The board went to the archive: it leaves the picker, the page opens the default board. */
+  onBoardArchived(): void {
+    const id = this.boardId();
+    this.hasArchivedBoards.set(true);
+    const rest = this.boards().filter((b) => b.id !== id);
+    this.boards.set(rest);
+    this.refreshBoards();
+    this.openDefault(rest);
+  }
+
+  /** A restored board joins the picker again. */
+  onBoardRestored(): void {
+    this.refreshBoards();
   }
 
   /** Read the board again, not from the reads made before (the retry after an error). */

@@ -5,7 +5,8 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
-implementation: null
+implementation:
+  - backend/app/modules/todos/service.py
 scope:
   - frontend/src/app/features/todos
   - frontend/src/app/features/gremien

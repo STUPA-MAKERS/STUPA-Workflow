@@ -5,7 +5,16 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
-implementation: null
+tests:
+  - "frontend/src/app/features/gremien/gremium-person-picker/gremium-person-picker.component.spec.ts:GremiumPersonPickerComponent"
+  - "frontend/src/app/features/calendar/appointment-dialog/appointment-dialog.component.spec.ts:AppointmentDialogComponent"
+  - "backend/tests/integration/modules/todos/test_todos_free_boards.py:test_the_picker_finds_gremien_and_persons"
+implementation:
+  - frontend/src/app/features/gremien/gremium-person-picker/gremium-person-picker.component.ts
+  - frontend/src/app/features/calendar/appointment-dialog/appointment-dialog.component.ts
+  - frontend/src/app/pages/todos/board-entries/todo-board-entries.component.ts
+  - backend/app/modules/todos/service.py
+  - backend/app/modules/site_config/square_logos.py
 scope:
   - frontend/src/app/features/todos
   - frontend/src/app/features/calendar

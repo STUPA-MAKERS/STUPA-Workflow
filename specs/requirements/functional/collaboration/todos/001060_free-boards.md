@@ -5,7 +5,12 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
-implementation: null
+tests:
+  - "backend/tests/integration/modules/todos/test_todos_free_boards.py:test_only_the_permission_creates_a_free_board"
+implementation:
+  - backend/app/modules/todos/models.py
+  - backend/app/modules/todos/service.py
+  - backend/migrations/versions/c6010961aa02_todo_free_boards.py
 scope:
   - backend/app/modules/todos
   - frontend/src/app/pages/todos

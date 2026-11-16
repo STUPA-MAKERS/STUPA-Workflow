@@ -5,7 +5,16 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
-implementation: null
+tests:
+  - "backend/tests/integration/modules/todos/test_todos_free_boards.py:test_only_the_permission_creates_a_free_board"
+  - "frontend/src/app/pages/todos/board-picker/todo-board-picker.component.spec.ts:TodoBoardPickerComponent"
+  - "frontend/src/app/pages/todos/new-board-dialog/todo-new-board-dialog.component.spec.ts:TodoNewBoardDialogComponent"
+implementation:
+  - backend/app/modules/todos/service.py
+  - backend/app/modules/todos/router.py
+  - backend/migrations/versions/c6010961aa02_todo_free_boards.py
+  - frontend/src/app/pages/todos/new-board-dialog/todo-new-board-dialog.component.ts
+  - frontend/src/app/pages/todos/board-picker/todo-board-picker.component.ts
 scope:
   - backend/app/modules/todos
   - frontend/src/app/pages/todos

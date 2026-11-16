@@ -54,6 +54,25 @@
         </button>
       }
     }
+    @if (canCreate() || hasArchived()) {
+      <div class="bp__sep" role="separator"></div>
+      @if (canCreate()) {
+        <button type="button" class="bp__row" data-testid="bp-create" (click)="act('create')">
+          <app-icon class="bp__icon" name="plus" [size]="18" />
+          <span class="bp__text">
+            <span class="bp__name">{{ 'todos.board.new' | t }}</span>
+          </span>
+        </button>
+      }
+      @if (hasArchived()) {
+        <button type="button" class="bp__row" data-testid="bp-archived" (click)="act('archived')">
+          <app-icon class="bp__icon" name="archive" [size]="18" />
+          <span class="bp__text">
+            <span class="bp__name">{{ 'todos.board.archived' | t }}</span>
+          </span>
+        </button>
+      }
+    }
   </ng-template>
 
   @if (open() && !phone()) {

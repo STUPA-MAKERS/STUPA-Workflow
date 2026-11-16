@@ -316,3 +316,22 @@ async def test_a_card_moves_between_a_free_board_and_a_gremium_board(
         assert there["boardId"] == str(gboard)
         back = _ok(client.post(f"/api/todos/cards/{card['id']}/transfer", json={"boardId": bid}))
         assert back["boardId"] == bid
+
+
+async def test_the_picker_finds_gremien_and_persons(
+    api: Api, maker: async_sessionmaker[AsyncSession]
+) -> None:
+    """Find gremien by name and persons from two characters on (spec 001074)."""
+    me, _ = await add_person(maker, "Mara")
+    await add_person(maker, "Astrid")
+    gid, _ = await add_gremium(maker, "AStA")
+    await add_gremium(maker, "Fachschaft")
+    with TestClient(api.app) as client:
+        api.login(me)
+        every = _ok(client.get("/api/todos/entry-options"))
+        assert {g["name"] for g in every["gremien"]} >= {"AStA", "Fachschaft"}
+        assert every["persons"] == []
+        hits = _ok(client.get("/api/todos/entry-options", params={"q": "ast"}))
+        assert [(g["id"], g["logoUrl"]) for g in hits["gremien"]] == [(str(gid), None)]
+        assert [p["name"] for p in hits["persons"]] == ["Astrid"]
+        assert "email" not in hits["persons"][0]

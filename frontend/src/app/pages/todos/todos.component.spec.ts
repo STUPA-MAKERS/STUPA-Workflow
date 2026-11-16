@@ -86,6 +86,9 @@ async function start(url: string, opts: Opts = {}) {
     board: jest.fn(() => of(b)),
     linkTargets: jest.fn(() => of([])),
     archive: jest.fn(() => of({ items: [], total: 0, limit: 50, offset: 0 })),
+    archivedBoards: jest.fn(() => of([])),
+    entries: jest.fn(() => of([])),
+    entryOptions: jest.fn(() => of({ gremien: [], persons: [] })),
   };
   const toast = { success: jest.fn(), error: jest.fn() };
   TestBed.configureTestingModule({
@@ -110,6 +113,7 @@ async function start(url: string, opts: Opts = {}) {
   (auth as unknown as { _principal: { set(v: unknown): void } })._principal.set({
     id: 'me',
     permissions: [],
+    roles: [],
     gremien: (opts.gremien ?? ['g-1', 'g-2']).map((id) => ({ id, name: id, slug: id })),
   });
   const harness = await RouterTestingHarness.create();

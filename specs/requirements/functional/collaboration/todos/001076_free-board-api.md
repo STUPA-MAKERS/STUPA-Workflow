@@ -5,7 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
-implementation: null
+tests:
+  - "mcp/antragsplattform_mcp/tests/test_todo_ticket_tools.py:test_free_board_tools_send_one_request_each"
+implementation:
+  - backend/app/modules/todos/router.py
+  - mcp/antragsplattform_mcp/tools/todos.py
 scope:
   - backend/app/modules/todos
   - mcp

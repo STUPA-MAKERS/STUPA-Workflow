@@ -5,7 +5,12 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
-implementation: null
+tests:
+  - "backend/tests/integration/modules/todos/test_todos_free_boards.py:test_a_card_of_a_free_board_goes_on_the_agenda_of_its_gremien"
+implementation:
+  - backend/app/modules/todos/access.py
+  - frontend/src/app/features/todos/card-detail/todo-card-detail.component.ts
+  - frontend/src/app/features/todos/agenda-dialog/todo-agenda-dialog.component.ts
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos

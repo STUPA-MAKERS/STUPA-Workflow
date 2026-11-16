@@ -482,6 +482,35 @@ class TodoBoardEntryOut(FrozenCamelModel, frozen=True):
     name: str
     role: TodoEntryRole
     fixed: bool = False
+    #: The square logo of a gremium entry (``/api/committees/{id}/logo``), else null.
+    logo_url: str | None = None
+
+
+class EntryGremiumOption(FrozenCamelModel, frozen=True):
+    """A gremium that the shared picker offers, with its logo path or null."""
+
+    id: UUID
+    name: str
+    logo_url: str | None = None
+
+
+class EntryPersonOption(FrozenCamelModel, frozen=True):
+    """An active person that the shared picker offers: the name, never the e-mail."""
+
+    id: UUID
+    name: str
+
+
+class EntryOptionsOut(FrozenCamelModel, frozen=True):
+    """The hits of the shared picker of gremien and persons (spec 001074).
+
+    ``gremien`` holds every gremium whose name holds the query (all of them for an
+    empty query); ``persons`` the active persons whose name holds it, from two
+    characters on and at most ten.
+    """
+
+    gremien: list[EntryGremiumOption]
+    persons: list[EntryPersonOption]
 
 
 class ColumnCreate(FrozenStrictCamelModel, frozen=True):

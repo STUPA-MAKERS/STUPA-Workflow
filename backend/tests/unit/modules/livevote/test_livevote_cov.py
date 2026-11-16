@@ -908,7 +908,7 @@ async def test_decorate_non_admin_protokollant_flag(
 
 async def test_list_filter_gremien_admin_sorted() -> None:
     g1, g2 = uuid4(), uuid4()
-    sess = _QueueSession(executes=[res((g1, "Zeta"), (g2, "alpha"))])
+    sess = _QueueSession(executes=[res((g1, "Zeta", None), (g2, "alpha", None))])
     svc = MeetingService(sess)  # type: ignore[arg-type]
     out = await svc.list_filter_gremien(_admin())
     assert [g.name for g in out] == ["alpha", "Zeta"]
@@ -932,7 +932,7 @@ async def test_list_filter_gremien_non_admin_visibility(
         executes=[
             res(),
             res(),
-            res((g1, "Beta")),
+            res((g1, "Beta", None)),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]

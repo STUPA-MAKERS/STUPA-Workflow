@@ -36,6 +36,7 @@ const KIND_FEATURE: ReadonlyMap<string, FeatureKey> = new Map<string, FeatureKey
   ['todo_assigned', 'todos'],
   ['todo_mentioned', 'todos'],
   ['todo_due', 'todos'],
+  ['todo_board_added', 'todos'],
   ['poll_started', 'voting'],
   ['poll_reminder', 'voting'],
   ['appointment', 'calendar'],

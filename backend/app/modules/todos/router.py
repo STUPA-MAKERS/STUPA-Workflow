@@ -54,6 +54,7 @@ from app.modules.todos.schemas import (
     CommentCreate,
     CommentIn,
     EntryIn,
+    EntryOptionsOut,
     EntryPatch,
     EventIn,
     LabelCreate,
@@ -211,6 +212,7 @@ async def create_board(
 ) -> TodoBoardOut:
     """Create a free board (admins and ``todo.create_board``, spec 001061)."""
     out = await service.create_board(payload, principal)
+    await service.session.commit()
     _send(service, background, request, settings, send)
     return out
 
@@ -223,7 +225,9 @@ async def create_board(
 )
 async def delete_board(board_id: UUID, service: ServiceDep, principal: Member) -> Response:
     """Delete an archived free board with its cards (admins only, spec 001068)."""
-    await service.delete_board(board_id, principal)
+    storage_keys = await service.delete_board(board_id, principal)
+    await service.session.commit()
+    await service.files.remove_objects(storage_keys)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -234,7 +238,9 @@ async def delete_board(board_id: UUID, service: ServiceDep, principal: Member) -
 )
 async def archive_board(board_id: UUID, service: ServiceDep, principal: Member) -> TodoBoardSummary:
     """Archive a free board: hidden and read-only (manage, spec 001068)."""
-    return await service.archive_board(board_id, principal)
+    out = await service.archive_board(board_id, principal)
+    await service.session.commit()
+    return out
 
 
 @router.post(
@@ -244,7 +250,17 @@ async def archive_board(board_id: UUID, service: ServiceDep, principal: Member) 
 )
 async def restore_board(board_id: UUID, service: ServiceDep, principal: Member) -> TodoBoardSummary:
     """Restore an archived free board (manage, spec 001068)."""
-    return await service.restore_board(board_id, principal)
+    out = await service.restore_board(board_id, principal)
+    await service.session.commit()
+    return out
+
+
+@router.get("/entry-options", response_model=EntryOptionsOut, responses=_errors(401))
+async def entry_options(
+    service: ServiceDep, principal: Member, q: Annotated[str, Query(max_length=100)] = ""
+) -> EntryOptionsOut:
+    """The gremien and persons of the shared picker (spec 001074): names, never e-mails."""
+    return await service.entry_options(principal, q)
 
 
 @router.get(
@@ -277,6 +293,7 @@ async def add_board_entry(
 ) -> list[TodoBoardEntryOut]:
     """Add a gremium or a person with a role (manage, specs 001064, 001077)."""
     out = await service.add_entry(board_id, payload, principal)
+    await service.session.commit()
     _send(service, background, request, settings, send)
     return out
 
@@ -290,7 +307,9 @@ async def patch_board_entry(
     board_id: UUID, entry_id: UUID, payload: EntryPatch, service: ServiceDep, principal: Member
 ) -> list[TodoBoardEntryOut]:
     """Change the role of an entry (manage; 409 ``last_manager``)."""
-    return await service.patch_entry(board_id, entry_id, payload, principal)
+    out = await service.patch_entry(board_id, entry_id, payload, principal)
+    await service.session.commit()
+    return out
 
 
 @router.delete(
@@ -302,7 +321,9 @@ async def delete_board_entry(
     board_id: UUID, entry_id: UUID, service: ServiceDep, principal: Member
 ) -> list[TodoBoardEntryOut]:
     """Remove an entry (manage; 409 ``last_manager``)."""
-    return await service.delete_entry(board_id, entry_id, principal)
+    out = await service.delete_entry(board_id, entry_id, principal)
+    await service.session.commit()
+    return out
 
 
 @router.get(
