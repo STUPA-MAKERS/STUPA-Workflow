@@ -1,0 +1,25 @@
+---
+id: "001069"
+title: A card of a free board goes on the agenda of each of its Gremien
+kind: functional
+status: draft
+owner: frederikbeimgraben
+updated: 2026-11-16
+implementation: null
+scope:
+  - backend/app/modules/todos
+  - frontend/src/app/features/todos
+  - backend/app/modules/livevote
+---
+
+# A card of a free board goes on the agenda of each of its Gremien
+
+The action `Auf Tagesordnung setzen` (000553) must also show on a card of a free board. It must
+offer the planned meetings of each Gremium that is a member entry of the board and whose agenda
+the person can edit, grouped by Gremium, the next meeting first. A free board without such a
+Gremium must not show the action. A card must still be on at most one agenda (000326).
+
+Reason: A board of several Gremien prepares work for the meetings of each of them.
+
+Test: A backend test puts a card of a free board on a meeting of one of its Gremien and gets 422
+`todo_wrong_board` for a Gremium that is not on the board.

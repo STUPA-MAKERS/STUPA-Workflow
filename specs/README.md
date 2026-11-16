@@ -261,6 +261,23 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/todos/000573](requirements/functional/collaboration/todos/000573_card-links-both-ways.md) | A link between two cards shows on both cards | approved |
 | [F/collaboration/todos/000735](requirements/functional/collaboration/todos/000735_termin-link.md) | A card can link a Termin | approved |
 | [F/collaboration/todos/000736](requirements/functional/collaboration/todos/000736_event-times.md) | The start and the end of an Event can have a time | approved |
+| [F/collaboration/todos/001060](requirements/functional/collaboration/todos/001060_free-boards.md) | A free board belongs to no single Gremium | draft |
+| [F/collaboration/todos/001061](requirements/functional/collaboration/todos/001061_free-board-create.md) | Admins and holders of todo.create_board create a free board | draft |
+| [F/collaboration/todos/001062](requirements/functional/collaboration/todos/001062_free-board-roles.md) | Each member entry of a free board has a role | draft |
+| [F/collaboration/todos/001063](requirements/functional/collaboration/todos/001063_gremium-entry-live.md) | A Gremium entry stands for the members of the Gremium at the time of the read | draft |
+| [F/collaboration/todos/001064](requirements/functional/collaboration/todos/001064_free-board-manage.md) | Members with Verwalten and admins manage a free board | draft |
+| [F/collaboration/todos/001065](requirements/functional/collaboration/todos/001065_free-board-assignees.md) | Assignees of a free board are its members who edit | draft |
+| [F/collaboration/todos/001066](requirements/functional/collaboration/todos/001066_free-board-global-keys.md) | todo.all and todo.read_all reach free boards | draft |
+| [F/collaboration/todos/001067](requirements/functional/collaboration/todos/001067_free-boards-in-picker.md) | Free boards show in the board picker after the boards of the Gremien | draft |
+| [F/collaboration/todos/001068](requirements/functional/collaboration/todos/001068_free-board-archive.md) | A manager archives a free board and only an admin deletes it | draft |
+| [F/collaboration/todos/001069](requirements/functional/collaboration/todos/001069_free-board-agenda.md) | A card of a free board goes on the agenda of each of its Gremien | draft |
+| [F/collaboration/todos/001070](requirements/functional/collaboration/todos/001070_gremium-tab-own-board.md) | The To-Dos tab of a Gremium shows only the board of the Gremium | draft |
+| [F/collaboration/todos/001071](requirements/functional/collaboration/todos/001071_free-board-added-mail.md) | A person added to a free board by name gets a mail | draft |
+| [F/collaboration/todos/001072](requirements/functional/collaboration/todos/001072_gremium-boards-stay.md) | The board of a Gremium stays its own kind | draft |
+| [F/collaboration/todos/001073](requirements/functional/collaboration/todos/001073_team-board-stays.md) | The team board Plattform stays a team board | draft |
+| [F/collaboration/todos/001074](requirements/functional/collaboration/todos/001074_gremium-person-picker.md) | One search field picks Gremien and persons | draft |
+| [F/collaboration/todos/001075](requirements/functional/collaboration/todos/001075_free-board-transfer.md) | A card moves between a free board and other shared boards | draft |
+| [F/collaboration/todos/001076](requirements/functional/collaboration/todos/001076_free-board-api.md) | Free boards are created and managed through the API and MCP | draft |
 | [F/finance/budget/000138](requirements/functional/finance/budget/000138_cost-centre-picker.md) | The cost centre pickers are fixed | approved |
 | [F/finance/budget/000139](requirements/functional/finance/budget/000139_close-fiscal-year.md) | A fiscal year closes and reopens | approved |
 | [F/finance/budget/000140](requirements/functional/finance/budget/000140_default-fiscal-year.md) | The default fiscal year holds today | approved |
@@ -416,7 +433,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/calendar/000737](requirements/functional/meetings/calendar/000737_event-as-termin.md) | The Kalender shows an Event like a Termin | approved |
 | [F/meetings/calendar/000738](requirements/functional/meetings/calendar/000738_termin-invite-person-search.md) | The invitation search finds each active account by name | approved |
 | [F/meetings/calendar/000740](requirements/functional/meetings/calendar/000740_termin-open-answers.md) | The answer list of a Termin names the invited persons without an answer | approved |
-| [F/meetings/calendar/000742](requirements/functional/meetings/calendar/000742_termin-invite-search-rows.md) | The invitation search of a Termin shows its hits as rows with an avatar | approved |
+| [F/meetings/calendar/000742](requirements/functional/meetings/calendar/000742_termin-invite-search-rows.md) | The invitation search of a Termin shows its hits as rows with an avatar | replaced |
 | [F/meetings/calendar/000744](requirements/functional/meetings/calendar/000744_week-span-blocks.md) | A timed entry over several days is a block on each of its days in the week view | approved |
 | [F/meetings/calendar/000746](requirements/functional/meetings/calendar/000746_week-whole-day.md) | The week view shows the whole day from 00:00 to 24:00 | approved |
 | [F/meetings/calendar/000973](requirements/functional/meetings/calendar/000973_rule-with-day-times.md) | A recurrence rule with times of the day gives only the first date | approved |

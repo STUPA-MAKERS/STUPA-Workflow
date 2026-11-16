@@ -2,11 +2,10 @@
 id: "000742"
 title: The invitation search of a Termin shows its hits as rows with an avatar
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-12
-implementation:
-  - frontend/src/app/features/calendar/appointment-dialog/appointment-dialog.component.html
+updated: 2026-11-16
+replaced_by: F/collaboration/todos/001074
 scope:
   - frontend/src/app/features
 ---
