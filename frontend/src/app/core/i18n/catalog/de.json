@@ -337,6 +337,7 @@
   "apply.steps.contact": "Kontakt",
   "apply.steps.review": "Prüfen & absenden",
   "apply.error.typesLoad": "Antragsarten konnten nicht geladen werden.",
+  "apply.error.typeUnknown": "Diese Antragsart gibt es nicht oder sie nimmt keine Anträge mehr an.",
   "apply.error.formLoad": "Formular konnte nicht geladen werden.",
   "apply.error.submit": "Antrag konnte nicht gesendet werden.",
   "apply.type.title": "Antragsart wählen",

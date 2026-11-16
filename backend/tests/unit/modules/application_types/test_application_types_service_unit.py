@@ -71,7 +71,7 @@ def test_list_public_maps_minimal_fields() -> None:
     assert item.has_budget is True
     assert item.active is True
     assert item.active_form_version_id == row.active_form_version_id
-    assert item.key is None
+    assert item.key == "finanz"
     assert item.gremium_id is None
 
 

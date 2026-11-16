@@ -49,7 +49,7 @@ class _FakeService:
             hasBudget=True,
             active=True,
             activeFormVersionId=uuid4(),
-            key="finanz" if admin else None,
+            key="finanz",
             gremiumId=uuid4() if admin else None,
         )
         return Page(items=[item], total=1, limit=limit, offset=offset)
@@ -83,6 +83,7 @@ def _as_user(app: FastAPI) -> None:
 
 
 def test_list_public_ok_camel_case(app_client: TestClient, fake_service: _FakeService) -> None:
+    """The public view gives the key and hides the Gremium (§001172)."""
     r = app_client.get("/api/application-types")
     assert r.status_code == 200
     body = r.json()
@@ -95,7 +96,7 @@ def test_list_public_ok_camel_case(app_client: TestClient, fake_service: _FakeSe
     call = fake_service.calls[0]
     assert call["admin"] is False
     assert call["include_inactive"] is False
-    assert item["key"] is None
+    assert item["key"] == "finanz"
     assert item["gremiumId"] is None
 
 

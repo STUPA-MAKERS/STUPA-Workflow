@@ -28,6 +28,9 @@ import {
  * route data, because route data wins over a `?frame=` query parameter in the input
  * binding. The redirects keep old bookmarks and shared links working. The old German URLs
  * (spec 000592) have no route here: `LegacyUrlSerializer` reads them as their English URLs.
+ * `/apply/<type>` (spec 001170) is a child without a component of `apply`, so the wizard
+ * stays the same instance while "Weiter" and the browser buttons change the type, and keeps
+ * its answers and files. `apply/confirmation` comes first, or `:type` would match it.
  * A route of a feature with a switch has `featureMatch`: while the feature is off, the route
  * does not match and the catch-all route shows "Seite nicht gefunden".
  */
@@ -43,18 +46,22 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/home.component').then((m) => m.HomeComponent),
       },
       {
-        path: 'apply',
-        data: { title: 'apply.title', footer: true },
-        loadComponent: () =>
-          import('./features/apply/apply-wizard.component').then((m) => m.ApplyWizardComponent),
-      },
-      {
         path: 'apply/confirmation',
         data: { title: 'apply.confirm.heading', contextual: true, footer: true },
         loadComponent: () =>
           import('./features/apply/apply-confirmation.component').then(
             (m) => m.ApplyConfirmationComponent,
           ),
+      },
+      {
+        path: 'apply',
+        data: { title: 'apply.title', footer: true },
+        loadComponent: () =>
+          import('./features/apply/apply-wizard.component').then((m) => m.ApplyWizardComponent),
+        children: [
+          { path: '', children: [] },
+          { path: ':type', children: [] },
+        ],
       },
       {
         path: 'login',

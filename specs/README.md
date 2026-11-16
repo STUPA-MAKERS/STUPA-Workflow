@@ -159,6 +159,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/applications/000882](requirements/functional/applications/applications/000882_pdf-no-pii-without-right.md) | The Antrag PDF shows only what the reader may see | approved |
 | [F/applications/applications/000883](requirements/functional/applications/applications/000883_pdf-name.md) | The Antrag PDF is named after the Antrag | approved |
 | [F/applications/applications/000888](requirements/functional/applications/applications/000888_pdf-signatures.md) | The Antrag PDF of an Antragsart can end with a signature section | approved |
+| [F/applications/applications/001170](requirements/functional/applications/applications/001170_apply-type-in-url.md) | The chosen Antragsart stands in the apply URL | approved |
+| [F/applications/applications/001171](requirements/functional/applications/applications/001171_apply-unknown-type.md) | An apply link to an unknown Antragsart opens the type step | approved |
+| [F/applications/applications/001172](requirements/functional/applications/applications/001172_public-type-key.md) | The public list of Antragstypen gives the key | approved |
+| [F/applications/applications/001173](requirements/functional/applications/applications/001173_apply-old-type-link.md) | An old apply link with the type id still works | approved |
 | [F/applications/applications/001180](requirements/functional/applications/applications/001180_type-groups.md) | Admins group the Antragsarten | approved |
 | [F/applications/applications/001181](requirements/functional/applications/applications/001181_apply-type-groups.md) | Step 1 shows the Antragsarten by group with the group text | approved |
 | [F/applications/applications/001182](requirements/functional/applications/applications/001182_apply-ungrouped-types.md) | Antragsarten without a group stand last under Weitere Anträge | approved |

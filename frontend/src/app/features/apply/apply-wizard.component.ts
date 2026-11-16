@@ -10,14 +10,14 @@ import {
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { catchError, of } from 'rxjs';
+import { catchError, filter, of, startWith } from 'rxjs';
 import {
   FormControl,
   FormGroup,
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
@@ -385,18 +385,35 @@ export class ApplyWizardComponent {
   });
 
   private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The type segment of the URL (`/apply/<key>`, the child route `:type`). */
+  private urlType: string | null = null;
+  /** The type of an old link (`/apply?type=<id>`, spec 001173). */
+  private oldUrlType: string | null = null;
+  /** The list of types is loaded, so the URL can be matched. */
+  private typesLoaded = false;
 
   constructor() {
     this.auth.ensureLoaded().subscribe();
+    this.router.events
+      .pipe(
+        filter((e) => e instanceof NavigationEnd),
+        startWith(null),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(() => {
+        const snap = this.route.snapshot;
+        const type = snap.firstChild?.paramMap.get('type') ?? null;
+        const oldType = snap.queryParamMap.get('type');
+        if (type === this.urlType && oldType === this.oldUrlType) return;
+        this.urlType = type;
+        this.oldUrlType = oldType;
+        if (this.typesLoaded) this.openFromUrl(false);
+      });
     this.api.applicationTypes().subscribe({
       next: (t) => {
-        const active = t.filter((x) => x.active);
-        this.types.set(active);
-        const wanted = [
-          this.route.snapshot.queryParamMap.get('type'),
-          readStorage(DRAFT_LAST_TYPE),
-        ].find((id) => !!id && active.some((x) => x.id === id));
-        if (wanted) this.selectType(wanted);
+        this.types.set(t.filter((x) => x.active));
+        this.typesLoaded = true;
+        this.openFromUrl(true);
       },
       error: () => this.toast.error(this.i18n.translate('apply.error.typesLoad')),
     });
@@ -414,11 +431,68 @@ export class ApplyWizardComponent {
     });
   }
 
-  selectType(id: Uuid): void {
+  selectType(id: Uuid, pastTypeStep = false): void {
     if (this.typeId() === id) return;
     this.typeId.set(id);
     this.predecessor.set(null);
-    this.loadForm(id);
+    this.loadForm(id, pastTypeStep);
+  }
+
+  /** The segment of a type in the apply URL: its key (spec 001170), else its id. */
+  private slugOf(id: Uuid | null): string | null {
+    const type = this.types().find((t) => t.id === id);
+    return type ? (type.key ?? type.id) : null;
+  }
+
+  /** The active type that a URL segment names, by key or by id. */
+  private typeBySlug(slug: string): ApplicationType | undefined {
+    return this.types().find((t) => t.key === slug || t.id === slug);
+  }
+
+  /**
+   * Bring the wizard to the URL (specs 001170, 001171, 001173).
+   *
+   * - `/apply/<key>`: that type, past the type step. An unknown key goes back to `/apply`
+   *   with a toast.
+   * - `/apply?type=<id>` (old link): replaced by `/apply/<key>`.
+   * - `/apply`: the type step. On the first open the type of the last autosave of this
+   *   tab comes back; when its autosave is past the type step, the URL gets its key.
+   *
+   * The browser buttons change only the URL, so the step follows it here when the type in
+   * the URL changes (a navigation to the same URL changes nothing): back to
+   * `/apply` shows the type step with the type still chosen, forward shows the details.
+   */
+  private openFromUrl(first: boolean): void {
+    const slug = this.urlType;
+    if (!slug && this.oldUrlType) {
+      const old = this.typeBySlug(this.oldUrlType);
+      this.navigateToType(old?.key ?? old?.id ?? null, true);
+      if (!old) this.toast.error(this.i18n.translate('apply.error.typeUnknown'));
+      return;
+    }
+    if (!slug) {
+      if (first) {
+        const last = readStorage(DRAFT_LAST_TYPE);
+        if (last && this.typeBySlug(last)?.id === last) this.selectType(last);
+      } else if (this.activeIndex() > 0) {
+        this.activeIndex.set(0);
+      }
+      return;
+    }
+    const type = this.typeBySlug(slug);
+    if (!type) {
+      this.toast.error(this.i18n.translate('apply.error.typeUnknown'));
+      this.activeIndex.set(0);
+      this.navigateToType(null, true);
+      return;
+    }
+    if (this.typeId() !== type.id) this.selectType(type.id, true);
+    else if (this.activeIndex() === 0 && this.effForm()) this.goTo(1);
+  }
+
+  /** Go to `/apply/<slug>`, or to `/apply` without a slug. */
+  private navigateToType(slug: string | null, replaceUrl: boolean): void {
+    void this.router.navigate(slug ? ['/apply', slug] : ['/apply'], { replaceUrl });
   }
 
   /**
@@ -450,16 +524,27 @@ export class ApplyWizardComponent {
     this.predecessor.set(null);
   }
 
-  private loadForm(id: Uuid): void {
+  /**
+   * Load the form of a type and restore its autosave. `pastTypeStep` (the URL names the
+   * type) opens at least the first step after the type step. An autosave past the type
+   * step on `/apply` puts the key into the URL, because every step after the type step
+   * has the URL `/apply/<key>` (spec 001170).
+   */
+  private loadForm(id: Uuid, pastTypeStep = false): void {
     this.loadingForm.set(true);
     this.api.effectiveForm(id).subscribe({
       next: (eff) => {
+        if (this.typeId() !== id) return;
         this.model = {};
         this.effForm.set(eff);
         this.buildFields(eff);
         this.restoreDraft(id);
         this.syncFileFields();
         this.loadingForm.set(false);
+        if (pastTypeStep && this.activeIndex() === 0) this.activeIndex.set(1);
+        else if (!pastTypeStep && !this.urlType && this.activeIndex() > 0) {
+          this.navigateToType(this.slugOf(id), true);
+        }
       },
       error: () => {
         this.loadingForm.set(false);
@@ -570,18 +655,27 @@ export class ApplyWizardComponent {
     return false;
   }
 
+  /** "Weiter". From the type step, the URL gets the key of the type (spec 001170). */
   next(): void {
-    if (!this.checkStep(this.currentStep())) return;
+    const from = this.currentStep();
+    if (!this.checkStep(from)) return;
     this.goTo(Math.min(this.activeIndex() + 1, this.stepKeys().length - 1));
+    if (from === 'type') this.navigateToType(this.slugOf(this.typeId()), false);
   }
 
   prev(): void {
-    this.goTo(Math.max(this.activeIndex() - 1, 0));
+    this.toStep(Math.max(this.activeIndex() - 1, 0));
   }
 
   /** A click on a done step of the stepper. */
   goToStep(index: number): void {
-    if (index < this.activeIndex()) this.goTo(index);
+    if (index < this.activeIndex()) this.toStep(index);
+  }
+
+  /** Go back to a step; the type step has the URL `/apply` (spec 001170). */
+  private toStep(index: number): void {
+    this.goTo(index);
+    if (index === 0) this.navigateToType(null, false);
   }
 
   private goTo(index: number): void {
@@ -706,6 +800,7 @@ export class ApplyWizardComponent {
     if (eff) this.buildFields(eff);
     this.activeIndex.set(0);
     this.saved.set(false);
+    if (this.urlType) this.navigateToType(null, true);
     await this.drafts.discard();
   }
 
