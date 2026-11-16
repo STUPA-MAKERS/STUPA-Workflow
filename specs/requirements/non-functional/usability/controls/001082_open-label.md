@@ -6,7 +6,7 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:
-  - "frontend/src/app/core/i18n/catalog.spec.ts:catalog"
+  - "frontend/src/app/core/i18n/translations.spec.ts:translations"
 implementation:
   - frontend/src/app/core/i18n/catalog
 scope:

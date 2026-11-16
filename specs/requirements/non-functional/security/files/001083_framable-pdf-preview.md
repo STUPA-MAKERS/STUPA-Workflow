@@ -6,7 +6,7 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:
-  - "backend/tests/unit/test_inline_preview.py:test_inline_preview_headers"
+  - "backend/tests/unit/shared/test_preview.py:test_inline_preview_headers"
 implementation:
   - backend/app/shared/preview.py
   - deploy/web/nginx.conf
@@ -28,5 +28,5 @@ and of the branding. An SVG logo must stay a download, because the viewer does n
 Reason: The SPA may frame only its own origin. The `sandbox` directive gives the framed file an
 opaque origin, so a PDF polyglot cannot run in the origin of the app (000264).
 
-Test: Unit test per route: with `?inline=true` the answer has the three headers, without it the
-answer is `attachment`, and a caller without access gets 404 in both cases.
+Test: Unit test of `file_response`: with `inline` and a PDF or raster type the answer has the
+three headers, without it the answer is as before, and an SVG never becomes a preview.

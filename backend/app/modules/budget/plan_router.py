@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.deps import Principal, SettingsDep, require_principal
 from app.modules.audit.actions import AuditAction
@@ -52,6 +52,7 @@ from app.shared.errors import (
     ServiceUnavailableError,
 )
 from app.shared.filenames import content_disposition
+from app.shared.preview import file_response
 from app.shared.xlsx import XLSX_MEDIA_TYPE, build_table_workbook
 
 router = APIRouter(tags=["budget"])
@@ -197,6 +198,7 @@ async def export_plan_pdf(
     service: ServiceDep,
     settings: SettingsDep,
     principal: Annotated[Principal, Depends(require_principal())],
+    inline: Annotated[bool, Query()] = False,
 ) -> Response:
     """Return a version of a Haushaltsplan as a PDF, for each reader of the plan.
 
@@ -227,11 +229,7 @@ async def export_plan_pdf(
             ) from exc
         raise ServiceUnavailableError("PDF rendering temporarily unavailable.") from exc
     name = plan_export.export_filename(export.head, "pdf")
-    return Response(
-        content=pdf,
-        media_type="application/pdf",
-        headers={"Content-Disposition": content_disposition("attachment", name)},
-    )
+    return file_response(pdf, name=name, mime="application/pdf", inline=inline)
 
 
 @router.post(

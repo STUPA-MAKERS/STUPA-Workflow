@@ -9,11 +9,15 @@ import type { AttachmentOutWire } from '@core/api/models';
 
 const APP_ID = 'app-1';
 
+/**
+ * An attachment on the wire. The default type is one that the viewer cannot show, so its
+ * row keeps the download button (001080); a preview test passes `application/pdf`.
+ */
 function wire(over: Partial<AttachmentOutWire> = {}): AttachmentOutWire {
   return {
     id: 'att-1',
     filename: 'plan.pdf',
-    mime: 'application/pdf',
+    mime: 'application/zip',
     size: 2048,
     scanned: false,
     ...over,
@@ -768,7 +772,7 @@ describe('AttachmentsPanelComponent', () => {
   it('offers a preview only for clean images/PDFs and opens the PDF in the viewer', async () => {
     const { http, detectChanges, fixture } = await setup();
     await uploadFile();
-    http.expectOne(uploadUrl).flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
+    http.expectOne(uploadUrl).flush(wire({ scanned: true, filename: 'plan.pdf', mime: 'application/pdf' }), { status: 201, statusText: 'Created' });
     detectChanges();
 
     const cmp = fixture.componentInstance;
@@ -777,7 +781,7 @@ describe('AttachmentsPanelComponent', () => {
     expect(cmp.canPreview({ ...cmp.attachments()[0], mime: 'application/zip' })).toBe(false);
     expect(screen.queryByRole('dialog')).toBeNull();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Vorschau' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
     const req = http.expectOne(dlUrl('att-1'));
     expect(req.request.method).toBe('GET');
     req.flush({ url: '/api/attachments/att-1/download?sig=ok', expiresIn: 120 });
@@ -808,7 +812,7 @@ describe('AttachmentsPanelComponent', () => {
       });
     detectChanges();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Vorschau' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
     http.expectOne(dlUrl('att-9')).flush({ url: '/api/attachments/att-9/download', expiresIn: 120 });
     detectChanges();
 
@@ -830,7 +834,7 @@ describe('AttachmentsPanelComponent', () => {
   it('steps through the previewable files, fetching each URL when the viewer reaches it', async () => {
     const { http, detectChanges, fixture } = await setup();
     await uploadFile();
-    http.expectOne(uploadUrl).flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
+    http.expectOne(uploadUrl).flush(wire({ scanned: true, filename: 'plan.pdf', mime: 'application/pdf' }), { status: 201, statusText: 'Created' });
     const cmp = fixture.componentInstance;
     const pdfAtt = cmp.attachments()[0];
     cmp.attachments.set([
@@ -844,7 +848,7 @@ describe('AttachmentsPanelComponent', () => {
       .spyOn(cmp as unknown as { openUrl: (u: string) => void }, 'openUrl')
       .mockImplementation(() => {});
 
-    await userEvent.click(screen.getAllByRole('button', { name: 'Vorschau' })[1]);
+    await userEvent.click(screen.getAllByRole('button', { name: 'Öffnen' })[1]);
     http.expectOne(dlUrl('att-9')).flush({ url: '/api/attachments/att-9/download', expiresIn: 120 });
     detectChanges();
     expect(cmp.viewerItems().map((i) => i.name)).toEqual(['plan.pdf', 'foto.png']);
@@ -877,7 +881,7 @@ describe('AttachmentsPanelComponent', () => {
     const { http, detectChanges, fixture, toast } = await setup();
     const error = jest.spyOn(toast, 'error');
     await uploadFile();
-    http.expectOne(uploadUrl).flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
+    http.expectOne(uploadUrl).flush(wire({ scanned: true, filename: 'plan.pdf', mime: 'application/pdf' }), { status: 201, statusText: 'Created' });
     const cmp = fixture.componentInstance;
     const pdfAtt = cmp.attachments()[0];
     cmp.attachments.set([pdfAtt, { ...pdfAtt, id: 'att-9', filename: 'foto.png', mime: 'image/png' }]);
@@ -915,7 +919,7 @@ describe('AttachmentsPanelComponent', () => {
   it('opens PDFs in the system viewer on coarse-pointer devices (images only in the viewer)', async () => {
     const { http, detectChanges, fixture } = await setup();
     await uploadFile();
-    http.expectOne(uploadUrl).flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
+    http.expectOne(uploadUrl).flush(wire({ scanned: true, filename: 'plan.pdf', mime: 'application/pdf' }), { status: 201, statusText: 'Created' });
     const cmp = fixture.componentInstance;
     const pdfAtt = cmp.attachments()[0];
     cmp.attachments.set([pdfAtt, { ...pdfAtt, id: 'att-9', filename: 'foto.png', mime: 'image/png' }]);
@@ -950,7 +954,7 @@ describe('AttachmentsPanelComponent', () => {
     const { http, detectChanges, fixture, toast } = await setup();
     const error = jest.spyOn(toast, 'error');
     await uploadFile();
-    http.expectOne(uploadUrl).flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
+    http.expectOne(uploadUrl).flush(wire({ scanned: true, filename: 'plan.pdf', mime: 'application/pdf' }), { status: 201, statusText: 'Created' });
     detectChanges();
     const cmp = fixture.componentInstance;
 

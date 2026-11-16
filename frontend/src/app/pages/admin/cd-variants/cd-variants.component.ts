@@ -1,3 +1,4 @@
+import { FileOpenService, type OpenableFile } from '@shared/viewer/file-open.service';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -135,6 +136,7 @@ function emptyForm(): VariantForm {
 })
 export class AdminCdVariantsComponent {
   private readonly api = inject(AdminApiService);
+  private readonly files = inject(FileOpenService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
@@ -286,8 +288,13 @@ export class AdminCdVariantsComponent {
           ]
         : []),
     ];
+    const viewable = this.files.canView(this.openable(logo));
     const file: RowMenuItem[] = logo.fileName
-      ? [{ id: 'download', label: this.i18n.translate('admin.cdVariants.download'), icon: 'download' }]
+      ? [
+          viewable
+            ? { id: 'download', label: this.i18n.translate('admin.cdVariants.open'), icon: 'file' }
+            : { id: 'download', label: this.i18n.translate('admin.cdVariants.download'), icon: 'download' },
+        ]
       : [];
     return [
       { items: [...move, ...file] },
@@ -308,14 +315,16 @@ export class AdminCdVariantsComponent {
     }
   }
 
-  /** The server answers the file as `attachment`, so a plain link click downloads it. */
+  /**
+   * A PDF or raster logo opens in the file viewer (spec 001080) through the sandboxed
+   * preview of its route (001083). An SVG downloads: the route answers it as `attachment`.
+   */
   private download(logo: CdVariantLogo): void {
-    const a = document.createElement('a');
-    a.href = this.fileUrl(logo);
-    a.download = logo.fileName ?? '';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    this.files.open(this.openable(logo));
+  }
+
+  private openable(logo: CdVariantLogo): OpenableFile {
+    return { name: logo.fileName ?? '', url: this.fileUrl(logo), mime: logo.mime ?? undefined };
   }
 
   /** Download URL of an uploaded logo. The server always answers `attachment`. */

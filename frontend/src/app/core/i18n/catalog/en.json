@@ -553,8 +553,7 @@
   "applications.detail.budgetAssign": "Assign",
   "applications.detail.budgetWithYear": "Cost centre · FY {year}",
   "applications.detail.compareVersions": "Compare versions",
-  "applications.detail.downloadPdf": "Download as PDF",
-  "applications.detail.pdfError": "The PDF could not be created.",
+  "applications.detail.openPdf": "Open as PDF",
   "applications.detail.tab.app": "Application",
   "applications.detail.tab.history": "History",
   "applications.detail.tab.files": "Attachments",
@@ -4522,7 +4521,7 @@
   "budget.plan.setState.confirm": "Set",
   "budget.plan.step.byHand": "by hand",
   "budget.plan.toast.stateSet": "The state is set.",
-  "budget.plan.action.exportPdf": "Export as PDF",
+  "budget.plan.action.openPdf": "Open as PDF",
   "budget.plan.action.exportXlsx": "Export as XLSX",
   "meetings.vote.rule.members_majority": "Majority of the members",
   "meetings.vote.rule.members_two_thirds": "Two-thirds majority of the members",
@@ -4597,5 +4596,9 @@
   "todos.archivedBoards.deleteTitle": "Delete board?",
   "todos.archivedBoards.deleteBody": "“{name}” is deleted with all its cards, comments and files. This cannot be undone.",
   "todos.archivedBoards.none": "No archived boards",
-  "account.notifications.kind.todo_board_added": "Added to a board"
+  "account.notifications.kind.todo_board_added": "Added to a board",
+  "viewer.download": "Download",
+  "budget.plan.pdfName": "Budget plan",
+  "admin.cdVariants.open": "Open the file",
+  "applications.attachments.open": "Open"
 }

@@ -553,8 +553,7 @@
   "applications.detail.budgetAssign": "Zuordnen",
   "applications.detail.budgetWithYear": "Kostenstelle · HHJ {year}",
   "applications.detail.compareVersions": "Versionen vergleichen",
-  "applications.detail.downloadPdf": "Als PDF herunterladen",
-  "applications.detail.pdfError": "Das PDF konnte nicht erstellt werden.",
+  "applications.detail.openPdf": "Als PDF öffnen",
   "applications.detail.tab.app": "Antrag",
   "applications.detail.tab.history": "Verlauf",
   "applications.detail.tab.files": "Anhänge",
@@ -4522,7 +4521,7 @@
   "budget.plan.setState.confirm": "Setzen",
   "budget.plan.step.byHand": "von Hand",
   "budget.plan.toast.stateSet": "Der Zustand ist gesetzt.",
-  "budget.plan.action.exportPdf": "Als PDF exportieren",
+  "budget.plan.action.openPdf": "Als PDF öffnen",
   "budget.plan.action.exportXlsx": "Als XLSX exportieren",
   "meetings.vote.rule.members_majority": "Mehrheit der Mitglieder",
   "meetings.vote.rule.members_two_thirds": "Zweidrittelmehrheit der Mitglieder",
@@ -4597,5 +4596,9 @@
   "todos.archivedBoards.deleteTitle": "Board löschen?",
   "todos.archivedBoards.deleteBody": "„{name}“ wird mit allen Karten, Kommentaren und Dateien gelöscht. Das lässt sich nicht rückgängig machen.",
   "todos.archivedBoards.none": "Keine archivierten Boards",
-  "account.notifications.kind.todo_board_added": "Aufnahme in ein Board"
+  "account.notifications.kind.todo_board_added": "Aufnahme in ein Board",
+  "viewer.download": "Herunterladen",
+  "budget.plan.pdfName": "Haushaltsplan",
+  "admin.cdVariants.open": "Datei öffnen",
+  "applications.attachments.open": "Öffnen"
 }

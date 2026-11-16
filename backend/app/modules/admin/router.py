@@ -125,12 +125,12 @@ from app.modules.gremien.role_schemas import (
 from app.modules.livevote.open_window import MeetingSettingsService, gremium_defaults
 from app.modules.meetings.periods import periods
 from app.modules.site_config.branding import Branding
-from app.modules.site_config.cd_logos import LogoSlot
+from app.modules.site_config.cd_logos import LogoSlot, sniff_cd_logo
 from app.modules.site_config.features import FeatureSwitches
 from app.shared.antiabuse import body_cap
 from app.shared.config_schemas import FlowGraph, export_json_schemas
 from app.shared.errors import ForbiddenError, NotFoundError, ProblemDetail
-from app.shared.filenames import content_disposition
+from app.shared.preview import file_response
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 public_router = APIRouter(tags=["admin"])
@@ -621,19 +621,27 @@ async def reorder_cd_variant_logos(
     responses=_errors(401, 403, 404, 503),
     response_class=Response,
 )
-async def get_cd_variant_logo_file(logo_id: UUID, service: CdVariantServiceDep) -> Response:
+async def get_cd_variant_logo_file(
+    logo_id: UUID,
+    service: CdVariantServiceDep,
+    inline: Annotated[bool, Query()] = False,
+) -> Response:
     """Stream an uploaded logo back from the server.
 
     Hardening: the route does NOT echo the stored ``mime``. A stored SVG would
     otherwise render inline in the app origin and execute script. The route
     therefore forces ``application/octet-stream`` plus ``Content-Disposition:
     attachment``, the same rule as ``get_invoice_file`` in the budget module.
+    ``?inline=true`` gives a PDF or raster logo as the sandboxed preview of the file
+    viewer, with the type sniffed from the bytes (spec 001083). An SVG stays a download.
     """
     data, name = await service.logo_file_bytes(logo_id)
-    return Response(
-        content=data,
-        media_type="application/octet-stream",
-        headers={"Content-Disposition": content_disposition("attachment", name)},
+    return file_response(
+        data,
+        name=name,
+        mime=sniff_cd_logo(data) or "application/octet-stream",
+        inline=inline,
+        fallback_mime="application/octet-stream",
     )
 
 
@@ -1556,17 +1564,25 @@ async def delete_pdf_asset(
     dependencies=[_SITE],
     responses=_errors(401, 403, 404, 422, 503),
 )
-async def get_pdf_asset_file(slot: PdfSlot, service: PdfBrandingServiceDep) -> Response:
+async def get_pdf_asset_file(
+    slot: PdfSlot,
+    service: PdfBrandingServiceDep,
+    inline: Annotated[bool, Query()] = False,
+) -> Response:
     """Download the upload of the slot, always as an attachment.
 
     Hardening: the route does not echo the stored type, because a stored SVG would
-    render inline in the app origin and run script.
+    render inline in the app origin and run script. ``?inline=true`` gives a PDF or
+    raster upload as the sandboxed preview of the file viewer, with the type sniffed
+    from the bytes (spec 001083). An SVG stays a download.
     """
     data, name = await service.file_bytes(slot)
-    return Response(
-        content=data,
-        media_type="application/octet-stream",
-        headers={"Content-Disposition": content_disposition("attachment", name)},
+    return file_response(
+        data,
+        name=name,
+        mime=sniff_cd_logo(data) or "application/octet-stream",
+        inline=inline,
+        fallback_mime="application/octet-stream",
     )
 
 

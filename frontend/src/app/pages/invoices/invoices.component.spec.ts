@@ -1,3 +1,4 @@
+import { FileOpenService } from '@shared/viewer/file-open.service';
 import { BehaviorSubject, of } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -1155,33 +1156,13 @@ describe('InvoicesComponent', () => {
     expect(c.saving()).toBe(false);
   });
 
-  it('openFile downloads the streamed blob with the invoice file name', async () => {
-    const { c, http } = await setup();
-    const dl = jest.spyOn(downloadUtil, 'downloadBlob').mockImplementation(() => undefined);
+  it('openFile opens the receipt in the file viewer (001080)', async () => {
+    const { c } = await setup();
+    const open = jest.spyOn(TestBed.inject(FileOpenService), 'open').mockImplementation(() => undefined);
     c.openFile(inv({ id: 'f1', fileName: 'rechnung.pdf' }));
-    const blob = new Blob(['pdf']);
-    http.expectOne((r) => r.url.endsWith('/api/invoices/f1/file')).flush(blob);
-    expect(dl).toHaveBeenCalledWith(expect.any(Blob), 'rechnung.pdf');
-    dl.mockRestore();
-  });
-
-  it('openFile falls back to beleg.pdf when no file name', async () => {
-    const { c, http } = await setup();
-    const dl = jest.spyOn(downloadUtil, 'downloadBlob').mockImplementation(() => undefined);
-    c.openFile(inv({ id: 'f1', fileName: null }));
-    http.expectOne((r) => r.url.endsWith('/api/invoices/f1/file')).flush(new Blob(['x']));
-    expect(dl).toHaveBeenCalledWith(expect.any(Blob), 'beleg.pdf');
-    dl.mockRestore();
-  });
-
-  it('openFile error toasts the generic failure', async () => {
-    const { c, http, toast } = await setup();
-    const spy = jest.spyOn(toast, 'error');
-    c.openFile(inv({ id: 'f1' }));
-    http
-      .expectOne((r) => r.url.endsWith('/api/invoices/f1/file'))
-      .flush(null, { status: 500, statusText: 'err' });
-    expect(spy).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
+    expect(open).toHaveBeenCalledWith({ name: 'rechnung.pdf', url: '/api/invoices/f1/file', kind: 'pdf' });
+    c.openFile(inv({ id: 'f2', fileName: null }));
+    expect(open).toHaveBeenLastCalledWith({ name: 'Beleg.pdf', url: '/api/invoices/f2/file', kind: 'pdf' });
   });
 
   it('statusOptions builds localized select options', async () => {
