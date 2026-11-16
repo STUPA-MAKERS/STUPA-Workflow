@@ -33,18 +33,28 @@ from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
 from pydantic import JsonValue
-from sqlalchemy import ColumnElement, and_, delete, exists, func, or_, select
+from sqlalchemy import ColumnElement, and_, delete, exists, func, or_, select, true, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.auth import policy
+from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.people import DELETED_PERSON, PersonRef, person_refs
 from app.modules.auth.principal import Principal
 from app.modules.files.drafts import bind_drafts, check_message_drafts
 from app.modules.files.schemas import MessageAttachmentOut
 from app.modules.files.service import FilesService
+from app.modules.gremien.models import Gremium
+from app.modules.site_config.square_logos import logo_url_of, square_logo_variants
 from app.modules.tickets.models import TicketEvent
 from app.modules.todos import events as todo_events
-from app.modules.todos.access import BoardAccess, ReadScope, token_reads
-from app.modules.todos.boards import ensure_personal_board
+from app.modules.todos.access import (
+    TODO_CONFIGURE,
+    BoardAccess,
+    ReadScope,
+    can_create_board,
+    token_reads,
+)
+from app.modules.todos.boards import add_default_columns, ensure_personal_board
 from app.modules.todos.grouping import grouped
 from app.modules.todos.lexorank import MAX_LENGTH, RankError, between, spread
 from app.modules.todos.link_view import LinkViewer
@@ -54,6 +64,7 @@ from app.modules.todos.models import (
     LINK_COLUMNS,
     TodoAssignee,
     TodoBoard,
+    TodoBoardEntry,
     TodoCard,
     TodoCardEvent,
     TodoCardLabel,
@@ -66,6 +77,7 @@ from app.modules.todos.models import (
     TodoLink,
 )
 from app.modules.todos.schemas import (
+    BoardCreate,
     BoardPatch,
     CardCreate,
     CardMove,
@@ -74,10 +86,16 @@ from app.modules.todos.schemas import (
     CheckItemPatch,
     ChecklistCount,
     ColumnPatch,
+    EntryGremiumOption,
+    EntryIn,
+    EntryOptionsOut,
+    EntryPatch,
+    EntryPersonOption,
     EventIn,
     LabelCreate,
     LabelPatch,
     TodoAssignedBoard,
+    TodoBoardEntryOut,
     TodoBoardOut,
     TodoBoardSummary,
     TodoCardDetail,
@@ -113,8 +131,10 @@ DUE_SOON_DAYS = 7
 #: The length of the comment excerpt in the mention mail.
 EXCERPT_LENGTH = 200
 
-MailKind = Literal["assigned", "mentioned"]
-_KIND_ORDER = {"personal": 0, "gremium": 1, "team": 2}
+MailKind = Literal["assigned", "mentioned", "board_added"]
+_KIND_ORDER = {"personal": 0, "gremium": 1, "free": 2, "team": 3}
+#: The most persons that the shared picker answers for one query.
+_PICKER_PEOPLE = 10
 
 
 def _now() -> datetime:
@@ -144,11 +164,14 @@ class TodoMail:
     """
 
     kind: MailKind
-    card_id: uuid.UUID
+    card_id: uuid.UUID | None
     recipients: tuple[uuid.UUID, ...]
     actor_id: uuid.UUID
     excerpt: str | None = None
     event_id: uuid.UUID = field(default_factory=uuid.uuid4, compare=False)
+    #: ``board_added``: the board and the role of the new entry (spec 001071).
+    board_id: uuid.UUID | None = None
+    role: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -291,9 +314,34 @@ def _assigned_board(
     )
 
 
+def _new_entry(board_id: uuid.UUID, kind: str, target_id: uuid.UUID, role: str) -> TodoBoardEntry:
+    """A new entry row of a gremium (``kind`` gremium) or of a person."""
+    return TodoBoardEntry(
+        id=uuid.uuid4(),
+        board_id=board_id,
+        gremium_id=target_id if kind == "gremium" else None,
+        principal_id=target_id if kind == "person" else None,
+        role=role,
+    )
+
+
+def _agenda_ids(board: TodoBoard, entries: Iterable[uuid.UUID | None]) -> tuple[uuid.UUID, ...]:
+    """The own gremium and the entry gremien of a gremium or free board, sorted."""
+    if board.kind not in ("gremium", "free"):
+        return ()
+    own = {board.gremium_id} if board.gremium_id is not None else set()
+    return tuple(sorted(own | {g for g in entries if g is not None}, key=str))
+
+
+def _not_archived(board: TodoBoard) -> None:
+    """Raise 409 ``board_archived`` for an archived board (read-only, spec 001068)."""
+    if board.archived_at is not None:
+        raise ConflictError("The board is archived.", code="board_archived")
+
+
 def _board_order(board: TodoBoard) -> tuple[int, str, str]:
-    """Sort key of the boards: personal, then gremium, then team, each by name."""
-    return (_KIND_ORDER.get(board.kind, 3), board.name.casefold(), str(board.id))
+    """Sort key of the boards: personal, gremium, free, then team, each by name."""
+    return (_KIND_ORDER.get(board.kind, 4), board.name.casefold(), str(board.id))
 
 
 def _in_column_order(cards: Iterable[TodoCard], columns: Sequence[TodoColumn]) -> list[TodoCard]:
@@ -388,15 +436,27 @@ class TodoService:
         return board
 
     async def _writable(self, board: TodoBoard, principal: Principal) -> None:
-        """Raise 403 ``todo_write_required`` for a readable board that is not writable."""
+        """Raise 403 ``todo_write_required`` for a readable board that is not writable.
+
+        An archived board is read-only: 409 ``board_archived`` (spec 001068).
+        """
+        _not_archived(board)
         if not await self.access.can_write(board, principal):
             raise ForbiddenError(
                 "Changing the cards of this board needs todo.write.",
                 code="todo_write_required",
             )
 
-    async def _configurable(self, board_id: uuid.UUID, principal: Principal) -> TodoBoard:
+    async def _configurable(
+        self, board_id: uuid.UUID, principal: Principal, *, archived: bool = False
+    ) -> TodoBoard:
+        """Load a board that the principal configures (403 ``todo_configure_required``).
+
+        An archived board is read-only (409 ``board_archived``) unless ``archived``.
+        """
         board = await self._board(board_id, principal)
+        if not archived:
+            _not_archived(board)
         if not await self.access.can_configure(board, principal):
             raise ForbiddenError(
                 "Changing this board needs todo.configure.", code="todo_configure_required"
@@ -669,6 +729,18 @@ class TodoService:
             ).all()
         }
         boards = sorted(found, key=_board_order)
+        entry_gremien = grouped(
+            (
+                await self.session.execute(
+                    select(TodoBoardEntry.board_id, TodoBoardEntry.gremium_id).where(
+                        TodoBoardEntry.board_id.in_([b.id for b in found]),
+                        TodoBoardEntry.gremium_id.is_not(None),
+                    )
+                )
+            )
+            .tuples()
+            .all()
+        )
         return [
             TodoBoardSummary(
                 id=b.id,
@@ -678,6 +750,7 @@ class TodoService:
                 can_write=await self.access.can_write(b, principal),
                 can_configure=await self.access.can_configure(b, principal),
                 open_count=counts.get(b.id, 0),
+                agenda_gremium_ids=_agenda_ids(b, entry_gremien.get(b.id, ())),
             )
             for b in boards
         ]
@@ -720,6 +793,8 @@ class TodoService:
             labels=tuple(_label_out(label) for label in labels),
             cards=await self.tiles(cards, principal),
             archived_count=int(archived or 0),
+            archived=board.archived_at is not None,
+            agenda_gremium_ids=tuple(sorted(await self.access.agenda_gremien(board), key=str)),
         )
 
     async def patch_board(
@@ -740,6 +815,372 @@ class TodoService:
         """Return the assignable people of a readable board."""
         board = await self._board(board_id, principal)
         return await self.access.members(board)
+
+    async def create_board(self, payload: BoardCreate, principal: Principal) -> TodoBoardOut:
+        """Create a free board with the default columns (spec 001061).
+
+        The creator becomes a member with ``manage``. A person entry of the payload gets
+        the mail ``todo_board_added`` (spec 001071), the creator none.
+
+        Raises:
+            ForbiddenError: Neither an admin nor ``todo.create_board`` (403
+                ``board_create_required``).
+            ValidationProblem: An unknown, double or empty entry (422).
+        """
+        if not can_create_board(principal):
+            raise ForbiddenError(
+                "Creating a board needs todo.create_board.", code="board_create_required"
+            )
+        actor = await self._actor(principal)
+        targets = [await self._entry_target(entry) for entry in payload.entries]
+        if len(set(targets)) != len(targets):
+            raise _invalid("An entry is in the list twice.", "entry_duplicate", "entries")
+        board = TodoBoard(id=uuid.uuid4(), name=payload.name.strip() or payload.name, kind="free")
+        self.session.add(board)
+        await self.session.flush()
+        add_default_columns(self.session, board.id)
+        roles = {
+            **{target: entry.role for target, entry in zip(targets, payload.entries, strict=True)},
+            ("person", actor): "manage",
+        }
+        for (kind, target_id), role in roles.items():
+            self.session.add(_new_entry(board.id, kind, target_id, role))
+            if kind == "person" and target_id != actor:
+                self._board_mail(board, target_id, role, actor)
+        await self.session.flush()
+        return await self._board_out(board, principal)
+
+    async def _entry_target(self, entry: EntryIn) -> tuple[str, uuid.UUID]:
+        """Check the target of an entry: exactly one known gremium or active person."""
+        if (entry.gremium_id is None) == (entry.principal_id is None):
+            raise _invalid(
+                "An entry names exactly one gremium or one person.", "entry_target", "entries"
+            )
+        if entry.gremium_id is not None:
+            if await self.session.get(Gremium, entry.gremium_id) is None:
+                raise _invalid("Unknown gremium.", "entry_target_not_found", "gremiumId")
+            return ("gremium", entry.gremium_id)
+        person = await self.session.get(PrincipalRow, entry.principal_id)
+        if person is None or not person.active or person.merged_into is not None:
+            raise _invalid("Unknown person.", "entry_target_not_found", "principalId")
+        return ("person", person.id)
+
+    def _board_mail(
+        self, board: TodoBoard, recipient: uuid.UUID, role: str, actor: uuid.UUID
+    ) -> None:
+        if recipient != actor:
+            self.outbox.append(
+                TodoMail("board_added", None, (recipient,), actor, board_id=board.id, role=role)
+            )
+
+    async def entries(self, board_id: uuid.UUID, principal: Principal) -> list[TodoBoardEntryOut]:
+        """The member entries of a readable board: the own gremium first, then by name."""
+        board = await self._board(board_id, principal)
+        return await self._entry_outs(board)
+
+    async def _entry_outs(self, board: TodoBoard) -> list[TodoBoardEntryOut]:
+        rows = (
+            await self.session.scalars(
+                select(TodoBoardEntry).where(TodoBoardEntry.board_id == board.id)
+            )
+        ).all()
+        gremium_ids = {r.gremium_id for r in rows if r.gremium_id is not None} | (
+            {board.gremium_id} if board.gremium_id is not None else set()
+        )
+        gremien = (
+            {
+                gid: (name, variant)
+                for gid, name, variant in (
+                    await self.session.execute(
+                        select(Gremium.id, Gremium.name, Gremium.cd_variant_id).where(
+                            Gremium.id.in_(gremium_ids)
+                        )
+                    )
+                ).tuples()
+            }
+            if gremium_ids
+            else {}
+        )
+        names = {gid: name for gid, (name, _variant) in gremien.items()}
+        logos = await square_logo_variants(self.session, (v for _n, v in gremien.values()))
+        logo = {gid: logo_url_of(gid, v, logos) for gid, (_n, v) in gremien.items()}
+        people = await person_refs(self.session, (r.principal_id for r in rows))
+        own = (
+            [
+                TodoBoardEntryOut(
+                    kind="gremium",
+                    target_id=board.gremium_id,
+                    name=names.get(board.gremium_id, ""),
+                    role="edit",
+                    fixed=True,
+                    logo_url=logo.get(board.gremium_id),
+                )
+            ]
+            if board.kind == "gremium" and board.gremium_id is not None
+            else []
+        )
+        outs = [
+            TodoBoardEntryOut(
+                id=r.id,
+                kind="gremium" if r.gremium_id is not None else "person",
+                target_id=r.gremium_id or r.principal_id,  # pyright: ignore[reportArgumentType]
+                name=(
+                    names.get(r.gremium_id, "")
+                    if r.gremium_id is not None
+                    else (people.get(r.principal_id) or DELETED_PERSON).display_name or ""  # pyright: ignore[reportArgumentType]
+                ),
+                role=r.role,  # pyright: ignore[reportArgumentType]
+                logo_url=logo.get(r.gremium_id) if r.gremium_id is not None else None,
+            )
+            for r in rows
+        ]
+        return own + sorted(
+            outs, key=lambda e: (e.kind != "gremium", e.name.casefold(), str(e.target_id))
+        )
+
+    async def entry_options(self, principal: Principal, q: str) -> EntryOptionsOut:
+        """The hits of the shared picker of gremien and persons (spec 001074).
+
+        Every gremium whose name holds ``q`` (all for an empty ``q``) with its logo
+        path, and the active persons whose name holds ``q``, from two characters on and
+        at most ten, by name only. A scoped OAuth token finds nothing: the picker is a
+        page of the app, the MCP tools name the ids.
+        """
+        if principal.scope_permissions is not None:
+            return EntryOptionsOut(gremien=[], persons=[])
+        term = q.strip()
+        pattern = f"%{escape_like(term)}%"
+        gremien = (
+            (
+                await self.session.execute(
+                    select(Gremium.id, Gremium.name, Gremium.cd_variant_id)
+                    .where(Gremium.name.ilike(pattern, escape="\\") if term else true())
+                    .order_by(Gremium.name, Gremium.id)
+                )
+            )
+            .tuples()
+            .all()
+        )
+        logos = await square_logo_variants(self.session, (v for _g, _n, v in gremien))
+        persons = (
+            (
+                await self.session.execute(
+                    select(PrincipalRow.id, PrincipalRow.display_name)
+                    .where(
+                        PrincipalRow.active.is_(True),
+                        PrincipalRow.merged_into.is_(None),
+                        PrincipalRow.display_name.ilike(pattern, escape="\\"),
+                    )
+                    .order_by(PrincipalRow.display_name, PrincipalRow.id)
+                    .limit(_PICKER_PEOPLE)
+                )
+            )
+            .tuples()
+            .all()
+            if len(term) >= 2
+            else []
+        )
+        return EntryOptionsOut(
+            gremien=[
+                EntryGremiumOption(id=gid, name=name, logo_url=logo_url_of(gid, v, logos))
+                for gid, name, v in gremien
+            ],
+            persons=[EntryPersonOption(id=pid, name=name or "") for pid, name in persons],
+        )
+
+    def _supports_entries(self, board: TodoBoard) -> None:
+        if board.kind not in ("gremium", "free"):
+            raise _invalid(
+                "Only a gremium board or a free board has entries.",
+                "entries_not_supported",
+                "boardId",
+            )
+
+    async def add_entry(
+        self, board_id: uuid.UUID, payload: EntryIn, principal: Principal
+    ) -> list[TodoBoardEntryOut]:
+        """Add a gremium or a person to a board (specs 001064, 001077).
+
+        Raises:
+            ConflictError: The target is on the board already (409 ``entry_exists``) or
+                is the own gremium of the board (409 ``own_gremium_entry``).
+        """
+        board = await self._configurable(board_id, principal)
+        self._supports_entries(board)
+        actor = await self._actor(principal)
+        await self._lock_board(board.id)
+        kind, target_id = await self._entry_target(payload)
+        if kind == "gremium" and target_id == board.gremium_id:
+            raise ConflictError(
+                "The own gremium is a fixed member of its board.", code="own_gremium_entry"
+            )
+        column = TodoBoardEntry.gremium_id if kind == "gremium" else TodoBoardEntry.principal_id
+        present = await self.session.scalar(
+            select(TodoBoardEntry.id).where(
+                TodoBoardEntry.board_id == board.id, column == target_id
+            )
+        )
+        if present is not None:
+            raise ConflictError("The entry exists.", code="entry_exists")
+        self.session.add(_new_entry(board.id, kind, target_id, payload.role))
+        if kind == "person":
+            self._board_mail(board, target_id, payload.role, actor)
+        self._touch(board)
+        await self.session.flush()
+        return await self._entry_outs(board)
+
+    async def _entry(self, board: TodoBoard, entry_id: uuid.UUID) -> TodoBoardEntry:
+        entry = await self.session.get(TodoBoardEntry, entry_id)
+        if entry is None or entry.board_id != board.id:
+            raise NotFoundError(f"entry {entry_id} not found")
+        return entry
+
+    async def _keep_a_manager(self, board: TodoBoard, entry: TodoBoardEntry) -> None:
+        """Refuse to drop the last ``manage`` entry of a free board (409 ``last_manager``)."""
+        if board.kind != "free" or entry.role != "manage":
+            return
+        others = await self.session.scalar(
+            select(func.count())
+            .select_from(TodoBoardEntry)
+            .where(
+                TodoBoardEntry.board_id == board.id,
+                TodoBoardEntry.role == "manage",
+                TodoBoardEntry.id != entry.id,
+            )
+        )
+        if not others:
+            raise ConflictError(
+                "The board needs at least one entry with the role manage.", code="last_manager"
+            )
+
+    async def patch_entry(
+        self, board_id: uuid.UUID, entry_id: uuid.UUID, payload: EntryPatch, principal: Principal
+    ) -> list[TodoBoardEntryOut]:
+        """Change the role of an entry; the last manager stays (409 ``last_manager``)."""
+        board = await self._configurable(board_id, principal)
+        await self._lock_board(board.id)
+        entry = await self._entry(board, entry_id)
+        if payload.role != "manage":
+            await self._keep_a_manager(board, entry)
+        await self.session.execute(
+            update(TodoBoardEntry).where(TodoBoardEntry.id == entry.id).values(role=payload.role)
+        )
+        self._touch(board)
+        await self.session.flush()
+        return await self._entry_outs(board)
+
+    async def delete_entry(
+        self, board_id: uuid.UUID, entry_id: uuid.UUID, principal: Principal
+    ) -> list[TodoBoardEntryOut]:
+        """Remove an entry; the last manager stays (409 ``last_manager``)."""
+        board = await self._configurable(board_id, principal)
+        await self._lock_board(board.id)
+        entry = await self._entry(board, entry_id)
+        await self._keep_a_manager(board, entry)
+        await self.session.delete(entry)
+        self._touch(board)
+        await self.session.flush()
+        return await self._entry_outs(board)
+
+    def _free(self, board: TodoBoard) -> None:
+        if board.kind != "free":
+            raise _invalid("Only a free board is archived or deleted.", "board_not_free", "boardId")
+
+    async def archive_board(self, board_id: uuid.UUID, principal: Principal) -> TodoBoardSummary:
+        """Archive a free board: hidden and read-only (spec 001068)."""
+        board = await self._configurable(board_id, principal, archived=True)
+        self._free(board)
+        if board.archived_at is None:
+            await self._set_archived(board, _now())
+            await self.session.flush()
+        return await self._summary(board, principal)
+
+    async def restore_board(self, board_id: uuid.UUID, principal: Principal) -> TodoBoardSummary:
+        """Restore an archived free board (spec 001068)."""
+        board = await self._configurable(board_id, principal, archived=True)
+        self._free(board)
+        if board.archived_at is not None:
+            await self._set_archived(board, None)
+            await self.session.flush()
+        return await self._summary(board, principal)
+
+    async def _set_archived(self, board: TodoBoard, when: datetime | None) -> None:
+        """Set or clear ``archived_at`` (the identity map follows the update)."""
+        await self.session.execute(
+            update(TodoBoard).where(TodoBoard.id == board.id).values(archived_at=when)
+        )
+        self._touch(board)
+
+    async def archived_boards(self, principal: Principal) -> list[TodoBoardSummary]:
+        """The archived free boards that the principal manages, by name."""
+        if not token_reads(principal):
+            raise ForbiddenError("The token scope does not allow to-dos.")
+        found = (
+            await self.session.scalars(
+                select(TodoBoard).where(
+                    TodoBoard.kind == "free", TodoBoard.archived_at.is_not(None)
+                )
+            )
+        ).all()
+        return [
+            await self._summary(b, principal)
+            for b in sorted(found, key=_board_order)
+            if await self.access.can_configure(b, principal)
+        ]
+
+    async def _summary(self, board: TodoBoard, principal: Principal) -> TodoBoardSummary:
+        return TodoBoardSummary(
+            id=board.id,
+            name=board.name,
+            kind=board.kind,  # pyright: ignore[reportArgumentType]
+            gremium_id=board.gremium_id,
+            can_write=await self.access.can_write(board, principal),
+            can_configure=await self.access.can_configure(board, principal),
+            archived=board.archived_at is not None,
+        )
+
+    async def delete_board(self, board_id: uuid.UUID, principal: Principal) -> list[str]:
+        """Delete an archived free board with its cards; admins only (spec 001068).
+
+        The board goes first and then the cards, the order of every to-do write, and the
+        comment files lose their rows like at a gremium delete. The caller commits and then
+        removes the objects of the returned storage keys, so a failed commit keeps them.
+
+        Raises:
+            ForbiddenError: Not an admin (403 ``board_delete_admin_only``).
+            ConflictError: The board is not archived (409 ``board_not_archived``).
+        """
+        board = await self._board(board_id, principal)
+        if not policy.admin_bypass(principal, TODO_CONFIGURE):
+            raise ForbiddenError("Only an admin deletes a board.", code="board_delete_admin_only")
+        self._free(board)
+        if board.archived_at is None:
+            raise ConflictError("Archive the board first.", code="board_not_archived")
+        await self._lock_board(board.id)
+        await self.session.execute(
+            select(TodoCard.id)
+            .where(TodoCard.board_id == board.id)
+            .order_by(TodoCard.id)
+            .with_for_update()
+        )
+        comment_ids = list(
+            (
+                await self.session.scalars(
+                    select(TodoComment.id)
+                    .join(TodoCard, TodoCard.id == TodoComment.card_id)
+                    .where(TodoCard.board_id == board.id)
+                    .order_by(TodoComment.id)
+                )
+            ).all()
+        )
+        await self.files.lock_for_messages("todo_comment", comment_ids)
+        storage_keys = await self.files.drop_for_messages(
+            "todo_comment", comment_ids, actor=principal.sub
+        )
+        await self.session.delete(board)
+        self._touch(board)
+        await self.session.flush()
+        return storage_keys
 
     async def archive(
         self,
@@ -2672,9 +3113,9 @@ class TodoService:
         card, board = await self._card(card_id, principal, lock=True, write=True)
         if card.archived_at is not None:
             raise _invalid("The card is archived.", "todo_archived", "todoId")
-        if board.kind != "gremium" or board.gremium_id != gremium_id:
+        if gremium_id not in await self.access.agenda_gremien(board):
             raise _invalid(
-                "The card is not on the board of this gremium.", "todo_wrong_board", "todoId"
+                "The card is not on a board of this gremium.", "todo_wrong_board", "todoId"
             )
         return card
 

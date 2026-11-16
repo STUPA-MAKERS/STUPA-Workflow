@@ -117,6 +117,10 @@ _REASONS: dict[str, dict[str, str]] = {
         "en": "You are receiving this email because a to-do that you are responsible "
         "for is due tomorrow.",
     },
+    "todo_board_added": {
+        "de": "Sie erhalten diese E-Mail, weil Sie zu einem Board hinzugefügt wurden.",
+        "en": "You are receiving this email because you were added to a board.",
+    },
     "poll_started": {
         "de": "Sie erhalten diese E-Mail, weil Sie in diesem Gremium abstimmen dürfen.",
         "en": "You are receiving this email because you vote in this committee.",

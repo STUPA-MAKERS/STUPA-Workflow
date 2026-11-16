@@ -67,7 +67,7 @@ SCOPES: dict[str, frozenset[str]] = {
     "budget:write": frozenset({"budget.structure", "budget.book"}),
     "meetings:write": frozenset({"session.manage", "protocol.write", "protocol.finalize"}),
     "tickets:write": frozenset({"ticket.manage"}),
-    "todos:write": frozenset({"todo.write", "todo.configure", "todo.all"}),
+    "todos:write": frozenset({"todo.write", "todo.configure", "todo.all", "todo.create_board"}),
     "committees:write": frozenset({"info.write"}),
     "forms:write": frozenset({"form.configure"}),
     "flows:write": frozenset({"flow.configure"}),

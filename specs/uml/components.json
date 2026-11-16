@@ -826,6 +826,11 @@
       "to": "shared"
     },
     {
+      "count": 1,
+      "from": "livevote",
+      "to": "site_config"
+    },
+    {
       "count": 2,
       "from": "livevote",
       "to": "todos"
@@ -1181,7 +1186,7 @@
       "to": "applications"
     },
     {
-      "count": 14,
+      "count": 16,
       "from": "todos",
       "to": "auth"
     },
@@ -1211,7 +1216,7 @@
       "to": "forms"
     },
     {
-      "count": 3,
+      "count": 4,
       "from": "todos",
       "to": "gremien"
     },
@@ -1236,7 +1241,7 @@
       "to": "shared"
     },
     {
-      "count": 1,
+      "count": 2,
       "from": "todos",
       "to": "site_config"
     },

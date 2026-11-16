@@ -1,0 +1,34 @@
+<app-dialog
+  [open]="open()"
+  size="form"
+  [title]="'todos.newBoard.title' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="open.set(false)"
+>
+  <form class="nb" (submit)="$event.preventDefault(); submit()">
+    <app-input
+      name="boardName"
+      [id]="'nb-name'"
+      [label]="'todos.settings.name' | t"
+      [required]="true"
+      [ngModel]="name()"
+      (ngModelChange)="name.set($event)"
+    />
+    <div class="nb__field" role="group" aria-labelledby="nb-members">
+      <span class="nb__cap" id="nb-members">{{ 'todos.entries.title' | t }}</span>
+      @if (open()) {
+        <app-todo-board-entries
+          [entries]="entries()"
+          (added)="add($event)"
+          (roleChanged)="setRole($event)"
+          (removed)="remove($event)"
+        />
+      }
+    </div>
+    <button type="submit" hidden></button>
+  </form>
+  <app-button dialog-footer variant="text" (click)="open.set(false)">{{ 'action.cancel' | t }}</app-button>
+  <app-button dialog-footer variant="fill" [disabled]="!valid()" [loading]="saving()" (click)="submit()">
+    {{ 'todos.board.create' | t }}
+  </app-button>
+</app-dialog>

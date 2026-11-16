@@ -76,6 +76,8 @@ Keys that need a note:
 - `todo.all`: global read AND write of the cards of every Gremium and team board. It
   never configures a board (that is the Gremium permission `todo.configure`) and makes
   no member. A personal board stays private.
+- `todo.create_board`: create a free to-do board (spec 001061). The creator becomes a
+  member with the role `manage`; the right reaches no existing board.
 - `calendar.manage`: read, change and delete every Termin of the Kalender and invite
   any Gremium. Without it a person changes only the own Termine.
 - `admin.calendars`: subscribe, change and delete the external calendars
@@ -142,6 +144,7 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "ticket.manage",
     "todo.read_all",
     "todo.all",
+    "todo.create_board",
     "calendar.manage",
     "calendar.publish",
     "admin.calendars",

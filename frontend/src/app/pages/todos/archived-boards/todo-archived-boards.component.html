@@ -1,0 +1,53 @@
+<app-dialog
+  [open]="open()"
+  size="form"
+  [title]="'todos.board.archived' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="open.set(false)"
+>
+  @if (boards().length) {
+    <ul class="ab rowgroup" [attr.aria-label]="'todos.board.archived' | t">
+      @for (board of boards(); track board.id) {
+        <li class="ab__row">
+          <app-icon class="ab__icon" name="kanban" [size]="18" />
+          <span class="ab__name">{{ board.name }}</span>
+          @if (board.canConfigure) {
+            <app-button
+              variant="text"
+              size="sm"
+              [disabled]="busy() !== null"
+              [loading]="busy() === board.id && deleting() === null"
+              (click)="restore(board)"
+            >
+              {{ 'todos.archivedBoards.restore' | t }}
+            </app-button>
+          }
+          @if (admin()) {
+            <app-button
+              variant="danger"
+              size="sm"
+              [disabled]="busy() !== null"
+              [ariaLabel]="'todos.archivedBoards.deleteOf' | t: { name: board.name }"
+              (click)="deleting.set(board)"
+            >
+              {{ 'todos.archivedBoards.delete' | t }}
+            </app-button>
+          }
+        </li>
+      }
+    </ul>
+  } @else {
+    <p class="ab__none">{{ 'todos.archivedBoards.none' | t }}</p>
+  }
+  <app-button dialog-footer variant="fill" (click)="open.set(false)">{{ 'todos.settings.done' | t }}</app-button>
+</app-dialog>
+
+<app-confirm-dialog
+  [open]="deleting() !== null"
+  [title]="'todos.archivedBoards.deleteTitle' | t"
+  [body]="'todos.archivedBoards.deleteBody' | t: { name: deleting()?.name ?? '' }"
+  [confirmLabel]="'todos.archivedBoards.delete' | t"
+  [busy]="busy() !== null"
+  (confirm)="confirmDelete()"
+  (cancel)="deleting.set(null)"
+/>

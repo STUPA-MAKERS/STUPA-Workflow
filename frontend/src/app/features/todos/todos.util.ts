@@ -520,6 +520,7 @@ export function dropEnter(to: TodoBoardKind): (drag: DragSource) => boolean {
 export const DROP_ENTER: Record<TodoBoardKind, (drag: DragSource) => boolean> = {
   personal: dropEnter('personal'),
   gremium: dropEnter('gremium'),
+  free: dropEnter('free'),
   team: dropEnter('team'),
 };
 
@@ -528,6 +529,7 @@ const MOVE_ERROR_TEXT: Record<string, TranslationKey> = {
   card_moved: 'todos.error.transfer',
   transfer_to_personal: 'todos.error.transferToPersonal',
   todo_write_required: 'todos.error.readOnly',
+  board_archived: 'todos.error.archived',
 };
 
 /** The toast text of a refused move or transfer: its code's text, else `fallback`. */

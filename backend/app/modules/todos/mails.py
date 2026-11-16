@@ -1,4 +1,4 @@
-"""To-do mails: ``todo_assigned``, ``todo_mentioned`` and ``todo_due``.
+"""To-do mails: ``todo_assigned``, ``todo_mentioned``, ``todo_due`` and ``todo_board_added``.
 
 ``todo_assigned`` goes to a newly added assignee other than the actor,
 ``todo_mentioned`` to the newly mentioned members other than the author. The router
@@ -6,7 +6,8 @@ sends both after the commit as a background task with its own session, and both 
 best effort: a mail failure never fails the write. ``todo_due`` reminds the
 assignees of an open card the day before it is due; the deadline cron sends it
 (``worker/todos.py``). Each kind is in ``NOTIFICATION_KINDS``, so a person can
-switch it off. The link opens the card on its board.
+switch it off. The link opens the card on its board. ``todo_board_added`` goes to a
+person who was added by name to a board (spec 001071); its link opens the board.
 """
 
 from __future__ import annotations
@@ -21,13 +22,17 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
 from app.modules.auth.models import Principal as PrincipalRow
-from app.modules.notifications.links import todo_link
+from app.modules.notifications.links import todo_board_link, todo_link
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.service import NotificationService
 from app.modules.notifications.texts.todos import (
     TODO_ASSIGNED_BODY,
     TODO_ASSIGNED_KEY,
     TODO_ASSIGNED_SUBJECT,
+    TODO_BOARD_ADDED_BODY,
+    TODO_BOARD_ADDED_KEY,
+    TODO_BOARD_ADDED_SUBJECT,
+    TODO_BOARD_ROLES,
     TODO_DUE_BODY,
     TODO_DUE_KEY,
     TODO_DUE_SUBJECT,
@@ -73,12 +78,14 @@ async def _name(session: AsyncSession, principal_id: UUID) -> str:
 async def send_todo_mail(
     session: AsyncSession, *, queue: MailQueue | None, settings: Settings, mail: TodoMail
 ) -> bool:
-    """Send one ``todo_assigned`` or ``todo_mentioned`` mail of the outbox.
+    """Send one ``todo_assigned``, ``todo_mentioned`` or ``todo_board_added`` mail.
 
     Returns:
         True when a mail was enqueued.
     """
-    card = await session.get(TodoCard, mail.card_id)
+    if mail.kind == "board_added":
+        return await _send_board_added(session, queue=queue, settings=settings, mail=mail)
+    card = await session.get(TodoCard, mail.card_id) if mail.card_id is not None else None
     board = await session.get(TodoBoard, card.board_id) if card is not None else None
     if card is None or board is None:
         return False
@@ -108,6 +115,37 @@ async def send_todo_mail(
             str(mail.event_id),
         ),
         link=todo_link(settings, card.id),
+    )
+
+
+async def _send_board_added(
+    session: AsyncSession, *, queue: MailQueue | None, settings: Settings, mail: TodoMail
+) -> bool:
+    """Send ``todo_board_added``: the board, the role and the link (spec 001071)."""
+    board = await session.get(TodoBoard, mail.board_id) if mail.board_id is not None else None
+    if board is None:
+        return False
+    recipients = await _addresses(session, mail.recipients)
+    if not recipients:
+        return False
+    return await NotificationService(session, queue=queue, settings=settings).send_kind_mail(
+        recipients,
+        kind=TODO_BOARD_ADDED_KEY,
+        template_key=TODO_BOARD_ADDED_KEY,
+        builtin_subject=TODO_BOARD_ADDED_SUBJECT,
+        builtin_body=TODO_BOARD_ADDED_BODY,
+        context={
+            "boardName": board.name,
+            "actor": await _name(session, mail.actor_id),
+            "role": TODO_BOARD_ROLES.get(mail.role or "", TODO_BOARD_ROLES["edit"]),
+        },
+        idempotency_parts=(
+            TODO_BOARD_ADDED_KEY,
+            str(board.id),
+            ",".join(sorted(str(r) for r in mail.recipients)),
+            str(mail.event_id),
+        ),
+        link=todo_board_link(settings, board.id),
     )
 
 

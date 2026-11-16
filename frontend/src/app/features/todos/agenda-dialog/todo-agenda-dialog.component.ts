@@ -18,8 +18,9 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { type PickRow, TodoPickDialogComponent } from '../pick-dialog/todo-pick-dialog.component';
 
 /**
- * "Auf Tagesordnung setzen" of a card on the board of a Gremium (spec 000553): pick one of
- * the planned meetings, the next one first and picked, and the card becomes a TOP of it.
+ * "Auf Tagesordnung setzen" of a card on the board of a Gremium or on a free board (spec
+ * 000553, 001069): pick one of the planned meetings, by Gremium and the next one first, and
+ * the card becomes a TOP of it. Meetings of several Gremien name their Gremium.
  * The card menu passes the meetings, so it can hide the item when there is none.
  */
 @Component({
@@ -45,10 +46,12 @@ export class TodoAgendaDialogComponent {
 
   readonly rows = computed<PickRow[]>(() => {
     const locale = this.i18n.formatLocale();
+    const several = new Set(this.meetings().map((m) => m.gremiumId)).size > 1;
     return this.meetings().map((m) => ({
       id: m.id,
       title: m.title,
       sub: [
+        several ? m.gremiumName : null,
         m.date ? weekdayDate(m.date, locale) : null,
         m.startTime ? m.startTime.slice(0, 5) : null,
       ]

@@ -135,6 +135,7 @@ from app.modules.todos.merge import fold_personal_board, rewrite_mentions
 from app.modules.todos.models import (
     TodoAssignee,
     TodoBoard,
+    TodoBoardEntry,
     TodoCard,
     TodoComment,
     TodoEvent,
@@ -257,6 +258,7 @@ COMBINED_COLUMNS: tuple[InstrumentedAttribute[Any], ...] = (
     DelegationSubstitute.member_principal_id,
     DelegationSubstitute.substitute_principal_id,
     TodoAssignee.principal_id,
+    TodoBoardEntry.principal_id,
     TicketSenderBlock.principal_id,
     CalendarInvitation.principal_id,
     CalendarAnswer.principal_id,
@@ -706,8 +708,8 @@ class PrincipalMergeService:
         """Combine the rows of the tables with a uniqueness rule.
 
         The row of the target wins for a notification kind, an attendance, a pool
-        entry, a to-do assignment, a sender block, and an invitation and an answer of a
-        Termin. A different attendance is a
+        entry, a to-do assignment, a board entry, a sender block, and an invitation and
+        an answer of a Termin. A different attendance is a
         conflict and never reaches this step. A moved self report ``absent`` becomes a
         lead entry, because the NOT VALID check ``self_status`` refuses such a row on
         every change; the status stays, so it matches the protocol PDF. A pool entry in
@@ -786,6 +788,16 @@ class PrincipalMergeService:
             old,
             new,
             exists().where(ta.principal_id == new, ta.card_id == TodoAssignee.card_id),
+            tally,
+            apply=apply,
+        )
+        tbe = aliased(TodoBoardEntry)
+        await self._combine(
+            "todos",
+            TodoBoardEntry.principal_id,
+            old,
+            new,
+            exists().where(tbe.principal_id == new, tbe.board_id == TodoBoardEntry.board_id),
             tally,
             apply=apply,
         )
