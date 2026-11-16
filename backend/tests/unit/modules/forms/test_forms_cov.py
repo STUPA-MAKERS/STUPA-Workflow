@@ -328,8 +328,8 @@ def test_budget_field_options_carry_the_tree() -> None:
     """Give each cost center its parent, key and color."""
     top, child = (uuid.uuid4() for _ in range(2))
     rows = [
-        (top, "AStA", "VS", None, "VS", "#123456"),
-        (child, "Kultur", "VS-1", top, "1", None),
+        (top, "AStA", "VS", None, "VS", "#123456", "VS"),
+        (child, "Kultur", "VS-1", top, "1", None, "VS-1"),
     ]
     out = _run(budget_field_options(_BudgetRowsSession(rows, gets=[])))  # type: ignore[arg-type]
     assert [o.model_dump(by_alias=True, exclude_none=True) for o in out] == [

@@ -328,21 +328,26 @@ def test_an_antrag_starts_with_its_title_and_draws_field_tables(tmp_path: Path) 
     assert any(line[3].endswith("Firma A") for line in lines)
 
 
-def test_an_antrag_cuts_long_values_and_long_table_cells(tmp_path: Path) -> None:
-    """§000881: a value of 30 lines or more and a nested cell of 3 lines or more end in "…"."""
+def test_an_antrag_never_cuts_a_value_but_cuts_a_long_table_cell(tmp_path: Path) -> None:
+    """§000881: a long value and a long nested table go on; a cell of 3 lines ends in "…"."""
     long_value = "".join(f"> Zeile {n}\\\n" for n in range(1, 41))
+    items = "".join(f"> - Punkt {n}\n" for n in range(1, 61))
+    rows = "".join(f"> | Position {n} | Angebot {n} |\n" for n in range(1, 61))
     cell = "Angebot " * 30
     source = (
         '---\ntitle: "A"\ntyp: antrag\n---\n\n'
-        f"> [!feld] Lang\n>\n{long_value}\n"
-        f"> [!feld] Kosten\n>\n> | Position | Angebot |\n> |---|---|\n> | Bus | {cell} |\n\n"
+        f"> [!feld] Lang\n>\n{long_value}>\n> Programm:\n>\n{items}\n"
+        f"> [!feld] Kosten\n>\n> | Position | Angebot |\n> |---|---|\n{rows}> | Bus | {cell} |\n\n"
         "> [!feld] Kurz\n>\n> eins\n"
     )
     lines = _lines(_render(source, "protocol-stupa"), tmp_path)
     words = [line[3] for line in lines]
-    assert "Zeile 29" in words and "Zeile 30" not in words
-    assert words.count("…") == 2
+    assert any(w.startswith("Zeile 40") for w in words) and "eins" in words
+    assert any(w.endswith("Punkt 60") for w in words)
+    assert any("Position 60" in w for w in words)
+    assert words.count("…") == 1
     assert sum(1 for w in words if "Angebot Angebot" in w) == 2
+    assert len({line[0] for line in lines}) > 1
 
 
 def test_an_antrag_draws_signature_rows_and_rules_in_a_nested_table(tmp_path: Path) -> None:

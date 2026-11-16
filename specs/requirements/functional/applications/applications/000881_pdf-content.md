@@ -26,7 +26,8 @@ the section name on a grey band across the table. The tables follow each other w
 the Antrag reads as one table. Each value cell must render its Markdown
 (paragraphs, lists, emphasis, links, tables).
 
-A value that would take 30 lines or more must show 29 lines and a line "…". A cell of the
+A value must never be cut: a long value, a long list and a long Kostenaufstellung must go on
+to the next page, and the Kostenaufstellung may break between two of its rows. A cell of the
 Kostenaufstellung (a position or an offer) that would take 3 lines or more must show 2 lines
 and a line "…". The note "Keine Vergleichsangebote" of a position must use the offer column and
 the amount column together, and it is cut only at 6 lines or more: it then shows 5 lines and a
@@ -68,11 +69,13 @@ The PDF must hold, in this order:
 
 The PDF must not show comments and must not show the status history.
 
-Reason: The PDF must show the Antrag as the Gremium reads it. Attached files often hold
+Reason: The PDF must show the Antrag as the Gremium reads it. A cut value hides the part of the
+Antrag that the Gremium decides on, often the program or the costs. Attached files often hold
 personal data that the platform cannot black out, so only their names go into the PDF.
 
 Test: Unit test of the Markdown builder: a fixture Antrag gives the five parts in order, as
 field rows, and a hidden field does not show. Unit test of the typst converter: a field row
 keeps the block Markdown of its value. Integration tests of the render: no title page, and
-the cut of a long value and of a long cell. Integration test of the route: a passed vote without
+a long value and a long Kostenaufstellung that go on to the next page with no "…", and the cut
+of a long cell. Integration test of the route: a passed vote without
 a decision row gives the section with Gremium and result, and a rejected vote gives no amount.

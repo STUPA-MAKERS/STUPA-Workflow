@@ -32,6 +32,14 @@ class _Years:
         ]
         return list(getattr(self._session, "active_fy", fallback))
 
+    async def is_leaf(self, node: Any) -> bool:
+        """Say the node is a leaf unless the fake session names it in `parents`."""
+        return node.id not in getattr(self._session, "parents", ())
+
+    async def is_income(self, node: Any, _fiscal_year_id: Any) -> bool:
+        """Say the node is income when the fake session names it in `income`."""
+        return node.id in getattr(self._session, "income", ())
+
 
 @pytest.fixture(autouse=True)
 def _choosable_years(monkeypatch: pytest.MonkeyPatch) -> None:

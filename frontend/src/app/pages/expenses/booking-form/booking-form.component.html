@@ -89,6 +89,7 @@
               />
               @if (s.newTopId()) {
                 <app-cost-centre-select
+                  leavesOnly
                   [id]="'bf-cc-' + mode()"
                   [label]="'expenses.field.costCentre' | t"
                   [placeholder]="'expenses.field.costCentrePlaceholder' | t"
@@ -141,6 +142,7 @@
           } @else if (e) {
             @if (editOwnsCostCentre()) {
               <app-cost-centre-select
+                leavesOnly
                 [id]="'bf-cc-' + mode()"
                 [label]="'expenses.field.costCentre' | t"
                 [placeholder]="'expenses.field.costCentrePlaceholder' | t"

@@ -18,6 +18,8 @@ import pytest
 from sqlalchemy import Engine, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.modules.application_types.models import ApplicationType
+from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.models import AuditEntry
 from app.modules.auth.principal import Principal
@@ -42,15 +44,21 @@ from app.modules.budget.tree.service_base import lock_tree
 from app.modules.budget.tree_models import Budget, BudgetAllocation, FiscalYear
 from app.modules.budget.tree_schemas import (
     AllocationSet,
+    AssignBudgetRequest,
     BudgetNodeCreate,
     BudgetNodeOut,
     BudgetNodeUpdate,
     BudgetTreeNodeOut,
     ExpenseCreate,
+    ExpenseUpdate,
     FiscalYearCreate,
     FiscalYearOut,
     FiscalYearUpdate,
+    MoveFiscalYearRequest,
+    TransferCreate,
 )
+from app.modules.flow.models import FlowVersion, State
+from app.modules.forms.models import FormVersion
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.search.service import SearchService
@@ -3204,3 +3212,184 @@ async def test_a_haushalt_with_a_plan_takes_a_booking_only_on_a_plan_in_force(
         fy.id
     ]
     assert (await svc.book_expense(booking(), actor="tester")).fiscal_year_id == fy.id
+
+
+async def _antrag(
+    session: AsyncSession, budget_id: uuid.UUID | None = None, fy_id: uuid.UUID | None = None
+) -> uuid.UUID:
+    """Store an Antrag in a running state, with a cost center and a year or without."""
+    app_type = ApplicationType(key=f"t-{uuid.uuid4().hex[:8]}", name_i18n={})
+    session.add(app_type)
+    await session.flush()
+    fv = FormVersion(application_type_id=app_type.id, version=1)
+    flv = FlowVersion(version=1)
+    session.add_all([fv, flv])
+    await session.flush()
+    state = State(flow_version_id=flv.id, key="review", label_i18n={}, kind="normal")
+    session.add(state)
+    await session.flush()
+    app = Application(
+        type_id=app_type.id,
+        form_version_id=fv.id,
+        flow_version_id=flv.id,
+        current_state_id=state.id,
+        budget_id=budget_id,
+        fiscal_year_id=fy_id,
+        amount=D(10),
+    )
+    session.add(app)
+    await session.commit()
+    return app.id
+
+
+async def test_an_antrag_is_not_assigned_to_an_income_cost_centre(
+    session: AsyncSession,
+) -> None:
+    """An Antrag takes a Kostenstelle on the expense side only, in the chosen year.
+
+    Rule: §F/finance/budget/001030.
+    """
+    t = await _tree(session)
+    await _in_force(t)
+    app_id = await _antrag(session)
+    with pytest.raises(ValidationProblem) as exc:
+        await t.svc.assign_budget(
+            app_id, AssignBudgetRequest(budgetId=t.inc.id, fiscalYearId=t.fy.id)
+        )
+    assert _code(exc) == "cost_centre_income"
+    await session.rollback()
+    done = await t.svc.assign_budget(
+        app_id, AssignBudgetRequest(budgetId=t.exp_a.id, fiscalYearId=t.fy.id)
+    )
+    assert done.budget_id == t.exp_a.id
+
+
+async def test_an_antrag_does_not_move_into_a_year_where_its_cost_centre_is_income(
+    session: AsyncSession,
+) -> None:
+    """An Antrag that already sits on an income Kostenstelle keeps it, but cannot move.
+
+    Rule: §F/finance/budget/001030.
+    """
+    t = await _tree(session)
+    await _in_force(t)
+    app_id = await _antrag(session, t.inc.id, t.fy.id)
+    with pytest.raises(ValidationProblem) as exc:
+        await t.svc.move_fiscal_year(app_id, MoveFiscalYearRequest(fiscalYearId=t.fy.id))
+    assert _code(exc) == "cost_centre_income"
+    await session.rollback()
+    kept = await session.get(Application, app_id, populate_existing=True)
+    assert kept is not None
+    assert kept.budget_id == t.inc.id
+
+
+async def test_the_form_options_leave_out_income_cost_centres(session: AsyncSession) -> None:
+    """The form field offers no Kostenstelle that is income in the current year.
+
+    Rule: §F/finance/budget/001030.
+    """
+    t = await _tree(session)
+    before = {option.value for option in await budget_field_options(session)}
+    assert str(t.inc.id) in before
+    await _in_force(t)
+    after = {option.value for option in await budget_field_options(session)}
+    assert str(t.inc.id) not in after
+    assert {str(t.top.id), str(t.exp.id), str(t.exp_a.id), str(t.exp_b.id)} <= after
+
+
+async def test_the_tree_names_the_years_where_a_node_is_income(session: AsyncSession) -> None:
+    """The tree names the years whose plan in force puts a node on the income side.
+
+    Rule: §F/finance/budget/001030.
+    """
+    t = await _tree(session)
+    await _in_force(t)
+    tree = await t.svc.get_tree()
+    top = next(n for n in tree if n.id == t.top.id)
+    income = {n.id: n.income_in for n in (top, *top.children)}
+    assert income[t.inc.id] == (t.fy.id,)
+    assert income[t.exp.id] == ()
+    assert income[t.top.id] == ()
+
+
+async def test_an_antrag_is_not_assigned_to_a_cost_centre_with_children(
+    session: AsyncSession,
+) -> None:
+    """An Antrag takes a leaf only, never a Titel or a Haushalt with nodes below it.
+
+    Rule: §F/finance/budget/001031.
+    """
+    t = await _tree(session)
+    await _in_force(t)
+    app_id = await _antrag(session)
+    for node in (t.exp, t.top):
+        with pytest.raises(ValidationProblem) as exc:
+            await t.svc.assign_budget(
+                app_id, AssignBudgetRequest(budgetId=node.id, fiscalYearId=t.fy.id)
+            )
+        assert _code(exc) == "cost_centre_not_leaf"
+        await session.rollback()
+    done = await t.svc.assign_budget(
+        app_id, AssignBudgetRequest(budgetId=t.exp_b.id, fiscalYearId=t.fy.id)
+    )
+    assert done.budget_id == t.exp_b.id
+
+
+async def test_a_booking_is_not_made_on_a_cost_centre_with_children(
+    session: AsyncSession,
+) -> None:
+    """A booking and its move take a leaf only; an income booking on an income leaf works.
+
+    Rule: §F/finance/budget/001032.
+    """
+    t = await _tree(session)
+    await _in_force(t)
+
+    def booking(budget_id: uuid.UUID, kind: str = "expense") -> ExpenseCreate:
+        return ExpenseCreate.model_validate(
+            {
+                "budgetId": str(budget_id),
+                "fiscalYearId": str(t.fy.id),
+                "amount": "5",
+                "description": "x",
+                "kind": kind,
+            }
+        )
+
+    with pytest.raises(ValidationProblem) as exc:
+        await t.svc.book_expense(booking(t.exp.id), actor="tester")
+    assert _code(exc) == "cost_centre_not_leaf"
+    await session.rollback()
+    booked = await t.svc.book_expense(booking(t.exp_a.id), actor="tester")
+    with pytest.raises(ValidationProblem) as moved:
+        await t.svc.update_expense(booked.id, ExpenseUpdate(budgetId=t.exp.id))
+    assert _code(moved) == "cost_centre_not_leaf"
+    await session.rollback()
+    income = await t.svc.book_expense(booking(t.inc.id, "income"), actor="tester")
+    assert income.budget_id == t.inc.id
+
+
+async def test_a_transfer_is_not_made_on_a_cost_centre_with_children(
+    session: AsyncSession,
+) -> None:
+    """Each leg of a transfer must be a leaf.
+
+    Rule: §F/finance/budget/001032.
+    """
+    t = await _tree(session)
+    await _in_force(t)
+
+    def transfer(to: uuid.UUID) -> TransferCreate:
+        return TransferCreate(
+            fromBudgetId=t.exp_a.id,
+            toBudgetId=to,
+            fiscalYearId=t.fy.id,
+            amount=D(1),
+            description="t",
+        )
+
+    with pytest.raises(ValidationProblem) as exc:
+        await t.svc.create_transfer(transfer(t.exp.id), actor="tester")
+    assert _code(exc) == "cost_centre_not_leaf"
+    await session.rollback()
+    assert (await t.svc.create_transfer(transfer(t.exp_b.id), actor="tester")).transfer_id

@@ -6,12 +6,12 @@ rows, asks these functions and writes the result.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from decimal import Decimal
 from typing import Any, Literal, assert_never
 from uuid import UUID
 
-from app.modules.budget.tree_rules import compose_tree_path, path_key_of
+from app.modules.budget.tree_rules import _SEP, compose_tree_path, path_key_of
 
 PlanState = Literal["draft", "in_progress", "in_force", "replaced"]
 #: The states a person can ask for. The platform sets the other two: `in_progress`
@@ -287,6 +287,16 @@ def sides_of(
     return {node: side_of(parent_of, top_id, sides, node) for node in parent_of}
 
 
+def is_below_path(path: str, titel_paths: Iterable[str]) -> bool:
+    """Tell if a tree path is one of `titel_paths` or lies below one of them.
+
+    The side of a Kostenstelle is the side of its Titel (000853), so a Kostenstelle is
+    income in a version when its path lies at or below the path of an income Titel
+    (001030). A path segment is alphanumeric, so the separator ends a prefix exactly.
+    """
+    return any(path == titel or path.startswith(titel + _SEP) for titel in titel_paths)
+
+
 def allocations_from_lines(
     nodes: Sequence[tuple[UUID, UUID | None, str | None]],
     amounts: Mapping[UUID, Decimal],
@@ -316,12 +326,14 @@ def with_plan_fields(
     enabled_of: Mapping[object, bool],
     planned_in: Mapping[object, Sequence[object]],
     coverable_of: Mapping[object, bool] | None = None,
+    income_in: Mapping[object, Sequence[object]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Add `plan_enabled`, `plan_coverable_default` and `planned_in` to each node dict.
+    """Add `plan_enabled`, `plan_coverable_default`, `planned_in` and `income_in`.
 
     `planned_in` holds, for a top-level node, the fiscal years with a version in
     force, and for a node below it the fiscal years whose version in force has a line
-    for the node.
+    for the node. `income_in` holds the fiscal years whose version in force puts the
+    node on the income side (001030).
     """
     return [
         {
@@ -329,7 +341,10 @@ def with_plan_fields(
             "plan_enabled": enabled_of.get(node["id"], False),
             "plan_coverable_default": (coverable_of or {}).get(node["id"], False),
             "planned_in": tuple(planned_in.get(node["id"], ())),
-            "children": with_plan_fields(node["children"], enabled_of, planned_in, coverable_of),
+            "income_in": tuple((income_in or {}).get(node["id"], ())),
+            "children": with_plan_fields(
+                node["children"], enabled_of, planned_in, coverable_of, income_in
+            ),
         }
         for node in forest
     ]
