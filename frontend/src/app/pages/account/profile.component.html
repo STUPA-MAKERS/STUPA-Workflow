@@ -17,8 +17,8 @@
           [href]="gravatarUrl"
           target="_blank"
           rel="noopener noreferrer"
-          [attr.aria-label]="'account.profile.gravatar' | t"
         >
+          <span class="sr-only">{{ 'account.profile.gravatar' | t }}</span>
           <app-avatar [name]="name()" principalId="me" size="lg" [decorative]="true" />
           <span class="pf__ext" aria-hidden="true"><app-icon name="ext" /></span>
         </a>
