@@ -376,7 +376,12 @@
       "to": "shared"
     },
     {
-      "count": 7,
+      "count": 1,
+      "from": "budget",
+      "to": "application_types"
+    },
+    {
+      "count": 8,
       "from": "budget",
       "to": "applications"
     },
