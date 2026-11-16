@@ -61,7 +61,7 @@ async def _seed_type(
 
 
 async def test_public_lists_only_active_types(session: AsyncSession) -> None:
-    """List only the active types; the public view hides the key."""
+    """List only the active types; the public view gives the key (§001172)."""
     await _seed_type(session, key="aktiv", name={"de": "Aktiv"})
     await _seed_type(session, key="inaktiv", name={"de": "Inaktiv"}, active=False)
     await session.commit()
@@ -70,7 +70,8 @@ async def test_public_lists_only_active_types(session: AsyncSession) -> None:
     page = await svc.list_types(lang="de", limit=50, offset=0)
 
     assert page.total == 1
-    assert [i.key for i in page.items] == [None]
+    assert [i.key for i in page.items] == ["aktiv"]
+    assert [i.gremium_id for i in page.items] == [None]
     assert [i.name for i in page.items] == ["Aktiv"]
     assert page.items[0].active is True
 
