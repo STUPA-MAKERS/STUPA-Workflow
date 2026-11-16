@@ -1550,7 +1550,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     );
     expect(unknown.placeholders).toEqual({});
     const reset = await firstValueFrom(s.resetMailTemplate('magic_link'));
-    expect(reset).toMatchObject({ key: 'magic_link', source: 'builtin', id: null, subjectI18n: { de: 'Dein Link zur Antragsplattform' } });
+    expect(reset).toMatchObject({ key: 'magic_link', source: 'builtin', id: null, subjectI18n: { de: 'Dein Link zu {{ platformName }}' } });
     expect((await firstValueFrom(s.resetMailTemplate('ghost'))).source).toBe('builtin');
     const pv = await firstValueFrom(
       s.previewMailPayload({

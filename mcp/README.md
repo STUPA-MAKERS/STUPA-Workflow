@@ -1,4 +1,4 @@
-# antragsplattform MCP server
+# workflow MCP server (antragsplattform-mcp)
 
 An [MCP](https://modelcontextprotocol.io) server that lets agents act on the
 antragsplattform through its HTTP API. Authentication uses a standard OAuth2
@@ -23,7 +23,7 @@ Configure it in your MCP client. Set the platform URL with `ANTRAGSPLATTFORM_URL
 ```json
 {
   "mcpServers": {
-    "antragsplattform": {
+    "workflow": {
       "command": "antragsplattform-mcp",
       "env": {
         "ANTRAGSPLATTFORM_URL": "https://antrag.example.org",

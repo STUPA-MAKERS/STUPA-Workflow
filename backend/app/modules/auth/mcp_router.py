@@ -81,7 +81,7 @@ def mcp_config(
     base = settings.public_base_url.rstrip("/")
     return {
         "mcpServers": {
-            "antragsplattform": {
+            "workflow": {
                 "command": "antragsplattform-mcp",
             }
         },
@@ -101,7 +101,7 @@ def mcp_package(
     settings: SettingsDep,
     _principal: Annotated[Principal, Depends(require_principal("mcp.use"))],
 ) -> StreamingResponse:
-    """Stream the `mcp/` source package as `antragsplattform-mcp.tar.gz`.
+    """Stream the `mcp/` source package as `workflow-mcp.tar.gz`.
 
     The package gets ``PUBLIC_BASE_URL`` baked in, so it needs no
     ``ANTRAGSPLATTFORM_URL``. ``json.dumps`` escapes quotes and newlines into the
@@ -123,17 +123,17 @@ def mcp_package(
             parts = set(Path(info.name).parts)
             return None if parts & _EXCLUDE else info
 
-        tar.add(pkg, arcname="antragsplattform-mcp", filter=_filter)
+        tar.add(pkg, arcname="workflow-mcp", filter=_filter)
         baked = (
             '"""Auto-generated at download — pins this package to its source platform."""\n'
             f"BASE_URL = {json.dumps(base)}\n"
         ).encode()
-        baked_info = tarfile.TarInfo("antragsplattform-mcp/antragsplattform_mcp/_baked.py")
+        baked_info = tarfile.TarInfo("workflow-mcp/antragsplattform_mcp/_baked.py")
         baked_info.size = len(baked)
         tar.addfile(baked_info, io.BytesIO(baked))
     buf.seek(0)
     return StreamingResponse(
         buf,
         media_type="application/gzip",
-        headers={"Content-Disposition": 'attachment; filename="antragsplattform-mcp.tar.gz"'},
+        headers={"Content-Disposition": 'attachment; filename="workflow-mcp.tar.gz"'},
     )
