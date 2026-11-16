@@ -2,7 +2,7 @@
 id: "000968"
 title: The plan PDF prints a line with lines below it in grey
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:
