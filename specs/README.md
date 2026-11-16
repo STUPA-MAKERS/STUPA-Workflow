@@ -392,6 +392,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/001040](requirements/functional/finance/budget/001040_plan-line-predecessor.md) | A plan line can name its predecessor in the year before | approved |
 | [F/finance/budget/001041](requirements/functional/finance/budget/001041_plan-row-sums-rows-below.md) | A row without its own figure of the year before sums the rows below it | approved |
 | [F/finance/budget/001042](requirements/functional/finance/budget/001042_plan-line-year-before-by-hand.md) | A plan line can set the Ansatz and the Ist of the year before by hand | approved |
+| [F/finance/budget/001130](requirements/functional/finance/budget/001130_plan-lines-as-tree.md) | The lines of a plan show as a tree | draft |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
 | [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | approved |
 | [F/finance/invoices/000262](requirements/functional/finance/invoices/000262_invoice-segments.md) | The invoice list has four segments | replaced |

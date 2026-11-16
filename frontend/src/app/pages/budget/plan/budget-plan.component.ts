@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Location, NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -362,7 +362,9 @@ export class BudgetPlanComponent {
     });
   });
   /** The rows of the tables. On a narrow screen the search of the page filters them. */
-  private readonly tableRows = computed(() => (this.wide() ? this.rows() : this.listRows()));
+  private readonly tableRows = computed(() => this.shown(this.wide() ? this.rows() : this.listRows()));
+  /** The plan of a phone shows tree rows instead of table cards (001130). */
+  readonly treeOnPhone = computed(() => this.phone());
   /** The rows of the table of a group: a side, or the Titel without one. */
   rowsOf(group: PlanGroup): readonly PlanRow[] {
     return this.tableRows().filter((r) => groupOf(r) === group);
@@ -391,6 +393,39 @@ export class BudgetPlanComponent {
     { value: 'income', label: this.i18n.translate('budget.plan.side.income') },
     { value: 'expense', label: this.i18n.translate('budget.plan.side.expense') },
   ]);
+
+  /** The rows that the person opened or closed. `null` until the first change: then the Titel are open (001130). */
+  private readonly openIds = signal<ReadonlySet<Uuid> | null>(null);
+  /** The rows whose children show. */
+  readonly opened = computed<ReadonlySet<Uuid>>(
+    () => this.openIds() ?? new Set(this.rows().filter((r) => r.hasChildren && r.depth === 0).map((r) => r.id)),
+  );
+  isOpen(row: PlanRow): boolean {
+    return this.opened().has(row.id);
+  }
+  toggle(row: PlanRow): void {
+    const open = this.opened();
+    this.openIds.set(new Set(open.has(row.id) ? [...open].filter((id) => id !== row.id) : [...open, row.id]));
+  }
+  private readonly rowById = computed(() => new Map(this.rows().map((r) => [r.id, r] as const)));
+  /** The ids of the rows above a row, its parent first. */
+  private above(id: Uuid): readonly Uuid[] {
+    const parent = this.rowById().get(id)?.parentId ?? null;
+    return parent ? [parent, ...this.above(parent)] : [];
+  }
+  /** Open the rows above `id`, so a selected row shows in the tree. */
+  private reveal(id: Uuid): void {
+    const open = this.opened();
+    const closed = this.above(id).filter((p) => !open.has(p));
+    if (closed.length) this.openIds.set(new Set([...open, ...closed]));
+  }
+  /** The rows whose parents are all open. A search shows every hit. */
+  private shown(rows: readonly PlanRow[]): readonly PlanRow[] {
+    if (this.query().trim()) return rows;
+    const open = this.opened();
+    return rows.filter((r) => this.above(r.id).every((p) => open.has(p)));
+  }
+  readonly treeRows = computed(() => this.shown(this.listRows()));
 
   /** The rows of the list, filtered by the search text. */
   readonly listRows = computed(() => {
@@ -785,6 +820,10 @@ export class BudgetPlanComponent {
     const wanted = Number(qp.get('version') ?? '');
     this.wantedVersion = qp.get('version') !== null && Number.isInteger(wanted) ? wanted : null;
     pageItemTitle(() => this.picked()?.name ?? null);
+    effect(() => {
+      const row = this.picked();
+      if (row) untracked(() => this.reveal(row.id));
+    });
     this.start();
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((params) => {
       const id = params.get('costCentre') ?? '';

@@ -137,8 +137,14 @@ const texts = (view: View, selector: string) => [...view.container.querySelector
 const input = (view: View, name: string) => view.container.querySelector<HTMLInputElement>(`[name="${name}"]`) as HTMLInputElement;
 const primary = () => within(screen.getByTestId('bp-primary')).getByRole('button');
 const treeRow = (view: View, name: string) =>
-  within(view.container.querySelector('.bd__tree') as HTMLElement).getByRole('button', { name: new RegExp(`^${name}`) });
+  within(view.container.querySelector('.bd__tree') as HTMLElement).getByRole('button', { name: new RegExp(`^${name}(?! (auf|zu)klappen$)`) });
 const tableRow = (name: string) => screen.getAllByText(name).find((el) => el.classList.contains('bp__name')) as HTMLElement;
+/** A row of the tree that a phone shows instead of the tables (001130). */
+const phoneRow = (name: string) =>
+  screen.getAllByText(name).find((el) => el.classList.contains('tn__name') && el.closest('.bp__phoneTree')) as HTMLElement;
+/** The chevron of a row of the list beside the plan. */
+const chevron = (view: View, name: string) =>
+  within(view.container.querySelector('.bd__tree') as HTMLElement).getByRole('button', { name: new RegExp(`^${name} (auf|zu)klappen`) });
 
 /** The two file entries of the head menu: each reader of the plan has them. */
 const FILES = ['Als PDF exportieren', 'Als XLSX exportieren'];
@@ -742,7 +748,7 @@ describe('BudgetPlanComponent', () => {
       const view = await setup({ wide: false, phone: true });
       expect(view.container.querySelector('.bp__field')).toBeNull();
       expect(screen.getByRole('button', { name: /^Haushalt:/ })).toHaveTextContent('Haushalt: VS-Mittel');
-      await userEvent.click(tableRow('Zuschüsse'));
+      await userEvent.click(phoneRow('Zuschüsse'));
       const sheet = await screen.findByRole('dialog', { name: 'Zuschüsse' });
       expect(text(sheet)).toContain('GRANTS · Ausgabe');
       await typeAmount(input(view, 'line-amount-grants'), '45,5');
@@ -775,7 +781,44 @@ describe('BudgetPlanComponent', () => {
       expect(first).toHaveAttribute('title', 'Der Plan ist nicht ausgeglichen.');
       await userEvent.keyboard('{Escape}');
       await userEvent.type(screen.getByPlaceholderText('Kostenstellen durchsuchen'), 'zusch');
-      expect(texts(view, '.bp__name')).toEqual(['Zuschüsse']);
+      expect(texts(view, '.bp__phoneTree .tn__name')).toEqual(['Zuschüsse']);
+    });
+
+    it('§F/finance/budget/001130: a row with children opens and closes in the list and in the table', async () => {
+      const view = await setup();
+      const chev = chevron(view, 'Personal');
+      expect(chev).toHaveAttribute('aria-expanded', 'true');
+      expect(texts(view, '.bd__tree .tn__name')).toContain('Löhne');
+      await userEvent.click(chev);
+      expect(chevron(view, 'Personal')).toHaveAttribute('aria-expanded', 'false');
+      expect(texts(view, '.bd__tree .tn__name')).not.toContain('Löhne');
+      expect(texts(view, '.bp__name')).not.toContain('Löhne');
+      await userEvent.type(screen.getByPlaceholderText('Kostenstellen durchsuchen'), 'löh');
+      expect(texts(view, '.bd__tree .tn__name')).toEqual(['VS-Mittel', 'Löhne']);
+      expect(await axe(view.container)).toHaveNoViolations();
+    });
+
+    it('§F/finance/budget/001130: a row with children is grey, a row of a leaf is not', async () => {
+      const view = await setup();
+      const rowOf = (name: string) => screen.getAllByText(name).find((el) => el.classList.contains('tn__name'))?.closest('.tn');
+      expect(rowOf('Personal')).toHaveClass('bp__parent');
+      expect(rowOf('Löhne')).not.toHaveClass('bp__parent');
+      expect(view.container.querySelectorAll('.bp__table .bp__muted').length).toBeGreaterThan(0);
+    });
+
+    it('§F/finance/budget/001130: a selected row opens the rows above it', async () => {
+      const view = await setup();
+      await userEvent.click(chevron(view, 'Personal'));
+      expect(texts(view, '.bd__tree .tn__name')).not.toContain('Löhne');
+      view.params.next(convertToParamMap({ costCentre: 'wages' }));
+      await waitFor(() => expect(texts(view, '.bd__tree .tn__name')).toContain('Löhne'));
+    });
+
+    it('§F/finance/budget/001130: a phone shows the plan as tree rows', async () => {
+      const view = await setup({ wide: false, phone: true });
+      expect(view.container.querySelector('.bp__table')).toBeNull();
+      expect(texts(view, '.bp__phoneTree .tn__name')).toEqual(['Beiträge', 'Personal', 'Löhne', 'Zuschüsse']);
+      expect(await axe(view.container)).toHaveNoViolations();
     });
 
     it('§F/finance/budget/000794: a Kostenstelle with children has no Ansatz field', async () => {
