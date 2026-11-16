@@ -747,6 +747,58 @@ describe('ApplyWizardComponent', () => {
   });
 
   /** §001170 */
+  it('names a type without a key by its id', async () => {
+    const noKey = TYPES.map((t) => ({ ...t, key: null }));
+    const s = await setup({ types: () => of(noKey) });
+    await pickType(s);
+    s.comp.next();
+    expect(s.navigate).toHaveBeenCalledWith(['/apply', 't1'], { replaceUrl: false });
+  });
+
+  /** §001173 */
+  it('replaces an old link to a type without a key with its id URL', async () => {
+    const noKey = TYPES.map((t) => ({ ...t, key: null }));
+    const s = await setup({ types: () => of(noKey), query: { type: 't1' } });
+    expect(s.navigate).toHaveBeenCalledWith(['/apply', 't1'], { replaceUrl: true });
+  });
+
+  /** §001170 */
+  it('leads a stepper click on the type step back to /apply', async () => {
+    const s = await setup({ params: { type: 'foerderantrag' } });
+    await waitFor(() => expect(s.comp.currentStep()).toBe('details'));
+    s.comp.goToStep(0);
+    expect(s.navigate).toHaveBeenCalledWith(['/apply'], { replaceUrl: false });
+    expect(s.comp.currentStep()).toBe('type');
+  });
+
+  /** §001170 */
+  it('leaves /apply/<key> for /apply when the draft is discarded', async () => {
+    const s = await setup({ params: { type: 'foerderantrag' } });
+    await waitFor(() => expect(s.comp.currentStep()).toBe('details'));
+    await s.comp.discardDraft();
+    expect(s.navigate).toHaveBeenCalledWith(['/apply'], { replaceUrl: true });
+    expect(s.comp.currentStep()).toBe('type');
+  });
+
+  /** §001170 */
+  it('ignores a navigation that keeps the type of the URL', async () => {
+    const s = await setup({ params: { type: 'foerderantrag' } });
+    await waitFor(() => expect(s.comp.currentStep()).toBe('details'));
+    s.urlTo('foerderantrag');
+    expect(s.comp.currentStep()).toBe('details');
+  });
+
+  /** §001170 */
+  it('switches to another type that the URL names', async () => {
+    const two = [TYPES[0], { ...TYPES[0], id: 't3', name: 'Zweiter', key: 'zweiter' }];
+    const s = await setup({ types: () => of(two), params: { type: 'foerderantrag' } });
+    await waitFor(() => expect(s.comp.currentStep()).toBe('details'));
+    s.urlTo('zweiter');
+    await waitFor(() => expect(s.comp.typeId()).toBe('t3'));
+    expect(s.comp.currentStep()).toBe('details');
+  });
+
+  /** §001170 */
   it('puts the key into the URL when the autosave of /apply is past the type step', async () => {
     sessionStorage.setItem(DRAFT_LAST_TYPE, 't1');
     sessionStorage.setItem(`${DRAFT_PREFIX}t1`, JSON.stringify({ v: 1, model: { title: 'X' }, step: 'review' }));

@@ -61,7 +61,7 @@ const OK_STATE: StateOutWire = {
 
 const TYPES: Page<ApplicationTypeListItemWire> = {
   items: [
-    { id: 't1', name: 'Förderantrag', hasBudget: true, active: true, activeFormVersionId: 'v1' },
+    { id: 't1', name: 'Förderantrag', key: 'foerderantrag', hasBudget: true, active: true, activeFormVersionId: 'v1' },
     { id: 't2', name: 'Reisekosten', hasBudget: false, active: true, activeFormVersionId: 'v2' },
     { id: 't3', name: 'Alt', hasBudget: false, active: false, activeFormVersionId: null },
   ],
@@ -414,8 +414,8 @@ describe('DashboardComponent', () => {
       });
       expect(cmp(fixture).newUser()).toBe(true);
       const card = screen.getByRole('region', { name: 'Antrag stellen' });
-      expect(within(card).getByRole('link', { name: 'Förderantrag' })).toHaveAttribute('href', '/apply/t1');
-      expect(within(card).getByRole('link', { name: 'Reisekosten' })).toBeInTheDocument();
+      expect(within(card).getByRole('link', { name: 'Förderantrag' })).toHaveAttribute('href', '/apply/foerderantrag');
+      expect(within(card).getByRole('link', { name: 'Reisekosten' })).toHaveAttribute('href', '/apply/t2');
       expect(within(card).queryByRole('link', { name: 'Alt' })).not.toBeInTheDocument();
       await router.navigateByUrl('/?tab=mine');
       fixture.detectChanges();
