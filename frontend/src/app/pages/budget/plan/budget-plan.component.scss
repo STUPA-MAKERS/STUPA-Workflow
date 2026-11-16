@@ -270,12 +270,3 @@
   -webkit-box-orient: vertical;
   overflow-wrap: anywhere;
 }
-/* A row with children holds a sum, not an Ansatz to type. Its name and its amount are grey,
-   as the parent lines of the plan PDF are (000968). */
-.bp__parent :is(.tn__name, .tn__amt, .bp__name),
-.bp__muted {
-  color: var(--color-text-muted);
-}
-.tn--on.bp__parent :is(.tn__name, .tn__amt) {
-  color: inherit;
-}

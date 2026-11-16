@@ -193,7 +193,6 @@
   <div
     class="tn"
     [class.tn--on]="row.id === selId()"
-    [class.bp__parent]="row.hasChildren"
     [style.--tn-depth]="row.depth + (base ?? 1)"
   >
     @if (row.hasChildren) {
@@ -488,7 +487,7 @@
 <ng-template #table let-rows let-nested="nested">
   <app-data-table class="bp__table" surface="rowgroup" [loading]="load().kind === 'loading'" [columns]="columns()" [rows]="rows" [rowKey]="rowId" [clickable]="true" (rowClick)="select($event)">
     <ng-template appCell="node" let-row>
-      <span class="bp__nodeRow" [class.bp__parent]="$any(row).hasChildren" [style.--bp-depth]="nested ? $any(row).depth : 0">
+      <span class="bp__nodeRow" [style.--bp-depth]="nested ? $any(row).depth : 0">
       @if (nested) {
         @if ($any(row).hasChildren) {
           <button type="button" class="tn__chev" [attr.aria-expanded]="isOpen($any(row))" [attr.aria-label]="(isOpen($any(row)) ? 'budget.dash.collapse' : 'budget.dash.expand') | t: { name: $any(row).name }" [disabled]="!!query().trim()" (click)="$event.stopPropagation(); toggle($any(row))">
@@ -532,12 +531,12 @@
           (keydown.enter)="onFieldEnter($event, $any(row))"
         />
       } @else if (tableFields()) {
-        <span class="bp__field bp__sum bp__muted" [class.bp__field--wide]="wideFields()">
+        <span class="bp__field bp__sum" [class.bp__field--wide]="wideFields()">
           <span class="bp__sumDigits mono">{{ sumDigits($any(row).amount) }}</span>
           <span class="bp__sumSign">€</span>
         </span>
       } @else {
-        <span class="bp__num bp__plan mono" [class.bp__muted]="$any(row).hasChildren">{{ money($any(row).amount) }}</span>
+        <span class="bp__num bp__plan mono">{{ money($any(row).amount) }}</span>
       }
     </ng-template>
     <ng-template appCell="base" let-row><span class="bp__num mono">{{ money($any(row).base) }}</span></ng-template>

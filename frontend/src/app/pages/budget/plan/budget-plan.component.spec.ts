@@ -798,14 +798,6 @@ describe('BudgetPlanComponent', () => {
       expect(await axe(view.container)).toHaveNoViolations();
     });
 
-    it('§F/finance/budget/001130: a row with children is grey, a row of a leaf is not', async () => {
-      const view = await setup();
-      const rowOf = (name: string) => screen.getAllByText(name).find((el) => el.classList.contains('tn__name'))?.closest('.tn');
-      expect(rowOf('Personal')).toHaveClass('bp__parent');
-      expect(rowOf('Löhne')).not.toHaveClass('bp__parent');
-      expect(view.container.querySelectorAll('.bp__table .bp__muted').length).toBeGreaterThan(0);
-    });
-
     it('§F/finance/budget/001130: a selected row opens the rows above it', async () => {
       const view = await setup();
       await userEvent.click(chevron(view, 'Personal'));

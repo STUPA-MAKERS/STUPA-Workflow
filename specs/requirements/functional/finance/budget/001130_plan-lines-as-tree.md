@@ -29,8 +29,7 @@ below a selected line (000815) has no chevrons.
 In the list and on a phone, a vertical line for each level above a row must run through the
 column of the chevrons, from the first to the last row below that level.
 
-A line with lines below it holds a sum (001041). Its name and its amount must be grey, as the
-parent lines of the plan PDF are (000968). A selected row keeps the colour of the selection.
+A line with lines below it holds a sum (001041). It has the colours of every other line.
 
 A name in the list and on a phone breaks into a second line. Only a name that is longer than
 two lines is cut.
@@ -44,5 +43,4 @@ the levels cannot be told apart, the deep names are cut, and the many parent lin
 0,00 € hide the lines with an Ansatz. On a phone each line was a card three rows high.
 
 Test: The component test closes and opens a line in the list and the table, searches in a
-closed line, selects a line below a closed line, reads the grey of a line with lines below,
-and reads the rows of the tree on a phone.
+closed line, selects a line below a closed line, and reads the rows of the tree on a phone.
