@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Location, NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { FileOpenService } from '@shared/viewer/file-open.service';
 import { EMPTY, type Observable, forkJoin, of } from 'rxjs';
 import { catchError, finalize, tap } from 'rxjs/operators';
 import {
@@ -182,6 +183,9 @@ const FIELD_COL = '10rem';
 /** The first Ansatz that the narrow amount field of a table cuts. */
 const WIDE_FROM = 10_000_000;
 
+/** A figure of the year before that a draft line sets by hand (001042). */
+type YearBeforeField = 'prevAmount' | 'prevActual';
+
 /**
  * The view "Planung" of the Budget tab: the Haushaltsplan of a fiscal year in the list and
  * detail geometry of the tab. The list shows the Kostenstellen of the plan with their Ansatz,
@@ -234,6 +238,7 @@ const WIDE_FROM = 10_000_000;
 export class BudgetPlanComponent {
   private readonly treeApi = inject(BudgetTreeApi);
   private readonly api = inject(BudgetPlanApi);
+  private readonly files = inject(FileOpenService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
@@ -359,7 +364,9 @@ export class BudgetPlanComponent {
     });
   });
   /** The rows of the tables. On a narrow screen the search of the page filters them. */
-  private readonly tableRows = computed(() => (this.wide() ? this.rows() : this.listRows()));
+  private readonly tableRows = computed(() => this.shown(this.wide() ? this.rows() : this.listRows()));
+  /** The plan of a phone shows tree rows instead of table cards (001130). */
+  readonly treeOnPhone = computed(() => this.phone());
   /** The rows of the table of a group: a side, or the Titel without one. */
   rowsOf(group: PlanGroup): readonly PlanRow[] {
     return this.tableRows().filter((r) => groupOf(r) === group);
@@ -388,6 +395,39 @@ export class BudgetPlanComponent {
     { value: 'income', label: this.i18n.translate('budget.plan.side.income') },
     { value: 'expense', label: this.i18n.translate('budget.plan.side.expense') },
   ]);
+
+  /** The rows that the person opened or closed. `null` until the first change: then the Titel are open (001130). */
+  private readonly openIds = signal<ReadonlySet<Uuid> | null>(null);
+  /** The rows whose children show. */
+  readonly opened = computed<ReadonlySet<Uuid>>(
+    () => this.openIds() ?? new Set(this.rows().filter((r) => r.hasChildren && r.depth === 0).map((r) => r.id)),
+  );
+  isOpen(row: PlanRow): boolean {
+    return this.opened().has(row.id);
+  }
+  toggle(row: PlanRow): void {
+    const open = this.opened();
+    this.openIds.set(new Set(open.has(row.id) ? [...open].filter((id) => id !== row.id) : [...open, row.id]));
+  }
+  private readonly rowById = computed(() => new Map(this.rows().map((r) => [r.id, r] as const)));
+  /** The ids of the rows above a row, its parent first. */
+  private above(id: Uuid): readonly Uuid[] {
+    const parent = this.rowById().get(id)?.parentId ?? null;
+    return parent ? [parent, ...this.above(parent)] : [];
+  }
+  /** Open the rows above `id`, so a selected row shows in the tree. */
+  private reveal(id: Uuid): void {
+    const open = this.opened();
+    const closed = this.above(id).filter((p) => !open.has(p));
+    if (closed.length) this.openIds.set(new Set([...open, ...closed]));
+  }
+  /** The rows whose parents are all open. A search shows every hit. */
+  private shown(rows: readonly PlanRow[]): readonly PlanRow[] {
+    if (this.query().trim()) return rows;
+    const open = this.opened();
+    return rows.filter((r) => this.above(r.id).every((p) => open.has(p)));
+  }
+  readonly treeRows = computed(() => this.shown(this.listRows()));
 
   /** The rows of the list, filtered by the search text. */
   readonly listRows = computed(() => {
@@ -491,7 +531,7 @@ export class BudgetPlanComponent {
     const own = money('amount', this.amountLabel(), this.tableFields() ? FIELD_COL : MONEY_COL);
     const rest = this.nachtrag()
       ? [money('base', this.baseLabel())]
-      : this.canCopy()
+      : this.showsYearBefore()
         ? [
             money('prev', this.i18n.translate('budget.plan.col.amount', { year: prev })),
             money('actual', this.i18n.translate('budget.plan.col.actual', { year: prev })),
@@ -507,7 +547,7 @@ export class BudgetPlanComponent {
   });
   readonly rowId = (row: unknown): string => (row as PlanRow).id;
   /** The plan has an Ansatz to compare against: the version before a Nachtrag, or a plan of the year before. */
-  readonly compared = computed(() => this.nachtrag() || this.canCopy());
+  readonly compared = computed(() => this.nachtrag() || this.showsYearBefore());
 
   /** The name of the Ansatz of the shown version: "Ansatz 2026" or "Ansatz 1. Nachtrag". */
   readonly amountLabel = computed(() => {
@@ -623,7 +663,7 @@ export class BudgetPlanComponent {
       ...item('setState', 'budget.plan.action.setState', 'edit', this.canSetState()),
     ];
     const files: RowMenuItem[] = [
-      ...item('exportPdf', 'budget.plan.action.exportPdf', 'download', !!this.version()),
+      ...item('exportPdf', 'budget.plan.action.openPdf', 'file', !!this.version()),
       ...item('exportXlsx', 'budget.plan.action.exportXlsx', 'download', !!this.version()),
     ];
     const draft: RowMenuItem[] =
@@ -782,6 +822,10 @@ export class BudgetPlanComponent {
     const wanted = Number(qp.get('version') ?? '');
     this.wantedVersion = qp.get('version') !== null && Number.isInteger(wanted) ? wanted : null;
     pageItemTitle(() => this.picked()?.name ?? null);
+    effect(() => {
+      const row = this.picked();
+      if (row) untracked(() => this.reveal(row.id));
+    });
     this.start();
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((params) => {
       const id = params.get('costCentre') ?? '';
@@ -1094,6 +1138,16 @@ export class BudgetPlanComponent {
   /** The year before has a plan in force: the new plan can start as its copy, and the page shows its Ansatz and its Ist. */
   readonly canCopy = computed(() => inForce(this.prevPlan()?.versions ?? []) !== null);
 
+  /**
+   * The page shows the Ansatz and the Ist of the year before: that year has a plan in force,
+   * or a line of the version sets one of the two by hand (000889, 001042).
+   */
+  readonly showsYearBefore = computed(
+    () =>
+      this.prevYear() !== null &&
+      (this.canCopy() || (this.version()?.lines ?? []).some((l) => (l.prevAmount ?? null) !== null || (l.prevActual ?? null) !== null)),
+  );
+
   /** Run an action of the head, of a menu or of the floating button. `row` is its Kostenstelle. */
   onAction(id: string, row: PlanRow | null = this.picked()): void {
     const version = this.version();
@@ -1141,12 +1195,26 @@ export class BudgetPlanComponent {
         this.stateOpen.set(true);
         return;
       case 'exportPdf':
-        this.exportFile('pdf');
+        this.openPdf();
         return;
       case 'exportXlsx':
         this.exportFile('xlsx');
         return;
     }
+  }
+
+  /**
+   * Open the shown version as PDF in the file viewer (spec 001080). Its download keeps
+   * the name of the server.
+   */
+  private openPdf(): void {
+    const version = this.version();
+    if (!version) return;
+    this.files.open({
+      name: `${this.i18n.translate('budget.plan.pdfName')}.pdf`,
+      url: this.api.exportUrl(version.id, 'pdf'),
+      kind: 'pdf',
+    });
   }
 
   /** Load the shown version as a file and hand it to the browser under the name of the server. */
@@ -1398,6 +1466,47 @@ export class BudgetPlanComponent {
     const predecessorId = (value || null) as Uuid | null;
     if (!version || !this.editable() || predecessorId === row.predecessorId) return;
     this.write(this.api.setPredecessor(version.id, row.id, predecessorId), null, null, false);
+  }
+
+  /** The two fields of the year before in the detail of a line (001042). */
+  readonly yearBeforeFields: readonly YearBeforeField[] = ['prevAmount', 'prevActual'];
+
+  /** The text of a field of the year before: the text a person types, else the value set by hand (001042). */
+  yearBeforeValue(row: PlanRow, field: YearBeforeField): string | number {
+    return this.edits()[`${row.id}:${field}`] ?? (field === 'prevAmount' ? row.prevByHand : row.actualByHand) ?? '';
+  }
+
+  /** The computed figure of the year before, as the placeholder of its empty field. */
+  yearBeforePlaceholder(row: PlanRow, field: YearBeforeField): string {
+    const computed = field === 'prevAmount' ? row.prevComputed : row.actualComputed;
+    return computed === null ? '' : this.sumDigits(computed);
+  }
+
+  /** Keep the figure of the year before a person types. */
+  editYearBefore(row: PlanRow, field: YearBeforeField, value: string | null): void {
+    this.edits.update((e) => ({ ...e, [`${row.id}:${field}`]: value ?? '' }));
+  }
+
+  /**
+   * A field of the year before lost the focus: save the typed value with the other value of
+   * the line. An empty field clears the value, so the line shows the computed figure again.
+   */
+  saveYearBefore(row: PlanRow, field: YearBeforeField): void {
+    const version = this.version();
+    const key = `${row.id}:${field}`;
+    const value = this.edits()[key];
+    if (value === undefined || !version) return;
+    this.edits.update((e) => Object.fromEntries(Object.entries(e).filter(([k]) => k !== key)));
+    const line = version.lines.find((l) => l.budgetId === row.id);
+    const wanted = value === '' ? null : value;
+    const saved = (field === 'prevAmount' ? line?.prevAmount : line?.prevActual) ?? null;
+    if (!this.editable() || !line || wanted === saved) return;
+    if (wanted !== null && amountProblem(wanted) === 'negative') {
+      this.toast.error(this.i18n.translate('budget.plan.error.amountNegative'));
+      return;
+    }
+    const body = { prevAmount: line.prevAmount ?? null, prevActual: line.prevActual ?? null, [field]: wanted };
+    this.write(this.api.setYearBefore(version.id, row.id, body), null, null, false);
   }
 
   /** The presses of the Vermerk switches whose save runs, by line and Vermerk. */

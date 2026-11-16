@@ -368,6 +368,10 @@ class ApplicationTypeOut(FrozenCamelModel, frozen=True):
     pdf_signatures: bool = Field(default=False, serialization_alias="pdfSignatures")
     comparison_offers: dict[Any, Any] | None = Field(serialization_alias="comparisonOffers")
     retention_months: int | None = Field(default=None, serialization_alias="retentionMonths")
+    #: The group in step 1 of the apply wizard (spec 001180), ``None`` = no group.
+    group_id: UUID | None = Field(default=None, serialization_alias="groupId")
+    #: The order inside the group (spec 001183).
+    position: int = 0
     active_form_version_id: UUID | None = Field(serialization_alias="activeFormVersionId")
     #: The number of the active form version. ``None`` while no version is active.
     active_form_version: int | None = Field(default=None, serialization_alias="activeFormVersion")
@@ -383,6 +387,7 @@ class ApplicationTypeCreate(FrozenCamelModel, frozen=True):
     pdf_signatures: bool = Field(default=False, alias="pdfSignatures")
     comparison_offers: ComparisonOffers | None = Field(default=None, alias="comparisonOffers")
     retention_months: int | None = Field(default=None, alias="retentionMonths", ge=1)
+    group_id: UUID | None = Field(default=None, alias="groupId")
 
 
 class ApplicationTypeUpdate(FrozenCamelModel, frozen=True):
@@ -394,6 +399,53 @@ class ApplicationTypeUpdate(FrozenCamelModel, frozen=True):
     pdf_signatures: bool | None = Field(default=None, alias="pdfSignatures")
     comparison_offers: ComparisonOffers | None = Field(default=None, alias="comparisonOffers")
     retention_months: int | None = Field(default=None, alias="retentionMonths", ge=1)
+    #: A sent null takes the type out of its group. An omitted field keeps the group.
+    group_id: UUID | None = Field(default=None, alias="groupId")
+
+
+class ApplicationTypeGroupOut(FrozenCamelModel, frozen=True):
+    """A group of Antragsarten (spec 001180)."""
+
+    id: UUID
+    name_i18n: I18nMap = Field(serialization_alias="nameI18n")
+    text_i18n: I18nMap = Field(serialization_alias="textI18n")
+    position: int
+
+
+class ApplicationTypeGroupCreate(FrozenStrictCamelModel, frozen=True):
+    """A new group of Antragsarten. It goes to the end of the order (spec 001183)."""
+
+    name_i18n: I18nMap = Field(alias="nameI18n")
+    text_i18n: I18nMap = Field(default_factory=dict, alias="textI18n")
+
+    @field_validator("name_i18n")
+    @classmethod
+    def _needs_german_name(cls, value: I18nMap) -> I18nMap:
+        """A group needs a German name (spec 001180)."""
+        if not value.get("de", "").strip():
+            raise ValueError("a group needs a German name")
+        return value
+
+
+class ApplicationTypeGroupUpdate(FrozenStrictCamelModel, frozen=True):
+    """Partial update of a group of Antragsarten."""
+
+    name_i18n: I18nMap | None = Field(default=None, alias="nameI18n")
+    text_i18n: I18nMap | None = Field(default=None, alias="textI18n")
+
+    @field_validator("name_i18n")
+    @classmethod
+    def _keeps_german_name(cls, value: I18nMap | None) -> I18nMap | None:
+        """A sent name keeps a German name (spec 001180)."""
+        if value is not None and not value.get("de", "").strip():
+            raise ValueError("a group needs a German name")
+        return value
+
+
+class OrderMove(FrozenStrictCamelModel, frozen=True):
+    """Move a group or an Antragsart one place up (-1) or down (+1) (spec 001183)."""
+
+    by: Literal[-1, 1]
 
 
 class FlowVersionCreate(FrozenCamelModel, frozen=True):

@@ -25,6 +25,7 @@ import type {
   PublicVoteResult,
 } from './public-protocols.models';
 import { publicList } from './public-list';
+import { FileOpenService } from '@shared/viewer/file-open.service';
 import { PublicProtocolsService } from './public-protocols.service';
 import {
   resultKey,
@@ -63,6 +64,7 @@ import { dayMonthYear, parseDay, weekdayDate } from '@shared/date-format';
 })
 export class PublicProtocolsComponent {
   private readonly api = inject(PublicProtocolsService);
+  private readonly files = inject(FileOpenService);
   private readonly i18n = inject(I18nService);
 
   /** The list logic that this page shares with "Beschlüsse". */
@@ -168,5 +170,10 @@ export class PublicProtocolsComponent {
 
   protected pdfUrl(p: PublicProtocolSummary): string {
     return this.api.pdfUrl(p.id);
+  }
+
+  /** The PDF opens in the file viewer (spec 001080); a click with a modifier keeps the link. */
+  protected openPdf(event: MouseEvent, p: PublicProtocolSummary): void {
+    this.files.click(event, { name: `${p.title}.pdf`, url: this.pdfUrl(p), kind: 'pdf' });
   }
 }

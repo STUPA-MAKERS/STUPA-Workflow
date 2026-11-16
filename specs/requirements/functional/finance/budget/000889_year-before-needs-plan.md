@@ -24,6 +24,7 @@ The page of a Haushaltsplan (000808, 000815) and its export (000875) must show t
 and the Ist of the year before only when the year before has a plan in force. Without
 one, the tables, the detail of a line, the XLSX file and the PDF file must have neither
 of the two. The export keeps the column "Änderung"; the page shows it as 001021 says.
+A version with a figure of the year before set by hand shows the two columns (001042).
 
 Reason: Without a plan in the year before there is no Ansatz to compare with, and the
 Ist holds only zeros and reads like a year without spending.

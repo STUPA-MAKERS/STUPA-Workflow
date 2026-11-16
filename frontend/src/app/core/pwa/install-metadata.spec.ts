@@ -91,6 +91,22 @@ describe('install metadata', () => {
     expect(content).toContain('interactive-widget=resizes-content');
   });
 
+  /**
+   * Spec 001090: nginx replaces the built-in head tags with the branded ones of
+   * /api/page-head (SSI). The built-in tags stay in the block, as the stub of the include
+   * and for the service worker, which keeps the built file.
+   */
+  it('puts the built-in head into the stub of the branded head', () => {
+    const html = indexHtml();
+    const block = /<!--# block name="brand_head" -->([\s\S]*?)<!--# endblock -->/.exec(html)?.[1];
+    expect(block).toContain('<title>');
+    expect(block).toContain('name="description"');
+    expect(block).toContain('name="apple-mobile-web-app-title"');
+    expect(block).toContain('rel="apple-touch-icon"');
+    expect(html).toContain('<!--# include virtual="/api/page-head" stub="brand_head" -->');
+    expect(html.match(/<title>/g)).toHaveLength(1);
+  });
+
   it('marks the page as a standalone app for iOS', () => {
     expect(indexHtml()).toContain('<meta name="apple-mobile-web-app-capable" content="yes" />');
   });

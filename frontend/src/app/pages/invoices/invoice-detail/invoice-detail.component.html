@@ -10,7 +10,7 @@
           [ariaLabel]="'invoices.openFile' | t"
           [title]="'invoices.openFile' | t"
           (click)="openFile.emit()"
-        ><app-icon name="download" /></app-button>
+        ><app-icon name="file" /></app-button>
       }
       @if (canManage()) {
         <app-sheet-action
@@ -60,7 +60,6 @@
               <span class="id__fileMeta">PDF</span>
             </span>
             <span class="id__fileOpen">
-              <app-icon name="download" [size]="18" />
               <span class="sr-only">{{ 'invoices.openFile' | t }}</span>
             </span>
           </button>

@@ -65,6 +65,20 @@ describe('BudgetPlanUtil', () => {
     expect(byId.get('grants')).toMatchObject({ prev: null, actual: null });
   });
 
+  it('§F/finance/budget/001042: a value set by hand wins one by one, and the rows above sum it', () => {
+    const rows = planRows({
+      top: TOP,
+      version: version({ lines: [line('fees', '100'), line('staff', '70'), line('wages', '60', { prevAmount: '12.00', prevActual: '8.00' }), line('grants', '30', { prevActual: '3.00' })] }),
+      base: null,
+      prev: version({ lines: [line('grants', '50')] }),
+      prevFiscalYearId: 'fy-25',
+    });
+    const byId = new Map(rows.map((r) => [r.id, r] as const));
+    expect(byId.get('wages')).toMatchObject({ prev: 12, actual: 8, prevByHand: 12, actualByHand: 8, prevComputed: null, actualComputed: null });
+    expect(byId.get('staff')).toMatchObject({ prev: 12, actual: 8, prevByHand: null });
+    expect(byId.get('grants')).toMatchObject({ prev: 50, actual: 3, prevComputed: 50, actualComputed: 0 });
+  });
+
   it('§F/finance/budget/001040: a line compares with its Vorgänger, and the Vorgänger with that line only', () => {
     expect(comparedWith([{ budgetId: 'a' }, { budgetId: 'b', predecessorId: 'a' }, { budgetId: 'c', predecessorId: null }])).toEqual(
       new Map([['a', null], ['b', 'a'], ['c', 'c']]),

@@ -73,8 +73,8 @@ from app.modules.budget.tree_schemas import (
 )
 from app.shared.antiabuse import body_cap
 from app.shared.errors import ForbiddenError, ProblemDetail, ValidationProblem
-from app.shared.filenames import content_disposition
 from app.shared.paging import Page
+from app.shared.preview import file_response
 
 router = APIRouter(tags=["budget"])
 
@@ -767,7 +767,11 @@ async def upload_invoice_file(
     responses=_errors(401, 403, 404, 503),
     response_class=Response,
 )
-async def get_invoice_file(invoice_id: UUID, service: ServiceDep) -> Response:
+async def get_invoice_file(
+    invoice_id: UUID,
+    service: ServiceDep,
+    inline: Annotated[bool, Query()] = False,
+) -> Response:
     """Stream the original receipt from the server.
 
     MinIO is internal, so the route serves no presigned URL. Hardening: the
@@ -775,14 +779,11 @@ async def get_invoice_file(invoice_id: UUID, service: ServiceDep) -> Response:
     The upload already enforces ``application/pdf``. Therefore the route forces
     the media type to ``application/pdf`` and adds ``Content-Disposition:
     attachment``. An HTML polyglot stored as a PDF then cannot render in the
-    app origin.
+    app origin. ``?inline=true`` gives the sandboxed preview of the file viewer
+    (spec 001083): the ``sandbox`` CSP gives the file an opaque origin.
     """
     data, _mime, name = await service.invoice_file_bytes(invoice_id)
-    return Response(
-        content=data,
-        media_type="application/pdf",
-        headers={"Content-Disposition": content_disposition("attachment", name)},
-    )
+    return file_response(data, name=name, mime="application/pdf", inline=inline)
 
 
 @router.get(

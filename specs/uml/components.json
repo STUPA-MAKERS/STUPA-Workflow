@@ -1,7 +1,7 @@
 {
   "edges": [
     {
-      "count": 3,
+      "count": 5,
       "from": "account",
       "to": "auth"
     },
@@ -116,12 +116,12 @@
       "to": "protocol"
     },
     {
-      "count": 35,
+      "count": 36,
       "from": "admin",
       "to": "shared"
     },
     {
-      "count": 21,
+      "count": 26,
       "from": "admin",
       "to": "site_config"
     },
@@ -376,7 +376,12 @@
       "to": "shared"
     },
     {
-      "count": 7,
+      "count": 1,
+      "from": "budget",
+      "to": "application_types"
+    },
+    {
+      "count": 8,
       "from": "budget",
       "to": "applications"
     },
@@ -416,7 +421,7 @@
       "to": "pdf"
     },
     {
-      "count": 35,
+      "count": 36,
       "from": "budget",
       "to": "shared"
     },
@@ -456,12 +461,12 @@
       "to": "protocol"
     },
     {
-      "count": 16,
+      "count": 18,
       "from": "calendar",
       "to": "shared"
     },
     {
-      "count": 3,
+      "count": 5,
       "from": "calendar",
       "to": "site_config"
     },
@@ -596,7 +601,7 @@
       "to": "pdf"
     },
     {
-      "count": 10,
+      "count": 11,
       "from": "documents",
       "to": "shared"
     },

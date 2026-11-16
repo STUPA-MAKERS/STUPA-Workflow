@@ -17,7 +17,7 @@ import { AppAccountMenuComponent } from './account-menu.component';
 @Component({ standalone: true, template: '' })
 class StubPage {}
 
-const ACCOUNT_ROUTES = ['account/notifications', 'account/grants'].map((path) => ({
+const ACCOUNT_ROUTES = ['account/profile', 'account/notifications', 'account/grants'].map((path) => ({
   path,
   component: StubPage,
 }));
@@ -70,6 +70,7 @@ describe('AppAccountMenuComponent', () => {
   /** API access shows only with mcp.use. */
   it('links the account pages', async () => {
     await setup();
+    expect(screen.getByRole('link', { name: 'Profil' })).toHaveAttribute('href', '/account/profile');
     expect(screen.getByRole('link', { name: 'Benachrichtigungen' })).toHaveAttribute(
       'href',
       '/account/notifications',

@@ -110,6 +110,17 @@
       }
     </div>
 
+    <app-input
+      class="aid__minutes"
+      type="number"
+      name="minutes"
+      [id]="'aid-minutes'"
+      [label]="'meetings.agenda.duration' | t"
+      [suffix]="'meetings.agenda.durationUnit' | t"
+      [error]="minutesInvalid() ? ('meetings.agenda.durationRange' | t) : ''"
+      [ngModel]="minutes()"
+      (ngModelChange)="minutes.set($event)"
+    />
     <app-switch
       class="aid__np"
       [id]="'aid-np'"

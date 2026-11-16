@@ -18,9 +18,9 @@ import { FormGroup, FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
-import { filenameFromDisposition } from '@shared/download.util';
 import { ObserversDialogComponent } from '../../features/apply/observers-dialog/observers-dialog.component';
 import { API_BASE_URL } from '@core/api/api.config';
+import { FileOpenService } from '@shared/viewer/file-open.service';
 import { AuthService } from '@core/auth/auth.service';
 import { FeatureService } from '@core/features/feature.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -86,7 +86,6 @@ import {
   TabsComponent,
   ToastService,
   scrollBehavior,
-  downloadBlob,
 } from '@stupa-makers/ui-kit';
 import {
   BudgetTreeApi,
@@ -226,10 +225,21 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
 export class ApplicationsDetailComponent {
   private readonly api = inject(ApiClient);
   private readonly apiBase = inject(API_BASE_URL);
+  private readonly files = inject(FileOpenService);
   private readonly budgetApi = inject(BudgetTreeApi);
   private readonly features = inject(FeatureService);
   /** The row "Kostenstelle" shows only while `Budget` is on (spec 000758). */
   protected readonly budgetOn = computed(() => this.features.isOn('budget'));
+  /**
+   * Show the Kostenstelle row: the type asks for money (`hasBudget`), or an old
+   * assignment is still there and can go away (001033). An Antrag of a type without
+   * money takes no Kostenstelle.
+   */
+  protected readonly budgetRow = computed(() => {
+    const app = this.app();
+    if (!this.budgetOn() || app === null) return false;
+    return !!app.budgetId || (!this.formLoading() && this.hasBudget());
+  });
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
@@ -835,7 +845,7 @@ export class ApplicationsDetailComponent {
         icon: 'archive',
       }),
     ];
-    const pdf: RowMenuItem = { id: 'pdf', label: t('applications.detail.downloadPdf'), icon: 'download' };
+    const pdf: RowMenuItem = { id: 'pdf', label: t('applications.detail.openPdf'), icon: 'file' };
     const more = [
       ...when(this.canForceStatus(), {
         id: 'force',
@@ -956,32 +966,21 @@ export class ApplicationsDetailComponent {
         this.observersOpen.set(true);
         break;
       case 'pdf':
-        this.downloadPdf(app.id);
+        this.openPdf(app.id, this.title());
         break;
     }
   }
 
-  /** A PDF download that runs: a second click waits for it. */
-  readonly pdfBusy = signal(false);
-
   /**
-   * "Als PDF herunterladen": the server renders the Antrag as the reader sees it and
-   * names the file (`Antrag_<Titel>_<Datum>.pdf`). The PDF streams through the API.
+   * "Als PDF öffnen": the server renders the Antrag as the reader sees it. The PDF opens in
+   * the file viewer (spec 001080); its download keeps the name of the server
+   * (`Antrag_<Titel>_<Datum>.pdf`). The PDF streams through the API.
    */
-  downloadPdf(id: string): void {
-    if (this.pdfBusy()) return;
-    this.pdfBusy.set(true);
-    this.api.applicationPdf(id).subscribe({
-      next: (res) => {
-        this.pdfBusy.set(false);
-        if (!res.body) return;
-        const name = filenameFromDisposition(res.headers.get('Content-Disposition'), 'Antrag.pdf');
-        downloadBlob(res.body, name);
-      },
-      error: () => {
-        this.pdfBusy.set(false);
-        this.toast.error(this.i18n.translate('applications.detail.pdfError'));
-      },
+  openPdf(id: string, title: string): void {
+    this.files.open({
+      name: `${title}.pdf`,
+      url: `${this.apiBase}/applications/${id}/pdf`,
+      kind: 'pdf',
     });
   }
 
@@ -1235,6 +1234,13 @@ export class ApplicationsDetailComponent {
         if (seq === this.loadSeq) this.budgetTree.set([]);
       },
     });
+  }
+
+  /** Take the old Kostenstelle off an Antrag of a type without money (001033). */
+  clearBudget(): void {
+    this.budgetChoice.set('');
+    this.fiscalChoice.set('');
+    this.assignBudget();
   }
 
   /** Assign or unassign the cost centre with POST /assign-budget, then reload. */

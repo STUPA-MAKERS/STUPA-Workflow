@@ -274,8 +274,18 @@ describe('mockApiInterceptor', () => {
       expect(me.permissions).toContain('budget.book');
     });
 
+    it('GET /auth/me/profile → mock profile with claims', async () => {
+      const profile = await get<{ claims: { key: string }[] }>('/api/auth/me/profile');
+      expect(profile.claims.map((c) => c.key)).toContain('groups');
+    });
+
     it('GET /altcha/challenge → 404 error', async () => {
       await expect(get('/api/altcha/challenge')).rejects.toMatchObject({ status: 404 });
+    });
+
+    it('GET /application-type-groups → the groups of step 1', async () => {
+      const groups = await get<{ name: string }[]>('/api/application-type-groups');
+      expect(groups.map((g) => g.name)).toEqual(['Projektanträge', 'Leere Gruppe']);
     });
 
     it('GET /application-types/{id}/form → effective form', async () => {
@@ -310,7 +320,7 @@ describe('mockApiInterceptor', () => {
 
     it('GET the attachments of the magic-link demo application', async () => {
       const list = await get<unknown[]>('/api/applications/33333333-3333-3333-3333-333333333333/attachments');
-      expect(list).toHaveLength(2);
+      expect(list).toHaveLength(3);
     });
 
     it('GET …/versions → version history', async () => {
@@ -1104,7 +1114,7 @@ describe('mockApiInterceptor', () => {
       expect(m.status).toBe('planned');
       expect(m.protokollantId).toBeNull();
       const a = await get<unknown[]>(`/api/meetings/${id}/agenda`);
-      expect(a.length).toBe(3);
+      expect(a.length).toBe(4);
     });
 
     it('GET /applications/{id}/form → effective form', async () => {
@@ -1133,6 +1143,25 @@ describe('mockApiInterceptor', () => {
       );
       expect(reordered.map((r) => r.id)).toEqual(ids);
       expect(reordered[0].position).toBe(0);
+    });
+
+    it('PUT …/agenda/{id}/duration sets and clears the minutes, and an add takes them (§ 001140)', async () => {
+      type Row = { id: string; estimatedMinutes?: number | null };
+      const added = await firstValueFrom(
+        http.post<Row[]>('/api/meetings/m1/agenda', { title: 'TOP Dauer', estimatedMinutes: 25 }),
+      );
+      const last = added[added.length - 1];
+      expect(last.estimatedMinutes).toBe(25);
+      const set = await firstValueFrom(
+        http.put<Row[]>(`/api/meetings/m1/agenda/${last.id}/duration`, { minutes: 40 }),
+      );
+      expect(set.find((r) => r.id === last.id)?.estimatedMinutes).toBe(40);
+      const cleared = await firstValueFrom(
+        http.put<Row[]>(`/api/meetings/m1/agenda/${last.id}/duration`, {}),
+      );
+      expect(cleared.find((r) => r.id === last.id)?.estimatedMinutes).toBeNull();
+      const plain = await firstValueFrom(http.post<Row[]>('/api/meetings/m1/agenda', { title: 'TOP ohne' }));
+      expect(plain[plain.length - 1].estimatedMinutes).toBeNull();
     });
 
     /** "Nächster TOP" ticks the item that the room leaves. */

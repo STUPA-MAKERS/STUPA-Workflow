@@ -727,6 +727,25 @@ export interface ApplicationTypeFull {
   readonly activeFormVersionId?: Uuid | null;
   /** Number of the active form version (`v7`). `null` while no version is active. */
   readonly activeFormVersion?: number | null;
+  /** The group in step 1 of the apply wizard (spec 001180). `null`: no group. */
+  readonly groupId?: Uuid | null;
+  /** The order inside the group (spec 001183). The server sends the list in this order. */
+  readonly position?: number;
+}
+
+/** A group of Antragsarten, `ApplicationTypeGroupOut` (spec 001180). */
+export interface ApplicationTypeGroupFull {
+  readonly id: Uuid;
+  readonly name: I18nMap;
+  /** Markdown per language, shown under the name in step 1 (spec 001181). */
+  readonly text: I18nMap;
+  readonly position: number;
+}
+
+/** Body to create or change a group of Antragsarten. */
+export interface ApplicationTypeGroupBody {
+  readonly name: I18nMap;
+  readonly text: I18nMap;
 }
 
 /** Body for `POST /admin/application-types` — create an application type/form. */
@@ -735,6 +754,7 @@ export interface ApplicationTypeCreateBody {
   readonly name: I18nMap;
   readonly gremiumId?: Uuid | null;
   readonly hasBudget?: boolean;
+  readonly groupId?: Uuid | null;
 }
 
 /** Body for `PATCH /admin/application-types/{id}` — title/gremium/budget. */
@@ -744,6 +764,8 @@ export interface ApplicationTypeUpdateBody {
   readonly hasBudget?: boolean;
   readonly pdfSignatures?: boolean;
   readonly comparisonOffers?: ComparisonOffers | null;
+  /** `null` takes the type out of its group (spec 001180); absent keeps it. */
+  readonly groupId?: Uuid | null;
 }
 
 /**
@@ -1285,8 +1307,6 @@ export interface SiteFreetexts {
   welcome: I18nMap;
   support: I18nMap;
   emailFooter: I18nMap;
-  /** Info text below the application(-type) selection — Markdown, each i18n. */
-  applyInfo?: I18nMap;
   /**
    * The text after the submission for a signed-in applicant ("intern") and for a guest
    * ("extern") — Markdown, each i18n. Empty ⇒ the built-in text of the language.
@@ -1302,6 +1322,8 @@ export interface Branding {
   appName?: string;
   /** Short app name (PWA icon/home screen). Empty ⇒ the default. */
   appShortName?: string;
+  /** One sentence about the platform per language (spec 001093). Empty uses the built-in text. */
+  readonly description?: I18nMap;
   logos: Partial<Record<LogoSlot, BrandingAsset>>;
   copyright: I18nMap;
   legalLinks: FooterLink[];

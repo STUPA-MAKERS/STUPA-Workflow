@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.deps import Principal, SettingsDep, require_principal
 from app.modules.audit.actions import AuditAction
@@ -24,6 +24,7 @@ from app.modules.budget.plan_schemas import (
     PlanLinePredecessorSet,
     PlanLineRename,
     PlanLineSet,
+    PlanLineYearBeforeSet,
     PlanNodeCreate,
     PlanOut,
     PlanReadableOut,
@@ -51,6 +52,7 @@ from app.shared.errors import (
     ServiceUnavailableError,
 )
 from app.shared.filenames import content_disposition
+from app.shared.preview import file_response
 from app.shared.xlsx import XLSX_MEDIA_TYPE, build_table_workbook
 
 router = APIRouter(tags=["budget"])
@@ -196,6 +198,7 @@ async def export_plan_pdf(
     service: ServiceDep,
     settings: SettingsDep,
     principal: Annotated[Principal, Depends(require_principal())],
+    inline: Annotated[bool, Query()] = False,
 ) -> Response:
     """Return a version of a Haushaltsplan as a PDF, for each reader of the plan.
 
@@ -226,11 +229,7 @@ async def export_plan_pdf(
             ) from exc
         raise ServiceUnavailableError("PDF rendering temporarily unavailable.") from exc
     name = plan_export.export_filename(export.head, "pdf")
-    return Response(
-        content=pdf,
-        media_type="application/pdf",
-        headers={"Content-Disposition": content_disposition("attachment", name)},
-    )
+    return file_response(pdf, name=name, mime="application/pdf", inline=inline)
 
 
 @router.post(
@@ -304,6 +303,21 @@ async def set_plan_line_predecessor(
 ) -> PlanOut:
     """Name the Vorgänger of a draft line in the year before, or clear it (spec 001040)."""
     out = await service.set_predecessor(version_id, budget_id, payload)
+    await service.session.commit()
+    return out
+
+
+@router.put(
+    "/budget-plan-versions/{version_id}/lines/{budget_id}/year-before",
+    response_model=PlanOut,
+    dependencies=_STRUCTURE,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def set_plan_line_year_before(
+    version_id: UUID, budget_id: UUID, payload: PlanLineYearBeforeSet, service: ServiceDep
+) -> PlanOut:
+    """Set the Ansatz and the Ist of the year before of a draft line by hand (spec 001042)."""
+    out = await service.set_year_before(version_id, budget_id, payload)
     await service.session.commit()
     return out
 

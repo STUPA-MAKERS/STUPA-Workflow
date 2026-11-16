@@ -13,6 +13,8 @@ from fastapi import APIRouter, Depends, Query
 
 from app.deps import DbSession, Principal, get_current_principal
 from app.modules.application_types.schemas import (
+    ApplicationTypeGroupItem,
+    ApplicationTypeGroupQuery,
     ApplicationTypeListItem,
     ApplicationTypeListQuery,
 )
@@ -60,3 +62,16 @@ async def list_application_types(
         include_inactive=is_admin,
         admin=is_admin,
     )
+
+
+@router.get(
+    "/application-type-groups",
+    response_model=list[ApplicationTypeGroupItem],
+    responses=_errors(422),
+)
+async def list_application_type_groups(
+    service: ServiceDep,
+    query: Annotated[ApplicationTypeGroupQuery, Query()],
+) -> list[ApplicationTypeGroupItem]:
+    """List the groups of Antragsarten for step 1 of the apply wizard (public, spec 001181)."""
+    return await service.list_groups(lang=query.lang)

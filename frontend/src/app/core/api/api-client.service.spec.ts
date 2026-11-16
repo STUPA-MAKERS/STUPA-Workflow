@@ -85,11 +85,23 @@ describe('ApiClient', () => {
           activeFormVersionId: 'v1',
           key: null,
           gremiumId: null,
+          groupId: null,
         },
       ]);
       done();
     });
     http.expectOne((r) => r.url === '/api/application-types').flush(page);
+  });
+
+  it('reads the groups of the Antragsarten in the UI language (spec 001181)', (done) => {
+    const groups = [{ id: 'g1', name: 'Projektanträge', text: '**VSM**' }];
+    api.applicationTypeGroups().subscribe((list) => {
+      expect(list).toEqual(groups);
+      done();
+    });
+    const req = http.expectOne((r) => r.url === '/api/application-type-groups');
+    expect(req.request.params.get('lang')).toBeTruthy();
+    req.flush(groups);
   });
 
   /**
@@ -995,6 +1007,23 @@ describe('ApiClient', () => {
     expect(http.expectOne('/api/meetings/m-1/agenda').request.body.nonPublic).toBe(false);
   });
 
+  it('sends the estimated minutes with each add, and sets or clears them (§ 001140)', () => {
+    api.addAgendaItem('m-1', 'app-1', false, 15).subscribe();
+    expect(http.expectOne('/api/meetings/m-1/agenda').request.body.estimatedMinutes).toBe(15);
+    api.addAgendaFreetext('m-1', 'Bericht', false, undefined, 10).subscribe();
+    expect(http.expectOne('/api/meetings/m-1/agenda').request.body.estimatedMinutes).toBe(10);
+    api.addAgendaTodo('m-1', 'k-1', false, 5).subscribe();
+    expect(http.expectOne('/api/meetings/m-1/agenda').request.body.estimatedMinutes).toBe(5);
+    api.addAgendaPlan('m-1', 'pv-1', false, 30).subscribe();
+    expect(http.expectOne('/api/meetings/m-1/agenda').request.body.estimatedMinutes).toBe(30);
+    api.setAgendaDuration('m-1', 't-1', 45).subscribe();
+    const put = http.expectOne('/api/meetings/m-1/agenda/t-1/duration');
+    expect(put.request.method).toBe('PUT');
+    expect(put.request.body).toEqual({ minutes: 45 });
+    api.setAgendaDuration('m-1', 't-1', null).subscribe();
+    expect(http.expectOne('/api/meetings/m-1/agenda/t-1/duration').request.body).toEqual({ minutes: null });
+  });
+
   it('adds an application agenda item', () => {
     api.addAgendaItem('m-1', 'app-1').subscribe();
     const req = http.expectOne('/api/meetings/m-1/agenda');
@@ -1250,6 +1279,16 @@ describe('ApiClient', () => {
       publicWithheld: false,
       gremiumProtocolsPublic: true,
     });
+  });
+
+  it('reads the own profile', (done) => {
+    api.getMyProfile().subscribe((p) => {
+      expect(p.sub).toBe('u-1');
+      done();
+    });
+    const req = http.expectOne('/api/auth/me/profile');
+    expect(req.request.method).toBe('GET');
+    req.flush({ sub: 'u-1', email: null, displayName: null, lastLogin: null, claims: [] });
   });
 
   it('lists notification preferences', (done) => {

@@ -15,6 +15,7 @@ import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from '../budget-t
 import { CostCentreCreateComponent } from '../cost-centre/cost-centre-create.component';
 import { CostCentreSettingsComponent } from '../cost-centre/cost-centre-settings.component';
 import { BudgetPlanApi, type BudgetPlan, type PlanMeeting, type PlanStep } from './budget-plan.api';
+import { FileOpenService } from '@shared/viewer/file-open.service';
 import { BudgetPlanComponent } from './budget-plan.component';
 import { FY25, FY26, QSM, TOP, fy, line, node, plan, version } from './budget-plan.fixtures';
 
@@ -77,12 +78,14 @@ async function setup(opts: Opts = {}) {
     setLine: jest.fn((..._args: unknown[]) => answer()),
     renameLine: jest.fn((..._args: unknown[]) => answer()),
     setPredecessor: jest.fn((..._args: unknown[]) => answer()),
+    setYearBefore: jest.fn((..._args: unknown[]) => answer()),
     deleteLine: jest.fn((..._args: unknown[]) => answer()),
     setState: jest.fn((..._args: unknown[]) => answer()),
     deleteVersion: jest.fn((..._args: unknown[]) => of(undefined)),
     passNextStep: jest.fn((..._args: unknown[]) => answer()),
     requestStep: jest.fn((..._args: unknown[]) => answer()),
     setStateByHand: jest.fn((..._args: unknown[]) => answer()),
+    exportUrl: (id: string, format: string) => `/api/budget-plan-versions/${id}/export.${format}`,
     exportVersion: jest.fn((_id: string, format: string) =>
       opts.exportFail ? throwError(() => problem(503)) : of({ blob: new Blob(['x']), filename: `Haushaltsplan_VS.${format}` }),
     ),
@@ -136,11 +139,17 @@ const texts = (view: View, selector: string) => [...view.container.querySelector
 const input = (view: View, name: string) => view.container.querySelector<HTMLInputElement>(`[name="${name}"]`) as HTMLInputElement;
 const primary = () => within(screen.getByTestId('bp-primary')).getByRole('button');
 const treeRow = (view: View, name: string) =>
-  within(view.container.querySelector('.bd__tree') as HTMLElement).getByRole('button', { name: new RegExp(`^${name}`) });
+  within(view.container.querySelector('.bd__tree') as HTMLElement).getByRole('button', { name: new RegExp(`^${name}(?! (auf|zu)klappen$)`) });
 const tableRow = (name: string) => screen.getAllByText(name).find((el) => el.classList.contains('bp__name')) as HTMLElement;
+/** A row of the tree that a phone shows instead of the tables (001130). */
+const phoneRow = (name: string) =>
+  screen.getAllByText(name).find((el) => el.classList.contains('tn__name') && el.closest('.bp__phoneTree')) as HTMLElement;
+/** The chevron of a row of the list beside the plan. */
+const chevron = (view: View, name: string) =>
+  within(view.container.querySelector('.bd__tree') as HTMLElement).getByRole('button', { name: new RegExp(`^${name} (auf|zu)klappen`) });
 
 /** The two file entries of the head menu: each reader of the plan has them. */
-const FILES = ['Als PDF exportieren', 'Als XLSX exportieren'];
+const FILES = ['Als PDF öffnen', 'Als XLSX exportieren'];
 
 /** Open the ⋮ menu of the head, or of `scope`, and return the names of its items. */
 async function openMenu(scope: HTMLElement = document.body): Promise<string[]> {
@@ -741,7 +750,7 @@ describe('BudgetPlanComponent', () => {
       const view = await setup({ wide: false, phone: true });
       expect(view.container.querySelector('.bp__field')).toBeNull();
       expect(screen.getByRole('button', { name: /^Haushalt:/ })).toHaveTextContent('Haushalt: VS-Mittel');
-      await userEvent.click(tableRow('Zuschüsse'));
+      await userEvent.click(phoneRow('Zuschüsse'));
       const sheet = await screen.findByRole('dialog', { name: 'Zuschüsse' });
       expect(text(sheet)).toContain('GRANTS · Ausgabe');
       await typeAmount(input(view, 'line-amount-grants'), '45,5');
@@ -774,7 +783,36 @@ describe('BudgetPlanComponent', () => {
       expect(first).toHaveAttribute('title', 'Der Plan ist nicht ausgeglichen.');
       await userEvent.keyboard('{Escape}');
       await userEvent.type(screen.getByPlaceholderText('Kostenstellen durchsuchen'), 'zusch');
-      expect(texts(view, '.bp__name')).toEqual(['Zuschüsse']);
+      expect(texts(view, '.bp__phoneTree .tn__name')).toEqual(['Zuschüsse']);
+    });
+
+    it('§F/finance/budget/001130: a row with children opens and closes in the list and in the table', async () => {
+      const view = await setup();
+      const chev = chevron(view, 'Personal');
+      expect(chev).toHaveAttribute('aria-expanded', 'true');
+      expect(texts(view, '.bd__tree .tn__name')).toContain('Löhne');
+      await userEvent.click(chev);
+      expect(chevron(view, 'Personal')).toHaveAttribute('aria-expanded', 'false');
+      expect(texts(view, '.bd__tree .tn__name')).not.toContain('Löhne');
+      expect(texts(view, '.bp__name')).not.toContain('Löhne');
+      await userEvent.type(screen.getByPlaceholderText('Kostenstellen durchsuchen'), 'löh');
+      expect(texts(view, '.bd__tree .tn__name')).toEqual(['VS-Mittel', 'Löhne']);
+      expect(await axe(view.container)).toHaveNoViolations();
+    });
+
+    it('§F/finance/budget/001130: a selected row opens the rows above it', async () => {
+      const view = await setup();
+      await userEvent.click(chevron(view, 'Personal'));
+      expect(texts(view, '.bd__tree .tn__name')).not.toContain('Löhne');
+      view.params.next(convertToParamMap({ costCentre: 'wages' }));
+      await waitFor(() => expect(texts(view, '.bd__tree .tn__name')).toContain('Löhne'));
+    });
+
+    it('§F/finance/budget/001130: a phone shows the plan as tree rows', async () => {
+      const view = await setup({ wide: false, phone: true });
+      expect(view.container.querySelector('.bp__table')).toBeNull();
+      expect(texts(view, '.bp__phoneTree .tn__name')).toEqual(['Beiträge', 'Personal', 'Löhne', 'Zuschüsse']);
+      expect(await axe(view.container.querySelector('.bp__phoneTree') as HTMLElement)).toHaveNoViolations();
     });
 
     it('§F/finance/budget/000794: a Kostenstelle with children has no Ansatz field', async () => {
@@ -1292,24 +1330,22 @@ describe('BudgetPlanComponent', () => {
       expect(view.success).toHaveBeenCalledWith('Die Version ist wieder ein Entwurf.');
     });
 
-    it('§F/finance/budget/000875: a reader loads the shown version as PDF and as XLSX', async () => {
+    it('§F/finance/budget/000875 §F/administration/files/001080: a reader opens the PDF in the viewer and loads the XLSX', async () => {
       const view = await setup({ perms: ['budget.view'] });
-      await choose('Als PDF exportieren');
-      expect(view.api.exportVersion).toHaveBeenLastCalledWith('v0', 'pdf');
+      const open = jest.spyOn(TestBed.inject(FileOpenService), 'open').mockImplementation(() => undefined);
+      await choose('Als PDF öffnen');
+      expect(open).toHaveBeenCalledWith({ name: 'Haushaltsplan.pdf', url: '/api/budget-plan-versions/v0/export.pdf', kind: 'pdf' });
       await choose('Als XLSX exportieren');
       expect(view.api.exportVersion).toHaveBeenLastCalledWith('v0', 'xlsx');
-      expect((downloadBlob as jest.Mock).mock.calls.map((call) => call[1])).toEqual([
-        'Haushaltsplan_VS.pdf',
-        'Haushaltsplan_VS.xlsx',
-      ]);
+      expect((downloadBlob as jest.Mock).mock.calls.map((call) => call[1])).toEqual(['Haushaltsplan_VS.xlsx']);
     });
 
     it('§F/finance/budget/000875: a failed export shows a toast and frees the menu', async () => {
       const view = await setup({ exportFail: true });
-      await choose('Als PDF exportieren');
+      await choose('Als XLSX exportieren');
       expect(view.error).toHaveBeenCalledWith('Der Export ist fehlgeschlagen.');
       expect(downloadBlob).not.toHaveBeenCalled();
-      expect(await openMenu()).toContain('Als XLSX exportieren');
+      expect(await openMenu()).toContain('Als PDF öffnen');
     });
 
     it('§F/finance/budget/000835 §F/finance/budget/000840: deletes the draft after the confirmation and reads the year again', async () => {
@@ -1670,6 +1706,31 @@ describe('BudgetPlanComponent', () => {
       await setup({ query: { costCentre: 'grants' } });
       await waitFor(() => expect(screen.getByRole('combobox', { name: /Seite/ })).toBeInTheDocument());
       expect(screen.queryByRole('combobox', { name: /Vorgänger/ })).toBeNull();
+    });
+
+    it('§F/finance/budget/001042: a draft line sets the Ansatz and the Ist of the year before by hand', async () => {
+      const view = await setup({ plans: { 'fy-26': plan(), 'fy-25': before }, query: { costCentre: 'grants' } });
+      const field = await waitFor(() => input(view, 'line-prevAmount-grants'));
+      expect(field.placeholder).toBe('30,00');
+      await typeAmount(field, '45');
+      expect(view.api.setYearBefore).toHaveBeenCalledWith('v0', 'grants', { prevAmount: '45', prevActual: null });
+      await typeAmount(input(view, 'line-prevActual-grants'), '');
+      expect(view.api.setYearBefore).toHaveBeenCalledTimes(1);
+      const page = view.fixture.componentInstance;
+      const row = page.rows().find((r) => r.id === 'grants')!;
+      page.editYearBefore(row, 'prevActual', '-1');
+      page.saveYearBefore(row, 'prevActual');
+      expect(view.api.setYearBefore).toHaveBeenCalledTimes(1);
+      expect(page.yearBeforePlaceholder({ ...row, actualComputed: null }, 'prevActual')).toBe('');
+    });
+
+    it('§F/finance/budget/001042: a value set by hand shows the columns of the year before without a plan in force', async () => {
+      const open = plan([version({ id: 'p', lines: [line('fees', '80')] })], 'fy-25');
+      const byHand = plan([version({ lines: [line('fees', '100'), line('grants', '30', { prevActual: '3.00' })] })]);
+      const view = await setup({ plans: { 'fy-26': byHand, 'fy-25': open } });
+      const expense = view.container.querySelectorAll('app-data-table')[1] as HTMLElement;
+      await waitFor(() => expect(within(expense).getAllByRole('columnheader').map(text)).toContain('Ist 2025/26'));
+      expect(text(expense)).toContain('3,00 €');
     });
 
     it('§F/finance/budget/001040: a choice takes the name and key of the line, else of its node, and an unchanged choice saves nothing', async () => {

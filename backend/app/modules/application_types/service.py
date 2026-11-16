@@ -2,7 +2,8 @@
 
 The public list holds the offerable types only. A type is offerable when it has
 an active form version. `form.configure` also reveals the inactive types and the
-admin fields.
+admin fields. The list is in the order of step 1: by group, then by the position in
+the group, the types without a group last (specs 001181-001183).
 """
 
 from __future__ import annotations
@@ -12,8 +13,11 @@ from uuid import UUID
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.application_types.models import ApplicationType
-from app.modules.application_types.schemas import ApplicationTypeListItem
+from app.modules.application_types.models import ApplicationType, ApplicationTypeGroup
+from app.modules.application_types.schemas import (
+    ApplicationTypeGroupItem,
+    ApplicationTypeListItem,
+)
 from app.shared.i18n import resolve_i18n
 from app.shared.paging import Page
 
@@ -45,7 +49,17 @@ class ApplicationTypesService:
         total = await self.session.scalar(select(func.count()).select_from(stmt.subquery()))
         rows = (
             await self.session.scalars(
-                stmt.order_by(ApplicationType.key).limit(limit).offset(offset)
+                stmt.outerjoin(
+                    ApplicationTypeGroup, ApplicationTypeGroup.id == ApplicationType.group_id
+                )
+                .order_by(
+                    ApplicationTypeGroup.position.nulls_last(),
+                    ApplicationTypeGroup.created_at.nulls_last(),
+                    ApplicationType.position,
+                    ApplicationType.key,
+                )
+                .limit(limit)
+                .offset(offset)
             )
         ).all()
 
@@ -62,6 +76,42 @@ class ApplicationTypesService:
             hasBudget=row.has_budget,
             active=active_form_version_id is not None,
             activeFormVersionId=active_form_version_id,
-            key=row.key if admin else None,
+            key=row.key,
             gremiumId=row.gremium_id if admin else None,
+            groupId=row.group_id,
         )
+
+    async def list_groups(self, *, lang: str = "de") -> list[ApplicationTypeGroupItem]:
+        """List every group in its order with the name and the text for `lang` (spec 001181).
+
+        The list holds empty groups too; step 1 hides a group without an offered type.
+        """
+        rows = (
+            await self.session.scalars(
+                select(ApplicationTypeGroup).order_by(
+                    ApplicationTypeGroup.position,
+                    ApplicationTypeGroup.created_at,
+                    ApplicationTypeGroup.id,
+                )
+            )
+        ).all()
+        return [
+            ApplicationTypeGroupItem(
+                id=row.id,
+                name=resolve_i18n(row.name_i18n, lang) or "",
+                text=resolve_i18n(row.text_i18n, lang) or "",
+            )
+            for row in rows
+        ]
+
+
+async def type_has_budget(session: AsyncSession, type_id: UUID) -> bool:
+    """Tell if an Antrag of this type asks for money (`has_budget`, spec 001033).
+
+    A missing type counts as a type without money, so a Kostenstelle stays off (fail
+    closed).
+    """
+    flag = await session.scalar(
+        select(ApplicationType.has_budget).where(ApplicationType.id == type_id)
+    )
+    return bool(flag)

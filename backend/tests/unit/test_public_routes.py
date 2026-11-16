@@ -41,10 +41,12 @@ Groups of ``PUBLIC_ROUTES`` and why each one is public:
   with public protocols, with its Gremien, search, the two detail reads and the ICS
   feed without a token. The service shows public entries only.
 - ALTCHA: the challenge comes before every public write.
-- Site config: the SPA reads branding and the PWA manifest before login.
+- Site config: the SPA reads branding and the PWA manifest before login. The web server
+  includes the branded page head into every page, and a link preview fetches its images.
 - UI texts: the SPA reads the text overrides and the extra languages before login.
-- Apply: the public wizard lists the application types, uploads and removes draft
-  files with its draft token (ALTCHA when signed out) and submits the application.
+- Apply: the public wizard lists the application types and their groups, uploads and
+  removes draft files with its draft token (ALTCHA when signed out) and submits the
+  application.
 - Tickets: the one-way public report of the help menu (ALTCHA when signed out).
 - Observers: the end link of a status mail ends an observation by its secret token,
   because the observer may have no account.
@@ -147,7 +149,12 @@ PUBLIC_ROUTES: Final[frozenset[tuple[str, str]]] = frozenset(
         ("GET", "/api/site-config"),
         ("GET", "/api/i18n"),
         ("GET", "/api/manifest.webmanifest"),
+        ("GET", "/api/page-head"),
+        ("GET", "/api/branding/preview.png"),
+        ("GET", "/api/branding/icons/{name}"),
+        ("GET", "/api/branding/favicon"),
         ("GET", "/api/application-types"),
+        ("GET", "/api/application-type-groups"),
         ("POST", "/api/applications"),
         ("POST", "/api/apply/attachments"),
         ("DELETE", "/api/apply/attachments/{attachment_id}"),

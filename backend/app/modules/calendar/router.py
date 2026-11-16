@@ -47,8 +47,10 @@ from app.modules.calendar.schemas import (
     PersonOut,
 )
 from app.modules.notifications.provider import mail_queue_from_pool
+from app.modules.site_config.names import active_short_name, name_slug
 from app.settings import Settings
 from app.shared.errors import NotFoundError, ProblemDetail, ValidationProblem
+from app.shared.filenames import content_disposition
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
 admin_router = APIRouter(prefix="/admin/calendars", tags=["calendar"])
@@ -291,8 +293,10 @@ async def calendar_feed(token: str, db: DbSession, settings: SettingsDep) -> Res
         )
         for meeting, gremium_name in meetings
     ]
+    short_name = await active_short_name(db)
     body = build_calendar(
         events,
+        calendar_name=f"{short_name} — Sitzungen",
         domain=_uid_domain(settings),
         card_events=card_events,
         due_cards=due_cards,
@@ -304,7 +308,9 @@ async def calendar_feed(token: str, db: DbSession, settings: SettingsDep) -> Res
         status_code=status.HTTP_200_OK,
         media_type=_ICS_MEDIA_TYPE,
         headers={
-            "Content-Disposition": 'inline; filename="stupa-sitzungen.ics"',
+            "Content-Disposition": content_disposition(
+                "inline", f"{name_slug(short_name)}-sitzungen.ics"
+            ),
             "Cache-Control": "private, max-age=300",
         },
     )

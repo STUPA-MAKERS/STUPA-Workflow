@@ -41,6 +41,9 @@
             </app-section>
           </div>
           <div class="br__col">
+            <app-section class="br__sec" [level]="2" [heading]="'admin.brand.preview.group' | t">
+              <span class="skel-box br__skArea"></span>
+            </app-section>
             <app-section class="br__sec" [level]="2" [heading]="'admin.brand.footer' | t">
               <span class="skel-box br__skField"></span>
             </app-section>
@@ -103,7 +106,7 @@
                     <span class="br__areaLabel">{{ withLang(freetextLabel(key)) }}</span>
                     <textarea
                       class="br__areaInput"
-                      [rows]="key === 'applyInfo' ? 3 : 2"
+                      [rows]="2"
                       [ngModel]="freetext(d, key)[lang()]"
                       (ngModelChange)="setText(freetext(d, key), $event)"
                       [name]="'text-' + key"
@@ -143,6 +146,22 @@
             </div>
 
             <div class="br__col">
+              <!-- § 001093: the description of the link preview, the page head and the manifest. -->
+              <app-section class="br__sec" [level]="2" [heading]="'admin.brand.preview.group' | t">
+                <label class="br__area" data-testid="description">
+                  <span class="br__areaLabel">{{ withLang('admin.brand.preview.description' | t) }}</span>
+                  <textarea
+                    class="br__areaInput"
+                    rows="3"
+                    maxlength="300"
+                    [placeholder]="descriptionDefault()"
+                    [ngModel]="descriptionMap(d)[lang()]"
+                    (ngModelChange)="setText(descriptionMap(d), $event)"
+                    name="description"
+                  ></textarea>
+                </label>
+              </app-section>
+
               <app-section class="br__sec" [level]="2" [heading]="'admin.brand.footer' | t">
                 <label class="br__area">
                   <span class="br__areaLabel">{{ withLang('admin.brand.copyright' | t) }}</span>

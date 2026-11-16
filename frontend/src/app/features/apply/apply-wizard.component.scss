@@ -128,14 +128,26 @@
   min-width: 0;
   font-weight: var(--fw-medium);
 }
-.wz__info {
+// Step 1 (spec 001185): the groups, the types without a group and "Folgeantrag" are
+// blocks with one gap between them; the text of a group sits between its title and its
+// rows with the gap of a section.
+.wz__groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.wz__step:has(> .wz__groups) {
+  gap: var(--space-6);
+}
+.wz__groupText {
+  padding: 0 var(--space-1);
   color: var(--color-text-muted);
   font-size: var(--fs-sm);
 }
-.wz__info :first-child {
+.wz__groupText :first-child {
   margin-top: 0;
 }
-.wz__info :last-child {
+.wz__groupText :last-child {
   margin-bottom: 0;
 }
 
@@ -151,10 +163,6 @@
 }
 .wz__block {
   --section-gap: var(--space-2);
-}
-.wz__predecessor {
-  display: block;
-  margin-top: var(--space-5);
 }
 .wz__fileList {
   margin: 0;

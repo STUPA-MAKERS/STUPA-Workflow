@@ -151,6 +151,7 @@ def test_feed_returns_ics_with_meeting(monkeypatch: pytest.MonkeyPatch) -> None:
         result((gid, object())),
         result(),
         result((meeting, "StuPa")),
+        result(),
     )
     resp = _client(db).get("/api/calendar/abctoken.ics")
     assert resp.status_code == 200
@@ -158,6 +159,7 @@ def test_feed_returns_ics_with_meeting(monkeypatch: pytest.MonkeyPatch) -> None:
     assert 'filename="stupa-sitzungen.ics"' in resp.headers["content-disposition"]
     body = resp.text
     assert "BEGIN:VCALENDAR" in body
+    assert "X-WR-CALNAME:STUPA — Sitzungen" in body
     assert "SUMMARY:Vollversammlung" in body
     assert "DTSTART:20260701T160000Z" in body
     assert "DTEND:20260701T180000Z" in body

@@ -13,7 +13,7 @@ import { LocaleSwitchService } from '../locale-switch.service';
 
 /**
  * The account menu of the kit (`app-account-menu`), filled from the session of the app: the
- * name and the avatar of the principal, the account pages ("Benachrichtigungen" and, with
+ * name and the avatar of the principal, the account pages ("Profil", "Benachrichtigungen" and, with
  * `mcp.use`, "API-Zugriff"), the languages (DE, EN and the active extra languages of the
  * admin page), the dark design and sign-out.
  *
@@ -39,6 +39,9 @@ import { LocaleSwitchService } from '../locale-switch.service';
       (navigated)="navigated.emit()"
     >
       <ng-container accountItems>
+        <a class="am__item" routerLink="/account/profile">
+          <app-icon name="user" [size]="19" />{{ 'account.menu.profile' | t }}
+        </a>
         <a class="am__item" routerLink="/account/notifications">
           <app-icon name="bell" [size]="19" />{{ 'account.menu.notifications' | t }}
         </a>

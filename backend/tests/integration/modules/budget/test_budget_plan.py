@@ -15,6 +15,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
+from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy import Engine, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -31,6 +32,7 @@ from app.modules.budget.plan_schemas import (
     PlanLinePredecessorSet,
     PlanLineRename,
     PlanLineSet,
+    PlanLineYearBeforeSet,
     PlanNodeCreate,
     PlanOut,
     PlanStateByHand,
@@ -879,6 +881,66 @@ async def test_a_line_compares_with_its_predecessor(session: AsyncSession) -> No
     await session.commit()
     copy = _version(await t.svc.get_plan(t.top.id, later.id))
     assert set(_predecessors(copy).values()) <= {None}
+
+
+
+def _year_before_by_hand(
+    version: PlanVersionOut,
+) -> dict[uuid.UUID, tuple[Decimal | None, Decimal | None]]:
+    return {line.budget_id: (line.prev_amount, line.prev_actual) for line in version.lines}
+
+
+async def test_a_line_sets_the_year_before_by_hand(session: AsyncSession) -> None:
+    """A draft line sets the Ansatz and the Ist of the year before by hand.
+
+    Rule: §F/finance/budget/001042.
+    """
+    today = date(2026, 11, 16)
+    t = await _tree(session)
+    await t.svc.create_fiscal_year(t.top.id, FiscalYearCreate(year=2025))
+    await session.commit()
+    draft = _version(await _balanced_draft(t))
+    bare = await t.svc.plan_export(draft.id, today)
+    assert (bare.head.prev_year, bare.head.prev_decided) == ("2025", False)
+
+    def values(amount: str | None, actual: str | None) -> PlanLineYearBeforeSet:
+        return PlanLineYearBeforeSet(
+            prevAmount=None if amount is None else D(amount),
+            prevActual=None if actual is None else D(actual),
+        )
+
+    plan = await t.svc.set_year_before(draft.id, t.exp_a.id, values("70.00", "55.50"))
+    assert _year_before_by_hand(_version(plan))[t.exp_a.id] == (D("70.00"), D("55.50"))
+    await t.svc.set_year_before(draft.id, t.inc.id, values(None, "90.00"))
+    await session.commit()
+    export = await t.svc.plan_export(draft.id, today)
+    assert export.head.prev_decided is True
+    rows = {r.name: (r.prev, r.actual) for g in export.groups for r in g.rows}
+    assert rows["Fachschaften"] == (D("70.00"), D("55.50"))
+    assert rows["Zuschüsse"] == (D("70.00"), D("55.50"))
+    assert rows["AKs"] == (None, None)
+    assert rows["Beiträge"] == (None, D("90.00"))
+
+    plan = await t.svc.set_year_before(draft.id, t.inc.id, values(None, None))
+    assert _year_before_by_hand(_version(plan))[t.inc.id] == (None, None)
+    with pytest.raises(ValidationProblem) as exc:
+        await t.svc.set_year_before(draft.id, uuid.uuid4(), values("1.00", None))
+    assert _code(exc) == "plan_line_missing"
+    with pytest.raises(PydanticValidationError):
+        values("-1.00", None)
+
+    await t.svc.set_plan_state(draft.id, PlanStateSet(state="in_force"))
+    await session.commit()
+    with pytest.raises(ConflictError) as conflict:
+        await t.svc.set_year_before(draft.id, t.exp_a.id, values(None, None))
+    assert _code(conflict) == "plan_version_locked"
+    nachtrag = _version(await t.svc.create_nachtrag(t.top.id, t.fy.id))
+    assert _year_before_by_hand(nachtrag)[t.exp_a.id] == (D("70.00"), D("55.50"))
+
+    nxt = await t.svc.create_fiscal_year(t.top.id, FiscalYearCreate(year=2027))
+    await session.commit()
+    copy = _version(await t.svc.get_plan(t.top.id, nxt.id))
+    assert set(_year_before_by_hand(copy).values()) <= {(None, None)}
 
 
 async def test_a_line_with_bookings_is_not_removed(session: AsyncSession) -> None:
@@ -3215,10 +3277,20 @@ async def test_a_haushalt_with_a_plan_takes_a_booking_only_on_a_plan_in_force(
 
 
 async def _antrag(
-    session: AsyncSession, budget_id: uuid.UUID | None = None, fy_id: uuid.UUID | None = None
+    session: AsyncSession,
+    budget_id: uuid.UUID | None = None,
+    fy_id: uuid.UUID | None = None,
+    *,
+    has_budget: bool = True,
 ) -> uuid.UUID:
-    """Store an Antrag in a running state, with a cost center and a year or without."""
-    app_type = ApplicationType(key=f"t-{uuid.uuid4().hex[:8]}", name_i18n={})
+    """Store an Antrag in a running state, with a cost center and a year or without.
+
+    `has_budget` is the flag of its type: an Antrag of a type without it asks for no
+    money (001033).
+    """
+    app_type = ApplicationType(
+        key=f"t-{uuid.uuid4().hex[:8]}", name_i18n={}, has_budget=has_budget
+    )
     session.add(app_type)
     await session.flush()
     fv = FormVersion(application_type_id=app_type.id, version=1)
@@ -3262,6 +3334,23 @@ async def test_an_antrag_is_not_assigned_to_an_income_cost_centre(
         app_id, AssignBudgetRequest(budgetId=t.exp_a.id, fiscalYearId=t.fy.id)
     )
     assert done.budget_id == t.exp_a.id
+
+
+async def test_an_antrag_without_money_takes_no_cost_centre(session: AsyncSession) -> None:
+    """An Antrag of a type without money takes no Kostenstelle; an old one can go away.
+
+    Rule: §F/finance/budget/001033.
+    """
+    t = await _tree(session)
+    old = await _antrag(session, t.exp_a.id, t.fy.id, has_budget=False)
+    with pytest.raises(ValidationProblem) as exc:
+        await t.svc.assign_budget(
+            old, AssignBudgetRequest(budgetId=t.exp_b.id, fiscalYearId=t.fy.id)
+        )
+    assert _code(exc) == "application_without_budget"
+    await session.rollback()
+    cleared = await t.svc.assign_budget(old, AssignBudgetRequest(budgetId=None))
+    assert (cleared.budget_id, cleared.fiscal_year_id) == (None, None)
 
 
 async def test_an_antrag_does_not_move_into_a_year_where_its_cost_centre_is_income(

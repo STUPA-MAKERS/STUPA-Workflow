@@ -140,6 +140,8 @@ class BudgetPlanLine(UUIDPkMixin, CreatedAtMixin, Base):
     are NULL from then on. ``predecessor_id`` names the cost center of a line in the plan
     in force of the year before that the line compares with instead of its own cost
     center (spec 001040). NULL keeps the comparison with its own cost center.
+    ``prev_amount`` and ``prev_actual`` are the Ansatz and the Ist of the year before
+    that the line sets by hand (spec 001042). NULL keeps the computed figure.
     """
 
     __tablename__ = "budget_plan_line"
@@ -161,6 +163,8 @@ class BudgetPlanLine(UUIDPkMixin, CreatedAtMixin, Base):
     predecessor_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("budget.id", ondelete="SET NULL"), nullable=True
     )
+    prev_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    prev_actual: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
 
     __table_args__ = (
         UniqueConstraint(
@@ -169,5 +173,7 @@ class BudgetPlanLine(UUIDPkMixin, CreatedAtMixin, Base):
         CheckConstraint("amount >= 0", name="budget_plan_line_amount"),
         CheckConstraint("blocked >= 0 AND blocked <= amount", name="budget_plan_line_blocked"),
         CheckConstraint("side IN ('income', 'expense')", name="budget_plan_line_side"),
+        CheckConstraint("prev_amount >= 0", name="budget_plan_line_prev_amount"),
+        CheckConstraint("prev_actual >= 0", name="budget_plan_line_prev_actual"),
         Index("ix_budget_plan_line_budget_id", "budget_id"),
     )

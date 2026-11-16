@@ -8,24 +8,26 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NgTemplateOutlet } from '@angular/common';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { catchError, filter, of, startWith } from 'rxjs';
 import {
   FormControl,
   FormGroup,
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
-import { BrandingService } from '@core/branding/branding.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type {
   ApplicationListItem,
   ApplicationType,
+  ApplicationTypeGroup,
   EffectiveForm,
   FormFieldDef,
   NewApplication,
@@ -67,6 +69,16 @@ import { PredecessorFieldComponent } from './predecessor-field/predecessor-field
 export type StepKey = 'type' | 'details' | 'contact' | 'review';
 
 /** The autosave of one application type (`sessionStorage`, this tab). */
+/** One block of step 1: a group, or the types without a group (specs 001181, 001182). */
+interface TypeBlock {
+  readonly id: string;
+  /** The heading; empty for the one list of a step without groups. */
+  readonly heading: string;
+  /** The rendered Markdown text of the group; empty without a text. */
+  readonly html: string;
+  readonly types: readonly ApplicationType[];
+}
+
 interface StoredAnswers {
   readonly v: 1;
   readonly model: Readonly<Record<string, unknown>>;
@@ -104,7 +116,8 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
  * the step.
  *
  * Steps:
- * 1. Antragsart: the active types; the configured info text below.
+ * 1. Antragsart: the active types by group, each group with its heading and its text
+ *    (specs 001181, 001182); the types without a group last under "Weitere Anträge".
  * 2. Angaben: every section of the effective form in one grid (`toFormlySections`),
  *    without the PII fields. A `file` field uploads its files as drafts; the block
  *    "Anhänge" below takes any other file (`DraftAttachmentsService`).
@@ -138,6 +151,7 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NgTemplateOutlet,
     SectionComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
@@ -165,7 +179,6 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
 export class ApplyWizardComponent {
   private readonly api = inject(ApiClient);
   private readonly auth = inject(AuthService);
-  private readonly branding = inject(BrandingService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
@@ -192,6 +205,11 @@ export class ApplyWizardComponent {
   protected readonly bar = computed(() => this.phone() && this.loggedIn());
 
   readonly types = signal<ApplicationType[]>([]);
+  /** The groups of step 1 in their order (spec 001181). A failed load shows one list. */
+  readonly groups = toSignal(
+    this.api.applicationTypeGroups().pipe(catchError(() => of<ApplicationTypeGroup[]>([]))),
+    { initialValue: [] as ApplicationTypeGroup[] },
+  );
   readonly typeId = signal<Uuid | null>(null);
   readonly effForm = signal<EffectiveForm | null>(null);
   readonly activeIndex = signal(0);
@@ -326,10 +344,32 @@ export class ApplyWizardComponent {
   /** The context of `visibleIf` and `compute`, as on the server. */
   readonly formContext = computed(() => ({ has_budget: this.effForm()?.hasBudget ?? false }));
 
-  /** Configured info text below the type selection — markdown, per language. */
-  readonly applyInfoHtml = computed(() => {
-    const text = resolveI18n(this.branding.freetexts().applyInfo ?? null, this.i18n.uiLocale()).trim();
-    return text ? renderMarkdown(text) : '';
+  /**
+   * The blocks of step 1 (specs 001181, 001182): each group with an offered type, with its
+   * heading and its rendered text, then the types without a group under "Weitere Anträge".
+   * Without a shown group there is one block without a heading. The server sends the types
+   * in this order, so a block keeps it.
+   */
+  readonly typeBlocks = computed<readonly TypeBlock[]>(() => {
+    const types = this.types();
+    const groups = this.groups();
+    const known = new Set(groups.map((g) => g.id));
+    const blocks: readonly TypeBlock[] = groups
+      .map((g) => ({
+        id: g.id,
+        heading: g.name,
+        html: g.text.trim() ? renderMarkdown(g.text) : '',
+        types: types.filter((t) => t.groupId === g.id),
+      }))
+      .filter((b) => b.types.length > 0);
+    const rest = types.filter((t) => !t.groupId || !known.has(t.groupId));
+    const other: TypeBlock = {
+      id: 'other',
+      heading: blocks.length ? this.i18n.translate('apply.type.other') : '',
+      html: '',
+      types: rest,
+    };
+    return rest.length ? [...blocks, other] : blocks;
   });
 
   readonly canSubmit = computed(() => {
@@ -345,18 +385,35 @@ export class ApplyWizardComponent {
   });
 
   private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The type segment of the URL (`/apply/<key>`, the child route `:type`). */
+  private urlType: string | null = null;
+  /** The type of an old link (`/apply?type=<id>`, spec 001173). */
+  private oldUrlType: string | null = null;
+  /** The list of types is loaded, so the URL can be matched. */
+  private typesLoaded = false;
 
   constructor() {
     this.auth.ensureLoaded().subscribe();
+    this.router.events
+      .pipe(
+        filter((e) => e instanceof NavigationEnd),
+        startWith(null),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(() => {
+        const snap = this.route.snapshot;
+        const type = snap.firstChild?.paramMap.get('type') ?? null;
+        const oldType = snap.queryParamMap.get('type');
+        if (type === this.urlType && oldType === this.oldUrlType) return;
+        this.urlType = type;
+        this.oldUrlType = oldType;
+        if (this.typesLoaded) this.openFromUrl(false);
+      });
     this.api.applicationTypes().subscribe({
       next: (t) => {
-        const active = t.filter((x) => x.active);
-        this.types.set(active);
-        const wanted = [
-          this.route.snapshot.queryParamMap.get('type'),
-          readStorage(DRAFT_LAST_TYPE),
-        ].find((id) => !!id && active.some((x) => x.id === id));
-        if (wanted) this.selectType(wanted);
+        this.types.set(t.filter((x) => x.active));
+        this.typesLoaded = true;
+        this.openFromUrl(true);
       },
       error: () => this.toast.error(this.i18n.translate('apply.error.typesLoad')),
     });
@@ -374,11 +431,68 @@ export class ApplyWizardComponent {
     });
   }
 
-  selectType(id: Uuid): void {
+  selectType(id: Uuid, pastTypeStep = false): void {
     if (this.typeId() === id) return;
     this.typeId.set(id);
     this.predecessor.set(null);
-    this.loadForm(id);
+    this.loadForm(id, pastTypeStep);
+  }
+
+  /** The segment of a type in the apply URL: its key (spec 001170), else its id. */
+  private slugOf(id: Uuid | null): string | null {
+    const type = this.types().find((t) => t.id === id);
+    return type ? (type.key ?? type.id) : null;
+  }
+
+  /** The active type that a URL segment names, by key or by id. */
+  private typeBySlug(slug: string): ApplicationType | undefined {
+    return this.types().find((t) => t.key === slug || t.id === slug);
+  }
+
+  /**
+   * Bring the wizard to the URL (specs 001170, 001171, 001173).
+   *
+   * - `/apply/<key>`: that type, past the type step. An unknown key goes back to `/apply`
+   *   with a toast.
+   * - `/apply?type=<id>` (old link): replaced by `/apply/<key>`.
+   * - `/apply`: the type step. On the first open the type of the last autosave of this
+   *   tab comes back; when its autosave is past the type step, the URL gets its key.
+   *
+   * The browser buttons change only the URL, so the step follows it here when the type in
+   * the URL changes (a navigation to the same URL changes nothing): back to
+   * `/apply` shows the type step with the type still chosen, forward shows the details.
+   */
+  private openFromUrl(first: boolean): void {
+    const slug = this.urlType;
+    if (!slug && this.oldUrlType) {
+      const old = this.typeBySlug(this.oldUrlType);
+      this.navigateToType(old?.key ?? old?.id ?? null, true);
+      if (!old) this.toast.error(this.i18n.translate('apply.error.typeUnknown'));
+      return;
+    }
+    if (!slug) {
+      if (first) {
+        const last = readStorage(DRAFT_LAST_TYPE);
+        if (last && this.typeBySlug(last)?.id === last) this.selectType(last);
+      } else if (this.activeIndex() > 0) {
+        this.activeIndex.set(0);
+      }
+      return;
+    }
+    const type = this.typeBySlug(slug);
+    if (!type) {
+      this.toast.error(this.i18n.translate('apply.error.typeUnknown'));
+      this.activeIndex.set(0);
+      this.navigateToType(null, true);
+      return;
+    }
+    if (this.typeId() !== type.id) this.selectType(type.id, true);
+    else if (this.activeIndex() === 0 && this.effForm()) this.goTo(1);
+  }
+
+  /** Go to `/apply/<slug>`, or to `/apply` without a slug. */
+  private navigateToType(slug: string | null, replaceUrl: boolean): void {
+    void this.router.navigate(slug ? ['/apply', slug] : ['/apply'], { replaceUrl });
   }
 
   /**
@@ -410,16 +524,27 @@ export class ApplyWizardComponent {
     this.predecessor.set(null);
   }
 
-  private loadForm(id: Uuid): void {
+  /**
+   * Load the form of a type and restore its autosave. `pastTypeStep` (the URL names the
+   * type) opens at least the first step after the type step. An autosave past the type
+   * step on `/apply` puts the key into the URL, because every step after the type step
+   * has the URL `/apply/<key>` (spec 001170).
+   */
+  private loadForm(id: Uuid, pastTypeStep = false): void {
     this.loadingForm.set(true);
     this.api.effectiveForm(id).subscribe({
       next: (eff) => {
+        if (this.typeId() !== id) return;
         this.model = {};
         this.effForm.set(eff);
         this.buildFields(eff);
         this.restoreDraft(id);
         this.syncFileFields();
         this.loadingForm.set(false);
+        if (pastTypeStep && this.activeIndex() === 0) this.activeIndex.set(1);
+        else if (!pastTypeStep && !this.urlType && this.activeIndex() > 0) {
+          this.navigateToType(this.slugOf(id), true);
+        }
       },
       error: () => {
         this.loadingForm.set(false);
@@ -530,18 +655,27 @@ export class ApplyWizardComponent {
     return false;
   }
 
+  /** "Weiter". From the type step, the URL gets the key of the type (spec 001170). */
   next(): void {
-    if (!this.checkStep(this.currentStep())) return;
+    const from = this.currentStep();
+    if (!this.checkStep(from)) return;
     this.goTo(Math.min(this.activeIndex() + 1, this.stepKeys().length - 1));
+    if (from === 'type') this.navigateToType(this.slugOf(this.typeId()), false);
   }
 
   prev(): void {
-    this.goTo(Math.max(this.activeIndex() - 1, 0));
+    this.toStep(Math.max(this.activeIndex() - 1, 0));
   }
 
   /** A click on a done step of the stepper. */
   goToStep(index: number): void {
-    if (index < this.activeIndex()) this.goTo(index);
+    if (index < this.activeIndex()) this.toStep(index);
+  }
+
+  /** Go back to a step; the type step has the URL `/apply` (spec 001170). */
+  private toStep(index: number): void {
+    this.goTo(index);
+    if (index === 0) this.navigateToType(null, false);
   }
 
   private goTo(index: number): void {
@@ -666,6 +800,7 @@ export class ApplyWizardComponent {
     if (eff) this.buildFields(eff);
     this.activeIndex.set(0);
     this.saved.set(false);
+    if (this.urlType) this.navigateToType(null, true);
     await this.drafts.discard();
   }
 

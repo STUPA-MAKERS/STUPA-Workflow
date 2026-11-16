@@ -68,6 +68,7 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
         "VotingService.assert_can_manage_group (manages_votes_in_gremium)"
     ),
     ("GET", "/api/auth/me"): _SELF,
+    ("GET", "/api/auth/me/profile"): _SELF,
     ("GET", "/api/budget-plan-versions/{version_id}/plan"): _BUDGET_NODE,
     ("GET", "/api/budget-plan-versions/{version_id}/readable"): _BUDGET_NODE,
     ("GET", "/api/budget-plan-versions/{version_id}/export.xlsx"): _BUDGET_NODE,
@@ -145,6 +146,7 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("PATCH", "/api/meetings/{meeting_id}/agenda/{item_id}"): _MEETING_WRITE,
     ("DELETE", "/api/meetings/{meeting_id}/agenda/{item_id}"): _MEETING_WRITE,
     ("PUT", "/api/meetings/{meeting_id}/agenda/{item_id}/done"): _MEETING_WRITE,
+    ("PUT", "/api/meetings/{meeting_id}/agenda/{item_id}/duration"): _MEETING_WRITE,
     ("GET", "/api/meetings/{meeting_id}/attendance"): _LIVE,
     ("PUT", "/api/meetings/{meeting_id}/attendance/me"): "AttendanceService.set_self (own row)",
     ("POST", "/api/meetings/{meeting_id}/attendance/me/late-excuse"): (

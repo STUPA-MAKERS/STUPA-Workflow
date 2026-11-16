@@ -196,6 +196,21 @@ export class MeetingAgendaService implements OnDestroy {
     });
   }
 
+  /** Set or clear the estimated duration of a TOP (§ 001140); the server sends the agenda back. */
+  setDuration(meetingId: Uuid, itemId: Uuid, minutes: number | null): void {
+    this.savingAgenda.set(true);
+    this.api.setAgendaDuration(meetingId, itemId, minutes).subscribe({
+      next: (rows) => {
+        this.savingAgenda.set(false);
+        this.setRows(rows);
+      },
+      error: (err: unknown) => {
+        this.savingAgenda.set(false);
+        this.failed(err);
+      },
+    });
+  }
+
   /**
    * Set or remove the done mark of a TOP ("TOP abhaken"). The server allows it to the
    * writer of the minutes and sends the agenda back.

@@ -33,6 +33,7 @@ async function setup(opts: { api?: Api; perms?: string[] } = {}) {
   const api: Api = {
     listApplicationTypesFull: jest.fn(() => of([type('f1', 'Förderantrag')])),
     listGremienOptions: jest.fn(() => of([{ id: 'g1', name: 'StuPa' }])),
+    listApplicationTypeGroups: jest.fn(() => of([])),
     createApplicationType,
     deleteApplicationType,
     ...opts.api,
@@ -56,8 +57,217 @@ async function setup(opts: { api?: Api; perms?: string[] } = {}) {
   return { ...view, c, api, router, toast, createApplicationType, deleteApplicationType };
 }
 
+const GROUPS = [
+  { id: 'gA', name: { de: 'Projektanträge' }, text: { de: 'Mit **Kosten**' }, position: 0 },
+  { id: 'gB', name: { de: 'Spezielle' }, text: {}, position: 1 },
+];
+
+function grouped(): ApplicationTypeFull[] {
+  return [
+    { ...type('f1', 'VSM'), groupId: 'gA', position: 0 },
+    { ...type('f2', 'QSM'), groupId: 'gA', position: 1 },
+    { ...type('f3', 'Sonstiges'), groupId: null, position: 0 },
+  ];
+}
+
+async function setupGroups(extra: Api = {}, perms?: string[]) {
+  return setup({
+    api: {
+      listApplicationTypesFull: jest.fn(() => of(grouped())),
+      listApplicationTypeGroups: jest.fn(() => of(GROUPS)),
+      ...extra,
+    },
+    perms,
+  });
+}
+
 describe('FormsListComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  describe('groups of Antragsarten (specs 001180, 001183)', () => {
+    it('shows each group with its text and the types without a group last', async () => {
+      await setupGroups();
+      const first = screen.getByRole('group', { name: 'Projektanträge' });
+      expect(first.querySelector('strong')?.textContent).toBe('Kosten');
+      expect(screen.getByRole('group', { name: 'Spezielle' })).toHaveTextContent(
+        'Noch keine Antragsart in dieser Gruppe',
+      );
+      expect(screen.getByRole('group', { name: 'Weitere Anträge' })).toHaveTextContent('Sonstiges');
+    });
+
+    it('shows one table without a heading when no group exists', async () => {
+      const { c } = await setup();
+      expect(c.blocks()).toEqual([expect.objectContaining({ group: null })]);
+      expect(c.blockHeading(c.blocks()[0])).toBe('');
+    });
+
+    it('creates a group from the dialog', async () => {
+      const createApplicationTypeGroup = jest.fn(() =>
+        of({ id: 'gC', name: { de: 'Neu' }, text: { de: 'T' }, position: 2 }),
+      );
+      const { c, toast } = await setupGroups({ createApplicationTypeGroup });
+      await userEvent.click(screen.getByRole('button', { name: 'Gruppe anlegen' }));
+      await userEvent.type(screen.getByLabelText(/Name \(DE\)/), 'Neu');
+      c.patchGroup('textDe', ' T ');
+      c.saveGroup(new Event('submit'));
+      expect(createApplicationTypeGroup).toHaveBeenCalledWith({ name: { de: 'Neu' }, text: { de: 'T' } });
+      expect(c.groups().map((g: { id: string }) => g.id)).toEqual(['gA', 'gB', 'gC']);
+      expect(toast.success).toHaveBeenCalled();
+      expect(c.groupDialog()).toBeNull();
+    });
+
+    it('edits a group with both languages and reports a failed save', async () => {
+      const updateApplicationTypeGroup = jest
+        .fn()
+        .mockReturnValueOnce(of({ ...GROUPS[0], name: { de: 'P', en: 'E' } }))
+        .mockReturnValueOnce(throwError(() => new Error('x')));
+      const { c, toast } = await setupGroups({ updateApplicationTypeGroup });
+      c.groupAction(GROUPS[0], { id: 'edit', label: '' });
+      expect(c.groupForm()).toEqual({ nameDe: 'Projektanträge', nameEn: '', textDe: 'Mit **Kosten**', textEn: '' });
+      c.patchGroup('nameDe', 'P');
+      c.patchGroup('nameEn', 'E');
+      c.patchGroup('textEn', 'Text');
+      c.saveGroup(new Event('submit'));
+      expect(updateApplicationTypeGroup).toHaveBeenCalledWith('gA', {
+        name: { de: 'P', en: 'E' },
+        text: { de: 'Mit **Kosten**', en: 'Text' },
+      });
+      expect(c.groups()[0].name).toEqual({ de: 'P', en: 'E' });
+      c.groupAction(GROUPS[1], { id: 'edit', label: '' });
+      c.saveGroup(new Event('submit'));
+      expect(toast.error).toHaveBeenCalled();
+      expect(c.saving()).toBe(false);
+    });
+
+    it('fills the dialog with the English name and text of a group', async () => {
+      const { c } = await setupGroups();
+      c.groupAction({ ...GROUPS[1], name: { de: 'S', en: 'Special' }, text: { en: 'Text' } }, { id: 'edit', label: '' });
+      expect(c.groupForm()).toEqual({ nameDe: 'S', nameEn: 'Special', textDe: '', textEn: 'Text' });
+    });
+
+    it('saves no group without a German name', async () => {
+      const createApplicationTypeGroup = jest.fn();
+      const { c } = await setupGroups({ createApplicationTypeGroup });
+      c.openGroupCreate();
+      c.saveGroup(new Event('submit'));
+      expect(createApplicationTypeGroup).not.toHaveBeenCalled();
+    });
+
+    it('deletes a group and loads the list again', async () => {
+      const deleteApplicationTypeGroup = jest
+        .fn()
+        .mockReturnValueOnce(of(void 0))
+        .mockReturnValueOnce(throwError(() => new Error('x')));
+      const { c, api, toast } = await setupGroups({ deleteApplicationTypeGroup });
+      c.groupAction(GROUPS[1], { id: 'delete', label: '' });
+      expect(c.confirmGroupDelete()).toBe(GROUPS[1]);
+      c.deleteGroup();
+      expect(deleteApplicationTypeGroup).toHaveBeenCalledWith('gB');
+      expect(api['listApplicationTypeGroups']).toHaveBeenCalledTimes(2);
+      c.groupAction(GROUPS[0], { id: 'delete', label: '' });
+      c.deleteGroup();
+      expect(toast.error).toHaveBeenCalled();
+      expect(c.deleting()).toBe(false);
+    });
+
+    it('moves groups and types with the arrows', async () => {
+      const moveApplicationTypeGroup = jest
+        .fn()
+        .mockReturnValueOnce(of([GROUPS[1], GROUPS[0]]))
+        .mockReturnValueOnce(throwError(() => new Error('x')));
+      const moveApplicationType = jest
+        .fn()
+        .mockReturnValueOnce(of([...grouped()].reverse()))
+        .mockReturnValueOnce(throwError(() => new Error('x')));
+      const { c, toast } = await setupGroups({ moveApplicationTypeGroup, moveApplicationType });
+      await userEvent.click(screen.getByRole('button', { name: 'Nach unten: Projektanträge' }));
+      expect(moveApplicationTypeGroup).toHaveBeenCalledWith('gA', 1);
+      expect(c.groups()[0].id).toBe('gB');
+      const menu = c.rowMenus().get('f2')[0].items;
+      expect(menu.map((i: { id: string }) => i.id)).toEqual(['up', 'down', 'group']);
+      expect(menu[1].disabledReason).toBe('Steht schon am Rand der Gruppe');
+      expect(c.rowMenus().get('f1')[0].items[0].disabledReason).toBe('Steht schon am Rand der Gruppe');
+      c.typeAction(grouped()[1], { id: 'up', label: '' });
+      expect(moveApplicationType).toHaveBeenCalledWith('f2', -1);
+      expect(c.types()[0].id).toBe('f3');
+      c.moveGroup(GROUPS[0], -1);
+      c.typeAction(grouped()[0], { id: 'down', label: '' });
+      expect(toast.error).toHaveBeenCalledTimes(2);
+    });
+
+    it('changes the group of a type', async () => {
+      const updateApplicationType = jest
+        .fn()
+        .mockReturnValueOnce(of(void 0))
+        .mockReturnValueOnce(throwError(() => new Error('x')));
+      const { c, toast } = await setupGroups({ updateApplicationType });
+      const [vsm, , loose] = grouped();
+      c.typeAction(vsm, { id: 'group', label: '' });
+      expect(c.regroupTo()).toBe('gA');
+      expect(c.groupOptions().map((o: { value: string }) => o.value)).toEqual(['', 'gA', 'gB']);
+      c.saveRegroup();
+      expect(updateApplicationType).not.toHaveBeenCalled();
+      expect(c.regroup()).toBeNull();
+      c.typeAction(vsm, { id: 'group', label: '' });
+      c.regroupTo.set('');
+      c.saveRegroup();
+      expect(updateApplicationType).toHaveBeenCalledWith('f1', { groupId: null });
+      expect(toast.success).toHaveBeenCalled();
+      c.typeAction(loose, { id: 'group', label: '' });
+      expect(c.regroupTo()).toBe('');
+      c.regroupTo.set('gB');
+      c.saveRegroup();
+      expect(updateApplicationType).toHaveBeenLastCalledWith('f3', { groupId: 'gB' });
+      expect(toast.error).toHaveBeenCalled();
+      c.regroup.set(null);
+      c.saveRegroup();
+      expect(updateApplicationType).toHaveBeenCalledTimes(2);
+    });
+
+    it('ignores a save or delete while one runs, and without a target', async () => {
+      const createApplicationTypeGroup = jest.fn();
+      const deleteApplicationTypeGroup = jest.fn();
+      const updateApplicationType = jest.fn();
+      const { c } = await setupGroups({ createApplicationTypeGroup, deleteApplicationTypeGroup, updateApplicationType });
+      c.patchGroup('nameDe', 'X');
+      c.saveGroup(new Event('submit'));
+      c.deleteGroup();
+      c.openGroupCreate();
+      c.patchGroup('nameDe', 'X');
+      c.saving.set(true);
+      c.saveGroup(new Event('submit'));
+      c.typeAction(grouped()[2], { id: 'group', label: '' });
+      c.regroupTo.set('gA');
+      c.saveRegroup();
+      c.groupAction(GROUPS[0], { id: 'delete', label: '' });
+      c.deleting.set(true);
+      c.deleteGroup();
+      c.typeAction(grouped()[0], { id: 'unknown', label: '' });
+      expect(createApplicationTypeGroup).not.toHaveBeenCalled();
+      expect(deleteApplicationTypeGroup).not.toHaveBeenCalled();
+      expect(updateApplicationType).not.toHaveBeenCalled();
+    });
+
+    it('names a group without a name and puts a type of an unknown group last', async () => {
+      const { c } = await setupGroups({
+        listApplicationTypeGroups: jest.fn(() => of([{ id: 'gX', name: {}, text: {}, position: 0 }])),
+        listApplicationTypesFull: jest.fn(() => of([{ ...type('f9', 'Lost'), groupId: 'gone', position: 0 }])),
+      });
+      expect(c.groupName(c.groups()[0])).toBe('Unbenanntes Formular');
+      expect(c.groupText(c.groups()[0])).toBe('');
+      expect(c.blocks().map((b: { id: string }) => b.id)).toEqual(['gX', 'other']);
+      expect(c.blocks()[1].types.map((t: { id: string }) => t.id)).toEqual(['f9']);
+    });
+
+    it('offers no group actions without admin.types', async () => {
+      const { c } = await setupGroups({}, ['admin.types_delete']);
+      expect(screen.queryByRole('button', { name: 'Gruppe anlegen' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Nach oben/ })).not.toBeInTheDocument();
+      expect(c.rowMenus().get('f1')).toEqual([{ items: [expect.objectContaining({ id: 'delete' })] }]);
+      c.openGroupCreate();
+      expect(c.groupDialog()).toBeNull();
+    });
+  });
 
   it('lists application types', async () => {
     await setup();

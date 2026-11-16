@@ -40,3 +40,22 @@
 .fl__foot {
   --dialog-footer-gap: var(--space-2);
 }
+
+// The groups of Antragsarten (spec 001180): one gap between the sections, the text of a
+// group under its title with the inset of the title.
+.fl__blocks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.fl__groupText {
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+.fl__groupText :first-child {
+  margin-top: 0;
+}
+.fl__groupText :last-child {
+  margin-bottom: 0;
+}

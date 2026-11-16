@@ -61,8 +61,8 @@ import {
 /** The language of the texts in the editor. */
 type TextLang = ContentLang;
 
-/** The free texts in display order. `applyInfo` takes Markdown. */
-const FREETEXTS = ['welcome', 'loginHint', 'support', 'emailFooter', 'applyInfo'] as const;
+/** The free texts in display order. Step 1 of the apply wizard has no text here (spec 001184). */
+const FREETEXTS = ['welcome', 'loginHint', 'support', 'emailFooter'] as const;
 type FreetextKey = (typeof FREETEXTS)[number];
 
 /** The two admin pages of the site config: "Branding" and "Texte". */
@@ -200,8 +200,13 @@ export class BrandingEditorComponent {
     this.loadFailed.set(false);
     this.api.getSiteConfig().subscribe({
       next: (cfg) => {
-        this.draft.set(cfg.branding);
-        this.keepSaved(cfg.branding);
+        // A config from before the description (spec 001093) has none; the field edits a map.
+        const branding = cfg.branding && {
+          ...cfg.branding,
+          description: cfg.branding.description ?? {},
+        };
+        this.draft.set(branding);
+        this.keepSaved(branding);
         this.markSaved(this.editRev());
         this.brand.applyBranding(cfg.branding);
         this.brand.previewAccent(undefined);
@@ -261,6 +266,16 @@ export class BrandingEditorComponent {
     return this.builtIn('footer.coBranding');
   }
 
+  /** The built-in description in the picked language: the placeholder of its field. */
+  protected descriptionDefault(): string {
+    return this.builtIn('app.description');
+  }
+
+  /** The description map; the load gives every draft one. */
+  protected descriptionMap(d: Branding): I18nMap {
+    return d.description ?? {};
+  }
+
   /** The built-in app name: the placeholder of the name field. */
   protected appNameDefault(): string {
     return this.builtIn('app.title');
@@ -275,8 +290,8 @@ export class BrandingEditorComponent {
   }
 
   /**
-   * The text map of a free text. A config from before a newer text (`applyInfo`, the texts
-   * after the creation, the accessibility statement) has none, so it gets an empty map.
+   * The text map of a free text. A config from before a newer text (the texts after the
+   * creation, the accessibility statement) has none, so it gets an empty map.
    */
   private textMap(d: Branding, key: keyof Branding['freetexts']): I18nMap {
     const texts: Partial<Record<keyof Branding['freetexts'], I18nMap>> = d.freetexts;

@@ -197,6 +197,8 @@ export class MeetingPageComponent {
   readonly setNonPublic = output<{ item: AgendaItem; nonPublic: boolean }>();
   /** Set or remove the done mark of an item ("TOP abhaken"). */
   readonly setDone = output<{ item: AgendaItem; done: boolean }>();
+  /** "Dauer ändern" in the agenda (§ 001140). */
+  readonly setDuration = output<{ item: AgendaItem; minutes: number | null }>();
   readonly moveTop = output<AgendaMove>();
   /** Name the minute-taker of a planned meeting. */
   readonly setProtokollant = output<Uuid>();

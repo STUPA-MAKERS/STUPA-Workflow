@@ -166,6 +166,25 @@ async def set_plan_line_predecessor(
 
 
 @group.tool
+async def set_plan_line_year_before(
+    version_id: str, budget_id: str, prev_amount: str | None, prev_actual: str | None
+) -> dict:
+    """Set the Ansatz and the Ist of the year before of a line in a draft version by hand.
+
+    Both values are set together as decimal strings such as "1500.00"; null clears a value,
+    so the line shows the computed figure again (from its Vorgänger, its own cost center
+    or the rows below it). A value set by hand wins over the computed figure everywhere,
+    and a row that sums the rows below uses it. The call gives 422 `plan_line_missing`
+    for a cost center without a line in the version and 409 `plan_version_locked` for a
+    version that is not a draft. Requires budget.structure.
+    """
+    return await api().put(
+        f"/budget-plan-versions/{version_id}/lines/{budget_id}/year-before",
+        json={"prevAmount": prev_amount, "prevActual": prev_actual},
+    )
+
+
+@group.tool
 async def delete_plan_line(version_id: str, budget_id: str) -> dict:
     """Remove the line of one cost center from a draft version.
 

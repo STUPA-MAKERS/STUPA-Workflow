@@ -7,7 +7,7 @@ metadata is the single source for Alembic and for the tests.
 from __future__ import annotations
 
 from app.db import Base
-from app.modules.application_types.models import ApplicationType
+from app.modules.application_types.models import ApplicationType, ApplicationTypeGroup
 from app.modules.applications.models import (
     Applicant,
     Application,
@@ -99,6 +99,7 @@ __all__ = [
     "ApplicationLinkEvent",
     "ApplicationObserver",
     "ApplicationType",
+    "ApplicationTypeGroup",
     "Attachment",
     "AttachmentDraftToken",
     "AuditEntry",

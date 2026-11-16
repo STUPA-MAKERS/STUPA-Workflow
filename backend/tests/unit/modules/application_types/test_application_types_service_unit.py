@@ -47,6 +47,7 @@ def _row(**over: object) -> SimpleNamespace:
         "has_budget": True,
         "active_form_version_id": uuid4(),
         "gremium_id": uuid4(),
+        "group_id": None,
     }
     base.update(over)
     return SimpleNamespace(**base)
@@ -70,7 +71,7 @@ def test_list_public_maps_minimal_fields() -> None:
     assert item.has_budget is True
     assert item.active is True
     assert item.active_form_version_id == row.active_form_version_id
-    assert item.key is None
+    assert item.key == "finanz"
     assert item.gremium_id is None
 
 

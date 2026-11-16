@@ -35,7 +35,8 @@ class ApplicationTypeListQuery(PageParams, frozen=True):
 class ApplicationTypeListItem(FrozenCamelModel, frozen=True):
     """One application type in the list.
 
-    `key` and `gremiumId` are admin-only. They stay `null` without the permission.
+    `key` is public, because the apply URL names the type by its key (spec 001172).
+    `gremiumId` is admin-only and stays `null` without the permission.
 
     `active` means that the type accepts a submission, because an active form version
     exists.
@@ -46,5 +47,27 @@ class ApplicationTypeListItem(FrozenCamelModel, frozen=True):
     has_budget: bool = Field(alias="hasBudget")
     active: bool
     active_form_version_id: UUID | None = Field(default=None, alias="activeFormVersionId")
-    key: str | None = None
+    key: str
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
+    #: The group in step 1 of the apply wizard (spec 001181); `null` = "Weitere Anträge".
+    group_id: UUID | None = Field(default=None, alias="groupId")
+
+
+class ApplicationTypeGroupQuery(FrozenCamelModel, frozen=True):
+    """Query parameters of the group list: only `lang`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    lang: Lang = DEFAULT_LANG
+
+
+class ApplicationTypeGroupItem(FrozenCamelModel, frozen=True):
+    """A group of Antragsarten for step 1 of the apply wizard (spec 001181).
+
+    `name` and `text` are resolved for `lang` with German as the fallback. `text` is
+    Markdown and can be empty.
+    """
+
+    id: UUID
+    name: str
+    text: str

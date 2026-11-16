@@ -39,8 +39,8 @@ import { formatMoney } from '@shared/format-money';
  * actions "Als bezahlt markieren" and "Buchung anlegen", then the receipt, the amounts
  * (net, VAT with its rate, gross), the data and the bookings with the booked share.
  *
- * The receipt shows as a file to open: the server sends the PDF as a download only, and
- * the page shows no PDF inside the app.
+ * The receipt shows as a file to open: a click opens it in the file viewer of the app
+ * (spec 001080), and the page shows no PDF inline.
  */
 @Component({
   selector: 'app-invoice-detail',
@@ -130,7 +130,7 @@ export class InvoiceDetailComponent {
     const file: RowMenuItem = {
       id: 'file',
       label: this.i18n.translate('invoices.openFile'),
-      icon: 'download',
+      icon: 'file',
     };
     const remove: RowMenuSection = {
       items: [

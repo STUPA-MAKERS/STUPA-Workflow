@@ -1,3 +1,4 @@
+import { FileOpenService } from '@shared/viewer/file-open.service';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -22,7 +23,6 @@ import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
   ConfirmDialogComponent,
-  downloadBlob,
   DropOverlayComponent,
   EmptyStateComponent,
   FileDropDirective,
@@ -157,6 +157,7 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
 })
 export class InvoicesComponent implements InvoiceFormHost {
   private readonly api = inject(BudgetTreeApi);
+  private readonly files = inject(FileOpenService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
@@ -898,14 +899,11 @@ export class InvoicesComponent implements InvoiceFormHost {
   }
 
   /**
-   * The API streams the PDF because MinIO is internal. `downloadBlob` opens an object URL in a new
-   * tab, which popup blockers do not stop after an async call.
+   * The receipt opens in the file viewer (spec 001080). The API streams the PDF because
+   * MinIO is internal; the viewer frames its sandboxed preview (001083).
    */
   openFile(i: Invoice): void {
-    this.api.invoiceFileBlob(i.id).subscribe({
-      next: (blob) => downloadBlob(blob, i.fileName || 'beleg.pdf'),
-      error: () => this.toast.error(this.i18n.translate('invoices.toast.failed')),
-    });
+    this.files.open({ name: i.fileName || 'Beleg.pdf', url: this.api.invoiceFileUrl(i.id), kind: 'pdf' });
   }
 
   /** The row menu of an invoice. */

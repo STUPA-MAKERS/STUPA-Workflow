@@ -122,7 +122,8 @@ class AssignmentOps(BudgetTreeServiceBase):
                 NULL. This mirrors the behavior of bookings.
                 `cost_centre_income` (422) for a Kostenstelle that is income in
                 the year (001030). `cost_centre_not_leaf` (422) for a node with
-                Kostenstellen below it (001031).
+                Kostenstellen below it (001031). `application_without_budget` (422)
+                for a Kostenstelle on an Antrag of a type without money (001033).
         """
         app = await self._get_application(application_id, for_update=True)
         if await in_budget_vote_state(self.session, app):
@@ -133,6 +134,8 @@ class AssignmentOps(BudgetTreeServiceBase):
             )
         if payload.budget_id is None:
             await self._require_open_fiscal_year(app.fiscal_year_id)
+        else:
+            await self._refuse_without_amount(app)
         node = await self._get_node(payload.budget_id) if payload.budget_id is not None else None
         budget_id = node.id if node is not None else None
         fy_id = (

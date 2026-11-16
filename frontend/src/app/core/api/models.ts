@@ -42,7 +42,7 @@ export interface PublicFooterLink {
 
 /** Public branding config of the active site version. It needs no authentication.
  *  The type stays loose on purpose. The frontend reads only what it shows: the free
- *  texts (for example `applyInfo`), the app name and the footer. */
+ *  texts (for example `welcome`), the app name and the footer. */
 export interface PublicSiteConfig {
   readonly version: number;
   /** The state of each feature. A feature that needs a feature that is off reads as off. */
@@ -75,7 +75,6 @@ export interface PublicSiteConfig {
           | 'welcome'
           | 'support'
           | 'emailFooter'
-          | 'applyInfo'
           | 'submittedInternal'
           | 'submittedExternal'
           | 'accessibilityStatement',
@@ -127,6 +126,21 @@ export interface GremiumRef {
   readonly id: Uuid;
   readonly name: string;
   readonly slug: string;
+}
+
+/** One SSO claim about the person: the claim name and its JSON value. */
+export interface ProfileClaim {
+  readonly key: string;
+  readonly value: unknown;
+}
+
+/** GET /auth/me/profile: the stored facts of the principal and the SSO claims. */
+export interface Profile {
+  readonly sub: string;
+  readonly email: string | null;
+  readonly displayName: string | null;
+  readonly lastLogin: string | null;
+  readonly claims: readonly ProfileClaim[];
 }
 
 export interface Principal {
@@ -455,6 +469,10 @@ export interface AgendaItem {
   readonly nonPublic?: boolean;
   /** The done mark ("TOP abhaken"): the time of the tick, or `null`. Set by hand only. */
   readonly doneAt?: string | null;
+  /** The time of the first move of the live meeting to the item (§ 000870), or `null`. */
+  readonly startedAt?: IsoDateTime | null;
+  /** The estimated duration in minutes (§ 001140), or `null`. */
+  readonly estimatedMinutes?: number | null;
   readonly stateLabel?: I18nMap | null;
   /** The requested amount of the application, for the decision proposal. */
   readonly amount?: string | null;
@@ -568,6 +586,17 @@ export interface ApplicationTypeListItemWire {
   /** Extra admin fields. The backend fills them only for an authorized reader. */
   readonly key?: string | null;
   readonly gremiumId?: Uuid | null;
+  /** The group in step 1 of the apply wizard (spec 001181). `null`: no group. */
+  readonly groupId?: Uuid | null;
+}
+
+/** A group of Antragsarten, `GET /api/application-type-groups` (spec 001181). */
+export interface ApplicationTypeGroup {
+  readonly id: Uuid;
+  /** The name in the requested language, German as the fallback. */
+  readonly name: string;
+  /** Markdown in the requested language; empty without a text. */
+  readonly text: string;
 }
 
 /** `TransitionOut`. The `label` is an i18n map. */
@@ -887,6 +916,11 @@ export interface ApplicationType {
   readonly activeFormVersionId: Uuid | null;
   readonly key: string | null;
   readonly gremiumId: Uuid | null;
+  /**
+   * The group in step 1 of the apply wizard (spec 001181). `null` or absent: no group.
+   * Optional, because the admin lists build types without it.
+   */
+  readonly groupId?: Uuid | null;
 }
 
 /** Available transition, frontend view, with the `label` resolved. */

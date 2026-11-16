@@ -49,6 +49,8 @@ MAX_LOGO_BYTES = 2 * 1024 * 1024
 #: Length caps for the i18n texts. They guard the auth-free public config against bloat.
 MAX_FREETEXT_CHARS = 10_000
 MAX_LABEL_CHARS = 500
+#: The description of the platform: one or two sentences, as a link preview shows them.
+MAX_DESCRIPTION_CHARS = 300
 MAX_I18N_KEY_CHARS = 16
 
 LogoSlot = Literal["wordmark", "imagemark", "favicon"]
@@ -200,16 +202,14 @@ class FooterLink(FrozenStrictCamelModel, frozen=True):
 class SiteFreetexts(FrozenStrictCamelModel, frozen=True):
     """The i18n freetexts of the site.
 
-    They are the login hint, the welcome, the support text, the e-mail footer, the
-    apply info, the texts after the submission and the accessibility statement.
+    They are the login hint, the welcome, the support text, the e-mail footer, the texts
+    after the submission and the accessibility statement.
     """
 
     login_hint: I18nMap = Field(default_factory=dict, alias="loginHint")
     welcome: I18nMap = Field(default_factory=dict)
     support: I18nMap = Field(default_factory=dict)
     email_footer: I18nMap = Field(default_factory=dict, alias="emailFooter")
-    #: Info text below the application-type selection — Markdown, per language.
-    apply_info: I18nMap = Field(default_factory=dict, alias="applyInfo")
     #: The text on the page after the submission, Markdown, per language. "Internal" is
     #: for a signed-in applicant (the application is submitted at once), "external" is
     #: for a guest (the e-mail link confirms the application). An empty language falls
@@ -222,12 +222,24 @@ class SiteFreetexts(FrozenStrictCamelModel, frozen=True):
         default_factory=default_statement, alias="accessibilityStatement"
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_apply_info(cls, data: object) -> object:
+        """Drop the apply info of an old stored config (spec 001184).
+
+        Step 1 of the apply wizard has no general text; the groups of Antragsarten hold
+        the texts. An old config still carries the key, and ``extra="forbid"`` would
+        reject that config.
+        """
+        if isinstance(data, dict):
+            return {k: v for k, v in data.items() if k not in ("applyInfo", "apply_info")}
+        return data
+
     @field_validator(
         "login_hint",
         "welcome",
         "support",
         "email_footer",
-        "apply_info",
         "submitted_internal",
         "submitted_external",
         "accessibility_statement",
@@ -286,6 +298,10 @@ class Branding(FrozenStrictCamelModel, frozen=True):
     #: back to the hardcoded defaults and the i18n values.
     app_name: str = Field(default="", alias="appName", max_length=MAX_LABEL_CHARS)
     app_short_name: str = Field(default="", alias="appShortName", max_length=MAX_LABEL_CHARS)
+    #: One sentence about the platform, per language. It is the description of the page
+    #: head, of the link preview and of the PWA manifest. An empty language falls back to
+    #: the built-in text (``admin.page_head.DEFAULT_DESCRIPTION``).
+    description: I18nMap = Field(default_factory=dict)
     logos: dict[LogoSlot, BrandingAsset] = Field(default_factory=dict)
     copyright: I18nMap = Field(default_factory=dict)
     legal_links: list[FooterLink] = Field(default_factory=list, alias="legalLinks", max_length=50)
@@ -328,6 +344,11 @@ class Branding(FrozenStrictCamelModel, frozen=True):
     @classmethod
     def _cap_copyright(cls, v: I18nMap) -> I18nMap:
         return _cap_i18n(v, MAX_LABEL_CHARS)
+
+    @field_validator("description")
+    @classmethod
+    def _cap_description(cls, v: I18nMap) -> I18nMap:
+        return _cap_i18n(v, MAX_DESCRIPTION_CHARS)
 
 
 class PublicBranding(Branding, frozen=True):

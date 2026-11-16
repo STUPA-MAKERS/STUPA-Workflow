@@ -136,7 +136,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> _World:
         await session.flush()
         leaf = Budget(parent_id=decider.id, key="L", path_key=f"T{tag}-C-L", name="Blatt")
         app_type = ApplicationType(gremium_id=None, key=f"t-{tag}", name_i18n={},
-                                   has_budget=False)
+                                   has_budget=True)
         session.add_all([leaf, app_type])
         await session.commit()
         await FormVersionWriter(session).create_form_version(

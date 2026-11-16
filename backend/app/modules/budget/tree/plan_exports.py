@@ -52,6 +52,13 @@ def _decided(plan: PlanOut | None) -> bool:
     return plan is not None and any(v.state == "in_force" for v in plan.versions)
 
 
+def _by_hand(version: PlanVersionOut) -> bool:
+    """Say if a line of the version sets a figure of the year before by hand (001042)."""
+    return any(
+        line.prev_amount is not None or line.prev_actual is not None for line in version.lines
+    )
+
+
 def _open_step(version: PlanVersionOut) -> str | None:
     """Return the name of the first step that the version has not passed, else none."""
     return next((s.name for s in version.steps if s.passed_at is None), None)
@@ -87,7 +94,7 @@ class PlanExportOps(PlanOps, TreeViewOps):
             state=version.state,
             exported_on=today,
             step=_open_step(version),
-            prev_decided=_decided(plan_before),
+            prev_decided=_decided(plan_before) or _by_hand(version),
         )
         return build_export(
             head,

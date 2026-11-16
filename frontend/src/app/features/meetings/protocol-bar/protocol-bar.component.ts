@@ -5,6 +5,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { longDate } from '@shared/date-format';
 import { ButtonComponent, ConfirmDialogComponent, IconComponent, type IconName } from '@stupa-makers/ui-kit';
+import { FileOpenService } from '@shared/viewer/file-open.service';
 import { MeetingSessionService } from '../meeting-session.service';
 import { ProtocolApprovalDialogComponent } from '../protocol-approval-dialog/protocol-approval-dialog.component';
 
@@ -74,6 +75,7 @@ export class ProtocolBarComponent {
   );
 
   private readonly i18n = inject(I18nService);
+  private readonly files = inject(FileOpenService);
   protected readonly draftSending = computed(() => this.session?.draftSending() ?? false);
   protected readonly approvalSaving = computed(() => this.session?.approvalSaving() ?? false);
   /** The confirmation of "Entwurf senden" is open. */
@@ -97,6 +99,14 @@ export class ProtocolBarComponent {
     const m = this.meeting();
     return m.status === 'closed' && !!m.canWrite && this.protocol().status === 'draft' && this.session !== null;
   });
+
+  /**
+   * A PDF link opens the PDF in the file viewer (spec 001080). A click with a modifier
+   * keeps the new tab of the link.
+   */
+  protected openPdf(event: MouseEvent, url: string, label: TranslationKey): void {
+    this.files.click(event, { name: `${this.meeting().title} · ${this.i18n.translate(label)}`, url, kind: 'pdf' });
+  }
 
   /** The two PDF links of a draft of a closed meeting (§ 000950). */
   protected readonly draftPdf = computed(() => {

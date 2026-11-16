@@ -17,6 +17,14 @@ export const ACCOUNT_GROUPS: readonly FrameGroup[] = [{ key: 'account', title: n
  */
 export const ACCOUNT_PAGES: readonly FramePage[] = [
   {
+    link: 'profile',
+    title: 'account.menu.profile',
+    desc: 'account.nav.profileDesc',
+    icon: 'user',
+    group: 'account',
+    permissions: [],
+  },
+  {
     link: 'notifications',
     title: 'account.menu.notifications',
     desc: 'account.nav.notificationsDesc',

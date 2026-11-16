@@ -86,6 +86,10 @@ export interface PlanLine {
    * of its own (001040). `null` or missing compares with its own Kostenstelle.
    */
   readonly predecessorId?: Uuid | null;
+  /** The Ansatz of the year before set by hand (001042); `null` keeps the computed figure. */
+  readonly prevAmount?: string | null;
+  /** The Ist of the year before set by hand (001042); `null` keeps the computed figure. */
+  readonly prevActual?: string | null;
 }
 
 /** One version of a Haushaltsplan: the Stammplan (number 0) or a Nachtrag. */
@@ -108,6 +112,12 @@ export interface BudgetPlan {
   readonly budgetId: Uuid;
   readonly fiscalYearId: Uuid;
   readonly versions: readonly PlanVersion[];
+}
+
+/** The figures of the year before that a draft line sets by hand (001042). Both are sent; `null` clears one. */
+export interface PlanYearBeforeSet {
+  readonly prevAmount: string | null;
+  readonly prevActual: string | null;
 }
 
 /** The body of a line write. A field the body leaves out keeps the value of the line. */
@@ -156,6 +166,11 @@ export class BudgetPlanApi {
     return this.http.get<BudgetPlan>(`${this.versionUrl(versionId)}/plan`, { context: skipLoading() });
   }
 
+  /** The route of a version as a file, for the file viewer (spec 001080). */
+  exportUrl(versionId: Uuid, format: PlanExportFormat): string {
+    return `${this.versionUrl(versionId)}/export.${format}`;
+  }
+
   /** A version as a file. Each reader of the plan can load it, a draft too. */
   exportVersion(versionId: Uuid, format: PlanExportFormat): Observable<PlanFile> {
     return this.http
@@ -190,6 +205,11 @@ export class BudgetPlanApi {
   /** Name the Vorgänger of a draft line in the year before, or clear it with `null` (001040). */
   setPredecessor(versionId: Uuid, budgetId: Uuid, predecessorId: Uuid | null): Observable<BudgetPlan> {
     return this.http.put<BudgetPlan>(`${this.lineUrl(versionId, budgetId)}/predecessor`, { predecessorId }, { context: skipLoading() });
+  }
+
+  /** Set the Ansatz and the Ist of the year before of a draft line by hand; `null` clears a value (001042). */
+  setYearBefore(versionId: Uuid, budgetId: Uuid, body: PlanYearBeforeSet): Observable<BudgetPlan> {
+    return this.http.put<BudgetPlan>(`${this.lineUrl(versionId, budgetId)}/year-before`, body, { context: skipLoading() });
   }
 
   deleteLine(versionId: Uuid, budgetId: Uuid): Observable<BudgetPlan> {

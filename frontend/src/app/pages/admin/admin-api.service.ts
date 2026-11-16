@@ -27,6 +27,8 @@ import {
   type BackupList,
   type ApplicationTypeCreateBody,
   type ApplicationTypeFull,
+  type ApplicationTypeGroupBody,
+  type ApplicationTypeGroupFull,
   type ApplicationTypeUpdateBody,
   type AuditActor,
   type AuditEntry,
@@ -95,6 +97,7 @@ import {
 } from './admin-revoke.mock';
 import {
   MOCK_APP_TYPES,
+  MOCK_APP_TYPE_GROUPS,
   MOCK_AUDIT_ACTORS,
   MOCK_AUDIT_ENTRIES,
   MOCK_AUDIT_VERIFICATION,
@@ -150,6 +153,67 @@ interface ApplicationTypeOutWire {
   readonly retentionMonths?: number | null;
   readonly activeFormVersionId?: Uuid | null;
   readonly activeFormVersion?: number | null;
+  readonly groupId?: Uuid | null;
+  readonly position?: number;
+}
+
+/** Raw shape of `ApplicationTypeGroupOut`. */
+interface ApplicationTypeGroupOutWire {
+  readonly id: Uuid;
+  readonly nameI18n?: Record<string, string> | null;
+  readonly textI18n?: Record<string, string> | null;
+  readonly position?: number;
+}
+
+function mapTypeFull(t: ApplicationTypeOutWire): ApplicationTypeFull {
+  return {
+    id: t.id,
+    name: (t.nameI18n ?? {}) as I18nMap,
+    gremiumId: t.gremiumId ?? null,
+    hasBudget: t.hasBudget ?? false,
+    pdfSignatures: t.pdfSignatures ?? false,
+    retentionMonths: t.retentionMonths ?? null,
+    activeFormVersionId: t.activeFormVersionId ?? null,
+    activeFormVersion: t.activeFormVersion ?? null,
+    groupId: t.groupId ?? null,
+    position: t.position ?? 0,
+  };
+}
+
+function mapTypeGroup(g: ApplicationTypeGroupOutWire): ApplicationTypeGroupFull {
+  return {
+    id: g.id,
+    name: (g.nameI18n ?? {}) as I18nMap,
+    text: (g.textI18n ?? {}) as I18nMap,
+    position: g.position ?? 0,
+  };
+}
+
+/** The mock order of the admin list: by position, as the server sends it. */
+function byPosition<T extends { readonly position?: number }>(rows: readonly T[]): readonly T[] {
+  return [...rows].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+}
+
+/** Swap a row with its neighbour and number the list again, as the server does. */
+function swapPositions<T extends { readonly id: Uuid; readonly position?: number }>(
+  rows: readonly T[],
+  id: Uuid,
+  by: -1 | 1,
+): readonly T[] {
+  const list = byPosition(rows);
+  const at = list.findIndex((r) => r.id === id);
+  const to = at + by;
+  if (at < 0 || to < 0 || to >= list.length) return list;
+  const pick = (i: number): T => (i === at ? list[to] : i === to ? list[at] : list[i]);
+  return list.map((_, i) => ({ ...pick(i), position: i }));
+}
+
+/**
+ * The mock store after a change of the types or the groups of Antragsarten. One merge for
+ * every mock write of this feature keeps the writes in one place.
+ */
+function mockStore<T extends object>(store: T, patch: Partial<T>): void {
+  Object.assign(store, patch);
 }
 
 /**
@@ -170,6 +234,7 @@ export class AdminApiService {
   private readonly store = mockTable({
     gremien: structuredCopy(MOCK_GREMIEN),
     appTypes: structuredCopy(MOCK_APP_TYPES),
+    appTypeGroups: structuredCopy(MOCK_APP_TYPE_GROUPS),
     formDrafts: structuredCopy(MOCK_FORM_DRAFTS) as Record<string, FormDraft>,
     flow: structuredCopy(MOCK_FLOW) as FlowGraph,
     gremiumRoles: structuredCopy(MOCK_GREMIUM_ROLES),
@@ -798,25 +863,106 @@ export class AdminApiService {
 
   /** Application types as an edit view (id + i18n name + gremium + budget flag). */
   listApplicationTypesFull(): Observable<ApplicationTypeFull[]> {
-    if (this.mock) return of(structuredCopy(this.store.appTypes));
+    if (this.mock) return of(structuredCopy([...byPosition(this.store.appTypes)]));
     return this.http
       .get<ApplicationTypeOutWire[]>(`${this.base}/admin/application-types`, {
         context: skipLoading(),
       })
-      .pipe(
-        map((list) =>
-          list.map((t) => ({
-            id: t.id,
-            name: (t.nameI18n ?? {}) as I18nMap,
-            gremiumId: t.gremiumId ?? null,
-            hasBudget: t.hasBudget ?? false,
-            pdfSignatures: t.pdfSignatures ?? false,
-            retentionMonths: t.retentionMonths ?? null,
-            activeFormVersionId: t.activeFormVersionId ?? null,
-            activeFormVersion: t.activeFormVersion ?? null,
-          })),
+      .pipe(map((list) => list.map(mapTypeFull)));
+  }
+
+  /** Move a type one place up (-1) or down (1) inside its group (spec 001183). */
+  moveApplicationType(id: Uuid, by: -1 | 1): Observable<ApplicationTypeFull[]> {
+    if (this.mock) {
+      const row = this.store.appTypes.find((t) => t.id === id);
+      const siblings = this.store.appTypes.filter((t) => (t.groupId ?? null) === (row?.groupId ?? null));
+      const moved = new Map(swapPositions(siblings, id, by).map((t) => [t.id, t]));
+      mockStore(this.store, { appTypes: this.store.appTypes.map((t) => moved.get(t.id) ?? t) });
+      return of(structuredCopy([...byPosition(this.store.appTypes)]));
+    }
+    return this.http
+      .post<ApplicationTypeOutWire[]>(`${this.base}/admin/application-types/${id}/move`, { by })
+      .pipe(map((list) => list.map(mapTypeFull)));
+  }
+
+  /** The groups of Antragsarten in their order (spec 001180). */
+  listApplicationTypeGroups(): Observable<ApplicationTypeGroupFull[]> {
+    if (this.mock) return of(structuredCopy([...byPosition(this.store.appTypeGroups)]));
+    return this.http
+      .get<ApplicationTypeGroupOutWire[]>(`${this.base}/admin/application-type-groups`, {
+        context: skipLoading(),
+      })
+      .pipe(map((list) => list.map(mapTypeGroup)));
+  }
+
+  /** Create a group at the end of the order. */
+  createApplicationTypeGroup(body: ApplicationTypeGroupBody): Observable<ApplicationTypeGroupFull> {
+    if (this.mock) {
+      const created: ApplicationTypeGroupFull = {
+        id: `atg-${this.store.appTypeGroups.length + 1}-${Date.now()}`,
+        name: { ...body.name },
+        text: { ...body.text },
+        position: this.store.appTypeGroups.length,
+      };
+      mockStore(this.store, { appTypeGroups: [...this.store.appTypeGroups, created] });
+      return of(structuredCopy(created));
+    }
+    return this.http
+      .post<ApplicationTypeGroupOutWire>(`${this.base}/admin/application-type-groups`, {
+        nameI18n: body.name,
+        textI18n: body.text,
+      })
+      .pipe(map(mapTypeGroup));
+  }
+
+  /** Change the name and the text of a group. */
+  updateApplicationTypeGroup(id: Uuid, body: ApplicationTypeGroupBody): Observable<ApplicationTypeGroupFull> {
+    if (this.mock) {
+      mockStore(this.store, {
+        appTypeGroups: this.store.appTypeGroups.map((g) =>
+          g.id === id ? { ...g, name: { ...body.name }, text: { ...body.text } } : g,
         ),
-      );
+      });
+      const row = this.store.appTypeGroups.find((g) => g.id === id);
+      return row ? of(structuredCopy(row)) : throwError(() => ({ status: 404 }));
+    }
+    return this.http
+      .patch<ApplicationTypeGroupOutWire>(`${this.base}/admin/application-type-groups/${id}`, {
+        nameI18n: body.name,
+        textI18n: body.text,
+      })
+      .pipe(map(mapTypeGroup));
+  }
+
+  /** Delete a group. Its types stay, without a group (spec 001180). */
+  deleteApplicationTypeGroup(id: Uuid): Observable<void> {
+    if (this.mock) {
+      const start = this.store.appTypes.filter((t) => !t.groupId).length;
+      const freed = this.store.appTypes.filter((t) => t.groupId === id).map((t) => t.id);
+      mockStore(this.store, {
+        appTypeGroups: this.store.appTypeGroups.filter((g) => g.id !== id),
+        appTypes: this.store.appTypes.map((t) =>
+          t.groupId === id ? { ...t, groupId: null, position: start + freed.indexOf(t.id) } : t,
+        ),
+      });
+      return of(void 0);
+    }
+    return this.http
+      .delete<unknown>(`${this.base}/admin/application-type-groups/${id}`)
+      .pipe(map(() => void 0));
+  }
+
+  /** Move a group one place up (-1) or down (1) (spec 001183). */
+  moveApplicationTypeGroup(id: Uuid, by: -1 | 1): Observable<ApplicationTypeGroupFull[]> {
+    if (this.mock) {
+      mockStore(this.store, { appTypeGroups: [...swapPositions(this.store.appTypeGroups, id, by)] });
+      return of(structuredCopy(this.store.appTypeGroups));
+    }
+    return this.http
+      .post<ApplicationTypeGroupOutWire[]>(`${this.base}/admin/application-type-groups/${id}/move`, {
+        by,
+      })
+      .pipe(map((list) => list.map(mapTypeGroup)));
   }
 
   /** Create a new application type/form — POST /admin/application-types. */
@@ -828,8 +974,10 @@ export class AdminApiService {
         gremiumId: body.gremiumId ?? null,
         hasBudget: body.hasBudget ?? false,
         activeFormVersionId: null,
+        groupId: body.groupId ?? null,
+        position: this.store.appTypes.filter((t) => (t.groupId ?? null) === (body.groupId ?? null)).length,
       };
-      this.store.appTypes = [...this.store.appTypes, created];
+      mockStore(this.store, { appTypes: [...this.store.appTypes, created] });
       return of(structuredCopy(created));
     }
     return this.http
@@ -838,18 +986,9 @@ export class AdminApiService {
         nameI18n: body.name,
         gremiumId: body.gremiumId ?? null,
         hasBudget: body.hasBudget ?? false,
+        groupId: body.groupId ?? null,
       })
-      .pipe(
-        map((t) => ({
-          id: t.id,
-          name: (t.nameI18n ?? {}) as I18nMap,
-          gremiumId: t.gremiumId ?? null,
-          hasBudget: t.hasBudget ?? false,
-          pdfSignatures: t.pdfSignatures ?? false,
-          retentionMonths: t.retentionMonths ?? null,
-          activeFormVersionId: t.activeFormVersionId ?? null,
-        })),
-      );
+      .pipe(map(mapTypeFull));
   }
 
   /** Edit application-type master data (title/gremium/budget) — PATCH. */
@@ -861,6 +1000,12 @@ export class AdminApiService {
         if (body.gremiumId !== undefined) row.gremiumId = body.gremiumId;
         if (body.hasBudget !== undefined) row.hasBudget = body.hasBudget;
       }
+      if (row && body.groupId !== undefined && body.groupId !== (row.groupId ?? null)) {
+        const position = this.store.appTypes.filter((t) => (t.groupId ?? null) === body.groupId).length;
+        mockStore(this.store, {
+          appTypes: this.store.appTypes.map((t) => (t.id === id ? { ...t, groupId: body.groupId, position } : t)),
+        });
+      }
       return of(void 0);
     }
     const payload: Record<string, unknown> = {
@@ -868,6 +1013,7 @@ export class AdminApiService {
       ...(body.gremiumId !== undefined ? { gremiumId: body.gremiumId } : {}),
       ...(body.hasBudget !== undefined ? { hasBudget: body.hasBudget } : {}),
       ...(body.pdfSignatures !== undefined ? { pdfSignatures: body.pdfSignatures } : {}),
+      ...(body.groupId !== undefined ? { groupId: body.groupId } : {}),
     };
     return this.http
       .patch<unknown>(`${this.base}/admin/application-types/${id}`, payload)
