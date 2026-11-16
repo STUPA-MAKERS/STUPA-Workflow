@@ -2,7 +2,7 @@
 id: "001030"
 title: An Antrag takes only a Kostenstelle on the expense side
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:

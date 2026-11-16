@@ -120,6 +120,8 @@ class AssignmentOps(BudgetTreeServiceBase):
             ValidationProblem: The fiscal year is ambiguous or missing. The
                 method fails with a 422 instead of leaving ``fiscal_year_id``
                 NULL. This mirrors the behavior of bookings.
+                `cost_centre_income` (422) for a Kostenstelle that is income in
+                the year (001030).
         """
         app = await self._get_application(application_id, for_update=True)
         if await in_budget_vote_state(self.session, app):
@@ -132,11 +134,10 @@ class AssignmentOps(BudgetTreeServiceBase):
             await self._require_open_fiscal_year(app.fiscal_year_id)
         node = await self._get_node(payload.budget_id) if payload.budget_id is not None else None
         budget_id = node.id if node is not None else None
-        fy_id = (
-            await self._resolve_fiscal_year(node, payload.fiscal_year_id)
-            if node is not None
-            else None
-        )
+        fy_id = None
+        if node is not None:
+            fy_id = await self._resolve_fiscal_year(node, payload.fiscal_year_id)
+            await self._refuse_income(node, fy_id)
         app.budget_id = budget_id
         app.fiscal_year_id = fy_id
         await self._audit(
@@ -168,6 +169,8 @@ class AssignmentOps(BudgetTreeServiceBase):
                 closed.
             ValidationProblem: `fiscal_year_not_choosable` (422) for a new year that
                 is past or whose plan is not in force.
+                `cost_centre_income` (422) when the Kostenstelle is income in the
+                new year (001030).
         """
         app = await self._get_application(application_id)
         if app.budget_id is None:
@@ -184,6 +187,7 @@ class AssignmentOps(BudgetTreeServiceBase):
                 errors=[{"field": "fiscalYearId", "msg": "wrong top-level budget"}],
             )
         await self._require_choosable(top, fy)
+        await self._refuse_income(node, fy.id)
         app.fiscal_year_id = fy.id
         await self._audit(
             AuditAction.BUDGET_MOVE_FISCAL_YEAR,

@@ -8,6 +8,7 @@ problem+json.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
@@ -18,9 +19,9 @@ from sqlalchemy import ColumnElement, Select, or_, select
 
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
-from app.modules.budget import tree_rules
+from app.modules.budget import plan_rules, tree_rules
 from app.modules.budget.access import viewed_by
-from app.modules.budget.plan_models import BudgetPlan, BudgetPlanVersion
+from app.modules.budget.plan_models import BudgetPlan, BudgetPlanLine, BudgetPlanVersion
 from app.modules.budget.tree_models import Budget, FiscalYear
 from app.modules.budget.tree_rules import _SEP
 from app.settings import Settings, get_settings
@@ -336,6 +337,56 @@ class BudgetTreeServiceBase:
             for f in await self._fiscal_years_of(top.id)
             if self._is_choosable(f, decided, late=late)
         ]
+
+    async def current_year(self, top: Budget) -> UUID | None:
+        """Return the current year of a budget: the first choosable year that holds today.
+
+        The flow action that assigns a Kostenstelle takes this year (000879), and the
+        options of a form field leave out the income Kostenstellen of it (001030).
+        """
+        today = self._today()
+        return next(
+            (f.id for f in await self.choosable_years(top) if f.start_date <= today <= f.end_date),
+            None,
+        )
+
+    async def income_titel_paths(
+        self, fiscal_year_ids: Sequence[UUID] | None = None
+    ) -> list[tuple[UUID, str]]:
+        """Return `(fiscal year, tree path)` of each income Titel of a version in force.
+
+        Only the line of a Titel holds a side (000853), so these paths and the paths
+        below them are the income Kostenstellen of the year (001030). `None` reads every
+        year.
+        """
+        stmt = (
+            select(BudgetPlan.fiscal_year_id, Budget.tree_path)
+            .join(BudgetPlanVersion, BudgetPlanVersion.plan_id == BudgetPlan.id)
+            .join(BudgetPlanLine, BudgetPlanLine.version_id == BudgetPlanVersion.id)
+            .join(Budget, Budget.id == BudgetPlanLine.budget_id)
+            .where(BudgetPlanVersion.state == "in_force", BudgetPlanLine.side == "income")
+        )
+        if fiscal_year_ids is not None:
+            stmt = stmt.where(BudgetPlan.fiscal_year_id.in_(fiscal_year_ids))
+        return [(fy, path) for fy, path in (await self.session.execute(stmt)).all()]
+
+    async def is_income(self, node: Budget, fiscal_year_id: UUID) -> bool:
+        """Tell if a Kostenstelle is income in a fiscal year (001030)."""
+        paths = [path for _fy, path in await self.income_titel_paths([fiscal_year_id])]
+        return plan_rules.is_below_path(node.tree_path, paths)
+
+    async def _refuse_income(self, node: Budget, fiscal_year_id: UUID) -> None:
+        """Refuse an Antrag on a Kostenstelle that is income in the year (001030).
+
+        Raises:
+            ValidationProblem: `cost_centre_income` (422).
+        """
+        if await self.is_income(node, fiscal_year_id):
+            raise ValidationProblem(
+                "An Antrag takes only a Kostenstelle on the expense side.",
+                code="cost_centre_income",
+                errors=[{"field": "budgetId", "msg": "income Kostenstelle in this year"}],
+            )
 
     async def _require_choosable(
         self, top: Budget, fy: FiscalYear, *, late: bool = False, on: date | None = None

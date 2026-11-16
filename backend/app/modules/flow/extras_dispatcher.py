@@ -333,8 +333,9 @@ class FlowExtrasActionDispatcher:
         Returns:
             `True` after the assignment. The caller commits. `False` when the node is
             missing, the application sits in a closed fiscal year, the budget has no
-            current fiscal year that a booking can take, or the application already has
-            this cost center. Nothing changed in that case.
+            current fiscal year that a booking can take, the cost center is income in
+            that year (001030), or the application already has this cost center.
+            Nothing changed in that case.
         """
         node = await session.get(Budget, budget_id)
         if node is None:
@@ -365,15 +366,20 @@ class FlowExtrasActionDispatcher:
             return False
         top = await self._top_level(session, node)
         today = datetime.now(ZoneInfo(get_settings().local_timezone)).date()
+        tree = BudgetTreeService(session)
         current = [
-            f.id
-            for f in await BudgetTreeService(session).choosable_years(top)
-            if f.start_date <= today <= f.end_date
+            f.id for f in await tree.choosable_years(top) if f.start_date <= today <= f.end_date
         ]
         if not current:
             logger.warning(
                 "assignBudget: budget %s has no current fiscal year that a booking can "
                 "take — skipped",
+                node.id,
+            )
+            return False
+        if await tree.is_income(node, current[0]):
+            logger.warning(
+                "assignBudget: budget %s is income in the current fiscal year — skipped",
                 node.id,
             )
             return False
