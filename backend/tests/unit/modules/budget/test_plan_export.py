@@ -72,8 +72,14 @@ def _export(number: int = 0, state: PlanState = "draft", prev: str | None = "202
         _Line(_FEES.id, D("100"), side="income"),
         _Line(_GRANTS.id, D("60"), side="expense", transferable=True, coverable=True),
         _Line(
-            _OFFICE.id, D("60"), side="expense", coverable=True, blocked=D("5"), note="IT",
-            name="Büro alt", path_key="VS-8-9",
+            _OFFICE.id,
+            D("60"),
+            side="expense",
+            coverable=True,
+            blocked=D("5"),
+            note="IT",
+            name="Büro alt",
+            path_key="VS-8-9",
         ),
         _Line(_OPEN.id, D("0")),
     )
@@ -123,7 +129,12 @@ def test_the_ist_needs_a_plan_in_the_year_before() -> None:
     bare = replace(export, head=replace(export.head, prev_decided=False))
     headers = plan_export.sheet_headers(bare)
     assert headers == (
-        "Schlüssel", "Bezeichnung", "Ansatz 2026", "Vermerke", "Gesperrt", "Erläuterung",
+        "Schlüssel",
+        "Bezeichnung",
+        "Ansatz 2026",
+        "Vermerke",
+        "Gesperrt",
+        "Erläuterung",
     )
     assert plan_export.money_columns(bare) == frozenset({2, 4})
     assert all(len(row.cells) == len(headers) for row in plan_export.sheet_rows(bare))
@@ -135,16 +146,39 @@ def test_the_table_of_a_first_plan_with_a_year_before() -> None:
     headers = plan_export.sheet_headers(export)
     rows = plan_export.sheet_rows(export)
     assert headers == (
-        "Schlüssel", "Bezeichnung", "Ansatz 2026", "Ansatz 2025", "Ist 2025",
-        "Vermerke", "Gesperrt", "Erläuterung",
+        "Schlüssel",
+        "Bezeichnung",
+        "Ansatz 2026",
+        "Ansatz 2025",
+        "Ist 2025",
+        "Vermerke",
+        "Gesperrt",
+        "Erläuterung",
     )
     assert plan_export.money_columns(export) == frozenset({2, 3, 4, 6})
     assert [row.kind for row in rows] == [
-        "group", "line", "sum", "group", "line", "line", "sum", "group", "line", "sum", "balance",
+        "group",
+        "line",
+        "sum",
+        "group",
+        "line",
+        "line",
+        "sum",
+        "group",
+        "line",
+        "sum",
+        "balance",
     ]
     assert all(len(row.cells) == len(headers) for row in rows)
     assert rows[5].cells == (
-        "VS-8-9", "Büro alt", D("60"), None, D("30"), "deckungsfähig", D("5"), "IT",
+        "VS-8-9",
+        "Büro alt",
+        D("60"),
+        None,
+        D("30"),
+        "deckungsfähig",
+        D("5"),
+        "IT",
     )
     assert rows[4].cells[6] is None
     assert rows[6].cells[:3] == (None, "Summe Ausgaben", D("60"))
@@ -155,8 +189,14 @@ def test_the_table_of_a_nachtrag_shows_the_version_before_and_the_change() -> No
     """A Nachtrag has the columns of the version before. No year before: no such columns."""
     export = _export(number=2, state="in_progress", prev=None)
     assert plan_export.sheet_headers(export) == (
-        "Schlüssel", "Bezeichnung", "Ansatz 2026", "Ansatz bisher", "Änderung",
-        "Vermerke", "Gesperrt", "Erläuterung",
+        "Schlüssel",
+        "Bezeichnung",
+        "Ansatz 2026",
+        "Ansatz bisher",
+        "Änderung",
+        "Vermerke",
+        "Gesperrt",
+        "Erläuterung",
     )
     rows = plan_export.sheet_rows(export)
     assert rows[1].cells[2:5] == (D("100"), D("80"), D("20"))
@@ -169,7 +209,9 @@ def test_the_head_names_the_version_and_its_state() -> None:
     """A version that is not in force has a mark for each page."""
     draft, nachtrag, decided = _head(), _head(1, "in_progress"), _head(0, "in_force")
     assert (draft.version, draft.title, draft.mark) == (
-        "Haushaltsplan", "Haushaltsplan VS-Mittel 2026", "Entwurf",
+        "Haushaltsplan",
+        "Haushaltsplan VS-Mittel 2026",
+        "Entwurf",
     )
     assert (nachtrag.version, nachtrag.mark) == ("Nachtrag 1", "Im Verfahren")
     assert decided.mark == ""
@@ -222,13 +264,14 @@ def test_the_pdf_request_holds_the_table_as_text() -> None:
     assert plan["rows"][5] == {
         "kind": "line",
         "depth": 1,
+        "leaf": True,
         "cells": ["VS-8-9", "Büro alt", "60,00", "", "30,00", "deckungsfähig", "5,00", "IT"],
     }
     assert plan_export.pdf_source(export) == '---\ntitle: "Haushaltsplan VS-Mittel 2026"\n---\n'
 
 
-def test_the_pdf_shows_the_amounts_of_a_line_with_lines_below_in_brackets() -> None:
-    """Rule: §F/finance/budget/000968. A line without a line below keeps its plain amounts."""
+def test_the_pdf_marks_a_line_with_lines_below_as_grey() -> None:
+    """Rule: §F/finance/budget/000968. Only a line with a line below is not a leaf; no brackets."""
     export = _export()
     expense = export.groups[1]
     assert [(r.key, r.leaf) for r in expense.rows] == [("VS-8", False), ("VS-8-9", True)]
@@ -239,8 +282,17 @@ def test_the_pdf_shows_the_amounts_of_a_line_with_lines_below_in_brackets() -> N
     plan = plan_export.pdf_config(export)["plan"]
     assert isinstance(plan, dict)
     assert plan["rows"][4]["cells"] == [
-        "VS-8", "Zuschüsse", "(60,00)", "(50,00)", "(0,00)", "übertragbar, deckungsfähig", "", "",
+        "VS-8",
+        "Zuschüsse",
+        "60,00",
+        "50,00",
+        "0,00",
+        "übertragbar, deckungsfähig",
+        "",
+        "",
     ]
+    assert [r["leaf"] for r in plan["rows"][4:7]] == [False, True, True]
+    assert not any(c.startswith("(") for r in plan["rows"] for c in r["cells"])
     assert plan["rows"][5]["cells"][2] == "60,00"
     assert plan["rows"][6]["cells"][2] == "60,00"
     assert plan["rows"][1]["cells"][2] == "100,00"
