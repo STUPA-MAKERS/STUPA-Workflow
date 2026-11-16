@@ -15,8 +15,8 @@ scope:
 # A card of a free board goes on the agenda of each of its Gremien
 
 The action `Auf Tagesordnung setzen` (000553) must also show on a card of a free board. It must
-offer the planned meetings of each Gremium that is a member entry of the board and whose agenda
-the person can edit, grouped by Gremium, the next meeting first. A free board without such a
+offer only the planned meetings of the Gremien that have access to the board through a member
+entry, with any role, and whose agenda the person can edit, grouped by Gremium, the next meeting first. A free board without such a
 Gremium must not show the action. A card must still be on at most one agenda (000326).
 
 Reason: A board of several Gremien prepares work for the meetings of each of them.
