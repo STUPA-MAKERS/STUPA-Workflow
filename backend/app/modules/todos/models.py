@@ -1,12 +1,18 @@
 """To-do tables: boards, columns, cards and everything that hangs on a card.
 
-A board has one of three kinds, and the kind decides its owner column:
+A board has one of four kinds, and the kind decides its owner column:
 
 * ``gremium`` — ``gremium_id``; one board per gremium (``uq_todo_board_gremium``).
 * ``personal`` — ``owner_id``; one board per account (``uq_todo_board_owner``).
 * ``team`` — ``permission``; the holders of that global permission.
+* ``free`` — no owner column; its members are its entries only (spec 001060).
 
 ``ck_todo_board_owner`` keeps exactly the owner column of the kind set.
+
+``todo_board_entry`` holds the member entries of a free board and the extra entries of a
+gremium board (specs 001060, 001077): exactly one of ``gremium_id`` and
+``principal_id``, with the role ``read``, ``edit`` or ``manage``. The own gremium of a
+gremium board is no row, it is a fixed member (spec 001078).
 
 A board has exactly one done column (partial unique index ``uq_todo_column_done``).
 A card in the done column carries ``completed_at``; a move out clears it. A card
@@ -55,7 +61,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db import Base, TimestampMixin, UUIDPkMixin
 
 #: The kinds of a board.
-BOARD_KINDS: tuple[str, ...] = ("gremium", "personal", "team")
+BOARD_KINDS: tuple[str, ...] = ("gremium", "personal", "team", "free")
+#: The roles of a member entry, from the lowest to the highest (spec 001062).
+ENTRY_ROLES: tuple[str, ...] = ("read", "edit", "manage")
 #: The colors of a label (a fixed palette of the frontend).
 LABEL_COLORS: tuple[str, ...] = ("green", "blue", "violet", "amber", "red", "gray")
 #: The kinds of a card event.
@@ -137,7 +145,9 @@ class TodoBoard(UUIDPkMixin, TimestampMixin, Base):
             "(kind = 'personal' AND owner_id IS NOT NULL AND gremium_id IS NULL "
             "AND permission IS NULL) OR "
             "(kind = 'team' AND permission IS NOT NULL AND gremium_id IS NULL "
-            "AND owner_id IS NULL)",
+            "AND owner_id IS NULL) OR "
+            "(kind = 'free' AND gremium_id IS NULL AND owner_id IS NULL "
+            "AND permission IS NULL)",
             name="owner",
         ),
         CheckConstraint(
@@ -156,6 +166,47 @@ class TodoBoard(UUIDPkMixin, TimestampMixin, Base):
             unique=True,
             postgresql_where=text("owner_id IS NOT NULL"),
         ),
+    )
+
+
+class TodoBoardEntry(UUIDPkMixin, Base):
+    """A member entry of a board: one gremium or one person, with a role.
+
+    A gremium entry stands for the members of the gremium at the time of the read
+    (spec 001063), so the row names the gremium and never its members.
+    """
+
+    __tablename__ = "todo_board_entry"
+
+    board_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("todo_board.id", ondelete="CASCADE"))
+    gremium_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("gremium.id", ondelete="CASCADE"), nullable=True
+    )
+    principal_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("principal.id", ondelete="CASCADE"), nullable=True
+    )
+    role: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(f"role IN ({_in(ENTRY_ROLES)})", name="role"),
+        CheckConstraint("(gremium_id IS NULL) <> (principal_id IS NULL)", name="target"),
+        Index(
+            "uq_todo_board_entry_gremium",
+            "board_id",
+            "gremium_id",
+            unique=True,
+            postgresql_where=text("gremium_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_todo_board_entry_principal",
+            "board_id",
+            "principal_id",
+            unique=True,
+            postgresql_where=text("principal_id IS NOT NULL"),
+        ),
+        Index("ix_todo_board_entry_gremium_id", "gremium_id"),
+        Index("ix_todo_board_entry_principal_id", "principal_id"),
     )
 
 

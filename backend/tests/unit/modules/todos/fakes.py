@@ -179,6 +179,10 @@ class FakeAccess:
     async def member_ids(self, _board: TodoBoard) -> set[uuid.UUID]:
         return set(self.member_set)
 
+    async def agenda_gremien(self, board: TodoBoard) -> set[uuid.UUID]:
+        """The own gremium of a gremium board; the fake has no entries."""
+        return {board.gremium_id} if board.kind == "gremium" and board.gremium_id else set()
+
 
 class FakeLinks:
     """``LinkResolver`` with fixed answers."""

@@ -387,6 +387,13 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         todos.TODO_DUE_PLACEHOLDERS,
     ),
     MailTemplateSpec(
+        todos.TODO_BOARD_ADDED_KEY,
+        todos.TODO_BOARD_ADDED_KEY,
+        todos.TODO_BOARD_ADDED_SUBJECT,
+        todos.TODO_BOARD_ADDED_BODY,
+        todos.TODO_BOARD_ADDED_PLACEHOLDERS,
+    ),
+    MailTemplateSpec(
         mentions.TICKET_MENTIONED_KEY,
         mentions.MENTION_KIND,
         mentions.TICKET_MENTIONED_SUBJECT,
