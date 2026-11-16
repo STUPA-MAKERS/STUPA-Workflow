@@ -1197,8 +1197,7 @@ class PlanOps(NodeOps, AllocationOps):
         wanted = payload.predecessor_id
         if wanted is not None:
             await self._check_predecessor(fy, top, nodes, lines, line, wanted)
-        before = line.predecessor_id
-        line.predecessor_id = wanted
+        before = self._name_predecessor(line, wanted)
         await self._audit(
             AuditAction.BUDGET_PLAN_LINE_SET,
             target_type="budget_plan",
@@ -1216,6 +1215,13 @@ class PlanOps(NodeOps, AllocationOps):
             },
         )
         return await self._plan_out(plan, top.id)
+
+    @staticmethod
+    def _name_predecessor(line: BudgetPlanLine, wanted: UUID | None) -> UUID | None:
+        """Give a line its Vorgänger and return the one it had."""
+        before = line.predecessor_id
+        line.predecessor_id = wanted
+        return before
 
     async def _check_predecessor(
         self,

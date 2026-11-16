@@ -302,6 +302,13 @@
       "to": "Budget"
     },
     {
+      "column": "predecessor_id",
+      "from": "BudgetPlanLine",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Budget"
+    },
+    {
       "column": "version_id",
       "from": "BudgetPlanLine",
       "multiplicity": "*",
@@ -2664,6 +2671,12 @@
           "nullable": false,
           "primaryKey": false,
           "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "predecessor_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
         },
         {
           "name": "id",
