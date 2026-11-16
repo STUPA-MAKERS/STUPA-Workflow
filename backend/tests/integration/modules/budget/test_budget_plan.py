@@ -884,7 +884,7 @@ async def test_a_line_compares_with_its_predecessor(session: AsyncSession) -> No
 
 
 
-def _by_hand(version: PlanVersionOut) -> dict[uuid.UUID, tuple[Decimal | None, Decimal | None]]:
+def _year_before_by_hand(version: PlanVersionOut) -> dict[uuid.UUID, tuple[Decimal | None, Decimal | None]]:
     return {line.budget_id: (line.prev_amount, line.prev_actual) for line in version.lines}
 
 
@@ -908,7 +908,7 @@ async def test_a_line_sets_the_year_before_by_hand(session: AsyncSession) -> Non
         )
 
     plan = await t.svc.set_year_before(draft.id, t.exp_a.id, values("70.00", "55.50"))
-    assert _by_hand(_version(plan))[t.exp_a.id] == (D("70.00"), D("55.50"))
+    assert _year_before_by_hand(_version(plan))[t.exp_a.id] == (D("70.00"), D("55.50"))
     await t.svc.set_year_before(draft.id, t.inc.id, values(None, "90.00"))
     await session.commit()
     export = await t.svc.plan_export(draft.id, today)
@@ -920,7 +920,7 @@ async def test_a_line_sets_the_year_before_by_hand(session: AsyncSession) -> Non
     assert rows["Beiträge"] == (None, D("90.00"))
 
     plan = await t.svc.set_year_before(draft.id, t.inc.id, values(None, None))
-    assert _by_hand(_version(plan))[t.inc.id] == (None, None)
+    assert _year_before_by_hand(_version(plan))[t.inc.id] == (None, None)
     with pytest.raises(ValidationProblem) as exc:
         await t.svc.set_year_before(draft.id, uuid.uuid4(), values("1.00", None))
     assert _code(exc) == "plan_line_missing"
@@ -933,12 +933,12 @@ async def test_a_line_sets_the_year_before_by_hand(session: AsyncSession) -> Non
         await t.svc.set_year_before(draft.id, t.exp_a.id, values(None, None))
     assert _code(conflict) == "plan_version_locked"
     nachtrag = _version(await t.svc.create_nachtrag(t.top.id, t.fy.id))
-    assert _by_hand(nachtrag)[t.exp_a.id] == (D("70.00"), D("55.50"))
+    assert _year_before_by_hand(nachtrag)[t.exp_a.id] == (D("70.00"), D("55.50"))
 
     nxt = await t.svc.create_fiscal_year(t.top.id, FiscalYearCreate(year=2027))
     await session.commit()
     copy = _version(await t.svc.get_plan(t.top.id, nxt.id))
-    assert set(_by_hand(copy).values()) <= {(None, None)}
+    assert set(_year_before_by_hand(copy).values()) <= {(None, None)}
 
 
 async def test_a_line_with_bookings_is_not_removed(session: AsyncSession) -> None:
