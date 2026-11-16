@@ -1651,7 +1651,7 @@ describe('BudgetPlanComponent', () => {
       const view = await setup({ plans: { 'fy-26': plan(), 'fy-25': before }, query: { costCentre: 'grants' } });
       await userEvent.click(await waitFor(() => select()));
       const options = (await screen.findAllByRole('option')).map((o) => text(o));
-      expect(options).toEqual(['Kein Vorgänger', 'STAFF · Personal', 'GRANTS · Zuschüsse']);
+      expect(options).toEqual(['Kein Vorgänger', 'GRANTS · Zuschüsse', 'STAFF · Personal']);
       await userEvent.click(screen.getByRole('option', { name: 'STAFF · Personal' }));
       expect(view.api.setPredecessor).toHaveBeenCalledWith('v0', 'grants', 'staff');
     });

@@ -1377,7 +1377,7 @@ export class BudgetPlanComponent {
 
   /**
    * The choices for the Vorgänger of a row (001040): the lines of the plan in force of the
-   * year before on the side of the row. A line that another row names is not choosable.
+   * year before on the side of the row, by key. A line that another row names is not choosable.
    */
   predecessorOptions(row: PlanRow): SelectOption[] {
     const taken = new Set(this.rows().flatMap((r) => (r.id !== row.id && r.predecessorId ? [r.predecessorId] : [])));
@@ -1386,8 +1386,10 @@ export class BudgetPlanComponent {
       .map((l) => {
         const node = findNode(this.tree(), l.budgetId);
         const key = simplifyPathKey(l.pathKey ?? node?.pathKey ?? '');
-        return { value: l.budgetId, label: `${key} · ${l.name ?? node?.name ?? ''}`, disabled: taken.has(l.budgetId) };
-      });
+        return { value: l.budgetId, key, label: `${key} · ${l.name ?? node?.name ?? ''}`, disabled: taken.has(l.budgetId) };
+      })
+      .sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }))
+      .map(({ value, label, disabled }) => ({ value, label, disabled }));
   }
 
   /** Name the Vorgänger of a draft line, or clear it with the empty choice (001040). */
