@@ -218,6 +218,41 @@ describe('FormsListComponent', () => {
       expect(updateApplicationType).toHaveBeenCalledTimes(2);
     });
 
+    it('ignores a save or delete while one runs, and without a target', async () => {
+      const createApplicationTypeGroup = jest.fn();
+      const deleteApplicationTypeGroup = jest.fn();
+      const updateApplicationType = jest.fn();
+      const { c } = await setupGroups({ createApplicationTypeGroup, deleteApplicationTypeGroup, updateApplicationType });
+      c.patchGroup('nameDe', 'X');
+      c.saveGroup(new Event('submit'));
+      c.deleteGroup();
+      c.openGroupCreate();
+      c.patchGroup('nameDe', 'X');
+      c.saving.set(true);
+      c.saveGroup(new Event('submit'));
+      c.typeAction(grouped()[2], { id: 'group', label: '' });
+      c.regroupTo.set('gA');
+      c.saveRegroup();
+      c.groupAction(GROUPS[0], { id: 'delete', label: '' });
+      c.deleting.set(true);
+      c.deleteGroup();
+      c.typeAction(grouped()[0], { id: 'unknown', label: '' });
+      expect(createApplicationTypeGroup).not.toHaveBeenCalled();
+      expect(deleteApplicationTypeGroup).not.toHaveBeenCalled();
+      expect(updateApplicationType).not.toHaveBeenCalled();
+    });
+
+    it('names a group without a name and puts a type of an unknown group last', async () => {
+      const { c } = await setupGroups({
+        listApplicationTypeGroups: jest.fn(() => of([{ id: 'gX', name: {}, text: {}, position: 0 }])),
+        listApplicationTypesFull: jest.fn(() => of([{ ...type('f9', 'Lost'), groupId: 'gone', position: 0 }])),
+      });
+      expect(c.groupName(c.groups()[0])).toBe('Unbenanntes Formular');
+      expect(c.groupText(c.groups()[0])).toBe('');
+      expect(c.blocks().map((b: { id: string }) => b.id)).toEqual(['gX', 'other']);
+      expect(c.blocks()[1].types.map((t: { id: string }) => t.id)).toEqual(['f9']);
+    });
+
     it('offers no group actions without admin.types', async () => {
       const { c } = await setupGroups({}, ['admin.types_delete']);
       expect(screen.queryByRole('button', { name: 'Gruppe anlegen' })).not.toBeInTheDocument();

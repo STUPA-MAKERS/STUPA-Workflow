@@ -1943,7 +1943,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith(`/application-types/${MOCK_TYPES.items[2].id}/form`)) return ok(MOCK_QSM_FORM);
     if (/\/application-types\/[^/]+\/form$/.test(p)) return ok(MOCK_EFFECTIVE_FORM);
     if (p.endsWith('/application-types')) return ok(MOCK_TYPES);
-    if (p.endsWith('/application-type-groups') && !p.includes('/admin/')) return ok(MOCK_TYPE_GROUPS);
+    if (p.endsWith('/application-type-groups')) return ok(MOCK_TYPE_GROUPS);
     if (p.endsWith('/meetings/timeline')) {
       const { past, upcoming } = mockTimeline();
       const q = (req.params.get('q') ?? '').trim().toLowerCase();

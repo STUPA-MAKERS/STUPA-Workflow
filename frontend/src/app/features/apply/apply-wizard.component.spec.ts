@@ -828,6 +828,12 @@ describe('ApplyWizardComponent', () => {
       expect(screen.getByRole('radio', { name: 'Förderantrag' })).toBeInTheDocument();
     });
 
+    it('shows no Weitere Anträge when every type has a group', async () => {
+      const s = await setup({ types: () => of(GROUPED.slice(0, 2)), groups: () => of(GROUPS) });
+      expect(s.comp.typeBlocks().map((b) => b.id)).toEqual(['g1', 'g2']);
+      expect(screen.queryByText('Weitere Anträge')).not.toBeInTheDocument();
+    });
+
     it('shows one list when the groups fail to load', async () => {
       const s = await setup({ types: () => of(GROUPED), groups: () => throwError(() => new Error('x')) });
       expect(s.comp.typeBlocks().length).toBe(1);

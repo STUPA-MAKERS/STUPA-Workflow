@@ -386,8 +386,8 @@ describe('AdminApiService — real mode (contract)', () => {
       { id: 't1', nameI18n: { de: 'X' }, gremiumId: 'g1', hasBudget: true, retentionMonths: 12, activeFormVersionId: 'fv' },
       { id: 't2' },
     ]);
-    expect(out![0]).toEqual({ id: 't1', name: { de: 'X' }, gremiumId: 'g1', hasBudget: true, pdfSignatures: false, retentionMonths: 12, activeFormVersionId: 'fv', activeFormVersion: null });
-    expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, hasBudget: false, pdfSignatures: false, retentionMonths: null, activeFormVersionId: null, activeFormVersion: null });
+    expect(out![0]).toEqual({ id: 't1', name: { de: 'X' }, gremiumId: 'g1', hasBudget: true, pdfSignatures: false, retentionMonths: 12, activeFormVersionId: 'fv', activeFormVersion: null, groupId: null, position: 0 });
+    expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, hasBudget: false, pdfSignatures: false, retentionMonths: null, activeFormVersionId: null, activeFormVersion: null, groupId: null, position: 0 });
   });
 
   it('maps the number of the active form version', () => {
@@ -1067,6 +1067,43 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
 
     await firstValueFrom(s.deleteApplicationType(created.id));
     expect((await firstValueFrom(s.listApplicationTypesFull())).some((t) => t.id === created.id)).toBe(false);
+  });
+
+  /** Groups of Antragsarten in the mock store: CRUD, moves, group change, delete (spec 001180, 001183). */
+  it('keeps groups and the type order in the mock store', async () => {
+    const s = svc();
+    const groups = await firstValueFrom(s.listApplicationTypeGroups());
+    expect(groups.map((g) => g.id)).toEqual(['atg-projekte', 'atg-spezial']);
+
+    const created = await firstValueFrom(s.createApplicationTypeGroup({ name: { de: 'Neu' }, text: { de: 'T' } }));
+    expect(created.position).toBe(2);
+    const renamed = await firstValueFrom(s.updateApplicationTypeGroup(created.id, { name: { de: 'Neu 2' }, text: {} }));
+    expect(renamed.name).toEqual({ de: 'Neu 2' });
+    await expect(firstValueFrom(s.updateApplicationTypeGroup('ghost', { name: { de: 'X' }, text: {} }))).rejects.toEqual({ status: 404 });
+
+    const up = await firstValueFrom(s.moveApplicationTypeGroup(created.id, -1));
+    expect(up.map((g) => g.id)).toEqual(['atg-projekte', created.id, 'atg-spezial']);
+    const edge = await firstValueFrom(s.moveApplicationTypeGroup('atg-projekte', -1));
+    expect(edge[0].id).toBe('atg-projekte');
+    await firstValueFrom(s.moveApplicationTypeGroup('ghost', 1));
+
+    const moved = await firstValueFrom(s.moveApplicationType('f-foerderung', 1));
+    const inGroup = moved.filter((t) => t.groupId === 'atg-projekte').map((t) => t.id);
+    expect(inGroup).toEqual(['f-veranstaltung', 'f-foerderung']);
+    await firstValueFrom(s.moveApplicationType('ghost', 1));
+
+    await firstValueFrom(s.updateApplicationType('f-anschaffung', { groupId: created.id }));
+    await firstValueFrom(s.updateApplicationType('f-anschaffung', { groupId: created.id }));
+    const regrouped = await firstValueFrom(s.listApplicationTypesFull());
+    expect(regrouped.find((t) => t.id === 'f-anschaffung')).toMatchObject({ groupId: created.id, position: 0 });
+
+    const grouped = await firstValueFrom(s.createApplicationType({ key: 'g', name: { de: 'G' }, groupId: created.id }));
+    expect(grouped).toMatchObject({ groupId: created.id, position: 1 });
+
+    await firstValueFrom(s.deleteApplicationTypeGroup(created.id));
+    const types = await firstValueFrom(s.listApplicationTypesFull());
+    expect(types.filter((t) => !t.groupId).map((t) => t.id).sort()).toEqual(['f-anschaffung', grouped.id].sort());
+    expect((await firstValueFrom(s.listApplicationTypeGroups())).some((g) => g.id === created.id)).toBe(false);
   });
 
   it('loads a known form draft and an empty stub for an unknown type', async () => {
