@@ -28,7 +28,13 @@ is authorized server-side by YOUR permissions ∩ the granted scope — a tool m
 if your account lacks the permission; that is expected, not a bug.
 
 HARD RULE: you can create/open/close/manage votes, but you can NEVER cast a ballot — there is
-no such tool and the server refuses it. Voting is reserved for humans.
+no such tool and the server refuses it. Voting is reserved for humans. The objection to an
+Umlaufverfahren, a backup, an account merge, the run of a privacy erasure and the login
+lifetime are human-only too. Every other function of the app has a tool.
+
+FINDING THINGS: `search(q)` searches like the command palette. Files (PDF, XLSX, images)
+never enter the chat: the `download_*`/`export_*` tools write them to a local path, and
+`upload_*` tools read a local path.
 
 TYPICAL FLOWS:
 - Decide on an application: `list_applications` → `get_application` → `list_transitions`
@@ -100,12 +106,24 @@ TYPICAL FLOWS:
   board with all its cards. Writes need the scope `todos:write` (the gremium right
   `todo.write` or the global `todo.all`); `read` reads only with the global `todo.read_all`
   (403 `todo_write_required` on a write; `canWrite` false).
+- To-do card parts: subtasks are the checklist of a card — `todo_checklist_add`,
+  `todo_checklist_update(card_id, item_id, done=True)` ticks one, `todo_checklist_remove`;
+  `todo_card_create` takes `checklist` too. `todo_card_assignee_add/_remove`,
+  `todo_card_label_add/_remove`, `todo_card_link_add/_remove`, `todo_card_event_set` (an
+  Event with its Reihe from `todo_series`), `todo_card_archive`/`_restore`. Board setup
+  (`manage`): `todo_column_*`, `todo_label_*`, `todo_board_update`.
+- Gremien and Kalender: `gremien_overview`, `gremium_members`, `gremium_decisions`,
+  `gremium_attendance`, `get_gremium_info`/`set_gremium_info`; `calendar_entries`,
+  `create_appointment` (a Termin with invitations), `answer_appointment`.
+- Votes without a meeting: `create_gremium_vote` (a poll, or `kind: "circular"` for an
+  Umlaufverfahren), `list_votes`.
 - Tickets (help menu reports, `ticket.manage` and scope `tickets:write`): `tickets_list` →
   `tickets_get` → `tickets_note` (internal) or `tickets_update` (status, assignee, kind).
   `tickets_block_sender(ticket_id)` / `tickets_unblock_sender(ticket_id)` block the reporter
   ("Absender sperren": later reports get a number and are dropped);
   `tickets_blocked_senders` lists the blocks, `tickets_delete_blocked_sender(block_id)`
-  lifts one whose ticket is gone or anonymized.
+  lifts one whose ticket is gone or anonymized. As a reporter: `tickets_report`,
+  `tickets_mine`, `tickets_mine_note`.
 - Chat files: `tickets_note`, `todo_comment` and `comment_application` take
   `file_paths` (local files, at most 5, same types and 10 MB cap as `upload_attachment`;
   the body may then be empty). The tool uploads each file as a draft and binds it to the

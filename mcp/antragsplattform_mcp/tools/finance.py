@@ -12,6 +12,7 @@ from .. import schemas as S
 from ..client import ApiError
 from ..schemas import dump_create, dump_patch
 from ._common import ToolGroup, api, params
+from .meetings import download_to
 
 group = ToolGroup()
 
@@ -163,6 +164,20 @@ async def list_sub_bookings(expense_id: str) -> dict:
     Requires budget.view or budget.book.
     """
     return await api().get(f"/budget-expenses/{expense_id}/sub-bookings")
+
+
+@group.tool
+async def download_invoice_file(
+    invoice_id: str, target_path: str, overwrite: bool = False
+) -> dict:
+    """Download the original receipt (PDF) of an invoice to a local file."""
+    return await download_to(
+        "GET",
+        f"/invoices/{invoice_id}/file",
+        target_path,
+        overwrite=overwrite,
+        fallback=f"rechnung-{invoice_id}.pdf",
+    )
 
 
 def register(mcp: FastMCP) -> None:

@@ -1,4 +1,4 @@
-"""To-do board tools: boards, member entries, cards, moves and comments.
+"""To-do board tools: boards, columns, labels, member entries, cards, checklists and comments.
 
 A person has a role on a board: `read`, `edit` or `manage`. A gremium board: each active
 member of the gremium edits, a member whose gremium role holds `todo.configure` manages,
@@ -295,6 +295,317 @@ async def todo_comment(
         file_paths,
     )
 
+
+
+@group.tool
+async def todo_comment_edit(
+    card_id: str, comment_id: str, body: str, mentions: list[str] | None = None
+) -> dict:
+    """Change the text and the mentions of an own comment; its files stay.
+
+    403 `not_comment_author` for the comment of another person. A new mention gets a mail.
+    """
+    return await api().patch(
+        f"/todos/cards/{card_id}/comments/{comment_id}",
+        json={"body": body, "mentions": mentions or []},
+    )
+
+
+@group.tool
+async def todo_comment_delete(card_id: str, comment_id: str) -> dict:
+    """Delete an own comment and its files (403 `not_comment_author` otherwise)."""
+    await api().delete(f"/todos/cards/{card_id}/comments/{comment_id}")
+    return {"deleted": True}
+
+
+@group.tool
+async def todo_cards_get(card_ids: list[str]) -> list:
+    """Read up to 50 whole cards in one call, in the given order.
+
+    A card that the caller cannot read is left out (where `todo_card_get` gives 404).
+    """
+    return await api().get("/todos/cards", params={"ids": card_ids})
+
+
+@group.tool
+async def todo_card_archive(card_id: str) -> dict:
+    """Archive a card. `todo_card_restore` brings it back."""
+    await api().delete(f"/todos/cards/{card_id}")
+    return {"archived": True}
+
+
+@group.tool
+async def todo_card_restore(card_id: str) -> dict:
+    """Bring an archived card back onto its board."""
+    return await api().post(f"/todos/cards/{card_id}/restore")
+
+
+@group.tool
+async def todo_card_assignee_add(card_id: str, principal_id: str) -> dict:
+    """Assign a member of the board to a card; the person gets the mail `todo_assigned`.
+
+    A person who is not a member of the board gives 422 `assignee_not_allowed`. The
+    members are in `todo_board_members`.
+    """
+    return await api().post(
+        f"/todos/cards/{card_id}/assignees", json={"principalId": principal_id}
+    )
+
+
+@group.tool
+async def todo_card_assignee_remove(card_id: str, principal_id: str) -> dict:
+    """Remove an assignee from a card."""
+    return await api().delete(f"/todos/cards/{card_id}/assignees/{principal_id}")
+
+
+@group.tool
+async def todo_card_label_add(card_id: str, label_id: str) -> dict:
+    """Put a label of the board on a card (422 `label_not_on_board` otherwise)."""
+    return await api().post(f"/todos/cards/{card_id}/labels", json={"labelId": label_id})
+
+
+@group.tool
+async def todo_card_label_remove(card_id: str, label_id: str) -> dict:
+    """Take a label off a card."""
+    return await api().delete(f"/todos/cards/{card_id}/labels/{label_id}")
+
+
+@group.tool
+async def todo_checklist_add(card_id: str, text: str) -> dict:
+    """Append a checklist item (a subtask) to a card.
+
+    `text` has 1 to 500 characters. Returns the whole card; the new item is the last of
+    `checklist`. Requires write access to the board.
+    """
+    return await api().post(f"/todos/cards/{card_id}/checklist", json={"text": text})
+
+
+@group.tool
+async def todo_checklist_update(
+    card_id: str,
+    item_id: str,
+    text: str | None = None,
+    done: bool | None = None,
+    position: int | None = None,
+) -> dict:
+    """Rename, tick, untick or move a checklist item (a subtask) of a card.
+
+    Args:
+        item_id: The id of the item in `checklist` of `todo_card_get`.
+        text: The new text, 1 to 500 characters.
+        done: true ticks the item, false unticks it.
+        position: The new place in the list, counted from 0.
+    """
+    return await api().patch(
+        f"/todos/cards/{card_id}/checklist/{item_id}",
+        json=params(text=text, done=done, position=position),
+    )
+
+
+@group.tool
+async def todo_checklist_remove(card_id: str, item_id: str) -> dict:
+    """Delete a checklist item (a subtask) of a card."""
+    return await api().delete(f"/todos/cards/{card_id}/checklist/{item_id}")
+
+
+@group.tool
+async def todo_link_targets(
+    q: str = "", kind: S.TodoLinkKind | None = None, exclude_card_id: str | None = None
+) -> list:
+    """Find link targets that the caller can read, by text (at most 5 per kind).
+
+    Below two characters, the kind `todo` lists the newest cards.
+
+    Args:
+        q: Search text.
+        kind: One kind only (default: all kinds).
+        exclude_card_id: Leave this card out of the `todo` hits.
+    """
+    return await api().get(
+        "/todos/link-targets",
+        params=params(q=q, kind=kind or "all", excludeCardId=exclude_card_id),
+    )
+
+
+@group.tool
+async def todo_card_link_add(card_id: str, link: S.TodoLinkIn) -> dict:
+    """Link a card to an object that the caller can read (422 `link_target_not_found`)."""
+    return await api().post(
+        f"/todos/cards/{card_id}/links", json=link.model_dump(exclude_none=True)
+    )
+
+
+@group.tool
+async def todo_card_link_remove(card_id: str, link_id: str) -> dict:
+    """Remove a link of a card; `link_id` is the id in `links` of `todo_card_get`."""
+    return await api().delete(f"/todos/cards/{card_id}/links/{link_id}")
+
+
+@group.tool
+async def todo_card_link_view(card_id: str, link_id: str) -> dict:
+    """Read the linked object of a card as a reader of the card sees it."""
+    return await api().get(f"/todos/cards/{card_id}/links/{link_id}/view")
+
+
+@group.tool
+async def todo_linked(kind: S.TodoLinkKind, target_id: str) -> list:
+    """List the cards that link an object (the back-references of the object)."""
+    return await api().get("/todos/linked", params={"kind": kind, "targetId": target_id})
+
+
+@group.tool
+async def todo_card_event_set(card_id: str, event: S.TodoEventIn) -> dict:
+    """Set the event data of a card: dates, times, place, participants and the Reihe.
+
+    The card becomes an Event (Veranstaltung) for good; an Event never becomes a to-do
+    again (409 `event_permanent`).
+    """
+    return await api().put(f"/todos/cards/{card_id}/event", json=dump_create(event))
+
+
+@group.tool
+async def todo_card_follow_up(card_id: str) -> dict:
+    """Create the next edition of an Event ("Folgeveranstaltung anlegen")."""
+    return await api().post(f"/todos/cards/{card_id}/follow-up")
+
+
+@group.tool
+async def todo_series(q: str | None = None) -> list:
+    """List the Reihen of Events by name (at most 50)."""
+    return await api().get("/todos/series", params=params(q=q))
+
+
+@group.tool
+async def todo_series_create(name: str) -> dict:
+    """Create a Reihe for Events; the name is unique, case ignored (409 `series_exists`)."""
+    return await api().post("/todos/series", json={"name": name})
+
+
+@group.tool
+async def todo_events(q: str | None = None) -> list:
+    """List the live Events on the boards that the caller writes (the Veranstaltung picker)."""
+    return await api().get("/todos/events", params=params(q=q))
+
+
+@group.tool
+async def todo_mine() -> dict:
+    """The open cards assigned to the caller, with the count due within 7 days."""
+    return await api().get("/todos/mine")
+
+
+@group.tool
+async def todo_board_update(
+    board_id: str, name: str | None = None, archive_after_days: int | None = None
+) -> dict:
+    """Rename a board or change the days after which done cards go to the archive.
+
+    Requires `manage` on the board (403 `todo_configure_required`).
+
+    Args:
+        name: 1 to 120 characters.
+        archive_after_days: 1 to 365.
+    """
+    return await api().patch(
+        f"/todos/boards/{board_id}",
+        json=params(name=name, archiveAfterDays=archive_after_days),
+    )
+
+
+@group.tool
+async def todo_board_members(board_id: str) -> list:
+    """List the people who can be assigned on a board (also the @-mention list)."""
+    return await api().get(f"/todos/boards/{board_id}/members")
+
+
+@group.tool
+async def todo_board_archived_cards(
+    board_id: str,
+    q: str | None = None,
+    events: bool = False,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> dict:
+    """List the archived cards of a board, newest archive first (paged).
+
+    Args:
+        q: Search text.
+        events: true lists only the Events.
+    """
+    return await api().get(
+        f"/todos/boards/{board_id}/archive",
+        params=params(q=q, events=events or None, limit=limit, offset=offset),
+    )
+
+
+@group.tool
+async def todo_entry_options(q: str = "") -> dict:
+    """Find gremien and persons for a member entry of a free board."""
+    return await api().get("/todos/entry-options", params={"q": q})
+
+
+@group.tool
+async def todo_column_add(board_id: str, name: str) -> dict:
+    """Append a column to a board (1 to 60 characters; requires `manage`)."""
+    return await api().post(f"/todos/boards/{board_id}/columns", json={"name": name})
+
+
+@group.tool
+async def todo_column_update(
+    board_id: str, column_id: str, name: str | None = None, is_done: bool | None = None
+) -> dict:
+    """Rename a column, or make it the done column with `is_done=True` (requires `manage`)."""
+    return await api().patch(
+        f"/todos/boards/{board_id}/columns/{column_id}",
+        json=params(name=name, isDone=True if is_done else None),
+    )
+
+
+@group.tool
+async def todo_columns_order(board_id: str, column_ids: list[str]) -> dict:
+    """Order the columns of a board; the list names every column once (requires `manage`)."""
+    return await api().put(
+        f"/todos/boards/{board_id}/columns/order", json={"columnIds": column_ids}
+    )
+
+
+@group.tool
+async def todo_column_delete(board_id: str, column_id: str, move_to: str | None = None) -> dict:
+    """Delete a column (requires `manage`).
+
+    A column with cards needs `move_to`, the column that takes them (409
+    `column_not_empty` without).
+    """
+    return await api().delete(
+        f"/todos/boards/{board_id}/columns/{column_id}", params=params(moveTo=move_to)
+    )
+
+
+@group.tool
+async def todo_label_add(board_id: str, name: str, color: S.TodoLabelColor) -> dict:
+    """Add a label to a board (requires `manage`; a taken name gives 409 `label_exists`)."""
+    return await api().post(
+        f"/todos/boards/{board_id}/labels", json={"name": name, "color": color}
+    )
+
+
+@group.tool
+async def todo_label_update(
+    board_id: str,
+    label_id: str,
+    name: str | None = None,
+    color: S.TodoLabelColor | None = None,
+) -> dict:
+    """Rename a label or change its color (requires `manage`)."""
+    return await api().patch(
+        f"/todos/boards/{board_id}/labels/{label_id}", json=params(name=name, color=color)
+    )
+
+
+@group.tool
+async def todo_label_delete(board_id: str, label_id: str) -> dict:
+    """Delete a label of a board (requires `manage`)."""
+    await api().delete(f"/todos/boards/{board_id}/labels/{label_id}")
+    return {"deleted": True}
 
 def register(mcp: FastMCP) -> None:
     """Register the to-do tool group."""

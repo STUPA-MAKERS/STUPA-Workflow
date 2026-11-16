@@ -12,7 +12,8 @@ from mcp.server.fastmcp import FastMCP
 
 from .. import schemas as S
 from ..schemas import dump_create, dump_patch
-from ._common import ToolGroup, api
+from ._common import ToolGroup, api, params
+from .meetings import download_to
 
 group = ToolGroup()
 
@@ -248,6 +249,46 @@ async def set_plan_state(version_id: str, state: Literal["in_force", "draft"]) -
     budget.structure.
     """
     return await api().post(f"/budget-plan-versions/{version_id}/state", json={"state": state})
+
+
+@group.tool
+async def set_plan_state_by_hand(
+    version_id: str,
+    state: Literal["draft", "in_progress", "in_force"],
+    reason: str,
+    step: int | None = None,
+) -> dict:
+    """Set the state of the newest version of a plan by hand, with a reason.
+
+    `step` names the step that a version `in_progress` waits for, by its place from 0.
+    The audit log records the reason. Ask the user before you call this.
+    """
+    return await api().put(
+        f"/budget-plan-versions/{version_id}/state",
+        json=params(state=state, step=step, reason=reason),
+    )
+
+
+@group.tool
+async def plan_version_readable(version_id: str) -> dict:
+    """Tell whether the caller reads the Haushaltsplan that holds a version."""
+    return await api().get(f"/budget-plan-versions/{version_id}/readable")
+
+
+@group.tool
+async def export_plan_version(
+    version_id: str,
+    target_path: str,
+    file_format: Literal["pdf", "xlsx"] = "pdf",
+    overwrite: bool = False,
+) -> dict:
+    """Download a version of a Haushaltsplan as PDF or `.xlsx` to a local file."""
+    path = f"/budget-plan-versions/{version_id}/export.pdf"
+    if file_format == "xlsx":
+        path = f"/budget-plan-versions/{version_id}/export.xlsx"
+    return await download_to(
+        "GET", path, target_path, overwrite=overwrite, fallback=f"haushaltsplan.{file_format}"
+    )
 
 
 def register(mcp: FastMCP) -> None:

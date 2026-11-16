@@ -103,15 +103,26 @@ board), `todo_all_boards` (every readable board with all its cards), `todo_card_
 `todo_card_move`, `todo_card_transfer` (to another board, optionally between two
 neighbors), `todo_comment`, `todo_board_create` (a free board), `todo_board_entries`,
 `todo_board_entry_add`, `todo_board_entry_update`, `todo_board_entry_remove`,
-`todo_board_archive`, `todo_board_restore`, `todo_board_delete`.
+`todo_board_archive`, `todo_board_restore`, `todo_board_delete`, the checklist (subtasks)
+`todo_checklist_add`, `todo_checklist_update`, `todo_checklist_remove`, the card parts
+(`todo_card_assignee_*`, `todo_card_label_*`, `todo_card_link_*`, `todo_card_event_set`,
+`todo_card_archive`, `todo_card_restore`) and the board setup (`todo_column_*`,
+`todo_label_*`, `todo_board_update`).
+Gremien and Kalender: `gremien_overview`, `gremium_members`, `gremium_decisions`,
+`gremium_attendance`, `get_gremium_info`, `set_gremium_info`, `calendar_entries`,
+`create_appointment`, `answer_appointment`.
+Search and profile: `search`, `get_profile`.
 Tickets: `tickets_list`, `tickets_get`, `tickets_note`, `tickets_update`,
 `tickets_block_sender`, `tickets_unblock_sender`, `tickets_blocked_senders`,
-`tickets_delete_blocked_sender` (need `ticket.manage`).
+`tickets_delete_blocked_sender` (need `ticket.manage`); as a reporter `tickets_report`,
+`tickets_mine`, `tickets_mine_note`.
 Audit: `list_audit`, `verify_audit_chain` (live), `get_latest_audit_verification` (stored).
 
-The list above is not complete. The server has about 185 tools in the modules of
+The list above is not complete. The server has about 400 tools in the modules of
 `antragsplattform_mcp/tools/`, also for flow and form editing, protocols, delegations,
-budget structure and the admin pages. `.claude/skills/mcp/SKILL.md` maps each tool group to
+budget structure, downloads to a local file and the admin pages. Every API route that a
+page of the app uses has a tool, except the closed exclusion list of spec 001201;
+`tests/test_route_parity.py` checks it. `.claude/skills/mcp/SKILL.md` maps each tool group to
 its backend route.
 
 ## Token cache
