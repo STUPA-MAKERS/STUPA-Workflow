@@ -1,0 +1,108 @@
+:host {
+  display: block;
+}
+
+.pf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.pf__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.pf__avatar {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.pf__avatar--link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.pf__avatar--link:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+// A pointer: the link symbol covers the image on hover and on keyboard focus.
+.pf__ext {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  opacity: 0;
+  transition: opacity var(--motion-xs) var(--ease-standard);
+}
+
+.pf__avatar--link:hover .pf__ext,
+.pf__avatar--link:focus-visible .pf__ext {
+  opacity: 1;
+}
+
+// A touch screen has no hover: a small badge on the corner shows the link always.
+@media (hover: none) {
+  .pf__ext {
+    inset: auto -4px -4px auto;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--color-surface-1);
+    background: var(--color-surface-3);
+    opacity: 1;
+  }
+}
+
+.pf__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pf__name {
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-lg);
+}
+
+.pf__mail {
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.pf__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pf__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-4);
+  row-gap: var(--space-1);
+  padding-block: var(--space-2);
+}
+
+.pf__label {
+  flex: 0 0 auto;
+  font-weight: var(--fw-medium);
+}
+
+.pf__value {
+  flex: 1 1 12rem;
+  min-width: 0;
+  color: var(--color-text-muted);
+  text-align: end;
+  overflow-wrap: anywhere;
+}

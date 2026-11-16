@@ -67,6 +67,7 @@ def _id_token(nonce: str) -> str:
             "exp": now + timedelta(hours=1),
             "email": "cb@x.de",
             "name": "Callback User",
+            "given_name": "Callback",
             "nonce": nonce,
         },
         _KEY,
@@ -139,6 +140,7 @@ async def test_callback_persists_principal_then_me_returns_200(
                 assert callback.status_code == 307, callback.text
                 assert settings.session_cookie_name in callback.cookies
                 me = await client.get("/api/auth/me")
+                profile = await client.get("/api/auth/me/profile")
     finally:
         await engine.dispose()
 
@@ -146,3 +148,13 @@ async def test_callback_persists_principal_then_me_returns_200(
     body = me.json()
     assert body["sub"] == "user-cb-1"
     assert body["email"] == "cb@x.de"
+
+    assert profile.status_code == 200, profile.text
+    page = profile.json()
+    assert page["sub"] == "user-cb-1"
+    assert page["last_login"] is not None
+    claims = {c["key"]: c["value"] for c in page["claims"]}
+    assert claims["given_name"] == "Callback"
+    assert claims["email"] == "cb@x.de"
+    assert "nonce" not in claims
+    assert "iss" not in claims

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Literal
+from datetime import datetime
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import EmailStr, Field
@@ -66,6 +67,23 @@ class GremiumRef(FrozenModel, frozen=True):
     id: UUID
     name: str
     slug: str
+
+
+class ProfileClaim(FrozenModel, frozen=True):
+    """One claim of the SSO about the person: the claim name and its JSON value."""
+
+    key: str
+    value: Any
+
+
+class ProfileOut(FrozenModel, frozen=True):
+    """The profile page: the stored facts of the principal and the SSO claims."""
+
+    sub: str
+    email: str | None = None
+    display_name: str | None = None
+    last_login: datetime | None = None
+    claims: tuple[ProfileClaim, ...] = ()
 
 
 class MeOut(FrozenModel, frozen=True):

@@ -16,10 +16,13 @@ from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy import select
 
 from app.deps import DbSession, Principal, SettingsDep, require_principal
-from app.modules.auth import sessions
+from app.modules.auth import profile, sessions
+from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.schemas import (
     GremiumRef,
     MeOut,
+    ProfileClaim,
+    ProfileOut,
 )
 from app.modules.gremien.models import Gremium
 from app.settings import Settings
@@ -97,6 +100,50 @@ async def me(
         has_scoped_budget_view=await _has_scoped_budget_view(db, principal.sub),
         in_substitute_pool=await _in_substitute_pool(db, principal.sub),
         has_reported_tickets=await _has_reported_tickets(db, principal.sub),
+    )
+
+
+@router.get("/me/profile", responses=_errors(401, 403))
+async def my_profile(
+    request: Request,
+    principal: Annotated[Principal, Depends(require_principal())],
+    db: DbSession,
+    settings: SettingsDep,
+) -> ProfileOut:
+    """Return the profile page: the stored facts and the SSO claims about the person.
+
+    The claims come from the `id_token` of the session cookie, and only when that session
+    belongs to the principal of the request (§F/administration/accounts/001120). An OAuth
+    bearer request has no such token and gets the stored fields as claims.
+    """
+    row = (
+        await db.execute(select(PrincipalRow).where(PrincipalRow.sub == principal.sub))
+    ).scalar_one_or_none()
+    id_token: str | None = None
+    cookie = request.cookies.get(settings.session_cookie_name)
+    if row is not None and cookie and principal.scope_permissions is None:
+        session_row = await sessions.load_principal_session(
+            db,
+            secret=settings.session_secret,
+            cookie_value=cookie,
+            now=datetime.now(UTC),
+            max_age=sessions.SESSION_COOKIE_MAX_AGE,
+        )
+        if session_row is not None and session_row.principal_id == row.id:
+            id_token = session_row.id_token
+    claims = profile.person_claims(
+        profile.id_token_claims(id_token),
+        sub=principal.sub,
+        email=principal.email,
+        name=principal.display_name,
+        groups=list(row.oidc_groups or []) if row is not None else sorted(principal.groups),
+    )
+    return ProfileOut(
+        sub=principal.sub,
+        email=principal.email,
+        display_name=principal.display_name,
+        last_login=row.last_login if row is not None else None,
+        claims=tuple(ProfileClaim(key=k, value=v) for k, v in claims),
     )
 
 

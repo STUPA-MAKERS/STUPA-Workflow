@@ -33,6 +33,7 @@ import type {
   Page,
   PublicSiteConfig,
   Principal,
+  Profile,
   ProtocolOutWire,
   SearchHit,
   SearchResults,
@@ -67,6 +68,24 @@ const MOCK_APPLICANT_APPLICATIONS = {
     { id: 'b915e2c0-0000-4000-8000-000000000001', title: 'Neue Bänke im Innenhof', state: { id: '00000000-0000-4000-8000-0000000000a3', key: 'abgelehnt', label: { de: 'Abgelehnt', en: 'Rejected' }, color: '#dc2626', editAllowed: false }, typeId: '22222222-2222-2222-2222-222222222222', amount: null, approvedAmount: null, currency: null, createdAt: '2026-03-02T11:05:00Z' },
   ],
 } as const;
+
+/** The profile page of the demo user: the claims of an authentik login. */
+const MOCK_PROFILE: Profile = {
+  sub: '00000000-0000-0000-0000-000000000001',
+  email: 'demo@stupa.example',
+  display_name: 'Demo Mitglied',
+  last_login: '2026-11-16T08:12:00Z',
+  claims: [
+    { key: 'email', value: 'demo@stupa.example' },
+    { key: 'email_verified', value: true },
+    { key: 'given_name', value: 'Demo' },
+    { key: 'groups', value: ['stupa-mitglieder', 'asta-finanzen'] },
+    { key: 'name', value: 'Demo Mitglied' },
+    { key: 'nickname', value: 'demo' },
+    { key: 'preferred_username', value: 'demo' },
+    { key: 'sub', value: '00000000-0000-0000-0000-000000000001' },
+  ],
+};
 
 const MOCK_PRINCIPAL: Principal = {
   sub: '00000000-0000-0000-0000-000000000001',
@@ -1858,6 +1877,9 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         branding: null,
       };
       return ok(config);
+    }
+    if (p.endsWith('/auth/me/profile')) {
+      return ok(MOCK_PROFILE);
     }
     if (p.endsWith('/auth/me')) {
       return mockAnonymous()

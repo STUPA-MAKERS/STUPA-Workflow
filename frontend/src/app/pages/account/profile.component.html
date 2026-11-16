@@ -1,0 +1,53 @@
+<section class="pf">
+  <app-page-header [flush]="true" [title]="'account.profile.title' | t">
+    <app-breadcrumbs crumbs />
+  </app-page-header>
+
+  @if (error(); as e) {
+    <app-note kind="error" icon="alert" role="alert">{{ e | t }}</app-note>
+  }
+
+  @if (loading()) {
+    <app-skeleton variant="rows" [count]="6" [label]="'common.loading' | t" />
+  } @else if (profile(); as p) {
+    <div class="pf__head">
+      @if (gravatarLink()) {
+        <a
+          class="pf__avatar pf__avatar--link"
+          [href]="gravatarUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          [attr.aria-label]="'account.profile.gravatar' | t"
+        >
+          <app-avatar [name]="name()" principalId="me" [decorative]="true" />
+          <span class="pf__ext" aria-hidden="true"><app-icon name="ext" [size]="16" /></span>
+        </a>
+      } @else {
+        <span class="pf__avatar">
+          <app-avatar [name]="name()" principalId="me" [decorative]="true" />
+        </span>
+      }
+      <div class="pf__who">
+        <span class="pf__name">{{ name() }}</span>
+        @if (p.email && p.email !== name()) {
+          <span class="pf__mail">{{ p.email }}</span>
+        }
+      </div>
+    </div>
+
+    <ul class="rowgroup rowgroup--settings pf__list" [attr.aria-label]="'account.profile.claims' | t">
+      @for (r of rows(); track r.key) {
+        <li class="pf__row">
+          <span class="pf__label">{{ r.label }}</span>
+          <span class="pf__value">{{ r.value }}</span>
+        </li>
+      }
+      @if (p.last_login) {
+        <li class="pf__row">
+          <span class="pf__label">{{ 'account.profile.lastLogin' | t }}</span>
+          <span class="pf__value">{{ p.last_login | ldate: 'medium' }}</span>
+        </li>
+      }
+    </ul>
+  }
+</section>

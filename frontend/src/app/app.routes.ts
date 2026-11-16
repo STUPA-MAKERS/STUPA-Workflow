@@ -707,6 +707,12 @@ export const routes: Routes = [
               ),
           },
           {
+            path: 'profile',
+            data: { title: 'account.profile.title' },
+            loadComponent: () =>
+              import('./pages/account/profile.component').then((m) => m.AccountProfileComponent),
+          },
+          {
             path: 'notifications',
             data: { title: 'account.notifications.title' },
             loadComponent: () =>
