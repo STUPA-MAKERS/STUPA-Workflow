@@ -408,3 +408,21 @@ def key_taken(
     """
     siblings = (n for n, parent in parent_of.items() if parent == parent_of[node] and n != node)
     return any(key in (key_of[sibling], draft_key_of.get(sibling)) for sibling in siblings)
+
+
+def compared_with(lines: Sequence[tuple[UUID, UUID | None]]) -> dict[UUID, UUID | None]:
+    """Return the cost center of the year before that each line compares with (001040).
+
+    `lines` holds `(budget_id, predecessor_id)` of the lines of a version. A line with a
+    Vorgänger compares with it. A line without one compares with its own cost center,
+    unless another line names that cost center as its Vorgänger: a line of the year
+    before then compares with that line only, so the sums of the year before count it
+    once.
+    """
+    taken = {predecessor for _, predecessor in lines if predecessor is not None}
+    return {
+        budget_id: predecessor
+        if predecessor is not None
+        else (None if budget_id in taken else budget_id)
+        for budget_id, predecessor in lines
+    }

@@ -145,6 +145,27 @@ async def rename_plan_line(version_id: str, budget_id: str, rename: S.PlanLineRe
 
 
 @group.tool
+async def set_plan_line_predecessor(
+    version_id: str, budget_id: str, predecessor_id: str | None
+) -> dict:
+    """Name the Vorgänger of a line in a draft version, or clear it with null.
+
+    The Vorgänger is the cost center of a line of the plan in force of the year before.
+    The line then compares with it instead of with its own cost center: the Ansatz and
+    the Ist of the year before and the Änderung. A line of the year before compares with
+    one line only, so the line of its own cost center then shows no figure of that year.
+    The call gives 422 `plan_predecessor_invalid` for a cost center that has no line in
+    the plan in force of the year before, for one on the other side, or for a line
+    without a side; 409 `plan_predecessor_taken` when another line names it; 409
+    `plan_version_locked` for a version that is not a draft. Requires budget.structure.
+    """
+    return await api().put(
+        f"/budget-plan-versions/{version_id}/lines/{budget_id}/predecessor",
+        json={"predecessorId": predecessor_id},
+    )
+
+
+@group.tool
 async def delete_plan_line(version_id: str, budget_id: str) -> dict:
     """Remove the line of one cost center from a draft version.
 
