@@ -9,6 +9,7 @@ and the rights of a gremium board (001078).
 
 from __future__ import annotations
 
+import uuid
 from datetime import date, timedelta
 from typing import Any
 
@@ -322,16 +323,17 @@ async def test_the_picker_finds_gremien_and_persons(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
     """Find gremien by name and persons from two characters on (spec 001074)."""
+    tag = f"Zq{uuid.uuid4().hex[:8]}"
     me, _ = await add_person(maker, "Mara")
-    await add_person(maker, "Astrid")
-    gid, _ = await add_gremium(maker, "AStA")
+    await add_person(maker, f"{tag} Astrid")
+    gid, _ = await add_gremium(maker, f"{tag} AStA")
     await add_gremium(maker, "Fachschaft")
     with TestClient(api.app) as client:
         api.login(me)
         every = _ok(client.get("/api/todos/entry-options"))
-        assert {g["name"] for g in every["gremien"]} >= {"AStA", "Fachschaft"}
+        assert {g["name"] for g in every["gremien"]} >= {f"{tag} AStA", "Fachschaft"}
         assert every["persons"] == []
-        hits = _ok(client.get("/api/todos/entry-options", params={"q": "ast"}))
+        hits = _ok(client.get("/api/todos/entry-options", params={"q": tag.lower()}))
         assert [(g["id"], g["logoUrl"]) for g in hits["gremien"]] == [(str(gid), None)]
-        assert [p["name"] for p in hits["persons"]] == ["Astrid"]
+        assert [p["name"] for p in hits["persons"]] == [f"{tag} Astrid"]
         assert "email" not in hits["persons"][0]
