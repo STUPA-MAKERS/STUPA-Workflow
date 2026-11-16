@@ -5,7 +5,7 @@ kind: functional
 status: draft
 owner: frederikbeimgraben
 updated: 2026-11-16
-tests: null
+tests:
 implementation: null
 scope:
   - backend/app/modules/meetings
