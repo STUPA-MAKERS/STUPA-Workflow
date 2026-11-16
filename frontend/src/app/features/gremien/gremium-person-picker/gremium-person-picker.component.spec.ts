@@ -66,4 +66,69 @@ describe('GremiumPersonPickerComponent', () => {
       jest.useRealTimers();
     }
   });
+
+  it('moves with the menu keys, browses on a press into the field and closes on Tab', async () => {
+    jest.useFakeTimers();
+    try {
+      const view = await setup();
+      fireEvent.pointerDown(view.field);
+      view.detect();
+      const options = within(screen.getByRole('listbox')).getAllByRole('option');
+      expect(options).toHaveLength(2);
+      options[0].focus();
+      fireEvent.keyDown(options[0], { key: 'ArrowDown' });
+      expect(document.activeElement).toBe(options[1]);
+      fireEvent.keyDown(options[1], { key: 'ArrowDown' });
+      expect(document.activeElement).toBe(options[1]);
+      fireEvent.keyDown(options[1], { key: 'ArrowUp' });
+      expect(document.activeElement).toBe(options[0]);
+      fireEvent.keyDown(options[0], { key: 'End' });
+      expect(document.activeElement).toBe(options[1]);
+      fireEvent.keyDown(options[1], { key: 'Home' });
+      expect(document.activeElement).toBe(options[0]);
+      fireEvent.keyDown(options[0], { key: 'x' });
+      fireEvent.keyDown(options[0], { key: 'Tab' });
+      view.detect();
+      expect(screen.queryByRole('listbox')).toBeNull();
+
+      fireEvent.keyDown(view.field, { key: 'ArrowDown' });
+      view.detect();
+      jest.runOnlyPendingTimers();
+      expect(document.activeElement?.getAttribute('role')).toBe('option');
+      fireEvent.keyDown(view.field, { key: 'Escape' });
+      view.detect();
+      expect(screen.queryByRole('listbox')).toBeNull();
+      fireEvent.keyDown(view.field, { key: 'Escape' });
+      fireEvent.keyDown(view.field, { key: 'ArrowDown' });
+      view.detect();
+      fireEvent.keyDown(view.field, { key: 'Tab' });
+      view.detect();
+      expect(screen.queryByRole('listbox')).toBeNull();
+
+      fireEvent.keyDown(view.field, { key: 'Enter' });
+      expect(view.picked).not.toHaveBeenCalled();
+      fireEvent.pointerDown(document.body);
+      view.detect();
+      expect(screen.queryByRole('listbox')).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('offers no persons without a person search and closes when the field leaves the view', async () => {
+    const view = await render(GremiumPersonPickerComponent, {
+      inputs: { placeholder: 'Gremium', gremien: GREMIEN },
+    });
+    const field = screen.getByLabelText('Gremium') as HTMLInputElement;
+    fireEvent.input(field, { target: { value: 'a' } });
+    view.fixture.detectChanges();
+    expect(within(screen.getByRole('listbox')).getAllByRole('option')).toHaveLength(2);
+    const pill = field.closest('app-search-pill') as HTMLElement;
+    jest.spyOn(pill, 'getBoundingClientRect').mockReturnValue({
+      top: -200, bottom: -100, left: 0, right: 100, width: 100, height: 100, x: 0, y: -200, toJSON: () => ({}),
+    } as DOMRect);
+    window.dispatchEvent(new Event('scroll'));
+    view.fixture.detectChanges();
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
 });

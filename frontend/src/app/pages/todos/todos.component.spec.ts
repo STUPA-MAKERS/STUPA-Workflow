@@ -197,6 +197,24 @@ describe('TodosComponent', () => {
     expect(router.url).toBe('/todos/b-2');
   });
 
+  /** § 001061, 001068: a new board opens, an archived one leaves the picker, a restored one joins it. */
+  it('opens a new free board, drops an archived one and reads the boards after a restore', async () => {
+    const { cmp, router, api, settle } = await start('/todos/b-2');
+    cmp.onBoardCreated(board({ id: 'b-9', name: 'Ersti-Woche' }));
+    await settle();
+    expect(router.url).toBe('/todos/b-9');
+    const reads = api.boards.mock.calls.length;
+    await router.navigateByUrl('/todos/b-2');
+    await settle();
+    cmp.onBoardArchived();
+    await settle();
+    expect(cmp.hasArchivedBoards()).toBe(true);
+    expect(router.url).not.toBe('/todos/b-2');
+    cmp.onBoardRestored();
+    await settle();
+    expect(api.boards.mock.calls.length).toBeGreaterThan(reads);
+  });
+
   it('says so when there is no board or the boards fail', async () => {
     const none = await start('/todos', { boards: [] });
     expect(none.cmp.notFound()).toBe(true);

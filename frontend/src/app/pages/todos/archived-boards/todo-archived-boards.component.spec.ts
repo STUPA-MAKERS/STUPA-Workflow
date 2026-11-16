@@ -66,4 +66,18 @@ describe('TodoArchivedBoardsComponent', () => {
     view.cmp.confirmDelete();
     expect(view.emptied).toHaveBeenCalled();
   });
+
+  it('says when the list does not load and when a restore fails', async () => {
+    const view = await setup(false);
+    view.api.restoreBoard.mockReturnValueOnce(throwError(() => new Error('down')));
+    view.cmp.restore(view.cmp.boards()[0]);
+    expect(view.toast.error).toHaveBeenCalledWith('Die Änderung konnte nicht gespeichert werden.');
+    expect(view.cmp.busy()).toBeNull();
+    view.api.archivedBoards.mockReturnValueOnce(throwError(() => new Error('down')));
+    view.fixture.componentRef.setInput('open', false);
+    view.fixture.detectChanges();
+    view.fixture.componentRef.setInput('open', true);
+    view.fixture.detectChanges();
+    expect(view.toast.error).toHaveBeenCalledWith('Die archivierten Boards konnten nicht geladen werden.');
+  });
 });

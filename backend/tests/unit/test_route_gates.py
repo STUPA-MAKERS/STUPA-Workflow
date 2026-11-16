@@ -247,6 +247,17 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("POST", "/api/todos/cards/{card_id}/restore"): _TODO_WRITE,
     ("GET", "/api/todos/cards/{card_id}/tile"): _TODO_READ,
     ("POST", "/api/todos/cards/{card_id}/transfer"): _TODO_WRITE,
+    ("POST", "/api/todos/boards"): "TodoService.create_board (can_create_board, spec 001061)",
+    ("DELETE", "/api/todos/boards/{board_id}"): (
+        "TodoService.delete_board (policy.admin_bypass todo.configure, spec 001068)"
+    ),
+    ("POST", "/api/todos/boards/{board_id}/archive"): _TODO_CONFIGURE,
+    ("POST", "/api/todos/boards/{board_id}/restore"): _TODO_CONFIGURE,
+    ("GET", "/api/todos/boards/{board_id}/entries"): _TODO_READ,
+    ("POST", "/api/todos/boards/{board_id}/entries"): _TODO_CONFIGURE,
+    ("PATCH", "/api/todos/boards/{board_id}/entries/{entry_id}"): _TODO_CONFIGURE,
+    ("DELETE", "/api/todos/boards/{board_id}/entries/{entry_id}"): _TODO_CONFIGURE,
+    ("GET", "/api/todos/entry-options"): "master data: gremien and person names for the picker",
     ("GET", "/api/todos/link-targets"): "todos.access.token_reads + TodoLinks.search",
     ("GET", "/api/todos/events"): "TodoService.writable_events (BoardAccess.can_write)",
     ("GET", "/api/todos/linked"): "TodoService.linked (per-kind read checks)",

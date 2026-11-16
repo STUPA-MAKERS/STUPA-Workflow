@@ -939,6 +939,27 @@
       "to": "Principal"
     },
     {
+      "column": "gremium_id",
+      "from": "TodoBoardEntry",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Gremium"
+    },
+    {
+      "column": "principal_id",
+      "from": "TodoBoardEntry",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "board_id",
+      "from": "TodoBoardEntry",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "TodoBoard"
+    },
+    {
       "column": "created_by",
       "from": "TodoCard",
       "multiplicity": "*",
@@ -6227,7 +6248,8 @@
           "values": [
             "gremium",
             "personal",
-            "team"
+            "team",
+            "free"
           ]
         },
         {
@@ -6284,6 +6306,56 @@
       "name": "TodoBoard",
       "path": "backend/app/modules/todos/models.py",
       "table": "todo_board"
+    },
+    {
+      "attributes": [
+        {
+          "name": "board_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "gremium_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "principal_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "role",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "read",
+            "edit",
+            "manage"
+          ]
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "TodoBoardEntry",
+      "module": "todos",
+      "name": "TodoBoardEntry",
+      "path": "backend/app/modules/todos/models.py",
+      "table": "todo_board_entry"
     },
     {
       "attributes": [

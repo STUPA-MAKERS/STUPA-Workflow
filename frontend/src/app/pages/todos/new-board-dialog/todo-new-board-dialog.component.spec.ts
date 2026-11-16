@@ -65,4 +65,19 @@ describe('TodoNewBoardDialogComponent', () => {
     expect(view.toast.error).toHaveBeenCalledWith('Du darfst keine Boards anlegen.');
     expect(view.cmp.open()).toBe(true);
   });
+
+  it('does not send an empty name or twice, and says so when the server fails', async () => {
+    const view = await setup();
+    view.cmp.submit();
+    expect(view.api.createBoard).not.toHaveBeenCalled();
+    view.cmp.name.set('X');
+    view.cmp.saving.set(true);
+    view.cmp.submit();
+    expect(view.api.createBoard).not.toHaveBeenCalled();
+    view.cmp.saving.set(false);
+    view.api.createBoard.mockReturnValueOnce(throwError(() => new Error('down')));
+    view.cmp.submit();
+    expect(view.toast.error).toHaveBeenCalledWith(expect.any(String));
+    expect(view.toast.error).not.toHaveBeenCalledWith('Du darfst keine Boards anlegen.');
+  });
 });
