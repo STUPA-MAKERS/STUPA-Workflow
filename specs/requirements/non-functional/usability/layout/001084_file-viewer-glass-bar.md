@@ -1,6 +1,6 @@
 ---
 id: "001084"
-title: The top bar of the file viewer is glass
+title: The file viewer is dark frosted glass
 kind: non-functional
 status: draft
 owner: frederikbeimgraben
@@ -11,13 +11,17 @@ scope:
   - frontend/vendor/ui-kit/src/lib/file-viewer
 ---
 
-# The top bar of the file viewer is glass
+# The file viewer is dark frosted glass
 
-The top bar of the file viewer must be frosted glass: a dark tint over a blur of the page
-behind the viewer. The tint must keep the name and the buttons at a contrast of at least 4.5:1
-on a light page. With less transparency (000596) the bar must be the solid tint.
+The whole file viewer must be one dark frosted glass over the page behind it: a dark tint over a
+strong blur, so the page shows only as a dark blur and none of its text stays readable, also at
+the edges of the screen. The top bar must be at least as dark as the rest of the viewer. The
+tint must keep the name and the buttons at a contrast of at least 4.5:1 on a light page. With
+less transparency (000596) the viewer must be the solid tint.
 
-Reason: The bar is the head of an overlay, like the heads of the sheets and dialogs, which are
-glass. A solid black bar looks like a different app.
+Reason: The viewer is an overlay like the sheets and dialogs, which are glass. A solid black
+surface looks like a different app, and a bar lighter than the rest draws the eye away from the
+file.
 
-Test: A screenshot of the viewer on a light and on a dark page, and with less transparency.
+Test: A screenshot of the viewer on a light and on a dark page, on a phone and on a desktop, and
+with less transparency.

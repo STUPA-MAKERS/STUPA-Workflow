@@ -849,7 +849,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/001016](requirements/non-functional/usability/layout/001016_no-sticky-bar-in-tab-pager.md) | A search bar in a paged tab does not stick | approved |
 | [NF/usability/layout/001079](requirements/non-functional/usability/layout/001079_file-viewer-above-everything.md) | The file viewer lies above everything | draft |
 | [NF/usability/layout/001081](requirements/non-functional/usability/layout/001081_phone-pdf-system-viewer.md) | A PDF on a phone opens in the system viewer | draft |
-| [NF/usability/layout/001084](requirements/non-functional/usability/layout/001084_file-viewer-glass-bar.md) | The top bar of the file viewer is glass | draft |
+| [NF/usability/layout/001084](requirements/non-functional/usability/layout/001084_file-viewer-glass-bar.md) | The file viewer is dark frosted glass | draft |
 | [P/integrations/webhooks/000963](protocols/integrations/webhooks/000963_webhook-delivery.md) | A webhook delivery is a signed JSON POST | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |
