@@ -1,3 +1,5 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { MeetingStatus, MeetingVote } from '@core/api/models';
@@ -46,6 +48,7 @@ async function setup(over: Partial<Inputs> = {}) {
       ...over,
     },
     on,
+    providers: [provideHttpClient(), provideHttpClientTesting()],
   });
   return { ...view, on };
 }
@@ -396,7 +399,7 @@ describe('VoteCardComponent', () => {
           election: { seats: 1, candidates: [{ id: 'c1', name: 'A' }, { id: 'c2', name: 'B' }], secret: true },
         }),
       });
-      expect(screen.getByText('2. Wahlgang')).toBeInTheDocument();
+      expect(screen.getByText(/^2\. Wahlgang · /)).toBeInTheDocument();
     });
   });
 });

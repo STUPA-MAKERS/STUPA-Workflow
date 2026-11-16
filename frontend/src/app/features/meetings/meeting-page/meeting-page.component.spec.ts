@@ -126,6 +126,33 @@ async function openMenu(): Promise<HTMLElement> {
   return screen.findByRole('menu');
 }
 
+const VOTE_MENU = 'Aktionen der Abstimmung';
+
+/** The items of every vote card menu (⋮); each menu is opened and closed again. */
+async function voteMenuItems(): Promise<string[]> {
+  const names: string[] = [];
+  for (const trigger of screen.queryAllByRole('button', { name: VOTE_MENU })) {
+    await userEvent.click(trigger);
+    names.push(...screen.queryAllByRole('menuitem').map((item) => item.textContent?.trim() ?? ''));
+    await userEvent.keyboard('{Escape}');
+  }
+  return names;
+}
+
+/** Choose the item of the vote card menu (⋮) that offers it. */
+async function chooseVoteMenu(name: string): Promise<void> {
+  for (const trigger of screen.queryAllByRole('button', { name: VOTE_MENU })) {
+    await userEvent.click(trigger);
+    const item = screen.queryByRole('menuitem', { name });
+    if (item) {
+      await userEvent.click(item);
+      return;
+    }
+    await userEvent.keyboard('{Escape}');
+  }
+  throw new Error(`no vote menu offers "${name}"`);
+}
+
 describe('MeetingPageComponent', () => {
   describe('header', () => {
     it('shows title, status, Gremium, date and the real start', async () => {
@@ -733,11 +760,11 @@ describe('MeetingPageComponent', () => {
       expect(cards.map((h) => h.textContent)).toEqual(['Wird der Nachtragshaushalt beschlossen?', 'Vertagen?']);
       await userEvent.click(screen.getByRole('button', { name: 'Abstimmung schließen' }));
       expect(on.voteClose).toHaveBeenCalledWith('v-1');
-      await userEvent.click(screen.getByRole('button', { name: 'Abstimmung abbrechen' }));
+      await chooseVoteMenu('Abstimmung abbrechen');
       expect(on.voteCancel).toHaveBeenCalledWith('v-1');
       await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
       expect(on.castVote).toHaveBeenCalledWith({ voteId: 'v-1', choice: 'yes' });
-      await userEvent.click(screen.getByRole('button', { name: 'Beschlussfrage löschen' }));
+      await chooseVoteMenu('Beschlussfrage löschen');
       expect(on.voteDelete).toHaveBeenCalledWith('v-0');
       expect(screen.getByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeEnabled();
     });
@@ -751,17 +778,17 @@ describe('MeetingPageComponent', () => {
     it('changes a planned vote and repeats a closed one', async () => {
       const draft = vote({ id: 'v-1', status: 'draft' });
       const { on, fixture } = await setup({ meeting: meeting({ votes: [draft] }) }, [MEDIA.wide]);
-      await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+      await chooseVoteMenu('Bearbeiten');
       expect(on.voteSource).toHaveBeenCalledWith({ mode: 'edit', vote: draft });
       const closed = vote({ id: 'v-1', status: 'closed', result: 'passed' });
       fixture.componentRef.setInput('meeting', meeting({ votes: [closed] }));
       fixture.detectChanges();
-      await userEvent.click(screen.getByRole('button', { name: 'Erneut abstimmen' }));
+      await chooseVoteMenu('Erneut abstimmen');
       expect(on.voteSource).toHaveBeenCalledWith({ mode: 'repeat', vote: closed });
       const again = vote({ id: 'v-2', status: 'open', repeatOfId: 'v-1', attempt: 2 });
       fixture.componentRef.setInput('meeting', meeting({ votes: [closed, again] }));
       fixture.detectChanges();
-      expect(screen.queryByRole('button', { name: 'Erneut abstimmen' })).toBeNull();
+      expect(await voteMenuItems()).not.toContain('Erneut abstimmen');
       expect(screen.getByText('Wiederholt')).toBeInTheDocument();
       expect(screen.getByText('2. Abstimmung')).toBeInTheDocument();
       fixture.componentRef.setInput(
@@ -770,7 +797,7 @@ describe('MeetingPageComponent', () => {
       );
       fixture.detectChanges();
       expect(screen.queryByText('Wiederholt')).toBeNull();
-      expect(screen.getByRole('button', { name: 'Erneut abstimmen' })).toBeInTheDocument();
+      expect(await voteMenuItems()).toContain('Erneut abstimmen');
     });
 
     /**

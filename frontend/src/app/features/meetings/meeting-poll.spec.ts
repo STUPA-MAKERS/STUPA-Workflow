@@ -157,7 +157,7 @@ describe('poll in the meeting', () => {
     it('a closed poll shows "Umfrage beendet", the counts and no decision', async () => {
       await card(poll());
       expect(screen.getByText('Umfrage beendet')).toBeInTheDocument();
-      expect(screen.getByText('Umfrage · Einzelwahl')).toBeInTheDocument();
+      expect(screen.getByText(/^Umfrage · Einzelwahl · beendet \d\d:\d\d$/)).toBeInTheDocument();
       expect(screen.queryByText(/Meiste Stimmen/)).toBeNull();
       expect(screen.queryByText('Abgelehnt')).toBeNull();
       expect(screen.queryByText('Angenommen')).toBeNull();
