@@ -221,7 +221,7 @@ services:
   clamav:
     # Pinned on purpose (never :latest), for reproducible deploys and a version audit
     # trail. The tag is a 1.x patch tag. On a bump, note the version in the deploy notes.
-    image: clamav/clamav:1.4.3@sha256:75fb5fd95fcbe1d7e6d240c369c1572b686ee2c95949d1042b5148de8eddebb4
+    image: clamav/clamav:1.4.6@sha256:cbc30de94b6e9b33ac14136ff45306cee02a1f9ae522394a3cc5b9215d1affe9
     pull_policy: missing
     <<: *restart
     volumes:
