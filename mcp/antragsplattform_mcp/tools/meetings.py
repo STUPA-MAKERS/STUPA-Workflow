@@ -15,8 +15,8 @@ import codecs
 import os
 import re
 import tempfile
-from pathlib import Path
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Literal
 from urllib.parse import unquote
 
