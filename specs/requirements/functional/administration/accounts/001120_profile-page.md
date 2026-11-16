@@ -8,6 +8,7 @@ updated: 2026-11-16
 tests:
   - "backend/tests/unit/modules/auth/test_profile_claims.py:test_id_token_claims_reads_the_payload"
   - "backend/tests/unit/modules/auth/test_profile_claims.py:test_person_claims_without_a_token_uses_the_stored_fields"
+  - "backend/tests/unit/modules/account/test_profile_route.py:test_profile_reads_the_claims_of_the_own_session"
   - "backend/tests/integration/modules/auth/test_auth_callback_persist.py:test_callback_persists_principal_then_me_returns_200"
   - "frontend/src/app/pages/account/profile.component.spec.ts:AccountProfileComponent"
   - "frontend/src/app/layout/account-menu/account-menu.component.spec.ts:AppAccountMenuComponent"
