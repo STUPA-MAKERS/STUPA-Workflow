@@ -1424,7 +1424,7 @@ export class BudgetPlanComponent {
   /** The computed figure of the year before, as the placeholder of its empty field. */
   yearBeforePlaceholder(row: PlanRow, field: YearBeforeField): string {
     const computed = field === 'prevAmount' ? row.prevComputed : row.actualComputed;
-    return computed === null ? '' : this.money(computed);
+    return computed === null ? '' : this.sumDigits(computed);
   }
 
   /** Keep the figure of the year before a person types. */

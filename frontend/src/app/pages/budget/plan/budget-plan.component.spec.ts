@@ -1676,7 +1676,7 @@ describe('BudgetPlanComponent', () => {
     it('§F/finance/budget/001042: a draft line sets the Ansatz and the Ist of the year before by hand', async () => {
       const view = await setup({ plans: { 'fy-26': plan(), 'fy-25': before }, query: { costCentre: 'grants' } });
       const field = await waitFor(() => input(view, 'line-prevAmount-grants'));
-      expect(field.placeholder).toBe('30,00 €');
+      expect(field.placeholder).toBe('30,00');
       await typeAmount(field, '45');
       expect(view.api.setYearBefore).toHaveBeenCalledWith('v0', 'grants', { prevAmount: '45', prevActual: null });
       await typeAmount(input(view, 'line-prevActual-grants'), '');
