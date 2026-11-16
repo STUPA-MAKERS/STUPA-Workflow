@@ -23,6 +23,7 @@ import { IconComponent, type IconName, MEDIA, mediaQuery, SideSheetComponent } f
 export const BOARD_ICON: Record<TodoBoardKind, IconName> = {
   personal: 'user',
   gremium: 'landmark',
+  free: 'kanban',
   team: 'ticket',
 };
 
@@ -40,8 +41,10 @@ interface PickerSection {
 /**
  * The board chip of the to-dos page ("Board: Studierendenparlament") and its
  * list: Persönlich (with the meta-board "Alle" under "Meine To-Dos" when `allId` is set),
- * Gremien and Team, each board with its open count. Desktop: a list
- * under the chip; Escape and a click outside close it. Phone: the bottom sheet.
+ * Gremien, Weitere Boards (the free boards, spec 001067) and Team, without counts. Below
+ * them the actions "Neues Board" (with `canCreate`, spec 001061) and "Archivierte Boards"
+ * (with `hasArchived`, spec 001068). Desktop: a list under the chip; Escape and a click
+ * outside close it. Phone: the bottom sheet.
  */
 @Component({
   selector: 'app-todo-board-picker',
@@ -66,6 +69,12 @@ export class TodoBoardPickerComponent {
    */
   readonly allId = input<string | null>(null);
   readonly picked = output<Uuid>();
+  /** The person may create a free board: the action "Neues Board" shows. */
+  readonly canCreate = input(false);
+  /** The person reads an archived free board: the action "Archivierte Boards" shows. */
+  readonly hasArchived = input(false);
+  readonly create = output<void>();
+  readonly showArchived = output<void>();
 
   readonly phone = mediaQuery(MEDIA.phone);
   readonly open = signal(false);
@@ -87,6 +96,7 @@ export class TodoBoardPickerComponent {
     const all: PickerSection[] = [
       { kind: 'personal', label: 'todos.board.personal', boards: of('personal') },
       { kind: 'gremium', label: 'todos.board.gremien', boards: of('gremium') },
+      { kind: 'free', label: 'todos.board.free', boards: of('free') },
       { kind: 'team', label: 'todos.board.team', boards: of('team') },
     ];
     return all.filter((s) => s.boards.length || (s.kind === 'personal' && this.allId() !== null));
@@ -135,6 +145,13 @@ export class TodoBoardPickerComponent {
   pickAll(): void {
     const id = this.allId();
     if (id !== null) this.choose(id);
+  }
+
+  /** An action row below the boards: the list closes first. */
+  act(which: 'create' | 'archived'): void {
+    this.open.set(false);
+    if (which === 'create') this.create.emit();
+    else this.showArchived.emit();
   }
 
   private choose(id: string): void {

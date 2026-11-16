@@ -1,0 +1,17 @@
+@use '../../../shared/ui/dialog-form' as df;
+
+@include df.host;
+
+.nb {
+  @include df.form;
+}
+.nb__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.nb__cap {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}

@@ -442,12 +442,14 @@
     />
     @if (assignTopId()) {
       <app-cost-centre-select
+        leavesOnly
         class="ad__ccFy"
         [label]="'applications.budget.field' | t"
         [allLabel]="'applications.budget.none' | t"
         [nodes]="assignTree()"
         [value]="budgetChoice()"
         [fiscalYearId]="fiscalChoice()"
+        expenseOnly
         (picked)="budgetChoice.set($event)"
       />
     }

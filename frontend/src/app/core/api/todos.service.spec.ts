@@ -32,6 +32,35 @@ describe('TodosApiService', () => {
     one.flush([]);
   });
 
+  /** § 001061, 001064, 001068, 001074: free boards, their entries and the picker. */
+  it('creates, archives, restores and deletes a free board and edits its entries', () => {
+    const calls: [() => unknown, string, string][] = [
+      [() => api.createBoard('Ersti', [{ gremiumId: 'g-1', role: 'edit' }]), 'POST', '/api/todos/boards'],
+      [() => api.deleteBoard('b-1'), 'DELETE', '/api/todos/boards/b-1'],
+      [() => api.archiveBoard('b-1'), 'POST', '/api/todos/boards/b-1/archive'],
+      [() => api.restoreBoard('b-1'), 'POST', '/api/todos/boards/b-1/restore'],
+      [() => api.entries('b-1'), 'GET', '/api/todos/boards/b-1/entries'],
+      [() => api.addEntry('b-1', { principalId: 'p-1', role: 'read' }), 'POST', '/api/todos/boards/b-1/entries'],
+      [() => api.patchEntry('b-1', 'e-1', 'manage'), 'PATCH', '/api/todos/boards/b-1/entries/e-1'],
+      [() => api.removeEntry('b-1', 'e-1'), 'DELETE', '/api/todos/boards/b-1/entries/e-1'],
+    ];
+    for (const [call, method, url] of calls) {
+      (call() as { subscribe: () => void }).subscribe();
+      const req = http.expectOne((r) => r.url === url && r.method === method);
+      expect(req.request.context.get(SKIP_LOADING)).toBe(true);
+      req.flush(null);
+    }
+
+    api.archivedBoards().subscribe();
+    http.expectOne((r) => r.url === '/api/todos/boards' && r.params.get('archived') === 'true').flush([]);
+    api.entryOptions().subscribe();
+    const all = http.expectOne((r) => r.url === '/api/todos/entry-options');
+    expect(all.request.params.has('q')).toBe(false);
+    all.flush({ gremien: [], persons: [] });
+    api.entryOptions('as').subscribe();
+    http.expectOne((r) => r.url === '/api/todos/entry-options' && r.params.get('q') === 'as').flush({ gremien: [], persons: [] });
+  });
+
   it('searches series and writable Events, with the term only when given', () => {
     api.series().subscribe();
     expect(http.expectOne((r) => r.url === '/api/todos/series').request.params.keys()).toEqual([]);

@@ -27,6 +27,7 @@ The kinds:
 - ``ticket_answer``: the team answered publicly on a ticket that the user reported.
 - ``todo_assigned``, ``todo_mentioned``, ``todo_due``: a to-do was assigned, the user
   was mentioned in a to-do comment, or an assigned to-do is due the next day.
+- ``todo_board_added``: the user was added by name to a to-do board (spec 001071).
 - ``mention``: the user was mentioned in an application comment or a ticket note
   (``comment_mentioned``, ``ticket_mentioned``).
 - ``status_update_team``: a status change of an application that a flow ``notify``
@@ -57,6 +58,7 @@ NOTIFICATION_KINDS: tuple[str, ...] = (
     "todo_assigned",
     "todo_mentioned",
     "todo_due",
+    "todo_board_added",
     "mention",
     "poll_started",
     "poll_reminder",

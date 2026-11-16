@@ -76,6 +76,7 @@ async function setup(opts: Opts = {}) {
     createNachtrag: jest.fn((..._args: unknown[]) => answer()),
     setLine: jest.fn((..._args: unknown[]) => answer()),
     renameLine: jest.fn((..._args: unknown[]) => answer()),
+    setPredecessor: jest.fn((..._args: unknown[]) => answer()),
     deleteLine: jest.fn((..._args: unknown[]) => answer()),
     setState: jest.fn((..._args: unknown[]) => answer()),
     deleteVersion: jest.fn((..._args: unknown[]) => of(undefined)),
@@ -1639,6 +1640,51 @@ describe('BudgetPlanComponent', () => {
       await setup({ plans: { 'fy-26': plan([version({ state: 'in_force' })]) }, query: { costCentre: 'fees' } });
       await waitFor(() => expect(field('Name')).toBeDisabled());
       expect(field('Schlüssel')).toBeDisabled();
+    });
+  });
+
+  describe('predecessor', () => {
+    const select = () => screen.getByRole('combobox', { name: /Vorgänger/ });
+    const before = plan([version({ id: 'p', state: 'in_force', lines: [line('fees', '80'), line('staff', '40'), line('grants', '30')] })], 'fy-25');
+
+    it('§F/finance/budget/001040: a draft line chooses a line of the year before on its side as Vorgänger', async () => {
+      const view = await setup({ plans: { 'fy-26': plan(), 'fy-25': before }, query: { costCentre: 'grants' } });
+      await userEvent.click(await waitFor(() => select()));
+      const options = (await screen.findAllByRole('option')).map((o) => text(o));
+      expect(options).toEqual(['Kein Vorgänger', 'GRANTS · Zuschüsse', 'STAFF · Personal']);
+      await userEvent.click(screen.getByRole('option', { name: 'STAFF · Personal' }));
+      expect(view.api.setPredecessor).toHaveBeenCalledWith('v0', 'grants', 'staff');
+    });
+
+    it('§F/finance/budget/001040: the Vorgänger gives the figures of the year before and clears with "Kein Vorgänger"', async () => {
+      const chosen = plan([version({ lines: [line('fees', '100'), line('grants', '30', { predecessorId: 'staff' })] })]);
+      const view = await setup({ plans: { 'fy-26': chosen, 'fy-25': before }, query: { costCentre: 'grants' } });
+      await waitFor(() => expect(select()).toHaveTextContent('STAFF · Personal'));
+      expect(text(view.container.querySelector('.bd__figs'))).toContain('Ansatz 2025/2640,00 €');
+      await userEvent.click(select());
+      await userEvent.click(await screen.findByRole('option', { name: 'Kein Vorgänger' }));
+      expect(view.api.setPredecessor).toHaveBeenCalledWith('v0', 'grants', null);
+    });
+
+    it('§F/finance/budget/001040: no field without a plan in force in the year before', async () => {
+      await setup({ query: { costCentre: 'grants' } });
+      await waitFor(() => expect(screen.getByRole('combobox', { name: /Seite/ })).toBeInTheDocument());
+      expect(screen.queryByRole('combobox', { name: /Vorgänger/ })).toBeNull();
+    });
+
+    it('§F/finance/budget/001040: a choice takes the name and key of the line, else of its node, and an unchanged choice saves nothing', async () => {
+      const renamed = plan(
+        [version({ id: 'p', state: 'in_force', lines: [line('staff', '40', { name: 'Alt', pathKey: 'VS-Z' }), line('gone', '5', { side: 'expense' })] })],
+        'fy-25',
+      );
+      const chosen = plan([version({ lines: [line('fees', '100'), line('grants', '30', { predecessorId: 'staff' })] })]);
+      const view = await setup({ plans: { 'fy-26': chosen, 'fy-25': renamed }, query: { costCentre: 'grants' } });
+      await waitFor(() => expect(select()).toBeInTheDocument());
+      const page = view.fixture.componentInstance;
+      const row = page.rows().find((r) => r.id === 'grants')!;
+      expect(page.predecessorOptions(row).map((o) => o.label)).toEqual([' · ', 'VS-Z · Alt']);
+      page.savePredecessor(row, 'staff');
+      expect(view.api.setPredecessor).not.toHaveBeenCalled();
     });
   });
 

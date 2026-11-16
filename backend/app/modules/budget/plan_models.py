@@ -137,7 +137,9 @@ class BudgetPlanLine(UUIDPkMixin, CreatedAtMixin, Base):
     rename does not change the text of a decided plan. They are NULL in a draft.
     ``draft_name`` and ``draft_key`` hold the name and the key that a draft gives the
     cost center. They apply to the cost center when the version comes into force and
-    are NULL from then on.
+    are NULL from then on. ``predecessor_id`` names the cost center of a line in the plan
+    in force of the year before that the line compares with instead of its own cost
+    center (spec 001040). NULL keeps the comparison with its own cost center.
     """
 
     __tablename__ = "budget_plan_line"
@@ -156,6 +158,9 @@ class BudgetPlanLine(UUIDPkMixin, CreatedAtMixin, Base):
     transferable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     coverable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     blocked: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal(0), server_default="0")
+    predecessor_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("budget.id", ondelete="SET NULL"), nullable=True
+    )
 
     __table_args__ = (
         UniqueConstraint(

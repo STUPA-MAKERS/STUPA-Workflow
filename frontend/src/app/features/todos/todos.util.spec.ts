@@ -9,6 +9,7 @@ import {
   defaultBoard,
   dropMove,
   dueInfo,
+  eventDays,
   eventText,
   filterActive,
   insertTile,
@@ -444,5 +445,15 @@ describe('todos.util', () => {
       expect(defaultBoard([asta, fs, stupa], ['gr-stupa'])?.id).toBe('s');
       expect(defaultBoard([personal, asta, fs, stupa], ['gr-stupa'])?.id).toBe('p');
     });
+  });
+});
+
+describe('eventDays', () => {
+  it('writes one day, a range in one year and a range over two years', () => {
+    expect(eventDays(null, null, 'de-DE')).toBeNull();
+    expect(eventDays('2026-11-12', null, 'de-DE')).toContain('2026');
+    expect(eventDays('2026-11-12', '2026-11-12', 'de-DE')).toBe(eventDays('2026-11-12', null, 'de-DE'));
+    expect(eventDays('2026-11-12', '2026-11-14', 'de-DE')).toMatch(/–.*2026$/);
+    expect(eventDays('2026-12-30', '2027-01-02', 'de-DE')).toMatch(/2026–.*2027$/);
   });
 });

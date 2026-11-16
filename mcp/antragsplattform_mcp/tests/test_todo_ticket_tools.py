@@ -37,6 +37,9 @@ class _FakeApi:
     async def patch(self, path: str, **kw: Any) -> dict[str, Any]:
         return await self._record("PATCH", path, kw)
 
+    async def delete(self, path: str, **kw: Any) -> dict[str, Any]:
+        return await self._record("DELETE", path, kw)
+
 
 @pytest.fixture
 def fake_api(monkeypatch: pytest.MonkeyPatch) -> _FakeApi:
@@ -206,4 +209,33 @@ def test_tickets_update_unassigns_with_null(fake_api: _FakeApi) -> None:
     assert fake_api.calls == [
         ("PATCH", "/tickets/t1", {"assigneeId": None}),
         ("PATCH", "/tickets/t1", {"status": "done", "completeTodos": True}),
+    ]
+
+
+def test_free_board_tools_send_one_request_each(fake_api: _FakeApi) -> None:
+    """Create a free board, manage its entries, archive, restore and delete it."""
+    entry = S.TodoBoardEntryIn(gremiumId="g1", role="read")
+    asyncio.run(todos.todo_boards(archived=True))
+    asyncio.run(todos.todo_board_create("Ersti", [entry]))
+    asyncio.run(todos.todo_board_entries("b1"))
+    asyncio.run(todos.todo_board_entry_add("b1", S.TodoBoardEntryIn(principalId="p1")))
+    asyncio.run(todos.todo_board_entry_update("b1", "e1", "manage"))
+    asyncio.run(todos.todo_board_entry_remove("b1", "e1"))
+    asyncio.run(todos.todo_board_archive("b1"))
+    asyncio.run(todos.todo_board_restore("b1"))
+    assert asyncio.run(todos.todo_board_delete("b1")) == {"deleted": "b1"}
+    assert fake_api.calls == [
+        ("GET", "/todos/boards", {"archived": True}),
+        (
+            "POST",
+            "/todos/boards",
+            {"name": "Ersti", "entries": [{"gremiumId": "g1", "role": "read"}]},
+        ),
+        ("GET", "/todos/boards/b1/entries", None),
+        ("POST", "/todos/boards/b1/entries", {"principalId": "p1", "role": "edit"}),
+        ("PATCH", "/todos/boards/b1/entries/e1", {"role": "manage"}),
+        ("DELETE", "/todos/boards/b1/entries/e1", None),
+        ("POST", "/todos/boards/b1/archive", None),
+        ("POST", "/todos/boards/b1/restore", None),
+        ("DELETE", "/todos/boards/b1", None),
     ]

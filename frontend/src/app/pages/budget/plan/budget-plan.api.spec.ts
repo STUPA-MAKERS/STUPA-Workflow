@@ -36,6 +36,8 @@ describe('BudgetPlanApi', () => {
     expectCall('PUT', '/api/budget-plan-versions/v/lines/b', line);
     api.deleteLine('v', 'b').subscribe();
     expectCall('DELETE', '/api/budget-plan-versions/v/lines/b');
+    api.setPredecessor('v', 'b', 'p').subscribe();
+    expectCall('PUT', '/api/budget-plan-versions/v/lines/b/predecessor', { predecessorId: 'p' });
     api.setState('v', 'in_force').subscribe();
     expectCall('POST', '/api/budget-plan-versions/v/state', { state: 'in_force' });
     api.planOfVersion('v').subscribe();

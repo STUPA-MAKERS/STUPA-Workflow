@@ -3,6 +3,7 @@ import {
   addable,
   amountProblem,
   cents,
+  comparedWith,
   currentVersion,
   inForce,
   memberIds,
@@ -48,6 +49,21 @@ describe('BudgetPlanUtil', () => {
     expect(rows[0]).toMatchObject({ base: 80, prev: 95, actual: 90, transferable: true, coverable: true, blocked: 5 });
     expect(rows[2]).toMatchObject({ id: 'wages', actual: 55, base: null, prev: null });
     expect(rows[3]).toMatchObject({ id: 'grants', actual: 0 });
+  });
+
+  it('§F/finance/budget/001040: a line compares with its Vorgänger, and the Vorgänger with that line only', () => {
+    expect(comparedWith([{ budgetId: 'a' }, { budgetId: 'b', predecessorId: 'a' }, { budgetId: 'c', predecessorId: null }])).toEqual(
+      new Map([['a', null], ['b', 'a'], ['c', 'c']]),
+    );
+    const rows = planRows({
+      top: TOP,
+      version: version({ lines: [line('fees', '100'), line('grants', '30', { predecessorId: 'fees' })] }),
+      base: null,
+      prev: version({ lines: [line('fees', '95')] }),
+      prevFiscalYearId: 'fy-25',
+    });
+    expect(rows.find((r) => r.id === 'grants')).toMatchObject({ prev: 95, predecessorId: 'fees' });
+    expect(rows.find((r) => r.id === 'fees')).toMatchObject({ prev: null, actual: null, predecessorId: null });
   });
 
   it('§F/finance/budget/000807: sums one side over the direct children of the top level', () => {

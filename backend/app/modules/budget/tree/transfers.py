@@ -50,7 +50,7 @@ class TransferOps(ExpenseOps):
 
         The fiscal year must belong to the top level of both cost centers. A past
         year that is not closed takes the transfer when its payment date lies in the
-        year.
+        year. Both cost centers must be leaves (001032).
         """
         src = await self._get_node(payload.from_budget_id)
         dst = await self._get_node(payload.to_budget_id)
@@ -65,6 +65,8 @@ class TransferOps(ExpenseOps):
                 "Both cost centres must share the fiscal year.",
                 errors=[{"field": "fiscalYearId", "msg": "must match for both"}],
             )
+        await self._refuse_not_leaf(src)
+        await self._refuse_not_leaf(dst)
         transfer_id = uuid.uuid4()
         out_row = BudgetExpense(
             id=uuid.uuid4(),

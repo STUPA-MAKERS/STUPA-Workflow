@@ -204,8 +204,8 @@ export class TopSheetComponent {
   readonly follow = input(false);
   /**
    * Show the linked list (the application and the to-dos) below the title. The meeting
-   * page turns it off and shows the list above the sheet, between the votes and the
-   * protocol.
+   * page and the participant view turn it off and show the list above the sheet, so it
+   * stands above the title for every reader (§ 000101).
    */
   readonly linked = input(true);
   /**

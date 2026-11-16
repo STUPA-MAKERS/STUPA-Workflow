@@ -25,6 +25,7 @@ from app.modules.livevote.service.votes import VoteReadOps
 from app.modules.meetings.keepers import keeper_summaries
 from app.modules.meetings.models import Meeting
 from app.modules.meetings.protocol_models import Protocol
+from app.modules.site_config.square_logos import logo_url_of, square_logo_variants
 from app.shared.search import dialect_of, trigram_rank
 
 #: A tuple of SQL filters that a query applies with `where(*filters)`.
@@ -108,13 +109,17 @@ class ListingOps(PermissionOps, VoteReadOps):
         also belongs in the filter.
         """
         stmt = (
-            select(Meeting.gremium_id, Gremium.name)
+            select(Meeting.gremium_id, Gremium.name, Gremium.cd_variant_id)
             .join(Gremium, Gremium.id == Meeting.gremium_id)
             .where(*await self._visibility(principal))
         )
         rows = (await self.session.execute(stmt.distinct())).all()
+        logos = await square_logo_variants(self.session, (variant for _g, _n, variant in rows))
         return sorted(
-            (MeetingGremiumOut(id=gid, name=name) for gid, name in rows),
+            (
+                MeetingGremiumOut(id=gid, name=name, logo_url=logo_url_of(gid, variant, logos))
+                for gid, name, variant in rows
+            ),
             key=lambda g: g.name.casefold(),
         )
 

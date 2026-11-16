@@ -17,7 +17,11 @@ from app.modules.auth.people import PersonRef
 from app.modules.files.schemas import MessageAttachmentOut, MessageFilesIn
 from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
-TodoBoardKind = Literal["gremium", "personal", "team"]
+TodoBoardKind = Literal["gremium", "personal", "team", "free"]
+#: The role of a member entry (spec 001062).
+TodoEntryRole = Literal["read", "edit", "manage"]
+#: The target of a member entry.
+TodoEntryKind = Literal["gremium", "person"]
 TodoLabelColor = Literal["green", "blue", "violet", "amber", "red", "gray"]
 TodoLinkKind = Literal[
     "application",
@@ -74,6 +78,11 @@ class TodoBoardSummary(FrozenCamelModel, frozen=True):
     can_write: bool = Field(default=True, serialization_alias="canWrite")
     can_configure: bool = Field(default=False, serialization_alias="canConfigure")
     open_count: int = Field(default=0, serialization_alias="openCount")
+    archived: bool = False
+    #: The gremien whose meetings take a card of the board (spec 001069).
+    agenda_gremium_ids: tuple[UUID, ...] = Field(
+        default_factory=tuple, serialization_alias="agendaGremiumIds"
+    )
 
 
 class TodoColumnOut(FrozenCamelModel, frozen=True):
@@ -291,6 +300,11 @@ class TodoBoardOut(FrozenCamelModel, frozen=True):
     labels: tuple[TodoLabelOut, ...] = Field(default_factory=tuple)
     cards: list[TodoCardTile] = Field(default_factory=list)
     archived_count: int = Field(default=0, serialization_alias="archivedCount")
+    archived: bool = False
+    #: The gremien whose meetings take a card of the board (spec 001069).
+    agenda_gremium_ids: tuple[UUID, ...] = Field(
+        default_factory=tuple, serialization_alias="agendaGremiumIds"
+    )
 
 
 class TodoMember(FrozenCamelModel, frozen=True):
@@ -429,6 +443,74 @@ class BoardPatch(FrozenStrictCamelModel, frozen=True):
 
     name: str | None = Field(default=None, min_length=1, max_length=120)
     archive_after_days: int | None = Field(default=None, alias="archiveAfterDays", ge=1, le=365)
+
+
+class EntryIn(FrozenStrictCamelModel, frozen=True):
+    """A new member entry: exactly one of ``gremiumId`` and ``principalId``."""
+
+    gremium_id: UUID | None = Field(default=None, alias="gremiumId")
+    principal_id: UUID | None = Field(default=None, alias="principalId")
+    role: TodoEntryRole = "edit"
+
+
+class EntryPatch(FrozenStrictCamelModel, frozen=True):
+    """A new role of a member entry."""
+
+    role: TodoEntryRole
+
+
+class BoardCreate(FrozenStrictCamelModel, frozen=True):
+    """A new free board (spec 001061): its name and its first entries.
+
+    The creator becomes a member with ``manage`` without an entry in the list.
+    """
+
+    name: str = Field(min_length=1, max_length=120)
+    entries: tuple[EntryIn, ...] = Field(default_factory=tuple, max_length=200)
+
+
+class TodoBoardEntryOut(FrozenCamelModel, frozen=True):
+    """A member entry of a board.
+
+    ``fixed`` marks the own gremium of a gremium board: it has no row (``id`` null) and
+    cannot be changed or removed (spec 001077). ``name`` is the gremium or the person.
+    """
+
+    id: UUID | None = None
+    kind: TodoEntryKind
+    target_id: UUID = Field(serialization_alias="targetId")
+    name: str
+    role: TodoEntryRole
+    fixed: bool = False
+    #: The square logo of a gremium entry (``/api/committees/{id}/logo``), else null.
+    logo_url: str | None = Field(default=None, serialization_alias="logoUrl")
+
+
+class EntryGremiumOption(FrozenCamelModel, frozen=True):
+    """A gremium that the shared picker offers, with its logo path or null."""
+
+    id: UUID
+    name: str
+    logo_url: str | None = Field(default=None, serialization_alias="logoUrl")
+
+
+class EntryPersonOption(FrozenCamelModel, frozen=True):
+    """An active person that the shared picker offers: the name, never the e-mail."""
+
+    id: UUID
+    name: str
+
+
+class EntryOptionsOut(FrozenCamelModel, frozen=True):
+    """The hits of the shared picker of gremien and persons (spec 001074).
+
+    ``gremien`` holds every gremium whose name holds the query (all of them for an
+    empty query); ``persons`` the active persons whose name holds it, from two
+    characters on and at most ten.
+    """
+
+    gremien: list[EntryGremiumOption]
+    persons: list[EntryPersonOption]
 
 
 class ColumnCreate(FrozenStrictCamelModel, frozen=True):

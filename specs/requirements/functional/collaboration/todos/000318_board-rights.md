@@ -2,11 +2,10 @@
 id: "000318"
 title: Board rights depend on the board kind
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation:
-  - backend/app/modules/todos/access.py
+updated: 2026-11-16
+replaced_by: F/collaboration/todos/001078
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos

@@ -1,8 +1,9 @@
 /**
  * API of the to-dos (`/api/todos`): boards, cards and their links.
  *
- * A board is a gremium board (members with `todo.write`), a personal board (the owner)
- * or a team board (holders of its permission). A board or a card the caller may not read
+ * A board is a gremium board (its members, plus its entries), a free board (its entries:
+ * Gremien and persons with a role, spec 001060-001078), a personal board (the owner) or a
+ * team board (holders of its permission). A board or a card the caller may not read
  * answers 404. The client only binds the data; the server stays authoritative.
  */
 import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
@@ -16,7 +17,9 @@ import { detailContext } from '@core/cache/cache.interceptor';
 import type { TicketStatus } from './tickets.service';
 import { httpParams } from './http-params';
 
-export type TodoBoardKind = 'gremium' | 'personal' | 'team';
+export type TodoBoardKind = 'gremium' | 'free' | 'personal' | 'team';
+/** The role of a member entry of a board: read, write, or write and manage. */
+export type TodoEntryRole = 'read' | 'edit' | 'manage';
 export type TodoLabelColor = 'green' | 'blue' | 'violet' | 'amber' | 'red' | 'gray';
 export type TodoLinkKind =
   | 'application'
@@ -42,6 +45,10 @@ export interface TodoBoardSummary {
   readonly canConfigure: boolean;
   /** Not archived, not in the done column. */
   readonly openCount: number;
+  /** A free board that its managers archived (spec 001068). */
+  readonly archived?: boolean;
+  /** The Gremien on whose agenda a card of the board can go (spec 001069). */
+  readonly agendaGremiumIds?: readonly Uuid[];
 }
 
 export interface TodoColumn {
@@ -238,6 +245,9 @@ export interface TodoBoard {
   readonly labels: readonly TodoLabel[];
   readonly cards: readonly TodoCardTile[];
   readonly archivedCount: number;
+  readonly archived?: boolean;
+  /** The Gremien on whose agenda a card of the board can go (spec 001069). */
+  readonly agendaGremiumIds?: readonly Uuid[];
 }
 
 export interface TodoCheckItem {
@@ -395,6 +405,32 @@ export interface TodoBoardPatch {
   readonly archiveAfterDays?: number | null;
 }
 
+/** A member entry of a board: a Gremium or a person with a role (spec 001062). */
+export interface TodoBoardEntry {
+  /** Null for the own Gremium of a Gremium board, which has no row. */
+  readonly id: Uuid | null;
+  readonly kind: 'gremium' | 'person';
+  readonly targetId: Uuid;
+  readonly name: string;
+  readonly role: TodoEntryRole;
+  /** The own Gremium of a Gremium board: it cannot change or go (spec 001077). */
+  readonly fixed: boolean;
+  readonly logoUrl?: string | null;
+}
+
+/** A new member entry: exactly one of `gremiumId` and `principalId`. */
+export interface TodoBoardEntryIn {
+  readonly gremiumId?: Uuid;
+  readonly principalId?: Uuid;
+  readonly role: TodoEntryRole;
+}
+
+/** The hits of the shared picker (`GET /todos/entry-options`, spec 001074). */
+export interface TodoEntryOptions {
+  readonly gremien: readonly { readonly id: Uuid; readonly name: string; readonly logoUrl: string | null }[];
+  readonly persons: readonly { readonly id: Uuid; readonly name: string }[];
+}
+
 /** The answer of a poll: a new board and its ETag, or `board: null` for 304. */
 export interface TodoBoardPoll {
   readonly board: TodoBoard | null;
@@ -463,6 +499,69 @@ export class TodosApiService {
             : throwError(() => err),
         ),
       );
+  }
+
+  /** The archived free boards that the caller reads (spec 001068). */
+  archivedBoards(): Observable<TodoBoardSummary[]> {
+    return this.http.get<TodoBoardSummary[]>(`${this.base}/todos/boards`, {
+      params: httpParams({ archived: true }),
+      context: skipLoading(),
+    });
+  }
+
+  /** A new free board with its entries; needs `todo.create_board` (spec 001061). */
+  createBoard(name: string, entries: readonly TodoBoardEntryIn[]): Observable<TodoBoard> {
+    return this.http.post<TodoBoard>(`${this.base}/todos/boards`, { name, entries }, { context: skipLoading() });
+  }
+
+  /** Delete an archived free board; admins only (spec 001068). */
+  deleteBoard(boardId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/todos/boards/${boardId}`, { context: skipLoading() });
+  }
+
+  archiveBoard(boardId: Uuid): Observable<TodoBoardSummary> {
+    return this.http.post<TodoBoardSummary>(`${this.base}/todos/boards/${boardId}/archive`, null, {
+      context: skipLoading(),
+    });
+  }
+
+  restoreBoard(boardId: Uuid): Observable<TodoBoardSummary> {
+    return this.http.post<TodoBoardSummary>(`${this.base}/todos/boards/${boardId}/restore`, null, {
+      context: skipLoading(),
+    });
+  }
+
+  /** The member entries of a board: the own Gremium first, then Gremien and persons. */
+  entries(boardId: Uuid): Observable<TodoBoardEntry[]> {
+    return this.http.get<TodoBoardEntry[]>(`${this.base}/todos/boards/${boardId}/entries`, {
+      context: skipLoading(),
+    });
+  }
+
+  addEntry(boardId: Uuid, body: TodoBoardEntryIn): Observable<TodoBoardEntry[]> {
+    return this.http.post<TodoBoardEntry[]>(`${this.base}/todos/boards/${boardId}/entries`, body, {
+      context: skipLoading(),
+    });
+  }
+
+  patchEntry(boardId: Uuid, entryId: Uuid, role: TodoEntryRole): Observable<TodoBoardEntry[]> {
+    return this.http.patch<TodoBoardEntry[]>(`${this.base}/todos/boards/${boardId}/entries/${entryId}`, { role }, {
+      context: skipLoading(),
+    });
+  }
+
+  removeEntry(boardId: Uuid, entryId: Uuid): Observable<TodoBoardEntry[]> {
+    return this.http.delete<TodoBoardEntry[]>(`${this.base}/todos/boards/${boardId}/entries/${entryId}`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** The Gremien and persons of the shared picker (spec 001074). */
+  entryOptions(q = ''): Observable<TodoEntryOptions> {
+    return this.http.get<TodoEntryOptions>(`${this.base}/todos/entry-options`, {
+      params: httpParams({ q: q || undefined }),
+      context: skipLoading(),
+    });
   }
 
   patchBoard(boardId: Uuid, body: TodoBoardPatch): Observable<TodoBoard> {

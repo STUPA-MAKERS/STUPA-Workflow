@@ -166,11 +166,11 @@ def test_with_plan_fields() -> None:
     assert out == [
         {
             "id": 1, "plan_enabled": True, "plan_coverable_default": False,
-            "planned_in": ("fy",),
+            "planned_in": ("fy",), "income_in": (),
             "children": [
                 {
                     "id": 2, "plan_enabled": False, "plan_coverable_default": False,
-                    "planned_in": ("fy",), "children": [],
+                    "planned_in": ("fy",), "income_in": (), "children": [],
                 }
             ],
         }
@@ -178,6 +178,20 @@ def test_with_plan_fields() -> None:
     marked = plan_rules.with_plan_fields(forest, {}, {}, {1: True})
     assert marked[0]["plan_coverable_default"] is True
     assert marked[0]["children"][0]["plan_coverable_default"] is False
+    income = plan_rules.with_plan_fields(forest, {}, {}, None, {2: ["fy"]})
+    assert income[0]["income_in"] == ()
+    assert income[0]["children"][0]["income_in"] == ("fy",)
+
+
+def test_income_nodes_are_the_nodes_below_an_income_titel() -> None:
+    """A Kostenstelle is income at or below an income Titel, never beside it.
+
+    Rule: §F/finance/budget/001030.
+    """
+    paths = {1: "VS", 2: "VS-1", 3: "VS-1-A", 4: "VS-10", 5: "VS-2", 6: "QS-1"}
+    below = {n for n, p in paths.items() if plan_rules.is_below_path(p, ("VS-1",))}
+    assert below == {2, 3}
+    assert not plan_rules.is_below_path("VS-1", ())
 
 
 @pytest.mark.parametrize(
@@ -326,3 +340,12 @@ def test_a_draft_must_not_give_two_cost_centres_one_path_key() -> None:
     assert not plan_rules.path_key_clash({one: "VS-82", two: "VS-9"}, now)
     assert plan_rules.path_key_clash({one: "VS-9", two: "VS-91"}, now)
     assert plan_rules.path_key_clash({one: "VS-7", two: "VS-7"}, now)
+
+
+def test_a_predecessor_takes_its_line_of_the_year_before_from_its_own_cost_center() -> None:
+    """A line of the year before compares with one line only.
+
+    Rule: §F/finance/budget/001040.
+    """
+    a, b, c = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    assert plan_rules.compared_with([(a, None), (b, a), (c, None)]) == {a: None, b: a, c: c}

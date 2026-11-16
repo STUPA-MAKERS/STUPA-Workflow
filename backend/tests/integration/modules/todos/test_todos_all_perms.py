@@ -387,7 +387,7 @@ def _admin_grants(engine: Engine) -> list[str]:
                 text(
                     "SELECT rp.permission FROM role_permission rp "
                     "JOIN role r ON r.id = rp.role_id "
-                    "WHERE r.key = 'admin' AND rp.permission LIKE 'todo.%' "
+                    "WHERE r.key = 'admin' AND rp.permission IN ('todo.all', 'todo.read_all') "
                     "ORDER BY rp.permission"
                 )
             ).scalars()

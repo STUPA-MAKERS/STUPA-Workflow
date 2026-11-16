@@ -382,6 +382,9 @@ export interface BudgetTreeNode {
    * it the fiscal years whose version in force has a line for the node.
    */
   readonly plannedIn?: readonly Uuid[];
+  /** The fiscal years whose plan version in force puts the node on the income side. An
+   *  Antrag must not take the node in these years (spec 001030). */
+  readonly incomeIn?: readonly Uuid[];
   readonly byFiscalYear: readonly BudgetAllocationView[];
   readonly children: readonly BudgetTreeNode[];
 }

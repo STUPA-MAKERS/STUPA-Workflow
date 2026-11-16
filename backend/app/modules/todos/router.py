@@ -39,6 +39,7 @@ from app.modules.todos.live import publish_pings, todo_broker
 from app.modules.todos.mails import notify_todo_mails
 from app.modules.todos.schemas import (
     AssigneeIn,
+    BoardCreate,
     BoardPatch,
     CardCreate,
     CardLabelIn,
@@ -52,12 +53,16 @@ from app.modules.todos.schemas import (
     ColumnPatch,
     CommentCreate,
     CommentIn,
+    EntryIn,
+    EntryOptionsOut,
+    EntryPatch,
     EventIn,
     LabelCreate,
     LabelPatch,
     LinkIn,
     SeriesCreate,
     TodoAssignedBoard,
+    TodoBoardEntryOut,
     TodoBoardOut,
     TodoBoardSummary,
     TodoCardDetail,
@@ -178,12 +183,147 @@ async def list_boards(
     service: ServiceDep,
     principal: Member,
     gremium_id: Annotated[UUID | None, Query(alias="gremiumId")] = None,
+    archived: bool = False,
 ) -> list[TodoBoardSummary]:
-    """List the readable boards: personal, the gremium boards by name, then team.
+    """List the readable boards: personal, gremium, free and team boards, each by name.
 
-    The first call creates the personal board "Meine To-Dos".
+    The first call creates the personal board "Meine To-Dos". ``archived`` lists the
+    archived free boards that the caller manages instead (spec 001068).
     """
+    if archived:
+        return await service.archived_boards(principal)
     return await service.list_boards(principal, gremium_id=gremium_id)
+
+
+@router.post(
+    "/boards",
+    response_model=TodoBoardOut,
+    status_code=status.HTTP_201_CREATED,
+    responses=_errors(401, 403, 422),
+)
+async def create_board(
+    payload: BoardCreate,
+    service: ServiceDep,
+    principal: Member,
+    background: BackgroundTasks,
+    request: Request,
+    settings: SettingsDep,
+    send: MailSenderDep,
+) -> TodoBoardOut:
+    """Create a free board (admins and ``todo.create_board``, spec 001061)."""
+    out = await service.create_board(payload, principal)
+    await service.session.commit()
+    _send(service, background, request, settings, send)
+    return out
+
+
+@router.delete(
+    "/boards/{board_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def delete_board(board_id: UUID, service: ServiceDep, principal: Member) -> Response:
+    """Delete an archived free board with its cards (admins only, spec 001068)."""
+    storage_keys = await service.delete_board(board_id, principal)
+    await service.session.commit()
+    await service.files.remove_objects(storage_keys)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/boards/{board_id}/archive",
+    response_model=TodoBoardSummary,
+    responses=_errors(401, 403, 404, 422),
+)
+async def archive_board(board_id: UUID, service: ServiceDep, principal: Member) -> TodoBoardSummary:
+    """Archive a free board: hidden and read-only (manage, spec 001068)."""
+    out = await service.archive_board(board_id, principal)
+    await service.session.commit()
+    return out
+
+
+@router.post(
+    "/boards/{board_id}/restore",
+    response_model=TodoBoardSummary,
+    responses=_errors(401, 403, 404, 422),
+)
+async def restore_board(board_id: UUID, service: ServiceDep, principal: Member) -> TodoBoardSummary:
+    """Restore an archived free board (manage, spec 001068)."""
+    out = await service.restore_board(board_id, principal)
+    await service.session.commit()
+    return out
+
+
+@router.get("/entry-options", response_model=EntryOptionsOut, responses=_errors(401))
+async def entry_options(
+    service: ServiceDep, principal: Member, q: Annotated[str, Query(max_length=100)] = ""
+) -> EntryOptionsOut:
+    """The gremien and persons of the shared picker (spec 001074): names, never e-mails."""
+    return await service.entry_options(principal, q)
+
+
+@router.get(
+    "/boards/{board_id}/entries",
+    response_model=list[TodoBoardEntryOut],
+    responses=_errors(401, 404),
+)
+async def board_entries(
+    board_id: UUID, service: ServiceDep, principal: Member
+) -> list[TodoBoardEntryOut]:
+    """The member entries of the board: the own gremium first, then gremien and persons."""
+    return await service.entries(board_id, principal)
+
+
+@router.post(
+    "/boards/{board_id}/entries",
+    response_model=list[TodoBoardEntryOut],
+    status_code=status.HTTP_201_CREATED,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def add_board_entry(
+    board_id: UUID,
+    payload: EntryIn,
+    service: ServiceDep,
+    principal: Member,
+    background: BackgroundTasks,
+    request: Request,
+    settings: SettingsDep,
+    send: MailSenderDep,
+) -> list[TodoBoardEntryOut]:
+    """Add a gremium or a person with a role (manage, specs 001064, 001077)."""
+    out = await service.add_entry(board_id, payload, principal)
+    await service.session.commit()
+    _send(service, background, request, settings, send)
+    return out
+
+
+@router.patch(
+    "/boards/{board_id}/entries/{entry_id}",
+    response_model=list[TodoBoardEntryOut],
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def patch_board_entry(
+    board_id: UUID, entry_id: UUID, payload: EntryPatch, service: ServiceDep, principal: Member
+) -> list[TodoBoardEntryOut]:
+    """Change the role of an entry (manage; 409 ``last_manager``)."""
+    out = await service.patch_entry(board_id, entry_id, payload, principal)
+    await service.session.commit()
+    return out
+
+
+@router.delete(
+    "/boards/{board_id}/entries/{entry_id}",
+    response_model=list[TodoBoardEntryOut],
+    responses=_errors(401, 403, 404, 409),
+)
+async def delete_board_entry(
+    board_id: UUID, entry_id: UUID, service: ServiceDep, principal: Member
+) -> list[TodoBoardEntryOut]:
+    """Remove an entry (manage; 409 ``last_manager``)."""
+    out = await service.delete_entry(board_id, entry_id, principal)
+    await service.session.commit()
+    return out
 
 
 @router.get(
