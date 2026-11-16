@@ -505,7 +505,7 @@ describe('AdminFrameComponent in account mode', () => {
   it('lists the account pages under "Konto", without search, tiles and group heading', async () => {
     const view = await setupAccount(['mcp.use']);
     expect(screen.getByRole('heading', { name: 'Konto', level: 1 })).toBeInTheDocument();
-    expect(accountLinks()).toEqual(['/account/notifications', '/account/grants']);
+    expect(accountLinks()).toEqual(['/account/profile', '/account/notifications', '/account/grants']);
     expect(screen.queryByRole('searchbox')).toBeNull();
     expect(view.container.querySelector('app-admin-health')).toBeNull();
     expect(view.api.listBackups).not.toHaveBeenCalled();
@@ -547,7 +547,7 @@ describe('AdminFrameComponent in account mode', () => {
 
   it('shows "API-Zugang" only with mcp.use, like the account menu', async () => {
     await setupAccount([]);
-    expect(accountLinks()).toEqual(['/account/notifications']);
+    expect(accountLinks()).toEqual(['/account/profile', '/account/notifications']);
   });
 
   it('wide: the home page is the navigation beside the empty sheet', async () => {

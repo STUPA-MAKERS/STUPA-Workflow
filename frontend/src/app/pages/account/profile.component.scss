@@ -47,9 +47,14 @@
   transition: opacity var(--motion-xs) var(--ease-standard);
 }
 
-.pf__avatar--link:hover .pf__ext,
 .pf__avatar--link:focus-visible .pf__ext {
   opacity: 1;
+}
+
+@media (hover: hover) {
+  .pf__avatar--link:hover .pf__ext {
+    opacity: 1;
+  }
 }
 
 // A touch screen has no hover: a small badge on the corner shows the link always.
