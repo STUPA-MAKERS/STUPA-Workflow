@@ -22,6 +22,7 @@ separate from the global group mappings and from each other.
 
 from __future__ import annotations
 
+import asyncio
 from datetime import date
 from typing import Annotated, Any
 from uuid import UUID
@@ -124,6 +125,14 @@ from app.modules.gremien.role_schemas import (
 )
 from app.modules.livevote.open_window import MeetingSettingsService, gremium_defaults
 from app.modules.meetings.periods import periods
+from app.modules.site_config.brand_images import (
+    ICON_SIZES,
+    MASKABLE_SIZES,
+    IconPurpose,
+    favicon_file,
+    icon_png,
+    preview_png,
+)
 from app.modules.site_config.branding import Branding
 from app.modules.site_config.cd_logos import LogoSlot
 from app.modules.site_config.features import FeatureSwitches
@@ -1655,4 +1664,74 @@ async def get_manifest(
         content=body,
         media_type="application/manifest+json",
         headers={"Cache-Control": "public, max-age=300"},
+    )
+
+
+#: The cache time of the branded head and images. A link carries ``?v=<version>``, so a
+#: save shows at once on the next page load; the 5 minutes cover a bare URL.
+_BRAND_CACHE = "public, max-age=300"
+
+#: The file names of the app icon route: ``icon-<n>x<n>.png`` and
+#: ``icon-maskable-<n>x<n>.png`` for the sizes of ``brand_images``.
+_ICON_NAMES: dict[str, tuple[int, IconPurpose]] = {
+    **{f"icon-{n}x{n}.png": (n, "any") for n in ICON_SIZES},
+    **{f"icon-maskable-{n}x{n}.png": (n, "maskable") for n in MASKABLE_SIZES},
+}
+
+
+@public_router.get("/page-head", include_in_schema=False)
+async def get_page_head(service: SiteServiceDep, settings: SettingsDep) -> Response:
+    """Serve the branded tags of the page head as an HTML fragment.
+
+    The web server includes the fragment into ``index.html`` with an SSI subrequest, so a
+    link preview reads the name, the description and the image of the active branding
+    (§ F/administration/admin/001090). The route is auth-free like the manifest.
+    """
+    return Response(
+        content=await service.page_head(settings.public_base_url),
+        media_type="text/html; charset=utf-8",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+def _png_response(data: bytes | None) -> Response:
+    if data is None:
+        raise NotFoundError("Kein Bild im Branding.", code="branding_image_missing")
+    return Response(content=data, media_type="image/png", headers={"Cache-Control": _BRAND_CACHE})
+
+
+@public_router.get("/branding/preview.png", include_in_schema=False)
+async def get_branding_preview(service: SiteServiceDep) -> Response:
+    """Serve the link preview image: the Bildmarke, else the Wortmarke, on a square.
+
+    Answers 404 without an inline mark; the page head then links the built-in icon.
+    """
+    branding, _ = await service.branding_and_version()
+    return _png_response(await asyncio.to_thread(preview_png, branding))
+
+
+@public_router.get("/branding/icons/{name}", include_in_schema=False)
+async def get_branding_icon(name: str, service: SiteServiceDep) -> Response:
+    """Serve an app icon from the Bildmarke (§ F/administration/admin/001092).
+
+    Answers 404 for an unknown file name or without an inline Bildmarke.
+    """
+    size = _ICON_NAMES.get(name)
+    if size is None:
+        raise NotFoundError("Unbekanntes Icon.", code="branding_image_missing")
+    branding, _ = await service.branding_and_version()
+    return _png_response(await asyncio.to_thread(icon_png, branding, *size))
+
+
+@public_router.get("/branding/favicon", include_in_schema=False)
+async def get_branding_favicon(service: SiteServiceDep) -> Response:
+    """Serve the uploaded favicon as stored; 404 without an inline one."""
+    branding, _ = await service.branding_and_version()
+    favicon = favicon_file(branding)
+    if favicon is None:
+        raise NotFoundError("Kein Favicon im Branding.", code="branding_image_missing")
+    return Response(
+        content=favicon.data,
+        media_type=favicon.mime,
+        headers={"Cache-Control": _BRAND_CACHE, "X-Content-Type-Options": "nosniff"},
     )

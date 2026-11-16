@@ -1302,6 +1302,8 @@ export interface Branding {
   appName?: string;
   /** Short app name (PWA icon/home screen). Empty ⇒ the default. */
   appShortName?: string;
+  /** One sentence about the platform per language (spec 001093). Empty uses the built-in text. */
+  description?: I18nMap;
   logos: Partial<Record<LogoSlot, BrandingAsset>>;
   copyright: I18nMap;
   legalLinks: FooterLink[];

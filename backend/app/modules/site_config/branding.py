@@ -49,6 +49,8 @@ MAX_LOGO_BYTES = 2 * 1024 * 1024
 #: Length caps for the i18n texts. They guard the auth-free public config against bloat.
 MAX_FREETEXT_CHARS = 10_000
 MAX_LABEL_CHARS = 500
+#: The description of the platform: one or two sentences, as a link preview shows them.
+MAX_DESCRIPTION_CHARS = 300
 MAX_I18N_KEY_CHARS = 16
 
 LogoSlot = Literal["wordmark", "imagemark", "favicon"]
@@ -286,6 +288,10 @@ class Branding(FrozenStrictCamelModel, frozen=True):
     #: back to the hardcoded defaults and the i18n values.
     app_name: str = Field(default="", alias="appName", max_length=MAX_LABEL_CHARS)
     app_short_name: str = Field(default="", alias="appShortName", max_length=MAX_LABEL_CHARS)
+    #: One sentence about the platform, per language. It is the description of the page
+    #: head, of the link preview and of the PWA manifest. An empty language falls back to
+    #: the built-in text (``admin.page_head.DEFAULT_DESCRIPTION``).
+    description: I18nMap = Field(default_factory=dict)
     logos: dict[LogoSlot, BrandingAsset] = Field(default_factory=dict)
     copyright: I18nMap = Field(default_factory=dict)
     legal_links: list[FooterLink] = Field(default_factory=list, alias="legalLinks", max_length=50)
@@ -328,6 +334,11 @@ class Branding(FrozenStrictCamelModel, frozen=True):
     @classmethod
     def _cap_copyright(cls, v: I18nMap) -> I18nMap:
         return _cap_i18n(v, MAX_LABEL_CHARS)
+
+    @field_validator("description")
+    @classmethod
+    def _cap_description(cls, v: I18nMap) -> I18nMap:
+        return _cap_i18n(v, MAX_DESCRIPTION_CHARS)
 
 
 class PublicBranding(Branding, frozen=True):

@@ -18,6 +18,10 @@ export type FreeTexts = NonNullable<NonNullable<PublicSiteConfig['branding']>['f
 type PublicBranding = NonNullable<PublicSiteConfig['branding']>;
 
 /** A logo slot of the branding. */
+/** The iOS home screen icon from the Bildmarke (API) and the built-in one (build). */
+const BRANDED_APPLE_ICON = 'api/branding/icons/icon-180x180.png';
+const DEFAULT_APPLE_ICON = 'apple-touch-icon.png';
+
 export type BrandLogoSlot = 'wordmark' | 'imagemark' | 'favicon';
 
 /**
@@ -69,6 +73,7 @@ export class BrandingService {
 
   /** Configured full name (empty ⇒ fallback). */
   private readonly _configuredName = signal('');
+  private readonly _configuredShortName = signal('');
 
   /**
    * The footer copyright. Footer content comes from the PUBLIC config, which needs no
@@ -181,6 +186,12 @@ export class BrandingService {
   );
 
   /**
+   * Short name: the config value, else the built-in "STUPA". The texts reach it as the
+   * placeholder `{shortName}` (spec 001096), for example "STUPA-Konto".
+   */
+  readonly shortName = computed(() => this._configuredShortName().trim() || 'STUPA');
+
+  /**
    * Home heading (H1): the config value, else i18n `home.heading`. By design the
    * configured name replaces the WHOLE heading. It gets no "Workflow" suffix.
    */
@@ -196,6 +207,22 @@ export class BrandingService {
     effect(() => {
       const preview = this._accentPreview();
       applyAccent(preview === undefined ? this._accent() : preview);
+    });
+    effect(() => this.i18n.setBrandParams({ shortName: this.shortName() }));
+    // The server fills the head from the branding (spec 001090), but the service worker
+    // serves the built file with the built-in tags; this keeps the iOS home screen name
+    // and icon of such a page on the branding too (spec 001092).
+    effect(() => {
+      document
+        .querySelector('meta[name="apple-mobile-web-app-title"]')
+        ?.setAttribute('content', this.shortName());
+      const mark = this._logos().imagemark;
+      document
+        .querySelector('link[rel="apple-touch-icon"]')
+        ?.setAttribute(
+          'href',
+          mark?.startsWith('data:') ? BRANDED_APPLE_ICON : DEFAULT_APPLE_ICON,
+        );
     });
     const builtIn = new Map<HTMLLinkElement, string>();
     effect(() => {
@@ -220,6 +247,7 @@ export class BrandingService {
   /** Take the branding parts that the whole app shows: after the load and after a save. */
   applyBranding(branding: PublicBranding | null | undefined): void {
     this._configuredName.set(branding?.appName ?? '');
+    this._configuredShortName.set(branding?.appShortName ?? '');
     this._copyright.set(branding?.copyright ?? null);
     this._legalLinks.set(branding?.legalLinks ?? []);
     this._freetexts.set(branding?.freetexts ?? {});

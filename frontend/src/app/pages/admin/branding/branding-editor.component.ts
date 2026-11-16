@@ -261,6 +261,16 @@ export class BrandingEditorComponent {
     return this.builtIn('footer.coBranding');
   }
 
+  /** The built-in description in the picked language: the placeholder of its field. */
+  protected descriptionDefault(): string {
+    return this.builtIn('app.description');
+  }
+
+  /** The description map; a config from before the field has none, so it gets one. */
+  protected descriptionMap(d: Branding): I18nMap {
+    return (d.description ??= {});
+  }
+
   /** The built-in app name: the placeholder of the name field. */
   protected appNameDefault(): string {
     return this.builtIn('app.title');
