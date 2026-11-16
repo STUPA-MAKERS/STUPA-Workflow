@@ -6,6 +6,10 @@
 
 #let plan-size = 8.5pt
 
+// A line with lines below it holds the sum of those lines, so it prints in
+// grey (spec 000968). #666666 keeps a contrast of 5.7:1 on white.
+#let parent-gray = rgb("#666666")
+
 // One row of the table as cells. A group heading spans the table. A sum and
 // the balance print bold below a thin rule.
 #let plan-row(row, cols) = {
@@ -20,7 +24,8 @@
       )),
     )
   } else if row.kind == "line" {
-    range(cols).map(i => if i == 1 { pad(left: row.depth * 0.9em, cells.at(i)) } else { cells.at(i) })
+    let ink = if row.at("leaf", default: true) { black } else { parent-gray }
+    range(cols).map(i => text(fill: ink, if i == 1 { pad(left: row.depth * 0.9em, cells.at(i)) } else { cells.at(i) }))
   } else {
     (
       table.hline(stroke: 0.4pt),

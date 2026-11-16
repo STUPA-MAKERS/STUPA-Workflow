@@ -497,15 +497,11 @@ def money(value: Decimal) -> str:
     return f"−{text}" if value < 0 else text
 
 
-def _pdf_cell(cell: Cell, *, leaf: bool = True) -> str:
-    """Return a cell as text. An amount of a line with lines below it stands in brackets.
-
-    Such an amount is the sum of the lines below it, so it is not counted again
-    (spec 000968).
-    """
+def _pdf_cell(cell: Cell) -> str:
+    """Return a cell as text, an amount the German way."""
     if not isinstance(cell, Decimal):
         return cell or ""
-    return money(cell) if leaf else f"({money(cell)})"
+    return money(cell)
 
 
 def pdf_source(export: PlanExport) -> str:
@@ -530,7 +526,8 @@ def pdf_config(export: PlanExport) -> dict[str, object]:
                 {
                     "kind": row.kind,
                     "depth": row.depth,
-                    "cells": [_pdf_cell(c, leaf=row.leaf) for c in row.cells],
+                    "leaf": row.leaf,
+                    "cells": [_pdf_cell(c) for c in row.cells],
                 }
                 for row in sheet_rows(export)
             ],

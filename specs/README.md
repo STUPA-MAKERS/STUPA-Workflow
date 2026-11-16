@@ -380,7 +380,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000929](requirements/functional/finance/budget/000929_plan-line-with-bookings-stays.md) | The line of a Kostenstelle with bookings is not removed | approved |
 | [F/finance/budget/000930](requirements/functional/finance/budget/000930_fiscal-year-audit.md) | The create and the change of a fiscal year are in the audit log | approved |
 | [F/finance/budget/000964](requirements/functional/finance/budget/000964_plan-pdf-head-line.md) | The head line of the plan PDF sits tight between the title and the table | approved |
-| [F/finance/budget/000968](requirements/functional/finance/budget/000968_plan-pdf-parent-amounts-in-brackets.md) | The plan PDF shows the amounts of a line with lines below it in brackets | approved |
+| [F/finance/budget/000968](requirements/functional/finance/budget/000968_plan-pdf-parent-lines-grey.md) | The plan PDF prints a line with lines below it in grey | approved |
 | [F/finance/budget/000990](requirements/functional/finance/budget/000990_late-booking-in-past-year.md) | A past fiscal year that is not closed takes a booking with a date in the year | approved |
 | [F/finance/budget/000991](requirements/functional/finance/budget/000991_close-names-open-antraege.md) | The close of a fiscal year names what stays open, and an Antrag can leave a closed year | approved |
 | [F/finance/budget/000992](requirements/functional/finance/budget/000992_stichtag-keeps-closed-years.md) | A new Stichtag moves only the fiscal years that are not closed | approved |

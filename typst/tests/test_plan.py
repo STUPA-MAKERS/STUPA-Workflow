@@ -67,6 +67,15 @@ def test_the_plan_takes_its_title_from_the_source_and_its_logos_from_the_config(
     assert doc["footer_logos"] == [{"name": "HSRT"}]
 
 
+def test_a_line_with_lines_below_keeps_its_leaf_flag() -> None:
+    """Rule: §F/finance/budget/000968. `leaf` passes to the template; a row without it is a leaf."""
+    parent = {**_row("line", "Personalausgaben", "64.000,00"), "leaf": False}
+    doc = build_document(SOURCE, variant="plan", config=_plan(rows=[parent, _row("sum", "S")]))
+    plan = doc["plan"]
+    assert isinstance(plan, dict)
+    assert [row["leaf"] for row in plan["rows"]] == [False, True]
+
+
 @pytest.mark.parametrize(
     "config",
     [
@@ -84,6 +93,7 @@ def test_the_plan_takes_its_title_from_the_source_and_its_logos_from_the_config(
         _plan(rows=[{"kind": "line", "depth": "0", "cells": ["", "", "", "", "", ""]}]),
         _plan(rows=[{"kind": "line", "depth": 0, "cells": ["too", "few"]}]),
         _plan(rows=[{"kind": "line", "depth": 0, "cells": [1, 2, 3, 4, 5, 6]}]),
+        _plan(rows=[{"kind": "line", "depth": 0, "leaf": "no", "cells": [""] * 6}]),
     ],
 )
 def test_a_plan_of_a_wrong_shape_is_refused(config: dict[str, object]) -> None:
