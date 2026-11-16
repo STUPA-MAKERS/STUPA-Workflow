@@ -80,7 +80,7 @@ async def _seed(
         session.add(gremium)
         await session.flush()
         app_type = ApplicationType(
-            gremium_id=gremium.id, key=f"t-{tag}", name_i18n={}, has_budget=False
+            gremium_id=gremium.id, key=f"t-{tag}", name_i18n={}, has_budget=True
         )
         budget = Budget(parent_id=None, key=f"K{tag}", path_key=f"K{tag}", name="Topf")
         hook = Webhook(

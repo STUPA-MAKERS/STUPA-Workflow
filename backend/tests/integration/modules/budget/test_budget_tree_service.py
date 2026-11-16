@@ -277,7 +277,7 @@ async def test_committed_rollup(session: AsyncSession) -> None:
         FiscalYearCreate(year=2026),
     )
 
-    app_type = ApplicationType(key=f"t-{_suffix()}", name_i18n={})
+    app_type = ApplicationType(key=f"t-{_suffix()}", name_i18n={}, has_budget=True)
     session.add(app_type)
     await session.flush()
     fv = FormVersion(application_type_id=app_type.id, version=1)
@@ -612,7 +612,7 @@ async def test_the_close_names_open_antraege_and_they_move_to_an_open_year(
     old = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this - 1))
     now = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this))
 
-    app_type = ApplicationType(key=f"t-{_suffix()}", name_i18n={})
+    app_type = ApplicationType(key=f"t-{_suffix()}", name_i18n={}, has_budget=True)
     session.add(app_type)
     await session.flush()
     fv = FormVersion(application_type_id=app_type.id, version=1)
