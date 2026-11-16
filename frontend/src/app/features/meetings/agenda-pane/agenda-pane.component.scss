@@ -160,3 +160,15 @@
     rotate: none;
   }
 }
+
+.ap__plan-end {
+  flex: none;
+  margin: 0;
+  padding: var(--space-2) var(--space-4) 0;
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+.ap__plan-end--over {
+  color: var(--color-warning);
+  font-weight: var(--fw-semibold);
+}

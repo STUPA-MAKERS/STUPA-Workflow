@@ -4,6 +4,7 @@ import {
   Component,
   computed,
   effect,
+  DestroyRef,
   ElementRef,
   inject,
   input,
@@ -21,8 +22,11 @@ import type { AgendaItem, Meeting, MeetingVote, Uuid } from '@core/api/models';
 import { TodosApiService, type TodoCardDetail } from '@core/api/todos.service';
 import {
   BadgeComponent,
+  ButtonComponent,
   ConfirmDialogComponent,
+  DialogComponent,
   EmptyStateComponent,
+  InputComponent,
   IconComponent,
   ListItemComponent,
   RowMenuComponent,
@@ -37,9 +41,10 @@ import { BodyPortalDirective } from '@shared/ui/body-portal/body-portal.directiv
 import { TodoLinkCardDialogComponent } from '../../todos/link-card-dialog/todo-link-card-dialog.component';
 import { TodoLinkedRefresh } from '../../todos/linked-list/todo-linked-refresh';
 import { TopBadgeComponent } from '../top-badge/top-badge.component';
+import { agendaPlan, planClock } from '../agenda-plan.util';
 
 /** The ids of the row menu items of an agenda item. */
-type AgendaAction = 'done' | 'rename' | 'up' | 'down' | 'nonPublic' | 'remove' | 'todo' | 'link';
+type AgendaAction = 'done' | 'rename' | 'duration' | 'up' | 'down' | 'nonPublic' | 'remove' | 'todo' | 'link';
 
 /**
  * Rename an agenda item and set its mark "nicht öffentlich": the meeting lead with write
@@ -97,6 +102,9 @@ export interface AgendaMove {
   imports: [
     TopBadgeComponent,
     ConfirmDialogComponent,
+    ButtonComponent,
+    DialogComponent,
+    InputComponent,
     EmptyStateComponent,
     CdkDrag,
     CdkDragPlaceholder,
@@ -207,6 +215,59 @@ export class AgendaPaneComponent {
     const m = this.meeting();
     return m.status === 'planned' ? null : m.currentAgendaItemId;
   });
+  /** The clock of the live plan: one tick each minute (§ 001143). */
+  private readonly clock = signal(new Date());
+  private readonly ticker = (() => {
+    const id = setInterval(() => this.clock.set(new Date()), 60_000);
+    inject(DestroyRef).onDestroy(() => clearInterval(id));
+    return id;
+  })();
+  /** The time plan of the agenda (§ 001141 – § 001144). */
+  protected readonly plan = computed(() => {
+    const own = this.durations();
+    const items = this.agenda().map((i) => (own.has(i.id) ? { ...i, estimatedMinutes: own.get(i.id) } : i));
+    return agendaPlan(items, this.meeting(), this.clock());
+  });
+  /** "Dauer ändern": the item, the draft, and the saved values of this mockup. */
+  protected readonly durationItem = signal<AgendaItem | null>(null);
+  protected readonly durationDraft = signal<number | null>(null);
+  private readonly durations = signal<ReadonlyMap<Uuid, number | null>>(new Map());
+  protected saveDuration(): void {
+    const item = this.durationItem();
+    if (!item) return;
+    const raw = this.durationDraft();
+    const value = raw === null || (raw as unknown) === '' ? null : Number(raw);
+    this.durations.update((m) => new Map(m).set(item.id, value));
+    this.durationItem.set(null);
+  }
+  /** The plan part of the row subline: `ca. 18:10 · 10 Min.`, or `18:04` for a reached item. */
+  protected planText(index: number): string | null {
+    const row = this.plan().rows[index];
+    if (!row) return null;
+    const parts: string[] = [];
+    if (row.start !== null) {
+      parts.push(
+        row.actual
+          ? this.i18n.translate('meetings.agenda.planActual', { time: planClock(row.start) })
+          : this.i18n.translate('meetings.agenda.planStart', { time: planClock(row.start) }),
+      );
+    }
+    if (row.minutes !== null) parts.push(this.i18n.translate('meetings.agenda.planMinutes', { n: row.minutes }));
+    return parts.length ? parts.join(' · ') : null;
+  }
+  /** The line below the last row: the planned end (§ 001144) or the sum (§ 001142). */
+  protected readonly planEnd = computed(() => {
+    const plan = this.plan();
+    if (plan.end !== null && plan.total !== null) {
+      const end = this.meeting().endTime;
+      return plan.overrun && end
+        ? this.i18n.translate('meetings.agenda.planEndOver', { time: planClock(plan.end), end: end.slice(0, 5) })
+        : this.i18n.translate('meetings.agenda.planEnd', { time: planClock(plan.end) });
+    }
+    if (plan.total !== null) return this.i18n.translate('meetings.agenda.planTotal', { n: plan.total });
+    return null;
+  });
+
   /** A row lifts while the agenda may change, is not saving and the row is not in rename. */
   protected canDrag(item: AgendaItem): boolean {
     return this.canChangeAgenda() && !this.savingAgenda() && !this.renaming(item);
@@ -226,7 +287,8 @@ export class AgendaPaneComponent {
    * "Antrag · Abstimmung offen", "To-Do". The number badge already names the TOP, and a
    * free-text item needs no kind: it gets a sub line only for an open vote, else none.
    */
-  protected sub(item: AgendaItem): string | null {
+  protected sub(item: AgendaItem, index: number): string | null {
+    const plan = this.planText(index);
     const kind = item.applicationId
       ? [this.i18n.translate('meetings.agenda.kindApplication')]
       : item.todoId
@@ -235,7 +297,7 @@ export class AgendaPaneComponent {
     const open = this.votesFor(item.id).some((v) => v.status === 'open')
       ? [this.i18n.translate('meetings.agenda.voteOpen')]
       : [];
-    const parts = [...kind, ...open];
+    const parts = [...(plan ? [plan] : []), ...kind, ...open];
     return parts.length ? parts.join(' · ') : null;
   }
 
@@ -301,8 +363,10 @@ export class AgendaPaneComponent {
 
     const up: RowMenuItem = { id: 'up', label: t('meetings.agenda.moveUp'), icon: 'up' };
     const down: RowMenuItem = { id: 'down', label: t('meetings.agenda.moveDown'), icon: 'down' };
+    const duration: RowMenuItem = { id: 'duration', label: t('meetings.agenda.durationEdit'), icon: 'clock' };
     const edit: readonly RowMenuItem[] = [
       rename,
+      duration,
       ...(index > 0 ? [up] : []),
       ...(index < this.agenda().length - 1 ? [down] : []),
     ];
@@ -340,6 +404,10 @@ export class AgendaPaneComponent {
         break;
       case 'done':
         this.setDone.emit({ item, done: !item.doneAt });
+        break;
+      case 'duration':
+        this.durationItem.set(item);
+        this.durationDraft.set(this.durations().get(item.id) ?? item.estimatedMinutes ?? null);
         break;
       case 'rename':
         this.renamingHere.set(item.id);

@@ -144,6 +144,8 @@ export class AgendaItemDialogComponent {
    */
   readonly description = signal('');
   readonly nonPublic = signal(false);
+  /** The estimated duration in minutes (§ 001140); empty means none. */
+  readonly minutes = signal<number | null>(null);
   readonly saving = signal(false);
 
   /** The open cards of the gremium board; `null` until the first switch to "To-Do". */
@@ -281,6 +283,7 @@ export class AgendaItemDialogComponent {
     this.freetext.set('');
     this.description.set('');
     this.nonPublic.set(false);
+    this.minutes.set(null);
     this.saving.set(false);
     this.todos.set(null);
     this.todoQuery.set('');

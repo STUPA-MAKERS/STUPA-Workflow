@@ -50,7 +50,7 @@
         } @else {
           <app-list-item
             [title]="title(item)"
-            [sub]="sub(item)"
+            [sub]="sub(item, i)"
             [selected]="item.id === selectedId()"
             (activate)="pick.emit(item.id)"
           >
@@ -79,6 +79,9 @@
       </li>
     }
   </ol>
+  @if (planEnd(); as end) {
+    <p class="ap__plan-end" [class.ap__plan-end--over]="plan().overrun">{{ end }}</p>
+  }
 } @else {
   <app-empty-state shape="agenda" rows="3" [heading]="'meetings.agenda.empty' | t" />
 }
@@ -99,3 +102,29 @@
   (confirm)="confirmRemove()"
   (cancel)="removing.set(null)"
 />
+
+@if (durationItem(); as item) {
+  <app-dialog
+    appBodyPortal
+    [open]="true"
+    [title]="'meetings.agenda.durationEdit' | t"
+    [closeLabel]="'action.close' | t"
+    size="form"
+    (closed)="durationItem.set(null)"
+  >
+    <form (submit)="$event.preventDefault(); saveDuration()">
+      <app-input
+        type="number"
+        name="minutes"
+        [id]="'ap-minutes'"
+        [label]="'meetings.agenda.duration' | t"
+        [suffix]="'meetings.agenda.durationUnit' | t"
+        [ngModel]="durationDraft()"
+        (ngModelChange)="durationDraft.set($event)"
+      />
+      <button type="submit" hidden></button>
+    </form>
+    <app-button dialog-footer variant="text" (click)="durationItem.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button dialog-footer variant="fill" (click)="saveDuration()">{{ 'action.save' | t }}</app-button>
+  </app-dialog>
+}
