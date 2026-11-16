@@ -2,7 +2,7 @@
 id: "001095"
 title: The account on the login names the short name
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:

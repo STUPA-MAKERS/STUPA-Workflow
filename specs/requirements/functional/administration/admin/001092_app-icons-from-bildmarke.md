@@ -2,7 +2,7 @@
 id: "001092"
 title: The app icons follow the Bildmarke
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:

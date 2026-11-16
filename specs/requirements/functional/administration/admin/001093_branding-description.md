@@ -2,7 +2,7 @@
 id: "001093"
 title: The branding holds the description of the platform
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:

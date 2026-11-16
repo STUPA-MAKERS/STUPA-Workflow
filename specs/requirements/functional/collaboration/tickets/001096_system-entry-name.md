@@ -2,7 +2,7 @@
 id: "001096"
 title: A system entry names the short name
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:

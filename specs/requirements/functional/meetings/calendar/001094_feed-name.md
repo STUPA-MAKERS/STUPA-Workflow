@@ -2,7 +2,7 @@
 id: "001094"
 title: A calendar feed is named by the short name
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:
