@@ -380,8 +380,8 @@ describe('BudgetPlanComponent', () => {
       const before = plan([version({ id: 'p', state: 'in_force', lines: [line('fees', '80'), line('grants', '30')] })], 'fy-25');
       const view = await setup({ plans: { 'fy-26': plan(), 'fy-25': before }, query: { costCentre: 'fees' } });
       const figures = text(view.container.querySelector('.bd__figs'));
-      expect(figures).toContain('Ansatz 2025/2680 €');
-      expect(figures).toContain('Ist 2025/2690 €');
+      expect(figures).toContain('Ansatz 2025/2680,00 €');
+      expect(figures).toContain('Ist 2025/2690,00 €');
     });
 
     it('shows a replaced version with a note and offers a Nachtrag only for the version in force', async () => {
@@ -862,8 +862,8 @@ describe('BudgetPlanComponent', () => {
       const view = await setup();
       const page = view.fixture.componentInstance;
       const row = page.rows()[0];
-      expect(page.changeText({ ...row, amount: 30, prev: 10 })).toMatch(/^\+20\s€$/);
-      expect(page.changeText({ ...row, amount: 10, prev: 30 })).toMatch(/^−20\s€$/);
+      expect(page.changeText({ ...row, amount: 30, prev: 10 })).toMatch(/^\+20,00\s€$/);
+      expect(page.changeText({ ...row, amount: 10, prev: 30 })).toMatch(/^−20,00\s€$/);
       expect(page.changeText({ ...row, amount: 10, prev: 10 })).toBe('–');
       expect(page.changeText({ ...row, amount: 10, prev: null })).toBe('–');
     });
@@ -1505,7 +1505,7 @@ describe('BudgetPlanComponent', () => {
       view.fixture.detectChanges();
       expect(create.open()).toBe(false);
       expect(view.treeApi.tree).toHaveBeenCalledTimes(2);
-      expect(text(view.container.querySelector('.bd__figs'))).toContain('Ansatz 2026/27100 €');
+      expect(text(view.container.querySelector('.bd__figs'))).toContain('Ansatz 2026/27100,00 €');
       await userEvent.click(screen.getByRole('button', { name: 'Kostenstelle anlegen' }));
       create.closed.emit();
       view.fixture.detectChanges();
