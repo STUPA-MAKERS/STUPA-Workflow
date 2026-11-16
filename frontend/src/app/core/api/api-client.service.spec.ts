@@ -1259,7 +1259,7 @@ describe('ApiClient', () => {
     });
     const req = http.expectOne('/api/auth/me/profile');
     expect(req.request.method).toBe('GET');
-    req.flush({ sub: 'u-1', email: null, display_name: null, last_login: null, claims: [] });
+    req.flush({ sub: 'u-1', email: null, displayName: null, lastLogin: null, claims: [] });
   });
 
   it('lists notification preferences', (done) => {

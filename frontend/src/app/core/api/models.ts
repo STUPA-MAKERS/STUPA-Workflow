@@ -139,8 +139,8 @@ export interface ProfileClaim {
 export interface Profile {
   readonly sub: string;
   readonly email: string | null;
-  readonly display_name: string | null;
-  readonly last_login: string | null;
+  readonly displayName: string | null;
+  readonly lastLogin: string | null;
   readonly claims: readonly ProfileClaim[];
 }
 

@@ -10,8 +10,8 @@ import { AccountProfileComponent, GRAVATAR_PROFILE_URL } from './profile.compone
 const PROFILE: Profile = {
   sub: 'u-1',
   email: 'ada@x.de',
-  display_name: 'Ada Lovelace',
-  last_login: '2026-11-16T08:00:00Z',
+  displayName: 'Ada Lovelace',
+  lastLogin: '2026-11-16T08:00:00Z',
   claims: [
     { key: 'email_verified', value: true },
     { key: 'groups', value: ['stupa', 'asta'] },
@@ -61,8 +61,8 @@ describe('AccountProfileComponent', () => {
       of({
         sub: 'u-2',
         email: 'bo@x.de',
-        display_name: null,
-        last_login: null,
+        displayName: null,
+        lastLogin: null,
         claims: [
           { key: 'sub', value: 'u-2' },
           { key: 'email_verified', value: false },
@@ -91,7 +91,7 @@ describe('AccountProfileComponent', () => {
 
   it('shows a dash as name without a name and an e-mail address', async () => {
     const { container } = await setup(
-      of({ sub: 'u-3', email: null, display_name: null, last_login: null, claims: [] }),
+      of({ sub: 'u-3', email: null, displayName: null, lastLogin: null, claims: [] }),
     );
     expect(container.querySelector('.pf__name')?.textContent?.trim()).toBe('—');
   });

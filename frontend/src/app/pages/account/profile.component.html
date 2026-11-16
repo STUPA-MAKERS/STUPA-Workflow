@@ -42,10 +42,10 @@
           <span class="pf__value">{{ r.value }}</span>
         </li>
       }
-      @if (p.last_login) {
+      @if (p.lastLogin) {
         <li class="pf__row">
           <span class="pf__label">{{ 'account.profile.lastLogin' | t }}</span>
-          <span class="pf__value">{{ p.last_login | ldate: 'medium' }}</span>
+          <span class="pf__value">{{ p.lastLogin | ldate: 'medium' }}</span>
         </li>
       }
     </ul>

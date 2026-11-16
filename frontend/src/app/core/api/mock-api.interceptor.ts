@@ -73,8 +73,8 @@ const MOCK_APPLICANT_APPLICATIONS = {
 const MOCK_PROFILE: Profile = {
   sub: '00000000-0000-0000-0000-000000000001',
   email: 'demo@stupa.example',
-  display_name: 'Demo Mitglied',
-  last_login: '2026-11-16T08:12:00Z',
+  displayName: 'Demo Mitglied',
+  lastLogin: '2026-11-16T08:12:00Z',
   claims: [
     { key: 'email', value: 'demo@stupa.example' },
     { key: 'email_verified', value: true },

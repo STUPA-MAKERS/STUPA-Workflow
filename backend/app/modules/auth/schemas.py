@@ -10,7 +10,7 @@ from uuid import UUID
 from pydantic import EmailStr, Field
 
 from app.shared.altcha import AltchaSolutionStr
-from app.shared.schemas import FrozenModel
+from app.shared.schemas import FrozenCamelModel, FrozenModel
 
 
 class MagicLinkRequest(FrozenModel, frozen=True):
@@ -76,13 +76,13 @@ class ProfileClaim(FrozenModel, frozen=True):
     value: Any
 
 
-class ProfileOut(FrozenModel, frozen=True):
+class ProfileOut(FrozenCamelModel, frozen=True):
     """The profile page: the stored facts of the principal and the SSO claims."""
 
     sub: str
     email: str | None = None
-    display_name: str | None = None
-    last_login: datetime | None = None
+    display_name: str | None = Field(default=None, alias="displayName")
+    last_login: datetime | None = Field(default=None, alias="lastLogin")
     claims: tuple[ProfileClaim, ...] = ()
 
 

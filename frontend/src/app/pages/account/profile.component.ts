@@ -95,7 +95,7 @@ export class AccountProfileComponent {
   /** The name of the head: the display name, else the e-mail address. */
   readonly name = computed(() => {
     const p = this.profile();
-    return p?.display_name || p?.email || '—';
+    return p?.displayName || p?.email || '—';
   });
 
   readonly rows = computed<ProfileRow[]>(() =>

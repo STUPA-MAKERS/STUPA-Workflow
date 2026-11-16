@@ -152,7 +152,7 @@ async def test_callback_persists_principal_then_me_returns_200(
     assert profile.status_code == 200, profile.text
     page = profile.json()
     assert page["sub"] == "user-cb-1"
-    assert page["last_login"] is not None
+    assert page["lastLogin"] is not None
     claims = {c["key"]: c["value"] for c in page["claims"]}
     assert claims["given_name"] == "Callback"
     assert claims["email"] == "cb@x.de"
