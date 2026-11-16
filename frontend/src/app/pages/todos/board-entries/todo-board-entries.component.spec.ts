@@ -50,6 +50,7 @@ describe('TodoBoardEntriesComponent', () => {
     expect(view.cmp.taken()).toEqual(['g-1', 'p-1']);
     expect(view.cmp.key(ENTRIES[0])).toBe('gremium:g-1');
     expect(view.cmp.key(ENTRIES[1])).toBe('e-1');
+    expect(view.cmp.roleName('nope' as never)).toBe('Bearbeiten');
     const people: unknown[] = [];
     view.cmp.findPeople('be').subscribe((p) => people.push(p));
     expect(people).toEqual([[{ id: 'p-2', name: 'Bert' }]]);

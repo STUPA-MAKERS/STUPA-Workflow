@@ -80,4 +80,14 @@ describe('TodoArchivedBoardsComponent', () => {
     view.fixture.detectChanges();
     expect(view.toast.error).toHaveBeenCalledWith('Die archivierten Boards konnten nicht geladen werden.');
   });
+
+  it('does nothing without a board to delete and says so when the delete fails', async () => {
+    const view = await setup(true);
+    view.cmp.confirmDelete();
+    expect(view.api.deleteBoard).not.toHaveBeenCalled();
+    view.api.deleteBoard.mockReturnValueOnce(throwError(() => new Error('down')));
+    view.cmp.deleting.set(view.cmp.boards()[0]);
+    view.cmp.confirmDelete();
+    expect(view.toast.error).toHaveBeenLastCalledWith('Die Änderung konnte nicht gespeichert werden.');
+  });
 });

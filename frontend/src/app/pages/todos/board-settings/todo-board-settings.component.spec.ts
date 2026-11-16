@@ -125,6 +125,22 @@ describe('TodoBoardSettingsComponent', () => {
     expect(cmp.open()).toBe(true);
   });
 
+  it('adds a person and skips the rows without an id', async () => {
+    const { api, cmp } = await setup(board({ kind: 'free', gremiumId: null }));
+    cmp.addEntry({ hit: { kind: 'person', id: 'p-9', name: 'Bert' }, role: 'edit' });
+    expect(api.addEntry).toHaveBeenCalledWith('b-1', { principalId: 'p-9', role: 'edit' });
+    const fixed = { ...ENTRIES[0], id: null };
+    cmp.setEntryRole({ entry: fixed, role: 'read' });
+    cmp.removeEntry(fixed);
+    expect(api.patchEntry).not.toHaveBeenCalled();
+    expect(api.removeEntry).not.toHaveBeenCalled();
+  });
+
+  it('reads no members of a personal board', async () => {
+    const { api } = await setup(board({ kind: 'personal', gremiumId: null }));
+    expect(api.entries).not.toHaveBeenCalled();
+  });
+
   it('saves a new name, keeps the old one for an empty or the same name', async () => {
     const { cmp, api, changed } = await setup();
     cmp.name.set('  ');
