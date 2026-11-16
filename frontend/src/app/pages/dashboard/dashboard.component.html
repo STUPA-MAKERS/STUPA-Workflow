@@ -235,7 +235,7 @@
           <h3 class="dash__applyH" [id]="'dash-apply-h-' + t">{{ 'dashboard.apply.title' | t }}</h3>
           <div class="rowgroup">
             @for (type of applyTypes(); track type.id) {
-              <app-list-item [title]="type.name" link="/apply" [linkQueryParams]="{ type: type.id }">
+              <app-list-item [title]="type.name" [link]="['/apply', type.key ?? type.id]">
                 <span lead class="dash__typeIcon"><app-icon name="fileplus" [size]="20" /></span>
                 <app-icon trail class="dash__chev" name="right" [size]="17" />
               </app-list-item>

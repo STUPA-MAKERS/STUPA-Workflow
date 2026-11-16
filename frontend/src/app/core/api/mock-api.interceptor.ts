@@ -392,6 +392,7 @@ const MOCK_TYPES: Page<ApplicationTypeListItemWire> = {
     {
       id: '11111111-1111-1111-1111-111111111111',
       name: 'Finanzantrag',
+      key: 'finanzantrag',
       hasBudget: true,
       active: true,
       activeFormVersionId: '44444444-4444-4444-4444-444444444444',
@@ -399,6 +400,7 @@ const MOCK_TYPES: Page<ApplicationTypeListItemWire> = {
     {
       id: '22222222-2222-2222-2222-222222222222',
       name: 'Sonstiger Antrag',
+      key: 'sonstiger-antrag',
       hasBudget: false,
       active: true,
       activeFormVersionId: '44444444-4444-4444-4444-444444444445',
@@ -406,6 +408,7 @@ const MOCK_TYPES: Page<ApplicationTypeListItemWire> = {
     {
       id: '22222222-2222-2222-2222-222222222223',
       name: 'Projektantrag: QSM',
+      key: 'projektantrag-qsm',
       hasBudget: false,
       active: true,
       activeFormVersionId: '44444444-4444-4444-4444-444444444446',

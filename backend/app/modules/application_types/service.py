@@ -62,6 +62,6 @@ class ApplicationTypesService:
             hasBudget=row.has_budget,
             active=active_form_version_id is not None,
             activeFormVersionId=active_form_version_id,
-            key=row.key if admin else None,
+            key=row.key,
             gremiumId=row.gremium_id if admin else None,
         )
