@@ -483,7 +483,7 @@ class TodoBoardEntryOut(FrozenCamelModel, frozen=True):
     role: TodoEntryRole
     fixed: bool = False
     #: The square logo of a gremium entry (``/api/committees/{id}/logo``), else null.
-    logo_url: str | None = None
+    logo_url: str | None = Field(default=None, serialization_alias="logoUrl")
 
 
 class EntryGremiumOption(FrozenCamelModel, frozen=True):
@@ -491,7 +491,7 @@ class EntryGremiumOption(FrozenCamelModel, frozen=True):
 
     id: UUID
     name: str
-    logo_url: str | None = None
+    logo_url: str | None = Field(default=None, serialization_alias="logoUrl")
 
 
 class EntryPersonOption(FrozenCamelModel, frozen=True):

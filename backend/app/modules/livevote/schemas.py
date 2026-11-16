@@ -348,7 +348,7 @@ class MeetingGremiumOut(FrozenCamelModel, frozen=True):
 
     id: UUID
     name: str
-    logo_url: str | None = None
+    logo_url: str | None = Field(default=None, serialization_alias="logoUrl")
 
 
 #: Upper limit for the reason of an excuse. The reason is personal data, so keep it short.
