@@ -504,11 +504,16 @@ export class CostCentreSelectComponent {
       const menu = this.menu()?.nativeElement;
       if (!menu) return;
       showInTopLayer(menu);
+      // The first place gives the list the width of its field. Its height is known only
+      // at that width, because the names wrap in a narrower list: so place it again.
       this.place(menu);
-      this.placed.set(true);
       this.afterRender(() => {
-        menu.querySelector<HTMLInputElement>('input')?.focus();
-        this.reveal();
+        this.place(menu);
+        this.placed.set(true);
+        this.afterRender(() => {
+          menu.querySelector<HTMLInputElement>('input')?.focus();
+          this.reveal();
+        });
       });
     });
   }
