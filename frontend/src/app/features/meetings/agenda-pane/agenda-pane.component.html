@@ -119,7 +119,7 @@
         [id]="'ap-minutes'"
         [label]="'meetings.agenda.duration' | t"
         [suffix]="'meetings.agenda.durationUnit' | t"
-        [error]="durationInvalid() ? ('meetings.agenda.durationRange' | t) : null"
+        [error]="durationInvalid() ? ('meetings.agenda.durationRange' | t) : ''"
         [ngModel]="durationDraft()"
         (ngModelChange)="durationDraft.set($event)"
       />

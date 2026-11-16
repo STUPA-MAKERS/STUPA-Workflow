@@ -117,7 +117,7 @@
       [id]="'aid-minutes'"
       [label]="'meetings.agenda.duration' | t"
       [suffix]="'meetings.agenda.durationUnit' | t"
-      [error]="minutesInvalid() ? ('meetings.agenda.durationRange' | t) : null"
+      [error]="minutesInvalid() ? ('meetings.agenda.durationRange' | t) : ''"
       [ngModel]="minutes()"
       (ngModelChange)="minutes.set($event)"
     />
