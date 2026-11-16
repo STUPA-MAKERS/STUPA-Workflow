@@ -668,6 +668,13 @@ const MOCK_APP_ATTACHMENTS: readonly AttachmentOutWire[] = [
     size: 96_512,
     scanned: true,
   },
+  {
+    id: 'att00000-0000-0000-0000-000000000013',
+    filename: 'Foto-Bus.jpg',
+    mime: 'image/jpeg',
+    size: 412_000,
+    scanned: true,
+  },
 ];
 
 /** The Vorgänger and the link history of every demo application (`GET .../links`). */
