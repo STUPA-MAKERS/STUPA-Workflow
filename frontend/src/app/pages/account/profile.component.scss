@@ -11,7 +11,7 @@
 .pf__head {
   display: flex;
   align-items: center;
-  gap: var(--space-5);
+  gap: var(--space-4);
   min-width: 0;
 }
 
@@ -42,7 +42,7 @@
   border-radius: 50%;
   background: var(--color-surface-3);
   color: var(--color-text);
-  --icon-size: 28px;
+  --icon-size: 24px;
   opacity: 0;
   transition: opacity var(--motion-xs) var(--ease-standard);
 }
@@ -55,12 +55,12 @@
 // A touch screen has no hover: a small badge on the corner shows the link always.
 @media (hover: none) {
   .pf__ext {
-    inset: auto 0 0 auto;
-    width: 32px;
-    height: 32px;
+    inset: auto -4px -4px auto;
+    width: 26px;
+    height: 26px;
     border: 2px solid var(--color-surface-1);
     background: var(--color-surface-3);
-    --icon-size: 18px;
+    --icon-size: 14px;
     opacity: 1;
   }
 }
@@ -74,14 +74,13 @@
 
 .pf__name {
   font-weight: var(--fw-semibold);
-  font-size: var(--fs-2xl);
+  font-size: var(--fs-xl);
   line-height: 1.2;
   overflow-wrap: anywhere;
 }
 
 .pf__mail {
   color: var(--color-text-muted);
-  font-size: var(--fs-xl);
   overflow-wrap: anywhere;
 }
 

@@ -29,8 +29,8 @@ scope:
 The account area must have the page "Profil" at `/account/profile`. Its entry must be the first
 entry of the account menu and of the account navigation. The page must show, read only, every
 claim of the `id_token` of the current session, one row per claim, and the time of the last
-login. Above the rows, a head must show the profile picture in the extra large avatar size
-(96px), the name in the size of a page title and the e-mail address below it. A claim that the catalog knows must show its label, and any other claim must show its
+login. Above the rows, a head must show the profile picture in the large avatar size (64px),
+the name in the size of a heading (22px) and the e-mail address below it. A claim that the catalog knows must show its label, and any other claim must show its
 name. The page must not store a new value: the claims come from the token that the session
 already keeps. Without such a token, as for an OAuth bearer request, the page must show the
 stored subject, name, e-mail address and groups.
