@@ -19,12 +19,12 @@
           rel="noopener noreferrer"
           [attr.aria-label]="'account.profile.gravatar' | t"
         >
-          <app-avatar [name]="name()" principalId="me" [decorative]="true" />
-          <span class="pf__ext" aria-hidden="true"><app-icon name="ext" [size]="16" /></span>
+          <app-avatar [name]="name()" principalId="me" size="xl" [decorative]="true" />
+          <span class="pf__ext" aria-hidden="true"><app-icon name="ext" /></span>
         </a>
       } @else {
         <span class="pf__avatar">
-          <app-avatar [name]="name()" principalId="me" [decorative]="true" />
+          <app-avatar [name]="name()" principalId="me" size="xl" [decorative]="true" />
         </span>
       }
       <div class="pf__who">
