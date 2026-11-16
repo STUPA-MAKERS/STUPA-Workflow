@@ -2,7 +2,7 @@
 id: "001090"
 title: The page head follows the branding before any script runs
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:

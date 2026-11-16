@@ -2,7 +2,7 @@
 id: "001091"
 title: The link preview shows the Bildmarke
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:
