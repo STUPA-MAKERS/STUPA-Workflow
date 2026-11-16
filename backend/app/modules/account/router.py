@@ -134,8 +134,8 @@ async def my_profile(
     return ProfileOut(
         sub=principal.sub,
         email=principal.email,
-        display_name=principal.display_name,
-        last_login=row.last_login if row is not None else None,
+        displayName=principal.display_name,
+        lastLogin=row.last_login if row is not None else None,
         claims=tuple(ProfileClaim(key=k, value=v) for k, v in claims),
     )
 
