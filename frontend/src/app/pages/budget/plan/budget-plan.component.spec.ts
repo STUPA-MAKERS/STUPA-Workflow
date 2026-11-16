@@ -15,6 +15,7 @@ import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from '../budget-t
 import { CostCentreCreateComponent } from '../cost-centre/cost-centre-create.component';
 import { CostCentreSettingsComponent } from '../cost-centre/cost-centre-settings.component';
 import { BudgetPlanApi, type BudgetPlan, type PlanMeeting, type PlanStep } from './budget-plan.api';
+import { FileOpenService } from '@shared/viewer/file-open.service';
 import { BudgetPlanComponent } from './budget-plan.component';
 import { FY25, FY26, QSM, TOP, fy, line, node, plan, version } from './budget-plan.fixtures';
 
@@ -84,6 +85,7 @@ async function setup(opts: Opts = {}) {
     passNextStep: jest.fn((..._args: unknown[]) => answer()),
     requestStep: jest.fn((..._args: unknown[]) => answer()),
     setStateByHand: jest.fn((..._args: unknown[]) => answer()),
+    exportUrl: (id: string, format: string) => `/api/budget-plan-versions/${id}/export.${format}`,
     exportVersion: jest.fn((_id: string, format: string) =>
       opts.exportFail ? throwError(() => problem(503)) : of({ blob: new Blob(['x']), filename: `Haushaltsplan_VS.${format}` }),
     ),
@@ -141,7 +143,7 @@ const treeRow = (view: View, name: string) =>
 const tableRow = (name: string) => screen.getAllByText(name).find((el) => el.classList.contains('bp__name')) as HTMLElement;
 
 /** The two file entries of the head menu: each reader of the plan has them. */
-const FILES = ['Als PDF exportieren', 'Als XLSX exportieren'];
+const FILES = ['Als PDF öffnen', 'Als XLSX exportieren'];
 
 /** Open the ⋮ menu of the head, or of `scope`, and return the names of its items. */
 async function openMenu(scope: HTMLElement = document.body): Promise<string[]> {
@@ -1293,24 +1295,22 @@ describe('BudgetPlanComponent', () => {
       expect(view.success).toHaveBeenCalledWith('Die Version ist wieder ein Entwurf.');
     });
 
-    it('§F/finance/budget/000875: a reader loads the shown version as PDF and as XLSX', async () => {
+    it('§F/finance/budget/000875 §F/administration/files/001080: a reader opens the PDF in the viewer and loads the XLSX', async () => {
       const view = await setup({ perms: ['budget.view'] });
-      await choose('Als PDF exportieren');
-      expect(view.api.exportVersion).toHaveBeenLastCalledWith('v0', 'pdf');
+      const open = jest.spyOn(TestBed.inject(FileOpenService), 'open').mockImplementation(() => undefined);
+      await choose('Als PDF öffnen');
+      expect(open).toHaveBeenCalledWith({ name: 'Haushaltsplan.pdf', url: '/api/budget-plan-versions/v0/export.pdf', kind: 'pdf' });
       await choose('Als XLSX exportieren');
       expect(view.api.exportVersion).toHaveBeenLastCalledWith('v0', 'xlsx');
-      expect((downloadBlob as jest.Mock).mock.calls.map((call) => call[1])).toEqual([
-        'Haushaltsplan_VS.pdf',
-        'Haushaltsplan_VS.xlsx',
-      ]);
+      expect((downloadBlob as jest.Mock).mock.calls.map((call) => call[1])).toEqual(['Haushaltsplan_VS.xlsx']);
     });
 
     it('§F/finance/budget/000875: a failed export shows a toast and frees the menu', async () => {
       const view = await setup({ exportFail: true });
-      await choose('Als PDF exportieren');
+      await choose('Als XLSX exportieren');
       expect(view.error).toHaveBeenCalledWith('Der Export ist fehlgeschlagen.');
       expect(downloadBlob).not.toHaveBeenCalled();
-      expect(await openMenu()).toContain('Als XLSX exportieren');
+      expect(await openMenu()).toContain('Als PDF öffnen');
     });
 
     it('§F/finance/budget/000835 §F/finance/budget/000840: deletes the draft after the confirmation and reads the year again', async () => {

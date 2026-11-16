@@ -56,25 +56,25 @@
       </app-button>
     }
     @if (draftPdf(); as draft) {
-      <a class="pb__pdf" [href]="draft.internal" target="_blank" rel="noopener">
-        <app-icon name="download" [size]="15" />
+      <a class="pb__pdf" [href]="draft.internal" target="_blank" rel="noopener" (click)="openPdf($event, draft.internal, 'meetings.protocolBar.pdfInternal')">
+        <app-icon name="file" [size]="15" />
         {{ 'meetings.protocolBar.pdfInternal' | t }}
       </a>
-      <a class="pb__pdf" [href]="draft.public" target="_blank" rel="noopener">
-        <app-icon name="download" [size]="15" />
+      <a class="pb__pdf" [href]="draft.public" target="_blank" rel="noopener" (click)="openPdf($event, draft.public, 'meetings.protocolBar.pdfPublic')">
+        <app-icon name="file" [size]="15" />
         {{ 'meetings.protocolBar.pdfPublic' | t }}
       </a>
     }
     @if (p.isFinal) {
       @if (p.pdfUrl) {
-        <a class="pb__pdf" [href]="p.pdfUrl" target="_blank" rel="noopener">
-          <app-icon name="download" [size]="15" />
+        <a class="pb__pdf" [href]="p.pdfUrl" target="_blank" rel="noopener" (click)="openPdf($event, p.pdfUrl, p.publicPdfUrl ? 'meetings.protocolBar.pdfInternal' : 'meetings.protocolBar.pdf')">
+          <app-icon name="file" [size]="15" />
           {{ (p.publicPdfUrl ? 'meetings.protocolBar.pdfInternal' : 'meetings.protocolBar.pdf') | t }}
         </a>
       }
       @if (p.publicPdfUrl) {
-        <a class="pb__pdf" [href]="p.publicPdfUrl" target="_blank" rel="noopener">
-          <app-icon name="download" [size]="15" />
+        <a class="pb__pdf" [href]="p.publicPdfUrl" target="_blank" rel="noopener" (click)="openPdf($event, p.publicPdfUrl, 'meetings.protocolBar.pdfPublic')">
+          <app-icon name="file" [size]="15" />
           {{ 'meetings.protocolBar.pdfPublic' | t }}
         </a>
       }

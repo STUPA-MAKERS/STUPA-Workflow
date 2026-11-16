@@ -1,3 +1,5 @@
+import { FileOpenService } from '@shared/viewer/file-open.service';
+import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -187,10 +189,9 @@ describe('AdminCdVariantsComponent', () => {
     expect(move).toHaveBeenLastCalledWith(VARIANT, 'title', 1, -1);
     c.onLogoMenu({ id: 'down', label: '' }, VARIANT, 'title', 0, TITLE_LOGO);
     expect(move).toHaveBeenLastCalledWith(VARIANT, 'title', 0, 1);
-    const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const open = jest.spyOn(TestBed.inject(FileOpenService), 'open').mockImplementation(() => undefined);
     c.onLogoMenu({ id: 'download', label: '' }, VARIANT, 'title', 1, TITLE_UPLOAD);
-    expect(click).toHaveBeenCalledTimes(1);
-    click.mockRestore();
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ url: expect.stringMatching(/\/file$/) }));
     c.onLogoMenu({ id: 'remove', label: '' }, VARIANT, 'title', 0, TITLE_LOGO);
     expect(remove).toHaveBeenCalledWith(VARIANT, TITLE_LOGO);
   });

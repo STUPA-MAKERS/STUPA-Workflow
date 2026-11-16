@@ -15,6 +15,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import type { PublicDecision, PublicProtocolDetail, PublicTop } from './public-protocols.models';
 import { electionCaption } from '../voting/election.util';
+import { FileOpenService } from '@shared/viewer/file-open.service';
 import { PublicProtocolsService } from './public-protocols.service';
 import { optionKey, orderedCounts, topParts, useNoindex, type TopPart } from './public-protocols.util';
 import { dayMonthYear, weekdayDate } from '@shared/date-format';
@@ -49,6 +50,7 @@ import { langAttr } from '@shared/forms/i18n-text';
 })
 export class PublicProtocolDetailComponent {
   private readonly api = inject(PublicProtocolsService);
+  private readonly files = inject(FileOpenService);
   private readonly i18n = inject(I18nService);
   private readonly route = inject(ActivatedRoute);
 
@@ -104,6 +106,11 @@ export class PublicProtocolDetailComponent {
 
   protected pdfUrl(p: PublicProtocolDetail): string {
     return this.api.pdfUrl(p.id);
+  }
+
+  /** The PDF opens in the file viewer (spec 001080); a click with a modifier keeps the link. */
+  protected openPdf(event: MouseEvent, p: PublicProtocolDetail): void {
+    this.files.click(event, { name: `${p.title}.pdf`, url: this.pdfUrl(p), kind: 'pdf' });
   }
 
   constructor() {

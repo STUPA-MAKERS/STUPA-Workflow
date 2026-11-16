@@ -1,3 +1,4 @@
+import { FileOpenService } from '@shared/viewer/file-open.service';
 import { BehaviorSubject, of } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting, type TestRequest } from '@angular/common/http/testing';
@@ -1527,35 +1528,14 @@ describe('ExpensesComponent (invoice detail)', () => {
     }
   });
 
-  /** A null fileName falls back to 'beleg.pdf'. */
-  it('openInvoiceFile streams the file blob and downloads it (fileName fallback)', () => {
-    (URL as unknown as { createObjectURL?: unknown }).createObjectURL = () => 'blob:mock';
-    (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL = () => undefined;
-    const createObjSpy = jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
-    const revokeSpy = jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-    const clickSpy = jest
-      .spyOn(HTMLAnchorElement.prototype, 'click')
-      .mockImplementation(() => undefined);
-    const { cmp, http } = build();
+  /** §F/administration/files/001080: the receipt opens in the file viewer; a null fileName falls back to 'Beleg.pdf'. */
+  it('openInvoiceFile opens the receipt in the file viewer (fileName fallback)', () => {
+    const { cmp } = build();
+    const open = jest.spyOn(TestBed.inject(FileOpenService), 'open').mockImplementation(() => undefined);
     dlg(cmp).openInvoiceFile({ ...INVOICE, fileName: null });
-    http
-      .expectOne((r) => r.url.endsWith('/invoices/inv-1/file') && r.method === 'GET')
-      .flush(new Blob(['pdf']));
-    expect(createObjSpy).toHaveBeenCalled();
-    expect(clickSpy).toHaveBeenCalled();
-    createObjSpy.mockRestore();
-    revokeSpy.mockRestore();
-    clickSpy.mockRestore();
-  });
-
-  it('openInvoiceFile toasts the problem detail on error', () => {
-    const { cmp, http } = build();
-    const { error } = toastSpies(cmp);
-    dlg(cmp).openInvoiceFile(INVOICE);
-    http
-      .expectOne((r) => r.url.endsWith('/invoices/inv-1/file'))
-      .flush(new Blob(['nope']), { status: 500, statusText: 'Server Error' });
-    expect(error).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
+    expect(open).toHaveBeenCalledWith({ name: 'Beleg.pdf', url: expect.stringMatching(/\/invoices\/inv-1\/file$/), kind: 'pdf' });
+    dlg(cmp).openInvoiceFile({ ...INVOICE, fileName: 'rechnung.pdf' });
+    expect(open).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'rechnung.pdf' }));
   });
 });
 

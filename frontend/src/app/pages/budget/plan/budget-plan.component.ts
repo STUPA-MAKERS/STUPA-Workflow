@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Location, NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { FileOpenService } from '@shared/viewer/file-open.service';
 import { EMPTY, type Observable, forkJoin, of } from 'rxjs';
 import { catchError, finalize, tap } from 'rxjs/operators';
 import {
@@ -237,6 +238,7 @@ type YearBeforeField = 'prevAmount' | 'prevActual';
 export class BudgetPlanComponent {
   private readonly treeApi = inject(BudgetTreeApi);
   private readonly api = inject(BudgetPlanApi);
+  private readonly files = inject(FileOpenService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
@@ -626,7 +628,7 @@ export class BudgetPlanComponent {
       ...item('setState', 'budget.plan.action.setState', 'edit', this.canSetState()),
     ];
     const files: RowMenuItem[] = [
-      ...item('exportPdf', 'budget.plan.action.exportPdf', 'download', !!this.version()),
+      ...item('exportPdf', 'budget.plan.action.openPdf', 'file', !!this.version()),
       ...item('exportXlsx', 'budget.plan.action.exportXlsx', 'download', !!this.version()),
     ];
     const draft: RowMenuItem[] =
@@ -1154,12 +1156,26 @@ export class BudgetPlanComponent {
         this.stateOpen.set(true);
         return;
       case 'exportPdf':
-        this.exportFile('pdf');
+        this.openPdf();
         return;
       case 'exportXlsx':
         this.exportFile('xlsx');
         return;
     }
+  }
+
+  /**
+   * Open the shown version as PDF in the file viewer (spec 001080). Its download keeps
+   * the name of the server.
+   */
+  private openPdf(): void {
+    const version = this.version();
+    if (!version) return;
+    this.files.open({
+      name: `${this.i18n.translate('budget.plan.pdfName')}.pdf`,
+      url: this.api.exportUrl(version.id, 'pdf'),
+      kind: 'pdf',
+    });
   }
 
   /** Load the shown version as a file and hand it to the browser under the name of the server. */

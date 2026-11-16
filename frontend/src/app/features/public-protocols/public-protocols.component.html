@@ -122,8 +122,8 @@
             </div>
             <div class="pp__side">
               @if (p.hasPdf) {
-                <a class="pp__btn" [href]="pdfUrl(p)" download>
-                  <app-icon name="download" [size]="16" />
+                <a class="pp__btn" [href]="pdfUrl(p)" download (click)="openPdf($event, p)">
+                  <app-icon name="file" [size]="16" />
                   {{ 'publicProtocols.pdf' | t }}
                 </a>
               }
