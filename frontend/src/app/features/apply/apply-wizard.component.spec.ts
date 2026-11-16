@@ -1,6 +1,6 @@
 import { computed, signal } from '@angular/core';
 import { ActivatedRoute, NavigationEnd, Router, convertToParamMap, provideRouter, type Event } from '@angular/router';
-import { type Subject, of, throwError } from 'rxjs';
+import { ReplaySubject, Subject, of, throwError } from 'rxjs';
 import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
@@ -796,6 +796,43 @@ describe('ApplyWizardComponent', () => {
     s.urlTo('zweiter');
     await waitFor(() => expect(s.comp.typeId()).toBe('t3'));
     expect(s.comp.currentStep()).toBe('details');
+  });
+
+  /** §001170 */
+  it('drops the form of a type that the user left while it loaded', async () => {
+    const forms = new Map<string, Subject<EffectiveForm>>();
+    const two = [TYPES[0], { ...TYPES[0], id: 't3', name: 'Zweiter', key: 'zweiter' }];
+    const s = await setup({
+      types: () => of(two),
+      effectiveForm: ((id: string) => {
+        const form = new ReplaySubject<EffectiveForm>(1);
+        forms.set(id, form);
+        return form;
+      }) as unknown as () => ReturnType<ApiClient['effectiveForm']>,
+    });
+    s.comp.selectType('t1');
+    s.comp.selectType('t3');
+    forms.get('t1')?.next(EFF);
+    expect(s.comp.effForm()).toBeNull();
+    forms.get('t3')?.next({ ...EFF, applicationTypeId: 't3' });
+    expect(s.comp.effForm()?.applicationTypeId).toBe('t3');
+  });
+
+  /** §001170 */
+  it('waits for the form before it leaves the type step', async () => {
+    const s = await setup({ params: { type: 'foerderantrag' }, effectiveForm: () => new Subject<EffectiveForm>() });
+    expect(s.comp.typeId()).toBe('t1');
+    s.urlTo(null);
+    expect(s.comp.currentStep()).toBe('type');
+    s.urlTo('foerderantrag');
+    expect(s.comp.currentStep()).toBe('type');
+  });
+
+  /** §001170 */
+  it('takes back only the last autosave type that is an id', async () => {
+    sessionStorage.setItem(DRAFT_LAST_TYPE, 'foerderantrag');
+    const s = await setup();
+    expect(s.comp.typeId()).toBeNull();
   });
 
   /** §001170 */
