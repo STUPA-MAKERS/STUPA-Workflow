@@ -345,7 +345,7 @@ def test_get_plan_with_the_full_view() -> None:
     assert body["versions"][0]["lines"][0] == {
         "budgetId": str(_NODE), "side": None, "amount": "10.00", "note": None, "name": None,
         "pathKey": None, "key": None, "transferable": False, "coverable": False,
-        "blocked": "0",
+        "blocked": "0", "predecessorId": None,
     }
     assert fake.session.commits == 0
 
