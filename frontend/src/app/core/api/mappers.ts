@@ -188,6 +188,7 @@ export function mapApplicationType(wire: ApplicationTypeListItemWire): Applicati
     activeFormVersionId: wire.activeFormVersionId ?? null,
     key: wire.key ?? null,
     gremiumId: wire.gremiumId ?? null,
+    groupId: wire.groupId ?? null,
   };
 }
 

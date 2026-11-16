@@ -106,7 +106,7 @@
                     <span class="br__areaLabel">{{ withLang(freetextLabel(key)) }}</span>
                     <textarea
                       class="br__areaInput"
-                      [rows]="key === 'applyInfo' ? 3 : 2"
+                      [rows]="2"
                       [ngModel]="freetext(d, key)[lang()]"
                       (ngModelChange)="setText(freetext(d, key), $event)"
                       [name]="'text-' + key"

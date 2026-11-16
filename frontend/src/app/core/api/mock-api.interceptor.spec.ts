@@ -283,6 +283,11 @@ describe('mockApiInterceptor', () => {
       await expect(get('/api/altcha/challenge')).rejects.toMatchObject({ status: 404 });
     });
 
+    it('GET /application-type-groups → the groups of step 1', async () => {
+      const groups = await get<{ name: string }[]>('/api/application-type-groups');
+      expect(groups.map((g) => g.name)).toEqual(['Projektanträge', 'Leere Gruppe']);
+    });
+
     it('GET /application-types/{id}/form → effective form', async () => {
       const form = await get<{ sections: unknown[] }>('/api/application-types/abc/form');
       expect(form.sections.length).toBeGreaterThan(0);

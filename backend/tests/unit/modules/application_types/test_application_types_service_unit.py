@@ -47,6 +47,7 @@ def _row(**over: object) -> SimpleNamespace:
         "has_budget": True,
         "active_form_version_id": uuid4(),
         "gremium_id": uuid4(),
+        "group_id": None,
     }
     base.update(over)
     return SimpleNamespace(**base)

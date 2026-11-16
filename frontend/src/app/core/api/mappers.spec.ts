@@ -376,6 +376,7 @@ describe('mapApplicationType', () => {
       activeFormVersionId: 'v1',
       key: null,
       gremiumId: null,
+      groupId: null,
     });
   });
 

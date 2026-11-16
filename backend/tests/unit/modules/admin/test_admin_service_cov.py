@@ -206,6 +206,8 @@ def type_row(**kw: Any) -> Any:
         "comparison_offers": None,
         "retention_months": None,
         "active_form_version_id": None,
+        "group_id": None,
+        "position": 0,
     }
     base.update(kw)
     return Row(**base)

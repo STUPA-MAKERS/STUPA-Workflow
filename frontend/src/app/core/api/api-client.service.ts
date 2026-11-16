@@ -56,6 +56,7 @@ import type {
   ApplicationPrefill,
   ApplicationState,
   ApplicationType,
+  ApplicationTypeGroup,
   ApplicationTypeListItemWire,
   ApplicationVersion,
   Attachment,
@@ -241,6 +242,18 @@ export class ApiClient {
         context: opts.quiet ? skipLoading() : undefined,
       })
       .pipe(map((page) => page.items.map(mapApplicationType)));
+  }
+
+  /**
+   * GET /application-type-groups — the groups of step 1 of the apply wizard in their order
+   * (spec 001181). Like the types, the server resolves the texts for `lang`.
+   */
+  applicationTypeGroups(): Observable<ApplicationTypeGroup[]> {
+    const params = new HttpParams().set('lang', this.i18n.uiLocale());
+    return this.http.get<ApplicationTypeGroup[]>(`${this.base}/application-type-groups`, {
+      params,
+      context: skipLoading(),
+    });
   }
 
   /** Effective form definition of an application type. */

@@ -386,8 +386,8 @@ describe('AdminApiService — real mode (contract)', () => {
       { id: 't1', nameI18n: { de: 'X' }, gremiumId: 'g1', hasBudget: true, retentionMonths: 12, activeFormVersionId: 'fv' },
       { id: 't2' },
     ]);
-    expect(out![0]).toEqual({ id: 't1', name: { de: 'X' }, gremiumId: 'g1', hasBudget: true, pdfSignatures: false, retentionMonths: 12, activeFormVersionId: 'fv', activeFormVersion: null });
-    expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, hasBudget: false, pdfSignatures: false, retentionMonths: null, activeFormVersionId: null, activeFormVersion: null });
+    expect(out![0]).toEqual({ id: 't1', name: { de: 'X' }, gremiumId: 'g1', hasBudget: true, pdfSignatures: false, retentionMonths: 12, activeFormVersionId: 'fv', activeFormVersion: null, groupId: null, position: 0 });
+    expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, hasBudget: false, pdfSignatures: false, retentionMonths: null, activeFormVersionId: null, activeFormVersion: null, groupId: null, position: 0 });
   });
 
   it('maps the number of the active form version', () => {
@@ -498,16 +498,82 @@ describe('AdminApiService — real mode (contract)', () => {
     );
     const req = http.expectOne('/api/admin/application-types');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ key: 'k', nameI18n: { de: 'N' }, gremiumId: 'g1', hasBudget: true });
+    expect(req.request.body).toEqual({ key: 'k', nameI18n: { de: 'N' }, gremiumId: 'g1', hasBudget: true, groupId: null });
     req.flush({ id: 'new-1' });
-    expect(created).toEqual({ id: 'new-1', name: {}, gremiumId: null, hasBudget: false, pdfSignatures: false, retentionMonths: null, activeFormVersionId: null });
+    expect(created).toEqual({
+      id: 'new-1',
+      name: {},
+      gremiumId: null,
+      hasBudget: false,
+      pdfSignatures: false,
+      retentionMonths: null,
+      activeFormVersionId: null,
+      activeFormVersion: null,
+      groupId: null,
+      position: 0,
+    });
   });
 
   it('POSTs an application type with default gremium/budget when omitted', () => {
     s.createApplicationType({ key: 'k', name: { de: 'N' } }).subscribe();
     const req = http.expectOne('/api/admin/application-types');
-    expect(req.request.body).toEqual({ key: 'k', nameI18n: { de: 'N' }, gremiumId: null, hasBudget: false });
+    expect(req.request.body).toEqual({ key: 'k', nameI18n: { de: 'N' }, gremiumId: null, hasBudget: false, groupId: null });
     req.flush({ id: 'x' });
+  });
+
+  it('reads, creates, changes, moves and deletes groups of Antragsarten (spec 001180)', () => {
+    s.listApplicationTypeGroups().subscribe((list) =>
+      expect(list).toEqual([{ id: 'g1', name: { de: 'P' }, text: {}, position: 0 }]),
+    );
+    http.expectOne('/api/admin/application-type-groups').flush([{ id: 'g1', nameI18n: { de: 'P' }, position: 0 }]);
+
+    s.createApplicationTypeGroup({ name: { de: 'P' }, text: { de: 'T' } }).subscribe();
+    const create = http.expectOne('/api/admin/application-type-groups');
+    expect(create.request.method).toBe('POST');
+    expect(create.request.body).toEqual({ nameI18n: { de: 'P' }, textI18n: { de: 'T' } });
+    create.flush({ id: 'g2', nameI18n: { de: 'P' }, textI18n: { de: 'T' }, position: 1 });
+
+    s.updateApplicationTypeGroup('g2', { name: { de: 'Q' }, text: {} }).subscribe();
+    const patch = http.expectOne('/api/admin/application-type-groups/g2');
+    expect(patch.request.method).toBe('PATCH');
+    patch.flush({ id: 'g2', nameI18n: { de: 'Q' }, position: 1 });
+
+    s.moveApplicationTypeGroup('g2', -1).subscribe();
+    const move = http.expectOne('/api/admin/application-type-groups/g2/move');
+    expect(move.request.body).toEqual({ by: -1 });
+    move.flush([]);
+
+    s.moveApplicationType('t1', 1).subscribe();
+    const typeMove = http.expectOne('/api/admin/application-types/t1/move');
+    expect(typeMove.request.body).toEqual({ by: 1 });
+    typeMove.flush([]);
+
+    s.deleteApplicationTypeGroup('g2').subscribe();
+    const del = http.expectOne('/api/admin/application-type-groups/g2');
+    expect(del.request.method).toBe('DELETE');
+    del.flush(null);
+  });
+
+  it('maps the group and the position of a type, and the defaults of a group', () => {
+    s.listApplicationTypesFull().subscribe((list) =>
+      expect(list[0]).toMatchObject({ groupId: 'g1', position: 3 }),
+    );
+    http.expectOne('/api/admin/application-types').flush([{ id: 't1', groupId: 'g1', position: 3 }]);
+    s.listApplicationTypeGroups().subscribe((list) =>
+      expect(list).toEqual([{ id: 'g9', name: {}, text: { de: 'T' }, position: 0 }]),
+    );
+    http.expectOne('/api/admin/application-type-groups').flush([{ id: 'g9', textI18n: { de: 'T' } }]);
+  });
+
+  it('sends the group of a type on create and on update', () => {
+    s.createApplicationType({ key: 'k', name: { de: 'N' }, groupId: 'g1' }).subscribe();
+    const create = http.expectOne('/api/admin/application-types');
+    expect(create.request.body.groupId).toBe('g1');
+    create.flush({ id: 't9' });
+    s.updateApplicationType('t9', { groupId: null }).subscribe();
+    const patch = http.expectOne('/api/admin/application-types/t9');
+    expect(patch.request.body).toEqual({ groupId: null });
+    patch.flush({ id: 't9' });
   });
 
   /** An empty body sets no keys. */
@@ -1023,6 +1089,50 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
 
     await firstValueFrom(s.deleteApplicationType(created.id));
     expect((await firstValueFrom(s.listApplicationTypesFull())).some((t) => t.id === created.id)).toBe(false);
+  });
+
+  /** Groups of Antragsarten in the mock store: CRUD, moves, group change, delete (spec 001180, 001183). */
+  it('keeps groups and the type order in the mock store', async () => {
+    const s = svc();
+    const groups = await firstValueFrom(s.listApplicationTypeGroups());
+    expect(groups.map((g) => g.id)).toEqual(['atg-projekte', 'atg-spezial']);
+
+    const created = await firstValueFrom(s.createApplicationTypeGroup({ name: { de: 'Neu' }, text: { de: 'T' } }));
+    expect(created.position).toBe(2);
+    const renamed = await firstValueFrom(s.updateApplicationTypeGroup(created.id, { name: { de: 'Neu 2' }, text: {} }));
+    expect(renamed.name).toEqual({ de: 'Neu 2' });
+    await expect(firstValueFrom(s.updateApplicationTypeGroup('ghost', { name: { de: 'X' }, text: {} }))).rejects.toEqual({ status: 404 });
+
+    const up = await firstValueFrom(s.moveApplicationTypeGroup(created.id, -1));
+    expect(up.map((g) => g.id)).toEqual(['atg-projekte', created.id, 'atg-spezial']);
+    const edge = await firstValueFrom(s.moveApplicationTypeGroup('atg-projekte', -1));
+    expect(edge[0].id).toBe('atg-projekte');
+    const last = await firstValueFrom(s.moveApplicationTypeGroup('atg-spezial', 1));
+    expect(last[last.length - 1].id).toBe('atg-spezial');
+    const loose = await firstValueFrom(s.moveApplicationType('f-anschaffung', -1));
+    expect(loose.find((t) => t.id === 'f-anschaffung')!.position).toBe(0);
+    await firstValueFrom(s.moveApplicationTypeGroup('ghost', 1));
+
+    const moved = await firstValueFrom(s.moveApplicationType('f-foerderung', 1));
+    const inGroup = moved.filter((t) => t.groupId === 'atg-projekte').map((t) => t.id);
+    expect(inGroup).toEqual(['f-veranstaltung', 'f-foerderung']);
+    await firstValueFrom(s.moveApplicationType('ghost', 1));
+
+    const store = (s as unknown as { store: { appTypes: { id: string; position?: number }[] } }).store;
+    store.appTypes = store.appTypes.map(({ position: _p, ...t }) => (t.id === 'f-anschaffung' ? t : { ...t, position: _p }));
+    expect((await firstValueFrom(s.listApplicationTypesFull())).map((t) => t.id)).toContain('f-anschaffung');
+    await firstValueFrom(s.updateApplicationType('f-anschaffung', { groupId: created.id }));
+    await firstValueFrom(s.updateApplicationType('f-anschaffung', { groupId: created.id }));
+    const regrouped = await firstValueFrom(s.listApplicationTypesFull());
+    expect(regrouped.find((t) => t.id === 'f-anschaffung')).toMatchObject({ groupId: created.id, position: 0 });
+
+    const grouped = await firstValueFrom(s.createApplicationType({ key: 'g', name: { de: 'G' }, groupId: created.id }));
+    expect(grouped).toMatchObject({ groupId: created.id, position: 1 });
+
+    await firstValueFrom(s.deleteApplicationTypeGroup(created.id));
+    const types = await firstValueFrom(s.listApplicationTypesFull());
+    expect(types.filter((t) => !t.groupId).map((t) => t.id).sort()).toEqual(['f-anschaffung', grouped.id].sort());
+    expect((await firstValueFrom(s.listApplicationTypeGroups())).some((g) => g.id === created.id)).toBe(false);
   });
 
   it('loads a known form draft and an empty stub for an unknown type', async () => {

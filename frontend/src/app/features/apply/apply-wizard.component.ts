@@ -8,8 +8,9 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { filter, startWith } from 'rxjs';
+import { NgTemplateOutlet } from '@angular/common';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { catchError, filter, of, startWith } from 'rxjs';
 import {
   FormControl,
   FormGroup,
@@ -20,13 +21,13 @@ import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
-import { BrandingService } from '@core/branding/branding.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type {
   ApplicationListItem,
   ApplicationType,
+  ApplicationTypeGroup,
   EffectiveForm,
   FormFieldDef,
   NewApplication,
@@ -68,6 +69,16 @@ import { PredecessorFieldComponent } from './predecessor-field/predecessor-field
 export type StepKey = 'type' | 'details' | 'contact' | 'review';
 
 /** The autosave of one application type (`sessionStorage`, this tab). */
+/** One block of step 1: a group, or the types without a group (specs 001181, 001182). */
+interface TypeBlock {
+  readonly id: string;
+  /** The heading; empty for the one list of a step without groups. */
+  readonly heading: string;
+  /** The rendered Markdown text of the group; empty without a text. */
+  readonly html: string;
+  readonly types: readonly ApplicationType[];
+}
+
 interface StoredAnswers {
   readonly v: 1;
   readonly model: Readonly<Record<string, unknown>>;
@@ -105,7 +116,8 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
  * the step.
  *
  * Steps:
- * 1. Antragsart: the active types; the configured info text below.
+ * 1. Antragsart: the active types by group, each group with its heading and its text
+ *    (specs 001181, 001182); the types without a group last under "Weitere Anträge".
  * 2. Angaben: every section of the effective form in one grid (`toFormlySections`),
  *    without the PII fields. A `file` field uploads its files as drafts; the block
  *    "Anhänge" below takes any other file (`DraftAttachmentsService`).
@@ -139,6 +151,7 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NgTemplateOutlet,
     SectionComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
@@ -166,7 +179,6 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
 export class ApplyWizardComponent {
   private readonly api = inject(ApiClient);
   private readonly auth = inject(AuthService);
-  private readonly branding = inject(BrandingService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
@@ -193,6 +205,11 @@ export class ApplyWizardComponent {
   protected readonly bar = computed(() => this.phone() && this.loggedIn());
 
   readonly types = signal<ApplicationType[]>([]);
+  /** The groups of step 1 in their order (spec 001181). A failed load shows one list. */
+  readonly groups = toSignal(
+    this.api.applicationTypeGroups().pipe(catchError(() => of<ApplicationTypeGroup[]>([]))),
+    { initialValue: [] as ApplicationTypeGroup[] },
+  );
   readonly typeId = signal<Uuid | null>(null);
   readonly effForm = signal<EffectiveForm | null>(null);
   readonly activeIndex = signal(0);
@@ -327,10 +344,32 @@ export class ApplyWizardComponent {
   /** The context of `visibleIf` and `compute`, as on the server. */
   readonly formContext = computed(() => ({ has_budget: this.effForm()?.hasBudget ?? false }));
 
-  /** Configured info text below the type selection — markdown, per language. */
-  readonly applyInfoHtml = computed(() => {
-    const text = resolveI18n(this.branding.freetexts().applyInfo ?? null, this.i18n.uiLocale()).trim();
-    return text ? renderMarkdown(text) : '';
+  /**
+   * The blocks of step 1 (specs 001181, 001182): each group with an offered type, with its
+   * heading and its rendered text, then the types without a group under "Weitere Anträge".
+   * Without a shown group there is one block without a heading. The server sends the types
+   * in this order, so a block keeps it.
+   */
+  readonly typeBlocks = computed<readonly TypeBlock[]>(() => {
+    const types = this.types();
+    const groups = this.groups();
+    const known = new Set(groups.map((g) => g.id));
+    const blocks: readonly TypeBlock[] = groups
+      .map((g) => ({
+        id: g.id,
+        heading: g.name,
+        html: g.text.trim() ? renderMarkdown(g.text) : '',
+        types: types.filter((t) => t.groupId === g.id),
+      }))
+      .filter((b) => b.types.length > 0);
+    const rest = types.filter((t) => !t.groupId || !known.has(t.groupId));
+    const other: TypeBlock = {
+      id: 'other',
+      heading: blocks.length ? this.i18n.translate('apply.type.other') : '',
+      html: '',
+      types: rest,
+    };
+    return rest.length ? [...blocks, other] : blocks;
   });
 
   readonly canSubmit = computed(() => {

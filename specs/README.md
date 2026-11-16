@@ -163,6 +163,12 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/applications/001171](requirements/functional/applications/applications/001171_apply-unknown-type.md) | An apply link to an unknown Antragsart opens the type step | approved |
 | [F/applications/applications/001172](requirements/functional/applications/applications/001172_public-type-key.md) | The public list of Antragstypen gives the key | approved |
 | [F/applications/applications/001173](requirements/functional/applications/applications/001173_apply-old-type-link.md) | An old apply link with the type id still works | approved |
+| [F/applications/applications/001180](requirements/functional/applications/applications/001180_type-groups.md) | Admins group the Antragsarten | approved |
+| [F/applications/applications/001181](requirements/functional/applications/applications/001181_apply-type-groups.md) | Step 1 shows the Antragsarten by group with the group text | approved |
+| [F/applications/applications/001182](requirements/functional/applications/applications/001182_apply-ungrouped-types.md) | Antragsarten without a group stand last under Weitere Anträge | approved |
+| [F/applications/applications/001183](requirements/functional/applications/applications/001183_type-group-order.md) | Admins set the order of the groups and of the Antragsarten | approved |
+| [F/applications/applications/001184](requirements/functional/applications/applications/001184_no-general-apply-text.md) | Step 1 has no general text, only the group texts | approved |
+| [F/applications/applications/001185](requirements/functional/applications/applications/001185_apply-step-spacing.md) | The blocks of step 1 have one even spacing | approved |
 | [F/applications/dashboard/000421](requirements/functional/applications/dashboard/000421_dashboard.md) | The start page is a work list with a side sheet | approved |
 | [F/applications/dashboard/000550](requirements/functional/applications/dashboard/000550_start-due-cards.md) | Start shows the due cards of the person | approved |
 | [F/applications/dashboard/000650](requirements/functional/applications/dashboard/000650_start-apply-button-tab-line.md) | Antrag stellen stands in the tab line of the desktop start page | approved |

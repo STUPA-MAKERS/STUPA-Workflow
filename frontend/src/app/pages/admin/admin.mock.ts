@@ -11,6 +11,7 @@ import type {
   Backup,
   ErasureRequest,
   ApplicationTypeFull,
+  ApplicationTypeGroupFull,
   Branding,
   CdVariant,
   ConfigRevision,
@@ -294,9 +295,23 @@ export const MOCK_FORMS: readonly FormOverviewItem[] = [
 
 /** Application types/forms for the forms builder — mock until the backend is real. */
 export const MOCK_APP_TYPES: readonly ApplicationTypeFull[] = [
-  { id: 'f-foerderung', name: { de: 'Förderantrag', en: 'Funding application' }, gremiumId: MOCK_GREMIUM_STUPA_ID, hasBudget: true, activeFormVersionId: 'fv-foerderung-3', activeFormVersion: 3 },
-  { id: 'f-veranstaltung', name: { de: 'Veranstaltungsantrag', en: 'Event application' }, gremiumId: 'g-asta', hasBudget: false, activeFormVersionId: 'fv-veranstaltung-2', activeFormVersion: 2 },
-  { id: 'f-anschaffung', name: { de: 'Anschaffungsantrag', en: 'Procurement application' }, gremiumId: MOCK_GREMIUM_STUPA_ID, hasBudget: true, activeFormVersionId: null, activeFormVersion: null },
+  { id: 'f-foerderung', name: { de: 'Förderantrag', en: 'Funding application' }, gremiumId: MOCK_GREMIUM_STUPA_ID, hasBudget: true, activeFormVersionId: 'fv-foerderung-3', activeFormVersion: 3, groupId: 'atg-projekte', position: 0 },
+  { id: 'f-veranstaltung', name: { de: 'Veranstaltungsantrag', en: 'Event application' }, gremiumId: 'g-asta', hasBudget: false, activeFormVersionId: 'fv-veranstaltung-2', activeFormVersion: 2, groupId: 'atg-projekte', position: 1 },
+  { id: 'f-anschaffung', name: { de: 'Anschaffungsantrag', en: 'Procurement application' }, gremiumId: MOCK_GREMIUM_STUPA_ID, hasBudget: true, activeFormVersionId: null, activeFormVersion: null, groupId: null, position: 0 },
+];
+
+/** The groups of Antragsarten (spec 001180). */
+export const MOCK_APP_TYPE_GROUPS: readonly ApplicationTypeGroupFull[] = [
+  {
+    id: 'atg-projekte',
+    name: { de: 'Projektanträge', en: 'Project applications' },
+    text: {
+      de: 'Anträge mit **Kostenaufstellung**. Pro Kostenposition sind mindestens drei Vergleichsangebote nötig.',
+      en: 'Applications with a **cost list**. Each cost item needs at least three comparison offers.',
+    },
+    position: 0,
+  },
+  { id: 'atg-spezial', name: { de: 'Speziellere Anträge', en: 'Special applications' }, text: {}, position: 1 },
 ];
 
 /** Form drafts per type — raw fields + description of the forms editor. */
@@ -520,7 +535,6 @@ export const MOCK_BRANDING: Branding = {
     welcome: { de: 'Willkommen auf der Antragsplattform.', en: 'Welcome to the application platform.' },
     support: { de: 'Bei Fragen: support@example.org', en: 'Questions? support@example.org' },
     emailFooter: { de: 'Automatische Nachricht – nicht antworten.', en: 'Automated message – do not reply.' },
-    applyInfo: {},
     submittedInternal: {},
     submittedExternal: {},
     accessibilityStatement: {
