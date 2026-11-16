@@ -1671,6 +1671,21 @@ describe('BudgetPlanComponent', () => {
       await waitFor(() => expect(screen.getByRole('combobox', { name: /Seite/ })).toBeInTheDocument());
       expect(screen.queryByRole('combobox', { name: /Vorgänger/ })).toBeNull();
     });
+
+    it('§F/finance/budget/001040: a choice takes the name and key of the line, else of its node, and an unchanged choice saves nothing', async () => {
+      const renamed = plan(
+        [version({ id: 'p', state: 'in_force', lines: [line('staff', '40', { name: 'Alt', pathKey: 'VS-Z' }), line('gone', '5', { side: 'expense' })] })],
+        'fy-25',
+      );
+      const chosen = plan([version({ lines: [line('fees', '100'), line('grants', '30', { predecessorId: 'staff' })] })]);
+      const view = await setup({ plans: { 'fy-26': chosen, 'fy-25': renamed }, query: { costCentre: 'grants' } });
+      await waitFor(() => expect(select()).toBeInTheDocument());
+      const page = view.fixture.componentInstance;
+      const row = page.rows().find((r) => r.id === 'grants')!;
+      expect(page.predecessorOptions(row).map((o) => o.label)).toEqual([' · ', 'VS-Z · Alt']);
+      page.savePredecessor(row, 'staff');
+      expect(view.api.setPredecessor).not.toHaveBeenCalled();
+    });
   });
 
   describe('sides', () => {
