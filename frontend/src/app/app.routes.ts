@@ -14,11 +14,11 @@ import {
  * component while "Weiter" and the browser buttons change the type segment, and keeps its
  * answers and files. `/apply/confirmation` is its own route.
  */
-export function applyMatcher(segments: UrlSegment[]): UrlMatchResult | null {
+export function applyMatcher(segments: readonly UrlSegment[]): UrlMatchResult | null {
   if (segments[0]?.path !== 'apply' || segments.length > 2) return null;
   const type = segments[1];
   if (type?.path === 'confirmation') return null;
-  return { consumed: segments, posParams: type ? { type } : {} };
+  return { consumed: [...segments], posParams: type ? { type } : {} };
 }
 
 /**
