@@ -2,7 +2,7 @@
 id: "001173"
 title: An old apply link with the type id still works
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:

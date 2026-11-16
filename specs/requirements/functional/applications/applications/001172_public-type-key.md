@@ -2,7 +2,7 @@
 id: "001172"
 title: The public list of Antragstypen gives the key
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:

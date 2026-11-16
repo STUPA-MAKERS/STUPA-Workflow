@@ -2,7 +2,7 @@
 id: "001171"
 title: An apply link to an unknown Antragsart opens the type step
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:
