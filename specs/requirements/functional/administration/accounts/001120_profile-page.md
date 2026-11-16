@@ -2,7 +2,7 @@
 id: "001120"
 title: The account area has a profile page with the SSO claims
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:

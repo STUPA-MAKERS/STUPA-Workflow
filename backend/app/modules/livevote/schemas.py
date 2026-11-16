@@ -550,6 +550,11 @@ class MeetingVoteOpenBody(MeetingVoteBody, frozen=True):
 AGENDA_BODY_MAX = 512_000
 
 
+#: The bounds of the estimated duration of an agenda item in minutes (spec 001140).
+AGENDA_MINUTES_MIN = 1
+AGENDA_MINUTES_MAX = 480
+
+
 class AgendaAddBody(FrozenCamelModel, frozen=True):
     """``POST /meetings/{id}/agenda`` — add an agenda item: application, free text, to-do or plan.
 
@@ -564,6 +569,10 @@ class AgendaAddBody(FrozenCamelModel, frozen=True):
     plan_version_id: UUID | None = Field(default=None, alias="planVersionId")
     non_public: bool = Field(default=False, alias="nonPublic")
     description: str | None = Field(default=None, max_length=AGENDA_BODY_MAX // 2)
+    #: The estimated duration of the new item in minutes (spec 001140).
+    estimated_minutes: int | None = Field(
+        default=None, ge=AGENDA_MINUTES_MIN, le=AGENDA_MINUTES_MAX, alias="estimatedMinutes"
+    )
 
     @model_validator(mode="after")
     def _one_of(self) -> AgendaAddBody:
@@ -592,6 +601,15 @@ class AgendaBodyBody(FrozenCamelModel, frozen=True):
     body: str | None = None
     title: str | None = Field(default=None, min_length=1)
     non_public: bool | None = Field(default=None, alias="nonPublic")
+
+
+class AgendaDurationBody(FrozenCamelModel, frozen=True):
+    """``PUT …/agenda/{itemId}/duration`` — set or clear the estimate of an item.
+
+    ``minutes`` is a whole number from 1 to 480 (spec 001140). ``null`` clears it.
+    """
+
+    minutes: int | None = Field(ge=AGENDA_MINUTES_MIN, le=AGENDA_MINUTES_MAX)
 
 
 class AgendaDoneBody(FrozenCamelModel, frozen=True):

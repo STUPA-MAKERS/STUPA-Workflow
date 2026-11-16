@@ -2,7 +2,7 @@
 id: "001121"
 title: The profile page hides the claims of the token itself
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:

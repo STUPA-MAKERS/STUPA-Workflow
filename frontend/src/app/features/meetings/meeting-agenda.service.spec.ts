@@ -210,3 +210,45 @@ describe('MeetingAgendaService — the item a link names', () => {
     expect(svc.selectedTopId()).toBe('t-2');
   });
 });
+
+describe('MeetingAgendaService — the duration of a TOP', () => {
+  let svc: MeetingAgendaService;
+  let saves: Subject<AgendaItem[]>[];
+  let api: { setAgendaDuration: jest.Mock };
+  let toast: { error: jest.Mock };
+
+  beforeEach(() => {
+    saves = [];
+    api = {
+      setAgendaDuration: jest.fn(() => {
+        const s = new Subject<AgendaItem[]>();
+        saves.push(s);
+        return s;
+      }),
+    };
+    toast = { error: jest.fn() };
+    TestBed.configureTestingModule({
+      providers: [
+        MeetingAgendaService,
+        { provide: ApiClient, useValue: api },
+        { provide: ToastService, useValue: toast },
+      ],
+    });
+    svc = TestBed.inject(MeetingAgendaService);
+  });
+
+  it('takes the agenda that the server sends back (§ 001140)', () => {
+    svc.setDuration('m-1', 't-1', 20);
+    expect(api.setAgendaDuration).toHaveBeenCalledWith('m-1', 't-1', 20);
+    expect(svc.savingAgenda()).toBe(true);
+    saves[0].next([{ ...item(''), estimatedMinutes: 20 }]);
+    expect(svc.savingAgenda()).toBe(false);
+    expect(svc.agenda()[0]?.estimatedMinutes).toBe(20);
+  });
+
+  it('ends the save and reports a failed one', () => {
+    svc.setDuration('m-1', 't-1', null);
+    saves[0].error(new Error('boom'));
+    expect(svc.savingAgenda()).toBe(false);
+  });
+});

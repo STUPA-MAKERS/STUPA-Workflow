@@ -148,7 +148,13 @@ def test_the_route_adds_a_todo_item(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     assert resp.status_code == 200
     assert calls[0] == ("check", CARD, GREMIUM)
-    assert calls[1][2] == {"todo_id": CARD, "title": "Plakat", "non_public": True, "actor": "p"}
+    assert calls[1][2] == {
+        "todo_id": CARD,
+        "title": "Plakat",
+        "non_public": True,
+        "actor": "p",
+        "estimated_minutes": None,
+    }
     assert calls[2][0] == "link"
     assert session.committed == 1
     ping = {"type": "card", "boardId": str(BOARD), "cardId": str(CARD)}

@@ -42,6 +42,7 @@ import { resolveI18n } from '@shared/forms/i18n-text';
 import { problemDetail } from '@core/api/problem';
 import { cardsOf, sortedColumns } from '../../todos/todos.util';
 import { isoDay, shortDay } from '@shared/date-format';
+import { minutesInvalid, parseMinutes } from '../agenda-plan.util';
 
 /** What the new agenda item is: an application of the Gremium, a Haushaltsplan, a to-do, or a free text. */
 export type AgendaItemKind = 'application' | 'plan' | 'todo' | 'freetext';
@@ -144,6 +145,14 @@ export class AgendaItemDialogComponent {
    */
   readonly description = signal('');
   readonly nonPublic = signal(false);
+  /** The estimated duration in minutes (§ 001140); empty means none. */
+  readonly minutes = signal<number | string | null>(null);
+  /** The duration as a whole number from 1 to 480, or `null` for an empty field. */
+  protected minutesValue(): number | null {
+    return parseMinutes(this.minutes());
+  }
+  /** The field holds a value outside 1 to 480: the add waits for a valid one. */
+  protected readonly minutesInvalid = computed(() => minutesInvalid(this.minutes()));
   readonly saving = signal(false);
 
   /** The open cards of the gremium board; `null` until the first switch to "To-Do". */
@@ -257,6 +266,7 @@ export class AgendaItemDialogComponent {
   });
 
   readonly valid = computed(() => {
+    if (this.minutesInvalid()) return false;
     switch (this.kind()) {
       case 'application':
       case 'plan':
@@ -281,6 +291,7 @@ export class AgendaItemDialogComponent {
     this.freetext.set('');
     this.description.set('');
     this.nonPublic.set(false);
+    this.minutes.set(null);
     this.saving.set(false);
     this.todos.set(null);
     this.todoQuery.set('');
@@ -405,18 +416,21 @@ export class AgendaItemDialogComponent {
     const pick = this.visiblePick();
     const todo = this.visibleTodoPick();
     const kind = this.kind();
+    const minutes = this.minutesValue();
+    const extra: [] | [number] = minutes === null ? [] : [minutes];
     const req =
       (kind === 'application' || kind === 'plan') && pick !== null
         ? pick.plan
-          ? this.api.addAgendaPlan(meetingId, pick.id, this.nonPublic())
-          : this.api.addAgendaItem(meetingId, pick.id, this.nonPublic())
+          ? this.api.addAgendaPlan(meetingId, pick.id, this.nonPublic(), ...extra)
+          : this.api.addAgendaItem(meetingId, pick.id, this.nonPublic(), ...extra)
         : kind === 'todo' && todo !== null
-          ? this.api.addAgendaTodo(meetingId, todo, this.nonPublic())
+          ? this.api.addAgendaTodo(meetingId, todo, this.nonPublic(), ...extra)
           : this.api.addAgendaFreetext(
               meetingId,
               this.freetext().trim(),
               this.nonPublic(),
               this.description().trim() || undefined,
+              ...extra,
             );
     this.saving.set(true);
     req.subscribe({
