@@ -884,7 +884,9 @@ async def test_a_line_compares_with_its_predecessor(session: AsyncSession) -> No
 
 
 
-def _year_before_by_hand(version: PlanVersionOut) -> dict[uuid.UUID, tuple[Decimal | None, Decimal | None]]:
+def _year_before_by_hand(
+    version: PlanVersionOut,
+) -> dict[uuid.UUID, tuple[Decimal | None, Decimal | None]]:
     return {line.budget_id: (line.prev_amount, line.prev_actual) for line in version.lines}
 
 
