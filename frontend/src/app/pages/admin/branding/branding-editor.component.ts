@@ -201,7 +201,10 @@ export class BrandingEditorComponent {
     this.api.getSiteConfig().subscribe({
       next: (cfg) => {
         // A config from before the description (spec 001093) has none; the field edits a map.
-        const branding: Branding = { ...cfg.branding, description: cfg.branding.description ?? {} };
+        const branding = cfg.branding && {
+          ...cfg.branding,
+          description: cfg.branding.description ?? {},
+        };
         this.draft.set(branding);
         this.keepSaved(branding);
         this.markSaved(this.editRev());

@@ -32,10 +32,10 @@ import {
 import type { Translate } from '@core/i18n/translations';
 import { personName } from '@shared/person-label.util';
 
-/** The German catalogue with its placeholders filled. */
+/** The German catalogue with its placeholders filled; `{shortName}` as I18nService fills it. */
 const t: Translate = (key: TranslationKey, params?: Record<string, string | number>) => {
   let text: string = de[key] ?? key;
-  for (const [k, v] of Object.entries(params ?? {})) text = text.replaceAll(`{${k}}`, String(v));
+  for (const [k, v] of Object.entries({ shortName: 'STUPA', ...params })) text = text.replaceAll(`{${k}}`, String(v));
   return text;
 };
 
