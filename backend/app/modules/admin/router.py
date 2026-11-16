@@ -52,6 +52,9 @@ from app.modules.admin.principal_merge import PrincipalMergeService
 from app.modules.admin.principal_revoke import PrincipalRevokeService
 from app.modules.admin.schemas import (
     ApplicationTypeCreate,
+    ApplicationTypeGroupCreate,
+    ApplicationTypeGroupOut,
+    ApplicationTypeGroupUpdate,
     ApplicationTypeOut,
     ApplicationTypeUpdate,
     CdVariantCreate,
@@ -89,6 +92,7 @@ from app.modules.admin.schemas import (
     MeetingSettingsUpdate,
     MergePreviewOut,
     MergeResultOut,
+    OrderMove,
     PdfAssetOut,
     PrincipalMergeIn,
     PrincipalOut,
@@ -803,6 +807,102 @@ async def delete_application_type(
     while applications of this type still exist.
     """
     await service.delete_application_type(type_id, principal.sub)
+
+
+@router.post(
+    "/application-types/{type_id}/move",
+    response_model=list[ApplicationTypeOut],
+    responses=_errors(401, 403, 404, 422),
+)
+async def move_application_type(
+    type_id: UUID,
+    payload: OrderMove,
+    session: DbSession,
+    service: ServiceDep,
+    principal: TypesAdmin,
+) -> list[ApplicationTypeOut]:
+    """Move an application type one place up or down inside its group (spec 001183)."""
+    result = await service.move_application_type(type_id, payload.by, principal.sub)
+    await session.commit()
+    return result
+
+
+@router.get(
+    "/application-type-groups",
+    response_model=list[ApplicationTypeGroupOut],
+    dependencies=[_TYPES_OR_FORM],
+    responses=_errors(401, 403),
+)
+async def list_application_type_groups(service: ServiceDep) -> list[ApplicationTypeGroupOut]:
+    """List the groups of Antragsarten in their order (spec 001180)."""
+    return await service.list_application_type_groups()
+
+
+@router.post(
+    "/application-type-groups",
+    response_model=ApplicationTypeGroupOut,
+    status_code=201,
+    responses=_errors(401, 403, 422),
+)
+async def create_application_type_group(
+    payload: ApplicationTypeGroupCreate,
+    session: DbSession,
+    service: ServiceDep,
+    principal: TypesAdmin,
+) -> ApplicationTypeGroupOut:
+    """Create a group of Antragsarten at the end of the order (spec 001180)."""
+    result = await service.create_application_type_group(payload, principal.sub)
+    await session.commit()
+    return result
+
+
+@router.patch(
+    "/application-type-groups/{group_id}",
+    response_model=ApplicationTypeGroupOut,
+    responses=_errors(401, 403, 404, 422),
+)
+async def update_application_type_group(
+    group_id: UUID,
+    payload: ApplicationTypeGroupUpdate,
+    session: DbSession,
+    service: ServiceDep,
+    principal: TypesAdmin,
+) -> ApplicationTypeGroupOut:
+    """Change the name or the text of a group of Antragsarten."""
+    result = await service.update_application_type_group(group_id, payload, principal.sub)
+    await session.commit()
+    return result
+
+
+@router.delete(
+    "/application-type-groups/{group_id}",
+    status_code=204,
+    responses=_errors(401, 403, 404),
+)
+async def delete_application_type_group(
+    group_id: UUID, session: DbSession, service: ServiceDep, principal: TypesAdmin
+) -> None:
+    """Delete a group. Its Antragsarten stay without a group (spec 001180)."""
+    await service.delete_application_type_group(group_id, principal.sub)
+    await session.commit()
+
+
+@router.post(
+    "/application-type-groups/{group_id}/move",
+    response_model=list[ApplicationTypeGroupOut],
+    responses=_errors(401, 403, 404, 422),
+)
+async def move_application_type_group(
+    group_id: UUID,
+    payload: OrderMove,
+    session: DbSession,
+    service: ServiceDep,
+    principal: TypesAdmin,
+) -> list[ApplicationTypeGroupOut]:
+    """Move a group of Antragsarten one place up or down (spec 001183)."""
+    result = await service.move_application_type_group(group_id, payload.by, principal.sub)
+    await session.commit()
+    return result
 
 
 @router.get(

@@ -85,11 +85,23 @@ describe('ApiClient', () => {
           activeFormVersionId: 'v1',
           key: null,
           gremiumId: null,
+          groupId: null,
         },
       ]);
       done();
     });
     http.expectOne((r) => r.url === '/api/application-types').flush(page);
+  });
+
+  it('reads the groups of the Antragsarten in the UI language (spec 001181)', (done) => {
+    const groups = [{ id: 'g1', name: 'Projektanträge', text: '**VSM**' }];
+    api.applicationTypeGroups().subscribe((list) => {
+      expect(list).toEqual(groups);
+      done();
+    });
+    const req = http.expectOne((r) => r.url === '/api/application-type-groups');
+    expect(req.request.params.get('lang')).toBeTruthy();
+    req.flush(groups);
   });
 
   /**

@@ -149,6 +149,7 @@ describe('Kern-Views a11y (axe)', () => {
     };
     const fakeApi: Partial<ApiClient> = {
       applicationTypes: () => of(TYPES),
+      applicationTypeGroups: () => of([]),
       effectiveForm: () => of(EFF),
       me: (() => of(null)) as unknown as ApiClient['me'],
       publicSiteConfig: () => of({ version: 1, branding: null }),

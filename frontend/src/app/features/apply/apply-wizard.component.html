@@ -32,19 +32,18 @@
     <div class="wz__body">
       <section class="wz__step" [hidden]="currentStep() !== 'type'">
         @if (types().length) {
-          <div class="wz__types rowgroup" role="radiogroup" [attr.aria-label]="'apply.type.legend' | t">
-            @for (t of types(); track t.id) {
-              <button
-                type="button"
-                class="wz__type"
-                role="radio"
-                [attr.aria-checked]="typeId() === t.id"
-                [class.is-selected]="typeId() === t.id"
-                (click)="selectType(t.id)"
-              >
-                <span class="wz__radio" aria-hidden="true"></span>
-                <span class="wz__typeName">{{ t.name }}</span>
-              </button>
+          <div class="wz__groups" role="radiogroup" [attr.aria-label]="'apply.type.legend' | t">
+            @for (block of typeBlocks(); track block.id) {
+              @if (block.heading) {
+                <app-section class="wz__block" [heading]="block.heading">
+                  @if (block.html) {
+                    <div class="wz__groupText" [innerHTML]="block.html"></div>
+                  }
+                  <ng-container *ngTemplateOutlet="typeRows; context: { $implicit: block.types }" />
+                </app-section>
+              } @else {
+                <ng-container *ngTemplateOutlet="typeRows; context: { $implicit: block.types }" />
+              }
             }
           </div>
         } @else {
@@ -53,7 +52,7 @@
         @if (loadingForm()) {
           <app-skeleton variant="lines" [count]="3" [label]="'apply.form.loading' | t" />
         } @else if (loggedIn() && effForm() && typeId(); as type) {
-          <app-section class="wz__block wz__predecessor" [heading]="'applications.predecessor.title' | t">
+          <app-section class="wz__block" [heading]="'applications.predecessor.title' | t">
             <app-predecessor-field
               inputId="wz-predecessor"
               [typeId]="type"
@@ -63,10 +62,25 @@
             />
           </app-section>
         }
-        @if (applyInfoHtml()) {
-          <div class="wz__info" [innerHTML]="applyInfoHtml()"></div>
-        }
       </section>
+
+      <ng-template #typeRows let-list>
+        <div class="wz__types rowgroup">
+          @for (t of $any(list); track t.id) {
+            <button
+              type="button"
+              class="wz__type"
+              role="radio"
+              [attr.aria-checked]="typeId() === t.id"
+              [class.is-selected]="typeId() === t.id"
+              (click)="selectType(t.id)"
+            >
+              <span class="wz__radio" aria-hidden="true"></span>
+              <span class="wz__typeName">{{ t.name }}</span>
+            </button>
+          }
+        </div>
+      </ng-template>
 
       @if (effForm()) {
         <section class="wz__step" [hidden]="currentStep() !== 'details'">

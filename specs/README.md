@@ -159,6 +159,12 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/applications/000882](requirements/functional/applications/applications/000882_pdf-no-pii-without-right.md) | The Antrag PDF shows only what the reader may see | approved |
 | [F/applications/applications/000883](requirements/functional/applications/applications/000883_pdf-name.md) | The Antrag PDF is named after the Antrag | approved |
 | [F/applications/applications/000888](requirements/functional/applications/applications/000888_pdf-signatures.md) | The Antrag PDF of an Antragsart can end with a signature section | approved |
+| [F/applications/applications/001180](requirements/functional/applications/applications/001180_type-groups.md) | Admins group the Antragsarten | draft |
+| [F/applications/applications/001181](requirements/functional/applications/applications/001181_apply-type-groups.md) | Step 1 shows the Antragsarten by group with the group text | draft |
+| [F/applications/applications/001182](requirements/functional/applications/applications/001182_apply-ungrouped-types.md) | Antragsarten without a group stand last under Weitere Anträge | draft |
+| [F/applications/applications/001183](requirements/functional/applications/applications/001183_type-group-order.md) | Admins set the order of the groups and of the Antragsarten | draft |
+| [F/applications/applications/001184](requirements/functional/applications/applications/001184_no-general-apply-text.md) | Step 1 has no general text, only the group texts | draft |
+| [F/applications/applications/001185](requirements/functional/applications/applications/001185_apply-step-spacing.md) | The blocks of step 1 have one even spacing | draft |
 | [F/applications/dashboard/000421](requirements/functional/applications/dashboard/000421_dashboard.md) | The start page is a work list with a side sheet | approved |
 | [F/applications/dashboard/000550](requirements/functional/applications/dashboard/000550_start-due-cards.md) | Start shows the due cards of the person | approved |
 | [F/applications/dashboard/000650](requirements/functional/applications/dashboard/000650_start-apply-button-tab-line.md) | Antrag stellen stands in the tab line of the desktop start page | approved |

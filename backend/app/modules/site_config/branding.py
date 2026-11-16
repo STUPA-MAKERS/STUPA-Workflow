@@ -202,16 +202,14 @@ class FooterLink(FrozenStrictCamelModel, frozen=True):
 class SiteFreetexts(FrozenStrictCamelModel, frozen=True):
     """The i18n freetexts of the site.
 
-    They are the login hint, the welcome, the support text, the e-mail footer, the
-    apply info, the texts after the submission and the accessibility statement.
+    They are the login hint, the welcome, the support text, the e-mail footer, the texts
+    after the submission and the accessibility statement.
     """
 
     login_hint: I18nMap = Field(default_factory=dict, alias="loginHint")
     welcome: I18nMap = Field(default_factory=dict)
     support: I18nMap = Field(default_factory=dict)
     email_footer: I18nMap = Field(default_factory=dict, alias="emailFooter")
-    #: Info text below the application-type selection — Markdown, per language.
-    apply_info: I18nMap = Field(default_factory=dict, alias="applyInfo")
     #: The text on the page after the submission, Markdown, per language. "Internal" is
     #: for a signed-in applicant (the application is submitted at once), "external" is
     #: for a guest (the e-mail link confirms the application). An empty language falls
@@ -224,12 +222,24 @@ class SiteFreetexts(FrozenStrictCamelModel, frozen=True):
         default_factory=default_statement, alias="accessibilityStatement"
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_apply_info(cls, data: object) -> object:
+        """Drop the apply info of an old stored config (spec 001184).
+
+        Step 1 of the apply wizard has no general text; the groups of Antragsarten hold
+        the texts. An old config still carries the key, and ``extra="forbid"`` would
+        reject that config.
+        """
+        if isinstance(data, dict):
+            return {k: v for k, v in data.items() if k not in ("applyInfo", "apply_info")}
+        return data
+
     @field_validator(
         "login_hint",
         "welcome",
         "support",
         "email_footer",
-        "apply_info",
         "submitted_internal",
         "submitted_external",
         "accessibility_statement",

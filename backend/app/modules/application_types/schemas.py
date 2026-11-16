@@ -48,3 +48,25 @@ class ApplicationTypeListItem(FrozenCamelModel, frozen=True):
     active_form_version_id: UUID | None = Field(default=None, alias="activeFormVersionId")
     key: str | None = None
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
+    #: The group in step 1 of the apply wizard (spec 001181); `null` = "Weitere Anträge".
+    group_id: UUID | None = Field(default=None, alias="groupId")
+
+
+class ApplicationTypeGroupQuery(FrozenCamelModel, frozen=True):
+    """Query parameters of the group list: only `lang`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    lang: Lang = DEFAULT_LANG
+
+
+class ApplicationTypeGroupItem(FrozenCamelModel, frozen=True):
+    """A group of Antragsarten for step 1 of the apply wizard (spec 001181).
+
+    `name` and `text` are resolved for `lang` with German as the fallback. `text` is
+    Markdown and can be empty.
+    """
+
+    id: UUID
+    name: str
+    text: str

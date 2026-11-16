@@ -141,6 +141,13 @@
       "to": "Application"
     },
     {
+      "column": "group_id",
+      "from": "ApplicationType",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "ApplicationTypeGroup"
+    },
+    {
       "column": "active_form_version_id",
       "from": "ApplicationType",
       "multiplicity": "*",
@@ -1753,6 +1760,18 @@
           "type": "INTEGER"
         },
         {
+          "name": "group_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "position",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
           "name": "active_form_version_id",
           "nullable": true,
           "primaryKey": false,
@@ -1776,6 +1795,45 @@
       "name": "ApplicationType",
       "path": "backend/app/modules/application_types/models.py",
       "table": "application_type"
+    },
+    {
+      "attributes": [
+        {
+          "name": "name_i18n",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "text_i18n",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "position",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "ApplicationTypeGroup",
+      "module": "application_types",
+      "name": "ApplicationTypeGroup",
+      "path": "backend/app/modules/application_types/models.py",
+      "table": "application_type_group"
     },
     {
       "attributes": [

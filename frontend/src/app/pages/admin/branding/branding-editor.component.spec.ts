@@ -546,16 +546,22 @@ describe('BrandingEditorComponent', () => {
     expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
   });
 
-  it('creates the apply info map on first use', async () => {
+  it('creates a missing text map on first use', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     const d = c.draft();
-    delete d.freetexts.applyInfo;
-    const map = c.freetext(d, 'applyInfo');
+    delete d.freetexts.support;
+    const map = c.freetext(d, 'support');
     expect(map).toEqual({});
-    expect(c.freetext(d, 'applyInfo')).toBe(map);
+    expect(c.freetext(d, 'support')).toBe(map);
     expect(c.freetext(d, 'welcome')).toBe(d.freetexts.welcome);
+  });
+
+  it('has no apply info text (spec 001184)', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((fixture.componentInstance as any).freetexts).not.toContain('applyInfo');
   });
 
   describe('texts after the creation', () => {

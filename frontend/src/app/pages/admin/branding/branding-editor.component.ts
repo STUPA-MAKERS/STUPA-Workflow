@@ -61,8 +61,8 @@ import {
 /** The language of the texts in the editor. */
 type TextLang = ContentLang;
 
-/** The free texts in display order. `applyInfo` takes Markdown. */
-const FREETEXTS = ['welcome', 'loginHint', 'support', 'emailFooter', 'applyInfo'] as const;
+/** The free texts in display order. Step 1 of the apply wizard has no text here (spec 001184). */
+const FREETEXTS = ['welcome', 'loginHint', 'support', 'emailFooter'] as const;
 type FreetextKey = (typeof FREETEXTS)[number];
 
 /** The two admin pages of the site config: "Branding" and "Texte". */
@@ -290,8 +290,8 @@ export class BrandingEditorComponent {
   }
 
   /**
-   * The text map of a free text. A config from before a newer text (`applyInfo`, the texts
-   * after the creation, the accessibility statement) has none, so it gets an empty map.
+   * The text map of a free text. A config from before a newer text (the texts after the
+   * creation, the accessibility statement) has none, so it gets an empty map.
    */
   private textMap(d: Branding, key: keyof Branding['freetexts']): I18nMap {
     const texts: Partial<Record<keyof Branding['freetexts'], I18nMap>> = d.freetexts;

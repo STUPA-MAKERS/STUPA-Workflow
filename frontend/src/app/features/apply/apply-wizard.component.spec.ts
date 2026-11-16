@@ -137,6 +137,7 @@ interface SetupOpts {
   types?: () => ReturnType<ApiClient['applicationTypes']>;
   effectiveForm?: () => ReturnType<ApiClient['effectiveForm']>;
   freetexts?: Record<string, Record<string, string>>;
+  groups?: () => ReturnType<ApiClient['applicationTypeGroups']>;
   /** The query params of the route, for example `{ type: 't1' }`. */
   query?: Record<string, string>;
   prefill?: jest.Mock;
@@ -148,6 +149,7 @@ async function setup(opts: SetupOpts = {}) {
   const toast = { error: jest.fn(), success: jest.fn(), show: jest.fn() };
   const api: Partial<ApiClient> = {
     applicationTypes: opts.types ?? (() => of(TYPES)),
+    applicationTypeGroups: opts.groups ?? (() => of([])),
     effectiveForm: opts.effectiveForm ?? (() => of(opts.form ?? EFF)),
     createApplication: create as unknown as ApiClient['createApplication'],
     me: (() => (opts.loggedIn ? of(PRINCIPAL) : throwError(() => ({ status: 401 })))) as unknown as ApiClient['me'],
@@ -779,10 +781,67 @@ describe('ApplyWizardComponent', () => {
     expect(s.comp.activeIndex()).toBe(0);
   });
 
-  it('renders the configured apply info as Markdown', async () => {
-    const s = await setup({ freetexts: { applyInfo: { de: '**Frist:** 1. Mai' } } });
-    expect(s.comp.applyInfoHtml()).toContain('<strong>Frist:</strong>');
-    expect(screen.getByText('Frist:')).toBeInTheDocument();
+  it('shows no general apply text (spec 001184)', async () => {
+    await setup({ freetexts: { applyInfo: { de: '**Frist:** 1. Mai' } } });
+    expect(screen.queryByText('Frist:')).not.toBeInTheDocument();
+  });
+
+  describe('groups of Antragsarten (specs 001181, 001182)', () => {
+    const GROUPED: ApplicationType[] = [
+      { ...TYPES[0], id: 'g1t', name: 'VSM', groupId: 'g1' },
+      { ...TYPES[0], id: 'g2t', name: 'Ersti', groupId: 'g2' },
+      { ...TYPES[0], id: 'loose', name: 'Sonstiges', groupId: null },
+      { ...TYPES[0], id: 'lost', name: 'Verwaist', groupId: 'gone' },
+    ];
+    const GROUPS = [
+      { id: 'g1', name: 'Projektanträge', text: 'Mit **Kostenaufstellung**' },
+      { id: 'g2', name: 'Spezielle Anträge', text: '' },
+      { id: 'g3', name: 'Leer', text: 'Nie sichtbar' },
+    ];
+
+    it('shows each group with its heading, its text and its types, in order', async () => {
+      await setup({ types: () => of(GROUPED), groups: () => of(GROUPS) });
+      const first = screen.getByRole('group', { name: 'Projektanträge' });
+      expect(within(first).getByText('Kostenaufstellung').tagName).toBe('STRONG');
+      expect(within(first).getAllByRole('radio').map((r) => r.textContent?.trim())).toEqual(['VSM']);
+      const second = screen.getByRole('group', { name: 'Spezielle Anträge' });
+      expect(within(second).getAllByRole('radio').map((r) => r.textContent?.trim())).toEqual(['Ersti']);
+      expect(screen.queryByText('Leer')).not.toBeInTheDocument();
+      expect(screen.queryByText('Nie sichtbar')).not.toBeInTheDocument();
+      const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent?.trim());
+      expect(headings).toEqual(['Projektanträge', 'Spezielle Anträge', 'Weitere Anträge']);
+    });
+
+    it('puts the types without a known group last under Weitere Anträge', async () => {
+      await setup({ types: () => of(GROUPED), groups: () => of(GROUPS) });
+      const other = screen.getByRole('group', { name: 'Weitere Anträge' });
+      expect(within(other).getAllByRole('radio').map((r) => r.textContent?.trim())).toEqual([
+        'Sonstiges',
+        'Verwaist',
+      ]);
+    });
+
+    it('shows one list without a heading when no group is shown', async () => {
+      const s = await setup({ groups: () => of([GROUPS[2]]) });
+      expect(s.comp.typeBlocks()).toEqual([expect.objectContaining({ heading: '', html: '' })]);
+      expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Förderantrag' })).toBeInTheDocument();
+    });
+
+    it('shows one list when the groups fail to load', async () => {
+      const s = await setup({ types: () => of(GROUPED), groups: () => throwError(() => new Error('x')) });
+      expect(s.comp.typeBlocks().length).toBe(1);
+      expect(screen.getAllByRole('radio').length).toBe(4);
+    });
+  });
+
+  it('gives the field Folgeantrag no own margin (spec 001185)', async () => {
+    const s = await setup({ form: PLAIN, loggedIn: true });
+    await waitFor(() => expect(s.comp['loggedIn']()).toBe(true));
+    await pickType(s);
+    const section = screen.getByRole('group', { name: 'Folgeantrag' });
+    expect(section.classList).toContain('wz__block');
+    expect(section.classList).not.toContain('wz__predecessor');
   });
 
   it('toasts when the types fail to load', async () => {

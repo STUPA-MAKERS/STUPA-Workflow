@@ -17,6 +17,7 @@ import type {
   ApplicationListItemWire,
   ApplicationLinksWire,
   ApplicationOutWire,
+  ApplicationTypeGroup,
   ApplicationTypeListItemWire,
   AttachmentOutWire,
   DraftAttachmentOutWire,
@@ -395,6 +396,7 @@ const MOCK_TYPES: Page<ApplicationTypeListItemWire> = {
       hasBudget: true,
       active: true,
       activeFormVersionId: '44444444-4444-4444-4444-444444444444',
+      groupId: 'a7000000-0000-0000-0000-000000000001',
     },
     {
       id: '22222222-2222-2222-2222-222222222222',
@@ -409,12 +411,25 @@ const MOCK_TYPES: Page<ApplicationTypeListItemWire> = {
       hasBudget: false,
       active: true,
       activeFormVersionId: '44444444-4444-4444-4444-444444444446',
+      groupId: 'a7000000-0000-0000-0000-000000000001',
     },
   ],
   total: 3,
   limit: 20,
   offset: 0,
 };
+
+/** The groups of step 1 of the apply wizard (spec 001181). */
+const MOCK_TYPE_GROUPS: readonly ApplicationTypeGroup[] = [
+  {
+    id: 'a7000000-0000-0000-0000-000000000001',
+    name: 'Projektanträge',
+    text:
+      'Anträge mit **Kostenaufstellung**. Pro Kostenposition sind mindestens drei ' +
+      'Vergleichsangebote nötig.',
+  },
+  { id: 'a7000000-0000-0000-0000-000000000002', name: 'Leere Gruppe', text: 'Nie sichtbar.' },
+];
 
 const MOCK_APP_ID = '33333333-3333-3333-3333-333333333333';
 /** The readers of the internal comments of the mock application: the "@" list. */
@@ -1905,6 +1920,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith(`/application-types/${MOCK_TYPES.items[2].id}/form`)) return ok(MOCK_QSM_FORM);
     if (/\/application-types\/[^/]+\/form$/.test(p)) return ok(MOCK_EFFECTIVE_FORM);
     if (p.endsWith('/application-types')) return ok(MOCK_TYPES);
+    if (p.endsWith('/application-type-groups') && !p.includes('/admin/')) return ok(MOCK_TYPE_GROUPS);
     if (p.endsWith('/meetings/timeline')) {
       const { past, upcoming } = mockTimeline();
       const q = (req.params.get('q') ?? '').trim().toLowerCase();

@@ -498,16 +498,60 @@ describe('AdminApiService — real mode (contract)', () => {
     );
     const req = http.expectOne('/api/admin/application-types');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ key: 'k', nameI18n: { de: 'N' }, gremiumId: 'g1', hasBudget: true });
+    expect(req.request.body).toEqual({ key: 'k', nameI18n: { de: 'N' }, gremiumId: 'g1', hasBudget: true, groupId: null });
     req.flush({ id: 'new-1' });
-    expect(created).toEqual({ id: 'new-1', name: {}, gremiumId: null, hasBudget: false, pdfSignatures: false, retentionMonths: null, activeFormVersionId: null });
+    expect(created).toEqual({
+      id: 'new-1',
+      name: {},
+      gremiumId: null,
+      hasBudget: false,
+      pdfSignatures: false,
+      retentionMonths: null,
+      activeFormVersionId: null,
+      activeFormVersion: null,
+      groupId: null,
+      position: 0,
+    });
   });
 
   it('POSTs an application type with default gremium/budget when omitted', () => {
     s.createApplicationType({ key: 'k', name: { de: 'N' } }).subscribe();
     const req = http.expectOne('/api/admin/application-types');
-    expect(req.request.body).toEqual({ key: 'k', nameI18n: { de: 'N' }, gremiumId: null, hasBudget: false });
+    expect(req.request.body).toEqual({ key: 'k', nameI18n: { de: 'N' }, gremiumId: null, hasBudget: false, groupId: null });
     req.flush({ id: 'x' });
+  });
+
+  it('reads, creates, changes, moves and deletes groups of Antragsarten (spec 001180)', () => {
+    s.listApplicationTypeGroups().subscribe((list) =>
+      expect(list).toEqual([{ id: 'g1', name: { de: 'P' }, text: {}, position: 0 }]),
+    );
+    http.expectOne('/api/admin/application-type-groups').flush([{ id: 'g1', nameI18n: { de: 'P' }, position: 0 }]);
+
+    s.createApplicationTypeGroup({ name: { de: 'P' }, text: { de: 'T' } }).subscribe();
+    const create = http.expectOne('/api/admin/application-type-groups');
+    expect(create.request.method).toBe('POST');
+    expect(create.request.body).toEqual({ nameI18n: { de: 'P' }, textI18n: { de: 'T' } });
+    create.flush({ id: 'g2', nameI18n: { de: 'P' }, textI18n: { de: 'T' }, position: 1 });
+
+    s.updateApplicationTypeGroup('g2', { name: { de: 'Q' }, text: {} }).subscribe();
+    const patch = http.expectOne('/api/admin/application-type-groups/g2');
+    expect(patch.request.method).toBe('PATCH');
+    patch.flush({ id: 'g2', nameI18n: { de: 'Q' }, position: 1 });
+
+    s.moveApplicationTypeGroup('g2', -1).subscribe();
+    const move = http.expectOne('/api/admin/application-type-groups/g2/move');
+    expect(move.request.body).toEqual({ by: -1 });
+    move.flush([]);
+
+    s.moveApplicationType('t1', 1).subscribe();
+    const typeMove = http.expectOne('/api/admin/application-types/t1/move');
+    expect(typeMove.request.body).toEqual({ by: 1 });
+    typeMove.flush([]);
+
+    s.deleteApplicationTypeGroup('g2').subscribe();
+    const del = http.expectOne('/api/admin/application-type-groups/g2');
+    expect(del.request.method).toBe('DELETE');
+    del.flush(null);
   });
 
   /** An empty body sets no keys. */
