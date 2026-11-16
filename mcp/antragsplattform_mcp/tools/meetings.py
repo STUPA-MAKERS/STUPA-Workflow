@@ -288,7 +288,8 @@ async def get_agenda(meeting_id: str) -> list[dict]:
     """Read the agenda of a meeting: its items in their order.
 
     Each item has `id`, `title`, `position`, `body` (markdown), `nonPublic`, `doneAt`,
-    `startedAt`, `estimatedMinutes`, and for an application item `applicationId`, `stateLabel` and `amount` (a to-do
+    `startedAt`, `estimatedMinutes`, and for an application item `applicationId`,
+    `stateLabel` and `amount` (a to-do
     item has `todoId`). Needs read access to the meeting. Read the agenda here before
     you change it, and after a failed write before you repeat it.
     """

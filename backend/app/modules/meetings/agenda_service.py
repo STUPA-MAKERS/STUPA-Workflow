@@ -359,10 +359,10 @@ class AgendaService:
         await self.session.commit()
         return await self.list(meeting_id)
 
-    async def set_duration(
+    async def set_duration_in_tx(
         self, meeting_id: UUID, item_id: UUID, minutes: int | None, *, actor: str | None = None
-    ) -> list[AgendaItemOut]:
-        """Set or clear the estimated duration of an agenda item, then commit.
+    ) -> None:
+        """Set or clear the estimated duration of an agenda item. It does not commit.
 
         The duration is part of the agenda structure, so it needs a `planned` or `live`
         meeting, as an add or a move does (spec 001140). `None` clears the estimate. A
@@ -382,8 +382,6 @@ class AgendaService:
                 AuditAction.AGENDA_ITEM_UPDATE, actor=actor, item=row, fields=["estimatedMinutes"]
             )
             await self.session.flush()
-            await self.session.commit()
-        return await self.list(meeting_id)
 
     async def _own_title(self, row: MeetingAgendaItem, title: str) -> str | None:
         """Return the title to store for a rename of `row` to `title`.

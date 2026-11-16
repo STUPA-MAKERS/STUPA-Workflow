@@ -88,10 +88,10 @@ async def test_set_duration_changes_clears_and_audits_once() -> None:
         return row
 
     service.item = _item  # type: ignore[method-assign]
-    await service.set_duration(MEETING, ITEM, 20, actor="p")
+    await service.set_duration_in_tx(MEETING, ITEM, 20, actor="p")
     assert row.estimated_minutes == 20
-    await service.set_duration(MEETING, ITEM, 20, actor="p")
-    await service.set_duration(MEETING, ITEM, None, actor="p")
+    await service.set_duration_in_tx(MEETING, ITEM, 20, actor="p")
+    await service.set_duration_in_tx(MEETING, ITEM, None, actor="p")
     assert row.estimated_minutes is None
     assert [kw["fields"] for _a, kw in audits] == [["estimatedMinutes"], ["estimatedMinutes"]]
 
@@ -100,8 +100,12 @@ async def test_set_duration_on_a_closed_meeting_is_refused() -> None:
     """§001140: the duration follows the add and the move, so a closed meeting refuses it."""
     service = _service(ScriptedSession(), "closed", [])
     with pytest.raises(ConflictError) as err:
-        await service.set_duration(MEETING, ITEM, 10, actor="p")
+        await service.set_duration_in_tx(MEETING, ITEM, 10, actor="p")
     assert err.value.code == "meeting_closed"
+
+
+async def _commit() -> None:
+    return None
 
 
 def _app(calls: list[Any], *, can_write: bool = True) -> TestClient:
@@ -124,8 +128,12 @@ def _app(calls: list[Any], *, can_write: bool = True) -> TestClient:
             calls.append(("add", kw))
             return []
 
-        async def set_duration(self, *args: Any, **kw: Any) -> list[Any]:
+        session = SimpleNamespace(commit=_commit)
+
+        async def set_duration_in_tx(self, *args: Any, **kw: Any) -> None:
             calls.append(("set_duration", args))
+
+        async def list(self, *_a: Any) -> list[Any]:
             return []
 
     app = create_app()

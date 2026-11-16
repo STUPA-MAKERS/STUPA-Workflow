@@ -1147,9 +1147,10 @@ async def set_agenda_duration(
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
         raise ForbiddenError("not allowed to edit the agenda")
-    items = await agenda.set_duration(meeting_id, item_id, payload.minutes, actor=principal.sub)
+    await agenda.set_duration_in_tx(meeting_id, item_id, payload.minutes, actor=principal.sub)
+    await agenda.session.commit()
     await service.broadcast_agenda(meeting_id, item_id)
-    return items
+    return await agenda.list(meeting_id)
 
 
 @router.put(
