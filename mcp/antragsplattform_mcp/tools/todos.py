@@ -1,12 +1,15 @@
-"""To-do board tools: boards, cards, moves and comments.
+"""To-do board tools: boards, member entries, cards, moves and comments.
 
-A board is readable for its members: a gremium board for the active members whose
-gremium role holds `todo.write` (or an admin), the personal board for its owner only, a
-team board for the holders of its permission. The global `todo.all` reads and writes,
-`todo.read_all` only reads every gremium and team board (never a personal one). An
-unreadable board or card is 404; a card write on a board that is only readable is 403
-`todo_write_required`. The token reads with the scope `read` (`todo.read_all`) or
-`todos:write` and writes with `todos:write`.
+A person has a role on a board: `read`, `edit` or `manage`. A gremium board: each active
+member of the gremium edits, a member whose gremium role holds `todo.configure` manages,
+and its extra entries (gremien or persons) add their roles. A free board (kind `free`)
+follows its entries only. The personal board is for its owner only, a team board for the
+holders of its permission; an admin manages every gremium and free board. The global
+`todo.all` reads and writes, `todo.read_all` only reads every gremium, free and team
+board (never a personal one). An unreadable board or card is 404; a card write on a
+board that is only readable is 403 `todo_write_required`; a change of the settings or
+the entries without `manage` is 403 `todo_configure_required`. The token reads with the
+scope `read` (`todo.read_all`) or `todos:write` and writes with `todos:write`.
 """
 
 from __future__ import annotations
@@ -22,17 +25,106 @@ group = ToolGroup()
 
 
 @group.tool
-async def todo_boards(gremium_id: str | None = None) -> list:
+async def todo_boards(gremium_id: str | None = None, archived: bool | None = None) -> list:
     """List the to-do boards the caller can read.
 
     The order is the personal board ("Meine To-Dos", created on the first call), the
-    gremium boards by name, then the team boards. Each entry carries `canWrite`,
-    `canConfigure` and `openCount` (cards not archived and not in the done column).
+    gremium boards by name, the free boards by name, then the team boards. Each entry
+    carries `canWrite`, `canConfigure`, `openCount` (cards not archived and not in the
+    done column) and `agendaGremiumIds` (the gremien whose meetings take its cards).
 
     Args:
         gremium_id: Only the board of this gremium.
+        archived: True lists the archived free boards that the caller manages instead.
     """
-    return await api().get("/todos/boards", params=params(gremiumId=gremium_id))
+    return await api().get(
+        "/todos/boards", params=params(gremiumId=gremium_id, archived=archived or None)
+    )
+
+
+@group.tool
+async def todo_board_create(name: str, entries: list[S.TodoBoardEntryIn] | None = None) -> dict:
+    """Create a free board with the columns Offen, In Arbeit, Wartet, Erledigt.
+
+    Needs an admin or the global permission `todo.create_board` (403
+    `board_create_required`). The caller becomes a member with `manage`. A person entry
+    gets the mail `todo_board_added`. A double entry is 422 `entry_duplicate`, an entry
+    with both or no target 422 `entry_target`.
+
+    Args:
+        name: 1 to 120 characters.
+        entries: The first gremien and persons, each with a role (default `edit`).
+    """
+    body = {"name": name, "entries": [e.model_dump(exclude_none=True) for e in entries or []]}
+    return await api().post("/todos/boards", json=body)
+
+
+@group.tool
+async def todo_board_entries(board_id: str) -> list:
+    """List the member entries of a board: gremien first, then persons, each by name.
+
+    The own gremium of a gremium board comes first with `fixed: true` and no `id`; it
+    cannot be changed. Each entry has `id`, `kind` (`gremium` | `person`), `targetId`,
+    `name` and `role`.
+    """
+    return await api().get(f"/todos/boards/{board_id}/entries")
+
+
+@group.tool
+async def todo_board_entry_add(board_id: str, entry: S.TodoBoardEntryIn) -> list:
+    """Add a gremium or a person to a gremium board or a free board (needs `manage`).
+
+    A gremium entry stands for the members of the gremium at the time of each read. 409
+    `entry_exists` for a target on the board, 409 `own_gremium_entry` for the own gremium
+    of a gremium board, 422 `entries_not_supported` on a personal or team board. Returns
+    all entries.
+    """
+    return await api().post(
+        f"/todos/boards/{board_id}/entries", json=entry.model_dump(exclude_none=True)
+    )
+
+
+@group.tool
+async def todo_board_entry_update(board_id: str, entry_id: str, role: S.TodoEntryRole) -> list:
+    """Change the role of an entry (needs `manage`).
+
+    The last `manage` entry of a free board stays: 409 `last_manager`. Returns all
+    entries.
+    """
+    return await api().patch(f"/todos/boards/{board_id}/entries/{entry_id}", json={"role": role})
+
+
+@group.tool
+async def todo_board_entry_remove(board_id: str, entry_id: str) -> list:
+    """Remove an entry (needs `manage`; 409 `last_manager`). Returns all entries."""
+    return await api().delete(f"/todos/boards/{board_id}/entries/{entry_id}")
+
+
+@group.tool
+async def todo_board_archive(board_id: str) -> dict:
+    """Archive a free board (needs `manage`): hidden from every list and read-only.
+
+    A write on an archived board is 409 `board_archived`. Restore it with
+    `todo_board_restore`; list the archived boards with `todo_boards(archived=True)`.
+    """
+    return await api().post(f"/todos/boards/{board_id}/archive")
+
+
+@group.tool
+async def todo_board_restore(board_id: str) -> dict:
+    """Restore an archived free board (needs `manage`)."""
+    return await api().post(f"/todos/boards/{board_id}/restore")
+
+
+@group.tool
+async def todo_board_delete(board_id: str) -> dict:
+    """Delete an archived free board with all its cards, comments and files.
+
+    Admins only (403 `board_delete_admin_only`); a board that is not archived is 409
+    `board_not_archived`. This cannot be undone.
+    """
+    await api().delete(f"/todos/boards/{board_id}")
+    return {"deleted": board_id}
 
 
 @group.tool
