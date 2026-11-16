@@ -275,7 +275,7 @@ services:
     # The password is mandatory, and deploy.sh blocks an empty value or "root". Sentinel
     # generates the missing secrets (JWT_SECRET, CODE_CHALLENGE_SECRET) itself into
     # /data/.env.
-    image: ghcr.io/altcha-org/sentinel:1.31.1@sha256:974647205e1fc0a7a7f4e70090d014bda89f5d582599f544fd7237bf1d3adc6f
+    image: ghcr.io/altcha-org/sentinel:1.31.2@sha256:ef2686dde72f86f3f07d943cb2a1c7e9aa815128f2ffe39e9782da5a3ea6ad5f
     <<: *restart
     environment:
       DEFAULT_ROOT_PASSWORD: ${ALTCHA_ROOT_PASSWORD}
