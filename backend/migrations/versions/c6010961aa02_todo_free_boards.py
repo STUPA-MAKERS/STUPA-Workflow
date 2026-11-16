@@ -16,7 +16,7 @@ The downgrade deletes the free boards, drops the table, restores the old checks 
 removes the permission rows.
 
 Revision ID: c6010961aa02
-Revises: 9a69ebacd008
+Revises: 5e7a2c9d4b18
 Create Date: 2026-11-16 04:00:00
 """
 
@@ -27,7 +27,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "c6010961aa02"
-down_revision: str | None = "9a69ebacd008"
+down_revision: str | None = "5e7a2c9d4b18"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
