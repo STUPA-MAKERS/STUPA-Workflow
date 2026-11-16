@@ -58,6 +58,7 @@ describe('FormlyBudgetSelectType', () => {
     const options = screen.getAllByRole('option');
     expect(options.map((o) => o.textContent?.replace(/\s+/g, ''))).toEqual(['VSAStA', '1Kultur']);
     expect(options[0].querySelector('.ccs__swatch')).not.toBeNull();
+    expect(options[0].getAttribute('aria-disabled')).toBe('true');
     await userEvent.click(options[1]);
     expect(host.model['ks']).toBe('b');
     expect(screen.getByRole('button', { name: /Kostenstelle/ })).toHaveTextContent('Kultur');

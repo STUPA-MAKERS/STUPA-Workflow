@@ -12,7 +12,8 @@ import type { BudgetTreeNode } from '../../../pages/budget/budget-tree.api';
  * search and the tree of cost centres with their colour swatches and keys, a popover on
  * a wide screen and the bottom sheet on a phone. `props.nodes` is the tree that the
  * mapper builds from the options of the server (`budgetOptionTree`). The hint and the
- * error text show below the field, as with `app-select`.
+ * error text show below the field, as with `app-select`. Only a cost centre without a
+ * cost centre below it can be picked (spec 001031).
  */
 @Component({
   selector: 'app-formly-budget-select',
@@ -31,6 +32,7 @@ import type { BudgetTreeNode } from '../../../pages/budget/budget-tree.api';
         [invalid]="showError"
         [placeholder]="props.placeholder || ('formly.select.placeholder' | t)"
         [emptyLabel]="'expenses.field.noCostCentres' | t"
+        leavesOnly
         (picked)="pick($event)"
       />
       @if (showError) {

@@ -2,7 +2,7 @@
 id: "001031"
 title: An Antrag takes only a Kostenstelle without a Kostenstelle below it
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:

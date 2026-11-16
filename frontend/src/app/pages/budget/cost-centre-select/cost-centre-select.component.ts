@@ -34,7 +34,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { simplifyPathKey } from '@shared/budget-path';
 import { nodeColors } from '../budget-color.util';
 import type { BudgetTreeNode } from '../budget-tree.api';
-import { pickable, withoutIncome } from '../cost-centre/cost-centre.util';
+import { pickable, withDescendants, withoutIncome } from '../cost-centre/cost-centre.util';
 import { formatMoney } from '@shared/format-money';
 import { costCentreFigures, findBudgetNode } from '../expense-display.util';
 
@@ -69,6 +69,9 @@ export interface CostCentreChoice {
   readonly negative: boolean;
   /** The index among the choices: the keyboard moves over it. */
   readonly index: number;
+  /** The node has Kostenstellen below it and `leavesOnly` is on: it shows, but cannot be
+   *  picked (spec 001031, 001032). */
+  readonly disabled: boolean;
 }
 
 /** One line of a group: a choice, or the path of the choices below it (while searching). */
@@ -142,6 +145,9 @@ export class CostCentreSelectComponent {
   /** Offer no Kostenstelle that is income in `fiscalYearId`: the picker of an Antrag
    *  (spec 001030). */
   readonly expenseOnly = input(false, { transform: booleanAttribute });
+  /** Only a node without an active Kostenstelle below it can be picked; the others show
+   *  as not available: the picker of an Antrag and of a booking (spec 001031, 001032). */
+  readonly leavesOnly = input(false, { transform: booleanAttribute });
   /** The text when the tree has no cost centre. */
   readonly emptyLabel = input('');
   /** The extra top choice with the value `''`, or '' for none. */
@@ -212,6 +218,7 @@ export class CostCentreSelectComponent {
           free: null,
           negative: false,
           index: 0,
+          disabled: false,
         }
       : null,
   );
@@ -228,6 +235,17 @@ export class CostCentreSelectComponent {
       : this.nodes();
     return pickable(nodes, (top) => [this.fiscalYearId(), this.fiscalYears().get(top.id) ?? '']);
   });
+
+  /** The nodes with an active Kostenstelle below them, in the tree as given. */
+  private readonly parents = computed(
+    () =>
+      new Set(
+        this.nodes()
+          .flatMap(withDescendants)
+          .filter((n) => (n.children ?? []).some((c) => c.active))
+          .map((n) => n.id),
+      ),
+  );
 
   /** The groups of the list: every top-level budget with a hit, its choices below. */
   protected readonly groups = computed<readonly CostCentreGroup[]>(() => {
@@ -324,7 +342,9 @@ export class CostCentreSelectComponent {
 
   protected onSearch(value: string): void {
     this.query.set(value);
-    const first = this.choices().find((c) => c.depth > 0) ?? this.choices()[0];
+    const first =
+      this.choices().find((c) => c.depth > 0 && !c.disabled) ??
+      this.choices().find((c) => !c.disabled);
     this.active.set(value.trim() && first ? first.index : this.startIndex());
   }
 
@@ -339,22 +359,22 @@ export class CostCentreSelectComponent {
     switch (event.key) {
       case 'ArrowDown':
         event.preventDefault();
-        this.moveTo(Math.min(i + 1, count - 1));
+        this.moveTo(this.pickableFrom(Math.min(i + 1, count - 1), 1, i));
         return;
       case 'ArrowUp':
         event.preventDefault();
-        this.moveTo(Math.max(i - 1, 0));
+        this.moveTo(this.pickableFrom(Math.max(i - 1, 0), -1, i));
         return;
       case 'Home':
         if (event.ctrlKey) {
           event.preventDefault();
-          this.moveTo(0);
+          this.moveTo(this.pickableFrom(0, 1, i));
         }
         return;
       case 'End':
         if (event.ctrlKey) {
           event.preventDefault();
-          this.moveTo(count - 1);
+          this.moveTo(this.pickableFrom(count - 1, -1, i));
         }
         return;
       case 'Enter': {
@@ -375,12 +395,13 @@ export class CostCentreSelectComponent {
   }
 
   protected choose(c: CostCentreChoice): void {
+    if (c.disabled) return;
     if (c.id !== this.value()) this.picked.emit(c.id);
     this.close(true);
   }
 
   protected hover(c: CostCentreChoice): void {
-    if (this.active() !== c.index) this.active.set(c.index);
+    if (!c.disabled && this.active() !== c.index) this.active.set(c.index);
   }
 
   protected onSheetOpen(open: boolean): void {
@@ -421,6 +442,7 @@ export class CostCentreSelectComponent {
       free: free === null ? null : formatMoney(free, this.i18n.formatLocale()),
       negative: free !== null && free < 0,
       index,
+      disabled: this.leavesOnly() && this.parents().has(n.id),
     };
   }
 
@@ -437,8 +459,20 @@ export class CostCentreSelectComponent {
   }
 
   private startIndex(): number {
-    const hit = this.choices().find((c) => c.id === this.value());
-    return hit ? hit.index : this.choices().length ? 0 : -1;
+    const hit = this.choices().find((c) => c.id === this.value() && !c.disabled);
+    return hit ? hit.index : (this.choices().find((c) => !c.disabled)?.index ?? -1);
+  }
+
+  /**
+   * The first choice from `start` in the direction `step` that can be picked, else
+   * `fallback`: the keyboard skips a node that is not available (spec 001031).
+   */
+  private pickableFrom(start: number, step: 1 | -1, fallback: number): number {
+    const list = this.choices();
+    const hit = (step > 0 ? list.slice(start) : list.slice(0, start + 1).reverse()).find(
+      (c) => !c.disabled,
+    );
+    return hit ? hit.index : fallback;
   }
 
   private moveTo(index: number): void {
