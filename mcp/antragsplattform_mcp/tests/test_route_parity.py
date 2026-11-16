@@ -185,20 +185,27 @@ def tool_routes() -> set[tuple[str, str]]:
     return calls
 
 
+def _branches(node: ast.expr) -> list[str]:
+    """The texts that an expression can have: each branch of a conditional expression."""
+    if isinstance(node, ast.IfExp):
+        return _branches(node.body) + _branches(node.orelse)
+    text = _const_str(node)
+    return [] if text is None else [text]
+
+
 def _calls_of(func: ast.AsyncFunctionDef | ast.FunctionDef) -> set[tuple[str, str]]:
     """The routes that one function sends; each value of a local path name counts."""
     names: dict[str, list[str]] = {}
     for node in ast.walk(func):
-        if isinstance(node, ast.Assign) and (text := _const_str(node.value)) is not None:
+        if isinstance(node, ast.Assign):
             for target in node.targets:
                 if isinstance(target, ast.Name):
-                    names.setdefault(target.id, []).append(text)
+                    names.setdefault(target.id, []).extend(_branches(node.value))
 
     def texts_of(node: ast.expr) -> list[str]:
         if isinstance(node, ast.Name):
             return names.get(node.id, [])
-        text = _const_str(node)
-        return [] if text is None else [text]
+        return _branches(node)
 
     calls: set[tuple[str, str]] = set()
     for node in ast.walk(func):

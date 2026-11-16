@@ -283,9 +283,11 @@ async def export_plan_version(
     overwrite: bool = False,
 ) -> dict:
     """Download a version of a Haushaltsplan as PDF or `.xlsx` to a local file."""
-    path = f"/budget-plan-versions/{version_id}/export.pdf"
-    if file_format == "xlsx":
-        path = f"/budget-plan-versions/{version_id}/export.xlsx"
+    path = (
+        f"/budget-plan-versions/{version_id}/export.xlsx"
+        if file_format == "xlsx"
+        else f"/budget-plan-versions/{version_id}/export.pdf"
+    )
     return await download_to(
         "GET", path, target_path, overwrite=overwrite, fallback=f"haushaltsplan.{file_format}"
     )

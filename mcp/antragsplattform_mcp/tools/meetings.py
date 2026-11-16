@@ -16,6 +16,7 @@ import os
 import re
 import tempfile
 from pathlib import Path
+from collections.abc import Mapping
 from typing import Literal
 from urllib.parse import unquote
 
@@ -875,7 +876,7 @@ async def download_to(
     *,
     overwrite: bool = False,
     fallback: str,
-    query: dict[str, object] | None = None,
+    query: Mapping[str, object] | None = None,
 ) -> dict:
     """Stream a binary answer of the API into a local file; the bytes never enter the chat.
 
@@ -1219,13 +1220,15 @@ async def download_protocol_pdf(
     non-public agenda item, else 404). `draft` and `draft_public` render a draft with the
     watermark "Entwurf" and store nothing (409 `protocol_not_draft`, `meeting_live`).
     """
-    path = f"/protocols/{protocol_id}/pdf"
-    query: dict[str, object] | None = None
-    if variant == "public":
-        path = f"/protocols/{protocol_id}/pdf/public"
-    elif variant in ("draft", "draft_public"):
-        path = f"/protocols/{protocol_id}/draft-pdf"
-        query = {"variant": "public" if variant == "draft_public" else "internal"}
+    draft = variant in ("draft", "draft_public")
+    path = (
+        f"/protocols/{protocol_id}/draft-pdf"
+        if draft
+        else f"/protocols/{protocol_id}/pdf/public"
+        if variant == "public"
+        else f"/protocols/{protocol_id}/pdf"
+    )
+    query = {"variant": "public" if variant == "draft_public" else "internal"} if draft else None
     return await download_to(
         "GET",
         path,

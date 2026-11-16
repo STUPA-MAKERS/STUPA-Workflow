@@ -341,9 +341,11 @@ async def download_cd_variant_logo(
     logo_id: str, target_path: str, square: bool = False, overwrite: bool = False
 ) -> dict:
     """Download a logo of a CD variant to a local file; `square` reads the square logo."""
-    path = f"/admin/cd-variant-logos/{logo_id}/file"
-    if square:
-        path = f"/admin/cd-variant-logos/{logo_id}/square"
+    path = (
+        f"/admin/cd-variant-logos/{logo_id}/square"
+        if square
+        else f"/admin/cd-variant-logos/{logo_id}/file"
+    )
     return await download_to(
         "GET", path, target_path, overwrite=overwrite, fallback=f"logo-{logo_id}"
     )
