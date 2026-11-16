@@ -84,6 +84,10 @@ class _Line(Protocol):
     @property
     def coverable(self) -> bool: ...
     @property
+    def prev_amount(self) -> Decimal | None: ...
+    @property
+    def prev_actual(self) -> Decimal | None: ...
+    @property
     def blocked(self) -> Decimal: ...
     @property
     def predecessor_id(self) -> UUID | None: ...
@@ -248,7 +252,25 @@ def _year_before_of(
     below: Sequence[tuple[Side | None, ExportRow]],
     depth: int,
 ) -> tuple[Decimal | None, Decimal | None]:
-    """Return the Ansatz and the Ist of the year before of a row (001040, 001041).
+    """Return the Ansatz and the Ist of the year before of a row (001040-001042).
+
+    A value that the line sets by hand wins over the computed figure, one by one.
+    """
+    computed = _computed_year_before(node, line, before, below, depth)
+    return (
+        computed[0] if line.prev_amount is None else line.prev_amount,
+        computed[1] if line.prev_actual is None else line.prev_actual,
+    )
+
+
+def _computed_year_before(
+    node: _Node,
+    line: _Line,
+    before: _YearBefore,
+    below: Sequence[tuple[Side | None, ExportRow]],
+    depth: int,
+) -> tuple[Decimal | None, Decimal | None]:
+    """Return the computed Ansatz and Ist of the year before of a row (001040, 001041).
 
     A row compares with its Vorgänger or its own cost center. A row with rows below
     whose match has no line in the plan of the year before sums the rows directly

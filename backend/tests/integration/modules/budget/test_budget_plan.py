@@ -15,6 +15,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
+from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy import Engine, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -31,6 +32,7 @@ from app.modules.budget.plan_schemas import (
     PlanLinePredecessorSet,
     PlanLineRename,
     PlanLineSet,
+    PlanLineYearBeforeSet,
     PlanNodeCreate,
     PlanOut,
     PlanStateByHand,
@@ -879,6 +881,64 @@ async def test_a_line_compares_with_its_predecessor(session: AsyncSession) -> No
     await session.commit()
     copy = _version(await t.svc.get_plan(t.top.id, later.id))
     assert set(_predecessors(copy).values()) <= {None}
+
+
+
+def _by_hand(version: PlanVersionOut) -> dict[uuid.UUID, tuple[Decimal | None, Decimal | None]]:
+    return {line.budget_id: (line.prev_amount, line.prev_actual) for line in version.lines}
+
+
+async def test_a_line_sets_the_year_before_by_hand(session: AsyncSession) -> None:
+    """A draft line sets the Ansatz and the Ist of the year before by hand.
+
+    Rule: §F/finance/budget/001042.
+    """
+    today = date(2026, 11, 16)
+    t = await _tree(session)
+    await t.svc.create_fiscal_year(t.top.id, FiscalYearCreate(year=2025))
+    await session.commit()
+    draft = _version(await _balanced_draft(t))
+    bare = await t.svc.plan_export(draft.id, today)
+    assert (bare.head.prev_year, bare.head.prev_decided) == ("2025", False)
+
+    def values(amount: str | None, actual: str | None) -> PlanLineYearBeforeSet:
+        return PlanLineYearBeforeSet(
+            prevAmount=None if amount is None else D(amount),
+            prevActual=None if actual is None else D(actual),
+        )
+
+    plan = await t.svc.set_year_before(draft.id, t.exp_a.id, values("70.00", "55.50"))
+    assert _by_hand(_version(plan))[t.exp_a.id] == (D("70.00"), D("55.50"))
+    await t.svc.set_year_before(draft.id, t.inc.id, values(None, "90.00"))
+    await session.commit()
+    export = await t.svc.plan_export(draft.id, today)
+    assert export.head.prev_decided is True
+    rows = {r.name: (r.prev, r.actual) for g in export.groups for r in g.rows}
+    assert rows["Fachschaften"] == (D("70.00"), D("55.50"))
+    assert rows["Zuschüsse"] == (D("70.00"), D("55.50"))
+    assert rows["AKs"] == (None, None)
+    assert rows["Beiträge"] == (None, D("90.00"))
+
+    plan = await t.svc.set_year_before(draft.id, t.inc.id, values(None, None))
+    assert _by_hand(_version(plan))[t.inc.id] == (None, None)
+    with pytest.raises(ValidationProblem) as exc:
+        await t.svc.set_year_before(draft.id, uuid.uuid4(), values("1.00", None))
+    assert _code(exc) == "plan_line_missing"
+    with pytest.raises(PydanticValidationError):
+        values("-1.00", None)
+
+    await t.svc.set_plan_state(draft.id, PlanStateSet(state="in_force"))
+    await session.commit()
+    with pytest.raises(ConflictError) as conflict:
+        await t.svc.set_year_before(draft.id, t.exp_a.id, values(None, None))
+    assert _code(conflict) == "plan_version_locked"
+    nachtrag = _version(await t.svc.create_nachtrag(t.top.id, t.fy.id))
+    assert _by_hand(nachtrag)[t.exp_a.id] == (D("70.00"), D("55.50"))
+
+    nxt = await t.svc.create_fiscal_year(t.top.id, FiscalYearCreate(year=2027))
+    await session.commit()
+    copy = _version(await t.svc.get_plan(t.top.id, nxt.id))
+    assert set(_by_hand(copy).values()) <= {(None, None)}
 
 
 async def test_a_line_with_bookings_is_not_removed(session: AsyncSession) -> None:

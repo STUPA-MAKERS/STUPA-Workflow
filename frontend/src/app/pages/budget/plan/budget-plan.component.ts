@@ -182,6 +182,9 @@ const FIELD_COL = '10rem';
 /** The first Ansatz that the narrow amount field of a table cuts. */
 const WIDE_FROM = 10_000_000;
 
+/** A figure of the year before that a draft line sets by hand (001042). */
+type YearBeforeField = 'prevAmount' | 'prevActual';
+
 /**
  * The view "Planung" of the Budget tab: the Haushaltsplan of a fiscal year in the list and
  * detail geometry of the tab. The list shows the Kostenstellen of the plan with their Ansatz,
@@ -491,7 +494,7 @@ export class BudgetPlanComponent {
     const own = money('amount', this.amountLabel(), this.tableFields() ? FIELD_COL : MONEY_COL);
     const rest = this.nachtrag()
       ? [money('base', this.baseLabel())]
-      : this.canCopy()
+      : this.showsYearBefore()
         ? [
             money('prev', this.i18n.translate('budget.plan.col.amount', { year: prev })),
             money('actual', this.i18n.translate('budget.plan.col.actual', { year: prev })),
@@ -507,7 +510,7 @@ export class BudgetPlanComponent {
   });
   readonly rowId = (row: unknown): string => (row as PlanRow).id;
   /** The plan has an Ansatz to compare against: the version before a Nachtrag, or a plan of the year before. */
-  readonly compared = computed(() => this.nachtrag() || this.canCopy());
+  readonly compared = computed(() => this.nachtrag() || this.showsYearBefore());
 
   /** The name of the Ansatz of the shown version: "Ansatz 2026" or "Ansatz 1. Nachtrag". */
   readonly amountLabel = computed(() => {
@@ -1094,6 +1097,16 @@ export class BudgetPlanComponent {
   /** The year before has a plan in force: the new plan can start as its copy, and the page shows its Ansatz and its Ist. */
   readonly canCopy = computed(() => inForce(this.prevPlan()?.versions ?? []) !== null);
 
+  /**
+   * The page shows the Ansatz and the Ist of the year before: that year has a plan in force,
+   * or a line of the version sets one of the two by hand (000889, 001042).
+   */
+  readonly showsYearBefore = computed(
+    () =>
+      this.prevYear() !== null &&
+      (this.canCopy() || (this.version()?.lines ?? []).some((l) => (l.prevAmount ?? null) !== null || (l.prevActual ?? null) !== null)),
+  );
+
   /** Run an action of the head, of a menu or of the floating button. `row` is its Kostenstelle. */
   onAction(id: string, row: PlanRow | null = this.picked()): void {
     const version = this.version();
@@ -1398,6 +1411,47 @@ export class BudgetPlanComponent {
     const predecessorId = (value || null) as Uuid | null;
     if (!version || !this.editable() || predecessorId === row.predecessorId) return;
     this.write(this.api.setPredecessor(version.id, row.id, predecessorId), null, null, false);
+  }
+
+  /** The two fields of the year before in the detail of a line (001042). */
+  readonly yearBeforeFields: readonly YearBeforeField[] = ['prevAmount', 'prevActual'];
+
+  /** The text of a field of the year before: the text a person types, else the value set by hand (001042). */
+  yearBeforeValue(row: PlanRow, field: YearBeforeField): string | number {
+    return this.edits()[`${row.id}:${field}`] ?? (field === 'prevAmount' ? row.prevByHand : row.actualByHand) ?? '';
+  }
+
+  /** The computed figure of the year before, as the placeholder of its empty field. */
+  yearBeforePlaceholder(row: PlanRow, field: YearBeforeField): string {
+    const computed = field === 'prevAmount' ? row.prevComputed : row.actualComputed;
+    return computed === null ? '' : this.money(computed);
+  }
+
+  /** Keep the figure of the year before a person types. */
+  editYearBefore(row: PlanRow, field: YearBeforeField, value: string | null): void {
+    this.edits.update((e) => ({ ...e, [`${row.id}:${field}`]: value ?? '' }));
+  }
+
+  /**
+   * A field of the year before lost the focus: save the typed value with the other value of
+   * the line. An empty field clears the value, so the line shows the computed figure again.
+   */
+  saveYearBefore(row: PlanRow, field: YearBeforeField): void {
+    const version = this.version();
+    const key = `${row.id}:${field}`;
+    const value = this.edits()[key];
+    if (value === undefined || !version) return;
+    this.edits.update((e) => Object.fromEntries(Object.entries(e).filter(([k]) => k !== key)));
+    const line = version.lines.find((l) => l.budgetId === row.id);
+    const wanted = value === '' ? null : value;
+    const saved = (field === 'prevAmount' ? line?.prevAmount : line?.prevActual) ?? null;
+    if (!this.editable() || !line || wanted === saved) return;
+    if (wanted !== null && amountProblem(wanted) === 'negative') {
+      this.toast.error(this.i18n.translate('budget.plan.error.amountNegative'));
+      return;
+    }
+    const body = { prevAmount: line.prevAmount ?? null, prevActual: line.prevActual ?? null, [field]: wanted };
+    this.write(this.api.setYearBefore(version.id, row.id, body), null, null, false);
   }
 
   /** The presses of the Vermerk switches whose save runs, by line and Vermerk. */

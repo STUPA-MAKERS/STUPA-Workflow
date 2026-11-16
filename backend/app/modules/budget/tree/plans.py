@@ -32,6 +32,7 @@ from app.modules.budget.plan_schemas import (
     PlanLinePredecessorSet,
     PlanLineRename,
     PlanLineSet,
+    PlanLineYearBeforeSet,
     PlanMeetingOut,
     PlanNodeCreate,
     PlanOut,
@@ -62,6 +63,11 @@ from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 _CENT = Decimal("0.01")
 
 
+def _money(value: Decimal | None) -> str | None:
+    """Return an amount as audit data, `None` for no amount."""
+    return None if value is None else f"{value:.2f}"
+
+
 def _changes_out(changes: dict[UUID, tuple[Decimal, Decimal]]) -> dict[str, list[str]]:
     """Return allocation changes as audit data: `[before, after]` per cost center."""
     return {
@@ -90,6 +96,8 @@ def _line_out(
         coverable=bool(line.coverable),
         blocked=(line.blocked if line.blocked is not None else _ZERO).quantize(_CENT),
         predecessorId=line.predecessor_id,
+        prevAmount=None if line.prev_amount is None else line.prev_amount.quantize(_CENT),
+        prevActual=None if line.prev_actual is None else line.prev_actual.quantize(_CENT),
     )
 
 
@@ -777,6 +785,8 @@ class PlanOps(NodeOps, AllocationOps):
                 coverable=line.coverable,
                 blocked=line.blocked,
                 predecessor_id=line.predecessor_id if same_year else None,
+                prev_amount=line.prev_amount if same_year else None,
+                prev_actual=line.prev_actual if same_year else None,
             )
             for line in source
         ]
@@ -1215,6 +1225,67 @@ class PlanOps(NodeOps, AllocationOps):
             },
         )
         return await self._plan_out(plan, top.id)
+
+    async def set_year_before(
+        self, version_id: UUID, budget_id: UUID, payload: PlanLineYearBeforeSet
+    ) -> PlanOut:
+        """Set the Ansatz and the Ist of the year before of a draft line by hand (001042).
+
+        A value replaces the figure that the line takes from its Vorgänger, its own cost
+        center or the rows below it. `None` clears it.
+
+        Raises:
+            NotFoundError: The version does not exist (404).
+            ConflictError: `fiscal_year_closed` (409), `plan_version_locked` (409) for
+                a version that is not a draft.
+            ValidationProblem: `plan_line_missing` (422) for a cost center without a
+                line in the version.
+        """
+        version, plan, _fy, top = await self._version_context(version_id)
+        if version.state != "draft":
+            raise ConflictError("Only a draft version can be edited.", code="plan_version_locked")
+        nodes = await self._subtree(top)
+        lines = await self._lines(version.id)
+        node = next((n for n in nodes if n.id == budget_id), None)
+        line = next((ln for ln in lines if ln.budget_id == budget_id), None)
+        if node is None or line is None:
+            raise ValidationProblem(
+                "The cost centre has no line in this version.",
+                code="plan_line_missing",
+                errors=[{"field": "budgetId", "msg": "no line in the version"}],
+            )
+        before = self._set_year_before(line, payload.prev_amount, payload.prev_actual)
+        await self._audit(
+            AuditAction.BUDGET_PLAN_LINE_SET,
+            target_type="budget_plan",
+            target_id=str(plan.id),
+            data={
+                "versionId": str(version.id),
+                "number": version.number,
+                "budgetId": str(node.id),
+                "pathKey": node.path_key,
+                "name": node.name,
+                "prevAmount": {
+                    "before": _money(before[0]),
+                    "after": _money(payload.prev_amount),
+                },
+                "prevActual": {
+                    "before": _money(before[1]),
+                    "after": _money(payload.prev_actual),
+                },
+            },
+        )
+        return await self._plan_out(plan, top.id)
+
+    @staticmethod
+    def _set_year_before(
+        line: BudgetPlanLine, amount: Decimal | None, actual: Decimal | None
+    ) -> tuple[Decimal | None, Decimal | None]:
+        """Give a line its figures of the year before and return the ones it had."""
+        before = (line.prev_amount, line.prev_actual)
+        setattr(line, "prev_amount", amount)  # noqa: B010
+        setattr(line, "prev_actual", actual)  # noqa: B010
+        return before
 
     @staticmethod
     def _name_predecessor(line: BudgetPlanLine, wanted: UUID | None) -> UUID | None:

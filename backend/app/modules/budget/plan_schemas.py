@@ -110,6 +110,17 @@ class PlanLinePredecessorSet(FrozenStrictCamelModel, frozen=True):
     predecessor_id: UUID | None = Field(alias="predecessorId")
 
 
+class PlanLineYearBeforeSet(FrozenStrictCamelModel, frozen=True):
+    """Set the Ansatz and the Ist of the year before of a draft line by hand (spec 001042).
+
+    Both values are set together. `None` clears a value, so the line shows the computed
+    figure again.
+    """
+
+    prev_amount: Amount | None = Field(default=None, alias="prevAmount")
+    prev_actual: Amount | None = Field(default=None, alias="prevActual")
+
+
 class PlanStateSet(FrozenStrictCamelModel, frozen=True):
     """Bring a version into force, or move a version in progress back to draft."""
 
@@ -208,6 +219,10 @@ class PlanLineOut(FrozenCamelModel, frozen=True):
     #: The cost center of the line of the year before that the line compares with
     #: instead of its own (spec 001040). `None` compares with its own cost center.
     predecessor_id: UUID | None = Field(default=None, alias="predecessorId")
+    #: The Ansatz and the Ist of the year before set by hand (spec 001042). `None`
+    #: keeps the computed figure.
+    prev_amount: Decimal | None = Field(default=None, alias="prevAmount")
+    prev_actual: Decimal | None = Field(default=None, alias="prevActual")
 
 
 class PlanMeetingOut(FrozenCamelModel, frozen=True):

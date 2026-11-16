@@ -47,6 +47,8 @@ class _Line:
     coverable: bool = False
     blocked: Decimal = D(0)
     predecessor_id: uuid.UUID | None = None
+    prev_amount: Decimal | None = None
+    prev_actual: Decimal | None = None
 
 
 def _head(number: int = 0, state: PlanState = "draft", prev: str | None = "2025") -> ExportHead:
@@ -190,6 +192,25 @@ def test_a_row_without_its_own_match_sums_the_rows_below() -> None:
     assert (rows["VS-5"].prev, rows["VS-5"].actual) == (D("15"), D("7"))
     assert (rows["VS-5-9"].prev, rows["VS-5-9"].actual) == (None, None)
     assert (expense.prev, expense.actual) == (D("15"), D("7"))
+
+
+
+def test_a_value_set_by_hand_wins_and_the_rows_above_sum_it() -> None:
+    """A line sets the Ansatz or the Ist of the year before by hand, one by one.
+
+    Rule: §F/finance/budget/001042.
+    """
+    lines = (
+        _Line(_GRANTS.id, D("60"), side="expense"),
+        _Line(_OFFICE.id, D("60"), side="expense", prev_amount=D("12"), prev_actual=D("8")),
+        _Line(_OPEN.id, D("0"), side="expense", prev_actual=D("3")),
+    )
+    export = build_export(_head(), _TOP, lines, prev=(), prev_fiscal_year_id=_PREV)
+    rows = {r.key: r for r in export.groups[0].rows}
+    assert (rows["VS-8-1"].prev, rows["VS-8-1"].actual) == (D("12"), D("8"))
+    assert (rows["VS-8"].prev, rows["VS-8"].actual) == (D("12"), D("8"))
+    assert (rows["VS-9"].prev, rows["VS-9"].actual) == (None, D("3"))
+    assert (export.groups[0].prev, export.groups[0].actual) == (D("12"), D("11"))
 
 
 def test_a_plan_without_lines_has_no_group_and_a_balance_of_zero() -> None:

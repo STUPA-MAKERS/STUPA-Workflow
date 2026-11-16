@@ -77,6 +77,7 @@ async function setup(opts: Opts = {}) {
     setLine: jest.fn((..._args: unknown[]) => answer()),
     renameLine: jest.fn((..._args: unknown[]) => answer()),
     setPredecessor: jest.fn((..._args: unknown[]) => answer()),
+    setYearBefore: jest.fn((..._args: unknown[]) => answer()),
     deleteLine: jest.fn((..._args: unknown[]) => answer()),
     setState: jest.fn((..._args: unknown[]) => answer()),
     deleteVersion: jest.fn((..._args: unknown[]) => of(undefined)),
@@ -1670,6 +1671,31 @@ describe('BudgetPlanComponent', () => {
       await setup({ query: { costCentre: 'grants' } });
       await waitFor(() => expect(screen.getByRole('combobox', { name: /Seite/ })).toBeInTheDocument());
       expect(screen.queryByRole('combobox', { name: /Vorgänger/ })).toBeNull();
+    });
+
+    it('§F/finance/budget/001042: a draft line sets the Ansatz and the Ist of the year before by hand', async () => {
+      const view = await setup({ plans: { 'fy-26': plan(), 'fy-25': before }, query: { costCentre: 'grants' } });
+      const field = await waitFor(() => input(view, 'line-prevAmount-grants'));
+      expect(field.placeholder).toBe('30,00 €');
+      await typeAmount(field, '45');
+      expect(view.api.setYearBefore).toHaveBeenCalledWith('v0', 'grants', { prevAmount: '45', prevActual: null });
+      await typeAmount(input(view, 'line-prevActual-grants'), '');
+      expect(view.api.setYearBefore).toHaveBeenCalledTimes(1);
+      const page = view.fixture.componentInstance;
+      const row = page.rows().find((r) => r.id === 'grants')!;
+      page.editYearBefore(row, 'prevActual', '-1');
+      page.saveYearBefore(row, 'prevActual');
+      expect(view.api.setYearBefore).toHaveBeenCalledTimes(1);
+      expect(page.yearBeforePlaceholder({ ...row, actualComputed: null }, 'prevActual')).toBe('');
+    });
+
+    it('§F/finance/budget/001042: a value set by hand shows the columns of the year before without a plan in force', async () => {
+      const open = plan([version({ id: 'p', lines: [line('fees', '80')] })], 'fy-25');
+      const byHand = plan([version({ lines: [line('fees', '100'), line('grants', '30', { prevActual: '3.00' })] })]);
+      const view = await setup({ plans: { 'fy-26': byHand, 'fy-25': open } });
+      const expense = view.container.querySelectorAll('app-data-table')[1] as HTMLElement;
+      await waitFor(() => expect(within(expense).getAllByRole('columnheader').map(text)).toContain('Ist 2025/26'));
+      expect(text(expense)).toContain('3,00 €');
     });
 
     it('§F/finance/budget/001040: a choice takes the name and key of the line, else of its node, and an unchanged choice saves nothing', async () => {

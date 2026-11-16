@@ -338,7 +338,7 @@
         <dt class="bd__figLabel">{{ baseLabel() }}</dt>
         <dd class="bd__figValue mono">{{ money(row.base) }}</dd>
       </div>
-    } @else if (canCopy() && prevYear(); as prev) {
+    } @else if (showsYearBefore() && prevYear(); as prev) {
       <div class="bd__fig">
         <dt class="bd__figLabel">{{ 'budget.plan.col.amount' | t: { year: prev.display } }}</dt>
         <dd class="bd__figValue mono">{{ money(row.prev) }}</dd>
@@ -384,6 +384,21 @@
             [disabled]="!editable()"
             data-testid="bp-predecessor"
           />
+        }
+        @if (!nachtrag() && prevYear(); as prev) {
+          @for (field of yearBeforeFields; track field) {
+            <app-currency-input
+              [name]="'line-' + field + '-' + row.id"
+              [label]="(field === 'prevAmount' ? 'budget.plan.line.prevAmount' : 'budget.plan.line.prevActual') | t: { year: prev.display }"
+              [placeholder]="yearBeforePlaceholder(row, field)"
+              [ngModel]="yearBeforeValue(row, field)"
+              (ngModelChange)="editYearBefore(row, field, $event)"
+              (focusout)="saveYearBefore(row, field)"
+              (keydown.enter)="saveYearBefore(row, field)"
+              [disabled]="!editable()"
+              [attr.data-testid]="'bp-' + field"
+            />
+          }
         }
         @if (!row.hasChildren) {
           <app-currency-input
