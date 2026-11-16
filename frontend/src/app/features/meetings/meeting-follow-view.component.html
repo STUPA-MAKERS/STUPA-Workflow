@@ -36,6 +36,9 @@
 @if (phone()) {
   <div class="fv__phone">
     @if (top) {
+      @if (topLeadRow(); as lead) {
+        <app-todo-linked-list class="fv__linked" kind="agenda_item" headingId="fv-todos" [showTitle]="false" [targetId]="top.id" [items]="[]" [lead]="lead" />
+      }
       <div class="fv__phoneTop">
         <span class="fv__kind">
           @if (showsNow()) {
@@ -71,6 +74,7 @@
             [canEdit]="false"
             saveState="idle"
             [follow]="true"
+            [linked]="false"
           />
         } @else if (excerpt().text) {
           <p class="fv__excerptText">{{ excerpt().text }}</p>
@@ -114,6 +118,9 @@
 
     <div class="fv__main">
       @if (top) {
+        @if (topLeadRow(); as lead) {
+          <app-todo-linked-list class="fv__linked" kind="agenda_item" headingId="fv-todos" [showTitle]="false" [targetId]="top.id" [items]="[]" [lead]="lead" />
+        }
         <app-top-sheet
           class="fv__sheet"
           [meeting]="m"
@@ -124,6 +131,7 @@
           [canEdit]="false"
           saveState="idle"
           [follow]="true"
+          [linked]="false"
         />
       } @else {
         <article class="fv__start">
