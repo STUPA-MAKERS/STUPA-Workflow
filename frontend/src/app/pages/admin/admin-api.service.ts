@@ -7,7 +7,7 @@
  */
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { skipLoading } from '@stupa-makers/ui-kit';
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { type Observable, map, of, throwError } from 'rxjs';
 import { API_BASE_URL, USE_MOCK_API } from '@core/api/api.config';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -38,11 +38,16 @@ import {
   type ConfigRevisionDiffWire,
   type NotificationSettings,
   type GuestSettings,
+  type GremiumDefaults,
+  type MeetingPeriods,
   type MeetingSettings,
+  type FeatureSwitches,
   type HelpTicketsSettings,
   type LoginSettings,
   type AuditPage,
   type Branding,
+  type PdfAsset,
+  type PdfSlot,
   type CdLogoSlot,
   type CdVariant,
   type CdVariantCreateBody,
@@ -109,7 +114,10 @@ import {
   MOCK_GREMIUM_STUPA_ID,
   MOCK_GROUP_MAPPINGS,
   MOCK_GUEST_SETTINGS,
+  MOCK_GREMIUM_DEFAULTS,
+  MOCK_MEETING_PERIODS,
   MOCK_MEETING_SETTINGS,
+  MOCK_FEATURES,
   MOCK_HELP_TICKETS,
   MOCK_LOGIN_SETTINGS,
   MOCK_MAIL_TEMPLATES,
@@ -138,6 +146,7 @@ interface ApplicationTypeOutWire {
   readonly nameI18n?: Record<string, string> | null;
   readonly gremiumId?: Uuid | null;
   readonly hasBudget?: boolean;
+  readonly pdfSignatures?: boolean;
   readonly retentionMonths?: number | null;
   readonly activeFormVersionId?: Uuid | null;
   readonly activeFormVersion?: number | null;
@@ -170,6 +179,8 @@ export class AdminApiService {
     mailRecipients: structuredCopy(MOCK_GREMIUM_MAIL_RECIPIENTS),
     guestSettings: structuredCopy(MOCK_GUEST_SETTINGS) as GuestSettings,
     meetingSettings: structuredCopy(MOCK_MEETING_SETTINGS) as MeetingSettings,
+    meetingPeriods: structuredCopy(MOCK_MEETING_PERIODS) as MeetingPeriods,
+    gremiumDefaults: structuredCopy(MOCK_GREMIUM_DEFAULTS) as GremiumDefaults,
     loginSettings: structuredCopy(MOCK_LOGIN_SETTINGS) as LoginSettings,
     helpTickets: structuredCopy(MOCK_HELP_TICKETS) as HelpTicketsSettings,
     cdVariants: structuredCopy(MOCK_CD_VARIANTS) as CdVariant[],
@@ -799,6 +810,7 @@ export class AdminApiService {
             name: (t.nameI18n ?? {}) as I18nMap,
             gremiumId: t.gremiumId ?? null,
             hasBudget: t.hasBudget ?? false,
+            pdfSignatures: t.pdfSignatures ?? false,
             retentionMonths: t.retentionMonths ?? null,
             activeFormVersionId: t.activeFormVersionId ?? null,
             activeFormVersion: t.activeFormVersion ?? null,
@@ -833,6 +845,7 @@ export class AdminApiService {
           name: (t.nameI18n ?? {}) as I18nMap,
           gremiumId: t.gremiumId ?? null,
           hasBudget: t.hasBudget ?? false,
+          pdfSignatures: t.pdfSignatures ?? false,
           retentionMonths: t.retentionMonths ?? null,
           activeFormVersionId: t.activeFormVersionId ?? null,
         })),
@@ -854,6 +867,7 @@ export class AdminApiService {
       ...(body.name ? { nameI18n: body.name } : {}),
       ...(body.gremiumId !== undefined ? { gremiumId: body.gremiumId } : {}),
       ...(body.hasBudget !== undefined ? { hasBudget: body.hasBudget } : {}),
+      ...(body.pdfSignatures !== undefined ? { pdfSignatures: body.pdfSignatures } : {}),
     };
     return this.http
       .patch<unknown>(`${this.base}/admin/application-types/${id}`, payload)
@@ -1264,15 +1278,42 @@ export class AdminApiService {
     });
   }
 
-  /** PUT /admin/meeting-settings — replaces both values (minutes before the start). */
-  putMeetingSettings(
-    body: Pick<MeetingSettings, 'openLeadMinutes' | 'confirmLeadMinutes'>,
-  ): Observable<MeetingSettings> {
+  /** PUT /admin/meeting-settings — replaces the value (minutes before the start). */
+  putMeetingSettings(body: Pick<MeetingSettings, 'openLeadMinutes'>): Observable<MeetingSettings> {
     if (this.mock) {
       this.store.meetingSettings = { ...this.store.meetingSettings, ...body };
       return of(structuredCopy(this.store.meetingSettings));
     }
     return this.http.put<MeetingSettings>(`${this.base}/admin/meeting-settings`, body);
+  }
+
+  /** GET /admin/meeting-periods — the periods of the Geschäftsordnung (P admin.deadlines, § 000917). */
+  getMeetingPeriods(): Observable<MeetingPeriods> {
+    if (this.mock) return of(structuredCopy(this.store.meetingPeriods));
+    return this.http.get<MeetingPeriods>(`${this.base}/admin/meeting-periods`, { context: skipLoading() });
+  }
+
+  /** PUT /admin/meeting-periods — replaces every period. */
+  putMeetingPeriods(body: MeetingPeriods): Observable<MeetingPeriods> {
+    if (this.mock) return of({ ...body });
+    return this.http.put<MeetingPeriods>(`${this.base}/admin/meeting-periods`, body);
+  }
+
+  /** GET /admin/gremium-defaults — the values that the form of a new Gremium starts with. */
+  getGremiumDefaults(): Observable<GremiumDefaults> {
+    if (this.mock) return of(structuredCopy(this.store.gremiumDefaults));
+    return this.http.get<GremiumDefaults>(`${this.base}/admin/gremium-defaults`, {
+      context: skipLoading(),
+    });
+  }
+
+  /**
+   * PUT /admin/gremium-defaults — replaces all values. No Gremium that exists changes.
+   * The mock answers the body and stores nothing.
+   */
+  putGremiumDefaults(body: GremiumDefaults): Observable<GremiumDefaults> {
+    if (this.mock) return of(structuredCopy(body));
+    return this.http.put<GremiumDefaults>(`${this.base}/admin/gremium-defaults`, body);
   }
 
   /**
@@ -1317,6 +1358,32 @@ export class AdminApiService {
       return of(structuredCopy(this.store.helpTickets));
     }
     return this.http.put<HelpTicketsSettings>(`${this.base}/admin/help-tickets`, body);
+  }
+
+  /** The feature switches of the mock mode. */
+  private readonly mockFeatures = signal<FeatureSwitches>({ ...MOCK_FEATURES });
+
+  /**
+   * GET /admin/features — the stored switch of each feature ("Funktionen"). The GET and
+   * the PUT need P(admin.features).
+   */
+  getFeatures(): Observable<FeatureSwitches> {
+    if (this.mock) return of(this.mockFeatures());
+    return this.http.get<FeatureSwitches>(`${this.base}/admin/features`, {
+      context: skipLoading(),
+    });
+  }
+
+  /**
+   * PUT /admin/features — writes a new active site-config version. 409 `feature_in_use`
+   * while the Antrag flow or an Antragsart uses a feature that would go off.
+   */
+  putFeatures(body: FeatureSwitches): Observable<FeatureSwitches> {
+    if (this.mock) {
+      this.mockFeatures.set({ ...body });
+      return of(this.mockFeatures());
+    }
+    return this.http.put<FeatureSwitches>(`${this.base}/admin/features`, body);
   }
 
   /**
@@ -1537,6 +1604,53 @@ export class AdminApiService {
       params,
       responseType: 'blob',
     });
+  }
+
+  /** The mock PDF branding: the mock keeps no file, only its data. */
+  private readonly mockPdfAssets = signal<Readonly<Record<PdfSlot, PdfAsset | null>>>({
+    logo: { builtin: true, fileName: null, mime: null, size: null },
+    footer: { builtin: true, fileName: null, mime: null, size: null },
+  });
+
+  private setMockPdfAsset(slot: PdfSlot, asset: PdfAsset | null): void {
+    this.mockPdfAssets.update((all) => ({ ...all, [slot]: asset }));
+  }
+
+  /** GET /admin/pdf-assets/{slot} — the graphic of the slot, or `null` (specs 000891, 000892). */
+  getPdfAsset(slot: PdfSlot): Observable<PdfAsset | null> {
+    if (this.mock) return of(this.mockPdfAssets()[slot]);
+    return this.http.get<PdfAsset | null>(`${this.base}/admin/pdf-assets/${slot}`);
+  }
+
+  /** PUT /admin/pdf-assets/{slot} — multipart upload that replaces the graphic. */
+  uploadPdfAsset(slot: PdfSlot, file: File): Observable<PdfAsset> {
+    if (this.mock) {
+      const asset = { builtin: false, fileName: file.name, mime: file.type, size: file.size };
+      this.setMockPdfAsset(slot, asset);
+      return of(asset);
+    }
+    const form = new FormData();
+    form.append('file', file);
+    return this.http.put<PdfAsset>(`${this.base}/admin/pdf-assets/${slot}`, form);
+  }
+
+  /** POST /admin/pdf-assets/{slot}/default — the built-in graphic again. */
+  resetPdfAsset(slot: PdfSlot): Observable<PdfAsset> {
+    if (this.mock) {
+      const asset = { builtin: true, fileName: null, mime: null, size: null };
+      this.setMockPdfAsset(slot, asset);
+      return of(asset);
+    }
+    return this.http.post<PdfAsset>(`${this.base}/admin/pdf-assets/${slot}/default`, {});
+  }
+
+  /** DELETE /admin/pdf-assets/{slot} — the PDFs then carry no graphic there. */
+  deletePdfAsset(slot: PdfSlot): Observable<void> {
+    if (this.mock) {
+      this.setMockPdfAsset(slot, null);
+      return of(undefined);
+    }
+    return this.http.delete<void>(`${this.base}/admin/pdf-assets/${slot}`);
   }
 
   getSiteConfig(): Observable<SiteConfig> {

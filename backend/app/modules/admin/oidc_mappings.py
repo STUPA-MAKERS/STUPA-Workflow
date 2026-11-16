@@ -99,9 +99,7 @@ class OidcMappingService:
     ) -> GremiumMembershipMappingOut:
         """Create a membership mapping."""
         await self._gremium_exists(payload.gremium_id)
-        row = GremiumMembershipMapping(
-            gremium_id=payload.gremium_id, oidc_group=payload.oidc_group
-        )
+        row = GremiumMembershipMapping(gremium_id=payload.gremium_id, oidc_group=payload.oidc_group)
         self.session.add(row)
         await self._flush("this gremium already maps this OIDC group")
         await self._audit_sync_commit(actor, "gremium_membership_mapping", row.id)

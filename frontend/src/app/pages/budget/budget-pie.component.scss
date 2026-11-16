@@ -42,6 +42,9 @@
 .pie__total--empty {
   color: var(--color-text-muted);
 }
+.pie__totalSkel {
+  width: 5.5em;
+}
 .pie__slice--link {
   cursor: pointer;
 }

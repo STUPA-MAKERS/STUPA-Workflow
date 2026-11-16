@@ -26,14 +26,17 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application
 from app.modules.budget.tree.service import BudgetTreeService
+from app.modules.budget.tree.service_base import _subtree_ids
 from app.modules.budget.tree_models import Budget
 from app.modules.budget.tree_schemas import (
     AllocationSet,
+    AssignBudgetRequest,
     BudgetNodeCreate,
     BudgetNodeUpdate,
     ExpenseCreate,
     FiscalYearCreate,
     InvoiceCreate,
+    MoveFiscalYearRequest,
     TransferCreate,
 )
 from app.modules.flow.models import FlowVersion, State
@@ -125,33 +128,66 @@ async def test_top_down_allocation_constraint(session: AsyncSession) -> None:
     )
     await svc.set_allocation(top.id, fy.id, AllocationSet(allocated=Decimal("1000")))
     await svc.set_allocation(c1.id, fy.id, AllocationSet(allocated=Decimal("600")))
-    with pytest.raises(ValidationProblem):
+    with pytest.raises(ValidationProblem) as above:
         await svc.set_allocation(c2.id, fy.id, AllocationSet(allocated=Decimal("500")))
+    assert above.value.code == "children_allocation_exceeds_parent"
     await svc.set_allocation(c2.id, fy.id, AllocationSet(allocated=Decimal("400")))
-    with pytest.raises(ValidationProblem):
+    with pytest.raises(ValidationProblem) as below:
         await svc.set_allocation(top.id, fy.id, AllocationSet(allocated=Decimal("900")))
+    assert below.value.code == "parent_allocation_below_children"
 
 
 async def test_rename_key_recomputes_descendant_paths(session: AsyncSession) -> None:
     """A rename of mid from 800 to 810 moves the paths of mid and of leaf.
 
-    The key of a sibling gives 409.
+    The key of a sibling gives 409. Rule: §F/finance/budget/000246.
     """
     svc = BudgetTreeService(session)
     g = await _gremium(session)
     top = await svc.create_node(BudgetNodeCreate(key=f"RK{_suffix()}", name="Top", gremiumId=g.id))
     mid = await svc.create_node(BudgetNodeCreate(key="800", name="Mid", parentId=top.id))
     leaf = await svc.create_node(BudgetNodeCreate(key="04", name="Leaf", parentId=mid.id))
-    assert leaf.path_key == f"{top.path_key}-800-04"
+    assert leaf.path_key == f"{top.path_key}-80004"
 
     out = await svc.update_node(mid.id, BudgetNodeUpdate(key="810", name="Mid"))
     assert out.path_key == f"{top.path_key}-810"
     leaf_row = await session.get(Budget, leaf.id)
-    assert leaf_row is not None and leaf_row.path_key == f"{top.path_key}-810-04"
+    assert leaf_row is not None and leaf_row.path_key == f"{top.path_key}-81004"
+    assert leaf_row.tree_path == f"{top.path_key}-810-04"
 
     await svc.create_node(BudgetNodeCreate(key="900", name="Sib", parentId=top.id))
     with pytest.raises(ConflictError):
         await svc.update_node(mid.id, BudgetNodeUpdate(key="900"))
+
+
+async def test_a_path_key_that_another_cost_centre_has_is_refused(session: AsyncSession) -> None:
+    """Two Kostenstellen never share a path key, and a subtree is found by the tree.
+
+    `80` with the child `133` and `801` with the child `33` would both be `…-80133`.
+    Rule: §F/finance/budget/000878.
+    """
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"PK{_suffix()}", name="Top", gremiumId=g.id))
+    short = await svc.create_node(BudgetNodeCreate(key="80", name="Kurz", parentId=top.id))
+    long = await svc.create_node(BudgetNodeCreate(key="801", name="Lang", parentId=top.id))
+    leaf = await svc.create_node(BudgetNodeCreate(key="33", name="Blatt", parentId=long.id))
+    assert leaf.path_key == f"{top.path_key}-80133"
+
+    with pytest.raises(ConflictError) as created:
+        await svc.create_node(BudgetNodeCreate(key="133", name="Gleich", parentId=short.id))
+    assert created.value.code == "budget_path_key_exists"
+    kid = await svc.create_node(BudgetNodeCreate(key="5", name="Kind", parentId=short.id))
+    other = await svc.create_node(BudgetNodeCreate(key="7", name="Sieben", parentId=top.id))
+    await svc.create_node(BudgetNodeCreate(key="0133", name="Tief", parentId=other.id))
+    with pytest.raises(ConflictError) as renamed:
+        await svc.update_node(other.id, BudgetNodeUpdate(key="8"))
+    assert renamed.value.code == "budget_path_key_exists"
+
+    short_row = await session.get(Budget, short.id)
+    assert short_row is not None
+    below = set((await session.scalars(_subtree_ids(short_row))).all())
+    assert below == {short.id, kid.id}
 
 
 async def test_transfer(session: AsyncSession) -> None:
@@ -465,3 +501,190 @@ async def test_list_invoices_search_filter_pagination(session: AsyncSession) -> 
 
     empty = await svc.list_invoices_paged(q="zzzzzznope")
     assert empty.total == 0 and empty.items == []
+
+
+async def test_a_new_booking_takes_only_a_year_that_is_not_past(session: AsyncSession) -> None:
+    """A Haushalt without a plan gives each year that is not closed and not past.
+
+    The pairs name the current year, a booking into a past year without a date is
+    refused, and a booking without a year takes the current one.
+    Rule: §F/finance/budget/000879.
+    """
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"BY{_suffix()}", name="Top", gremiumId=g.id))
+    this = date.today().year
+    past = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this - 1))
+    now = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this))
+    later = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this + 1))
+    closed = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this + 2))
+    await svc.set_fiscal_year_closed(top.id, closed.id, closed=True)
+
+    pairs = [p for p in await svc.choosable_pairs(None) if p.budget_id == top.id]
+    assert [(p.fiscal_year_id, p.current, p.budget_name) for p in pairs] == [
+        (now.id, True, "Top"), (later.id, False, "Top"),
+    ]
+    assert [p for p in await svc.choosable_pairs(set()) if p.budget_id == top.id] == []
+
+    def booking(fiscal_year_id: uuid.UUID | None) -> ExpenseCreate:
+        return ExpenseCreate(
+            budgetId=top.id, fiscalYearId=fiscal_year_id, amount=Decimal("5"), description="x"
+        )
+
+    with pytest.raises(ValidationProblem) as refused:
+        await svc.book_expense(booking(past.id), actor="tester")
+    assert refused.value.code == "booking_date_outside_year"
+    assert (await svc.book_expense(booking(later.id), actor="tester")).fiscal_year_id == later.id
+    assert (await svc.book_expense(booking(None), actor="tester")).fiscal_year_id == now.id
+
+
+async def test_a_past_open_year_takes_a_booking_with_a_date_in_the_year(
+    session: AsyncSession,
+) -> None:
+    """A booking and a transfer go into a past year that is not closed, with a date in it.
+
+    The pairs for a booking list the past year, the pairs for an assignment do not.
+    Rule: §F/finance/budget/000990.
+    """
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"LB{_suffix()}", name="Top", gremiumId=g.id))
+    other = await svc.create_node(BudgetNodeCreate(key="01", name="Child", parentId=top.id))
+    this = date.today().year
+    past = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this - 1))
+    now = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this))
+
+    late = [p for p in await svc.choosable_pairs(None, late=True) if p.budget_id == top.id]
+    assert [(p.fiscal_year_id, p.past) for p in late] == [(past.id, True), (now.id, False)]
+    plain = [p for p in await svc.choosable_pairs(None) if p.budget_id == top.id]
+    assert [p.fiscal_year_id for p in plain] == [now.id]
+
+    def booking(on: date | None) -> ExpenseCreate:
+        return ExpenseCreate(
+            budgetId=top.id,
+            fiscalYearId=past.id,
+            amount=Decimal("5"),
+            description="x",
+            paymentDate=on,
+        )
+
+    with pytest.raises(ValidationProblem) as outside:
+        await svc.book_expense(booking(date(this, 1, 2)), actor="tester")
+    assert outside.value.code == "booking_date_outside_year"
+    booked = await svc.book_expense(booking(date(this - 1, 12, 30)), actor="tester")
+    assert booked.fiscal_year_id == past.id
+
+    def transfer(on: date | None) -> TransferCreate:
+        return TransferCreate(
+            fromBudgetId=top.id,
+            toBudgetId=other.id,
+            fiscalYearId=past.id,
+            amount=Decimal("1"),
+            description="t",
+            paymentDate=on,
+        )
+
+    with pytest.raises(ValidationProblem) as no_date:
+        await svc.create_transfer(transfer(None), actor="tester")
+    assert no_date.value.code == "booking_date_outside_year"
+    assert (await svc.create_transfer(transfer(date(this - 1, 12, 30)), actor="tester")).transfer_id
+
+    await svc.set_fiscal_year_closed(top.id, past.id, closed=True)
+    with pytest.raises(ConflictError):
+        await svc.book_expense(booking(date(this - 1, 12, 30)), actor="tester")
+
+
+async def test_the_close_names_open_antraege_and_they_move_to_an_open_year(
+    session: AsyncSession,
+) -> None:
+    """The close check counts the open Anträge of a year, and a closed year lets them go.
+
+    An Antrag in an end state does not count. After the close, the Antrag moves to an
+    open year and takes a cost center in an open year, and its assignment cannot be
+    cleared. Rule: §F/finance/budget/000991.
+    """
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"CC{_suffix()}", name="Top", gremiumId=g.id))
+    leaf = await svc.create_node(BudgetNodeCreate(key="01", name="Leaf", parentId=top.id))
+    this = date.today().year
+    old = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this - 1))
+    now = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this))
+
+    app_type = ApplicationType(key=f"t-{_suffix()}", name_i18n={})
+    session.add(app_type)
+    await session.flush()
+    fv = FormVersion(application_type_id=app_type.id, version=1)
+    flv = FlowVersion(version=1)
+    session.add_all([fv, flv])
+    await session.flush()
+    running = State(flow_version_id=flv.id, key="review", label_i18n={}, kind="normal")
+    done = State(
+        flow_version_id=flv.id, key="done", label_i18n={}, kind="normal", is_terminal=True
+    )
+    session.add_all([running, done])
+    await session.flush()
+
+    def application(state: State) -> Application:
+        return Application(
+            type_id=app_type.id,
+            form_version_id=fv.id,
+            flow_version_id=flv.id,
+            current_state_id=state.id,
+            budget_id=leaf.id,
+            fiscal_year_id=old.id,
+            amount=Decimal("10"),
+        )
+
+    first, second, finished = application(running), application(running), application(done)
+    session.add_all([first, second, finished])
+    await session.commit()
+
+    check = await svc.close_check(top.id, old.id)
+    assert (check.open_applications, check.draft_supplement) == (2, False)
+    assert (await svc.close_check(top.id, now.id)).open_applications == 0
+
+    await svc.set_fiscal_year_closed(top.id, old.id, closed=True)
+    moved = await svc.move_fiscal_year(first.id, MoveFiscalYearRequest(fiscalYearId=now.id))
+    assert moved.fiscal_year_id == now.id
+    assigned = await svc.assign_budget(
+        second.id, AssignBudgetRequest(budgetId=top.id, fiscalYearId=now.id)
+    )
+    assert (assigned.budget_id, assigned.fiscal_year_id) == (top.id, now.id)
+    with pytest.raises(ConflictError) as kept:
+        await svc.assign_budget(finished.id, AssignBudgetRequest(budgetId=None))
+    assert kept.value.code == "fiscal_year_closed"
+
+
+async def test_a_year_with_allocations_of_zero_is_deleted(session: AsyncSession) -> None:
+    """An allocation blocks the delete of its year until it is set to 0.
+
+    Rule: §F/finance/budget/000141.
+    """
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"DZ{_suffix()}", name="Top", gremiumId=g.id))
+    fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=date.today().year))
+    await svc.set_allocation(top.id, fy.id, AllocationSet(allocated=Decimal("100")))
+    with pytest.raises(ConflictError) as blocked:
+        await svc.delete_fiscal_year(top.id, fy.id)
+    assert blocked.value.code == "fiscal_year_has_allocations"
+    await svc.set_allocation(top.id, fy.id, AllocationSet(allocated=Decimal("0")))
+    await svc.delete_fiscal_year(top.id, fy.id)
+    assert [f.id for f in await svc.list_fiscal_years(top.id)] == []
+
+
+async def test_a_new_stichtag_moves_only_the_years_that_are_not_closed(
+    session: AsyncSession,
+) -> None:
+    """Rule: §F/finance/budget/000992."""
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"ST{_suffix()}", name="Top", gremiumId=g.id))
+    done = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2024))
+    running = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2025))
+    await svc.set_fiscal_year_closed(top.id, done.id, closed=True)
+    await svc.update_node(top.id, BudgetNodeUpdate(fiscalStartMonth=4, fiscalStartDay=1))
+    years = {f.id: (f.start_date, f.end_date) for f in await svc.list_fiscal_years(top.id)}
+    assert years[done.id] == (date(2024, 1, 1), date(2024, 12, 31))
+    assert years[running.id] == (date(2025, 4, 1), date(2026, 3, 31))

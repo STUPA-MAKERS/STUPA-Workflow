@@ -2,11 +2,10 @@
 id: "000262"
 title: The invoice list has four segments
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-10
-implementation:
-  - frontend/src/app/pages/invoices/invoices.component.ts
+updated: 2026-11-16
+replaced_by: NF/usability/controls/000667
 scope:
   - backend/app/modules/budget
   - frontend/src/app/pages/budget

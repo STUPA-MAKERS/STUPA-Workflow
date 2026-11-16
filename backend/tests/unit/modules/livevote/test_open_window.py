@@ -1,9 +1,9 @@
 """The open window of a meeting and its settings.
 
 A planned meeting opens at the earliest ``open_lead_minutes`` before its planned
-start. Before ``confirm_lead_minutes`` the open needs ``confirmEarly``. A meeting
-without a date, and a live or closed meeting, has no window. The settings service
-validates the order of the two values and writes a ``config_change`` entry.
+start. From that point on the open needs nothing more. A meeting without a date, and
+a live or closed meeting, has no window. The settings service writes a
+``config_change`` entry.
 """
 
 from __future__ import annotations
@@ -19,11 +19,12 @@ from app.modules.livevote.open_window import (
     MeetingSettingsService,
     OpenWindow,
     check_open,
+    gremium_defaults,
     load_meeting_settings,
     open_window,
 )
 from app.modules.meetings.models import Meeting, MeetingSettings
-from app.shared.errors import ConflictError, ValidationProblem
+from app.shared.errors import ConflictError
 
 TZ = "Europe/Berlin"
 
@@ -36,8 +37,8 @@ def _meeting(status: str = "planned", day: date | None = date(2026, 10, 20)) -> 
     return m
 
 
-def _settings(open_lead: int = 60, confirm_lead: int = 10) -> MeetingSettings:
-    return MeetingSettings(id=1, open_lead_minutes=open_lead, confirm_lead_minutes=confirm_lead)
+def _settings(open_lead: int = 60) -> MeetingSettings:
+    return MeetingSettings(id=1, open_lead_minutes=open_lead)
 
 
 class _Session:
@@ -67,19 +68,15 @@ def test_window_counts_back_from_the_local_start() -> None:
     18:00 in Berlin in October (CEST) is 16:00 UTC.
     """
     window = open_window(_meeting(), _settings(), TZ)
-    assert window == OpenWindow(
-        opens_at=datetime(2026, 10, 20, 15, 0, tzinfo=UTC),
-        confirm_until=datetime(2026, 10, 20, 15, 50, tzinfo=UTC),
-    )
+    assert window == OpenWindow(opens_at=datetime(2026, 10, 20, 15, 0, tzinfo=UTC))
 
 
 def test_window_without_start_time_starts_at_midnight() -> None:
     m = _meeting()
     m.start_time = None
-    window = open_window(m, _settings(30, 0), TZ)
+    window = open_window(m, _settings(30), TZ)
     assert window is not None
-    assert window.confirm_until == datetime(2026, 10, 19, 22, 0, tzinfo=UTC)
-    assert window.opens_at == window.confirm_until - timedelta(minutes=30)
+    assert window.opens_at == datetime(2026, 10, 19, 21, 30, tzinfo=UTC)
 
 
 @pytest.mark.parametrize("meeting", [_meeting("live"), _meeting("closed"), _meeting(day=None)])
@@ -88,26 +85,20 @@ def test_no_window(meeting: Meeting) -> None:
 
 
 def test_check_open() -> None:
-    w = OpenWindow(
-        opens_at=datetime(2026, 10, 20, 15, 0, tzinfo=UTC),
-        confirm_until=datetime(2026, 10, 20, 15, 50, tzinfo=UTC),
-    )
-    check_open(None, now=datetime(2000, 1, 1, tzinfo=UTC), confirmed=False)
+    """§F/meetings/meetings/000092: from ``opens_at`` on the open needs nothing more."""
+    w = OpenWindow(opens_at=datetime(2026, 10, 20, 15, 0, tzinfo=UTC))
+    check_open(None, now=datetime(2000, 1, 1, tzinfo=UTC))
     with pytest.raises(ConflictError) as ei:
-        check_open(w, now=w.opens_at - timedelta(seconds=1), confirmed=True)
+        check_open(w, now=w.opens_at - timedelta(seconds=1))
     assert ei.value.code == "meeting_too_early"
-    with pytest.raises(ConflictError) as ei:
-        check_open(w, now=w.opens_at, confirmed=False)
-    assert ei.value.code == "early_open_unconfirmed"
-    check_open(w, now=w.opens_at, confirmed=True)
-    check_open(w, now=w.confirm_until, confirmed=False)
-    check_open(w, now=w.confirm_until + timedelta(days=1), confirmed=False)
+    check_open(w, now=w.opens_at)
+    check_open(w, now=w.opens_at + timedelta(days=1))
 
 
 async def test_load_falls_back_to_the_defaults() -> None:
     row = await load_meeting_settings(_Session())  # type: ignore[arg-type]
-    assert (row.open_lead_minutes, row.confirm_lead_minutes) == (60, 10)
-    stored = _settings(90, 15)
+    assert row.open_lead_minutes == 60
+    stored = _settings(90)
     assert await load_meeting_settings(_Session(stored)) is stored  # type: ignore[arg-type]
 
 
@@ -120,26 +111,66 @@ async def test_update_creates_the_row_and_audits(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(mod, "audit_record", _record)
     session = _Session()
     row = await MeetingSettingsService(session).update(  # type: ignore[arg-type]
-        open_lead_minutes=120, confirm_lead_minutes=30, actor="adm"
+        open_lead_minutes=120, actor="adm"
     )
-    assert (row.open_lead_minutes, row.confirm_lead_minutes) == (120, 30)
+    assert row.open_lead_minutes == 120
     assert row.updated_by == "adm"
     assert session.added == [row]
     assert session.commits == 1
     [entry] = calls
     assert entry["target_type"] == "meeting_settings"
-    assert entry["data"] == {
-        "openLeadMinutes": {"from": 60, "to": 120},
-        "confirmLeadMinutes": {"from": 10, "to": 30},
+    assert entry["data"] == {"openLeadMinutes": {"from": 60, "to": 120}}
+
+
+async def test_gremium_defaults_start_with_the_values_of_the_satzung() -> None:
+    """A missing row gives the defaults 40, 25, off, off, 120 and 2.
+
+    §F/administration/admin/000906.
+    """
+    row = await MeetingSettingsService(_Session()).get()  # type: ignore[arg-type]
+    assert gremium_defaults(row) == {
+        "quorumPercent": 40,
+        "repeatQuorumPercent": 25,
+        "guestsMayVote": False,
+        "allowVoteDelegation": False,
+        "delegationLeadMinutes": 120,
+        "delegationMaxPerDelegate": 2,
     }
 
 
-async def test_update_refuses_a_confirm_point_before_the_open() -> None:
-    session = _Session(_settings())
-    with pytest.raises(ValidationProblem):
-        await MeetingSettingsService(session).update(  # type: ignore[arg-type]
-            open_lead_minutes=10, confirm_lead_minutes=20, actor="adm"
-        )
-    assert session.commits == 0
-    assert session.row is not None
-    assert session.row.open_lead_minutes == 60
+async def test_update_gremium_defaults_audits_only_the_change(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Replace the defaults: the audit entry names only the changed values.
+
+    §F/administration/admin/000906.
+    """
+    calls: list[dict[str, Any]] = []
+
+    async def _record(_session: Any, **kw: Any) -> None:
+        calls.append(kw)
+
+    monkeypatch.setattr(mod, "audit_record", _record)
+    session = _Session()
+    values = {
+        "quorumPercent": 50,
+        "repeatQuorumPercent": None,
+        "guestsMayVote": False,
+        "allowVoteDelegation": True,
+        "delegationLeadMinutes": 120,
+        "delegationMaxPerDelegate": 2,
+    }
+    row = await MeetingSettingsService(session).update_gremium_defaults(  # type: ignore[arg-type]
+        values, actor="adm"
+    )
+    assert gremium_defaults(row) == values
+    assert row.updated_by == "adm" and session.commits == 0
+    assert row.open_lead_minutes == 60
+    [entry] = calls
+    assert entry["data"] == {
+        "gremiumDefaults": {
+            "quorumPercent": {"from": 40, "to": 50},
+            "repeatQuorumPercent": {"from": 25, "to": None},
+            "allowVoteDelegation": {"from": False, "to": True},
+        }
+    }

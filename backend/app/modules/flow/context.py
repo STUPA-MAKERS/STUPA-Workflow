@@ -51,14 +51,18 @@ async def committee_ids_for_sub(session: AsyncSession, sub: str | None) -> froze
         return frozenset()
     datetime.now(UTC)
     rows = (
-        await session.execute(
-            select(GremiumMembership.gremium_id)
-            .join(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
-            .where(
-                PrincipalRow.sub == sub,
+        (
+            await session.execute(
+                select(GremiumMembership.gremium_id)
+                .join(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
+                .where(
+                    PrincipalRow.sub == sub,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return frozenset(str(g) for g in rows)
 
 
@@ -182,9 +186,7 @@ async def build_base_context(
         has_attachment=has_attachment,
         field_values=field_values,
         field_types=field_types,
-        vote_gremium_id=(
-            str(app.vote_gremium_id) if app.vote_gremium_id is not None else None
-        ),
+        vote_gremium_id=(str(app.vote_gremium_id) if app.vote_gremium_id is not None else None),
         budget_has_decision_gremium=(
             await effective_decision_gremium(session, app.budget_id) is not None
         ),

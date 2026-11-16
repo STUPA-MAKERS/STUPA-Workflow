@@ -98,11 +98,9 @@ _UPGRADE: tuple[str, ...] = (
     "ALTER TABLE flow_version DROP CONSTRAINT IF EXISTS flow_version_version_key",
     "ALTER TABLE flow_version DROP CONSTRAINT IF EXISTS uq_flow_version_version",
     _RENUMBER,
-    (
-        "ALTER TABLE flow_version "
-        "ADD CONSTRAINT uq_flow_version_version UNIQUE (version)"
-    ),
+    ("ALTER TABLE flow_version ADD CONSTRAINT uq_flow_version_version UNIQUE (version)"),
 )
+
 
 def upgrade() -> None:
     """Upgrade the schema to this revision."""

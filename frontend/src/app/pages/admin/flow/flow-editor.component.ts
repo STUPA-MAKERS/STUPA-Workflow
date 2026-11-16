@@ -1,3 +1,4 @@
+import { FeatureService } from '@core/features/feature.service';
 import type { I18nMap } from '@core/api/models';
 import {
   ChangeDetectionStrategy,
@@ -185,7 +186,10 @@ export class FlowEditorComponent {
   protected readonly versionHistory = viewChild(VersionHistoryComponent);
 
   protected readonly compareOps = COMPARE_OPS;
-  protected readonly stateKinds: StateKind[] = ['normal', 'vote'];
+  /** The kinds a state can take: the vote state needs `Abstimmungen` (spec 000761). */
+  protected readonly stateKinds: StateKind[] = inject(FeatureService).isOn('voting')
+    ? ['normal', 'vote']
+    : ['normal'];
 
   protected readonly gremiumOptions = this.opts.gremiumOptions;
   protected readonly globalRoleOptions = this.opts.globalRoleOptions;

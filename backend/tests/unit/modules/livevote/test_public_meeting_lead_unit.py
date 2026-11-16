@@ -37,6 +37,7 @@ from app.modules.livevote.schemas import (
 )
 from app.modules.livevote.service import BrokerPublisher, MeetingService
 from app.modules.livevote.service.lifecycle import LifecycleOps
+from app.modules.meetings.present import Present
 from app.modules.protocol.markdown import build_vote_snippet, guest_vote_note
 from app.modules.protocol.service import _guest_note
 from app.modules.voting.schemas import TallyOut, VoteOut
@@ -46,6 +47,7 @@ from app.shared.config_schemas import VoteConfig
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, RateLimitedError
 from app.shared.ratelimit import InMemoryRateLimiter
 from tests._support.flow_fakes import FakeSession, result
+from tests.unit.conftest import Presence
 from tests.unit.modules.livevote.test_livevote_cov import (
     _FakeAgendaService,
     _FakeAttendanceService,
@@ -308,8 +310,10 @@ async def test_apply_public_rules() -> None:
         is None
     )
     session = FakeSession()
+    session.get_results = [SimpleNamespace(quorum_percent=None, guests_may_vote=True)]
     events = await _Lifecycle(session)._apply_public(m, MeetingPatch(publicJoin=True), lead, NOW)  # type: ignore[arg-type]
     assert m.public_join is True and m.join_code is not None and events is not None
+    assert m.guests_mode == "vote"
     [entry] = [a for a in session.added if type(a).__name__ == "AuditEntry"]
     assert entry.action == "meeting_public_join_changed"
     assert entry.data["publicJoin"] == {"from": False, "to": True}
@@ -344,7 +348,7 @@ async def test_guest_vote_open_query() -> None:
     assert await MeetingService(FakeSession())._guest_vote_open(uuid4()) is False  # type: ignore[arg-type]
 
 
-async def test_meeting_reads_for_guests() -> None:
+async def test_meeting_reads_for_guests(presence: Presence) -> None:
     session = FakeSession([result((uuid4(), "admitted", 2), (uuid4(), "pending", 1))])
     svc = MeetingService(session)  # type: ignore[arg-type]
     counts = await svc._guest_counts([uuid4()])
@@ -352,7 +356,7 @@ async def test_meeting_reads_for_guests() -> None:
     assert await svc._guest_counts([]) == {}
     assert await svc.admitted_guests_by_meeting([]) == {}
     mid = uuid4()
-    session = FakeSession([result((mid, 3))])
+    presence.here = Present(members=3)
     assert await MeetingService(session).present_member_count(mid) == 3  # type: ignore[arg-type]
     session = FakeSession([result(SimpleNamespace(gremium_id=mid))])
     assert await MeetingService(session).meeting_gremium_id(uuid4()) == mid  # type: ignore[arg-type]
@@ -474,33 +478,63 @@ def test_guest_name_drops_hidden_characters() -> None:
 def test_meeting_defaults_route(setup: Any) -> None:
     client, meetings, *_ = setup
     resp = client.get(f"/api/committees/{uuid4()}/meeting-defaults")
-    assert resp.json() == {"publicJoinAllowed": True, "quorumPercent": None}
+    assert resp.json() == {
+        "guestsVoteAllowed": True,
+        "quorumPercent": None,
+        "inviteDaysOrdinary": 7,
+        "inviteDaysExtraordinary": 3,
+    }
     meetings._can_manage = False
     assert client.get(f"/api/committees/{uuid4()}/meeting-defaults").status_code == 403
 
 
-async def test_public_join_needs_a_gremium_without_quorum() -> None:
-    """Allow public participation only in a gremium without a quorum.
+async def test_guest_ballot_needs_the_switch_and_no_quorum() -> None:
+    """Give guests a ballot only with the switch of the Gremium and without a quorum.
 
-    The gremium has a quorum of 50 %.
+    §F/meetings/meetings/000904, §F/meetings/meetings/000905.
     """
     from app.shared.errors import ValidationProblem
 
     lead = Principal(sub="lead")
-    session = FakeSession()
-    session.scalar_results = [50]
-    with pytest.raises(ValidationProblem) as err:
-        await _Lifecycle(session)._apply_public(_m(), MeetingPatch(publicJoin=True), lead, NOW)  # type: ignore[arg-type]
-    assert err.value.code == "public_join_needs_no_quorum"
-    no_quorum = FakeSession()
-    assert await MeetingService(no_quorum).gremium_has_quorum(uuid4()) is False  # type: ignore[arg-type]
-    assert await MeetingService(no_quorum)._gremium_quorum_set(uuid4()) is False  # type: ignore[arg-type]
+    watch = MeetingPatch(publicJoin=True, guestsMode="vote")
     with_quorum = FakeSession()
-    with_quorum.get_results = [SimpleNamespace(quorum_percent=50)]
-    assert await MeetingService(with_quorum)._gremium_quorum_set(uuid4()) is True  # type: ignore[arg-type]
+    with_quorum.get_results = [SimpleNamespace(quorum_percent=50, guests_may_vote=True)]
+    with pytest.raises(ValidationProblem) as err:
+        await _Lifecycle(with_quorum)._apply_public(_m(guests_mode="watch"), watch, lead, NOW)  # type: ignore[arg-type]
+    assert err.value.code == "guests_vote_needs_no_quorum"
+    switch_off = FakeSession()
+    switch_off.get_results = [SimpleNamespace(quorum_percent=None, guests_may_vote=False)]
+    with pytest.raises(ValidationProblem) as err:
+        await _Lifecycle(switch_off)._apply_public(_m(guests_mode="watch"), watch, lead, NOW)  # type: ignore[arg-type]
+    assert err.value.code == "guests_vote_off"
+    allowed = FakeSession()
+    allowed.get_results = [SimpleNamespace(quorum_percent=None, guests_may_vote=True)]
+    m = _m(guests_mode="watch")
+    await _Lifecycle(allowed)._apply_public(m, watch, lead, NOW)  # type: ignore[arg-type]
+    assert m.guests_mode == "vote" and m.public_join is True
+    assert await MeetingService(FakeSession()).guests_vote_allowed(uuid4()) is False  # type: ignore[arg-type]
+    on = FakeSession()
+    on.get_results = [SimpleNamespace(quorum_percent=None, guests_may_vote=True)]
+    assert await MeetingService(on).guests_vote_allowed(uuid4()) is True  # type: ignore[arg-type]
+    quorum = FakeSession()
+    quorum.get_results = [SimpleNamespace(quorum_percent=40, guests_may_vote=True)]
+    assert await MeetingService(quorum).guests_vote_allowed(uuid4()) is False  # type: ignore[arg-type]
 
 
-async def test_votes_for_counts_guests_of_a_guest_vote() -> None:
+async def test_a_stale_vote_mode_becomes_watch_at_the_switch_on() -> None:
+    """Switch public participation on with a stored ``vote`` the Gremium no longer allows.
+
+    §F/meetings/meetings/000905.
+    """
+    lead = Principal(sub="lead")
+    session = FakeSession()
+    session.get_results = [SimpleNamespace(quorum_percent=40, guests_may_vote=False)]
+    m = _m(guests_mode="vote")
+    await _Lifecycle(session)._apply_public(m, MeetingPatch(publicJoin=True), lead, NOW)  # type: ignore[arg-type]
+    assert m.public_join is True and m.guests_mode == "watch"
+
+
+async def test_votes_for_counts_guests_of_a_guest_vote(presence: Presence) -> None:
     from app.modules.voting.models import Vote
 
     mid = uuid4()
@@ -517,7 +551,8 @@ async def test_votes_for_counts_guests_of_a_guest_vote() -> None:
         status="open",
         eligible_count=3,
     )
-    session = FakeSession([result(vote), result(), result((mid, 2)), result((mid, 1))])
+    presence.here = Present(members=2)
+    session = FakeSession([result(vote), result(), result((mid, 1))])
     out = await MeetingService(session)._votes_for([mid])  # type: ignore[arg-type]
     [item] = out[mid]
     assert item.guests_vote is True and item.present == 3

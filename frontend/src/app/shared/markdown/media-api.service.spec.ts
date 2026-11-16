@@ -20,6 +20,26 @@ describe('MediaApiService', () => {
     expect(got).toBe(`/api/media/images/${ID}`);
     http.verify();
   });
+
+  it('posts a PDF to the meeting and reads its info (spec 000862)', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const api = TestBed.inject(MediaApiService);
+    const http = TestBed.inject(HttpTestingController);
+    const doc = { id: ID, url: `/api/media/documents/${ID}`, name: 'a.pdf', size: 1, pages: 2 };
+    const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
+    let pages: number | undefined;
+    api.uploadDocument('m1', file).subscribe((d) => (pages = d.pages));
+    const up = http.expectOne('/api/meetings/m1/documents');
+    expect(up.request.method).toBe('POST');
+    expect((up.request.body as FormData).get('file')).toBe(file);
+    up.flush(doc);
+    expect(pages).toBe(2);
+    let name: string | undefined;
+    api.documentInfo(doc.url).subscribe((d) => (name = d.name));
+    http.expectOne(`${doc.url}/info`).flush(doc);
+    expect(name).toBe('a.pdf');
+    http.verify();
+  });
 });
 
 describe('media helpers', () => {

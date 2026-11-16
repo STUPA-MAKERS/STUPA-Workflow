@@ -18,31 +18,45 @@ from typing import Any
 
 #: Path segment: alphanumeric, for example `VS`, `800` or `04`. Path composition
 #: reserves the separator `-`, so a segment must not contain it.
-_KEY_RE = re.compile(r"^[A-Za-z0-9]+$")
+_KEY_RE = re.compile(r"[A-Za-z0-9]+")
 _SEP = "-"
 _ZERO = Decimal(0)
 #: Length cap per path segment. It matches `max_length` in the schemas and bounds
-#: the free text in the `path_key` prefix comparisons.
+#: the free text in the `tree_path` prefix comparisons.
 _KEY_MAX = 64
 
 
 def is_valid_key(key: str) -> bool:
-    """Check for a valid path segment: alphanumeric, no `-`, length-capped."""
-    return len(key) <= _KEY_MAX and bool(_KEY_RE.match(key))
+    """Check for a valid path segment: alphanumeric, no `-`, length-capped.
+
+    The whole text must match, because `$` also matches before a line feed at the end.
+    """
+    return len(key) <= _KEY_MAX and _KEY_RE.fullmatch(key) is not None
 
 
-def compose_path_key(parent_path: str | None, key: str) -> str:
-    """Compose the path key.
+def compose_tree_path(parent_path: str | None, key: str) -> str:
+    """Compose the tree path, the keys from the top level down with `-` between them.
 
-    A top-level node gets `key`. Any other node gets `<parent_path>-<key>`.
+    A top-level node gets `key`. Any other node gets `<parent_path>-<key>`. The tree
+    path says where a node is in the tree. No person reads it.
     """
     return key if parent_path is None else f"{parent_path}{_SEP}{key}"
+
+
+def path_key_of(tree_path: str) -> str:
+    """Give the path key that a person reads: `VSM-80133` for the tree path `VSM-801-33`.
+
+    The key of the top level, one hyphen, then the keys of each level with nothing
+    between them. The path key of a top-level node is its key.
+    """
+    top, _, below = tree_path.partition(_SEP)
+    return f"{top}{_SEP}{below.replace(_SEP, '')}" if below else top
 
 
 def is_descendant_path(ancestor_path: str, node_path: str) -> bool:
     """Check whether `node_path` lies strictly below `ancestor_path`.
 
-    The check follows the path-prefix convention (`VS` > `VS-800` > `VS-800-04`).
+    The check follows the prefix of the tree path (`VS` > `VS-800` > `VS-800-04`).
     The node itself does NOT count as a descendant.
     """
     return node_path.startswith(ancestor_path + _SEP)
@@ -140,8 +154,8 @@ def rollup_committed(
     amount stays untouched.
 
     Args:
-        node_paths: `(node_id, path_key)` of every tree node.
-        leaf_amounts: `(leaf_path_key, amount)` per bound application.
+        node_paths: `(node_id, tree_path)` of every tree node.
+        leaf_amounts: `(leaf_tree_path, amount)` per bound application.
 
     Returns:
         The bound sum per node id.
@@ -197,6 +211,30 @@ def pick_fiscal_year[T](candidates: Sequence[tuple[T, date, date]], today: date)
             return None
 
 
+def is_choosable_year(
+    end: date, today: date, *, closed: bool, plan_in_force: bool | None, late: bool = False
+) -> bool:
+    """Say if a new booking or assignment can take a fiscal year (spec 000879).
+
+    The year must not be closed and must not be past. `plan_in_force` is `None` for a
+    budget without a plan. For a budget with a plan it says if the plan of the year is
+    in force, because money moves only on a decided plan. `late` is for a booking or a
+    transfer: it also takes a past year, because a payment of the last weeks of a year
+    is often entered after the year has ended (spec 000990).
+    """
+    return not closed and (late or end >= today) and plan_in_force is not False
+
+
+def late_booking_date_fits(start: date, end: date, today: date, on: date | None) -> bool:
+    """Say if the date of a booking fits a fiscal year that may be past (spec 000990).
+
+    A year that is not past takes a booking with any date or with none. A past year
+    takes only a booking whose date lies in the year, because the date is then the
+    only sign that the money belongs to that year.
+    """
+    return end >= today or (on is not None and start <= on <= end)
+
+
 def is_valid_fiscal_start(start_month: int, start_day: int) -> bool:
     """Check that the fiscal cutoff day and month form a valid date in EVERY year.
 
@@ -218,9 +256,7 @@ def fiscal_year_bounds(year: int, start_month: int, start_day: int) -> tuple[dat
             this to 422 instead of a 500.
     """
     if not is_valid_fiscal_start(start_month, start_day):
-        raise ValueError(
-            f"invalid fiscal start day/month: {start_day:02d}.{start_month:02d}"
-        )
+        raise ValueError(f"invalid fiscal start day/month: {start_day:02d}.{start_month:02d}")
     start = date(year, start_month, start_day)
     end = date(year + 1, start_month, start_day) - timedelta(days=1)
     return start, end
@@ -228,11 +264,7 @@ def fiscal_year_bounds(year: int, start_month: int, start_day: int) -> tuple[dat
 
 def fiscal_year_display(year: int, start_month: int, start_day: int) -> str:
     """Format a fiscal year: `YYYY` for a Jan 1 cutoff, else `YYYY/YY`."""
-    return (
-        str(year)
-        if start_month == 1 and start_day == 1
-        else f"{year}/{(year + 1) % 100:02d}"
-    )
+    return str(year) if start_month == 1 and start_day == 1 else f"{year}/{(year + 1) % 100:02d}"
 
 
 def resolve_decision_gremium[K, G](
@@ -276,32 +308,43 @@ def _decision_from[K, G](
     )
 
 
-#: Field order of a node tuple: id, parent_id, gremium_id, key, path_key, name,
-#: currency, active, color, fiscal_start_month, fiscal_start_day, hidden_in_budget,
-#: view_gremium_id, decision_gremium_id.
+#: Field order of a node tuple: id, parent_id, gremium_id, key, tree_path, name,
+#: currency, active, color, fiscal_start_month, fiscal_start_day, view_gremium_id,
+#: decision_gremium_id.
 NodeTuple = tuple[
-    object, object | None, object | None, str, str, str, str, bool,
-    str | None, int, int, bool, object | None, object | None,
+    object,
+    object | None,
+    object | None,
+    str,
+    str,
+    str,
+    str,
+    bool,
+    str | None,
+    int,
+    int,
+    object | None,
+    object | None,
 ]
 
 
-def scope_forest(forest: list[dict[str, Any]], gremium_ids: set[object]) -> list[dict[str, Any]]:
-    """Scope the forest to the Gremien that may see it.
+def scope_forest(forest: list[dict[str, Any]], root_ids: set[object]) -> list[dict[str, Any]]:
+    """Scope the forest to the subtrees that a reader may see.
 
-    The function returns every subtree whose root carries a `view_gremium_id`
-    from `gremium_ids`. Each such subtree becomes a new tab root. The walk goes
-    depth first. A hit takes its WHOLE subtree, so a nested match is not
+    `root_ids` are the nodes that one of the Gremien of the reader reads. The function
+    returns the subtree of every such node. Each such subtree becomes a new tab root.
+    The walk goes depth first. A hit takes its WHOLE subtree, so a nested match is not
     duplicated. The outer match wins.
     """
-    return [hit for root in forest for hit in _scoped(root, gremium_ids)] if gremium_ids else []
+    return [hit for root in forest for hit in _scoped(root, root_ids)] if root_ids else []
 
 
-def _scoped(node: dict[str, Any], gremium_ids: set[object]) -> tuple[dict[str, Any], ...]:
-    """Return the outermost nodes of the subtree of `node` that a Gremium may see."""
+def _scoped(node: dict[str, Any], root_ids: set[object]) -> tuple[dict[str, Any], ...]:
+    """Return the outermost nodes of the subtree of `node` that the reader may see."""
     return (
         (node,)
-        if node.get("view_gremium_id") in gremium_ids
-        else tuple(hit for child in node.get("children", []) for hit in _scoped(child, gremium_ids))
+        if node.get("id") in root_ids
+        else tuple(hit for child in node.get("children", []) for hit in _scoped(child, root_ids))
     )
 
 
@@ -383,7 +426,7 @@ def build_forest(
     fiscal year.
 
     `allocations` holds `(budget_id, fiscal_year_id, allocated)` rows, top-down.
-    `bound_rows` holds `(fiscal_year_id, leaf_path_key, amount)` per bound
+    `bound_rows` holds `(fiscal_year_id, leaf_tree_path, amount)` per bound
     application. `requested_rows`, `expended_rows` and `income_rows` use the same
     shape, one per in-flight application, per actual expense and per income.
     `gremium_id` filters the roots. `None` keeps every root.
@@ -401,23 +444,35 @@ def build_forest(
     parents = dict.fromkeys(n[1] for n in nodes)
     children_of = {parent: [n for n in nodes if n[1] == parent] for parent in parents}
     parent_of = {n[0]: n[1] for n in nodes}
-    decision_of = {n[0]: n[13] for n in nodes}
+    decision_of = {n[0]: n[12] for n in nodes}
 
     def to_dict(n: NodeTuple) -> dict[str, Any]:
-        (nid, parent_id, n_gremium, key, path, name, currency, active, color,
-         fy_month, fy_day, hidden_in_budget, view_gremium_id, decision_gremium_id) = n
+        (
+            nid,
+            parent_id,
+            n_gremium,
+            key,
+            path,
+            name,
+            currency,
+            active,
+            color,
+            fy_month,
+            fy_day,
+            view_gremium_id,
+            decision_gremium_id,
+        ) = n
         effective, source = resolve_decision_gremium(nid, parent_of, decision_of)
         return {
             "id": nid,
             "parent_id": parent_id,
             "gremium_id": n_gremium,
             "key": key,
-            "path_key": path,
+            "path_key": path_key_of(path),
             "name": name,
             "currency": currency,
             "active": active,
             "color": color,
-            "hidden_in_budget": hidden_in_budget,
             "view_gremium_id": view_gremium_id,
             "decision_gremium_id": decision_gremium_id,
             "effective_decision_gremium_id": effective,
@@ -436,8 +491,4 @@ def build_forest(
         }
 
     roots = children_of.get(None, [])
-    return [
-        to_dict(r)
-        for r in roots
-        if gremium_id is None or r[2] == gremium_id
-    ]
+    return [to_dict(r) for r in roots if gremium_id is None or r[2] == gremium_id]

@@ -19,6 +19,8 @@ from sqlalchemy import ColumnElement, Select, or_, select
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.budget import tree_rules
+from app.modules.budget.access import viewed_by
+from app.modules.budget.plan_models import BudgetPlan, BudgetPlanVersion
 from app.modules.budget.tree_models import Budget, FiscalYear
 from app.modules.budget.tree_rules import _SEP
 from app.settings import Settings, get_settings
@@ -60,12 +62,33 @@ def _applied(*clauses: ColumnElement[bool] | None) -> tuple[ColumnElement[bool],
 
 
 def _subtree_ids(node: Budget) -> Select[UUID]:
-    """Select the ids of `node` and of every node below it, by the path-key prefix."""
+    """Select the ids of `node` and of every node below it, by the prefix of the tree path."""
     return select(Budget.id).where(
         or_(
-            Budget.path_key == node.path_key,
-            Budget.path_key.like(node.path_key + _SEP + "%"),
+            Budget.tree_path == node.tree_path,
+            Budget.tree_path.like(node.tree_path + _SEP + "%"),
         )
+    )
+
+
+async def lock_tree(session: AsyncSession, budget_id: UUID | None) -> None:
+    """Lock the top-level budget above a cost center, for a write that reads its tree.
+
+    The statement finds the top level by the parent chain, because the parent of a
+    cost center never changes and its path key can. The lock is `FOR NO KEY UPDATE`,
+    because a new row that points at the budget (a booking, a line) must not wait for
+    it. A cost center that does not exist locks no row.
+    """
+    if budget_id is None:
+        return
+    up = select(Budget.id, Budget.parent_id).where(Budget.id == budget_id).cte("up", recursive=True)
+    chain = up.union_all(select(Budget.id, Budget.parent_id).where(Budget.id == up.c.parent_id))
+    top = select(chain.c.id).where(chain.c.parent_id.is_(None)).scalar_subquery()
+    await session.execute(
+        select(Budget)
+        .where(Budget.id == top)
+        .with_for_update(of=Budget, key_share=True)
+        .execution_options(populate_existing=True)
     )
 
 
@@ -118,10 +141,9 @@ class BudgetTreeServiceBase:
     async def visible_budget_ids(self, member_gremium_ids: set[UUID]) -> set[UUID]:
         """Return the ids of the cost centres that a gremium-scoped reader may see.
 
-        A node is visible when the node itself or an ancestor carries a
-        ``view_gremium_id`` of a member Gremium. This is the set form of
-        `TreeViewOps.can_view_node`: the root paths with a matching
-        ``view_gremium_id`` open their whole subtree through the ``path_key`` prefix.
+        A node is visible when a member Gremium reads the node itself or an ancestor
+        (`access.viewed_by`). This is the set form of `TreeViewOps.can_view_node`: the
+        matching root paths open their whole subtree through the prefix of the tree path.
         A holder of the full budget view needs no filter and does not call this.
 
         A path segment is alphanumeric (`tree_rules.is_valid_key`), so the prefix holds
@@ -131,14 +153,14 @@ class BudgetTreeServiceBase:
             return set()
         root_paths = (
             await self.session.scalars(
-                select(Budget.path_key).where(Budget.view_gremium_id.in_(member_gremium_ids))
+                select(Budget.tree_path).where(viewed_by(member_gremium_ids))
             )
         ).all()
         if not root_paths:
             return set()
         scoped = or_(
             *[
-                or_(Budget.path_key == rp, Budget.path_key.like(f"{rp}{_SEP}%"))
+                or_(Budget.tree_path == rp, Budget.tree_path.like(f"{rp}{_SEP}%"))
                 for rp in root_paths
             ]
         )
@@ -190,15 +212,34 @@ class BudgetTreeServiceBase:
         if fy is not None:
             self._refuse_closed(fy)
 
+    async def _lock_tree(self, budget_id: UUID | None) -> None:
+        """Lock the top-level budget above a cost center, before a write in its tree.
+
+        Each write in the tree of a budget takes this lock first: a write of a plan, and
+        each write that a plan depends on or that reads what such a write changes (a
+        cost center, a key, a side, an allocation, a fiscal year, the steps, the plan
+        switch). Two writes on one budget then run one after the other, and the second
+        reads what the first left: the statement reads the row of the budget again, so
+        its plan switch is the one that the write before left. A caller reads its own
+        rows after this lock, never before. The lock comes before the lock of a plan
+        row and before the audit entry, so no two writes wait for each other.
+
+        The statement finds the top level by the parent chain, because the parent of a
+        cost center never changes and its path key can. The lock is `FOR NO KEY
+        UPDATE`, because a new row that points at the budget (a booking, a line) must
+        not wait for it. A cost center that does not exist locks no row.
+        """
+        await lock_tree(self.session, budget_id)
+
     async def _top_level(self, node: Budget) -> Budget:
         """Return the top-level budget of a node.
 
         It is the first path segment and holds `parent_id IS NULL`.
         """
-        top_path = node.path_key.split(_SEP, 1)[0]
+        top_path = node.tree_path.split(_SEP, 1)[0]
         top = (
             await self.session.execute(
-                select(Budget).where(Budget.path_key == top_path, Budget.parent_id.is_(None))
+                select(Budget).where(Budget.tree_path == top_path, Budget.parent_id.is_(None))
             )
         ).scalar_one_or_none()
         if top is None:
@@ -237,19 +278,121 @@ class BudgetTreeServiceBase:
                 errors=[{"field": "fiscalStartDay", "msg": str(exc)}],
             ) from exc
 
-    async def _resolve_fiscal_year(self, node: Budget, fiscal_year_id: UUID | None) -> UUID:
+    async def _plan_for_new_year(self, top: Budget, fy: FiscalYear) -> None:
+        """Give a new fiscal year what the plan of its budget needs.
+
+        The plan operations replace this, because the fiscal year operations sit below
+        them and cannot call them.
+        """
+
+    def _today(self) -> date:
+        """Return the date of today in the time zone of the platform."""
+        return datetime.now(ZoneInfo(self.settings.local_timezone)).date()
+
+    async def _decided_years(self, top: Budget) -> set[UUID] | None:
+        """Return the fiscal years of a budget whose plan is in force.
+
+        `None` for a budget without plans, because each of its years can be planned
+        without one.
+        """
+        if not top.plan_enabled:
+            return None
+        return set(
+            (
+                await self.session.scalars(
+                    select(BudgetPlan.fiscal_year_id)
+                    .join(BudgetPlanVersion, BudgetPlanVersion.plan_id == BudgetPlan.id)
+                    .join(FiscalYear, FiscalYear.id == BudgetPlan.fiscal_year_id)
+                    .where(
+                        FiscalYear.budget_id == top.id,
+                        BudgetPlanVersion.state == "in_force",
+                    )
+                )
+            ).all()
+        )
+
+    def _is_choosable(
+        self, fy: FiscalYear, decided: set[UUID] | None, *, late: bool = False
+    ) -> bool:
+        """Tell if a new booking can take the fiscal year (spec 000879)."""
+        return tree_rules.is_choosable_year(
+            fy.end_date,
+            self._today(),
+            closed=fy.closed_at is not None,
+            plan_in_force=None if decided is None else fy.id in decided,
+            late=late,
+        )
+
+    async def choosable_years(self, top: Budget, *, late: bool = False) -> list[FiscalYear]:
+        """Return the fiscal years of a budget that a new booking can take (spec 000879).
+
+        A year that is not closed and not past. A budget with a plan gives only the
+        years whose plan is in force. `late` adds the past years that are not closed,
+        which a booking and a transfer with a date in the year can take (spec 000990).
+        """
+        decided = await self._decided_years(top)
+        return [
+            f
+            for f in await self._fiscal_years_of(top.id)
+            if self._is_choosable(f, decided, late=late)
+        ]
+
+    async def _require_choosable(
+        self, top: Budget, fy: FiscalYear, *, late: bool = False, on: date | None = None
+    ) -> None:
+        """Refuse a fiscal year that a new booking or assignment cannot take.
+
+        `late` is for a booking and a transfer, which a past year takes when `on`, the
+        date of the booking, lies in the year (spec 000990).
+
+        Raises:
+            ConflictError: `fiscal_year_closed` (409).
+            ValidationProblem: `fiscal_year_not_choosable` (422) for a year that is
+                past, or whose plan is not in force in a budget with a plan.
+                `booking_date_outside_year` (422) for a past year and a booking
+                without a date in the year.
+        """
+        self._refuse_closed(fy)
+        if not self._is_choosable(fy, await self._decided_years(top), late=late):
+            raise ValidationProblem(
+                "The fiscal year is past or its plan is not in force.",
+                code="fiscal_year_not_choosable",
+                errors=[{"field": "fiscalYearId", "msg": "past, or no plan in force"}],
+            )
+        if not tree_rules.late_booking_date_fits(fy.start_date, fy.end_date, self._today(), on):
+            raise ValidationProblem(
+                "A booking into a past fiscal year needs a date in that year.",
+                code="booking_date_outside_year",
+                errors=[{"field": "paymentDate", "msg": "must lie in the fiscal year"}],
+            )
+
+    async def _resolve_fiscal_year(
+        self,
+        node: Budget,
+        fiscal_year_id: UUID | None,
+        *,
+        kept: bool = False,
+        late: bool = False,
+        on: date | None = None,
+    ) -> UUID:
         """Resolve the fiscal year of a node operation.
 
         A booking, a transfer and an assignment all use this. An explicit fiscal
-        year must belong to the top-level budget. Without one the method takes
-        the current fiscal year of the top-level budget: the single active open
-        year, or among several active open years the one that contains the
-        local date. A closed year never counts as that default. The result is
-        never `None`.
+        year must belong to the top-level budget and must be a year that a new
+        booking can take (`choosable_years`, spec 000879). `kept` is for a booking
+        that moves to another cost center and keeps its year: the year must then
+        only be open. `late` and `on` are for a booking and a transfer: an explicit
+        past year is taken when `on`, the date of the booking, lies in it (spec
+        000990). Without a fiscal year the method takes the current one of the
+        top-level budget: the single active year that is not past and that a booking
+        can take, or among several the one that contains the local date. The result
+        is never `None`.
 
         Raises:
             ValidationProblem: The fiscal year belongs to another top-level
-                budget, or no current fiscal year can be derived (422).
+                budget, is `fiscal_year_not_choosable`, the date is
+                `booking_date_outside_year`, or no current fiscal year can be
+                derived (422).
             ConflictError: `fiscal_year_closed` (409) for an explicit closed
                 fiscal year.
         """
@@ -261,15 +404,15 @@ class BudgetTreeServiceBase:
                     "Fiscal year does not belong to this budget's top-level.",
                     errors=[{"field": "fiscalYearId", "msg": "wrong top-level budget"}],
                 )
-            self._refuse_closed(fy)
+            if kept:
+                self._refuse_closed(fy)
+            else:
+                await self._require_choosable(top, fy, late=late, on=on)
             return fy.id
         candidates = [
-            (f.id, f.start_date, f.end_date)
-            for f in await self._fiscal_years_of(top.id)
-            if f.active and f.closed_at is None
+            (f.id, f.start_date, f.end_date) for f in await self.choosable_years(top) if f.active
         ]
-        today = datetime.now(ZoneInfo(self.settings.local_timezone)).date()
-        picked = tree_rules.pick_fiscal_year(candidates, today)
+        picked = tree_rules.pick_fiscal_year(candidates, self._today())
         if picked is None:
             raise ValidationProblem(
                 "No current fiscal year — specify fiscalYearId.",

@@ -29,8 +29,10 @@ class _FakeSession:
     The test proves that a conflict writes *no* audit row and runs *no* commit.
     """
 
-    def __init__(self, *, gremium: Any, in_use: Any, deciding: Any = None) -> None:
-        self._scalars = [gremium, in_use, deciding]
+    def __init__(
+        self, *, gremium: Any, in_use: Any, deciding: Any = None, budget: Any = None
+    ) -> None:
+        self._scalars = [gremium, in_use, deciding, budget]
         self.statements: list[Any] = []
         self.deleted: list[Any] = []
         self.execute_calls = 0
@@ -99,3 +101,17 @@ async def test_delete_gremium_that_decides_a_vote_raises_conflict() -> None:
     assert err.value.code == "gremium_decides_vote"
     assert session.deleted == []
     assert session.committed == 0
+
+
+@pytest.mark.asyncio
+async def test_delete_gremium_with_a_budget_raises_conflict() -> None:
+    """§F/finance/budget/000844: a Gremium that a budget belongs to cannot go away."""
+    gid = uuid.uuid4()
+    session = _FakeSession(gremium=_Row(id=gid), in_use=None, budget=uuid.uuid4())
+    svc = ConfigService(session)  # type: ignore[arg-type]
+
+    with pytest.raises(ConflictError) as err:
+        await svc.delete_gremium(gid, _ADMIN)
+    assert err.value.code == "gremium_has_budget"
+    assert "budget.gremium_id = " in str(session.statements[3])
+    assert (session.deleted, session.committed, session.execute_calls) == ([], 0, 0)

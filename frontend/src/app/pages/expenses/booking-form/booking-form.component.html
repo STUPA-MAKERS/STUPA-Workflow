@@ -81,40 +81,31 @@
                 'expenses.form.fromApplication' | t
               }}</app-locked-field>
             } @else {
-              <app-cost-centre-select
-                [id]="'bf-cc-' + mode()"
-                [label]="'expenses.field.costCentre' | t"
-                [placeholder]="'expenses.field.costCentrePlaceholder' | t"
-                [emptyLabel]="'expenses.field.noCostCentres' | t"
-                [required]="true"
-                [nodes]="tree()"
-                [value]="ccId()"
-                [fiscalYearId]="ccYear()"
-                [fiscalYears]="s.topFiscalYears()"
-                (opened)="s.loadTopFiscalYears()"
-                (picked)="pickCostCentre($event)"
+              <app-budget-year-select
+                [late]="true"
+                [fiscalYearId]="s.newFiscalYearId()"
+                [preferBudgetId]="preferTop()"
+                (picked)="s.onPickPair($event)"
               />
+              @if (s.newTopId()) {
+                <app-cost-centre-select
+                  [id]="'bf-cc-' + mode()"
+                  [label]="'expenses.field.costCentre' | t"
+                  [placeholder]="'expenses.field.costCentrePlaceholder' | t"
+                  [emptyLabel]="'expenses.field.noCostCentres' | t"
+                  [required]="true"
+                  [nodes]="pairTree()"
+                  [value]="ccId()"
+                  [fiscalYearId]="ccYear()"
+                  (picked)="pickCostCentre($event)"
+                />
+              }
             }
-            <div class="mf__grid">
+            <div [class.mf__grid]="!!s.newApplicationId()">
               @if (s.newApplicationId()) {
                 <app-locked-field filled [label]="'expenses.field.fiscalYear' | t">{{
                   'expenses.form.fromApplication' | t
                 }}</app-locked-field>
-              } @else {
-                <app-select
-                  name="fy"
-                  [label]="'expenses.field.fiscalYear' | t"
-                  [placeholder]="'expenses.field.fiscalYearPlaceholder' | t"
-                  [options]="s.fiscalYearOptions()"
-                  [required]="true"
-                  [error]="
-                    s.newBudgetId() && !s.fiscalYearOptions().length
-                      ? ('expenses.field.noFiscalYear' | t)
-                      : ''
-                  "
-                  [ngModel]="s.newFiscalYearId()"
-                  (ngModelChange)="s.newFiscalYearId.set($event)"
-                />
               }
               <app-input
                 name="cat"
@@ -262,12 +253,16 @@
                 />
               }
               @if (lock.invoiceDate) {
-                <app-locked-field filled [label]="'expenses.field.invoiceDate' | t">{{
-                  s.newInvoiceDate() | ldate: 'mediumDate'
-                }}</app-locked-field>
+                <app-locked-field
+                  filled
+                  [class.mf__wide]="!!s.newPair()?.past"
+                  [label]="'expenses.field.invoiceDate' | t"
+                  >{{ s.newInvoiceDate() | ldate: 'mediumDate' }}</app-locked-field
+                >
               } @else {
                 <app-datepicker
                   name="invDate"
+                  [class.mf__wide]="!!s.newPair()?.past"
                   [label]="'expenses.field.invoiceDate' | t"
                   [ngModel]="s.newInvoiceDate()"
                   (ngModelChange)="s.newInvoiceDate.set($event)"
@@ -275,7 +270,10 @@
               }
               <app-datepicker
                 name="payDate"
+                [class.mf__wide]="!!s.newPair()?.past"
                 [label]="'expenses.field.paymentDate' | t"
+                [required]="!!s.newPair()?.past && !s.newApplicationId()"
+                [error]="s.bookingDateFits() ? '' : ('expenses.lateDate' | t)"
                 [ngModel]="s.newPaymentDate()"
                 (ngModelChange)="s.newPaymentDate.set($event)"
               />
@@ -351,7 +349,9 @@
 
   <app-fab
     icon="check"
-    [label]="(mode() === 'create' && layout() !== 'sheet' ? 'expenses.form.save' : 'action.save') | t"
+    [label]="
+      (mode() === 'create' && layout() !== 'sheet' ? 'expenses.form.save' : 'action.save') | t
+    "
     [contained]="layout() !== 'page'"
     [disabled]="mode() === 'create' && !s.canSubmitCreate()"
     [loading]="saving()"

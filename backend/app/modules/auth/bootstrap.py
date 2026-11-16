@@ -27,9 +27,7 @@ _ADMIN_ROLE_KEY = "admin"
 _MEMBER_ROLE_KEY = "member"
 
 
-def _is_bootstrap_principal(
-    row: PrincipalRow, settings: Settings, *, email_verified: bool
-) -> bool:
+def _is_bootstrap_principal(row: PrincipalRow, settings: Settings, *, email_verified: bool) -> bool:
     """Return `True` if the principal matches by `sub` or by verified email.
 
     `sub` is the IdP identity that nobody can forge, so it always counts. An email counts
@@ -50,9 +48,7 @@ async def _admin_role_id(db: AsyncSession) -> object | None:
     return res.scalar_one_or_none()
 
 
-async def _has_admin_assignment(
-    db: AsyncSession, principal_id: object, role_id: object
-) -> bool:
+async def _has_admin_assignment(db: AsyncSession, principal_id: object, role_id: object) -> bool:
     """Return `True` if the principal already holds the role."""
     res = await db.execute(
         select(RoleAssignment.id).where(

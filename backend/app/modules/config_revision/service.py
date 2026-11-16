@@ -39,9 +39,7 @@ def _lock_key(entity_type: str, entity_id: str) -> int:
     as a signed bigint. The result is a plain integer constant in SQL. It is
     injection-safe without a bind parameter.
     """
-    digest = hashlib.blake2b(
-        f"{entity_type}:{entity_id}".encode(), digest_size=8
-    ).digest()
+    digest = hashlib.blake2b(f"{entity_type}:{entity_id}".encode(), digest_size=8).digest()
     return int.from_bytes(digest, "big", signed=True)
 
 
@@ -130,9 +128,7 @@ class ConfigRevisionService:
         key = _as_uuid(revision_id)
         return None if key is None else await self.session.get(ConfigRevision, key)
 
-    async def list_for(
-        self, entity_type: str, entity_id: str
-    ) -> list[ConfigRevision]:
+    async def list_for(self, entity_type: str, entity_id: str) -> list[ConfigRevision]:
         """List all snapshots of an entity (newest first)."""
         return list(
             (

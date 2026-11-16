@@ -22,6 +22,48 @@ BUILTIN_MEETING_BODY = {
     "{% if meetingTime %}, {{ meetingTime }}{% endif %}\n",
 }
 
+#: The mail to the persons with ``session.manage`` when the unexcused absences of a
+#: member reach the limit of a term, or the limit minus 1.
+BUILTIN_ABSENCE_LIMIT_SUBJECT = {
+    "de": "Unentschuldigtes Fehlen: {{ memberName }}{% if gremiumName %} ({{ gremiumName }})"
+    "{% endif %}",
+    "en": "Unexcused absence: {{ memberName }}{% if gremiumName %} ({{ gremiumName }}){% endif %}",
+}
+BUILTIN_ABSENCE_LIMIT_BODY = {
+    "de": "Hallo,\n\n{{ memberName }} hat in der Sitzung „{{ meetingTitle }}“"
+    "{% if meetingDate %} am {{ meetingDate }}{% endif %} unentschuldigt gefehlt. "
+    "Das ist das {{ count }}. unentschuldigte Fehlen in dieser Amtszeit"
+    "{% if gremiumName %} im Gremium {{ gremiumName }}{% endif %}.\n\n"
+    "{% if reached %}Die Grenze von {{ limit }} ist erreicht. Der Verlust des Mandats "
+    "gehört auf die Tagesordnung der nächsten Sitzung.{% else %}Die Grenze liegt bei "
+    "{{ limit }}. Das Mitglied ist zu verwarnen.{% endif %}\n",
+    "en": "Hello,\n\n{{ memberName }} was absent without an excuse in the meeting "
+    '"{{ meetingTitle }}"{% if meetingDate %} on {{ meetingDate }}{% endif %}. '
+    "This is unexcused absence number {{ count }} in this term"
+    "{% if gremiumName %} in the committee {{ gremiumName }}{% endif %}.\n\n"
+    "{% if reached %}The limit of {{ limit }} is reached. The loss of the mandate "
+    "belongs on the agenda of the next meeting.{% else %}The limit is {{ limit }}. "
+    "The member is to be warned.{% endif %}\n",
+}
+
+#: The mail to the persons with ``session.manage`` when a member hands in a late
+#: excuse for a closed meeting (§F/meetings/meetings/000943).
+BUILTIN_LATE_EXCUSE_SUBJECT = {
+    "de": "Nachträgliche Entschuldigung: {{ memberName }}{% if gremiumName %} "
+    "({{ gremiumName }}){% endif %}",
+    "en": "Late excuse: {{ memberName }}{% if gremiumName %} ({{ gremiumName }}){% endif %}",
+}
+BUILTIN_LATE_EXCUSE_BODY = {
+    "de": "Hallo,\n\n{{ memberName }} hat sich für die Sitzung „{{ meetingTitle }}“"
+    "{% if meetingDate %} am {{ meetingDate }}{% endif %} nachträglich entschuldigt. "
+    "Die Entschuldigung gilt sofort, das Fehlen zählt nicht mehr als unentschuldigt.\n\n"
+    "Grund: {{ reason }}\n",
+    "en": "Hello,\n\n{{ memberName }} handed in a late excuse for the meeting "
+    '"{{ meetingTitle }}"{% if meetingDate %} on {{ meetingDate }}{% endif %}. '
+    "The excuse applies at once, the absence no longer counts as unexcused.\n\n"
+    "Reason: {{ reason }}\n",
+}
+
 #: Builtin subject of a meeting-bound delegation mail to the substitute. The context
 #: names the meeting, the Gremium and the delegating member.
 BUILTIN_DELEGATION_GRANTED_SUBJECT = {

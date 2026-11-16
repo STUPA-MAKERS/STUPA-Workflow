@@ -54,4 +54,11 @@ describe('AccessibilityStatementComponent', () => {
     expect(screen.getByText('Erklärung wird geladen')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Barriere melden' })).toBeInTheDocument();
   });
+
+  /** Spec 000758: the report is a ticket, so it does not show while Tickets is off. */
+  it('shows no report section while Tickets is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['tickets']));
+    await setup({ de: 'Text' });
+    expect(screen.queryByRole('button', { name: 'Barriere melden' })).toBeNull();
+  });
 });

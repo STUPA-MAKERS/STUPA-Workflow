@@ -249,4 +249,18 @@ describe('TodoLinkPickerComponent', () => {
     expect(container.querySelector('.lp--sheet')).not.toBeNull();
     expect(container.querySelector('.lp__x')).toBeNull();
   });
+
+  /** Spec 000758: the picker offers no kind of a feature that is off. */
+  it('offers no chip for the kinds of a feature that is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['tickets', 'budget']));
+    const { open } = await setup();
+    localStorage.removeItem('ap.features.off');
+    await open();
+    const chips = screen.getAllByRole('button', { pressed: false }).map((b) => b.textContent?.trim());
+    expect(chips).toContain('Sitzungen');
+    expect(chips).not.toContain('Tickets');
+    expect(chips).not.toContain('Kostenstellen');
+    expect(chips).not.toContain('Buchungen');
+  });
 });
+

@@ -3,7 +3,8 @@
 `Protocol` holds the minutes of one meeting, one row per meeting. The UNIQUE
 constraint on `meeting_id` makes `POST /meetings/{id}/protocol` idempotent: it
 creates the row or loads it. The `markdown` column backs the editor.
-`finalize` sets `status='final'` plus `pdf_storage_key` and `sent_at`.
+`finalize` sets `status='final'` plus `pdf_storage_key` and `finalized_at`, and `sent_at`
+when the mail of the protocol goes out.
 
 `ProtocolVoteRef` holds one embedded vote. The UNIQUE constraint on
 (protocol_id, vote_id) makes the embedding idempotent, so a snippet never
@@ -45,21 +46,19 @@ class Protocol(UUIDPkMixin, TimestampMixin, Base):
 
     __tablename__ = "protocol"
 
-    meeting_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("meeting.id", ondelete="CASCADE")
-    )
-    gremium_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("gremium.id", ondelete="CASCADE")
-    )
+    meeting_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("meeting.id", ondelete="CASCADE"))
+    gremium_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("gremium.id", ondelete="CASCADE"))
     markdown: Mapped[str] = mapped_column(Text, server_default="")
     pdf_storage_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     #: Redacted public variant, set only when an agenda item is non-public.
     public_pdf_storage_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     author: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, server_default="draft")
-    sent_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    #: The moment of the finalization. The public protocols page shows it.
+    finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: The moment of the mail of the final protocol. NULL when no mail went out,
+    #: because the Gremium has no recipient or the mail queue is off.
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     #: CD-variant key of the gremium, snapshotted at creation. `stupa` and `asta`
     #: select the render variant `protocol-stupa` and `protocol-asta`.
     cd_variant: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -77,11 +76,18 @@ class Protocol(UUIDPkMixin, TimestampMixin, Base):
     #: Permanent failures of the public build. The hourly heal job skips a protocol
     #: after a few of them; a successful build resets the count.
     public_render_failures: Mapped[int] = mapped_column(Integer, server_default="0")
+    #: The approval of the final protocol by the Gremium: the moment of the mark, the
+    #: meeting that approved it and the person who set the mark. All NULL without it.
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    approved_meeting_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("meeting.id", ondelete="SET NULL"), nullable=True
+    )
+    approved_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: The last send of the draft by mail to the members; NULL without a send.
+    draft_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
-        CheckConstraint(
-            "status IN ('draft','rendering','final')", name="protocol_status"
-        ),
+        CheckConstraint("status IN ('draft','rendering','final')", name="protocol_status"),
         UniqueConstraint("meeting_id", name="uq_protocol_meeting"),
         Index("ix_protocol_gremium_id", "gremium_id"),
     )
@@ -95,12 +101,8 @@ class ProtocolVoteRef(UUIDPkMixin, Base):
 
     __tablename__ = "protocol_vote_ref"
 
-    protocol_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("protocol.id", ondelete="CASCADE")
-    )
-    vote_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("vote.id", ondelete="CASCADE")
-    )
+    protocol_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("protocol.id", ondelete="CASCADE"))
+    vote_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("vote.id", ondelete="CASCADE"))
 
     __table_args__ = (
         UniqueConstraint("protocol_id", "vote_id", name="uq_protocol_vote_ref"),

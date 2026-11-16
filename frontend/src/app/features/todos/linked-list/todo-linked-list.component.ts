@@ -21,6 +21,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { TodoLinkCardDialogComponent } from '../link-card-dialog/todo-link-card-dialog.component';
 import { type NewTodoLink, TodoNewDialogComponent } from '../new-dialog/todo-new-dialog.component';
+import { FeatureService } from '@core/features/feature.service';
 import { TodoLinkedRefresh, linkedKey } from './todo-linked-refresh';
 import { personName } from '@shared/person-label.util';
 
@@ -31,6 +32,8 @@ export interface LinkedLead {
   readonly sub: string;
   /** The router link. The row opens it in a new tab. */
   readonly link: readonly unknown[];
+  /** The query parameters of the link. */
+  readonly queryParams?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -76,6 +79,7 @@ export interface LinkedLead {
 export class TodoLinkedListComponent {
   private readonly api = inject(TodosApiService);
   private readonly refresh = inject(TodoLinkedRefresh);
+  private readonly features = inject(FeatureService);
   private readonly i18n = inject(I18nService);
   private readonly t: Translate = (key, params) => this.i18n.translate(key, params);
 
@@ -121,7 +125,7 @@ export class TodoLinkedListComponent {
   readonly canAct = toSignal(
     toObservable(computed(() => this.actions() || this.headActions())).pipe(
       switchMap((on) =>
-        on
+        on && this.features.isOn('todos')
           ? this.api.boards().pipe(
               map((boards) => boards.some((b) => b.canWrite)),
               catchError(() => of(false)),
@@ -131,7 +135,10 @@ export class TodoLinkedListComponent {
     ),
     { initialValue: false },
   );
-  readonly showActions = computed(() => this.actions() && this.canAct());
+  /** While `Boards` is off the section keeps its other rows and has no card and no action. */
+  readonly showActions = computed(
+    () => this.actions() && this.canAct() && this.features.isOn('todos'),
+  );
   readonly newLinks = computed<NewTodoLink[]>(() => [
     {
       kind: this.kind(),
@@ -172,6 +179,7 @@ export class TodoLinkedListComponent {
   private load(kind: Exclude<TodoLinkKind, 'todo'>, id: Uuid, keep: boolean): void {
     const seq = ++this.seq;
     if (!keep) this.loaded.set([]);
+    if (!this.features.isOn('todos')) return;
     this.api.linked(kind, id).subscribe({
       next: (cards) => {
         if (seq === this.seq) this.loaded.set(cards);

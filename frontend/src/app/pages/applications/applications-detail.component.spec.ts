@@ -885,7 +885,6 @@ describe('ApplicationsDetailComponent', () => {
         currency: 'EUR',
         active: true,
         color: null,
-        hiddenInBudget: false,
         viewGremiumId: null,
         fiscalStartMonth: 1,
         fiscalStartDay: 1,
@@ -918,6 +917,21 @@ describe('ApplicationsDetailComponent', () => {
     const label = screen.getByText('Kostenstelle');
     return label.closest('app-field-row') as HTMLElement;
   }
+
+  /** Spec 000758: the Antrag omits the Kostenstelle while Budget is off. */
+  it('shows no cost centre and asks for no tree while Budget is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['budget']));
+    const { http, detectChanges } = await setup(['application.manage']);
+    localStorage.removeItem('ap.features.off');
+    http.expectOne(url('')).flush({ ...appWire(), budgetId: 'b1' });
+    http.expectOne(url('/versions')).flush(VERSIONS);
+    http.expectOne(url('/comments')).flush(COMMENTS);
+    http.expectNone((r) => r.url === '/api/budgets');
+    flushForm(http);
+    detectChanges();
+    expect(screen.queryByText('Kostenstelle')).toBeNull();
+    flushAttachments(http);
+  });
 
   /** Only a manager changes it. */
   it('names the cost centre also for a reader without application.manage', async () => {
@@ -977,8 +991,7 @@ describe('ApplicationsDetailComponent', () => {
   });
 
   /**
-   * The fiscal-year list of the assigned cost centre loads first. The open dialog reloads the
-   * fiscal-year list of the current top budget. The refresh fetches the application and the aux
+   * The fiscal-year list of the assigned cost centre loads first, for the badge. The refresh fetches the application and the aux
    * data again.
    */
   it('assigns a budget (success → toast + refresh) and opens the dialog with the current value', async () => {
@@ -996,7 +1009,6 @@ describe('ApplicationsDetailComponent', () => {
     cmp['openBudgetDialog']();
     expect(cmp['budgetDialogOpen']()).toBe(true);
     expect(cmp['budgetChoice']()).toBe('b1');
-    http.expectOne((r) => r.url === '/api/budgets/b1/fiscal-years').flush([]);
 
     cmp['budgetChoice'].set('');
     cmp.assignBudget();

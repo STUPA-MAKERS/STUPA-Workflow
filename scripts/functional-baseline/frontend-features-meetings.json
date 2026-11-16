@@ -1,6 +1,5 @@
 {
   "frontend/src/app/features/meetings/calendar-subscribe/calendar-subscribe.component.ts": 5,
   "frontend/src/app/features/meetings/participant-attendance/participant-attendance.component.ts": 1,
-  "frontend/src/app/features/meetings/participant-roster/participant-roster.component.ts": 1,
-  "frontend/src/app/features/meetings/top-sheet/top-sheet.component.ts": 2
+  "frontend/src/app/features/meetings/participant-roster/participant-roster.component.ts": 1
 }

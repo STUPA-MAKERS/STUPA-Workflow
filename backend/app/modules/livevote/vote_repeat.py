@@ -10,9 +10,11 @@ opens, ``reopen_application`` moves the application back into the vote state tha
 closed vote decided, through the same path as an audit-log revert: a status event with
 the note ``vote:repeat``, a ``status_change`` audit entry, and the decision of the
 closed vote gives way to the decision before it. The close of the repeat fires the
-branch again. The move back works only while the application still sits in the state
-that the closed vote put it in, because a later change (for example a payment) is not
-undone by a repeat.
+branch again. The move back commits with the create or the open of the repeat. An
+open repeat that is cancelled gives the application back the decision of the closed
+vote (``voting.repeat.restore_repeated_decision``). The move back works only while
+the application still sits in the state that the closed vote put it in, because a
+later change (for example a payment) is not undone by a repeat.
 """
 
 from __future__ import annotations
@@ -28,10 +30,8 @@ from app.modules.audit.models import AuditEntry
 from app.modules.flow.models import State
 from app.modules.flow.service import FlowService
 from app.modules.voting.models import Vote
+from app.modules.voting.repeat import REPEAT_NOTE
 from app.shared.errors import ConflictError, NotFoundError
-
-#: The note of the status event that moves an application back for a repeat.
-REPEAT_NOTE = "vote:repeat"
 
 
 async def repeat_source(
@@ -40,14 +40,16 @@ async def repeat_source(
     """Load the closed vote that a new vote repeats, and check that it can repeat.
 
     The vote must be a closed vote of this meeting on this agenda item. Only one repeat
-    of a vote exists at a time (a cancelled repeat does not count), and no other vote
-    of the item may be prepared or open, so the room never runs two votes on one
+    of a vote exists at a time (a cancelled repeat does not count), an election with a
+    next Wahlgang repeats that Wahlgang and not itself, and no other vote of the item
+    may be prepared or open, so the room never runs two votes on one
     question.
 
     Raises:
         NotFoundError: The meeting has no such vote on this agenda item.
         ConflictError: The vote is not closed (``vote_not_closed``), it already has a
-            repeat (``repeat_exists``), or the item has a prepared or open vote
+            repeat (``repeat_exists``), a next Wahlgang continues it
+            (``next_round_exists``), or the item has a prepared or open vote
             (``vote_pending``).
     """
     source = (
@@ -62,12 +64,10 @@ async def repeat_source(
     if source is None:
         raise NotFoundError(f"vote {repeat_of} not found on this agenda item")
     if source.status != "closed":
-        raise ConflictError(
-            "Only a closed vote can be repeated.", code="vote_not_closed"
-        )
+        raise ConflictError("Only a closed vote can be repeated.", code="vote_not_closed")
     others = (
         await session.execute(
-            select(Vote.status, Vote.repeat_of_id).where(
+            select(Vote.status, Vote.repeat_of_id, Vote.parent_vote_id).where(
                 Vote.agenda_item_id == item_id,
                 Vote.id != source.id,
                 Vote.status != "cancelled",
@@ -76,6 +76,10 @@ async def repeat_source(
     ).all()
     if any(row.repeat_of_id == source.id for row in others):
         raise ConflictError("This vote already has a repeat.", code="repeat_exists")
+    if any(row.parent_vote_id == source.id for row in others):
+        raise ConflictError(
+            "This election has a next Wahlgang; vote on that again.", code="next_round_exists"
+        )
     if any(row.status in ("draft", "open") for row in others):
         raise ConflictError(
             "The agenda item has a prepared or open vote; finish it first.",
@@ -127,18 +131,18 @@ async def assert_reopenable(session: AsyncSession, source: Vote) -> StatusEvent 
     event = await _branch_event(session, source.id)
     if event is None or event.to_state_id != current or event.from_state_id is None:
         raise ConflictError(
-            "The application changed its status after the vote; a repeat cannot "
-            "take it back.",
+            "The application changed its status after the vote; a repeat cannot take it back.",
             code="application_moved_on",
         )
     return event
 
 
 async def reopen_application(session: AsyncSession, source: Vote, *, actor: str) -> None:
-    """Move the application of a repeated vote back into its vote state (commits).
+    """Move the application of a repeated vote back into its vote state (no commit).
 
     Nothing happens for a vote without an application or an application that is still
-    in a vote state.
+    in a vote state. The caller commits with the create or the open of the repeat, so
+    a refused open leaves the application where it is.
 
     Raises:
         ConflictError: The application moved on after the close of the vote
@@ -171,4 +175,5 @@ async def reopen_application(session: AsyncSession, source: Vote, *, actor: str)
         reverted_audit_id=audit_id,
         reverted_status_event_id=event.id,
         note=REPEAT_NOTE,
+        commit=False,
     )

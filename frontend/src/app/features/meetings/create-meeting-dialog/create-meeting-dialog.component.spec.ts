@@ -122,6 +122,9 @@ describe('CreateMeetingDialogComponent', () => {
       startTime: '18:00',
       endTime: '20:00',
       protokollantId: 'p-1',
+      kind: 'ordinary',
+      location: null,
+      form: 'presence',
     });
     req.flush({ id: 'm-9', title: 'x', status: 'planned', votes: [], createdAt: '2026-10-01T00:00:00Z' });
     expect(closed).toHaveBeenCalled();
@@ -299,8 +302,48 @@ describe('CreateMeetingDialogComponent', () => {
     expect(cmp.title()).toBe('Studierendenparlament meeting on 10 November 2026');
   });
 
+  /** § 000918 */
+  describe('late invitation', () => {
+    const inDays = (n: number): string => {
+      const d = new Date();
+      d.setDate(d.getDate() + n);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+
+    it('warns when the date is nearer than the period of the kind and still goes on', async () => {
+      localStorage.setItem('ap.locale', 'de');
+      const { http, cmp, fixture } = await setup();
+      fixture.debugElement.injector.get(I18nService).setLocale('de');
+      flushGremien(http, fixture);
+      cmp.onGremiumChange('g-1');
+      http.expectOne('/api/committees/g-1/meeting-members').flush([]);
+      http
+        .expectOne('/api/committees/g-1/meeting-defaults')
+        .flush({ guestsVoteAllowed: false, quorumPercent: 50, inviteDaysOrdinary: 7, inviteDaysExtraordinary: 3 });
+      cmp.date.set(inDays(10));
+      cmp.time.set('18:00');
+      fixture.detectChanges();
+      expect(screen.queryByText(/Ladungsfrist/)).toBeNull();
+      cmp.date.set(inDays(5));
+      fixture.detectChanges();
+      expect(screen.getByText('Die Ladungsfrist von 7 Tagen ist nicht mehr einzuhalten.')).toBeInTheDocument();
+      cmp.kind.set('repeat');
+      fixture.detectChanges();
+      expect(screen.queryByText(/Ladungsfrist/)).toBeNull();
+      cmp.date.set(inDays(2));
+      fixture.detectChanges();
+      expect(screen.getByText('Die Ladungsfrist von 3 Tagen ist nicht mehr einzuhalten.')).toBeInTheDocument();
+      cmp.kind.set('extraordinary');
+      fixture.detectChanges();
+      expect(screen.getByRole('button', { name: 'Weiter' })).toBeEnabled();
+      cmp.next();
+      expect(cmp.step()).toBe(2);
+    });
+  });
+
   describe('public participation', () => {
-    it('locks the switch for a gremium with a quorum and sends it for one without', async () => {
+    /** §F/meetings/meetings/000904, §F/meetings/meetings/000905 */
+    it('lets guests only watch where the Gremium gives them no ballot', async () => {
       localStorage.setItem('ap.locale', 'de');
       const { http, cmp, fixture } = await setup();
       fixture.debugElement.injector.get(I18nService).setLocale('de');
@@ -308,31 +351,123 @@ describe('CreateMeetingDialogComponent', () => {
       flushGremien(http, fixture);
       cmp.onGremiumChange('g-1');
       http.expectOne('/api/committees/g-1/meeting-members').flush([]);
-      http.expectOne('/api/committees/g-1/meeting-defaults').flush({ publicJoinAllowed: false, quorumPercent: 50 });
-      cmp.publicJoin.set(true);
+      http.expectOne('/api/committees/g-1/meeting-defaults').flush({ guestsVoteAllowed: false, quorumPercent: 50 });
       cmp.onGremiumChange('g-2');
       http.expectOne('/api/committees/g-2/meeting-members').flush([]);
       const late = http.expectOne('/api/committees/g-2/meeting-defaults');
       cmp.onGremiumChange('g-1');
-      late.flush({ publicJoinAllowed: true, quorumPercent: null });
+      late.flush({ guestsVoteAllowed: true, quorumPercent: null });
       http.expectOne('/api/committees/g-1/meeting-members').flush([]);
-      http.expectOne('/api/committees/g-1/meeting-defaults').flush({ publicJoinAllowed: false, quorumPercent: 50 });
-      expect(cmp.publicJoin()).toBe(false);
+      http.expectOne('/api/committees/g-1/meeting-defaults').flush({ guestsVoteAllowed: false, quorumPercent: 50 });
+      expect(cmp.guestsMode()).toBe('watch');
       cmp.date.set('2026-11-10');
       cmp.time.set('18:00');
       cmp.next();
+      cmp.publicJoin.set(true);
       fixture.detectChanges();
-      expect(screen.getByRole('dialog')).toHaveTextContent('Dieses Gremium hat ein Quorum von 50 %.');
-      expect(screen.getByRole('switch', { name: /Öffentliche Teilnahme/ })).toBeDisabled();
+      expect(screen.getByRole('switch', { name: /Öffentliche Teilnahme/ })).toBeEnabled();
+      expect(screen.getByRole('dialog')).toHaveTextContent('Gäste schauen in diesem Gremium nur zu.');
+      expect(screen.queryByRole('radio', { name: /Gäste dürfen abstimmen/ })).toBeNull();
 
       cmp.onGremiumChange('g-2');
       http.expectOne('/api/committees/g-2/meeting-members').flush([]);
-      http.expectOne('/api/committees/g-2/meeting-defaults').error(new ProgressEvent('x'));
-      cmp.publicJoin.set(true);
+      http.expectOne('/api/committees/g-2/meeting-defaults').flush({ guestsVoteAllowed: true, quorumPercent: null });
+      expect(cmp.guestsMode()).toBe('vote');
       cmp.submit();
       const req = http.expectOne('/api/meetings');
       expect(req.request.body).toEqual(expect.objectContaining({ publicJoin: true, guestsMode: 'vote' }));
-      req.flush({ code: 'public_join_needs_no_quorum' }, { status: 422, statusText: 'x' });
+      req.flush({ code: 'guests_vote_off' }, { status: 422, statusText: 'x' });
+      const toasts = fixture.debugElement.injector.get(ToastService).toasts().map((t) => t.message);
+      expect(toasts).toContain('In diesem Gremium dürfen Gäste nicht abstimmen.');
+    });
+
+    /** §F/meetings/meetings/000903, §F/meetings/meetings/000907 */
+    it('sends the kind, the place and the form, and refuses a place that is too long', async () => {
+      localStorage.setItem('ap.locale', 'de');
+      const { http, cmp, fixture } = await setup();
+      fixture.debugElement.injector.get(I18nService).setLocale('de');
+      fixture.detectChanges();
+      flushGremien(http, fixture);
+      cmp.onGremiumChange('g-1');
+      http.expectOne('/api/committees/g-1/meeting-members').flush([]);
+      http.expectOne('/api/committees/g-1/meeting-defaults').error(new ProgressEvent('x'));
+      cmp.date.set('2026-11-10');
+      cmp.time.set('18:00');
+      fixture.detectChanges();
+      expect(await optionLabels(screen.getByLabelText('Sitzungsart'))).toEqual([
+        'Ordentliche Sitzung',
+        'Außerordentliche Sitzung',
+        'Wiederholungssitzung',
+        'Konstituierende Sitzung',
+      ]);
+      expect(await optionLabels(screen.getByLabelText('Form'))).toEqual(['Präsenz', 'Hybrid', 'Videokonferenz']);
+      cmp.location.set('x'.repeat(201));
+      fixture.detectChanges();
+      expect(cmp.step1Valid()).toBe(false);
+      expect(screen.getByRole('dialog')).toHaveTextContent('Der Ort darf höchstens 200 Zeichen haben.');
+      cmp.kind.set('extraordinary');
+      cmp.location.set(' Raum 9-108 ');
+      cmp.form.set('hybrid');
+      cmp.next();
+      cmp.submit();
+      const req = http.expectOne({ method: 'POST', url: '/api/meetings' });
+      expect(req.request.body).toEqual(
+        expect.objectContaining({ kind: 'extraordinary', location: 'Raum 9-108', form: 'hybrid' }),
+      );
+      expect(req.request.body).not.toHaveProperty('repeatOfId');
+    });
+
+    /** §F/meetings/meetings/000940 */
+    it('asks a repeat meeting for its first meeting and sends it', async () => {
+      localStorage.setItem('ap.locale', 'de');
+      const { http, cmp, fixture, toasts } = await setup();
+      fixture.debugElement.injector.get(I18nService).setLocale('de');
+      flushGremien(http, fixture);
+      cmp.onGremiumChange('g-1');
+      http.expectOne('/api/meetings?gremiumId=g-1').flush([
+        { id: 'm-1', title: '34. Sitzung', date: '2026-11-03', status: 'closed', votes: [], createdAt: 'x' },
+        { id: 'm-2', title: '36. Sitzung', date: '2026-11-24', status: 'planned', votes: [], createdAt: 'x' },
+        { id: 'm-3', title: 'Ohne Datum', status: 'planned', votes: [], createdAt: 'x' },
+      ]);
+      cmp.date.set('2026-11-10');
+      cmp.time.set('18:00');
+      fixture.detectChanges();
+      expect(screen.queryByLabelText(/Erste Sitzung/)).toBeNull();
+      cmp.kind.set('repeat');
+      fixture.detectChanges();
+      expect(cmp.step1Valid()).toBe(false);
+      expect(await optionLabels(screen.getByLabelText(/Erste Sitzung/))).toEqual([
+        '34. Sitzung · 03.11.2026',
+        'Ohne Datum',
+      ]);
+      cmp.repeatOf.set('m-1');
+      expect(cmp.step1Valid()).toBe(true);
+      cmp.date.set('2026-11-01');
+      expect(cmp.step1Valid()).toBe(false);
+      cmp.date.set('2026-11-10');
+      cmp.next();
+      cmp.submit();
+      const req = http.expectOne({ method: 'POST', url: '/api/meetings' });
+      expect(req.request.body).toEqual(expect.objectContaining({ kind: 'repeat', repeatOfId: 'm-1' }));
+      req.flush(
+        { type: 'about:blank', status: 422, code: 'repeat_first_meeting_invalid' },
+        { status: 422, statusText: 'Unprocessable' },
+      );
+      expect(toasts()).toContain('Die erste Sitzung muss eine frühere Sitzung des Gremiums sein.');
+    });
+
+    it('drops the first meeting with a new Gremium and has no list after a failed read', async () => {
+      const { http, cmp, fixture } = await setup();
+      flushGremien(http, fixture);
+      cmp.onGremiumChange('g-1');
+      cmp.repeatOf.set('m-1');
+      cmp.onGremiumChange('g-2');
+      expect(cmp.repeatOf()).toBe('');
+      const [stale, current] = http.match((r) => r.url === '/api/meetings' && r.method === 'GET');
+      stale!.flush([{ id: 'm-1', title: 'x', status: 'planned', votes: [], createdAt: 'x' }]);
+      expect(cmp.meetings()).toEqual([]);
+      current!.error(new ProgressEvent('x'));
+      expect(cmp.meetings()).toEqual([]);
     });
   });
 });

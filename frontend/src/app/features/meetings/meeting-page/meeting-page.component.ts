@@ -1,3 +1,4 @@
+import { FeatureService } from '@core/features/feature.service';
 import type { EditorMode } from '../top-sheet/top-sheet.component';
 import {
   ChangeDetectionStrategy,
@@ -5,6 +6,7 @@ import {
   ElementRef,
   computed,
   inject,
+  Injector,
   input,
   model,
   output,
@@ -42,6 +44,7 @@ import {
   type AgendaMove,
   AgendaPaneComponent,
   canChangeAgenda,
+  canEditTop,
 } from '../agenda-pane/agenda-pane.component';
 import {
   type AttendanceChange,
@@ -50,12 +53,13 @@ import {
 import { type DockPanel, SessionDockComponent } from '../session-dock/session-dock.component';
 import { type SaveState, TopSheetComponent } from '../top-sheet/top-sheet.component';
 import { VoteCardComponent } from '../vote-card/vote-card.component';
+import { firstMeetingLink } from '../meeting-kind.util';
 import { voteSnippet, votesInText } from '../meetings.util';
 import { voteOptionLabel } from '../meetings-display.util';
 import { openWindowClock, openWindowState, openWindowWhen } from '../open-window.util';
 import { JoinQrComponent } from '../public-join/join-qr.component';
 import { MeetingHeadComponent } from '../meeting-head/meeting-head.component';
-import { topApplicationLead } from '../top-application-lead.util';
+import { topLead } from '../top-application-lead.util';
 import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { clock, weekdayDate } from '@shared/date-format';
 import { pageItemTitle } from '../../../layout/page-title.service';
@@ -67,9 +71,10 @@ type SessionAction = 'todos' | 'open' | 'agenda' | 'settings' | 'attendance' | '
  * The session page of the meeting lead and the minute-taker (`/meetings/:id`).
  *
  * The header carries the title, the status, "Gremium · date · seit HH:MM", the session
- * menu and, on a wider screen, the close of a live meeting. "Sitzung eröffnen" is an item
- * of the session menu, disabled with its reason until a minute-taker is set and the open
- * window opens. Below the header the agenda pane, the sheet of the open item and the
+ * menu and, above the phone width, the main action: "Sitzung eröffnen" of a planned meeting
+ * or "Sitzung schließen" of a live one, at the same place (spec 000096). On a phone both are
+ * items of the session menu. The opening is disabled with its reason until a minute-taker is
+ * set and the open window opens; before the window the button reads "Möglich ab …". Below the header the agenda pane, the sheet of the open item and the
  * cards of its votes. A planned meeting opens on its first agenda item, so the text and
  * the votes can be prepared before the start. The dock at the foot steps through the
  * agenda and holds the attendance and the minute-taker (on a phone before the opening:
@@ -266,12 +271,14 @@ export class MeetingPageComponent {
 
   /** "TOP hinzufügen" in the header of the agenda sheet, and the rename by a click on the title. */
   protected readonly canAddTop = computed(() => canChangeAgenda(this.meeting(), this.locked()));
+  /** The title of the open item changes until the protocol is locked (§ 000982). */
+  protected readonly canRenameTop = computed(() => canEditTop(this.meeting(), this.locked()));
 
   /**
    * The row of the application of the open item, the first row of the linked list above
-   * the sheet (`topApplicationLead`).
+   * the sheet (`topLead`), or the row of its Haushaltsplan.
    */
-  protected readonly applicationLead = computed(() => topApplicationLead(this.top(), this.i18n));
+  protected readonly applicationLead = topLead(this.top, inject(Injector), this.i18n);
 
   /** "Studierendenparlament · Di, 29.09.2026 · seit 18:04". */
   protected readonly subLine = computed(() => {
@@ -293,6 +300,9 @@ export class MeetingPageComponent {
       ...time,
     ].join(' · ');
   });
+
+  /** The first meeting of a Wiederholungssitzung (§ 000940). */
+  protected readonly firstLink = computed(() => firstMeetingLink(this.meeting(), this.i18n));
 
   /** Presence is shown to the people who run the meeting, while it is live. */
   protected readonly showPresence = computed(() => {
@@ -321,6 +331,13 @@ export class MeetingPageComponent {
     return this.i18n.translate('meetings.control.opensAt', { when });
   });
 
+  /** Why "Sitzung eröffnen" is disabled (no minute-taker, or "Möglich ab …"), else `null`. */
+  protected readonly openBlocked = computed<string | null>(() =>
+    this.meeting().protokollantId
+      ? this.opensAtText() || null
+      : this.i18n.translate('meetings.control.needProtokollant'),
+  );
+
   protected readonly mainAction = computed<'open' | 'close' | null>(() => {
     const m = this.meeting();
     if (m.status === 'planned' && m.canControl) return 'open';
@@ -330,8 +347,8 @@ export class MeetingPageComponent {
 
   /**
    * The session menu: settings, attendance and delete. Below the wide layout the beamer
-   * of a planned or live meeting goes in here too; on a phone the header keeps only the title, so the close moves in
-   * as well (the finalize is in the protocol bar). The opening is always here, first.
+   * of a planned or live meeting goes in here too; on a phone the header keeps only the title, so the opening (first)
+   * and the close move in as well (the finalize is in the protocol bar). Above the phone width both are header buttons.
    *
    * The beamer route and its stream need session.manage in the gremium.
    */
@@ -346,13 +363,11 @@ export class MeetingPageComponent {
       (m.status === 'planned' && m.canManage) ||
       (m.status === 'live' && (m.canManage || m.isProtokollant));
     const main: readonly RowMenuItem[] = [
-      ...when(this.mainAction() === 'open', {
+      ...when(this.phone() && this.mainAction() === 'open', {
         id: 'open',
         label: t('meetings.control.open'),
         icon: 'play',
-        disabledReason: m.protokollantId
-          ? this.opensAtText() || null
-          : t('meetings.control.needProtokollant'),
+        disabledReason: this.openBlocked(),
       }),
       // Below the wide layout the agenda is a sheet, and the menu opens it.
       ...when(!this.wide(), { id: 'agenda', label: t('meetings.agenda.title'), icon: 'list' }),
@@ -404,10 +419,12 @@ export class MeetingPageComponent {
     return [{ items: main }, { items: danger }];
   });
 
+  /** The page shows no vote while `Abstimmungen` is off (spec 000758). */
+  private readonly votingOn = inject(FeatureService).isOn('voting');
   /** The votes of the open item: the open one first, then the newest first. */
   protected readonly votes = computed<MeetingVote[]>(() => {
     const t = this.top();
-    if (!t) return [];
+    if (!t || !this.votingOn) return [];
     const own = this.meeting().votes.filter((v) => v.agendaItemId === t.id);
     const open = own.filter((v) => v.status === 'open');
     const rest = own.filter((v) => v.status !== 'open').reverse();
@@ -425,6 +442,20 @@ export class MeetingPageComponent {
     this.meeting().votes.some((v) => v.status === 'open'),
   );
 
+  /**
+   * The votes of the open item that another vote continues: a next Wahlgang (§ 000971) or a
+   * repeat that is not cancelled. Such a vote takes no further Wahlgang and no further repeat.
+   */
+  protected readonly continuedIds = computed(
+    () =>
+      new Set(
+        this.votes()
+          .filter((v) => v.status !== 'cancelled')
+          .flatMap((v) => [v.parentVoteId, v.repeatOfId])
+          .filter((id): id is string => !!id),
+      ),
+  );
+
   /** The closed votes of the open item whose repeat opened: their cards say "Wiederholt". */
   protected readonly repeatedIds = computed(
     () =>
@@ -435,15 +466,13 @@ export class MeetingPageComponent {
       ),
   );
   /**
-   * The closed votes of the open item that can be voted on again: no repeat of them is
-   * prepared, open or closed, and the item has no prepared or open vote.
+   * The closed votes of the open item that can be voted on again: no repeat and no next
+   * Wahlgang of them is prepared, open or closed, and the item has no prepared or open vote.
    */
   protected readonly repeatableIds = computed(() => {
     const own = this.votes();
     if (own.some((v) => v.status === 'draft' || v.status === 'open')) return new Set<string>();
-    const taken = new Set(
-      own.filter((v) => v.repeatOfId && v.status !== 'cancelled').map((v) => v.repeatOfId),
-    );
+    const taken = this.continuedIds();
     return new Set(own.filter((v) => v.status === 'closed' && !taken.has(v.id)).map((v) => v.id));
   });
 
@@ -463,15 +492,19 @@ export class MeetingPageComponent {
   });
 
   /**
-   * "Beschlussfrage hinzufügen": an application item holds one vote, free text any number.
+   * "Beschlussfrage hinzufügen": an application item and the item of a
+   * Haushaltsplan hold one vote, free text any number. A draft of a plan is on the agenda
+   * for a reading and takes no vote.
    * A planned meeting prepares the vote as a draft; so does a live meeting while another
    * vote is open (the dialog then only prepares).
    */
   protected readonly canAddVote = computed(() => {
     const m = this.meeting();
     const t = this.top();
-    if (!t || !m.canManageVotes || this.locked() || m.status === 'closed') return false;
-    return !t.applicationId || this.votes().length === 0;
+    if (!t || !m.canManageVotes || this.locked() || m.status === 'closed' || t.planReading) return false;
+    return (
+      !(t.applicationId || t.planVersionId) || this.votes().every((v) => v.status === 'cancelled')
+    );
   });
 
   /** The add button of an application item: open the vote, or only prepare it. */

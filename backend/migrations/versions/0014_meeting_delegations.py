@@ -52,10 +52,7 @@ _UPGRADE: tuple[str, ...] = (
         "ON meeting_delegation (meeting_id, delegate_principal_id) "
         "WHERE delegate_voting"
     ),
-    (
-        "CREATE INDEX IF NOT EXISTS ix_meeting_delegation_meeting "
-        "ON meeting_delegation (meeting_id)"
-    ),
+    ("CREATE INDEX IF NOT EXISTS ix_meeting_delegation_meeting ON meeting_delegation (meeting_id)"),
     (
         "CREATE INDEX IF NOT EXISTS ix_meeting_delegation_delegate "
         "ON meeting_delegation (delegate_principal_id)"

@@ -33,6 +33,12 @@ from app.modules.auth.models import (
 )
 from app.modules.auth.oauth_models import OAuthAuthorizationCode, OAuthToken
 from app.modules.backup.models import Backup
+from app.modules.budget.plan_models import (
+    BudgetPlan,
+    BudgetPlanLine,
+    BudgetPlanStep,
+    BudgetPlanVersion,
+)
 from app.modules.budget.tree_models import (
     Budget,
     BudgetAllocation,
@@ -49,8 +55,8 @@ from app.modules.delegations.models import MeetingDelegation
 from app.modules.files.models import Attachment, AttachmentDraftToken
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.models import FormField, FormVersion
-from app.modules.gremien.models import DelegationSubstitute, Gremium
-from app.modules.media.models import MarkdownImage
+from app.modules.gremien.models import DelegationSubstitute, Gremium, GremiumInfo
+from app.modules.media.models import MarkdownDocument, MarkdownImage
 from app.modules.meetings.models import (
     Meeting,
     MeetingAgendaItem,
@@ -102,6 +108,10 @@ __all__ = [
     "Base",
     "Budget",
     "BudgetAllocation",
+    "BudgetPlan",
+    "BudgetPlanLine",
+    "BudgetPlanStep",
+    "BudgetPlanVersion",
     "BudgetExpense",
     "ConfigRevision",
     "FiscalYear",
@@ -112,10 +122,12 @@ __all__ = [
     "FormField",
     "FormVersion",
     "Gremium",
+    "GremiumInfo",
     "GroupMapping",
     "GuestApplicationSettings",
     "MagicLink",
     "MailTemplate",
+    "MarkdownDocument",
     "MarkdownImage",
     "NotificationPreference",
     "NotificationSettings",

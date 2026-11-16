@@ -242,7 +242,25 @@ class GremiumCreate(WireModel, frozen=True):
     allowVoteDelegation: bool = False
     delegationLeadMinutes: int = 0
     delegationAllowExternal: bool = False
+    delegationMaxPerDelegate: int = Field(default=2, ge=1, le=20)
+    delegationInElections: bool = False
     quorumPercent: int | None = Field(default=None, ge=0, le=100)
+    termStartMonth: int | None = Field(
+        default=None,
+        ge=1,
+        le=12,
+        description="The month in which a term (Amtszeit) starts. Without it the setting counts.",
+    )
+    repeatQuorumPercent: int | None = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description="The quorum of a Wiederholungssitzung. Without it the normal quorum counts.",
+    )
+    guestsMayVote: bool = Field(
+        default=False,
+        description="Guests of a public meeting can get a ballot. Counts only without a quorum.",
+    )
     protocolsPublic: bool = Field(
         default=False,
         description=(
@@ -260,7 +278,12 @@ class GremiumUpdate(WireModel, frozen=True):
     allowVoteDelegation: bool | None = None
     delegationLeadMinutes: int | None = None
     delegationAllowExternal: bool | None = None
+    delegationMaxPerDelegate: int | None = Field(default=None, ge=1, le=20)
+    delegationInElections: bool | None = None
     quorumPercent: int | None = None
+    termStartMonth: int | None = Field(default=None, ge=1, le=12)
+    repeatQuorumPercent: int | None = None
+    guestsMayVote: bool | None = None
     protocolsPublic: bool | None = Field(
         default=None,
         description=(
@@ -363,6 +386,7 @@ class ApplicationTypeCreate(WireModel, frozen=True):
     nameI18n: I18nMap
     gremiumId: str | None = None
     hasBudget: bool = False
+    pdfSignatures: bool = False
     comparisonOffers: dict[str, Any] | None = None
 
 
@@ -370,6 +394,7 @@ class ApplicationTypeUpdate(WireModel, frozen=True):
     nameI18n: I18nMap | None = None
     gremiumId: str | None = None
     hasBudget: bool | None = None
+    pdfSignatures: bool | None = None
     comparisonOffers: dict[str, Any] | None = None
 
 
@@ -418,16 +443,54 @@ class BudgetNodeCreate(WireModel, frozen=True):
     )
 
 
+class PlanLineSet(WireModel, frozen=True):
+    side: Literal["income", "expense"] | None = Field(
+        default=None,
+        description="The side of a Titel, a direct child of the top-level node. A "
+        "cost center further down takes the side of its Titel.",
+    )
+    amount: str | None = Field(
+        default=None,
+        description="The Ansatz as a decimal string. Ignored for a cost center with a "
+        "child line: it holds the sum of its children.",
+    )
+    note: str | None = Field(default=None, description="The Erläuterung")
+    transferable: bool | None = Field(default=None, description="Vermerk übertragbar")
+    coverable: bool | None = Field(default=None, description="Vermerk deckungsfähig")
+    blocked: str | None = Field(
+        default=None, description="The gesperrt amount as a decimal string, at most the Ansatz"
+    )
+
+
+class PlanLineRename(WireModel, frozen=True):
+    name: str | None = Field(default=None, description="The new name of the cost center")
+    key: str | None = Field(
+        default=None, description="The new key, the last segment of the path key"
+    )
+
+
+class PlanStep(WireModel, frozen=True):
+    name: str
+    gremiumId: str | None = Field(
+        default=None, description="The Gremium that decides this step by a vote"
+    )
+
+
+class PlanNodeCreate(WireModel, frozen=True):
+    parentId: str
+    key: str
+    name: str
+    side: Literal["income", "expense"] | None = Field(
+        default=None, description="The side of a Titel, a direct child of the top-level node"
+    )
+    amount: str = "0"
+
+
 class BudgetNodeUpdate(WireModel, frozen=True):
     key: str | None = None
     name: str | None = None
     active: bool | None = None
     color: str | None = None
-    hiddenInBudget: bool | None = Field(
-        default=None,
-        description="Hide this node (incl. subtree) in the budget tab — display only, "
-        "rollups/export unchanged",
-    )
     viewGremiumId: str | None = Field(
         default=None,
         description="Committee whose members see this node (incl. subtree) as a "
@@ -435,6 +498,8 @@ class BudgetNodeUpdate(WireModel, frozen=True):
     )
     fiscalStartMonth: int | None = None
     fiscalStartDay: int | None = None
+    #: Top level only: a plan line starts deckungsfähig when it becomes an expense line.
+    planCoverableDefault: bool | None = None
     decisionGremiumId: str | None = Field(
         default=None,
         description="Deciding Gremium of this node. A descendant without an own value "
@@ -465,6 +530,9 @@ class TransferCreate(WireModel, frozen=True):
     fiscalYearId: str
     amount: str = Field(description="Decimal string > 0")
     description: str
+    paymentDate: str | None = Field(
+        default=None, description="ISO date; a past fiscal year needs one inside the year"
+    )
 
 
 class InvoiceCreate(WireModel, frozen=True):
@@ -513,7 +581,24 @@ class MeetingCreate(WireModel, frozen=True):
         "to join, the meeting lead admits them.",
     )
     guestsMode: Literal["vote", "watch"] | None = Field(
-        default=None, description="Admitted guests vote (`vote`) or only follow (`watch`)."
+        default=None,
+        description="Admitted guests vote (`vote`) or only follow (`watch`). `vote` needs a "
+        "Gremium that lets guests vote and has no quorum (422 `guests_vote_off`, "
+        "`guests_vote_needs_no_quorum`).",
+    )
+    kind: Literal["ordinary", "extraordinary", "repeat", "constituent"] | None = Field(
+        default=None,
+        description="The kind of the meeting. A new meeting is `ordinary`.",
+    )
+    repeatOfId: str | None = Field(
+        default=None,
+        description="The first meeting of a `repeat` meeting: an earlier meeting of the same "
+        "Gremium. A `repeat` meeting needs it (422 `repeat_needs_first_meeting`, "
+        "`repeat_first_meeting_invalid`).",
+    )
+    location: str | None = Field(default=None, description="The place, at most 200 characters.")
+    form: Literal["presence", "hybrid", "video"] | None = Field(
+        default=None, description="The form of the meeting. A new meeting is `presence`."
     )
 
 
@@ -536,10 +621,20 @@ class MeetingPatch(WireModel, frozen=True):
         default=None,
         description="`watch` gives 409 `guest_vote_open` while a vote with guests is open.",
     )
-    confirmEarly: bool = Field(
-        default=False,
-        description="Confirm an early open: `status: live` before `confirmUntil` of the "
-        "meeting gives 409 `early_open_unconfirmed` without it.",
+    kind: Literal["ordinary", "extraordinary", "repeat", "constituent"] | None = Field(
+        default=None,
+        description="The kind of the meeting. It changes only while the meeting is planned "
+        "(409 `meeting_not_planned`).",
+    )
+    repeatOfId: str | None = Field(
+        default=None,
+        description="The first meeting of a `repeat` meeting: an earlier meeting of the same "
+        "Gremium. A meeting that becomes `repeat` needs it (422 "
+        "`repeat_needs_first_meeting`, `repeat_first_meeting_invalid`).",
+    )
+    location: str | None = Field(default=None, description="The place, at most 200 characters.")
+    form: Literal["presence", "hybrid", "video"] | None = Field(
+        default=None, description="The form of the meeting. A new meeting is `presence`."
     )
 
 
@@ -585,15 +680,27 @@ class MeetingVoteOpenBody(WireModel, frozen=True):
     `kind: "election"` opens a personnel election: `question` names the round,
     `seats` the number of posts and `candidates` the persons (at least `seats`). An
     election is only possible on a free-text item (422 `election_on_application_item`).
-    The server ignores `options` and `majorityRule` for an election: each voter gives up
-    to `seats` votes, the candidates with the most votes are elected.
+    The server ignores `options` for an election: each voter gives up to `seats` votes,
+    the candidates with the most votes are elected. `majorityRule` `members_majority`
+    on an election for one seat asks for more votes than half of all eligible members;
+    without that majority nobody is elected (result `no_majority`). Other rules do not
+    change an election.
     """
 
     agendaItemId: str
     kind: Literal["motion", "election"] = "motion"
     question: str | None = None
     options: list[str] = Field(default_factory=lambda: ["yes", "no", "abstain"])
-    majorityRule: Literal["simple", "absolute", "two_thirds"] = "simple"
+    majorityRule: Literal[
+        "simple", "absolute", "two_thirds", "members_majority", "members_two_thirds"
+    ] = Field(
+        default="simple",
+        description=(
+            "`members_majority` and `members_two_thirds` count the yes ballots against "
+            "all eligible members; the other rules count against the cast ballots. The "
+            "vote on a Haushaltsplan always uses `members_majority`."
+        ),
+    )
     secret: bool | None = Field(
         default=None,
         description="A motion and an election are always secret. Leave it out; false "
@@ -603,8 +710,8 @@ class MeetingVoteOpenBody(WireModel, frozen=True):
     candidates: list[ElectionCandidateIn] = Field(
         default_factory=list, description="Election only: 1 to 50 candidates."
     )
-    # The server counts the eligible voters from the roster of the gremium.
-    quorumPercent: int | None = None
+    # The server counts the eligible voters from the roster of the gremium and takes the
+    # quorum from the settings of the gremium. A quorum on one vote gives 422.
     guestsVote: bool | None = Field(
         default=None,
         description="Public meeting: the admitted guests vote too (no quorum, majority of "
@@ -683,14 +790,6 @@ class MeetingSettingsUpdate(WireModel, frozen=True):
         ge=0,
         le=10080,
         description="Earliest open of a meeting, in minutes before its planned start",
-    )
-    confirmLeadMinutes: int = Field(
-        ge=0,
-        le=10080,
-        description=(
-            "Before this point (minutes before the planned start) the open needs "
-            "`confirmEarly`. Not larger than openLeadMinutes (422)"
-        ),
     )
 
 

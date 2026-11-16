@@ -1,0 +1,29 @@
+@use '../../../../shared/ui/dialog-form' as df;
+
+@include df.host;
+
+.gdd {
+  @include df.form;
+}
+
+.gdd__switch {
+  display: block;
+}
+.gdd__switch ::ng-deep .sw {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.gdd__switch ::ng-deep .sw__label {
+  font-weight: var(--fw-semibold);
+}
+
+.gdd__nested {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-inline-start: var(--space-1);
+  padding-inline-start: var(--space-4);
+  border-inline-start: 2px solid var(--color-border);
+}

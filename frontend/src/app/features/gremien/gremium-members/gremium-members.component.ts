@@ -24,7 +24,6 @@ import {
   mediaQuery,
   SearchPillComponent,
   SkeletonComponent,
-  StickyBarComponent,
   SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { fileSlug, groupInOrder, localized, roleRank, toCsv } from '../gremien.util';
@@ -58,7 +57,6 @@ export interface MemberRow {
   imports: [
     SectionComponent,
     LoadErrorComponent,
-    StickyBarComponent,
     TranslatePipe,
     ButtonComponent,
     IconComponent,

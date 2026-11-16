@@ -30,7 +30,13 @@ from app.modules.auth.rbac import VOTE_GROUP_PREFIX
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.voting.models import Vote, VotedMarker
-from app.modules.voting.schemas import MyBallot, VoteKind, VoteListItem, VoteStatus
+from app.modules.voting.schemas import (
+    CancelReason,
+    MyBallot,
+    VoteKind,
+    VoteListItem,
+    VoteStatus,
+)
 from app.shared.config_schemas import VoteConfig
 from app.shared.paging import Page
 from app.shared.search import escape_like
@@ -91,7 +97,7 @@ async def _standalone_scope(
     their Gremium.
     """
     global_ok: ColumnElement[bool] = (
-        and_(Vote.meeting_id.is_(None), Vote.kind != "poll")
+        and_(Vote.meeting_id.is_(None), Vote.kind.not_in(("poll", "circular")))
         if principal.has("application.read") or principal.has("application.read_all")
         else false()
     )
@@ -105,9 +111,7 @@ async def _standalone_scope(
         if g.startswith(VOTE_GROUP_PREFIX)
     ) | {str(gid) for ids in held for gid in ids}
     standalone_ok = (
-        and_(Vote.meeting_id.is_(None), Vote.eligible_group.in_(sorted(keys)))
-        if keys
-        else false()
+        and_(Vote.meeting_id.is_(None), Vote.eligible_group.in_(sorted(keys))) if keys else false()
     )
     return global_ok, standalone_ok
 
@@ -136,6 +140,7 @@ async def list_votes(
     gremium_id: UUID | None = None,
     q: str | None = None,
     kind: VoteKind | None = None,
+    cancelled_reason: CancelReason | None = None,
     limit: int,
     offset: int,
 ) -> Page[VoteListItem]:
@@ -144,7 +149,8 @@ async def list_votes(
     ``statuses`` defaults to ``DEFAULT_STATUSES``. ``gremium_id`` keeps the votes of
     one gremium (the gremium of the meeting, else the group of the vote). ``q``
     searches the question and the meeting title (substring, case-insensitive).
-    ``kind`` keeps the motions, the elections or the polls.
+    ``kind`` keeps the motions, the elections or the polls. ``cancelled_reason`` keeps
+    of the cancelled votes only those with this reason (§F/meetings/voting/000936).
     """
     wanted = list(dict.fromkeys(statuses or DEFAULT_STATUSES))
     where = (
@@ -153,6 +159,11 @@ async def list_votes(
         _search_clause(q),
         *((_gremium_text() == str(gremium_id),) if gremium_id is not None else ()),
         *((Vote.kind == kind,) if kind is not None else ()),
+        *(
+            (or_(Vote.status != "cancelled", Vote.cancel_reason == cancelled_reason),)
+            if cancelled_reason is not None
+            else ()
+        ),
     )
     base = (
         select(Vote, Meeting.title, Meeting.gremium_id)

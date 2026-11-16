@@ -1,9 +1,10 @@
 /**
- * Mock of the public protocol routes (`/public/committees`, `/public/protocols…`) for the
+ * Mock of the public protocol routes (`/public/committees`, `/public/protocols…`, `/public/decisions`) for the
  * dev mock mode. Two fictional protocols of one public gremium. The interceptor loads
  * this file on first use.
  */
 import type {
+  PublicDecisionPage,
   PublicGremium,
   PublicProtocolDetail,
   PublicProtocolPage,
@@ -84,6 +85,25 @@ export function mockPublicProtocols(
       limit: 20,
       offset: 0,
     };
+    return { body };
+  }
+  if (path.endsWith('/public/decisions')) {
+    const items = PROTOCOLS.flatMap((p) =>
+      p.tops.flatMap((top) =>
+        top.decisions.map((d) => ({
+          protocolId: p.id,
+          gremium: p.gremium,
+          date: p.date,
+          semester: p.semester,
+          kind: 'motion' as const,
+          question: d.question,
+          meetingTitle: p.title,
+          result: d.result,
+          counts: d.counts,
+        })),
+      ),
+    );
+    const body: PublicDecisionPage = { items, total: items.length, limit: 20, offset: 0 };
     return { body };
   }
   const id = /\/public\/protocols\/([^/]+)$/.exec(path)?.[1];

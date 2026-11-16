@@ -4,6 +4,7 @@ import type { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';
 import { skipLoading } from '@stupa-makers/ui-kit';
 import type {
+  PublicDecisionPage,
   PublicGremium,
   PublicProtocolDetail,
   PublicProtocolPage,
@@ -48,6 +49,14 @@ export class PublicProtocolsService {
     });
   }
 
+  /** GET /public/decisions — one page of the public decisions, newest first. */
+  decisions(query: PublicProtocolQuery = {}): Observable<PublicDecisionPage> {
+    return this.http.get<PublicDecisionPage>(`${this.base}/public/decisions`, {
+      params: protocolParams(query),
+      context: skipLoading(),
+    });
+  }
+
   /** GET /public/protocols/semesters — the semesters with protocols for the filters. */
   semesters(query: PublicProtocolQuery = {}): Observable<PublicSemester[]> {
     return this.http.get<PublicSemester[]>(`${this.base}/public/protocols/semesters`, {
@@ -72,5 +81,13 @@ export class PublicProtocolsService {
   /** The URL of an image in the public Markdown of a protocol (no login). */
   imageUrl(protocolId: string, imageId: string): string {
     return `${this.base}/public/protocols/${encodeURIComponent(protocolId)}/images/${imageId}`;
+  }
+
+  /**
+   * The URL of an embedded PDF in the public Markdown of a protocol (no login, spec
+   * 000867). Its info route is `<url>/info`.
+   */
+  documentUrl(protocolId: string, documentId: string): string {
+    return `${this.base}/public/protocols/${encodeURIComponent(protocolId)}/documents/${documentId}`;
   }
 }

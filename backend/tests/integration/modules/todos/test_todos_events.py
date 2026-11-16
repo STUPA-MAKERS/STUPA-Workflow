@@ -115,8 +115,8 @@ async def _money(maker: async_sessionmaker[AsyncSession]) -> dict[str, uuid.UUID
                 decided_at=datetime(2026, 11, 1, 19, tzinfo=UTC),
             )
         )
-        node = Budget(key=f"E{uuid.uuid4().hex[:6]}", path_key="", name="Kultur")
-        node.path_key = node.key
+        key = f"E{uuid.uuid4().hex[:6]}"
+        node = Budget(key=key, path_key=key, name="Kultur")
         session.add(node)
         await session.flush()
         fy = FiscalYear(

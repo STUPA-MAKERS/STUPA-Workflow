@@ -146,4 +146,19 @@ describe('HomeComponent', () => {
       expect(screen.getAllByRole('link')).toHaveLength(3);
     });
   });
+
+  /** Spec 000758: the start page omits the tiles of a feature that is off. */
+  it('leaves out the calendar while Kalender is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['calendar']));
+    await setup();
+    expect(screen.queryByRole('link', { name: /^Kalender/ })).toBeNull();
+    expect(screen.getAllByRole('link')).toHaveLength(2);
+  });
+
+  it('does not ask for the protocols while Sitzungen is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['meetings']));
+    const { protocols } = await setup();
+    expect(protocols.list).not.toHaveBeenCalled();
+    expect(screen.queryByRole('link', { name: /Protokolle/ })).toBeNull();
+  });
 });

@@ -119,12 +119,8 @@ class NotificationSettingsOut(FrozenCamelModel, frozen=True):
 class NotificationSettingsUpdate(FrozenCamelModel, frozen=True):
     """Partial update of the platform config (only set fields change)."""
 
-    task_reminder_enabled: bool | None = Field(
-        default=None, alias="taskReminderEnabled"
-    )
-    task_reminder_after_days: int | None = Field(
-        default=None, alias="taskReminderAfterDays", ge=1
-    )
+    task_reminder_enabled: bool | None = Field(default=None, alias="taskReminderEnabled")
+    task_reminder_after_days: int | None = Field(default=None, alias="taskReminderAfterDays", ge=1)
     task_reminder_repeat_days: int | None = Field(
         default=None, alias="taskReminderRepeatDays", ge=0
     )

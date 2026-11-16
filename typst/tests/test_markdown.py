@@ -435,3 +435,99 @@ def test_blackout_keeps_shortcodes_beside_a_mark() -> None:
     inline = block["c"]
     assert inline[0] == {"t": "bar"}  # pyright: ignore[reportIndexIssue]
     assert {"t": "time", "v": "18:00"} in inline  # pyright: ignore[reportOperatorIssue]
+
+
+def test_time_note_keeps_inline_markdown_and_the_blackout() -> None:
+    """§000872: `> [!anmerkung HH:MM] text` is a time note with a two-digit hour."""
+    (note,) = conv("> [!anmerkung 8:05] %%%% verlässt **die** Sitzung")
+    assert note["t"] == "timenote"
+    assert note["time"] == "08:05"
+    inline = cast("list[Node]", note["c"])
+    assert inline[0] == {"t": "bar"}
+    assert {"t": "strong", "c": [{"t": "text", "v": "die"}]} in inline
+    assert texts(note) == " verlässt die Sitzung"
+
+
+def test_time_note_without_text_and_a_bad_time() -> None:
+    """§000871: an empty note holds the time only; a bad time keeps the quote."""
+    empty, heading, bad, other = conv(
+        "> [!anmerkung 18:42]\n\n# TOP\n\n> [!anmerkung 25:00] x\n\n> [!anmerkung] y"
+    )
+    assert empty == {"t": "timenote", "time": "18:42", "c": []}
+    assert heading["t"] == "heading"
+    assert bad["t"] == "quote"
+    assert other["t"] == "quote"
+
+
+def test_field_rows_form_one_table_and_keep_block_markdown() -> None:
+    """§000881: a field row keeps the block Markdown of its value; rows in a row join."""
+    md = (
+        "> [!feld] Titel *kurz*\n>\n> Eins\n\n"
+        "> [!feld] Beschreibung\n>\n> Text **fett**.\n>\n> - a\n> - b\n\n"
+        "> [!FIELD] Kosten\n>\n> | A | B |\n> |---|---|\n> | 1 | 2 |\n\n"
+        "Zwischentext\n\n"
+        "> [!feld] Allein\n> erste Zeile\n"
+    )
+    blocks = conv(md)
+    assert [b["t"] for b in blocks] == ["fields", "par", "fields"]
+    rows = cast("list[Node]", blocks[0]["rows"])
+    assert [texts(r["label"]) for r in rows] == ["Titel kurz", "Beschreibung", "Kosten"]
+    assert {"t": "emph", "c": [{"t": "text", "v": "kurz"}]} in cast("list[Node]", rows[0]["label"])
+    assert [b["t"] for b in cast("list[Node]", rows[1]["c"])] == ["par", "list"]
+    assert [b["t"] for b in cast("list[Node]", rows[2]["c"])] == ["table"]
+    alone = cast("list[Node]", blocks[2]["rows"])[0]
+    assert texts(alone["label"]) == "Allein"
+    assert texts(alone["c"]) == "erste Zeile"
+
+
+def test_field_rows_inside_a_quote_form_a_table_there() -> None:
+    blocks = conv("> > [!feld] A\n> >\n> > x\n")
+    inner = cast("list[Node]", blocks[0]["c"])
+    assert inner[0]["t"] == "fields"
+
+
+def test_a_section_heading_in_front_of_field_rows_is_the_title_of_the_table() -> None:
+    """§000881: the section name prints on the band of its table, not as a heading."""
+    blocks = conv(
+        "# Antrag\n\n> [!feld] A\n>\n> x\n\n# Ohne Zeilen\n\nText\n\n"
+        "## Klein\n\n> [!feld] B\n>\n> y\n"
+    )
+    assert [b["t"] for b in blocks] == ["fields", "heading", "par", "heading", "fields"]
+    assert texts(blocks[0]["title"]) == "Antrag"
+    assert "title" not in blocks[4]
+
+
+def test_a_signature_row_is_a_field_row_with_its_signer() -> None:
+    """§000888: a signature row joins the field table and names the signer."""
+    blocks = conv(
+        "# Unterschriften\n\n"
+        "> [!unterschrift] Sachlich richtig\n>\n> Finanzreferent:in\n\n"
+        "> [!SIGNATURE] Ohne Rolle\n"
+    )
+    assert [b["t"] for b in blocks] == ["fields"]
+    rows = cast("list[Node]", blocks[0]["rows"])
+    assert [texts(r["label"]) for r in rows] == ["Sachlich richtig", "Ohne Rolle"]
+    assert [r["sign"] for r in rows] == ["Finanzreferent:in", ""]
+    assert [r["c"] for r in rows] == [[], []]
+
+
+def test_blackout_block_keeps_its_content_in_the_internal_variant() -> None:
+    """§000965 §000689: the fence lines go, the content prints as normal Markdown."""
+    blocks = conv("Vorher.\n%%\nGeheim %%Anna%%\n\n- Punkt\n%%\nDanach.")
+    assert [b["t"] for b in blocks] == ["par", "par", "list", "par"]
+    assert texts(blocks[1]) == "Geheim Anna"
+    assert "%%" not in "".join(texts(b) for b in blocks)
+
+
+def test_empty_blackout_block_is_one_full_bar() -> None:
+    """§000967: the empty block of the public variant is the paragraph of one block bar."""
+    blocks = conv("Vorher.\n%%\n%%\nDanach.")
+    assert blocks[1] == {"t": "par", "c": [{"t": "blockbar"}]}
+    assert texts(blocks[0]) == "Vorher."
+    assert texts(blocks[2]) == "Danach."
+
+
+def test_blackout_fence_in_code_stays_code() -> None:
+    """§000965: a `%%` line in a code block is code, not a fence."""
+    (code,) = conv("```\n%%\n```")
+    assert code["t"] == "codeblock"

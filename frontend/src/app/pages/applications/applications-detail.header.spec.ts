@@ -4,6 +4,12 @@
  *
  * Its own file, like the comments spec: the base spec is large already.
  */
+/** A plain copy of the kit module lets a test spy on `downloadBlob`. */
+jest.mock('@stupa-makers/ui-kit', () => ({
+  __esModule: true,
+  ...jest.requireActual('@stupa-makers/ui-kit'),
+}));
+import * as kit from '@stupa-makers/ui-kit';
 import { signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import {
@@ -278,14 +284,14 @@ describe('ApplicationsDetailComponent — header', () => {
     expect(screen.getByRole('button', { name: 'Archivieren' })).toBeInTheDocument();
   });
 
-  it('offers no edit in a locked state and no actions without rights', async () => {
-    const { http } = await setup({
+  it('offers no edit in a locked state and only the PDF without rights', async () => {
+    const { http, cmp } = await setup({
       perms: ['application.read'],
       app: { state: { ...SUBMITTED, editAllowed: false } },
       versions: [VERSIONS[0]],
     });
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).not.toBeInTheDocument();
+    expect(cmp.menuSections().flatMap((s) => s.items.map((i) => i.id))).toEqual(['pdf']);
     expect(screen.queryByRole('group', { name: 'Übergänge' })).not.toBeInTheDocument();
     http.verify();
   });
@@ -335,7 +341,7 @@ describe('ApplicationsDetailComponent — header', () => {
       const { detectChanges } = await setup();
       await openMenu(detectChanges);
       const items = screen.getAllByRole('menuitem').map((el) => el.textContent?.trim());
-      expect(items).toEqual(['Status setzen', 'Beobachter:innen', 'Versionen vergleichen', 'Löschen']);
+      expect(items).toEqual(['Status setzen', 'Beobachter:innen', 'Versionen vergleichen', 'Als PDF herunterladen', 'Löschen']);
       expect(screen.getByRole('menuitem', { name: 'Löschen' })).toHaveClass('rm__item--danger');
     });
 
@@ -345,6 +351,7 @@ describe('ApplicationsDetailComponent — header', () => {
       expect(screen.getAllByRole('menuitem').map((el) => el.textContent?.trim())).toEqual([
         'Beobachter:innen',
         'Versionen vergleichen',
+        'Als PDF herunterladen',
         'Anonymisierung beantragen',
       ]);
       await userEvent.click(screen.getByRole('menuitem', { name: 'Anonymisierung beantragen' }));
@@ -372,14 +379,14 @@ describe('ApplicationsDetailComponent — header', () => {
       });
       expect(screen.getByText('Eingereicht von Luis Meyer')).toBeInTheDocument();
       expect(cmp.canManageObservers()).toBe(false);
-      expect(cmp.menuSections().flatMap((sec) => sec.items.map((i) => i.id))).toEqual(['versions']);
+      expect(cmp.menuSections().flatMap((sec) => sec.items.map((i) => i.id))).toEqual(['versions', 'pdf']);
       expect(screen.queryByRole('group', { name: 'Übergänge' })).not.toBeInTheDocument();
       expect(cmp.historyEntries().some((e) => e.actor === 'Luis Meyer')).toBe(true);
     });
 
     it('leaves "Versionen vergleichen" out with only one version', async () => {
       const { cmp } = await setup({ versions: [VERSIONS[0]] });
-      expect(cmp.menuSections().flatMap((s) => s.items.map((i) => i.id))).toEqual(['force', 'observers', 'delete']);
+      expect(cmp.menuSections().flatMap((s) => s.items.map((i) => i.id))).toEqual(['force', 'observers', 'pdf', 'delete']);
     });
 
     it('opens the force dialog, confirms the delete, and reloads after a forced state', async () => {
@@ -419,7 +426,45 @@ describe('ApplicationsDetailComponent — header', () => {
 
     it('holds only the rights the reader has on a phone', async () => {
       const { cmp } = await setup({ phone: true, perms: ['application.read'], versions: [VERSIONS[0]], app: { state: { ...SUBMITTED, editAllowed: false } } });
-      expect(cmp.menuSections()).toEqual([]);
+      expect(cmp.menuSections().flatMap((s) => s.items.map((i) => i.id))).toEqual(['pdf']);
+    });
+
+    it('downloads the PDF under the name of the server, once at a time', async () => {
+      const dl = jest.spyOn(kit, 'downloadBlob').mockImplementation(() => undefined);
+      const { cmp, http } = await setup();
+      cmp.onMenu({ id: 'pdf', label: '' });
+      cmp.onMenu({ id: 'pdf', label: '' });
+      const req = http.expectOne((r) => r.url === '/api/applications/app-1/pdf');
+      expect(req.request.responseType).toBe('blob');
+      req.flush(new Blob(['%PDF']), {
+        headers: {
+          'Content-Disposition':
+            "attachment; filename=\"Antrag_Plakate_2026-11-10.pdf\"; filename*=UTF-8''Antrag_Pl%C3%A4kate_2026-11-10.pdf",
+        },
+      });
+      expect(dl).toHaveBeenCalledWith(expect.any(Blob), 'Antrag_Pläkate_2026-11-10.pdf');
+      expect(cmp.pdfBusy()).toBe(false);
+      dl.mockRestore();
+    });
+
+    it('tells a failed PDF in a toast', async () => {
+      const { cmp, http, toast } = await setup();
+      const error = jest.spyOn(toast, 'error');
+      cmp.downloadPdf('app-1');
+      http
+        .expectOne((r) => r.url === '/api/applications/app-1/pdf')
+        .flush(new Blob(['x']), { status: 503, statusText: 'Unavailable' });
+      expect(error).toHaveBeenCalledWith('Das PDF konnte nicht erstellt werden.');
+      expect(cmp.pdfBusy()).toBe(false);
+    });
+
+    it('saves nothing for an empty PDF response', async () => {
+      const dl = jest.spyOn(kit, 'downloadBlob').mockImplementation(() => undefined);
+      const { cmp, http } = await setup();
+      cmp.downloadPdf('app-1');
+      http.expectOne((r) => r.url === '/api/applications/app-1/pdf').flush(null);
+      expect(dl).not.toHaveBeenCalled();
+      dl.mockRestore();
     });
 
     /** The edit form needs structuredClone, which jsdom lacks. */
@@ -576,55 +621,34 @@ describe('ApplicationsDetailComponent — header', () => {
     const YEARS_URL = (r: { url: string }) => r.url === '/api/budgets/b1/fiscal-years';
 
     /**
-     * Another cost centre of the same top budget sets the year choice back to automatic. The
-     * original cost centre brings its year back. No cost centre, or one outside the tree, has no
-     * years to choose.
+     * The dialog asks for the pair of budget and fiscal year first (spec 000879). A pair of
+     * another budget empties the cost centre, a pair of the same budget keeps it.
      */
-    it('names the cost centre with its fiscal year and changes both in the dialog', async () => {
+    it('names the cost centre with its fiscal year and asks for the pair in the dialog', async () => {
       const { http, cmp, detectChanges } = await setup({ app: { budgetId: 'b2', fiscalYearId: 'fy1' }, tree: TREE });
       http.expectOne(YEARS_URL).flush(YEARS);
       detectChanges();
       expect(screen.getByText('Kostenstelle · HHJ 2026')).toBeInTheDocument();
 
       await userEvent.click(screen.getByRole('button', { name: 'Kostenstelle ändern' }));
-      http.expectOne(YEARS_URL).flush(YEARS);
+      const pair = { budgetId: 'b1', budgetName: 'VS-Mittel', fiscalYearId: 'fy1', display: '2026', current: true, past: false, startDate: '2026-01-01', endDate: '2026-12-31' };
+      http.expectOne('/api/budget-years').flush([pair]);
       detectChanges();
       const c = cmp as unknown as {
-        fiscalOptions: () => { value: string; label: string }[];
-        onBudgetPicked: (id: string) => void;
+        onAssignPair: (p: typeof pair) => void;
         fiscalChoice: () => string;
-        fiscalYears: () => unknown[];
+        budgetChoice: () => string;
+        assignTree: () => { id: string }[];
       };
-      expect(c.fiscalOptions().map((o) => o.label)).toEqual(['Automatisch (aktuelles HHJ)', '2026', '2025 (inaktiv)']);
-
-      c.onBudgetPicked('b1');
-      expect(c.fiscalChoice()).toBe('');
-      http.expectOne(YEARS_URL).flush({}, { status: 500, statusText: 'x' });
-      expect(c.fiscalYears()).toEqual([]);
-      c.onBudgetPicked('b2');
+      expect(c.assignTree().map((n) => n.id)).toEqual(['b1']);
+      expect(c.budgetChoice()).toBe('b2');
       expect(c.fiscalChoice()).toBe('fy1');
-      http.expectOne(YEARS_URL).flush(YEARS);
-      c.onBudgetPicked('');
-      c.onBudgetPicked('gone');
-      expect(c.fiscalYears()).toEqual([]);
-      http.verify();
-    });
 
-    it('offers a closed year only while it is the year of the application', async () => {
-      const closed = { ...YEARS[1], id: 'fyc', year: 2024, display: '2024', closedAt: '2026-03-01T00:00:00Z' };
-      const c = (await setup({ app: { budgetId: 'b2', fiscalYearId: 'fy1' }, tree: TREE })).cmp as unknown as {
-        fiscalOptions: () => { value: string; label: string }[];
-        fiscalYears: { set: (v: unknown[]) => void };
-        app: { update: (f: (a: Record<string, unknown>) => Record<string, unknown>) => void };
-      };
-      c.fiscalYears.set([YEARS[0], closed]);
-      expect(c.fiscalOptions().map((o) => o.label)).toEqual(['Automatisch (aktuelles HHJ)', '2026']);
-      c.app.update((a) => ({ ...a, fiscalYearId: 'fyc' }));
-      expect(c.fiscalOptions().map((o) => o.label)).toEqual([
-        'Automatisch (aktuelles HHJ)',
-        '2026',
-        '2024 · abgeschlossen',
-      ]);
+      c.onAssignPair({ ...pair, budgetId: 'other', fiscalYearId: 'fy9' });
+      expect(c.budgetChoice()).toBe('');
+      expect(c.fiscalChoice()).toBe('fy9');
+      expect(c.assignTree()).toEqual([]);
+      http.verify();
     });
 
     it('names a cost centre without a year and offers "Zuordnen" without one', async () => {

@@ -1,3 +1,4 @@
+import { FeatureService } from '@core/features/feature.service';
 import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -50,6 +51,7 @@ import { actionParamOf, recipientNeedsRef, recipientsOf } from './flow-guard.uti
 })
 export class TransitionDetailComponent {
   private readonly i18n = inject(I18nService);
+  private readonly features = inject(FeatureService);
 
   readonly transition = input.required<TransitionDef>();
   readonly roleOptions = input.required<SelectOption[]>();
@@ -83,7 +85,10 @@ export class TransitionDetailComponent {
   }
 
   protected actionOptions(): SelectOption[] {
-    const blocked: readonly string[] = this.targetBudgetVote() ? ASSIGN_BUDGET_ACTIONS : [];
+    const blocked: readonly string[] = [
+      ...(this.targetBudgetVote() || !this.features.isOn('budget') ? ASSIGN_BUDGET_ACTIONS : []),
+      ...(this.features.isOn('meetings') ? [] : ['addToNextSession']),
+    ];
     return ACTION_TYPES.filter((a) => !blocked.includes(a)).map((a) => ({
       value: a,
       label: this.i18n.translate(`admin.flow.actionType.${a}` as TranslationKey),

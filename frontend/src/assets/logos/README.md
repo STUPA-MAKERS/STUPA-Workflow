@@ -8,6 +8,8 @@ Official **STUPA** assets from the corporate design (Nextcloud
 | `stupa-mark.svg` | square mark (favicon, app icon) | `Icon/STUPA/STUPA-Logo_icon-only.svg` |
 | `stupa-wordmark-light.svg` | header and footer logo in the **light** theme (black text plus mark) | `Logo/STUPA/STUPA-Logo_black-text.svg` |
 | `stupa-wordmark-dark.svg` | header and footer logo in the **dark** theme (white text plus mark) | `Logo/STUPA/STUPA-Logo_white-text.svg` |
+| `pdf-stupa.svg` | preview of the built-in export logo on `/admin/branding` (spec 001005) | copy of `typst/vendor/hsrtreport-typst/src/assets/images/logos/STUPA.svg` |
+| `pdf-skyline.svg` | preview of the built-in footer graphic on `/admin/branding` (spec 001005) | copy of `typst/vendor/hsrtreport-typst/src/assets/images/Skyline.svg` |
 
 ImageMagick renders `favicon.ico` (`frontend/public/`) from `stupa-mark.svg` at 16, 32, 48
 and 64 px.

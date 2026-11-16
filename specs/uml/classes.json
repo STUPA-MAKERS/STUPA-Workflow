@@ -288,6 +288,55 @@
       "to": "Invoice"
     },
     {
+      "column": "fiscal_year_id",
+      "from": "BudgetPlan",
+      "multiplicity": "1",
+      "onDelete": "CASCADE",
+      "to": "FiscalYear"
+    },
+    {
+      "column": "budget_id",
+      "from": "BudgetPlanLine",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Budget"
+    },
+    {
+      "column": "version_id",
+      "from": "BudgetPlanLine",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "BudgetPlanVersion"
+    },
+    {
+      "column": "budget_id",
+      "from": "BudgetPlanStep",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Budget"
+    },
+    {
+      "column": "gremium_id",
+      "from": "BudgetPlanStep",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Gremium"
+    },
+    {
+      "column": "plan_id",
+      "from": "BudgetPlanVersion",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "BudgetPlan"
+    },
+    {
+      "column": "vote_id",
+      "from": "BudgetPlanVoteSnapshot",
+      "multiplicity": "1",
+      "onDelete": "CASCADE",
+      "to": "Vote"
+    },
+    {
       "column": "variant_id",
       "from": "CdVariantLogo",
       "multiplicity": "*",
@@ -387,6 +436,20 @@
     },
     {
       "column": "gremium_id",
+      "from": "GremiumInfo",
+      "multiplicity": "1",
+      "onDelete": "CASCADE",
+      "to": "Gremium"
+    },
+    {
+      "column": "updated_by",
+      "from": "GremiumInfo",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Principal"
+    },
+    {
+      "column": "gremium_id",
       "from": "GremiumMembership",
       "multiplicity": "*",
       "onDelete": "CASCADE",
@@ -463,6 +526,13 @@
       "to": "Application"
     },
     {
+      "column": "meeting_id",
+      "from": "MarkdownDocument",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Meeting"
+    },
+    {
       "column": "active_application_id",
       "from": "Meeting",
       "multiplicity": "*",
@@ -475,6 +545,13 @@
       "multiplicity": "*",
       "onDelete": "CASCADE",
       "to": "Gremium"
+    },
+    {
+      "column": "repeat_of_id",
+      "from": "Meeting",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Meeting"
     },
     {
       "column": "current_agenda_item_id",
@@ -496,6 +573,20 @@
       "multiplicity": "*",
       "onDelete": "CASCADE",
       "to": "Application"
+    },
+    {
+      "column": "plan_version_id",
+      "from": "MeetingAgendaItem",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "BudgetPlanVersion"
+    },
+    {
+      "column": "plan_document_id",
+      "from": "MeetingAgendaItem",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "MarkdownDocument"
     },
     {
       "column": "meeting_id",
@@ -601,6 +692,13 @@
       "multiplicity": "*",
       "onDelete": "CASCADE",
       "to": "Gremium"
+    },
+    {
+      "column": "approved_meeting_id",
+      "from": "Protocol",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Meeting"
     },
     {
       "column": "meeting_id",
@@ -1063,6 +1161,13 @@
       "multiplicity": "*",
       "onDelete": "CASCADE",
       "to": "Application"
+    },
+    {
+      "column": "plan_version_id",
+      "from": "Vote",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "BudgetPlanVersion"
     },
     {
       "column": "meeting_id",
@@ -1597,6 +1702,12 @@
         },
         {
           "name": "has_budget",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "pdf_signatures",
           "nullable": false,
           "primaryKey": false,
           "type": "BOOLEAN"
@@ -2193,6 +2304,12 @@
           "type": "TEXT"
         },
         {
+          "name": "tree_path",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
           "name": "name",
           "nullable": false,
           "primaryKey": false,
@@ -2217,12 +2334,6 @@
           "type": "TEXT"
         },
         {
-          "name": "hidden_in_budget",
-          "nullable": false,
-          "primaryKey": false,
-          "type": "BOOLEAN"
-        },
-        {
           "name": "view_gremium_id",
           "nullable": true,
           "primaryKey": false,
@@ -2245,6 +2356,18 @@
           "nullable": false,
           "primaryKey": false,
           "type": "SMALLINT"
+        },
+        {
+          "name": "plan_enabled",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "plan_coverable_default",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
         },
         {
           "name": "id",
@@ -2436,6 +2559,259 @@
       "name": "BudgetExpense",
       "path": "backend/app/modules/budget/tree_models.py",
       "table": "budget_expense"
+    },
+    {
+      "attributes": [
+        {
+          "name": "fiscal_year_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "BudgetPlan",
+      "module": "budget",
+      "name": "BudgetPlan",
+      "path": "backend/app/modules/budget/plan_models.py",
+      "table": "budget_plan"
+    },
+    {
+      "attributes": [
+        {
+          "name": "version_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "budget_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "amount",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "note",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "name",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "path_key",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "draft_name",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "draft_key",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "side",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "income",
+            "expense"
+          ]
+        },
+        {
+          "name": "transferable",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "coverable",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "blocked",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "BudgetPlanLine",
+      "module": "budget",
+      "name": "BudgetPlanLine",
+      "path": "backend/app/modules/budget/plan_models.py",
+      "table": "budget_plan_line"
+    },
+    {
+      "attributes": [
+        {
+          "name": "budget_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "position",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "gremium_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "BudgetPlanStep",
+      "module": "budget",
+      "name": "BudgetPlanStep",
+      "path": "backend/app/modules/budget/plan_models.py",
+      "table": "budget_plan_step"
+    },
+    {
+      "attributes": [
+        {
+          "name": "plan_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "number",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "state",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "draft",
+            "in_progress",
+            "in_force",
+            "replaced"
+          ]
+        },
+        {
+          "name": "steps",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "in_force_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "BudgetPlanVersion",
+      "module": "budget",
+      "name": "BudgetPlanVersion",
+      "path": "backend/app/modules/budget/plan_models.py",
+      "table": "budget_plan_version"
+    },
+    {
+      "attributes": [
+        {
+          "name": "vote_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "document",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "BudgetPlanVoteSnapshot",
+      "module": "budget",
+      "name": "BudgetPlanVoteSnapshot",
+      "path": "backend/app/modules/budget/plan_models.py",
+      "table": "budget_plan_vote_snapshot"
     },
     {
       "attributes": [
@@ -3275,10 +3651,46 @@
           "type": "BOOLEAN"
         },
         {
+          "name": "delegation_max_per_delegate",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "delegation_in_elections",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
           "name": "quorum_percent",
           "nullable": true,
           "primaryKey": false,
           "type": "INTEGER"
+        },
+        {
+          "name": "quorum_min_present",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "repeat_quorum_percent",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "term_start_month",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "guests_may_vote",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
         },
         {
           "name": "protocols_public",
@@ -3310,6 +3722,51 @@
       "name": "Gremium",
       "path": "backend/app/modules/gremien/models.py",
       "table": "gremium"
+    },
+    {
+      "attributes": [
+        {
+          "name": "gremium_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "body_md",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "links",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "version",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "updated_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "GremiumInfo",
+      "module": "gremien",
+      "name": "GremiumInfo",
+      "path": "backend/app/modules/gremien/models.py",
+      "table": "gremium_info"
     },
     {
       "attributes": [
@@ -3795,6 +4252,57 @@
           "type": "TEXT"
         },
         {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "size",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BIGINT"
+        },
+        {
+          "name": "pages",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "meeting_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "MarkdownDocument",
+      "module": "media",
+      "name": "MarkdownDocument",
+      "path": "backend/app/modules/media/models.py",
+      "table": "markdown_document"
+    },
+    {
+      "attributes": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "storage_key",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
           "name": "mime",
           "nullable": false,
           "primaryKey": false,
@@ -3881,6 +4389,35 @@
           ]
         },
         {
+          "name": "kind",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "ordinary",
+            "extraordinary",
+            "repeat",
+            "constituent"
+          ]
+        },
+        {
+          "name": "location",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "form",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "presence",
+            "hybrid",
+            "video"
+          ]
+        },
+        {
           "name": "started_at",
           "nullable": true,
           "primaryKey": false,
@@ -3939,6 +4476,30 @@
           "type": "TEXT"
         },
         {
+          "name": "repeat_of_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "late_excuse_days",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "present_count",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "eligible_count",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
           "name": "id",
           "nullable": false,
           "primaryKey": true,
@@ -3984,6 +4545,18 @@
           "type": "CHAR(32)"
         },
         {
+          "name": "plan_version_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "plan_document_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
           "name": "body",
           "nullable": true,
           "primaryKey": false,
@@ -4003,6 +4576,12 @@
         },
         {
           "name": "done_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "started_at",
           "nullable": true,
           "primaryKey": false,
           "type": "DATETIME"
@@ -4258,7 +4837,73 @@
           "type": "INTEGER"
         },
         {
-          "name": "confirm_lead_minutes",
+          "name": "default_quorum_percent",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "default_repeat_quorum_percent",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "default_guests_may_vote",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "default_allow_vote_delegation",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "circular_min_days",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "invite_days_ordinary",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "invite_days_extraordinary",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "late_excuse_days",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "absence_limit",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "term_start_month",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "default_delegation_lead_minutes",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "default_delegation_max_per_delegate",
           "nullable": false,
           "primaryKey": false,
           "type": "INTEGER"
@@ -4495,6 +5140,73 @@
     {
       "attributes": [
         {
+          "name": "slot",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "logo",
+            "footer"
+          ]
+        },
+        {
+          "name": "builtin",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "object_key",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "file_name",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "mime",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "size",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "created_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "PdfAsset",
+      "module": "site_config",
+      "name": "PdfAsset",
+      "path": "backend/app/modules/site_config/models.py",
+      "table": "pdf_asset"
+    },
+    {
+      "attributes": [
+        {
           "name": "sub",
           "nullable": false,
           "primaryKey": false,
@@ -4632,6 +5344,12 @@
           ]
         },
         {
+          "name": "finalized_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
           "name": "sent_at",
           "nullable": true,
           "primaryKey": false,
@@ -4672,6 +5390,30 @@
           "nullable": false,
           "primaryKey": false,
           "type": "INTEGER"
+        },
+        {
+          "name": "approved_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "approved_meeting_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "approved_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "draft_sent_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
         },
         {
           "name": "id",
@@ -6361,6 +7103,12 @@
           "type": "INTEGER"
         },
         {
+          "name": "present_seats",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
           "name": "kind",
           "nullable": false,
           "primaryKey": false,
@@ -6368,7 +7116,8 @@
           "values": [
             "motion",
             "election",
-            "poll"
+            "poll",
+            "circular"
           ]
         },
         {
@@ -6414,6 +7163,18 @@
           "type": "INTEGER"
         },
         {
+          "name": "plan_version_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "cancel_reason",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
           "name": "id",
           "nullable": false,
           "primaryKey": true,
@@ -6445,6 +7206,12 @@
           "nullable": false,
           "primaryKey": false,
           "type": "TEXT"
+        },
+        {
+          "name": "same_caster",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
         },
         {
           "name": "id",

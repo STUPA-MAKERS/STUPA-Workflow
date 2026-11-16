@@ -40,6 +40,7 @@ from app.shared.errors import ConflictError, NotFoundError
 #:   todo.write      — read and work on the to-do board of the gremium (cards,
 #:                     moves, comments, checklists, links)
 #:   todo.configure  — edit the name, the columns and the labels of that board
+#:   info.write      — edit the Markdown text and the links of the Info tab
 #: An OAuth token caps these permissions through its scope. See
 #: ``app.modules.auth.policy``.
 GREMIUM_PERMISSIONS: tuple[str, ...] = (
@@ -50,6 +51,7 @@ GREMIUM_PERMISSIONS: tuple[str, ...] = (
     "protocol.finalize",
     "todo.write",
     "todo.configure",
+    "info.write",
 )
 _ALL_PERMS: list[str] = list(GREMIUM_PERMISSIONS)
 
@@ -109,9 +111,7 @@ async def gremium_reader_ids(session: AsyncSession, sub: str) -> set[UUID]:
     """
     from app.modules.gremien.pool import substitute_gremien_for_sub
 
-    return await gremium_member_ids(session, sub) | await substitute_gremien_for_sub(
-        session, sub
-    )
+    return await gremium_member_ids(session, sub) | await substitute_gremien_for_sub(session, sub)
 
 
 def _sanitize_perms(perms: list[str] | None) -> list[str]:
@@ -278,9 +278,7 @@ class GremiumRoleService:
             raise ConflictError("forced gremium role cannot be deleted", code="gremium_role_forced")
         in_use = (
             await self.session.scalars(
-                select(GremiumMembership.id).where(
-                    GremiumMembership.gremium_role_id == role_id
-                )
+                select(GremiumMembership.id).where(GremiumMembership.gremium_role_id == role_id)
             )
         ).first()
         if in_use is not None:
@@ -290,9 +288,7 @@ class GremiumRoleService:
             )
         mapped = (
             await self.session.scalars(
-                select(GremiumRoleMapping.id).where(
-                    GremiumRoleMapping.gremium_role_id == role_id
-                )
+                select(GremiumRoleMapping.id).where(GremiumRoleMapping.gremium_role_id == role_id)
             )
         ).first()
         if mapped is not None:
@@ -325,6 +321,5 @@ class GremiumRoleService:
             )
         ).all()
         return [
-            _membership_out(m, name, email, active=bool(active))
-            for m, name, email, active in rows
+            _membership_out(m, name, email, active=bool(active)) for m, name, email, active in rows
         ]

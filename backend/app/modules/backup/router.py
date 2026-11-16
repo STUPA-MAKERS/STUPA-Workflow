@@ -229,9 +229,7 @@ async def export_backup(
 
     length = {"Content-Length": str(row.size_bytes)} if row.size_bytes else {}
     headers = {
-        "Content-Disposition": content_disposition(
-            "attachment", download_name(row.created_at)
-        ),
+        "Content-Disposition": content_disposition("attachment", download_name(row.created_at)),
         "X-Content-Type-Options": "nosniff",
         **length,
     }

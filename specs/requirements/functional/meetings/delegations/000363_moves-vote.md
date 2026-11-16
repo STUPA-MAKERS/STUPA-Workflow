@@ -4,10 +4,10 @@ title: A delegation moves the vote
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
+updated: 2026-11-14
 implementation:
   - backend/app/modules/delegations/service.py
-  - backend/app/modules/voting/service.py
+  - backend/app/modules/voting/service
 scope:
   - backend/app/modules/delegations
   - backend/app/modules/voting
@@ -16,4 +16,4 @@ scope:
 # A delegation moves the vote
 
 A delegation with voting must block the own ballot of the delegator. The delegate must cast one
-more ballot for the delegator.
+more ballot for each delegator.

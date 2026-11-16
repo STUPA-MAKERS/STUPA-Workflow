@@ -55,7 +55,7 @@
         @if (p.tops.length === 0) {
           <div class="pd__free">
             @if (p.markdown) {
-              <app-markdown-view [src]="p.markdown" [imageSrc]="imageSrc()" [attr.lang]="textLang()" />
+              <app-markdown-view [src]="p.markdown" [imageSrc]="imageSrc()" [documentSrc]="documentSrc()" [attr.lang]="textLang()" />
             } @else {
               <app-empty-state shape="text" rows="3" [heading]="'publicProtocols.detail.noText' | t" />
             }
@@ -87,7 +87,7 @@
                     </h3>
                     @for (part of partsOf(top); track $index) {
                       @if (part.kind === 'text') {
-                        <app-markdown-view class="pd__md" [src]="part.markdown" [imageSrc]="imageSrc()" [attr.lang]="textLang()" />
+                        <app-markdown-view class="pd__md" [src]="part.markdown" [imageSrc]="imageSrc()" [documentSrc]="documentSrc()" [attr.lang]="textLang()" />
                       } @else {
                         <ng-container *ngTemplateOutlet="decisionBox; context: { $implicit: part.decision }" />
                       }

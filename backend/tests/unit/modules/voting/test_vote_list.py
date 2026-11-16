@@ -97,7 +97,7 @@ async def test_scope_application_reader_does_not_read_gremium_polls(
     """An application reader reads the standalone application votes, never a Gremium poll."""
     reader = Principal(sub="r", permissions={"application.read"})
     sql = _sql(await listing.read_scope(fake_session(), reader))
-    assert "vote.kind != %(kind_1)s" in sql
+    assert "vote.kind NOT IN" in sql
 
 
 async def test_scope_admin_reads_every_standalone_vote_and_poll(scope: dict[str, Any]) -> None:
@@ -111,7 +111,7 @@ async def test_scope_application_reader_with_a_gremium_key_reads_its_polls(
 ) -> None:
     reader = Principal(sub="r", permissions={"application.read"}, groups={vote_group_key(GID)})
     sql = _sql(await listing.read_scope(fake_session(), reader))
-    assert "vote.kind != %(kind_1)s" in sql
+    assert "vote.kind NOT IN" in sql
     assert "eligible_group IN" in sql
 
 
@@ -251,6 +251,7 @@ async def test_service_delegates_to_listing(monkeypatch: pytest.MonkeyPatch) -> 
         "gremium_id": None,
         "q": "x",
         "kind": None,
+        "cancelled_reason": None,
         "limit": 50,
         "offset": 0,
     }
@@ -310,6 +311,7 @@ def test_router_list_passes_filters() -> None:
             ("gremiumId", str(GID)),
             ("q", "x"),
             ("kind", "poll"),
+            ("cancelledReason", "objection"),
             ("limit", "20"),
             ("offset", "40"),
         ],
@@ -330,6 +332,7 @@ def test_router_list_passes_filters() -> None:
         "gremium_id": GID,
         "q": "x",
         "kind": "poll",
+        "cancelled_reason": "objection",
         "limit": 20,
         "offset": 40,
     }
@@ -346,3 +349,13 @@ async def test_list_filters_by_kind(scope: dict[str, Any]) -> None:
     await listing.list_votes(db, Principal(sub="x"), kind="poll", limit=5, offset=0)
     sql = str(db.statements[0].compile(compile_kwargs={"literal_binds": True}))
     assert "vote.kind = 'poll'" in sql
+
+
+async def test_list_keeps_only_the_cancelled_votes_of_an_objection(scope: dict[str, Any]) -> None:
+    """§F/meetings/voting/000936: a cancelled vote shows only with the reason objection."""
+    db = fake_session(result())
+    await listing.list_votes(
+        db, Principal(sub="x"), cancelled_reason="objection", limit=5, offset=0
+    )
+    sql = str(db.statements[0].compile(compile_kwargs={"literal_binds": True}))
+    assert "vote.status != 'cancelled' OR vote.cancel_reason = 'objection'" in sql

@@ -27,10 +27,12 @@ from sqlalchemy import ColumnElement, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.access import READ_ALL_PERMISSION, READ_PERMISSION
-from app.modules.budget.access import has_budget_read
+from app.modules.budget.access import has_budget_read, viewed_by
+from app.modules.budget.form_options import below_active_only
 from app.modules.budget.tree_models import Budget
 from app.modules.gremien.models import Gremium
 from app.modules.search.schemas import SearchHit, SearchKind, SearchResults
+from app.modules.site_config.features import Feature, active_features
 from app.shared.i18n import pick_lang, resolve_i18n
 from app.shared.search import dialect_of, trigram_rank
 
@@ -84,6 +86,17 @@ HIT_URL: Mapping[SearchKind, str] = {
     "event": "/todos?card={id}",
 }
 
+#: The features a source needs. A source without an entry belongs to no feature.
+SOURCE_FEATURE: Mapping[str, frozenset[Feature]] = {
+    "meeting": frozenset({Feature.MEETINGS}),
+    "invoice": frozenset({Feature.INVOICES}),
+    "expense": frozenset({Feature.BUDGET}),
+    "budget": frozenset({Feature.BUDGET}),
+    "ticket": frozenset({Feature.TICKETS}),
+    "todo": frozenset({Feature.TODOS}),
+    "event": frozenset({Feature.TODOS}),
+}
+
 #: The status of a ticket hit, in the reader's language.
 TICKET_STATUS: Mapping[str, Mapping[str, str]] = {
     "new": {"de": "Neu", "en": "New"},
@@ -116,7 +129,8 @@ class SearchService:
         The sources run in sequence, not gathered, because they share one AsyncSession
         and a session is not safe for concurrent use; each query is small and indexed. A
         broken source is logged and listed in ``failed``, so it does not empty the
-        palette.
+        palette. A source of a feature that is off is not asked, so the search returns
+        no hit of it.
         """
         query = q.strip()
         if len(query) < MIN_QUERY_LENGTH:
@@ -134,9 +148,11 @@ class SearchService:
             "todo": self._todos,
             "event": self._events,
         }
+        enabled = await active_features(self.session)
         outcomes = [
             (name, await _answer(name, run, query, principal, lang))
             for name, run in sources.items()
+            if SOURCE_FEATURE.get(name, enabled) <= enabled
         ]
         answered = [found for _, found in outcomes if found is not None]
         return SearchResults(
@@ -252,7 +268,7 @@ class SearchService:
         scope = await self._budget_scope(principal)
         if scope is None:
             return []
-        stmt = select(Budget).where(where, Budget.hidden_in_budget.is_(False), *scope)
+        stmt = select(Budget).where(where, Budget.active.is_(True), below_active_only(), *scope)
         rows = (await self.session.scalars(stmt.order_by(rank.desc()).limit(PER_KIND + 1))).all()
         return [
             SearchHit(
@@ -276,7 +292,7 @@ class SearchService:
         if has_budget_read(principal):
             return ()
         member = await gremium_reader_ids(self.session, principal.sub)
-        return (Budget.view_gremium_id.in_(member),) if member else None
+        return (viewed_by(member),) if member else None
 
     async def _gremien(self, q: str, principal: Principal, lang: str) -> list[SearchHit]:
         """Search the committees, for a caller who can act on one.

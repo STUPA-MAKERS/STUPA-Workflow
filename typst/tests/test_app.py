@@ -182,3 +182,38 @@ def test_malformed_multipart_400(client: TestClient) -> None:
         headers={"Content-Type": "multipart/form-data; boundary=nope"},
     )
     assert resp.status_code == 400
+
+
+def test_multipart_pdf_assets_become_anlagen_and_merge(
+    client: TestClient, compiler: CompileRecorder, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """§000864: the service reads the sizes, numbers the Anlagen and merges after the compile."""
+    from .test_appendix import A, B, make_pdf
+
+    merged: list[tuple[bytes, tuple[object, ...]]] = []
+
+    def merge(pdf: bytes, appendix: tuple[object, ...], documents: object) -> bytes:
+        merged.append((pdf, appendix))
+        return b"%PDF-merged"
+
+    monkeypatch.setattr(app_module, "merge_appendix", merge)
+    source = f"# T\n\n[Plan](/api/media/documents/{A}) [Kaputt](/api/media/documents/{B})\n"
+    files = [
+        ("source", ("protocol.md", source.encode(), "text/markdown")),
+        _asset_part(f"doc-{A}.pdf", make_pdf((595, 842))),
+        _asset_part(f"doc-{B}.pdf", b"%PDF-1.7 kaputt"),
+    ]
+    resp = client.post("/render", files=files)
+    assert resp.status_code == 200
+    assert resp.content == b"%PDF-merged"
+    appendix = compiler.doc["appendix"]
+    assert appendix == [
+        {
+            "n": 1,
+            "doc": A,
+            "name": "Plan",
+            "pages": [[595.0, 842.0]],
+            "watermark": "Anlage 1 zum Protokoll",
+        }
+    ]
+    assert len(merged) == 1

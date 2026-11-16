@@ -226,6 +226,10 @@ class _Result:
         """Return no rows for the aggregate queries such as `_present_by_meeting`."""
         return []
 
+    def first(self) -> None:
+        """Return no row, because no election waits for the lot in these tests."""
+        return None
+
 
 class _FakeSession:
     def __init__(self, existing: object = None) -> None:
@@ -591,17 +595,13 @@ async def test_service_delete_unfinalized_is_audited(
 
 
 @pytest.mark.asyncio
-async def test_service_patch_closed_session_settings_frozen() -> None:
-    """A closed meeting locks the date, the time and the protocol writer."""
-    from datetime import date
-
+async def test_service_patch_closed_session_keeps_its_protocol_writer() -> None:
+    """§F/meetings/meetings/000982: the protocol writer closes with the meeting."""
     meeting = _meeting(status="closed")
     svc = MeetingService(_FakeSession(existing=meeting))  # type: ignore[arg-type]
-    with pytest.raises(ConflictError):
-        await svc.patch(meeting.id, MeetingPatch(date=date(2026, 7, 1)), _principal())
-    with pytest.raises(ConflictError):
+    with pytest.raises(ConflictError) as ei:
         await svc.patch(meeting.id, MeetingPatch(protokollantId=uuid4()), _principal())
-    assert meeting.date is None
+    assert ei.value.code == "meeting_closed"
 
 
 async def test_pool_substitute_sees_committee_timeline(

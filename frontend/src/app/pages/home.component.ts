@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { FeatureService } from '@core/features/feature.service';
 import { BrandingService } from '@core/branding/branding.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -40,6 +41,10 @@ export class HomeComponent {
   private readonly branding = inject(BrandingService);
   private readonly i18n = inject(I18nService);
   private readonly protocols = inject(PublicProtocolsService);
+  private readonly features = inject(FeatureService);
+
+  /** The card "Kalender" shows only while `Kalender` is on (spec 000758). */
+  protected readonly calendarOn = computed(() => this.features.isOn('calendar'));
 
   /** The newest public protocols. */
   protected readonly latest = signal<readonly PublicProtocolSummary[]>([]);
@@ -65,6 +70,7 @@ export class HomeComponent {
   );
 
   constructor() {
+    if (!this.features.isOn('meetings')) return;
     this.protocols.list({ limit: LATEST_COUNT }).subscribe({
       next: (page) => {
         this.latest.set(page.items);

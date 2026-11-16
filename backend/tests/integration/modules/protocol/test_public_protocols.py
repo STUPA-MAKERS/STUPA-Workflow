@@ -107,6 +107,7 @@ async def _seed(
             title=title,
             date=day,
             status="closed",
+            present_count=1,
             protokollant_id=people[KEEPER].id,
         )
         session.add(meeting)
@@ -375,9 +376,7 @@ async def test_search_semester_and_paging(
         page = client.get("/api/public/protocols", params={**scope, "limit": 1}).json()
         assert page["total"] == 2
         assert [i["id"] for i in page["items"]] == [str(pid_a)]
-        page = client.get(
-            "/api/public/protocols", params={**scope, "limit": 1, "offset": 1}
-        ).json()
+        page = client.get("/api/public/protocols", params={**scope, "limit": 1, "offset": 1}).json()
         assert [i["id"] for i in page["items"]] == [str(pid_b)]
         ws = client.get("/api/public/protocols", params={**scope, "semester": "ws-2026"}).json()
         assert [i["id"] for i in ws["items"]] == [str(pid_a)]
@@ -388,9 +387,7 @@ async def test_search_semester_and_paging(
         semesters = client.get("/api/public/protocols/semesters", params=scope)
         assert semesters.headers["X-Robots-Tag"] == "noindex"
         assert semesters.json() == [{"key": "ws-2026", "count": 1}, {"key": "ws-2025", "count": 1}]
-        assert (
-            client.get("/api/public/protocols", params={"semester": "winter"}).status_code == 422
-        )
+        assert client.get("/api/public/protocols", params={"semester": "winter"}).status_code == 422
 
 
 async def _audit(maker: async_sessionmaker[AsyncSession], target: uuid.UUID) -> list[AuditEntry]:
@@ -467,9 +464,7 @@ async def test_withhold_toggle_and_finalize_option(
         out = client.get(f"/api/meetings/{meeting_id}/protocol").json()
         assert out["gremiumProtocolsPublic"] is True
         assert out["publicWithheld"] is False
-        fin = client.post(
-            f"/api/protocols/{protocol_id}/finalize", json={"publicWithheld": True}
-        )
+        fin = client.post(f"/api/protocols/{protocol_id}/finalize", json={"publicWithheld": True})
         assert fin.status_code == 200, fin.text
         assert fin.json()["publicWithheld"] is True
         assert client.get(f"/api/public/protocols/{protocol_id}").status_code == 404
@@ -481,8 +476,7 @@ async def test_withhold_toggle_and_finalize_option(
         assert client.get(f"/api/public/protocols/{protocol_id}").status_code == 200
         client.patch(f"/api/protocols/{protocol_id}", json={"publicWithheld": False})
         assert (
-            client.patch(f"/api/protocols/{protocol_id}", json={"markdown": "x"}).status_code
-            == 409
+            client.patch(f"/api/protocols/{protocol_id}", json={"markdown": "x"}).status_code == 409
         )
         assert client.patch(f"/api/protocols/{protocol_id}", json={}).status_code == 422
 
@@ -491,6 +485,25 @@ async def test_withhold_toggle_and_finalize_option(
     assert finalize[0].data["publicWithheld"] is True
     publication = [e for e in entries if e.action == "protocol_publication"]
     assert [(e.data["old"], e.data["new"]) for e in publication] == [(False, True), (True, False)]
+
+
+async def test_a_reopened_protocol_leaves_the_public_page_until_it_is_final_again(
+    api: FastAPI, maker: async_sessionmaker[AsyncSession]
+) -> None:
+    """§F/meetings/protocols/000983: a draft again is not public, the next final one is."""
+    storage = _Storage()
+    _, _, protocol_id = await _seed(maker)
+
+    with TestClient(api) as client:
+        _enter(client, api, storage)
+        assert client.post(f"/api/protocols/{protocol_id}/finalize", json={}).status_code == 200
+        assert client.get(f"/api/public/protocols/{protocol_id}").status_code == 200
+        back = client.post(f"/api/protocols/{protocol_id}/reopen")
+        assert back.status_code == 200, back.text
+        assert client.get(f"/api/public/protocols/{protocol_id}").status_code == 404
+        again = client.post(f"/api/protocols/{protocol_id}/finalize", json={})
+        assert again.status_code == 200, again.text
+        assert client.get(f"/api/public/protocols/{protocol_id}").status_code == 200
 
 
 async def test_draft_patch_with_markdown_and_withheld(
@@ -560,3 +573,38 @@ async def test_withheld_draft_stays_withheld_on_plain_finalize(
     entries = await _audit(maker, protocol_id)
     assert [e.data["publicWithheld"] for e in entries if e.action == "protocol_finalize"] == [True]
     assert len([e for e in entries if e.action == "protocol_publication"]) == 1
+
+
+async def test_public_decisions_list(api: FastAPI, maker: async_sessionmaker[AsyncSession]) -> None:
+    """The decisions of a public protocol are public, without a session (spec 000926).
+
+    The decision of a protocol that is not final stays out, and no answer holds a name
+    or a part of the non-public TOP.
+    """
+    storage = _Storage()
+    gremium_id, _, protocol_id = await _seed(maker)
+    draft_gid, _, _ = await _seed(maker)
+    await _finalize(maker, protocol_id, storage)
+
+    with TestClient(api) as client:
+        _enter(client, api, storage)
+        res = client.get("/api/public/decisions", params={"gremium": str(gremium_id)})
+        assert res.status_code == 200
+        assert res.headers["X-Robots-Tag"] == "noindex"
+        body = res.json()
+        assert body["total"] == 1
+        item = body["items"][0]
+        assert item["protocolId"] == str(protocol_id)
+        assert item["question"] == QUESTION
+        assert item["date"] == "2026-09-29"
+        assert item["meetingTitle"] == "34. Sitzung"
+        assert item["result"] == "passed"
+        assert item["kind"] == "motion"
+        assert isinstance(item["counts"], dict)
+        _assert_no_names(body)
+        hidden = client.get("/api/public/decisions", params={"gremium": str(draft_gid)}).json()
+        assert hidden["total"] == 0
+        none = client.get(
+            "/api/public/decisions", params={"gremium": str(gremium_id), "q": "Sitzung"}
+        ).json()
+        assert none["total"] == 0

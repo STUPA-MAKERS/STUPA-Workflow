@@ -1,9 +1,9 @@
 import { errorToasts } from '../../../../../testing/load-error';
 import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { AdminApiService } from '../../admin-api.service';
-import type { CdVariantOption, Gremium } from '../../admin.models';
+import type { CdVariantOption, Gremium, GremiumDefaults } from '../../admin.models';
 import { GremiumDialogComponent, parseRecipients } from './gremium-dialog.component';
 import { pickOption } from '../../../../../testing/select';
 
@@ -23,6 +23,15 @@ const STUPA: Gremium = {
   quorumPercent: 50,
 };
 
+const NO_DEFAULTS: GremiumDefaults = {
+  quorumPercent: null,
+  repeatQuorumPercent: null,
+  guestsMayVote: false,
+  allowVoteDelegation: false,
+  delegationLeadMinutes: 0,
+  delegationMaxPerDelegate: 2,
+};
+
 function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
   return {
     getGremiumMailRecipients: jest.fn(() =>
@@ -32,6 +41,7 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
     createGremium: jest.fn((b: Partial<Gremium>) => of({ id: 'g-new', ...b })),
     updateGremium: jest.fn((id: string, b: Partial<Gremium>) => of({ ...STUPA, id, ...b })),
     getGremiumPublicPreview: jest.fn(() => of({ finalCount: 6, missingCount: 5 })),
+    getGremiumDefaults: jest.fn(() => of(NO_DEFAULTS)),
     ...over,
   };
 }
@@ -93,11 +103,14 @@ describe('GremiumDialogComponent', () => {
     expect(api.getGremiumMailRecipients).toHaveBeenCalledWith('g-1');
   });
 
-  /** The switches are delegation, delegation to externals and the public protocol page. */
+  /**
+   * The switches are the guest ballot, delegation, delegation to externals, delegation in
+   * elections and the public page.
+   */
   it('has no switch to change a ballot after casting', async () => {
     await setup(STUPA);
     expect(screen.queryByText(/Stimme nach Abgabe/)).toBeNull();
-    expect(screen.getAllByRole('switch')).toHaveLength(3);
+    expect(screen.getAllByRole('switch')).toHaveLength(5);
   });
 
   /** The quorum is a percent, so 150 becomes 100. */
@@ -108,6 +121,7 @@ describe('GremiumDialogComponent', () => {
     const quorum = screen.getByRole('spinbutton', { name: 'Quorum (%)' });
     await userEvent.clear(quorum);
     await userEvent.type(quorum, '150');
+    await userEvent.type(screen.getByRole('spinbutton', { name: 'Mindestzahl Anwesender' }), '2000');
     const lead = screen.getByRole('spinbutton', { name: 'Vorlauf für Delegationen (Minuten)' });
     await userEvent.clear(lead);
     await userEvent.type(lead, '30');
@@ -124,7 +138,12 @@ describe('GremiumDialogComponent', () => {
       allowVoteDelegation: true,
       delegationLeadMinutes: 30,
       delegationAllowExternal: true,
+      delegationMaxPerDelegate: 2,
+      delegationInElections: false,
       quorumPercent: 100,
+      quorumMinPresent: 1000,
+      repeatQuorumPercent: null,
+      guestsMayVote: false,
     });
     expect(api.setGremiumMailRecipients).toHaveBeenCalledWith('g-1', [
       'a@x.de',
@@ -146,6 +165,9 @@ describe('GremiumDialogComponent', () => {
     await userEvent.click(screen.getByRole('switch', { name: 'Stimm-Delegation erlauben' }));
     await waitFor(() => expect(screen.getByRole('spinbutton', { name: /Vorlauf/ })).toHaveValue(0));
     await userEvent.type(screen.getByRole('spinbutton', { name: 'Quorum (%)' }), '40');
+    const least = screen.getByRole('spinbutton', { name: 'Mindestzahl Anwesender' });
+    await userEvent.type(least, '3');
+    await userEvent.clear(least);
     await userEvent.click(save());
     expect(api.createGremium).toHaveBeenCalledWith({
       name: 'Finanz Ausschuss',
@@ -156,10 +178,155 @@ describe('GremiumDialogComponent', () => {
       allowVoteDelegation: true,
       delegationLeadMinutes: 0,
       delegationAllowExternal: false,
+      delegationMaxPerDelegate: 2,
+      delegationInElections: false,
       quorumPercent: 40,
+      quorumMinPresent: null,
+      repeatQuorumPercent: null,
+      guestsMayVote: false,
     });
     expect(api.setGremiumMailRecipients).toHaveBeenCalledWith('g-new', []);
     expect(saved).toHaveBeenCalledWith(expect.objectContaining({ created: true }));
+  });
+
+  /** §F/administration/admin/000906 */
+  it('starts a new Gremium with the defaults, and keeps what the admin typed before', async () => {
+    const api = makeApi({
+      getGremiumDefaults: jest.fn(() =>
+        of({
+          quorumPercent: 40,
+          repeatQuorumPercent: 25,
+          guestsMayVote: false,
+          allowVoteDelegation: true,
+          delegationLeadMinutes: 120,
+          delegationMaxPerDelegate: 3,
+        }),
+      ),
+    });
+    await setup(null, api);
+    expect(screen.getByRole('spinbutton', { name: 'Höchstzahl Delegationen je Person' })).toHaveValue(3);
+    await userEvent.click(screen.getByRole('switch', { name: 'Delegationen auch bei Wahlen' }));
+    expect(screen.getByRole('spinbutton', { name: 'Quorum (%)' })).toHaveValue(40);
+    expect(screen.getByRole('spinbutton', { name: 'Quorum der Wiederholungssitzung (%)' })).toHaveValue(25);
+    expect(screen.getByRole('spinbutton', { name: /Vorlauf/ })).toHaveValue(120);
+    await userEvent.type(screen.getByRole('textbox', { name: /Name/ }), 'Neu');
+    await userEvent.click(save());
+    expect(api.createGremium).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quorumPercent: 40,
+        repeatQuorumPercent: 25,
+        guestsMayVote: false,
+        allowVoteDelegation: true,
+        delegationLeadMinutes: 120,
+        delegationMaxPerDelegate: 3,
+        delegationInElections: true,
+      }),
+    );
+  });
+
+  /** §F/administration/admin/000906 */
+  it('reads no defaults for a stored Gremium', async () => {
+    const stored = await setup(STUPA);
+    expect(stored.api.getGremiumDefaults).not.toHaveBeenCalled();
+  });
+
+  /** §F/administration/admin/000906 */
+  it('keeps what the admin changed before the defaults arrive', async () => {
+    const answer = new Subject<GremiumDefaults>();
+    const api = makeApi({ getGremiumDefaults: jest.fn(() => answer) });
+    const { fixture } = await setup(null, api);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cmp = fixture.componentInstance as any;
+    cmp.patch('quorumPercent', 10);
+    cmp.patch('repeatQuorumPercent', 5);
+    cmp.patch('guestsMayVote', true);
+    cmp.patch('allowVoteDelegation', true);
+    cmp.patch('delegationLeadMinutes', 7);
+    cmp.patchMax(5);
+    cmp.patchMinPresent('abc');
+    answer.next({
+      quorumPercent: 40,
+      repeatQuorumPercent: 25,
+      guestsMayVote: false,
+      allowVoteDelegation: false,
+      delegationLeadMinutes: 120,
+      delegationMaxPerDelegate: 4,
+    });
+    expect(cmp.form()).toEqual(
+      expect.objectContaining({
+        quorumPercent: 10,
+        repeatQuorumPercent: 5,
+        guestsMayVote: true,
+        allowVoteDelegation: true,
+        delegationLeadMinutes: 7,
+        delegationMaxPerDelegate: 5,
+        quorumMinPresent: null,
+      }),
+    );
+  });
+
+  /** §F/administration/admin/000906 */
+  it('drops the defaults that arrive after the dialog closed', async () => {
+    const answer = new Subject<GremiumDefaults>();
+    const api = makeApi({ getGremiumDefaults: jest.fn(() => answer) });
+    const { fixture } = await setup(null, api);
+    fixture.componentRef.setInput('open', false);
+    fixture.detectChanges();
+    answer.next({
+      quorumPercent: 40,
+      repeatQuorumPercent: 25,
+      guestsMayVote: true,
+      allowVoteDelegation: true,
+      delegationLeadMinutes: 120,
+      delegationMaxPerDelegate: 4,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((fixture.componentInstance as any).form().quorumPercent).toBeNull();
+  });
+
+  it('survives a failed read of the defaults', async () => {
+    const api = makeApi({ getGremiumDefaults: jest.fn(() => throwError(() => ({ status: 500 }))) });
+    await setup(null, api);
+    expect(screen.getByRole('spinbutton', { name: 'Quorum (%)' })).toHaveValue(null);
+  });
+
+  /** §F/meetings/voting/000902, §F/meetings/meetings/000904 */
+  /** § 000948: a stored Gremium has its own start month; a new one takes the setting. */
+  it('saves the start month of the term of a stored Gremium', async () => {
+    const stored = await setup({ ...STUPA, termStartMonth: 4 });
+    expect(screen.getByText('Beginn der Amtszeit')).toBeTruthy();
+    stored.fixture.componentInstance['patchTermStart']('13');
+    stored.fixture.componentInstance['patchTermStart']('7');
+    await userEvent.click(save());
+    expect(stored.api.updateGremium).toHaveBeenCalledWith('g-1', expect.objectContaining({ termStartMonth: 7 }));
+  });
+
+  it('shows no start month for a new Gremium and sends none', async () => {
+    const fresh = await setup(null);
+    expect(screen.queryByText('Beginn der Amtszeit')).toBeNull();
+    await userEvent.type(screen.getByRole('textbox', { name: /Name/ }), 'Neu');
+    await userEvent.click(save());
+    expect(fresh.api.createGremium.mock.calls[0][0]).not.toHaveProperty('termStartMonth');
+  });
+
+  it('saves the repeat quorum and the guest ballot; a quorum locks the guest switch', async () => {
+    const { api } = await setup({ ...STUPA, quorumPercent: null, repeatQuorumPercent: 30 });
+    const repeat = screen.getByRole('spinbutton', { name: 'Quorum der Wiederholungssitzung (%)' });
+    expect(repeat).toHaveValue(30);
+    await userEvent.clear(repeat);
+    await userEvent.type(repeat, '25');
+    const guests = screen.getByRole('switch', { name: 'Gäste dürfen abstimmen' });
+    expect(guests).toBeEnabled();
+    await userEvent.click(guests);
+    await userEvent.click(save());
+    expect(api.updateGremium).toHaveBeenCalledWith(
+      'g-1',
+      expect.objectContaining({ repeatQuorumPercent: 25, guestsMayVote: true }),
+    );
+    await userEvent.type(screen.getByRole('spinbutton', { name: 'Quorum (%)' }), '40');
+    await waitFor(() =>
+      expect(screen.getByRole('switch', { name: 'Gäste dürfen abstimmen' })).toBeDisabled(),
+    );
   });
 
   it('names a taken slug', async () => {

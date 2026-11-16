@@ -73,6 +73,7 @@ class DeliveryOutcome:
 @dataclass(frozen=True, slots=True)
 class WebhookService:
     """Deliver outgoing webhooks: create the delivery rows and send them from the worker."""
+
     session: AsyncSession
     settings: Settings
     queue: WebhookQueue | None = None
@@ -97,9 +98,7 @@ class WebhookService:
         """
         hook = await self.session.get(Webhook, webhook_id)
         if hook is None or not hook.active:
-            logger.warning(
-                "webhook %s missing/inactive — flow action skipped", webhook_id
-            )
+            logger.warning("webhook %s missing/inactive — flow action skipped", webhook_id)
             return 0
         key = f"{idempotency_base}:{hook.id}" if idempotency_base else None
         if key is not None and key in await self._existing_keys(event, [key]):
@@ -125,9 +124,7 @@ class WebhookService:
             await self.queue.enqueue(delivery.id)
         return 1
 
-    async def _existing_keys(
-        self, event: str, candidate_keys: Sequence[str]
-    ) -> set[str]:
+    async def _existing_keys(self, event: str, candidate_keys: Sequence[str]) -> set[str]:
         """Return the idempotency keys of this event that exist already.
 
         The query uses an `IN` over the concrete candidate keys. It does not scan every
@@ -171,9 +168,7 @@ class WebhookService:
 
         hook = await self.session.get(Webhook, delivery.webhook_id)
         if hook is None or not hook.active or hook.secret is None:
-            return await self._finish(
-                delivery, "dead", moment, response_code=None
-            )
+            return await self._finish(delivery, "dead", moment, response_code=None)
 
         try:
             ips = assert_allowed_url(
@@ -212,9 +207,7 @@ class WebhookService:
             return await self._fail(delivery, moment, response_code=None)
         return await self._classify(delivery, moment, status_code, delivery_id)
 
-    async def _send_capped(
-        self, http_client: httpx.AsyncClient, request: httpx.Request
-    ) -> int:
+    async def _send_capped(self, http_client: httpx.AsyncClient, request: httpx.Request) -> int:
         """POST the request and return only the status code.
 
         The method streams the response body and stops at `_MAX_RESPONSE_BYTES`. That
@@ -245,9 +238,7 @@ class WebhookService:
                 finally:
                     await response.aclose()
         except TimeoutError as exc:
-            raise httpx.TimeoutException(
-                "webhook delivery exceeded total deadline"
-            ) from exc
+            raise httpx.TimeoutException("webhook delivery exceeded total deadline") from exc
 
     async def _classify(
         self,
@@ -315,9 +306,7 @@ class WebhookService:
         await self._record(
             delivery, kind, moment, response_code=response_code, attempts=final_attempts
         )
-        return DeliveryOutcome(
-            kind=kind, attempts=final_attempts, response_code=response_code
-        )
+        return DeliveryOutcome(kind=kind, attempts=final_attempts, response_code=response_code)
 
     async def _record(
         self,

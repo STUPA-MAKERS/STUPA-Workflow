@@ -13,6 +13,8 @@
  *  - `*Body` types are request bodies in the camelCase wire form.
  */
 
+import type { FeatureStates } from '@core/features/feature.service';
+
 export type Uuid = string;
 export type IsoDateTime = string;
 
@@ -43,6 +45,8 @@ export interface PublicFooterLink {
  *  texts (for example `applyInfo`), the app name and the footer. */
 export interface PublicSiteConfig {
   readonly version: number;
+  /** The state of each feature. A feature that needs a feature that is off reads as off. */
+  readonly features?: FeatureStates;
   /**
    * Hours a guest has to confirm the email before the platform discards the
    * application (admin setting `guest_application_settings.confirm_ttl_hours`).
@@ -422,6 +426,11 @@ export interface Attendance {
    * can be substituted. An older server leaves the flag out.
    */
   readonly canVote?: boolean;
+  /**
+   * The end of the late-excuse window: only on the own `absent` row of a closed meeting
+   * while the window is open (§ 000922).
+   */
+  readonly lateExcuseUntil?: string | null;
 }
 
 /** `AgendaItemOut`. An agenda item holds a linked application or free text. */
@@ -431,6 +440,10 @@ export interface AgendaItem {
   readonly applicationId: Uuid | null;
   /** The to-do card that the item was made from, or `null`. */
   readonly todoId?: Uuid | null;
+  /** The version of a Haushaltsplan that the item decides, or `null`. */
+  readonly planVersionId?: Uuid | null;
+  /** The plan of the item is a draft: the meeting reads it and takes no vote on it. */
+  readonly planReading?: boolean;
   /** The own title of the item, else the title of its application. */
   readonly title: string | null;
   /** The title of the application. `null` for a free-text item. */
@@ -452,6 +465,26 @@ export interface AssignableApplication {
   readonly applicationId: Uuid;
   readonly title: string | null;
   readonly stateLabel?: I18nMap | null;
+}
+
+/** `WaitingPlanOut`. A version of a Haushaltsplan that an agenda can take: one that waits for the decision of the Gremium, or a draft for a reading. */
+export interface WaitingPlan {
+  readonly planVersionId: Uuid;
+  readonly budgetName: string;
+  readonly fiscalYear: string;
+  readonly number: number;
+  readonly step: string;
+  /** The title that the agenda item of the plan takes. */
+  readonly title: string;
+  /** A draft that the agenda takes for a reading, without a decision. */
+  readonly reading?: boolean;
+}
+
+/** `AssignablePlansOut`. The plan versions that the agenda of a meeting can take. */
+export interface AssignablePlans {
+  /** The Gremium of the meeting decides the plan of a Haushalt in a step. */
+  readonly decides: boolean;
+  readonly plans: readonly WaitingPlan[];
 }
 
 /** `AltchaChallengeOut`. A server-signed proof-of-work challenge. GET /altcha/challenge. */
@@ -1135,16 +1168,24 @@ export interface ApplicantApplications {
   readonly items: readonly ApplicantApplicationItem[];
 }
 
-export type MajorityRule = 'simple' | 'absolute' | 'two_thirds';
+/** The two `members_` rules count the yes ballots against all eligible members. */
+export type MajorityRule =
+  | 'simple'
+  | 'absolute'
+  | 'two_thirds'
+  | 'members_majority'
+  | 'members_two_thirds';
 /** `draft`: planned, not open yet. `cancelled`: the application left the vote state by hand, so the vote stopped. */
 export type VoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
 /** A motion gives `passed`, `rejected` or `tie`. A personnel election gives
  *  `elected`, `runoff` (a runoff decides the open seats), `tie` (the lot decides) or
- *  `rejected` (quorum missed, or nobody elected). */
-export type VoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff';
+ *  `rejected` (quorum missed, or nobody elected). An election that needs the majority
+ *  of the members gives `no_majority` when no candidate reaches it. */
+export type VoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff' | 'no_majority';
 /** `motion`: a decision (Ja/Nein/Enthaltung). `election`: a personnel election.
- *  `poll`: a poll ("Umfrage") that only counts the answers. */
-export type VoteKind = 'motion' | 'election' | 'poll';
+ *  `poll`: a poll ("Umfrage") that only counts the answers. `circular`: an
+ *  Umlaufverfahren, a decision of a Gremium outside a meeting. */
+export type VoteKind = 'motion' | 'election' | 'poll' | 'circular';
 
 /** `single`: one option or an abstention. `multi`: 0 to `maxChoices` options.
  *  `date`: Ja/Vielleicht/Nein for every date. */
@@ -1208,6 +1249,18 @@ export interface PollCreateBody extends PollIn {
   readonly draft: boolean;
 }
 
+/** `POST /votes`: an Umlaufverfahren of a Gremium. The server fixes the rules:
+ *  Ja/Nein/Enthaltung, secret, the majority of the members. */
+export interface CircularCreateBody {
+  readonly kind: 'circular';
+  readonly eligibleGroup: Uuid;
+  readonly question: string;
+  /** The planned end, at least `circularMinDays` days ahead. */
+  readonly closesAt: IsoDateTime;
+  /** Keep it a draft; otherwise it opens at once. */
+  readonly draft: boolean;
+}
+
 /** One candidate of a personnel election. The server gives the ids (`c1`..`cn`). */
 export interface ElectionCandidate {
   readonly id: string;
@@ -1232,6 +1285,9 @@ export interface ElectionConfig {
   readonly quorum?: Quorum | null;
   readonly abstainCountsQuorum?: boolean;
   readonly guestsVote?: boolean;
+  /** `members_majority` (one seat): the elected candidate needs more votes than half
+   *  of the eligible members. */
+  readonly majorityRule?: 'relative' | 'members_majority';
 }
 
 /** The runoff that a tie at the seat boundary needs. `voteId` is set once it exists. */
@@ -1263,6 +1319,8 @@ export interface ElectionResult {
   readonly elected: readonly string[];
   readonly runoff?: ElectionRunoff | null;
   readonly lot?: ElectionLot | null;
+  /** The lot for a place in the third Wahlgang, after a tie for the second place. */
+  readonly nextRoundLot?: ElectionLot | null;
 }
 
 /** The election fields of a vote and the poll fields. A motion has
@@ -1273,7 +1331,7 @@ export interface ElectionFields {
   readonly electionResult?: ElectionResult | null;
   /** The election that this runoff continues. */
   readonly parentVoteId?: Uuid | null;
-  /** 1 for the first round, 2 for the first runoff. */
+  /** The number of the Wahlgang: 1 for the first one. */
   readonly round?: number;
   /** A poll: its mode and options. */
   readonly poll?: PollConfig | null;
@@ -1297,6 +1355,10 @@ export interface VoteConfig {
   readonly options: readonly string[];
   readonly majorityRule: MajorityRule;
   readonly quorum?: Quorum | null;
+  /** `present`: the quorum of a meeting vote counts the present persons, not the ballots. */
+  readonly quorumBasis?: 'ballots' | 'present';
+  /** The least number of present persons of the Gremium, copied to the vote. */
+  readonly quorumMinPresent?: number | null;
   readonly abstainCountsQuorum?: boolean;
   readonly secret?: boolean;
   /** Admitted guests of a public meeting vote too: no quorum, majority of the cast votes. */
@@ -1366,6 +1428,8 @@ export interface Vote extends ElectionFields {
   readonly agendaItemId?: Uuid | null;
   /** The motion of a meeting vote. A standalone vote often has none. */
   readonly question?: string | null;
+  /** The version of a Haushaltsplan whose step the vote decides, else `null`. */
+  readonly planVersionId?: Uuid | null;
   readonly eligibleGroup: string;
   readonly config: VoteConfig;
   readonly status: VoteStatus;
@@ -1373,6 +1437,8 @@ export interface Vote extends ElectionFields {
   /** The planned end of the cast window (a deadline), not the real end. */
   readonly closesAt: IsoDateTime | null;
   readonly result: VoteResult | null;
+  /** `objection`: a member objected to the Umlaufverfahren, which cancelled it. */
+  readonly cancelReason?: 'objection' | null;
   readonly secret: boolean;
   /** Copies of `config.majorityRule` and `config.quorum` for the vote card. */
   readonly majorityRule?: MajorityRule;
@@ -1439,6 +1505,8 @@ export interface VoteListQuery {
   readonly q?: string;
   /** Only the motions, the elections or the polls. */
   readonly kind?: VoteKind;
+  /** Of the cancelled votes, only those with this reason. */
+  readonly cancelledReason?: 'objection';
   readonly limit?: number;
   readonly offset?: number;
 }
@@ -1451,6 +1519,8 @@ export type BallotChoice = string | readonly string[] | Readonly<Record<string, 
  *  changes after the cast: a second cast gives 409 `already_voted`. */
 export interface BallotResult {
   readonly status: 'cast';
+  /** The ballots that the cast wrote: the own one and one for each represented member. */
+  readonly ballots?: number;
 }
 
 /**
@@ -1605,12 +1675,23 @@ export interface MeetingOutWire {
   readonly admittedGuests?: number;
   /** The open join requests; the meeting lead only, else 0. */
   readonly pendingGuests?: number;
-  /** Public participation is possible: only a gremium without a quorum allows it. */
-  readonly publicJoinAllowed?: boolean;
+  /** The present count fixed at the close (000946); `null` while the meeting is not closed. */
+  readonly presentCount?: number | null;
+  /** The members with a voting right, fixed at the close; `null` while not closed. */
+  readonly eligibleCount?: number | null;
+  /** The pool substitutes on a seat who are no present member with a voting right. */
+  readonly presentSeats?: number;
+  /** Guests can get a ballot: the Gremium has the switch on and no quorum. */
+  readonly guestsVoteAllowed?: boolean;
+  /** The kind of the meeting. */
+  readonly kind?: MeetingKind;
+  readonly repeatOfId?: Uuid | null;
+  /** The place of the meeting, or `null`. */
+  readonly location?: string | null;
+  /** The form of the meeting. */
+  readonly form?: MeetingForm;
   /** The earliest open of a planned meeting with a date (UTC), else `null`. */
   readonly opensAt?: IsoDateTime | null;
-  /** Before this point the open needs `confirmEarly` (UTC), else `null`. */
-  readonly confirmUntil?: IsoDateTime | null;
 }
 
 /** `ProtocolOut`. Meeting protocol. POST /meetings/{id}/protocol, PATCH /protocols/{id}. */
@@ -1629,6 +1710,13 @@ export interface ProtocolOutWire {
   readonly publicWithheld?: boolean;
   /** The gremium publishes its final protocols on the public protocol page. */
   readonly gremiumProtocolsPublic?: boolean;
+  /** The mark "genehmigt" and the meeting that approved the protocol (§ 000924). */
+  readonly approvedAt?: IsoDateTime | null;
+  readonly approvedMeetingId?: Uuid | null;
+  readonly approvedMeetingTitle?: string | null;
+  readonly approvedMeetingDate?: string | null;
+  /** The last send of the draft by mail, `null` without a send (§ 000937). */
+  readonly draftSentAt?: IsoDateTime | null;
 }
 
 /** Body for `POST /meetings` (`MeetingCreate`). */
@@ -1646,6 +1734,11 @@ export interface MeetingCreateBody {
   /** Public participation over a QR code. */
   readonly publicJoin?: boolean;
   readonly guestsMode?: GuestsMode;
+  readonly kind?: MeetingKind;
+  /** The first meeting of a `repeat` meeting (000940). The server needs it for this kind. */
+  readonly repeatOfId?: Uuid | null;
+  readonly location?: string | null;
+  readonly form?: MeetingForm;
 }
 
 /** Body for `PATCH /meetings/{id}`. Status, active application, date or protokollant. */
@@ -1673,8 +1766,12 @@ export interface MeetingPatchBody {
   readonly publicJoin?: boolean;
   /** Guests vote or only follow. `watch` gives 409 `guest_vote_open` while a guest vote runs. */
   readonly guestsMode?: GuestsMode;
-  /** Confirms an early open (`status: 'live'` before `confirmUntil`). */
-  readonly confirmEarly?: boolean;
+  /** Only while the meeting is planned (409 `meeting_not_planned`). */
+  readonly kind?: MeetingKind;
+  /** The first meeting of a `repeat` meeting (000940). The server needs it for this kind. */
+  readonly repeatOfId?: Uuid | null;
+  readonly location?: string | null;
+  readonly form?: MeetingForm;
 }
 
 /** Body for `POST /protocols/{id}/votes`. It embeds votes. */
@@ -1805,12 +1902,24 @@ export interface Meeting {
   readonly admittedGuests: number;
   /** The open join requests (meeting lead only, else 0). */
   readonly pendingGuests: number;
-  /** Public participation is possible: only a gremium without a quorum allows it. */
-  readonly publicJoinAllowed: boolean;
+  /** The present count fixed at the close (000946); `null` while the meeting is not closed. */
+  readonly presentCount?: number | null;
+  /** The members with a voting right, fixed at the close; `null` while not closed. */
+  readonly eligibleCount?: number | null;
+  /** The pool substitutes on a seat who are no present member with a voting right. */
+  readonly presentSeats?: number;
+  /** Guests can get a ballot: the Gremium has the switch on and no quorum. */
+  readonly guestsVoteAllowed: boolean;
+  /** The kind of the meeting. Only a planned meeting changes it. */
+  readonly kind: MeetingKind;
+  /** The first meeting of a `repeat` meeting (000940), else `null`. */
+  readonly repeatOfId?: Uuid | null;
+  /** The place of the meeting, or `null`. */
+  readonly location: string | null;
+  /** The form of the meeting. */
+  readonly form: MeetingForm;
   /** The earliest open of a planned meeting with a date (ISO, UTC), else `null`. */
   readonly opensAt: IsoDateTime | null;
-  /** Before this point the open is early and needs a confirmation (ISO, UTC), else `null`. */
-  readonly confirmUntil: IsoDateTime | null;
 }
 
 /** Direction of the meeting timeline relative to *now*. */
@@ -1845,6 +1954,14 @@ export interface Protocol {
   readonly publicWithheld?: boolean;
   /** The gremium publishes its final protocols on the public protocol page. */
   readonly gremiumProtocolsPublic?: boolean;
+  /** The time of the mark "genehmigt", `null` without a mark (§ 000924). */
+  readonly approvedAt?: IsoDateTime | null;
+  /** The meeting that approved the protocol. */
+  readonly approvedMeetingId?: Uuid | null;
+  readonly approvedMeetingTitle?: string | null;
+  readonly approvedMeetingDate?: string | null;
+  /** The last send of the draft by mail, `null` without a send (§ 000937). */
+  readonly draftSentAt?: IsoDateTime | null;
 }
 
 /**
@@ -1939,6 +2056,12 @@ export interface SearchResults {
 
 /** Admitted guests vote (`vote`) or only follow the meeting (`watch`). */
 export type GuestsMode = 'vote' | 'watch';
+/** The kind of a meeting. A new meeting is `ordinary`. */
+export type MeetingKind = 'ordinary' | 'extraordinary' | 'repeat' | 'constituent';
+export const MEETING_KINDS: readonly MeetingKind[] = ['ordinary', 'extraordinary', 'repeat', 'constituent'];
+/** The form of a meeting. A new meeting is `presence`. */
+export type MeetingForm = 'presence' | 'hybrid' | 'video';
+export const MEETING_FORMS: readonly MeetingForm[] = ['presence', 'hybrid', 'video'];
 
 /** The state of a join request or of a guest. */
 export type GuestStatus = 'pending' | 'admitted' | 'rejected' | 'removed' | 'left';
@@ -2046,6 +2169,10 @@ export interface GuestMe {
 
 /** `GET /committees/{id}/meeting-defaults`: what a new meeting of the gremium allows. */
 export interface MeetingDefaults {
-  readonly publicJoinAllowed: boolean;
+  readonly guestsVoteAllowed: boolean;
   readonly quorumPercent: number | null;
+  /** Days between the invitation and an ordinary meeting (§ 000917). */
+  readonly inviteDaysOrdinary: number;
+  /** Days between the invitation and a meeting of every other kind. */
+  readonly inviteDaysExtraordinary: number;
 }

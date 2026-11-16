@@ -125,9 +125,7 @@ async def _deliver_magic_link(
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as db:
         link = await email_login.issue_confirm_link(db, settings, email=email)
-        lang = await resolve_application_lang(
-            db, application_id=application_id, settings=settings
-        )
+        lang = await resolve_application_lang(db, application_id=application_id, settings=settings)
         await NotificationService(db, queue=queue, settings=settings).send_email_login(
             email=email, link=link, lang=lang
         )
@@ -971,8 +969,7 @@ async def update_comment(
         actor=access.actor,
         viewer_sub=access.principal.sub if access.principal is not None else None,
         viewer_is_applicant=access.is_owning_applicant,
-        can_manage=access.principal is not None
-        and access.principal.has(MANAGE_PERMISSION),
+        can_manage=access.principal is not None and access.principal.has(MANAGE_PERMISSION),
         allow_unconfirmed=access.is_owning_applicant,
         mentions=payload.mentions,
         may_mention=access.can_see_internal,
@@ -1015,8 +1012,7 @@ async def delete_comment(
         actor=access.actor,
         viewer_sub=access.principal.sub if access.principal is not None else None,
         viewer_is_applicant=access.is_owning_applicant,
-        can_manage=access.principal is not None
-        and access.principal.has(MANAGE_PERMISSION),
+        can_manage=access.principal is not None and access.principal.has(MANAGE_PERMISSION),
         allow_unconfirmed=access.is_owning_applicant,
         files=FilesService(service.session, storage=storage),
     )

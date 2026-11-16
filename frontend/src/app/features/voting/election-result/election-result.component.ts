@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -31,6 +32,7 @@ import {
   electionBars,
   electionResultLine,
   lotPending,
+  nextRoundOf,
   runoffPending,
   seatsText,
 } from '../election.util';
@@ -44,9 +46,14 @@ import {
  * - A tie of a single seat (or in a runoff) waits for the lot; the vote manager draws
  *   it ("Los ziehen"). The server draws, records who triggered it and audits it.
  * - A drawn lot shows the note "Durch Los entschieden".
+ * - A first or second Wahlgang without the majority of the members offers the next
+ *   Wahlgang to the vote manager ("Zweiter Wahlgang", "Dritter Wahlgang"). The button
+ *   creates the draft, and the protokollant opens it (§ 000971).
  *
  * The meeting card, the vote page and the beamer use it. The beamer never gets the
- * actions (`canManage` stays off).
+ * actions (`canManage` stays off). In the meeting card (`inCard`) the card states the
+ * result: the bars come without the result heading, and a pending lot shows only the
+ * tags and the button (§ 001006).
  *
  * One button serves both steps, so the focus stays on it and the second click of a double click
  * does not confirm.
@@ -56,6 +63,7 @@ import {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NgTemplateOutlet,
     ButtonComponent,
     IconComponent,
     NoteComponent,
@@ -65,6 +73,7 @@ import {
   ],
   host: {
     '[class.bars--beamer]': "variant() === 'beamer'",
+    '[class.er--card]': 'inCard()',
   },
   templateUrl: './election-result.component.html',
   styleUrls: ['../vote-bars.component.scss', './election-result.component.scss'],
@@ -86,10 +95,20 @@ export class ElectionResultComponent {
   /** The caller may draw the lot and start the runoff (vote manager or meeting lead). */
   readonly canManage = input(false);
 
-  /** The lot was drawn or the runoff opened: the caller reads the vote again. */
+  /** The number of this Wahlgang. */
+  readonly round = input(1);
+  /** The caller may start the next Wahlgang: the election has none yet (§ 000971). */
+  readonly canNextRound = input(false);
+  /**
+   * The meeting card: no result heading above the bars and no banner text for the lot,
+   * because the status line of the card states the result once (§ 001006).
+   */
+  readonly inCard = input(false);
+
+  /** The lot was drawn or the next Wahlgang created: the caller reads the votes again. */
   readonly changed = output<Vote>();
 
-  protected readonly busy = signal<'lot' | null>(null);
+  protected readonly busy = signal<'lot' | 'next' | null>(null);
   /** The first click on "Los ziehen" asks again: the draw cannot be undone. */
   protected readonly lotArmed = signal(false);
   private readonly lotActions = viewChild<ElementRef<HTMLElement>>('lotActions');
@@ -108,7 +127,11 @@ export class ElectionResultComponent {
     if (!result) return null;
     const er = this.electionResult();
     const kind: StatusKind =
-      result === 'elected' ? 'accent' : result === 'rejected' ? 'error' : 'warn';
+      result === 'elected'
+        ? 'accent'
+        : result === 'rejected' || result === 'no_majority'
+          ? 'error'
+          : 'warn';
     const text =
       result === 'runoff'
         ? this.t('election.result.runoff')
@@ -143,6 +166,23 @@ export class ElectionResultComponent {
     const drawn = this.electionResult()?.lot?.drawn;
     if (!drawn) return null;
     return this.t('election.lot.note', {
+      names: candidateNames(this.election(), drawn, this.t).join(', '),
+    });
+  });
+
+  /** "Zweiter Wahlgang" or "Dritter Wahlgang" after a Wahlgang without a majority. */
+  protected readonly nextRound = computed<TranslationKey | null>(() => {
+    if (!this.canNextRound() || !this.voteId()) return null;
+    const next = nextRoundOf(this.election(), this.result(), this.round());
+    if (next === null) return null;
+    return next === 2 ? 'election.nextRound.second' : 'election.nextRound.third';
+  });
+
+  /** The lot for a place in the third Wahlgang: "Das Los bestimmt …: Ben". */
+  protected readonly nextRoundLotNote = computed(() => {
+    const drawn = this.electionResult()?.nextRoundLot?.drawn;
+    if (!drawn) return null;
+    return this.t('election.nextRound.lotNote', {
       names: candidateNames(this.election(), drawn, this.t).join(', '),
     });
   });
@@ -192,6 +232,21 @@ export class ElectionResultComponent {
       next: (vote) => {
         this.busy.set(null);
         this.toast.success(this.t('election.lot.drawn'));
+        this.changed.emit(vote);
+      },
+      error: (err: unknown) => this.fail(err),
+    });
+  }
+
+  /** Create the draft of the next Wahlgang; the protokollant opens it. */
+  startNextRound(): void {
+    const id = this.voteId();
+    if (!id || this.busy()) return;
+    this.busy.set('next');
+    this.api.nextElectionRound(id).subscribe({
+      next: (vote) => {
+        this.busy.set(null);
+        this.toast.success(this.t('election.nextRound.created'));
         this.changed.emit(vote);
       },
       error: (err: unknown) => this.fail(err),

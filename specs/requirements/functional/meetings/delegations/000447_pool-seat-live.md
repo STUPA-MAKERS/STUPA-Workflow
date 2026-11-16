@@ -2,11 +2,10 @@
 id: "000447"
 title: Pool seats need only a live meeting
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation:
-  - backend/app/modules/delegations/pool_seat.py
+updated: 2026-11-16
+replaced_by: F/meetings/delegations/000113
 scope:
   - backend/app/modules/delegations
   - frontend/src/app/features/meetings

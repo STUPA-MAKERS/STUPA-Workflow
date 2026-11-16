@@ -25,12 +25,21 @@ The rules:
 - `note` is the reason of an excuse and is personal data. Only the member and
   the lead see it. The lead's set and reset write `attendance_set` and
   `attendance_reset` to the audit log, never with the note.
-- A closed meeting freezes the attendance (409), because the protocol carries it.
+- A closed meeting freezes the own report (409), because the protocol carries the
+  attendance. The lead still sets and resets a record until the protocol is final or
+  in its render (§F/meetings/meetings/000951), then 409 `protocol_final`. Such a
+  change counts the present members of the meeting again. The other exception is
+  the late excuse (§F/meetings/meetings/000922): until
+  `lateExcuseDays` days after the close, a member changes the own `absent` to
+  `excused` and must give the reason. The change writes `attendance_set` with
+  `late: true`, never with the note.
 """
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, time, timedelta
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -48,7 +57,14 @@ from app.modules.meetings.keepers import (
     keeper_principal_ids,
     member_permissions,
 )
-from app.modules.meetings.models import Meeting, MeetingAttendance
+from app.modules.meetings.models import (
+    Meeting,
+    MeetingAttendance,
+    MeetingSettings,
+)
+from app.modules.meetings.periods import kept_late_excuse_days
+from app.modules.meetings.present import present_count
+from app.modules.meetings.protocol_models import Protocol
 from app.modules.meetings.roster import meeting_roster_filter
 from app.modules.meetings.schemas import (
     AttendanceOut,
@@ -56,6 +72,7 @@ from app.modules.meetings.schemas import (
     MeetingMemberOut,
     SelfAttendanceStatus,
 )
+from app.settings import get_settings
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
 
 _DELEGATION_ACTIVE = (
@@ -84,6 +101,28 @@ def _resolve_note(
     return existing.note if existing is not None else None
 
 
+def late_excuse_until(meeting: Meeting, days: int) -> datetime | None:
+    """Return the end of the late-excuse window of a closed meeting, else None.
+
+    The window ends with the local day that is ``days`` days after the close, not at
+    the clock time of the close: a period in days ends with its last day.
+    """
+    if meeting.status != "closed" or meeting.closed_at is None:
+        return None
+    zone = ZoneInfo(get_settings().local_timezone)
+    last_day = (meeting.closed_at.astimezone(zone) + timedelta(days=days)).date()
+    return datetime.combine(last_day, time(23, 59, 59), tzinfo=zone).astimezone(UTC)
+
+
+def _open_window(
+    rec: MeetingAttendance | None, until: datetime | None, now: datetime, *, is_self: bool
+) -> datetime | None:
+    """Return ``until`` for the own ``absent`` record while the window is open."""
+    if not is_self or rec is None or rec.status != "absent" or until is None:
+        return None
+    return until if now <= until else None
+
+
 def _attendance_out(
     member: PrincipalRow,
     rec: MeetingAttendance | None,
@@ -91,9 +130,11 @@ def _attendance_out(
     *,
     is_self: bool,
     can_write: bool,
+    late_until: datetime | None = None,
 ) -> AttendanceOut:
     """Build one roster row; the note goes only to the member and to the lead."""
     return AttendanceOut(
+        lateExcuseUntil=late_until,
         principalId=member.id,
         displayName=member.display_name,
         email=member.email,
@@ -211,6 +252,8 @@ class AttendanceService:
         )
         by_principal = {r.principal_id: r for r in records}
         perms = await member_permissions(self.session, meeting.gremium_id)
+        until = late_excuse_until(meeting, await self._late_excuse_days(meeting))
+        now = datetime.now(UTC)
         return [
             _attendance_out(
                 m,
@@ -218,9 +261,83 @@ class AttendanceService:
                 perms.get(m.id, frozenset()),
                 is_self=m.sub == requester_sub,
                 can_write=can_write,
+                late_until=_open_window(
+                    by_principal.get(m.id), until, now, is_self=m.sub == requester_sub
+                ),
             )
             for m in members
         ]
+
+    async def _late_excuse_days(self, meeting: Meeting) -> int:
+        """Return the late-excuse period of the meeting, in days (spec 000942).
+
+        A meeting keeps the value of the time it was made. Only a meeting from before
+        the column reads the settings.
+        """
+        kept: int | None = getattr(meeting, "late_excuse_days", None)
+        if kept is not None:
+            return kept
+        return kept_late_excuse_days(
+            None,
+            await self.session.scalar(
+                select(MeetingSettings.late_excuse_days).where(MeetingSettings.id == 1)
+            ),
+        )
+
+    async def excuse_late(
+        self,
+        meeting_id: UUID,
+        requester_sub: str,
+        note: str,
+        *,
+        now: datetime,
+        can_write: bool = False,
+    ) -> list[AttendanceOut]:
+        """Change the own ``absent`` of a closed meeting to ``excused``.
+
+        The window ends ``lateExcuseDays`` days after the close. The record gets the
+        reason and the source ``self``. The caller commits.
+
+        Raises:
+            ForbiddenError: The requester has no account row.
+            ConflictError: The meeting is not closed (``meeting_not_closed``), the
+                requester has no ``absent`` record (``not_absent``), or the window is
+                over (``late_excuse_expired``).
+        """
+        meeting = await self._meeting(meeting_id, for_write=True)
+        until = late_excuse_until(meeting, await self._late_excuse_days(meeting))
+        if until is None:
+            raise ConflictError("A late excuse needs a closed meeting.", code="meeting_not_closed")
+        member_id = await self.session.scalar(
+            select(PrincipalRow.id).where(PrincipalRow.sub == requester_sub)
+        )
+        if member_id is None:
+            raise ForbiddenError("only a member gives an excuse")
+        existing = await self._record(meeting_id, member_id)
+        if existing is None or existing.status != "absent":
+            raise ConflictError("Only an absence can be excused later.", code="not_absent")
+        if now > until:
+            raise ConflictError("The period for a late excuse is over.", code="late_excuse_expired")
+        before_source = existing.source
+        self._write(
+            existing,
+            meeting_id=meeting_id,
+            principal_id=member_id,
+            status="excused",
+            source="self",
+            note=note,
+        )
+        await self._flush_write()
+        await self._audit(
+            AuditAction.ATTENDANCE_SET,
+            actor=requester_sub,
+            meeting_id=meeting_id,
+            principal_id=member_id,
+            status={"from": "absent", "to": "excused"},
+            source={"from": before_source, "to": "self"},
+            late=True,
+        )
+        return await self.roster(meeting_id, requester_sub, can_write=can_write)
 
     async def _record(self, meeting_id: UUID, principal_id: UUID) -> MeetingAttendance | None:
         """Load the record of one member with a row lock.
@@ -297,6 +414,31 @@ class AttendanceService:
             raise ConflictError(
                 "Attendance is read-only once the meeting is closed.", code="meeting_closed"
             )
+
+    async def _ensure_lead_open(self, meeting: Meeting) -> None:
+        """Refuse a change of the lead when the protocol of a closed meeting is final.
+
+        The lead corrects the attendance of a closed meeting while its protocol is a
+        draft (§F/meetings/meetings/000951). A protocol in its render counts as final.
+
+        Raises:
+            ConflictError: The protocol is final (409 ``protocol_final``).
+        """
+        if meeting.status != "closed":
+            return
+        state = await self.session.scalar(
+            select(Protocol.status).where(Protocol.meeting_id == meeting.id)
+        )
+        if state in ("rendering", "final"):
+            raise ConflictError(
+                "Attendance is read-only once the protocol is final.", code="protocol_final"
+            )
+
+    async def _recount(self, meeting: Meeting) -> None:
+        """Count the present members of a closed meeting again after a correction."""
+        if meeting.status == "closed":
+            here = await present_count(self.session, meeting.id)
+            setattr(meeting, "present_count", here.total)  # noqa: B010
 
     async def _audit(
         self,
@@ -451,20 +593,35 @@ class AttendanceService:
         The router checks `canWrite` before the call. The change writes
         `attendance_set` with the status before and after it.
 
+        In a closed meeting the change is a correction of the record. It also takes a
+        former member who has a record in the meeting, because the roster still lists
+        this person. It frees no pool seat and checks no delegation, because the
+        votes of the meeting are over and the substitutions belong to its record.
+
         Raises:
-            NotFoundError: The principal is not a current member of the Gremium.
-            ConflictError: The meeting is closed, the status is `present` while a
+            NotFoundError: The principal is not a current member of the Gremium, and
+                the meeting is not closed or holds no record of the principal.
+            ConflictError: The protocol of the closed meeting is final (code
+                `protocol_final`), the status is `present` while a
                 delegation of the member exists (code `delegation_active`), or
                 a parallel change wrote the record first (code `conflict`).
         """
         meeting = await self._meeting(meeting_id, for_write=True)
-        self._ensure_not_closed(meeting)
+        await self._ensure_lead_open(meeting)
+        closed = meeting.status == "closed"
         members = await self._current_members(meeting.gremium_id)
-        if not any(m.id == principal_id for m in members):
+        is_member = any(m.id == principal_id for m in members)
+        if not is_member and not closed:
             raise NotFoundError("principal is not a current member of this committee")
-        if status == "present" and await self._delegated(meeting_id, principal_id, requester_sub):
+        if (
+            not closed
+            and status == "present"
+            and await self._delegated(meeting_id, principal_id, requester_sub)
+        ):
             raise ConflictError(_DELEGATION_ACTIVE, code="delegation_active")
         existing = await self._record(meeting_id, principal_id)
+        if not is_member and existing is None:
+            raise NotFoundError("principal has no attendance record in this meeting")
         before = existing.status if existing is not None else None
         before_source = existing.source if existing is not None else None
         self._write(
@@ -476,6 +633,7 @@ class AttendanceService:
             note=_resolve_note(status, existing=existing, note=note, replace_note=replace_note),
         )
         await self._flush_write()
+        await self._recount(meeting)
         await self._audit(
             AuditAction.ATTENDANCE_SET,
             actor=requester_sub,
@@ -497,10 +655,10 @@ class AttendanceService:
         no audit entry. The router checks `canWrite` before the call.
 
         Raises:
-            ConflictError: The meeting is closed.
+            ConflictError: The protocol of the closed meeting is final (409).
         """
         meeting = await self._meeting(meeting_id, for_write=True)
-        self._ensure_not_closed(meeting)
+        await self._ensure_lead_open(meeting)
         existing = await self._record(meeting_id, principal_id)
         if existing is not None:
             await self._audit(
@@ -513,5 +671,6 @@ class AttendanceService:
             )
             await self.session.delete(existing)
             await self.session.flush()
+            await self._recount(meeting)
             await self.session.commit()
         return await self.roster(meeting_id, requester_sub, can_write=True)

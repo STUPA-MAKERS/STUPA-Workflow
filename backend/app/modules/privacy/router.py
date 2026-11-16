@@ -62,6 +62,7 @@ def _canonical_email(raw: str) -> str:
             "email is not a valid e-mail address", code="invalid_email"
         ) from exc
 
+
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 _CONFIG = Depends(require_principal("privacy.manage"))
 ConfigPrincipal = Annotated[Principal, Depends(require_principal("privacy.manage"))]
@@ -241,9 +242,7 @@ async def put_settings(
     body: PrivacySettingsUpdate, service: SettingsServiceDep
 ) -> PrivacySettingsOut:
     """Change the global retention default."""
-    settings = await service.update(
-        default_retention_months=body.default_retention_months
-    )
+    settings = await service.update(default_retention_months=body.default_retention_months)
     return PrivacySettingsOut.model_validate(settings, from_attributes=True)
 
 

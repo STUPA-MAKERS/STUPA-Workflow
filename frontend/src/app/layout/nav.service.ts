@@ -1,5 +1,6 @@
 import { Injectable, computed, inject } from '@angular/core';
 import { AuthService } from '@core/auth/auth.service';
+import { type FeatureKey, FeatureService } from '@core/features/feature.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { IconName } from '@stupa-makers/ui-kit';
 
@@ -35,6 +36,7 @@ export const ADMIN_AREA_PERMISSIONS = [
   'privacy.manage',
   'webhook.manage',
   'admin.calendars',
+  'admin.features',
   'ticket.manage',
   'audit.read',
   'backup.manage',
@@ -77,6 +79,8 @@ export interface NavItem {
   readonly reportedTickets?: boolean;
   /** Match the active route exactly. */
   readonly exact?: boolean;
+  /** The feature of the entry. The entry does not show while the feature is off. */
+  readonly feature?: FeatureKey;
   /** `end` entries sit at the foot of the rail, after the spacer. */
   readonly place: 'main' | 'end';
 }
@@ -91,8 +95,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'applications', path: '/applications', labelKey: 'nav.applications', icon: 'file', permissions: [], place: 'main' },
   { key: 'tasks', path: '/tasks', labelKey: 'nav.tasks', icon: 'tasks', permissions: [], place: 'main' },
   /** Every session has at least the personal board. */
-  { key: 'todos', path: '/todos', labelKey: 'nav.todos', icon: 'circleok', permissions: [], place: 'main' },
-  { key: 'calendar', path: '/calendar', labelKey: 'nav.calendar', icon: 'cal', permissions: [], place: 'main' },
+  { key: 'todos', path: '/todos', labelKey: 'nav.todos', icon: 'circleok', permissions: [], feature: 'todos', place: 'main' },
+  { key: 'calendar', path: '/calendar', labelKey: 'nav.calendar', icon: 'cal', permissions: [], feature: 'calendar', place: 'main' },
   {
     key: 'meetings',
     path: '/meetings',
@@ -105,6 +109,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permissions: ['meeting.view_all'],
     gremiumPermissions: ['session.manage', 'protocol.write'],
     inAnyCommittee: true,
+    feature: 'meetings',
     place: 'main',
   },
   {
@@ -124,6 +129,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: 'vote',
     permissions: [],
     gremiumPermissions: VOTING_GREMIUM_PERMISSIONS,
+    feature: 'voting',
     place: 'main',
   },
   {
@@ -134,11 +140,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permissions: BUDGET_PERMISSIONS,
     /** A gremium with an assigned cost centre sees the tab in scoped form. */
     scopedBudgetView: true,
+    feature: 'budget',
     place: 'main',
   },
-  { key: 'expenses', path: '/expenses', labelKey: 'nav.expenses', icon: 'swap', permissions: BUDGET_PERMISSIONS, place: 'main' },
-  { key: 'invoices', path: '/invoices', labelKey: 'nav.invoices', icon: 'receipt', permissions: BUDGET_PERMISSIONS, place: 'main' },
-  { key: 'tickets', path: '/tickets', labelKey: 'nav.tickets', icon: 'ticket', permissions: ['ticket.manage'], reportedTickets: true, place: 'main' },
+  { key: 'expenses', path: '/expenses', labelKey: 'nav.expenses', icon: 'swap', permissions: BUDGET_PERMISSIONS, feature: 'budget', place: 'main' },
+  { key: 'invoices', path: '/invoices', labelKey: 'nav.invoices', icon: 'receipt', permissions: BUDGET_PERMISSIONS, feature: 'invoices', place: 'main' },
+  { key: 'tickets', path: '/tickets', labelKey: 'nav.tickets', icon: 'ticket', permissions: ['ticket.manage'], reportedTickets: true, feature: 'tickets', place: 'main' },
   { key: 'admin', path: '/admin', labelKey: 'nav.admin', icon: 'shield', permissions: ADMIN_AREA_PERMISSIONS, place: 'end' },
 ];
 
@@ -148,16 +155,18 @@ export const BOTTOM_BAR_KEYS: readonly NavKey[] = ['start', 'applications', 'mee
 /**
  * The navigation entries the signed-in principal may open.
  *
- * The filter is UX only: the route guards and the server stay authoritative.
+ * An entry of a feature that is off does not show. The filter is UX only: the route guards
+ * and the server stay authoritative.
  */
 @Injectable({ providedIn: 'root' })
 export class NavService {
   private readonly auth = inject(AuthService);
+  private readonly features = inject(FeatureService);
 
   readonly visible = computed<NavItem[]>(() => {
     if (!this.auth.isAuthenticated()) return [];
     const inAnyCommittee = this.auth.gremien().length > 0;
-    return NAV_ITEMS.filter(
+    return NAV_ITEMS.filter((item) => !item.feature || this.features.isOn(item.feature)).filter(
       (item) =>
         this.globalAllows(item) ||
         (item.gremiumPermissions ?? []).some((p) => this.auth.canInAnyGremium(p)) ||

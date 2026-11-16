@@ -12,6 +12,11 @@ magic-link applicant. The id is a random uuid4, so it is unguessable on top of t
 session check. The image of a protocol that an applicant cannot read is therefore
 reachable only with its id.
 
+The routes of an embedded PDF (`/api/media/documents/{id}`, its info route and the
+upload ``POST /api/meetings/{id}/documents``) are in `protocol.documents_router`,
+because they check a right on the Sitzung (spec 000862, §NF/security/files/000979).
+This module only builds their answer (`document_response`).
+
 The route of the images of a public protocol is in `protocol.public_images_router`,
 because it reads the protocol, and `media` imports no higher module
 (§S/backend/python/000651).
@@ -40,12 +45,13 @@ from app.modules.auth.principal import Applicant, Principal
 from app.modules.files.body import read_capped
 from app.modules.files.storage import ObjectStorage
 from app.modules.media.schemas import MarkdownImageOut
-from app.modules.media.service import ImageStream, MediaService
+from app.modules.media.service import DocumentStream, ImageStream, MediaService
 from app.shared.antiabuse import (
     enforce_media_body_cap,
     rate_limit_media_images,
 )
 from app.shared.errors import ForbiddenError, ProblemDetail, UnauthorizedError
+from app.shared.filenames import content_disposition
 
 router = APIRouter(tags=["media"])
 
@@ -54,6 +60,14 @@ _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 #: The CSP of an image answer: no active content, also when opened directly.
 IMAGE_CSP = "default-src 'none'; sandbox"
 _PRIVATE_CACHE = "private, max-age=31536000, immutable"
+
+#: The CSP of an inline PDF: the file viewer of the SPA frames it from the same origin
+#: only. ``sandbox`` gives the document a unique origin without scripts; the built-in
+#: PDF viewers of Firefox and Chromium still render with it. The same headers as the
+#: inline preview of an attachment PDF.
+DOCUMENT_PREVIEW_CSP = (
+    "default-src 'none'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'; sandbox"
+)
 
 #: The OAuth scopes whose texts take images: protocol TOPs, to-do cards and their
 #: comments, ticket notes, application comments.
@@ -77,6 +91,7 @@ def get_media_service(session: DbSession, request: Request, settings: SettingsDe
         session,
         storage=storage,
         max_bytes=settings.markdown_image_max_bytes,
+        max_document_bytes=settings.markdown_document_max_bytes,
         settings=settings,
     )
 
@@ -94,6 +109,31 @@ def image_response(image: ImageStream, cache_control: str) -> StreamingResponse:
         "Cache-Control": cache_control,
     }
     return StreamingResponse(image.stream, media_type=image.mime, headers=headers)
+
+
+def document_response(
+    document: DocumentStream, *, inline: bool, cache_control: str
+) -> StreamingResponse:
+    """Build the streaming answer of one embedded PDF (spec 000869).
+
+    ``inline`` gives the framable preview for the file viewer, else a forced
+    download. Both name the file and carry ``nosniff``.
+    """
+    preview = (
+        {"Content-Security-Policy": DOCUMENT_PREVIEW_CSP, "X-Frame-Options": "SAMEORIGIN"}
+        if inline
+        else {}
+    )
+    headers = {
+        "Content-Disposition": content_disposition(
+            "inline" if inline else "attachment", document.name, default="Dokument.pdf"
+        ),
+        "Content-Length": str(document.size),
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": cache_control,
+        **preview,
+    }
+    return StreamingResponse(document.stream, media_type="application/pdf", headers=headers)
 
 
 @router.post(

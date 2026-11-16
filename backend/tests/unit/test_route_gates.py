@@ -23,6 +23,8 @@ Groups of ``OBJECT_CHECK_ROUTES`` that authorize no object:
   the avatar of a principal is the same Gravatar image that the person list shows.
   ``GET /api/calendar/people`` serves id and name of the active accounts to any session
   for the invitation of a person, never an address, and nothing to a scoped token.
+  ``GET /api/votes/circular-rules`` serves the least number of days of an
+  Umlaufverfahren, one number of the meeting settings, to any session.
 """
 
 from __future__ import annotations
@@ -66,10 +68,17 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
         "VotingService.assert_can_manage_group (manages_votes_in_gremium)"
     ),
     ("GET", "/api/auth/me"): _SELF,
+    ("GET", "/api/budget-plan-versions/{version_id}/plan"): _BUDGET_NODE,
+    ("GET", "/api/budget-plan-versions/{version_id}/readable"): _BUDGET_NODE,
+    ("GET", "/api/budget-plan-versions/{version_id}/export.xlsx"): _BUDGET_NODE,
+    ("GET", "/api/budget-plan-versions/{version_id}/export.pdf"): _BUDGET_NODE,
     ("GET", "/api/budgets"): "budget.tree_router._has_full_view + member gremien",
+    ("GET", "/api/budget-years"): "budget.tree_router._has_full_view + member gremien",
     ("GET", "/api/budgets/{budget_id}/applications"): _BUDGET_NODE,
     ("GET", "/api/budgets/{budget_id}/expenses"): _BUDGET_NODE,
     ("GET", "/api/budgets/{budget_id}/fiscal-years"): _BUDGET_NODE,
+    ("GET", "/api/budgets/{budget_id}/fiscal-years/{fiscal_year_id}/plan"): _BUDGET_NODE,
+    ("GET", "/api/budgets/{budget_id}/plan-steps"): _BUDGET_NODE,
     ("GET", "/api/calendar/entries"): (
         "CalendarEntries.between (meeting_read_scope, BoardAccess.scope, appointments.readable)"
     ),
@@ -105,8 +114,15 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("GET", "/api/committees"): "master data: id, name and variant of every gremium",
     ("GET", "/api/committees/overview"): "GremienService.overview (policy.GREMIUM_VIEW_ALL)",
     ("GET", "/api/committees/{gremium_id}/attendance"): _GREMIUM_VIEW,
+    ("GET", "/api/committees/{gremium_id}/attendance/export.xlsx"): (
+        "gremien_overview.router (session.manage in the Gremium)"
+    ),
     ("GET", "/api/committees/{gremium_id}/attendance/{principal_id}"): _GREMIUM_VIEW,
     ("GET", "/api/committees/{gremium_id}/decisions"): _GREMIUM_VIEW,
+    ("GET", "/api/committees/{gremium_id}/info"): _GREMIUM_VIEW,
+    ("PUT", "/api/committees/{gremium_id}/info"): (
+        "require_gremium + info.save_info (policy.holds_gremium_permission info.write)"
+    ),
     ("GET", "/api/committees/{gremium_id}/logo"): "policy.can_view_gremium",
     ("GET", "/api/committees/{gremium_id}/meeting-defaults"): _MEETING_MANAGE,
     ("GET", "/api/committees/{gremium_id}/meeting-members"): _MEETING_MANAGE,
@@ -124,18 +140,23 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("GET", "/api/meetings/{meeting_id}/agenda"): _LIVE,
     ("POST", "/api/meetings/{meeting_id}/agenda"): _MEETING_WRITE,
     ("GET", "/api/meetings/{meeting_id}/agenda/assignable"): _LIVE,
+    ("GET", "/api/meetings/{meeting_id}/agenda/assignable-plans"): _LIVE,
     ("PUT", "/api/meetings/{meeting_id}/agenda/order"): _MEETING_WRITE,
     ("PATCH", "/api/meetings/{meeting_id}/agenda/{item_id}"): _MEETING_WRITE,
     ("DELETE", "/api/meetings/{meeting_id}/agenda/{item_id}"): _MEETING_WRITE,
     ("PUT", "/api/meetings/{meeting_id}/agenda/{item_id}/done"): _MEETING_WRITE,
     ("GET", "/api/meetings/{meeting_id}/attendance"): _LIVE,
     ("PUT", "/api/meetings/{meeting_id}/attendance/me"): "AttendanceService.set_self (own row)",
+    ("POST", "/api/meetings/{meeting_id}/attendance/me/late-excuse"): (
+        "AttendanceService.excuse_late (own row)"
+    ),
     ("PUT", "/api/meetings/{meeting_id}/attendance/{principal_id}"): (
         "livevote.router._require_lead (PermissionOps.can_write)"
     ),
     ("DELETE", "/api/meetings/{meeting_id}/attendance/{principal_id}"): (
         "livevote.router._require_lead (PermissionOps.can_write)"
     ),
+    ("POST", "/api/meetings/{meeting_id}/documents"): "ProtocolService.authorize_write_meeting",
     ("GET", "/api/meetings/{meeting_id}/guests"): _MEETING_MANAGE,
     ("POST", "/api/meetings/{meeting_id}/guests/admit-all"): _MEETING_MANAGE,
     ("POST", "/api/meetings/{meeting_id}/guests/{guest_id}/admit"): _MEETING_MANAGE,
@@ -147,6 +168,7 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("POST", "/api/meetings/{meeting_id}/join-code/rotate"): _MEETING_MANAGE,
     ("GET", "/api/meetings/{meeting_id}/protocol"): "ProtocolService.authorize_read_meeting",
     ("POST", "/api/meetings/{meeting_id}/protocol"): "ProtocolService.authorize_write_meeting",
+    ("GET", "/api/meetings/{meeting_id}/known-names"): "ProtocolService.authorize_write_meeting",
     ("POST", "/api/meetings/{meeting_id}/minute-taker-handover"): "HandoverOps.can_hand_over",
     ("DELETE", "/api/meetings/{meeting_id}/minute-taker-handover"): "HandoverOps.can_hand_over",
     ("POST", "/api/meetings/{meeting_id}/votes"): (
@@ -172,6 +194,11 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ),
     ("DELETE", "/api/protocols/{protocol_id}"): _PROTOCOL_WRITE,
     ("POST", "/api/protocols/{protocol_id}/finalize"): "ProtocolService.authorize_finalize",
+    ("POST", "/api/protocols/{protocol_id}/draft-mail"): "ProtocolService.authorize_write",
+    ("GET", "/api/protocols/{protocol_id}/draft-pdf"): _PROTOCOL_READ,
+    ("PUT", "/api/protocols/{protocol_id}/approval"): "ProtocolService.authorize_finalize",
+    ("DELETE", "/api/protocols/{protocol_id}/approval"): "ProtocolService.authorize_finalize",
+    ("POST", "/api/protocols/{protocol_id}/reopen"): "ProtocolService.authorize_finalize",
     ("GET", "/api/protocols/{protocol_id}/pdf"): _PROTOCOL_READ,
     ("GET", "/api/protocols/{protocol_id}/pdf/public"): _PROTOCOL_READ,
     ("POST", "/api/protocols/{protocol_id}/votes"): _PROTOCOL_WRITE,
@@ -228,7 +255,11 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("GET", "/api/todos/series"): "any member; names of series only (spec 000483)",
     ("POST", "/api/todos/series"): "TodoService.create_series (writes a shared board)",
     ("GET", "/api/votes"): "voting.listing.read_scope",
-    ("POST", "/api/votes"): "PollService.can_create (policy.has_gremium_permission vote.manage)",
+    ("POST", "/api/votes"): (
+        "PollService.can_create (policy.has_gremium_permission vote.manage), also for "
+        "CircularService.create"
+    ),
+    ("GET", "/api/votes/circular-rules"): "master data: circularMinDays for the create form",
     ("GET", "/api/votes/{vote_id}"): "VotingService.assert_can_read",
     ("PATCH", "/api/votes/{vote_id}"): _MANAGE_VOTE,
     ("DELETE", "/api/votes/{vote_id}"): _MANAGE_VOTE,
@@ -236,6 +267,10 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("POST", "/api/votes/{vote_id}/cancel"): _RUN_VOTE,
     ("POST", "/api/votes/{vote_id}/close"): _RUN_VOTE,
     ("POST", "/api/votes/{vote_id}/draw-lot"): _MANAGE_VOTE,
+    ("POST", "/api/votes/{vote_id}/next-round"): _MANAGE_VOTE,
+    ("POST", "/api/votes/{vote_id}/objection"): (
+        "CircularService.object (VotingService.can_cast_own: roster of the vote)"
+    ),
     ("POST", "/api/votes/{vote_id}/open"): _RUN_VOTE,
     ("WS", "/api/ws/meetings/{meeting_id}"): "livevote.router._authorize (is_participant)",
     ("WS", "/api/ws/meetings/{meeting_id}/projector"): (

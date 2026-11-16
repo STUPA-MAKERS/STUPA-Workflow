@@ -375,9 +375,7 @@ class GuestService:
             guest.decided_by = actor_id
         await self.session.flush()
         outs = await self._outs(admitted)
-        return GuestEvents(
-            updated=(*voided, *((out, "public_off") for out in outs)), counts=True
-        )
+        return GuestEvents(updated=(*voided, *((out, "public_off") for out in outs)), counts=True)
 
     async def purge_on_close(self, meeting: Meeting) -> GuestEvents:
         """The meeting closes: delete the requests and pseudonymize the guests.

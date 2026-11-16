@@ -76,9 +76,7 @@ _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 #: Types the browser may render inline in the attachment preview: PDF and raster images
 #: from the upload allowlist. HTML, SVG and XML never appear here, so there is no
 #: stored-XSS vector. Every other type stays a forced download.
-_INLINE_MIMES = frozenset(
-    {"application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp"}
-)
+_INLINE_MIMES = frozenset({"application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp"})
 
 #: CSP of an inline preview response. The SPA shows the file in an iframe of the same
 #: origin, so this one response may be framed by 'self' only, because the default API set
@@ -87,8 +85,7 @@ _INLINE_MIMES = frozenset(
 #: and Chromium still render with this policy. Every other response keeps the default API
 #: set from `SecurityHeadersMiddleware`.
 PREVIEW_CSP = (
-    "default-src 'none'; frame-ancestors 'self'; base-uri 'none'; "
-    "form-action 'none'; sandbox"
+    "default-src 'none'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'; sandbox"
 )
 _PREVIEW_HEADERS = {
     "Content-Security-Policy": PREVIEW_CSP,
@@ -248,9 +245,7 @@ async def _assert_ticket_reader(
     ):
         raise missing
     if owner.kind == "ticket_note":
-        deleted = await db.scalar(
-            select(TicketNote.deleted_at).where(TicketNote.id == owner.id)
-        )
+        deleted = await db.scalar(select(TicketNote.deleted_at).where(TicketNote.id == owner.id))
         if deleted is not None:
             raise missing
 
@@ -455,9 +450,7 @@ async def get_attachment_url(
         await _assert_owner_reader(db, service, owner, principal, applicant, attachment_id)
         return await service.message_url(attachment_id)
     access = await _application_access(db, service, attachment_id, principal, applicant)
-    return await service.signed_url(
-        attachment_id, allow_unconfirmed=access.is_owning_applicant
-    )
+    return await service.signed_url(attachment_id, allow_unconfirmed=access.is_owning_applicant)
 
 
 @router.get(
@@ -507,9 +500,7 @@ async def download_attachment(
     )
     preview = inline and mime in _INLINE_MIMES
     headers = {
-        "Content-Disposition": content_disposition(
-            "inline" if preview else "attachment", filename
-        ),
+        "Content-Disposition": content_disposition("inline" if preview else "attachment", filename),
         "Content-Length": str(size),
         "X-Content-Type-Options": "nosniff",
         **(_PREVIEW_HEADERS if preview else {}),
@@ -582,16 +573,12 @@ DRAFT_TOKEN_HEADER = "X-Draft-Token"
 )
 async def upload_draft_attachment(
     drafts: DraftsDep,
-    verifier: Annotated[
-        AltchaVerifier | NullAltchaVerifier, Depends(get_altcha_verifier)
-    ],
+    verifier: Annotated[AltchaVerifier | NullAltchaVerifier, Depends(get_altcha_verifier)],
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     file: Annotated[UploadFile, File()],
     field_key: Annotated[str | None, Form(max_length=256)] = None,
     altcha: Annotated[str | None, Form(max_length=4096)] = None,
-    draft_token: Annotated[
-        str | None, Header(alias=DRAFT_TOKEN_HEADER, max_length=128)
-    ] = None,
+    draft_token: Annotated[str | None, Header(alias=DRAFT_TOKEN_HEADER, max_length=128)] = None,
 ) -> DraftAttachmentOut:
     """Upload a file of the wizard before the application exists.
 
@@ -621,9 +608,7 @@ async def upload_draft_attachment(
         try:
             await verifier.verify(altcha)
         except AltchaError as exc:
-            raise BadRequestError(
-                "Altcha verification failed.", code="altcha_failed"
-            ) from exc
+            raise BadRequestError("Altcha verification failed.", code="altcha_failed") from exc
     data = await read_capped(file, drafts.files.max_bytes)
     return await drafts.upload(
         token=draft_token,

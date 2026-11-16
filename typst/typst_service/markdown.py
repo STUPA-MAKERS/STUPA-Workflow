@@ -17,11 +17,21 @@ builder (`backend/app/modules/protocol/markdown.py`):
   `ja: 12, nein: 3, enthaltung: 2`. A vote callout without a tally line can
   hold a personnel election or a poll (Umfrage), which the template draws as a
   ranking.
+* A field row `> [!feld] Label`, with the value as block Markdown below it in
+  the same quote. Rows that follow each other form one table of two columns
+  (an Antrag is such tables).
+* A time note `> [!anmerkung HH:MM] text` is one grey, centered line with its
+  time. The backend puts an empty one in front of the heading of each TOP
+  that the Sitzung reached, with the time of the move to that TOP.
 * Inline shortcodes: `{{time 18:30}}`, `{{vote ja=1 nein=2 enthaltung=0}}`,
   `{{count anwesend}}` and a bare frontmatter field such as `{{anwesend}}`.
 * Blackout marks: the empty marker `%%%%` is a black bar of one fixed width.
   The backend puts it in place of each marked name of the public variant. A
   `%%Name%%` of the internal variant prints the name as plain text.
+* Blackout blocks: two lines that hold only `%%` fence a block. The converter
+  drops the fence lines and keeps the content, so the internal variant prints
+  it as normal Markdown. The empty block (one fence line right after the other)
+  is the bar of the public variant: one black bar of the full text width.
 * TeX math: `$...$` in a line, and a paragraph that is one `$$...$$` block.
   The formula body goes to the template as a string. The vendored mitex
   package converts it inside math mode.
@@ -33,6 +43,10 @@ builder (`backend/app/modules/protocol/markdown.py`):
   (a URL, a relative path, a missing asset) keeps its alt text. The node names
   the asset only; the template loads it from `/assets/`. A paragraph that holds
   only an image becomes a block image (`figure`).
+* PDFs: a link to the canonical path of an uploaded PDF,
+  `[name](/api/media/documents/<uuid>)`, becomes a `docref` node when the caller
+  uploaded its bytes as `doc-<uuid>.pdf`, else a `docmiss` node. The module
+  `appendix` numbers the references and makes the PDFs Anlagen.
 """
 
 from __future__ import annotations
@@ -45,12 +59,21 @@ from typing import TYPE_CHECKING, Final, cast
 
 import marko
 
+from .appendix import DOCUMENT_ASSET_RE, DOCUMENT_PATH_RE
+
 if TYPE_CHECKING:
     from collections.abc import Collection, Iterator, Mapping, Sequence
 
     from .frontmatter import Meta
 
-__all__ = ["ConversionError", "Node", "convert_body", "image_assets", "strip_antrag_fences"]
+__all__ = [
+    "ConversionError",
+    "Node",
+    "convert_body",
+    "image_assets",
+    "strip_antrag_fences",
+    "strip_blackout_blocks",
+]
 
 type Node = dict[str, object]
 
@@ -68,6 +91,12 @@ class ConversionError(ValueError):
 # -- callouts ---------------------------------------------------------------
 
 CALLOUT_RE: Final[re.Pattern[str]] = re.compile(r"^\s*\[!(\w+)\]\s*", re.IGNORECASE)
+
+# The marker of a time note: `[!anmerkung HH:MM]`. The time is part of the marker,
+# so the generic callout pattern does not match it.
+TIME_NOTE_RE: Final[re.Pattern[str]] = re.compile(
+    r"^\s*\[!anmerkung\s+([01]?\d|2[0-3]):([0-5]\d)\]\s*", re.IGNORECASE
+)
 
 # Marker -> (box kind, bold label). The label opens the box body.
 _LABELLED: Final[dict[str, tuple[str, str | None]]] = {
@@ -91,6 +120,13 @@ _LABELLED: Final[dict[str, tuple[str, str | None]]] = {
 }
 _VOTE_MARKERS: Final[frozenset[str]] = frozenset({"ABSTIMMUNG", "VOTE"})
 _SIGNATURE_MARKERS: Final[frozenset[str]] = frozenset({"UNTERSCHRIFTEN", "SIGNATURES"})
+# A field row: `> [!feld] Label` and the value below it as block Markdown. The rows
+# that follow each other form one table of two columns, label and value.
+_FIELD_MARKERS: Final[frozenset[str]] = frozenset({"FELD", "FIELD"})
+# A signature row: `> [!unterschrift] Label` and the role of the signer below it. It is
+# a field row whose value is a blank area with a line for the date and a line for the
+# signature, to fill in by hand.
+_SIGN_MARKERS: Final[frozenset[str]] = frozenset({"UNTERSCHRIFT", "SIGNATURE"})
 
 _TALLY_RE: Final[dict[str, re.Pattern[str]]] = {
     "yes": re.compile(r"(?:ja|yes)\s*[:=]?\s*(\d+)", re.IGNORECASE),
@@ -381,6 +417,13 @@ _ANTRAG_OPEN_RE: Final[re.Pattern[str]] = re.compile(r"^\s*:::\s*antrag\b[^\n]*$
 _FENCE_CLOSE_RE: Final[re.Pattern[str]] = re.compile(r"^\s*:::\s*$")
 _CODE_FENCE_RE: Final[re.Pattern[str]] = re.compile(r"^\s*(```|~~~)")
 
+# A fence line of a blackout block: only `%%`.
+_BLOCK_FENCE_RE: Final[re.Pattern[str]] = re.compile(r"^[ \t]*%%[ \t]*\r?$")
+
+# The paragraph that stands for the bar of an empty blackout block. The private-use
+# characters keep it apart from any text a keeper types.
+_BLOCK_BAR_TEXT: Final = "\ue000blackout-block\ue000"
+
 
 def _text(value: str) -> Node:
     return {"t": "text", "v": value}
@@ -553,6 +596,41 @@ def strip_antrag_fences(markdown: str) -> str:
     return "\n".join(line for line, scan in kept if scan.keep)
 
 
+@dataclass(frozen=True, slots=True)
+class _BlockScan:
+    """The blackout block state after one line, and the lines that replace it."""
+
+    in_code: bool = False
+    # The line number of the open fence line, else None.
+    open_at: int | None = None
+    out: tuple[str, ...] = ()
+
+
+def _block_line(scan: _BlockScan, numbered: tuple[int, str]) -> _BlockScan:
+    """Advance the block state over one line."""
+    index, line = numbered
+    match line:
+        case _ if _CODE_FENCE_RE.match(line):
+            return replace(scan, in_code=not scan.in_code, out=(line,))
+        case _ if not scan.in_code and _BLOCK_FENCE_RE.match(line) and scan.open_at is None:
+            return replace(scan, open_at=index, out=("",))
+        case _ if not scan.in_code and _BLOCK_FENCE_RE.match(line):
+            empty = scan.open_at == index - 1
+            return replace(scan, open_at=None, out=(_BLOCK_BAR_TEXT, "") if empty else ("",))
+        case _:
+            return replace(scan, out=(line,))
+
+
+def strip_blackout_blocks(markdown: str) -> str:
+    """Drop the fence lines of each blackout block, outside code.
+
+    A fence line becomes an empty line, so the content of a block stands apart
+    from the text around it. The empty block becomes the paragraph of the bar.
+    """
+    scans = itertools.accumulate(enumerate(markdown.split("\n")), _block_line, initial=_BlockScan())
+    return "\n".join(line for scan in itertools.islice(scans, 1, None) for line in scan.out)
+
+
 # -- the converter ----------------------------------------------------------
 
 
@@ -567,6 +645,8 @@ class _Converter:
     meta: Meta
     # uuid -> asset name of the uploaded images.
     images: Mapping[str, str]
+    # The uuids of the uploaded PDFs whose bytes came with the request.
+    documents: Collection[str] = ()
     depth: int = 0
     ul: int = 0
     ol: int = 0
@@ -608,6 +688,8 @@ class _Converter:
                 return [{"t": "emph", "c": self.inlines(node)}]
             case "Strikethrough":
                 return [{"t": "strike", "c": self.inlines(node)}]
+            case "Link" if DOCUMENT_PATH_RE.fullmatch(str(getattr(node, "dest", ""))):
+                return [self._document(node)]
             case "Link" | "AutoLink" | "Url":
                 dest = str(getattr(node, "dest", ""))
                 external = EXTERNAL_URL_RE.match(dest)
@@ -620,6 +702,19 @@ class _Converter:
                 return [self._image(node)]
             case _:
                 return self.inlines(node)
+
+    def _document(self, node: object) -> Node:
+        """Build the reference to an uploaded PDF: a `docref`, or a `docmiss` without bytes.
+
+        `appendix.number_documents` numbers the references later and turns the ones
+        past the budget into `docmiss`.
+        """
+        name = "".join(_plain(c) for c in _children(node)).strip() or "PDF"
+        match = DOCUMENT_PATH_RE.fullmatch(str(getattr(node, "dest", "")))
+        doc = match.group(1) if match is not None else ""
+        if doc not in self.documents:
+            return {"t": "docmiss", "name": name}
+        return {"t": "docref", "doc": doc, "name": name}
 
     def _image(self, node: object) -> Node:
         """Build an image node: the uploaded asset, else the alt text only.
@@ -739,6 +834,9 @@ class _Converter:
         display = self._display_math(node)
         if display is not None:
             return display
+        if _plain(node).strip() == _BLOCK_BAR_TEXT:
+            # The empty blackout block of the public variant (000967).
+            return {"t": "par", "c": [{"t": "blockbar"}]}
         content = _trim(self.inlines(node))
         if len(content) == 1 and content[0].get("t") == "image" and "asset" in content[0]:
             # A paragraph of one image is a block image, centered and scaled.
@@ -771,7 +869,7 @@ class _Converter:
         return {"t": "codeblock", "v": (text or "").rstrip("\n")}
 
     def blocks(self, nodes: list[object]) -> list[Node]:
-        return [out for node in nodes for out in self.block(node)]
+        return _field_tables([out for node in nodes for out in self.block(node)])
 
     def _display_math(self, node: object) -> Node | None:
         parts = [_source_text(c) for c in _children(node)]
@@ -808,15 +906,44 @@ class _Converter:
 
     def _quote(self, node: object) -> list[Node]:
         kids = _children(node)
+        note = self._time_note(kids)
+        if note is not None:
+            return [note, *self.blocks(kids[1:])]
         match self._marker(kids):
             case None:
                 return [{"t": "quote", "c": self.blocks(kids)}]
             case (name, _) if name in _VOTE_MARKERS:
                 return [self._vote(kids)]
+            case (name, rest) if name in _FIELD_MARKERS:
+                return [self._field(kids, rest)]
+            case (name, rest) if name in _SIGN_MARKERS:
+                return [self._sign_row(kids, rest)]
             case (name, _) if name in _SIGNATURE_MARKERS:
                 return [self._signature_callout(kids)]
             case (name, rest):
                 return [self._labelled(kids, name, rest)]
+
+    def _time_note(self, kids: list[object]) -> Node | None:
+        """Build a time note from `> [!anmerkung HH:MM] text`, or None for another quote.
+
+        The note is the first paragraph of the quote. Its text keeps the inline Markdown,
+        the shortcodes and the blackout marks. The hour gets two digits.
+        """
+        if not kids or _kind(kids[0]) != "Paragraph":
+            return None
+        inner = _children(kids[0])
+        first = _leaf(inner[0]) if inner else None
+        match = TIME_NOTE_RE.match(first) if first is not None else None
+        if match is None or _kind(inner[0]) != "RawText":
+            return None
+        return {
+            "t": "timenote",
+            "time": f"{int(match.group(1)):02d}:{match.group(2)}",
+            "c": [
+                *_inline_text(cast("str", first)[match.end() :], self.meta),
+                *self._inline_nodes(inner[1:]),
+            ],
+        }
 
     def _labelled(self, kids: list[object], name: str, rest: str) -> Node:
         """Build a callout box. Its bold label and the rest of the marker line open the body."""
@@ -828,6 +955,25 @@ class _Converter:
             *self._inline_nodes(first[1:]),
         ]
         return {"t": "callout", "kind": box, "c": [{"t": "par", "c": head}, *self.blocks(kids[1:])]}
+
+    def _field(self, kids: list[object], rest: str) -> Node:
+        """Build a field row: the first line is the label, the rest is the value.
+
+        The value keeps its block Markdown: paragraphs, lists, quotes and tables.
+        A line of the first paragraph after the label opens the value.
+        """
+        head, *more = _split_at_breaks(_children(kids[0]))
+        text = rest if head[1:] else rest.rstrip()
+        label = [*_inline_text(text, self.meta), *self._inline_nodes(head[1:])]
+        lead = [{"t": "par", "c": self._inline_nodes(line)} for line in more if line]
+        return {"t": "field", "label": label, "c": [*lead, *self.blocks(kids[1:])]}
+
+    def _sign_row(self, kids: list[object], rest: str) -> Node:
+        """Build a signature row: the first line is the label, the rest names the signer."""
+        lines = ["".join(_plain(n) for n in line).strip() for line in self._callout_lines(kids)]
+        role = " ".join(line for line in lines[1:] if line)
+        label = [*_inline_text(rest.strip(), self.meta)]
+        return {"t": "field", "label": label, "c": [], "sign": role}
 
     def _marker(self, kids: list[object]) -> tuple[str, str] | None:
         """Read the callout marker of a quote: `(NAME, rest of the first text)`."""
@@ -841,7 +987,10 @@ class _Converter:
         if match is None:
             return None
         name = match.group(1).upper()
-        if name not in _LABELLED and name not in _VOTE_MARKERS and name not in _SIGNATURE_MARKERS:
+        known = (
+            _LABELLED.keys() | _VOTE_MARKERS | _SIGNATURE_MARKERS | _FIELD_MARKERS | _SIGN_MARKERS
+        )
+        if name not in known:
             return None
         return name, first[match.end() :]
 
@@ -915,6 +1064,41 @@ class _Converter:
         }
 
 
+def _field_tables(nodes: list[Node]) -> list[Node]:
+    """Join the field rows that follow each other into one table node.
+
+    A level-1 heading right in front of the rows is the title of the table: the
+    template prints it on a band across the table, so the heading node drops.
+    """
+    runs = [
+        (is_field, list(run))
+        for is_field, run in itertools.groupby(nodes, key=lambda node: node.get("t") == "field")
+    ]
+    titled = [
+        not is_field and bool(run) and _is_section(run[-1]) and index + 1 < len(runs)
+        for index, (is_field, run) in enumerate(runs)
+    ]
+    return [
+        out
+        for index, (is_field, run) in enumerate(runs)
+        for out in (
+            [_fields(run, runs[index - 1][1][-1] if index and titled[index - 1] else None)]
+            if is_field
+            else run[:-1]
+            if titled[index]
+            else run
+        )
+    ]
+
+
+def _is_section(node: Node) -> bool:
+    return node.get("t") == "heading" and node.get("level") == 1
+
+
+def _fields(rows: list[Node], heading: Node | None) -> Node:
+    return {"t": "fields", "rows": rows, **({"title": heading["c"]} if heading else {})}
+
+
 def _split_at_breaks(inlines: list[object]) -> list[list[object]]:
     """Split a run of inline nodes at each line break; the breaks drop."""
     breaks = [index for index, node in enumerate(inlines) if _kind(node) == "LineBreak"]
@@ -960,13 +1144,17 @@ def convert_body(markdown: str, meta: Meta, assets: Collection[str] = ()) -> lis
     """Convert the Markdown body of a protocol into block nodes.
 
     `assets` holds the names of the uploaded assets. An `img-<uuid>.<ext>` among
-    them lets the image `/api/media/images/<uuid>` show.
+    them lets the image `/api/media/images/<uuid>` show. A `doc-<uuid>.pdf` among
+    them makes the link `/api/media/documents/<uuid>` a `docref` node.
 
     Raises:
         ConversionError: The Markdown nests too deep.
     """
-    tree = _PARSER.parse(strip_antrag_fences(markdown))
-    converter = _Converter(meta=meta, images=image_assets(assets))
+    tree = _PARSER.parse(strip_blackout_blocks(strip_antrag_fences(markdown)))
+    documents = frozenset(
+        match.group(1) for name in assets if (match := DOCUMENT_ASSET_RE.fullmatch(name))
+    )
+    converter = _Converter(meta=meta, images=image_assets(assets), documents=documents)
     try:
         blocks = converter.blocks(_children(tree))
     except RecursionError:

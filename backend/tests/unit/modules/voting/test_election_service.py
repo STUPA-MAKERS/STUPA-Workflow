@@ -19,6 +19,7 @@ from fastapi.testclient import TestClient
 from app.deps import get_current_applicant, get_current_principal
 from app.main import create_app
 from app.modules.auth.principal import Principal
+from app.modules.meetings.present import Present
 from app.modules.voting import router as voting_router
 from app.modules.voting.election import (
     ElectionService,
@@ -38,11 +39,13 @@ from app.modules.voting.tally import tally_election
 from app.shared.config_schemas import ElectionConfig
 from app.shared.errors import ConflictError, ForbiddenError, ValidationProblem
 from tests._support.flow_fakes import fake_session, result
+from tests.unit.conftest import Presence
 from tests.unit.modules.voting.test_voting_service_unit import (  # noqa: F401 - fixture
     GID,
     NOW,
     _FakeFlow,
     _patch_flow,
+    _persons,
     _vote,
     _voter,
 )
@@ -158,9 +161,10 @@ async def test_get_closed_election_counts_ballots_and_candidates() -> None:
     assert out.config.options == ["c1", "c2", "c3", "abstain"]
 
 
-async def test_get_open_election_hides_the_counts() -> None:
+async def test_get_open_election_hides_the_counts(monkeypatch: pytest.MonkeyPatch) -> None:
     vote = _evote()
     db = fake_session(result(vote), result(), result('["c1"]'))
+    monkeypatch.setattr(VotingService, "voters", _persons(1))
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False
     assert out.tally.counts == {}
@@ -284,18 +288,21 @@ async def test_close_election_after_the_window_rejects_without_quorum() -> None:
     assert out.election_result is not None and out.election_result.elected == []
 
 
-async def test_close_meeting_election_fixes_the_attendance() -> None:
+async def test_close_meeting_election_fixes_the_attendance(presence: Presence) -> None:
     """The close of a meeting election stores 4 present members and 2 admitted guests."""
     vote = _evote(meeting_id=uuid4())
     db = fake_session(result(vote), result('["c1"]'))
-    db.scalar_results = [4, 2]
+    presence.here = Present(members=4)
+    db.scalar_results = [None, 2]
     out = await VotingService(db).close(vote.id, _voter(), now=NOW)
     assert out.tally.present_members == 4
     assert out.tally.present_guests == 2
     assert out.tally.eligible == 10
 
 
-async def test_close_meeting_election_with_guests_counts_them_as_eligible() -> None:
+async def test_close_meeting_election_with_guests_counts_them_as_eligible(
+    presence: Presence,
+) -> None:
     """The admitted guests of a meeting election with guests count as eligible.
 
     The fake session serves the admitted guest, no guest ballots and no guest markers.
@@ -310,7 +317,8 @@ async def test_close_meeting_election_with_guests_counts_them_as_eligible() -> N
         result(),
         result(),
     )
-    db.scalar_results = [3]
+    presence.here = Present(members=3)
+    db.scalar_results = [None]
     out = await VotingService(db).close(vote.id, _voter(), now=NOW)
     assert out.tally.eligible == 4
     assert vote.eligible_count == 4

@@ -1,3 +1,4 @@
+import { FeatureService, type FeatureKey } from '@core/features/feature.service';
 import { NgTemplateOutlet } from '@angular/common';
 import { DomPortalOutlet, TemplatePortal } from '@angular/cdk/portal';
 import {
@@ -61,6 +62,18 @@ const KIND_CHIPS: readonly { readonly value: PickerKind; readonly label: Transla
   { value: 'todo', label: 'todos.picker.todos' },
 ];
 
+/** The feature of a link kind; a kind without an entry has no switch. */
+const LINK_FEATURE: Partial<Record<TodoLinkKind, FeatureKey>> = {
+  meeting: 'meetings',
+  agenda_item: 'meetings',
+  vote: 'voting',
+  appointment: 'calendar',
+  invoice: 'invoices',
+  expense: 'budget',
+  budget: 'budget',
+  ticket: 'tickets',
+};
+
 /** The key of a link target in the `linked` set. */
 export function linkKey(kind: TodoLinkKind, id: Uuid): string {
   return `${kind}:${id}`;
@@ -92,6 +105,7 @@ export function linkKey(kind: TodoLinkKind, id: Uuid): string {
 export class TodoLinkPickerComponent {
   private readonly api = inject(TodosApiService);
   private readonly i18n = inject(I18nService);
+  private readonly features = inject(FeatureService);
   private readonly t: Translate = (key, params) => this.i18n.translate(key, params);
 
   readonly open = model(false);
@@ -102,7 +116,11 @@ export class TodoLinkPickerComponent {
   readonly picked = output<TodoLinkTarget>();
 
   readonly phone = mediaQuery(MEDIA.phone);
-  readonly chips = KIND_CHIPS;
+  /** The chips of the kinds that this platform has (spec 000758). */
+  readonly chips = KIND_CHIPS.filter((chip) => {
+    const feature = chip.value === 'all' ? undefined : LINK_FEATURE[chip.value];
+    return feature === undefined || this.features.isOn(feature);
+  });
   readonly kind = signal<PickerKind>('all');
   readonly hits = signal<TodoLinkTarget[]>([]);
   readonly failed = signal(false);

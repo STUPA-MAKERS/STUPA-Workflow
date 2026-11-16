@@ -50,6 +50,7 @@ interface Inputs {
   meeting: Meeting;
   attendance: Attendance[];
   saving: boolean;
+  protocolLocked: boolean;
   viewers: LiveViewer[];
   conflictId: string | null;
 }
@@ -226,11 +227,20 @@ describe('AttendanceSheetComponent', () => {
   });
 
   /** The live list is for a running meeting. */
-  it('freezes every row of a closed meeting', async () => {
-    await setup({ meeting: meeting({ status: 'closed' }) });
+  it('freezes every row of a closed meeting with a final protocol', async () => {
+    await setup({ meeting: meeting({ status: 'closed' }), protocolLocked: true });
     expect(within(sheet()).queryByRole('radiogroup')).toBeNull();
     expect(within(sheet()).getByText('Unentschuldigt', { selector: 'app-status-text' })).toBeInTheDocument();
     expect(within(sheet()).queryByText(/Live dabei/)).toBeNull();
+  });
+
+  /** § 000951 (protocolLocked): the lead corrects a closed meeting, a member does not. */
+  it('lets the lead correct a closed meeting until the protocol is final', async () => {
+    const { fixture } = await setup({ meeting: meeting({ status: 'closed' }) });
+    expect(within(sheet()).getAllByRole('radiogroup').length).toBeGreaterThan(0);
+    fixture.componentRef.setInput('meeting', meeting({ status: 'closed', canControl: false }));
+    fixture.detectChanges();
+    expect(within(sheet()).queryByRole('radiogroup')).toBeNull();
   });
 
   /**

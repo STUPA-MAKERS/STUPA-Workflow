@@ -15,6 +15,9 @@ import { JoinLinkComponent } from './join-link.component';
  * "Sitzung bearbeiten": the switch "Öffentliche Teilnahme (QR)", then the choice
  * "Gäste dürfen abstimmen" / "Gäste schauen nur zu" (two equal segments with one line
  * each), then the join link with its QR code, or, before the create, where it will be.
+ *
+ * A Gremium that gives guests no ballot (its switch is off, or it has a quorum) shows
+ * no choice: the guests only watch, and a lock line says so (§ 000904, § 000905).
  */
 @Component({
   selector: 'app-public-join-settings',
@@ -30,10 +33,8 @@ export class PublicJoinSettingsComponent {
   readonly publicJoin = model(false);
   readonly guestsMode = model<GuestsMode>('vote');
   readonly disabled = input(false);
-  /** The gremium has no quorum: only then can the participation be switched on. */
-  readonly allowed = input(true);
-  /** The quorum of the gremium, for the explanation; `null` when it is unknown. */
-  readonly quorumPercent = input<number | null>(null);
+  /** Guests can get a ballot in this Gremium; else the mode is "nur zuschauen". */
+  readonly voteAllowed = input(true);
   /** The join link of an existing meeting, or `null` (create dialog, not loaded yet). */
   readonly link = input<JoinLink | null>(null);
   readonly rotating = input(false);
@@ -43,16 +44,6 @@ export class PublicJoinSettingsComponent {
     { value: 'vote', label: this.i18n.translate('guests.mode.vote') },
     { value: 'watch', label: this.i18n.translate('guests.mode.watch') },
   ]);
-
-  /** On only without a quorum; a meeting that is public already can always switch off. */
-  protected readonly switchLocked = computed(
-    () => this.disabled() || (!this.allowed() && !this.publicJoin()),
-  );
-  protected readonly notAllowedText = computed(() => {
-    const first = this.i18n.translate('guests.settings.needsNoQuorum');
-    const q = this.quorumPercent();
-    return q === null ? first : `${first} ${this.i18n.translate('guests.settings.hasQuorum', { n: q })}`;
-  });
 
   setMode(value: string | null): void {
     if (value === 'vote' || value === 'watch') this.guestsMode.set(value);

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 
+from app.modules.notifications.brand import MailBrand
 from app.modules.notifications.layout import append_link_text, render_layout
 from app.modules.notifications.links import (
     MailLink,
@@ -72,7 +73,7 @@ def _layout(content: str, url: str | None) -> str:
     return render_layout(
         content_html=content,
         title="T",
-        site_name="S",
+        brand=MailBrand(name="S"),
         base_url="https://x.de",
         reason="R",
         action_url=url,

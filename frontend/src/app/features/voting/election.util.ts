@@ -180,6 +180,7 @@ export function electionResultLine(
 ): string {
   const elected = candidateNames(election, er?.elected ?? [], t);
   if (result === 'tie') return t('election.result.tie');
+  if (result === 'no_majority') return t('election.result.noMajority');
   if (result === 'rejected' || elected.length === 0) return t('election.result.nobody');
   return t('election.result.elected', { names: elected.join(', ') });
 }
@@ -191,8 +192,32 @@ export function electionCaption(
   t: Translate,
 ): string {
   const seats = election?.seats ?? 1;
-  const head = (round ?? 1) > 1 ? t('election.runoffRound', { n: round ?? 2 }) : t('election.kind');
+  const n = round ?? 1;
+  if (election?.majorityRule === 'members_majority') {
+    const rule = n >= SIMPLE_MAJORITY_ROUND ? 'meetings.vote.rule.simple' : 'meetings.vote.rule.members_majority';
+    const kind = n > 1 ? `${t('election.kind')} · ${t('meetings.vote.attemptElection', { n })}` : t('election.kind');
+    return `${kind} · ${seatsText(seats, t)} · ${t(rule)}`;
+  }
+  const head = n > 1 ? t('election.runoffRound', { n }) : t('election.kind');
   return `${head} · ${seatsText(seats, t)}`;
+}
+
+/** From this Wahlgang on the simple majority elects (§ 000971). */
+export const SIMPLE_MAJORITY_ROUND = 3;
+
+/**
+ * The next Wahlgang that a closed election takes: 2 or 3 after a first or a second
+ * Wahlgang without the majority of the members, else `null` (§ 000971).
+ */
+export function nextRoundOf(
+  election: ElectionConfig | null,
+  result: VoteResult | string | null,
+  round: number | undefined,
+): number | null {
+  const n = round ?? 1;
+  return election?.majorityRule === 'members_majority' && result === 'no_majority' && n < SIMPLE_MAJORITY_ROUND
+    ? n + 1
+    : null;
 }
 
 /**
@@ -212,6 +237,8 @@ export function electionStatus(result: VoteResult | string | null): StatusView {
       return { kind: 'warn', key: 'election.status.runoff' };
     case 'tie':
       return { kind: 'warn', key: 'election.status.tie' };
+    case 'no_majority':
+      return { kind: 'error', key: 'election.status.noMajority' };
     default:
       return { kind: 'error', key: 'election.status.rejected' };
   }

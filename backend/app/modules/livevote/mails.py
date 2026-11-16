@@ -20,6 +20,10 @@ from app.modules.notifications.links import meeting_link
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.service import NotificationService
 from app.modules.notifications.texts.meetings import (
+    BUILTIN_ABSENCE_LIMIT_BODY,
+    BUILTIN_ABSENCE_LIMIT_SUBJECT,
+    BUILTIN_LATE_EXCUSE_BODY,
+    BUILTIN_LATE_EXCUSE_SUBJECT,
     BUILTIN_MEETING_BODY,
     BUILTIN_MEETING_SUBJECT,
 )
@@ -76,6 +80,115 @@ class MeetingMailer:
                     "gremiumName": gremium_name or "",
                 },
                 idempotency_parts=("meeting_created", str(meeting.id)),
+                link=meeting_link(settings, meeting.id),
+            )
+
+    async def absence_limit(self, settings: Settings, meeting_id: uuid.UUID, pool: object) -> None:
+        """Mail the absence notices of a closed meeting to its managers; log a failure."""
+        try:
+            await self._absence_limit(settings, meeting_id, pool)
+        except Exception:
+            logger.exception("absence mail failed (meeting=%s)", meeting_id)
+
+    async def _absence_limit(self, settings: Settings, meeting_id: uuid.UUID, pool: object) -> None:
+        from app.modules.gremien.models import Gremium
+        from app.modules.livevote.open_window import load_meeting_settings
+        from app.modules.meetings.absence import absence_notices, manager_emails
+        from app.modules.meetings.models import Meeting
+
+        queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
+        sessionmaker = get_sessionmaker()
+        async with sessionmaker() as session:
+            meeting = await session.get(Meeting, meeting_id)
+            if meeting is None:
+                return
+            notices = await absence_notices(session, meeting, await load_meeting_settings(session))
+            recipients = await manager_emails(session, meeting.gremium_id) if notices else []
+            if not recipients:
+                return
+            gremium_name = await session.scalar(
+                select(Gremium.name).where(Gremium.id == meeting.gremium_id)
+            )
+            service = NotificationService(session, queue=queue, settings=settings)
+            for notice in notices:
+                await service.send_kind_mail(
+                    recipients,
+                    kind="meeting",
+                    template_key="absence_limit",
+                    builtin_subject=BUILTIN_ABSENCE_LIMIT_SUBJECT,
+                    builtin_body=BUILTIN_ABSENCE_LIMIT_BODY,
+                    context={
+                        "meetingId": str(meeting.id),
+                        "meetingTitle": meeting.title,
+                        "meetingDate": meeting.date.strftime("%d.%m.%Y") if meeting.date else "",
+                        "gremiumName": gremium_name or "",
+                        "memberName": notice.name,
+                        "count": notice.count,
+                        "limit": notice.limit,
+                        "reached": notice.reached,
+                    },
+                    idempotency_parts=(
+                        "absence_limit",
+                        str(meeting.id),
+                        str(notice.principal_id),
+                    ),
+                    link=meeting_link(settings, meeting.id),
+                )
+
+    async def late_excuse(
+        self, settings: Settings, meeting_id: uuid.UUID, member_sub: str, pool: object
+    ) -> None:
+        """Mail a late excuse of a member to the managers of the Gremium; log a failure."""
+        try:
+            await self._late_excuse(settings, meeting_id, member_sub, pool)
+        except Exception:
+            logger.exception("late excuse mail failed (meeting=%s)", meeting_id)
+
+    async def _late_excuse(
+        self, settings: Settings, meeting_id: uuid.UUID, member_sub: str, pool: object
+    ) -> None:
+        from app.modules.auth.models import Principal as PrincipalRow
+        from app.modules.gremien.models import Gremium
+        from app.modules.meetings.absence import manager_emails
+        from app.modules.meetings.models import Meeting, MeetingAttendance
+
+        queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
+        sessionmaker = get_sessionmaker()
+        async with sessionmaker() as session:
+            meeting = await session.get(Meeting, meeting_id)
+            member = await session.scalar(
+                select(PrincipalRow).where(PrincipalRow.sub == member_sub)
+            )
+            if meeting is None or member is None:
+                return
+            record = await session.scalar(
+                select(MeetingAttendance).where(
+                    MeetingAttendance.meeting_id == meeting_id,
+                    MeetingAttendance.principal_id == member.id,
+                    MeetingAttendance.status == "excused",
+                )
+            )
+            recipients = await manager_emails(session, meeting.gremium_id) if record else []
+            if record is None or not recipients:
+                return
+            gremium_name = await session.scalar(
+                select(Gremium.name).where(Gremium.id == meeting.gremium_id)
+            )
+            await NotificationService(session, queue=queue, settings=settings).send_kind_mail(
+                recipients,
+                kind="meeting",
+                template_key="late_excuse",
+                builtin_subject=BUILTIN_LATE_EXCUSE_SUBJECT,
+                builtin_body=BUILTIN_LATE_EXCUSE_BODY,
+                context={
+                    "meetingId": str(meeting.id),
+                    "meetingTitle": meeting.title,
+                    "meetingDate": meeting.date.strftime("%d.%m.%Y") if meeting.date else "",
+                    "gremiumName": gremium_name or "",
+                    "memberName": member.display_name or member.email or "",
+                    "reason": record.note or "",
+                },
+                idempotency_parts=("late_excuse", str(meeting.id), str(member.id)),
                 link=meeting_link(settings, meeting.id),
             )
 

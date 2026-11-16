@@ -34,6 +34,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { simplifyPathKey } from '@shared/budget-path';
 import { nodeColors } from '../budget-color.util';
 import type { BudgetTreeNode } from '../budget-tree.api';
+import { pickable } from '../cost-centre/cost-centre.util';
 import { formatMoney } from '@shared/format-money';
 import { costCentreFigures, findBudgetNode } from '../expense-display.util';
 
@@ -212,11 +213,20 @@ export class CostCentreSelectComponent {
       : null,
   );
 
+  /**
+   * The cost centres of the list: no inactive one, and for a fiscal year with a plan in
+   * force only the cost centres of that plan or with a booking or an application in it.
+   * The field still names a pick that the list no longer offers.
+   */
+  private readonly offered = computed(() =>
+    pickable(this.nodes(), (top) => [this.fiscalYearId(), this.fiscalYears().get(top.id) ?? '']),
+  );
+
   /** The groups of the list: every top-level budget with a hit, its choices below. */
   protected readonly groups = computed<readonly CostCentreGroup[]>(() => {
     const q = this.query().trim().toLocaleLowerCase();
     const start = { groups: [] as readonly CostCentreGroup[], next: this.allChoice() ? 1 : 0 };
-    return this.nodes().reduce((acc, top) => {
+    return this.offered().reduce((acc, top) => {
       const group = this.group(top, q, acc.next);
       return group
         ? { groups: [...acc.groups, group], next: acc.next + 1 + choiceCount(group) }

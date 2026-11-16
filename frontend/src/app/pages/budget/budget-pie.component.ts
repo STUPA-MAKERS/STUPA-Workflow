@@ -47,7 +47,8 @@ const GROW = 5;
  *
  * Without an amount (all slices 0) the chart keeps its size and shows one neutral ring
  * with 0 in the hole and neutral skeleton lines in place of the legend, so the layout
- * does not jump when the metric changes. It shows no "no data" text.
+ * does not jump when the metric changes. It shows no "no data" text. With `loading` it is the
+ * skeleton of the chart: the same ring and lines, and a bar in place of the 0.
  */
 @Component({
   selector: 'app-budget-pie',
@@ -67,6 +68,11 @@ export class BudgetPieComponent {
   readonly slices = input<readonly PieSlice[]>([]);
   /** The currency of the amounts. */
   readonly currency = input<string>('EUR');
+  /**
+   * The amounts are still loading: the neutral ring and the legend lines of the empty chart,
+   * with a bar in place of the total, so the loading page does not say 0 €.
+   */
+  readonly loading = input(false);
   /** Click on a slice or an entry with an `id`: emits the cost centre id. */
   readonly sliceClick = output<string>();
 
@@ -102,7 +108,7 @@ export class BudgetPieComponent {
   /** The accessible name. Without an amount it also says that there is no amount. */
   protected readonly name = computed(() => {
     const name = this.ariaLabel() ?? this.label();
-    return this.empty() ? this.i18n.translate('budget.pie.emptyLabel', { name }) : name;
+    return this.empty() && !this.loading() ? this.i18n.translate('budget.pie.emptyLabel', { name }) : name;
   });
 
   protected onSlice(a: Arc): void {

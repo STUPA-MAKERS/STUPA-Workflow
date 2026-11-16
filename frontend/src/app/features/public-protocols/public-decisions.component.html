@@ -1,0 +1,126 @@
+<section class="pp">
+  <header class="pp__head">
+    <nav class="pp__crumbs" [attr.aria-label]="'publicProtocols.crumbs' | t">
+      <a routerLink="/">{{ 'publicProtocols.crumbHome' | t }}</a>
+      <app-icon name="right" [size]="13" />
+      <a routerLink="/protocols">{{ 'publicProtocols.title' | t }}</a>
+      <app-icon name="right" [size]="13" />
+      <span aria-current="page">{{ 'publicDecisions.title' | t }}</span>
+    </nav>
+    <h1 class="pp__title">{{ 'publicDecisions.title' | t }}</h1>
+  </header>
+
+  @if (!loading() && !error() && total() === 0 && !hasFilters()) {
+    <div class="pp__none">
+      <app-empty-state shape="date"
+        [heading]="'publicDecisions.empty.none' | t"
+        [body]="'publicDecisions.empty.noneBody' | t"
+      >
+        <a class="pp__btn pp__btn--tonal" routerLink="/protocols">
+          <app-icon name="back" [size]="16" />
+          {{ 'publicProtocols.title' | t }}
+        </a>
+      </app-empty-state>
+    </div>
+  } @else {
+    <div class="pp__toolbar">
+      <app-search-pill
+        size="md"
+        [clearable]="true"
+        [placeholder]="'publicDecisions.search' | t"
+        [results]="loading() ? null : total()"
+        [value]="search.text()"
+        (valueChange)="search.set($event)"
+        (commit)="search.flush()"
+      />
+      <div class="pp__chips">
+        <app-filter-select
+          [label]="'publicProtocols.filter.gremium' | t"
+          [multiple]="true"
+          [options]="gremiumOptions()"
+          [values]="gremiumFilter()"
+          (valuesChange)="onGremien($event)"
+          [text]="gremiumText()"
+          [active]="gremiumFilter().length > 0"
+          [resetLabel]="'publicProtocols.filter.reset' | t"
+        />
+        <app-filter-select
+          [label]="'publicProtocols.filter.semester' | t"
+          [options]="semesterOptions()"
+          [value]="semesterFilter()"
+          (valueChange)="onSemester($event)"
+          [text]="semesterText()"
+          [active]="semesterFilter() !== ''"
+        />
+        <span class="pp__spacer"></span>
+        @if (!loading()) {
+          <span class="pp__count" aria-live="polite">{{ countText() }}</span>
+        }
+      </div>
+    </div>
+
+    @if (loading()) {
+      <app-skeleton variant="rows" [count]="4" [label]="'publicDecisions.loading' | t" />
+    } @else if (error() && items().length === 0) {
+      <app-note kind="error" icon="alert" role="alert">{{ 'publicDecisions.error' | t }}</app-note>
+    } @else if (items().length === 0) {
+      <div class="pp__none">
+        <app-empty-state shape="date"
+          [heading]="'publicDecisions.empty.filtered' | t"
+          [body]="'publicDecisions.empty.filteredBody' | t"
+        >
+          <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'publicProtocols.filter.resetAll' | t }}</app-button>
+        </app-empty-state>
+      </div>
+    } @else {
+      @for (group of groups(); track group.key) {
+        <h2 class="pp__group">{{ group.label }}</h2>
+        @for (d of group.items; track $index) {
+          <article class="pp__card">
+            <app-date-block class="pp__date" [date]="dateOf(d)" />
+            <div class="pp__main">
+              <div class="pp__titles">
+                <p class="pp__meta">
+                  @for (part of meta(d); track $index) {
+                    <span>{{ part }}</span>
+                  }
+                </p>
+                <h3 class="pp__cardTitle">
+                  <app-highlight [text]="question(d)" [query]="appliedQuery()" />
+                </h3>
+              </div>
+              @if (d.kind === 'election') {
+                <p class="pp__tally"><span class="pp__kind">{{ 'publicDecisions.election' | t }}</span></p>
+              } @else {
+                <p class="pp__tally">
+                  @if (resultLabel(d); as key) {
+                    <span class="pp__result" [class.pp__result--no]="!isYes(d)">{{ key | t }}</span>
+                  }
+                  @for (c of counts(d); track $index) {
+                    <span>{{ c }}</span>
+                  }
+                </p>
+              }
+            </div>
+            @if (d.protocolId) {
+              <div class="pp__side">
+                <a class="pp__view" [routerLink]="['/protocols', d.protocolId]">
+                  {{ 'publicDecisions.protocol' | t }}
+                  <app-icon name="right" [size]="15" />
+                </a>
+              </div>
+            }
+          </article>
+        }
+      }
+      @if (error()) {
+        <app-note kind="error" icon="alert" role="alert">{{ 'publicDecisions.error' | t }}</app-note>
+      }
+      @if (hasMore()) {
+        <app-button class="pp__more" variant="tonal" [loading]="loadingMore()" (click)="loadMore()">
+          {{ 'publicDecisions.more' | t }}
+        </app-button>
+      }
+    }
+  }
+</section>

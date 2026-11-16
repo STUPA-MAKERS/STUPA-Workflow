@@ -1,6 +1,11 @@
 import type { GremiumAttendanceMonth, GremiumAttendanceRow } from '@core/api/gremien.service';
+import { gremiumInfo } from '../../../testing/gremien-fixtures';
 import {
   cellStrength,
+  infoEmpty,
+  infoTabShown,
+  infoUrlShown,
+  infoUrlValid,
   cellView,
   fileSlug,
   localized,
@@ -17,6 +22,7 @@ import {
   shiftMonth,
   sortRows,
   toCsv,
+  rangeDays,
 } from './gremien.util';
 
 const MONTHS: GremiumAttendanceMonth[] = [
@@ -32,6 +38,7 @@ function row(name: string | null, cells: [boolean, number][], id = name ?? 'x'):
     roleKey: 'member',
     roleName: { de: 'Mitglied' },
     isSelf: false,
+    unexcused: 0,
     cells: cells.map(([member, present], i) => ({
       month: MONTHS[i].month,
       member,
@@ -158,5 +165,27 @@ describe('gremien.util', () => {
     expect(fileSlug('Fachschaft Wirtschaft & Recht')).toBe('fachschaft-wirtschaft-recht');
     expect(fileSlug('Ärzte-Ausschuss')).toBe('arzte-ausschuss');
     expect(fileSlug('!!!')).toBe('gremium');
+  });
+});
+
+describe('rangeDays', () => {
+  it('gives the first and the last day of a range of months', () => {
+    expect(rangeDays({ from: '2026-10', to: '2027-02' })).toEqual({ from: '2026-10-01', to: '2027-02-28' });
+    expect(rangeDays({ from: '2024-02', to: '2024-02' })).toEqual({ from: '2024-02-01', to: '2024-02-29' });
+  });
+
+  it('checks the Info links and when the tab shows (§ 001012, § 001015)', () => {
+    expect(infoUrlValid('https://wiki.example.org')).toBe(true);
+    expect(infoUrlValid(' MAILTO:a@b.de ')).toBe(true);
+    expect(infoUrlValid('https://')).toBe(false);
+    expect(infoUrlValid('javascript:alert(1)')).toBe(false);
+    expect(infoUrlShown('mailto:a@b.de')).toBe('a@b.de');
+    expect(infoUrlShown('https://w.de')).toBe('https://w.de');
+    expect(infoEmpty(gremiumInfo({ bodyMd: '  ' }))).toBe(true);
+    expect(infoTabShown(undefined)).toBe(true);
+    expect(infoTabShown(null)).toBe(true);
+    expect(infoTabShown(gremiumInfo())).toBe(false);
+    expect(infoTabShown(gremiumInfo({ canEdit: true }))).toBe(true);
+    expect(infoTabShown(gremiumInfo({ links: [{ label: 'W', url: 'https://w.de' }] }))).toBe(true);
   });
 });

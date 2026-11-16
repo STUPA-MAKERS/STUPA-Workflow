@@ -13,5 +13,5 @@ file:
 - `F/meetings/delegations/000110` Vote delegation is a Gremium setting
 - `F/administration/translations/000136` Every i18n text is editable in English too
 - `F/administration/accounts/000154` Memberships and roles come from OIDC groups
-- `F/administration/accounts/000266` Every user holds the member role
+- `F/administration/accounts/000154` Every user holds the member role (in the rule of the OIDC groups)
 - `F/administration/accounts/000267` Gremium rights come only from the membership

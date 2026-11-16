@@ -31,6 +31,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Downgrade the schema to the previous revision."""
-    op.execute(
-        "ALTER TABLE account_fints_credential DROP COLUMN IF EXISTS fints_locked_until"
-    )
+    op.execute("ALTER TABLE account_fints_credential DROP COLUMN IF EXISTS fints_locked_until")

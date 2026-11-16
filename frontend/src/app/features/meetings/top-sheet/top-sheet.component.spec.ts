@@ -9,10 +9,12 @@ import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-up
 import { renderDeferred } from '../../../../testing/defer';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
+import { ApiClient } from '@core/api/api-client.service';
 import type { AgendaItem, Meeting, Protocol } from '@core/api/models';
 import { MarkdownEditorComponent } from '@stupa-makers/ui-kit/markdown-editor';
 import { AGENDA, meeting, protocol } from '../../../../testing/meeting-fixtures';
-import { type SaveState, TopSheetComponent } from './top-sheet.component';
+import { type SaveState, TopSheetComponent, documentUploadErrorKey } from './top-sheet.component';
+import { KnownNamesService } from './known-names.service';
 import { NO_LINKED_TODOS } from '../../../../testing/todo-fixtures';
 
 interface Inputs {
@@ -28,6 +30,12 @@ interface Inputs {
   canRename: boolean;
   renamingTopId: string | null;
 }
+
+/** The known names of the meeting (000970). */
+const KNOWN_NAMES: Provider = {
+  provide: KnownNamesService,
+  useValue: { names: () => [{ first: 'Lena', last: 'Hoffmann' }] },
+};
 
 async function setup(over: Partial<Inputs> = {}, extraProviders: Provider[] = []) {
   const bodyChange = jest.fn();
@@ -49,7 +57,7 @@ async function setup(over: Partial<Inputs> = {}, extraProviders: Provider[] = []
       ...over,
     },
     on: { bodyChange, finalize, startRename, cancelRename, renameTop, doneChange },
-    providers: [provideRouter([]), NO_LINKED_TODOS, ...extraProviders],
+    providers: [provideRouter([]), NO_LINKED_TODOS, KNOWN_NAMES, ...extraProviders],
   });
   await renderDeferred(view.fixture);
   return { ...view, bodyChange, finalize, startRename, cancelRename, renameTop, doneChange };
@@ -121,6 +129,17 @@ describe('TopSheetComponent', () => {
     expect(container.querySelector('app-todo-linked-list li')).toBe(row);
   });
 
+  /** §F/finance/budget/000838: the item of a plan names its kind and links to the version. */
+  it('shows the Haushaltsplan of a plan item as a row for a reader of the plan', async () => {
+    await setup(
+      { top: { ...AGENDA[0], applicationId: null, planVersionId: 'pv-1', title: 'Haushaltsplan VS-Mittel 2026: Beschluss' }, topIndex: 2 },
+      [{ provide: ApiClient, useValue: { planOfVersionReadable: () => of(true) } }],
+    );
+    expect(screen.getByText(/TOP 3 · Haushaltsplan/)).toBeInTheDocument();
+    const link = await screen.findByRole('link', { name: 'Haushaltsplan VS-Mittel 2026: Beschluss' });
+    expect(link).toHaveAttribute('href', '/budget/plan?planVersion=pv-1');
+  });
+
   it('keeps the application row in the participant view', async () => {
     await setup({ top: AGENDA[2], topIndex: 2, follow: true });
     expect(screen.getByRole('link', { name: 'Antrag Kulturfestival' })).toHaveAttribute('href', '/applications/app-1');
@@ -166,6 +185,13 @@ describe('TopSheetComponent', () => {
     expect(pick).toHaveBeenCalled();
   });
 
+  it('inserts a time note with the current time from the bar (000873)', async () => {
+    const view = await setup();
+    const note = jest.spyOn(editorOf(view), 'insertTimeNote').mockReturnValue(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Anmerkung mit Uhrzeit einfügen' }));
+    expect(note).toHaveBeenCalledWith(expect.stringMatching(/^\d{2}:\d{2}$/));
+  });
+
   it('uploads an image of the editor through the media service and reports an error', async () => {
     const upload = jest
       .fn()
@@ -187,6 +213,101 @@ describe('TopSheetComponent', () => {
     const error = jest.spyOn(toast, 'error');
     await expect(uploader!(png)).rejects.toEqual({ status: 413 });
     expect(error).toHaveBeenCalled();
+  });
+
+  it('uploads a PDF to the protocol of the meeting and opens a badge in the overlay (000862, 000863)', async () => {
+    const doc = { id: ID, url: `/api/media/documents/${ID}`, name: 'Angebot.pdf', size: 9, pages: 3 };
+    const uploadDocument = jest
+      .fn()
+      .mockReturnValueOnce(of(doc))
+      .mockReturnValueOnce(throwError(() => ({ status: 415 })));
+    const documentInfo = jest.fn(() => of(doc));
+    const view = await setup({}, [{ provide: MediaApiService, useValue: { uploadDocument, documentInfo } }]);
+    const editor = editorOf(view);
+    const pick = jest.spyOn(editor, 'pickDocument').mockImplementation(() => undefined);
+    await userEvent.click(screen.getByRole('button', { name: 'PDF einfügen' }));
+    expect(pick).toHaveBeenCalled();
+    const uploader = editor.documentUpload();
+    const pdf = new File(['x'], 'Angebot.pdf', { type: 'application/pdf' });
+    await expect(uploader!(pdf)).resolves.toEqual({ src: doc.url, name: 'Angebot.pdf' });
+    expect(uploadDocument).toHaveBeenCalledWith(view.fixture.componentInstance.meeting().id, pdf);
+    const error = jest.spyOn(TestBed.inject(ToastService), 'error');
+    await expect(uploader!(pdf)).rejects.toEqual({ status: 415 });
+    expect(error).toHaveBeenCalledWith('Nur PDF-Dateien ohne Passwort.');
+    await expect(editor.documentInfo()!(doc.url)).resolves.toBe(3);
+    await expect(editor.documentInfo()!(doc.url)).resolves.toBe(3);
+    expect(documentInfo).toHaveBeenCalledTimes(1);
+    editor.documentOpen.emit({ src: doc.url, name: 'Angebot.pdf' });
+    view.fixture.detectChanges();
+    expect(await screen.findByTitle('Angebot.pdf')).toHaveAttribute('src', `${doc.url}?inline=true`);
+  });
+
+  it('puts an uploaded PDF at the caret of the Markdown source', async () => {
+    const doc = { id: ID, url: `/api/media/documents/${ID}`, name: 'Plan.pdf', size: 9, pages: 1 };
+    const view = await setup({ top: { ...AGENDA[0], body: 'Siehe' } }, [
+      { provide: MediaApiService, useValue: { uploadDocument: () => of(doc), documentInfo: () => of(doc) } },
+    ]);
+    await userEvent.click(screen.getByRole('radio', { name: 'Markdown' }));
+    const area = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Markdown' });
+    area.setSelectionRange(5, 5);
+    const event = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
+    Object.defineProperty(event, 'clipboardData', {
+      value: { files: [new File(['x'], 'Plan.pdf', { type: 'application/pdf' })], getData: () => '' },
+    });
+    area.dispatchEvent(event);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(event.defaultPrevented).toBe(true);
+    expect(area.value).toBe(`Siehe [Plan.pdf](/api/media/documents/${ID}) `);
+    expect(view.bodyChange).toHaveBeenLastCalledWith({ itemId: 't-1', body: area.value });
+  });
+
+  it('maps each upload status to its message key (000869)', () => {
+    expect([403, 413, 415, 429, 503, 500, undefined].map((s) => documentUploadErrorKey(s))).toEqual([
+      'markdown.document.error.forbidden',
+      'markdown.document.error.tooLarge',
+      'markdown.document.error.type',
+      'markdown.image.error.rate',
+      'markdown.image.error.storage',
+      'markdown.document.error.upload',
+      'markdown.document.error.upload',
+    ]);
+  });
+
+  it('picks and drops PDFs into the Markdown source, and leaves other files alone', async () => {
+    const doc = { id: ID, url: `/api/media/documents/${ID}`, name: 'Plan.pdf', size: 9, pages: 1 };
+    const documentInfo = jest.fn(() => throwError(() => new Error('404')));
+    const view = await setup({ top: { ...AGENDA[0], body: '' } }, [
+      { provide: MediaApiService, useValue: { uploadDocument: () => of(doc), documentInfo } },
+    ]);
+    await expect(editorOf(view).documentInfo()!(doc.url)).resolves.toBeNull();
+    await userEvent.click(screen.getByRole('radio', { name: 'Markdown' }));
+    const area = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Markdown' });
+    const pdf = new File(['x'], 'Plan.pdf', { type: 'application/pdf' });
+    const click = jest.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(function (
+      this: HTMLInputElement,
+    ) {
+      Object.defineProperty(this, 'files', { value: [pdf] });
+      this.dispatchEvent(new Event('change'));
+    });
+    view.fixture.componentInstance.insertDocument();
+    await new Promise((r) => setTimeout(r, 0));
+    click.mockRestore();
+    expect(area.value).toBe(`[Plan.pdf](/api/media/documents/${ID}) `);
+    const drop = (files: File[]): Event => {
+      const event = new Event('drop', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'dataTransfer', { value: { files } });
+      area.dispatchEvent(event);
+      return event;
+    };
+    expect(drop([new File(['x'], 'a.txt', { type: 'text/plain' })]).defaultPrevented).toBe(false);
+    expect(drop([pdf]).defaultPrevented).toBe(true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(area.value.match(/Plan\.pdf\]/g)).toHaveLength(2);
+  });
+
+  it('gives a reader no PDF upload', async () => {
+    const view = await setup({ editable: false });
+    expect(editorOf(view).documentUpload()).toBeNull();
   });
 
   it('gives a reader no image upload', async () => {
@@ -222,6 +343,39 @@ describe('TopSheetComponent', () => {
       expect(editorOf(view)).toBeTruthy();
     });
 
+    it('blacks out a known name typed in the Markdown source (000969)', async () => {
+      const view = await setup({ top: { ...AGENDA[0], body: '' } });
+      await userEvent.click(screen.getByRole('radio', { name: 'Markdown' }));
+      const area = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Markdown' });
+      await userEvent.type(area, 'Es spricht lena hoffmann. Lena sagt');
+      expect(area.value).toBe('Es spricht %%lena hoffmann%%. %%Lena%% sagt');
+      expect(view.bodyChange).toHaveBeenLastCalledWith({ itemId: 't-1', body: area.value });
+    });
+
+    it('marks through the undo stack of the browser where it has one', async () => {
+      await setup({ top: { ...AGENDA[0], body: '' } });
+      await userEvent.click(screen.getByRole('radio', { name: 'Markdown' }));
+      const area = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Markdown' });
+      const exec = jest.fn((_cmd: string, _ui: boolean, text: string) => {
+        area.setRangeText(text, area.selectionStart, area.selectionEnd);
+        return true;
+      });
+      Object.defineProperty(document, 'execCommand', { value: exec, configurable: true });
+      try {
+        await userEvent.type(area, 'Lena,');
+      } finally {
+        Reflect.deleteProperty(document, 'execCommand');
+      }
+      expect(exec).toHaveBeenCalledWith('insertText', false, '%%Lena%%');
+      expect(area.value).toBe('%%Lena%%,');
+    });
+
+    it('marks no name for a reader', async () => {
+      const view = await setup({ editable: false, top: { ...AGENDA[0], body: '' } });
+      const cmp = view.fixture.componentInstance as unknown as { knownNames: () => readonly unknown[] };
+      expect(cmp.knownNames()).toEqual([]);
+    });
+
     it('formats the Markdown source from the bar', async () => {
       const view = await setup({ top: { ...AGENDA[0], body: 'Wort' } });
       await userEvent.click(screen.getByRole('radio', { name: 'Markdown' }));
@@ -248,6 +402,10 @@ describe('TopSheetComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Bild einfügen' }));
       expect(pick).toHaveBeenCalled();
       expect(screen.queryByRole('button', { name: 'Tabelle bearbeiten' })).toBeNull();
+      area.setSelectionRange(0, 0);
+      await userEvent.click(screen.getByRole('button', { name: 'Anmerkung mit Uhrzeit einfügen' }));
+      expect(area.value).toMatch(/^Text\n\n> \[!anmerkung \d{2}:\d{2}\] \n\n\|/);
+      expect(view.bodyChange).toHaveBeenLastCalledWith({ itemId: 't-1', body: area.value });
     });
 
     it('keeps the Markdown source of a reader read only', async () => {
@@ -260,6 +418,7 @@ describe('TopSheetComponent', () => {
       };
       cmp.toggleFormat('bold');
       (cmp as unknown as { insertTable(): void }).insertTable();
+      (cmp as unknown as { insertTimeNote(): void }).insertTimeNote();
       area.dispatchEvent(new Event('input'));
       expect(area.value).toBe('Text');
       expect(view.bodyChange).not.toHaveBeenCalled();
@@ -277,7 +436,7 @@ describe('TopSheetComponent', () => {
     const bar = screen.getByRole('status');
     expect(bar).toHaveTextContent('Entwurf · Das Protokoll ist noch nicht versandt.');
     expect(container.querySelector('.ts__foot')).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & senden' }));
     expect(finalize).toHaveBeenCalled();
     fixture.componentRef.setInput(
       'protocol',
@@ -288,7 +447,7 @@ describe('TopSheetComponent', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Final · Das Protokoll ist final und wurde versandt.');
     expect(screen.getByRole('link', { name: 'PDF intern' })).toHaveAttribute('href', '/p.pdf');
     expect(screen.getByRole('link', { name: 'PDF öffentlich' })).toHaveAttribute('href', '/pub.pdf');
-    expect(screen.queryByRole('button', { name: 'Finalisieren & versenden' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Finalisieren & senden' })).toBeNull();
     expect(screen.queryByText('Gespeichert')).toBeNull();
   });
 

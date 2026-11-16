@@ -24,20 +24,25 @@ import logging
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date as _date
-from typing import Any, Literal
+from datetime import datetime
+from typing import Any, Literal, NamedTuple
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import ColumnElement, Date, Select, and_, cast, func, or_, select
+from sqlalchemy import ColumnElement, Date, Select, Text, and_, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.gremien.models import Gremium
-from app.modules.media.refs import image_ids_in
+from app.modules.media.refs import document_ids_in, image_ids_in
 from app.modules.meetings.models import Meeting
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.protocol.filename import protocol_pdf_filename
-from app.shared.config_schemas import ElectionConfig
+from app.modules.voting.circular import CIRCULAR
+from app.modules.voting.models import Vote
+from app.modules.voting.schemas import VoteOut
+from app.modules.voting.service import VotingService
+from app.shared.config_schemas import ElectionConfig, MajorityRule
 from app.shared.errors import NotFoundError, ServiceUnavailableError
 from app.shared.schemas import FrozenCamelModel
 
@@ -45,8 +50,7 @@ logger = logging.getLogger("app.protocol")
 
 SNAPSHOT_VERSION = 1
 
-VoteResult = Literal["passed", "rejected", "tie", "elected", "runoff"]
-MajorityRule = Literal["simple", "absolute", "two_thirds"]
+VoteResult = Literal["passed", "rejected", "tie", "elected", "runoff", "no_majority"]
 
 
 def passed_conditions(view: object) -> list[str]:
@@ -96,7 +100,6 @@ class PublicDecision(FrozenCamelModel, frozen=True):
             secret=bool(getattr(view, "secret", False)),
             conditions=passed_conditions(view),
         )
-
 
     @classmethod
     def _from_election(cls, view: object, election: ElectionConfig) -> PublicDecision:
@@ -326,6 +329,15 @@ class PublicFilter:
     q: str | None = None
 
 
+class CircularRow(NamedTuple):
+    """One closed circular vote of a public Gremium, without its result and sums."""
+
+    vote_id: UUID
+    question: str | None
+    closed_at: datetime | None
+    gremium: Gremium
+
+
 @dataclass(frozen=True, slots=True)
 class PublicProtocolService:
     """The reads of the public protocols page. No write and no auth here.
@@ -390,7 +402,7 @@ class PublicProtocolService:
             title=meeting.title,
             date=meeting_day(meeting),
             semester=semester_of(meeting_day(meeting)),
-            finalizedAt=protocol.sent_at,
+            finalizedAt=protocol.finalized_at,
             gremium=self._ref(gremium),
             tops=[
                 PublicTopSummary(
@@ -448,6 +460,42 @@ class PublicProtocolService:
             offset=offset,
         )
 
+    async def visible_rows(self, flt: PublicFilter) -> list[tuple[Protocol, Meeting, Gremium]]:
+        """Return every visible protocol of the filters, newest meeting first."""
+        stmt = self._filtered(self._base(), flt).order_by(
+            meeting_day_expr().desc(), Meeting.created_at.desc(), Protocol.id
+        )
+        return [(p, m, g) for p, m, g in (await self.session.execute(stmt)).all()]
+
+    async def circular_rows(self, flt: PublicFilter) -> list[CircularRow]:
+        """Read the closed circular votes of the public gremien, newest close first.
+
+        A circular vote stands in no protocol, so its row is the source
+        (§F/meetings/voting/000949). A row holds no result and no sums: the caller
+        cuts the page first and reads `circular_view` only for the votes of the page.
+        Only the gremium filter applies here: the caller filters by the day of the
+        close and by the question.
+        """
+        stmt = (
+            select(Vote.id, Vote.question, Vote.closed_at, Gremium)
+            .join(Gremium, Vote.eligible_group == cast(Gremium.id, Text))
+            .where(
+                Vote.kind == CIRCULAR,
+                Vote.status == "closed",
+                Gremium.protocols_public.is_(True),
+                *([Gremium.id.in_(flt.gremium_ids)] if flt.gremium_ids else []),
+            )
+            .order_by(Vote.closed_at.desc(), Vote.id)
+        )
+        return [
+            CircularRow(vote_id, question, closed_at, gremium)
+            for vote_id, question, closed_at, gremium in (await self.session.execute(stmt)).all()
+        ]
+
+    async def circular_view(self, vote_id: UUID) -> VoteOut:
+        """Read one closed circular vote with its result and the sums of its votes."""
+        return await VotingService(self.session).get(vote_id)
+
     async def list_semesters(self, flt: PublicFilter) -> list[PublicSemesterOut]:
         """Count the visible protocols per semester, newest semester first.
 
@@ -465,7 +513,7 @@ class PublicProtocolService:
         )
         rows = (await self.session.execute(stmt)).all()
         counts = Counter(semester_of(day) for (day,) in rows)
-        ordered = sorted(counts, key=lambda k: (semester_range(k)[0]), reverse=True)
+        ordered = sorted(counts, key=lambda k: semester_range(k)[0], reverse=True)
         return [PublicSemesterOut(key=k, count=counts[k]) for k in ordered]
 
     async def _visible(self, protocol_id: UUID) -> tuple[Protocol, Meeting, Gremium]:
@@ -489,7 +537,7 @@ class PublicProtocolService:
             title=meeting.title,
             date=meeting_day(meeting),
             semester=semester_of(meeting_day(meeting)),
-            finalizedAt=protocol.sent_at,
+            finalizedAt=protocol.finalized_at,
             gremium=self._ref(gremium),
             lang=gremium.default_lang,
             tops=[
@@ -523,6 +571,20 @@ class PublicProtocolService:
         snap = self._snapshot(protocol)
         texts = [snap.markdown, *(t.markdown for t in snap.tops if not t.non_public)]
         return set(image_ids_in(*texts))
+
+    async def public_document_ids(self, protocol_id: UUID) -> set[UUID]:
+        """Return the ids of the embedded PDFs that the public version shows.
+
+        Like the images, the ids come from the public Markdown only, so a PDF of a
+        non-public TOP stays out (spec 000867).
+
+        Raises:
+            NotFoundError: The protocol is not visible.
+        """
+        protocol = (await self._visible(protocol_id))[0]
+        snap = self._snapshot(protocol)
+        texts = [snap.markdown, *(t.markdown for t in snap.tops if not t.non_public)]
+        return set(document_ids_in(*texts))
 
     async def get_pdf(self, protocol_id: UUID) -> tuple[bytes, str]:
         """Return the public PDF bytes and the download file name, else 404.

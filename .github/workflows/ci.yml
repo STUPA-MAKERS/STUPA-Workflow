@@ -45,7 +45,7 @@ jobs:
     outputs:
       frontend: ${{ steps.check.outputs.frontend }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - id: check
         run: |
           if [ -f frontend/package.json ]; then
@@ -57,11 +57,11 @@ jobs:
   specs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # `implementation` paths in the specs point into the ui-kit submodule.
           submodules: recursive
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -72,6 +72,8 @@ jobs:
       # script imports the backend models and reads its import graph.
       - run: pip install -e 'backend[dev]'
       - run: python3 scripts/build_uml.py --check
+      # The schema files and the examples of the protocol specs (specs 000958, 000959).
+      - run: python3 scripts/check_protocols.py
 
   # Functional style ratchet (specs/style/shared/functional/000437): the count of violations
   # per Python file must not rise above scripts/functional-baseline/. fe-unit checks the
@@ -79,14 +81,16 @@ jobs:
   functional:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: python3 scripts/check_functional.py
       # Service commits, fake sessions and import exceptions can only go down
-      # (specs 000640, 000642, 000646).
+      # (specs 000640, 000642, 000651).
       - run: python3 scripts/check_ratchets.py
+      # Images and actions are pinned, and a build download repeats (specs 000978, 000981).
+      - run: python3 scripts/check_build_pins.py
 
   be-lint:
     runs-on: ubuntu-latest
@@ -94,8 +98,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -104,7 +108,7 @@ jobs:
       - name: Ruff lint
         run: ruff check .
       # The layers of the modules and the shared code (specs 000643, 000644). An entry of
-      # `ignore_imports` that matches no import fails too (000646).
+      # `ignore_imports` that matches no import fails too (000651).
       - name: Import contracts
         run: lint-imports
       # `ruff format --check` runs locally through pre-commit (.pre-commit-config.yaml).
@@ -116,8 +120,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -132,8 +136,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -146,7 +150,7 @@ jobs:
         env:
           COVERAGE_FILE: .coverage.unit
         run: pytest --cov --cov-report=term-missing --cov-fail-under=0
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: backend-coverage-unit
           path: backend/.coverage.unit
@@ -161,8 +165,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -172,7 +176,7 @@ jobs:
         env:
           COVERAGE_FILE: .coverage.integration
         run: pytest -m integration --cov --cov-report= --cov-fail-under=0
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: backend-coverage-integration
           path: backend/.coverage.integration
@@ -190,7 +194,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16-alpine@sha256:81e77a4833487b8132fe4b00bedd39dc3f74b8641e387f19312a48f7de218c2e
         env:
           POSTGRES_USER: app
           POSTGRES_PASSWORD: pw
@@ -205,11 +209,11 @@ jobs:
       SESSION_SECRET: "ci-session-secret"
       MAGIC_LINK_SECRET: "ci-magic-link-secret"
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           fetch-tags: true
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -246,7 +250,7 @@ jobs:
     # job runs without an external Keycloak.
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16-alpine@sha256:81e77a4833487b8132fe4b00bedd39dc3f74b8641e387f19312a48f7de218c2e
         env:
           POSTGRES_USER: app
           POSTGRES_PASSWORD: pw
@@ -261,8 +265,8 @@ jobs:
       SESSION_SECRET: "ci-session-secret"
       MAGIC_LINK_SECRET: "ci-magic-link-secret"
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -304,11 +308,11 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # @stupa-makers/ui-kit lives at frontend/vendor/ui-kit as a git submodule.
           submodules: recursive
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: "22"
           cache: npm
@@ -357,10 +361,10 @@ jobs:
         || vars.RUN_E2E == 'true'
       )
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: recursive
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: "22"
           cache: npm
@@ -375,7 +379,7 @@ jobs:
       # login and pulls anonymously.
       - name: Docker Hub login
         if: env.DOCKERHUB_USERNAME != ''
-        uses: docker/login-action@v4
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
         with:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -383,7 +387,7 @@ jobs:
         run: scripts/e2e.sh
       - name: Playwright-Report (immer — Beweis >0 Tests)
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: playwright-report
           path: frontend/playwright-report
@@ -400,10 +404,10 @@ jobs:
     needs: [detect, fe-unit]
     if: needs.detect.outputs.frontend == 'true'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: recursive
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: "22"
           cache: npm
@@ -415,7 +419,7 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Docker Hub login
         if: env.DOCKERHUB_USERNAME != ''
-        uses: docker/login-action@v4
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
         with:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -423,7 +427,7 @@ jobs:
         run: scripts/e2e.sh e2e/06-axe.spec.ts
       - name: Playwright-Report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: axe-report
           path: frontend/playwright-report
@@ -441,8 +445,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -450,7 +454,7 @@ jobs:
       # The same install as the test jobs, so the coverage version that reads the
       # data files is the version that wrote them.
       - run: pip install -e '.[dev]'
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: backend-coverage-*
           path: backend
@@ -477,13 +481,13 @@ jobs:
       (github.event_name == 'push' && github.ref == 'refs/heads/main')
       || github.event_name == 'workflow_dispatch'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # Docker Hub limits anonymous pulls per runner IP and answers 429. A login
       # raises the limit. A fork or a pull request without the secrets skips the
       # login and pulls anonymously.
       - name: Docker Hub login
         if: env.DOCKERHUB_USERNAME != ''
-        uses: docker/login-action@v4
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
         with:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -515,23 +519,24 @@ jobs:
       TYPST_VERSION: "0.15.1"
       TYPST_SHA256: a6d077d0a95eed5a2eba715b2dae06be954f624ccbf85758a03f389ded33118c
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # The HSRT design (fonts, logos) comes from the hsrtreport-typst submodule.
           submodules: recursive
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: typst/pyproject.toml
       - name: Install typst and poppler
         run: |
-          curl -fsSL -o /tmp/typst.tar.xz \
+          curl -fsSL --retry 5 --retry-all-errors -o /tmp/typst.tar.xz \
             "https://github.com/typst/typst/releases/download/v${TYPST_VERSION}/typst-x86_64-unknown-linux-musl.tar.xz"
           echo "${TYPST_SHA256}  /tmp/typst.tar.xz" | sha256sum -c -
           tar -xJf /tmp/typst.tar.xz -C /tmp
           sudo install -m 0755 /tmp/typst-x86_64-unknown-linux-musl/typst /usr/local/bin/typst
-          sudo apt-get update && sudo apt-get install -y --no-install-recommends poppler-utils
+          sudo apt-get -o Acquire::Retries=5 update
+          sudo apt-get -o Acquire::Retries=5 install -y --no-install-recommends poppler-utils
           typst --version
       - name: Install
         run: pip install -e '.[dev]'
@@ -554,8 +559,8 @@ jobs:
       run:
         working-directory: mcp
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -576,8 +581,8 @@ jobs:
       run:
         working-directory: admin-cli
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -591,7 +596,7 @@ jobs:
   compose:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Validate docker-compose
         working-directory: deploy
         run: |
@@ -615,13 +620,13 @@ jobs:
       || contains(github.event.pull_request.labels.*.name, 'run-restore-smoke')
       || vars.RUN_RESTORE_SMOKE == 'true'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # Docker Hub limits anonymous pulls per runner IP and answers 429. A login
       # raises the limit. A fork or a pull request without the secrets skips the
       # login and pulls anonymously.
       - name: Docker Hub login
         if: env.DOCKERHUB_USERNAME != ''
-        uses: docker/login-action@v4
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
         with:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -647,7 +652,7 @@ jobs:
       || contains(github.event.pull_request.labels.*.name, 'run-real-stack-smoke')
       || vars.RUN_REAL_STACK_SMOKE == 'true'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # The job builds the `web` image, which compiles the Angular app against the
           # `@stupa-makers/ui-kit` submodule. Without this the build cannot resolve the
@@ -658,7 +663,7 @@ jobs:
       # login and pulls anonymously.
       - name: Docker Hub login
         if: env.DOCKERHUB_USERNAME != ''
-        uses: docker/login-action@v4
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
         with:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}

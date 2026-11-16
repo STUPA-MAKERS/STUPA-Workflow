@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import html
+import io
 import re
 import shutil
 import struct
@@ -239,3 +240,183 @@ def test_skipped_heading_level_keeps_the_top_numbers(tmp_path: Path) -> None:
     lines = _lines(_render(source, None), tmp_path)
     assert any(line[3].startswith("TOP 1.1") and "Zwei" in line[3] for line in lines)
     assert not any(line[3].startswith("TOP") and "Unter" in line[3] for line in lines)
+
+
+def test_time_notes_print_centered_above_the_top(tmp_path: Path) -> None:
+    """§000871 and §000872: the time of a TOP is a centered line right above its heading."""
+    source = (
+        "---\ntitle: T\n---\n\n"
+        "> [!anmerkung 18:30]\n\n# Begrüßung\n\nText.\n\n"
+        "> [!anmerkung 18:47] %%Max%% verlässt die Sitzung.\n\n"
+        "> [!anmerkung 18:52]\n\n# Haushalt\n\nText.\n"
+    )
+    lines = _lines(_render(source, None), tmp_path)
+    time_page, time_x, time_y = _find(lines, "18:30 Uhr")
+    top_page, _, top_y = _find(lines, "TOP 1")
+    assert time_page == top_page
+    assert 0 < top_y - time_y < 30
+    assert time_x > 250
+    assert any(line[3] == "18:47 Uhr · Max verlässt die Sitzung." for line in lines)
+    _, _, second_y = _find(lines, "18:52 Uhr")
+    _, _, top2_y = _find(lines, "TOP 2")
+    assert 0 < top2_y - second_y < 30
+
+
+def test_embedded_pdfs_become_watermarked_anlagen_with_linked_references(tmp_path: Path) -> None:
+    """§000864, §000865 and §000866: the Anlagen follow the protocol, each page has the
+    watermark, and the reference prints the page of the Anlage and links to it."""
+    from pypdf import PdfReader
+
+    from typst_service.app import _appendix_of, _document_sizes
+    from typst_service.appendix import document_assets, merge_appendix
+
+    from .test_appendix import A, B, make_pdf
+
+    source = (
+        '---\ntitle: "GV"\ndatum: "2026-06-15"\n---\n\n# Haushalt\n\n'
+        f"Siehe [Haushaltsplan.pdf](/api/media/documents/{A}) und "
+        f"[Angebot.pdf](/api/media/documents/{B}).\n"
+    )
+    assets = {
+        f"doc-{A}.pdf": make_pdf((595, 842), (595, 842)),
+        f"doc-{B}.pdf": make_pdf((842, 595)),
+    }
+    documents = document_assets(assets)
+    sizes = _document_sizes(documents)
+    doc = build_document(source, variant=None, assets=assets.keys(), documents=sizes)
+    compiled = asyncio.run(default_compiler().compile(doc, assets))
+    pdf = merge_appendix(compiled, _appendix_of(doc, sizes), documents)
+    reader = PdfReader(io.BytesIO(pdf))
+    pages = len(reader.pages)
+    lines = _lines(pdf, tmp_path)
+    text = " ".join(line[3] for line in lines)
+    assert "Anlage 1: Haushaltsplan.pdf (Seite 2)" in text
+    assert "Anlage 2: Angebot.pdf (Seite 4)" in text
+    tail = [reader.pages[i] for i in range(pages - 3, pages)]
+    assert [round(float(p.mediabox.width)) for p in tail] == [595, 595, 842]
+    marks = [p.extract_text() for p in tail]
+    assert all("zum Protokoll GV vom 15.06.2026" in m for m in marks)
+    assert "Anlage 1" in marks[0] and "Quelle 1" in marks[0]
+    assert "Anlage 2" in marks[2] and "Quelle 1" in marks[2]
+    index = {page.indirect_reference.idnum: i for i, page in enumerate(reader.pages)}  # pyright: ignore[reportOptionalMemberAccess]
+    targets = [
+        index[annot.get_object()["/Dest"][0].idnum]
+        for annot in reader.pages[1].get("/Annots", [])
+        if "/Dest" in annot.get_object()
+    ]
+    assert targets == [pages - 3, pages - 1]
+
+
+def test_an_antrag_starts_with_its_title_and_draws_field_tables(tmp_path: Path) -> None:
+    """§000881: no title page; the field rows print label and value side by side."""
+    source = (
+        '---\ntitle: "Exkursion Stuttgart"\ntyp: antrag\n---\n\n'
+        "> [!feld] Antragsart\n>\n> Finanzantrag\n\n"
+        "# Antrag\n\n"
+        "> [!feld] Beschreibung\n>\n> Wir fahren **los**.\n>\n> - Firma A\n"
+    )
+    pdf = _render(source, "protocol-stupa")
+    lines = _lines(pdf, tmp_path)
+    assert {line[0] for line in lines} == {1}
+    title_page, _, title_y = _find(lines, "Exkursion Stuttgart")
+    label_page, label_x, label_y = _find(lines, "Antragsart")
+    value_page, value_x, value_y = _find(lines, "Finanzantrag")
+    assert title_page == label_page == value_page == 1
+    assert title_y < 60 and title_y < label_y
+    assert abs(label_y - value_y) < 2 and value_x > label_x + 100
+    assert not any(line[3].startswith("TOP") for line in lines)
+    assert any(line[3].endswith("Firma A") for line in lines)
+
+
+def test_an_antrag_cuts_long_values_and_long_table_cells(tmp_path: Path) -> None:
+    """§000881: a value of 30 lines or more and a nested cell of 3 lines or more end in "…"."""
+    long_value = "".join(f"> Zeile {n}\\\n" for n in range(1, 41))
+    cell = "Angebot " * 30
+    source = (
+        '---\ntitle: "A"\ntyp: antrag\n---\n\n'
+        f"> [!feld] Lang\n>\n{long_value}\n"
+        f"> [!feld] Kosten\n>\n> | Position | Angebot |\n> |---|---|\n> | Bus | {cell} |\n\n"
+        "> [!feld] Kurz\n>\n> eins\n"
+    )
+    lines = _lines(_render(source, "protocol-stupa"), tmp_path)
+    words = [line[3] for line in lines]
+    assert "Zeile 29" in words and "Zeile 30" not in words
+    assert words.count("…") == 2
+    assert sum(1 for w in words if "Angebot Angebot" in w) == 2
+
+
+def test_an_antrag_draws_signature_rows_and_rules_in_a_nested_table(tmp_path: Path) -> None:
+    """§000888: a signature row prints its two captions. §000881: a nested table renders."""
+    source = (
+        '---\ntitle: "A"\ntyp: antrag\n---\n\n'
+        "> [!feld] Kosten\n>\n> | Position | Angebot |\n> |---|---|\n"
+        "> | Bus | Eins |\n> | | Zwei |\n> | **Summe** | |\n\n"
+        "# Unterschriften\n\n"
+        "> [!unterschrift] Sachlich richtig\n>\n> Finanzreferent:in\n"
+    )
+    words = [line[3] for line in _lines(_render(source, "protocol-stupa"), tmp_path)]
+    assert "Unterschriften" in words and "Sachlich richtig" in words
+    assert "Datum" in words and "Unterschrift Finanzreferent:in" in words
+    assert "Zwei" in words and "Summe" in words
+
+
+def test_an_antrag_starts_every_page_with_its_title(tmp_path: Path) -> None:
+    """§000881: the title heads each page in the same form, at the same place."""
+    rows = "".join(f"> [!feld] Feld {n}\n>\n> Wert {n}\n\n" for n in range(60))
+    source = f'---\ntitle: "Exkursion Stuttgart"\ntyp: antrag\n---\n\n{rows}'
+    lines = _lines(_render(source, "protocol-stupa"), tmp_path)
+    titles = [line for line in lines if line[3] == "Exkursion Stuttgart"]
+    assert [line[0] for line in titles] == [1, 2]
+    assert titles[0][1:3] == titles[1][1:3]
+
+
+def _gray_page(pdf: bytes, tmp_path: Path, page: int, dpi: int) -> tuple[int, bytes]:
+    """Render one page as an 8-bit gray PGM and return its width and pixels."""
+    path = tmp_path / "bar.pdf"
+    path.write_bytes(pdf)
+    pgm = subprocess.run(
+        ["pdftoppm", "-gray", "-r", str(dpi), "-f", str(page), "-l", str(page), str(path)],
+        capture_output=True,
+        check=True,
+    ).stdout
+    head = pgm.split(b"\n", 3)
+    width = int(head[1].split()[0])
+    return width, head[3]
+
+
+def _dark_rows(pixels: bytes, width: int, x0: int, x1: int) -> list[int]:
+    """The rows with a dark pixel between the columns x0 and x1."""
+    rows = len(pixels) // width
+    return [y for y in range(rows) if any(pixels[y * width + x] < 100 for x in range(x0, x1))]
+
+
+def test_a_black_bar_sits_on_the_baseline(tmp_path: Path) -> None:
+    """§000887: the bar reaches from just under the baseline to above the cap height."""
+    pdf = _render("---\ntitle: T\n---\n\nHalli %%%% HHH\n", None)
+    lines = _lines(pdf, tmp_path)
+    page, x, y = _find(lines, "Halli")
+    dpi = 144
+    scale = dpi / 72
+    width, pixels = _gray_page(pdf, tmp_path, page, dpi)
+    top = round((y - 2) * scale)
+    band = pixels[top * width : (top + round(24 * scale)) * width]
+    letters = _dark_rows(band, width, round(x * scale), round((x + 4) * scale))
+    bar = _dark_rows(band, width, round((x + 40) * scale), round((x + 50) * scale))
+    baseline, cap = letters[-1], letters[0]
+    assert round(0.5 * scale) <= bar[-1] - baseline <= round(2 * scale)
+    assert round(1 * scale) <= cap - bar[0] <= round(3 * scale)
+
+
+def test_a_note_in_a_nested_table_takes_the_empty_cells_after_it(tmp_path: Path) -> None:
+    """§000881: the note uses the columns to its right and may take five lines."""
+    note = "Hinweis " * 80
+    source = (
+        '---\ntitle: "A"\ntyp: antrag\n---\n\n'
+        "> [!feld] Kosten\n>\n> | Position | Angebot | Betrag |\n> |---|---|---:|\n"
+        f"> | Bus | Eins | 1 |\n> | | {note} | |\n\n"
+    )
+    lines = _lines(_render(source, "protocol-stupa"), tmp_path)
+    notes = [line for line in lines if "Hinweis Hinweis" in line[3]]
+    assert len(notes) == 5
+    assert [line[3] for line in lines].count("…") == 1
+    assert len(notes[0][3].split()) >= 5

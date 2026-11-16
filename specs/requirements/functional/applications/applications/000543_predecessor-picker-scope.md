@@ -4,7 +4,7 @@ title: The Vorgänger picker lists only readable Anträge
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-10
+updated: 2026-11-16
 implementation:
   - backend/app/modules/applications/links_router.py
   - frontend/src/app/features/apply/predecessor-field/predecessor-field.component.ts
@@ -24,7 +24,8 @@ logged in. The server must check the read right of the chosen Vorgänger again w
 the link. A caller who is not logged in must not see the picker.
 
 Reason: The picker must not show the title of an Antrag that the caller cannot open. A guest
-has no read scope, because a magic link covers only its own Antrag.
+has no read scope of the list: a magic link covers only its own Antrag, and an e-mail login
+session covers only the Anträge of its address (000583).
 
 Test: Unit tests of the link route: a Vorgänger outside the read scope fails with 403, and a
 guest submission with a Vorgänger fails with 403.

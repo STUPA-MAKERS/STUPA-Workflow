@@ -1,6 +1,8 @@
 import { Component, viewChild } from '@angular/core';
-import { fireEvent, render, screen } from '@testing-library/angular';
+import { fireEvent, render, screen, within } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
 import { of, throwError } from 'rxjs';
+import { ApiClient } from '@core/api/api-client.service';
 import { GremienApiService } from '@core/api/gremien.service';
 import { MEDIA } from '@stupa-makers/ui-kit';
 import { runAxe } from '../../../../testing/a11y';
@@ -15,10 +17,11 @@ import { loadErrorToast, retryLoadError } from '../../../../testing/load-error';
   template: `
     <button type="button" class="anchor">Zelle</button>
     <button type="button" class="outside">Draußen</button>
-    <app-attendance-detail gremiumId="g-1" />
+    <app-attendance-detail gremiumId="g-1" (changed)="changed()" />
   `,
 })
 class Host {
+  readonly changed = jest.fn();
   readonly detail = viewChild.required(AttendanceDetailComponent);
 }
 
@@ -34,7 +37,13 @@ async function setup(opts: { api?: ReturnType<typeof gremienApiMock>; phone?: bo
   localStorage.setItem('ap.locale', 'de');
   const restore = matchMediaQueries(...(opts.phone ? [MEDIA.phone] : []));
   const api = opts.api ?? gremienApiMock();
-  const view = await render(Host, { providers: [{ provide: GremienApiService, useValue: api }] });
+  const client = { excuseLate: jest.fn(() => of([])) };
+  const view = await render(Host, {
+    providers: [
+      { provide: GremienApiService, useValue: api },
+      { provide: ApiClient, useValue: client },
+    ],
+  });
   const anchor = view.container.querySelector('.anchor') as HTMLButtonElement;
   const cmp = view.fixture.componentInstance.detail();
   const openWith = async (request: AttendanceDetailRequest, target: EventTarget | null = anchor) => {
@@ -43,7 +52,7 @@ async function setup(opts: { api?: ReturnType<typeof gremienApiMock>; phone?: bo
     await view.fixture.whenStable();
     view.fixture.detectChanges();
   };
-  return { ...view, api, anchor, cmp, openWith, restore };
+  return { ...view, api, client, anchor, cmp, openWith, restore };
 }
 
 describe('AttendanceDetailComponent', () => {
@@ -70,6 +79,42 @@ describe('AttendanceDetailComponent', () => {
     expect(dialog.querySelector('.gad__month')).toBeNull();
     expect(dialog.classList.contains('gad--placed')).toBe(true);
     expect(await runAxe(view.container)).toHaveNoViolations();
+  });
+
+  /** § 000922 */
+  it('excuses an own absence later and tells the matrix to read again', async () => {
+    const late = memberAttendance({
+      meetings: [
+        { meetingId: 'm-2', title: '32. Sitzung', date: '2026-09-29', startTime: '18:00:00', status: 'absent', delegateName: null, lateExcuseUntil: '2099-01-01T00:00:00Z' },
+        { meetingId: 'm-3', title: '31. Sitzung', date: '2026-09-15', startTime: '18:00:00', status: 'absent', delegateName: null },
+      ],
+    });
+    const view = await setup({ api: gremienApiMock({ memberAttendance: jest.fn(() => of(late)) }) });
+    restore = view.restore;
+    await view.openWith(ONE);
+    const buttons = screen.getAllByRole('button', { name: 'Nachträglich entschuldigen' });
+    expect(buttons).toHaveLength(1);
+    await userEvent.click(buttons[0]);
+    view.fixture.detectChanges();
+    expect(screen.queryByRole('dialog', { name: 'Finn Schulze · September 2026' })).toBeNull();
+    const dialog = screen.getByRole('dialog', { name: 'Nachträglich entschuldigen' });
+    await userEvent.type(within(dialog).getByLabelText(/Grund/), 'Krank');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Entschuldigen' }));
+    view.fixture.detectChanges();
+    expect(view.client.excuseLate).toHaveBeenCalledWith('m-2', 'Krank');
+    expect(view.fixture.componentInstance.changed).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog', { name: 'Nachträglich entschuldigen' })).toBeNull();
+  });
+
+  it('closes the late excuse on "Abbrechen" without a change', async () => {
+    const view = await setup();
+    restore = view.restore;
+    view.cmp.askExcuse(memberAttendance().meetings[0]);
+    view.fixture.detectChanges();
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Nachträglich entschuldigen' })).getByRole('button', { name: 'Abbrechen' }));
+    view.fixture.detectChanges();
+    expect(screen.queryByRole('dialog', { name: 'Nachträglich entschuldigen' })).toBeNull();
+    expect(view.fixture.componentInstance.changed).not.toHaveBeenCalled();
   });
 
   /** A close before the next frame leaves the focus where the close put it. */

@@ -10,10 +10,11 @@ from sqlalchemy import and_, select
 
 from app.modules.audit.actions import AuditAction
 from app.modules.budget import tree_rules
+from app.modules.budget.plan_models import BudgetPlan, BudgetPlanVersion
 from app.modules.budget.tree.service_base import _ZERO, BudgetTreeServiceBase
 from app.modules.budget.tree_models import Budget, BudgetAllocation
 from app.modules.budget.tree_schemas import AllocationOut, AllocationSet
-from app.shared.errors import ValidationProblem
+from app.shared.errors import ConflictError, ValidationProblem
 
 
 class AllocationOps(BudgetTreeServiceBase):
@@ -29,15 +30,39 @@ class AllocationOps(BudgetTreeServiceBase):
             )
         ).scalar_one_or_none()
 
+    async def _refuse_planned(self, top: Budget, fiscal_year_id: UUID) -> None:
+        """Refuse a direct allocation change in a year with a plan version in force.
+
+        The plan in force sets the allocations, and only a Nachtrag changes them. A
+        year whose plan has no version in force keeps its allocations by hand. The
+        rule applies while the plan switch of the top-level node is on.
+
+        Raises:
+            ConflictError: `allocation_from_plan` (409).
+        """
+        planned = top.plan_enabled and await self.session.scalar(
+            select(BudgetPlanVersion.id)
+            .join(BudgetPlan, BudgetPlan.id == BudgetPlanVersion.plan_id)
+            .where(
+                BudgetPlan.fiscal_year_id == fiscal_year_id,
+                BudgetPlanVersion.state == "in_force",
+            )
+        )
+        if planned:
+            raise ConflictError(
+                "The Haushaltsplan sets the allocations of this fiscal year.",
+                code="allocation_from_plan",
+            )
+
     async def _lock_budget(self, budget_id: UUID) -> None:
-        """Lock the budget row pessimistically (``SELECT … FOR UPDATE``).
+        """Lock the budget row pessimistically (``SELECT … FOR NO KEY UPDATE``).
 
         The lock serializes concurrent sibling allocations. They all lock the
         same parent row. Read-sum, validate and write then stay atomic, so no
         double over-allocation gets through.
         """
         await self.session.execute(
-            select(Budget.id).where(Budget.id == budget_id).with_for_update()
+            select(Budget.id).where(Budget.id == budget_id).with_for_update(key_share=True)
         )
 
     async def _children_alloc_sum(
@@ -83,6 +108,7 @@ class AllocationOps(BudgetTreeServiceBase):
                 budget, the children sum exceeds the parent allocation, or the
                 new allocation falls below the sum already given to children.
         """
+        await self._lock_tree(budget_id)
         node = await self._get_node(budget_id)
         fy = await self._get_fiscal_year(fiscal_year_id)
         top = await self._top_level(node)
@@ -92,6 +118,7 @@ class AllocationOps(BudgetTreeServiceBase):
                 errors=[{"field": "fiscalYearId", "msg": "wrong top-level budget"}],
             )
         self._refuse_closed(fy)
+        await self._refuse_planned(top, fiscal_year_id)
 
         await self._lock_budget(node.id)
         if node.parent_id is not None:
@@ -108,6 +135,7 @@ class AllocationOps(BudgetTreeServiceBase):
             ):
                 raise ValidationProblem(
                     "Children allocation would exceed the parent budget.",
+                    code="children_allocation_exceeds_parent",
                     errors=[{"field": "allocated", "msg": "exceeds parent budget"}],
                 )
 
@@ -115,6 +143,7 @@ class AllocationOps(BudgetTreeServiceBase):
         if tree_rules.parent_allocation_below_children(payload.allocated, own_children):
             raise ValidationProblem(
                 "Allocation is below the sum already distributed to children.",
+                code="parent_allocation_below_children",
                 errors=[{"field": "allocated", "msg": "below children allocations"}],
             )
 

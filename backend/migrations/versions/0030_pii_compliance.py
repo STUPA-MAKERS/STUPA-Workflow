@@ -33,18 +33,9 @@ depends_on: str | Sequence[str] | None = None
 
 _UPGRADE: tuple[str, ...] = (
     "ALTER TABLE applicant ADD COLUMN IF NOT EXISTS anonymized_at timestamptz",
-    (
-        "ALTER TABLE form_field ADD COLUMN IF NOT EXISTS "
-        "is_pii boolean NOT NULL DEFAULT false"
-    ),
-    (
-        "ALTER TABLE application_type ADD COLUMN IF NOT EXISTS "
-        "retention_months integer"
-    ),
-    (
-        "ALTER TABLE state ADD COLUMN IF NOT EXISTS "
-        "is_terminal boolean NOT NULL DEFAULT false"
-    ),
+    ("ALTER TABLE form_field ADD COLUMN IF NOT EXISTS is_pii boolean NOT NULL DEFAULT false"),
+    ("ALTER TABLE application_type ADD COLUMN IF NOT EXISTS retention_months integer"),
+    ("ALTER TABLE state ADD COLUMN IF NOT EXISTS is_terminal boolean NOT NULL DEFAULT false"),
     (
         "CREATE TABLE IF NOT EXISTS privacy_settings ("
         "id integer PRIMARY KEY DEFAULT 1, "
@@ -72,10 +63,7 @@ _UPGRADE: tuple[str, ...] = (
         "CONSTRAINT erasure_request_status "
         "CHECK (status IN ('open','executed','rejected')))"
     ),
-    (
-        "CREATE INDEX IF NOT EXISTS ix_erasure_request_status "
-        "ON erasure_request (status)"
-    ),
+    ("CREATE INDEX IF NOT EXISTS ix_erasure_request_status ON erasure_request (status)"),
     (
         "INSERT INTO role_permission (role_id, permission) "
         "SELECT role_id, 'privacy.manage' FROM role_permission "

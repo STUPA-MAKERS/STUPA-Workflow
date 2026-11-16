@@ -66,7 +66,7 @@ def _rows(
 ) -> tuple[Any, Any, Any]:
     protocol = SimpleNamespace(
         id=PID,
-        sent_at=datetime(2026, 10, 2, tzinfo=UTC),
+        finalized_at=datetime(2026, 10, 2, tzinfo=UTC),
         public_content=_snapshot().model_dump(mode="json", by_alias=True),
         public_pdf_storage_key=key,
         public_pdf_size=1234,
@@ -192,6 +192,19 @@ async def test_list_protocols_maps_rows_and_filters() -> None:
     assert "protocols_public IS true" in sql
     assert "public_withheld IS false" in sql
     assert "LIKE" in sql.upper()
+
+
+async def test_visible_rows_keep_the_fail_closed_rule() -> None:
+    """The rows behind the public decisions use the visibility rule of the list."""
+    session = _Session([[_rows()]])
+    svc = PublicProtocolService(session)  # type: ignore[arg-type]
+    rows = await svc.visible_rows(PublicFilter(gremium_ids=(GID,)))
+    assert rows[0][0].id == PID
+    sql = " ".join(session.statements)
+    assert "protocols_public IS true" in sql
+    assert "public_withheld IS false" in sql
+    assert "public_content IS NOT NULL" in sql
+    assert "status" in sql
 
 
 async def test_list_protocols_without_storage_has_no_pdf() -> None:

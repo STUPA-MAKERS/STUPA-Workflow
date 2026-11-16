@@ -95,9 +95,7 @@ class Access:
         the applicant, so the internal comments of the Gremium stay hidden.
         """
         return (
-            self.principal is not None
-            and not self._owner_as_applicant
-            and self.via != "observer"
+            self.principal is not None and not self._owner_as_applicant and self.via != "observer"
         )
 
     @property
@@ -214,9 +212,7 @@ async def _observer_access(
     )
 
 
-async def _committee_can_read(
-    db: AsyncSession, application_id: UUID, principal: Principal
-) -> bool:
+async def _committee_can_read(db: AsyncSession, application_id: UUID, principal: Principal) -> bool:
     """Check the committee read scope for one application.
 
     The scope grants read access only. It never grants write or transition
@@ -284,13 +280,15 @@ async def committee_gremium_ids(db: AsyncSession, application_id: UUID) -> set[U
     the result does not. Both functions must cover the same three paths:
 
     1. the ``view_gremium_id`` of the cost center of the application and of each of
-       its ancestors (the ``path_key`` prefixes, as ``can_view_node`` reads them);
+       its ancestors (the prefixes of the tree path, as ``can_view_node`` reads them), and
+       each Gremium that decides the plan of its Haushalt in a step (spec 000890);
     2. the deciding Gremium of the current vote state (``application.vote_gremium_id``);
     3. the Gremium of each meeting that voted on the application.
 
     The mentionable persons of the comments (`applications/mentions.py`) read this
     set, because a mention must name a person who reads the internal comments.
     """
+    from app.modules.budget.plan_models import BudgetPlanStep
     from app.modules.budget.tree_models import Budget
     from app.modules.budget.tree_rules import _SEP
     from app.modules.meetings.models import Meeting
@@ -307,14 +305,27 @@ async def committee_gremium_ids(db: AsyncSession, application_id: UUID) -> set[U
         return set()
     budget_id, vote_gremium_id = row
     path_key = (
-        await db.scalar(select(Budget.path_key).where(Budget.id == budget_id))
+        await db.scalar(select(Budget.tree_path).where(Budget.id == budget_id))
         if budget_id is not None
         else None
     )
     segments = path_key.split(_SEP) if path_key is not None else []
     prefixes = [_SEP.join(segments[: i + 1]) for i in range(len(segments))]
     views = (
-        await db.scalars(select(Budget.view_gremium_id).where(Budget.path_key.in_(prefixes)))
+        await db.scalars(select(Budget.view_gremium_id).where(Budget.tree_path.in_(prefixes)))
+        if path_key is not None
+        else ()
+    )
+    deciding = (
+        await db.scalars(
+            select(BudgetPlanStep.gremium_id)
+            .join(Budget, Budget.id == BudgetPlanStep.budget_id)
+            .where(
+                Budget.tree_path == prefixes[0],
+                Budget.parent_id.is_(None),
+                Budget.plan_enabled.is_(True),
+            )
+        )
         if path_key is not None
         else ()
     )
@@ -325,7 +336,11 @@ async def committee_gremium_ids(db: AsyncSession, application_id: UUID) -> set[U
         .distinct()
     )
     vote_gremien = {vote_gremium_id} if vote_gremium_id is not None else set[UUID]()
-    return {*vote_gremien, *(v for v in views if v is not None), *meetings}
+    return {
+        *vote_gremien,
+        *(v for v in (*views, *deciding) if v is not None),
+        *meetings,
+    }
 
 
 async def _resolve_with_creator(
@@ -478,9 +493,7 @@ async def require_app_applicant(
     access = await require_app_edit(application_id, db, principal, applicant)
     if access.applicant is not None:
         return access
-    if access.principal is not None and await _is_creator(
-        db, application_id, access.principal
-    ):
+    if access.principal is not None and await _is_creator(db, application_id, access.principal):
         return access
     raise ForbiddenError("Only the applicant fires this transition.")
 

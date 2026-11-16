@@ -72,9 +72,7 @@ async def test_gremium_delete_deletes_meetings_and_keeps_votes_without_a_meeting
         assert kept is not None
         assert kept.status == "closed"
         for model in (VotedMarker, SecretBallot):
-            rows = await session.scalars(
-                select(model).where(model.vote_id == s.vote_ids["closed"])
-            )
+            rows = await session.scalars(select(model).where(model.vote_id == s.vote_ids["closed"]))
             assert rows.all() == []
 
     [meeting_entry] = await audit_actions(maker, target_id=s.meeting_id)

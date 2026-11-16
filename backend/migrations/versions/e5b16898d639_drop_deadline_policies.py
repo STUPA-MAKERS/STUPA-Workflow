@@ -156,10 +156,7 @@ def rewrite_flow_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
 
 def _rewrite_transitions(conn: sa.Connection) -> None:
     rows = conn.execute(
-        sa.text(
-            "SELECT id, guard FROM transition "
-            "WHERE strpos(guard::text, :op) > 0"
-        ),
+        sa.text("SELECT id, guard FROM transition WHERE strpos(guard::text, :op) > 0"),
         {"op": _OP},
     ).fetchall()
     for tid, guard in rows:
@@ -168,8 +165,7 @@ def _rewrite_transitions(conn: sa.Connection) -> None:
             continue
         conn.execute(
             sa.text(
-                "UPDATE transition SET guard = CAST(:g AS jsonb), automatic = false "
-                "WHERE id = :id"
+                "UPDATE transition SET guard = CAST(:g AS jsonb), automatic = false WHERE id = :id"
             ),
             {"g": None if new_guard is None else json.dumps(new_guard), "id": tid},
         )
@@ -186,21 +182,15 @@ def _rewrite_snapshots(conn: sa.Connection) -> None:
     if not rows:
         return
     conn.execute(
-        sa.text(
-            "ALTER TABLE config_revision DISABLE TRIGGER trg_config_revision_no_update"
-        )
+        sa.text("ALTER TABLE config_revision DISABLE TRIGGER trg_config_revision_no_update")
     )
     for rid, snapshot in rows:
         conn.execute(
-            sa.text(
-                "UPDATE config_revision SET snapshot = CAST(:s AS jsonb) WHERE id = :id"
-            ),
+            sa.text("UPDATE config_revision SET snapshot = CAST(:s AS jsonb) WHERE id = :id"),
             {"s": json.dumps(rewrite_flow_snapshot(snapshot)), "id": rid},
         )
     conn.execute(
-        sa.text(
-            "ALTER TABLE config_revision ENABLE TRIGGER trg_config_revision_no_update"
-        )
+        sa.text("ALTER TABLE config_revision ENABLE TRIGGER trg_config_revision_no_update")
     )
 
 
@@ -215,8 +205,8 @@ _UPGRADE: tuple[str, ...] = (
     "END IF; END $$",
     "DELETE FROM mail_template WHERE key = 'deadline_approaching' AND NOT EXISTS "
     "(SELECT 1 FROM transition WHERE actions @> "
-    "'[{\"templateKey\": \"deadline_approaching\"}]'::jsonb OR actions @> "
-    "'[{\"template_key\": \"deadline_approaching\"}]'::jsonb)",
+    '\'[{"templateKey": "deadline_approaching"}]\'::jsonb OR actions @> '
+    '\'[{"template_key": "deadline_approaching"}]\'::jsonb)',
     "DELETE FROM notification_preference WHERE kind = 'deadline'",
     "DROP TABLE IF EXISTS deadline",
     "DROP TABLE IF EXISTS deadline_policy",

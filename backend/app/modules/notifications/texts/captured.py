@@ -19,7 +19,7 @@ APPLICATION_CAPTURED_BODY: dict[str, str] = {
     "de": "Hallo{% if applicantName %} {{ applicantName }}{% endif %},\n\n"
     "für dich wurde ein Antrag"
     "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %} "
-    "auf der Antragsplattform erfasst"
+    "bei {{ platformName }} erfasst"
     "{% if gremiumName %} ({{ gremiumName }}){% endif %}."
     "{% if receivedOn %} Eingegangen am {{ receivedOn }}.{% endif %}"
     "{% if intake %} Eingang: {{ intake }}.{% endif %}\n\n"
@@ -29,7 +29,7 @@ APPLICATION_CAPTURED_BODY: dict[str, str] = {
     "en": "Hello{% if applicantName %} {{ applicantName }}{% endif %},\n\n"
     "an application"
     '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %} '
-    "was entered for you on the application platform"
+    "was entered for you on {{ platformName }}"
     "{% if gremiumName %} ({{ gremiumName }}){% endif %}."
     "{% if receivedOn %} Received on {{ receivedOn }}.{% endif %}"
     "{% if intake %} Intake: {{ intake }}.{% endif %}\n\n"

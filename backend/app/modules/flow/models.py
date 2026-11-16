@@ -110,12 +110,8 @@ class Transition(UUIDPkMixin, Base):
     flow_version_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("flow_version.id", ondelete="CASCADE")
     )
-    from_state_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("state.id", ondelete="CASCADE")
-    )
-    to_state_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("state.id", ondelete="CASCADE")
-    )
+    from_state_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("state.id", ondelete="CASCADE"))
+    to_state_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("state.id", ondelete="CASCADE"))
     label_i18n: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     color: Mapped[str | None] = mapped_column(Text, nullable=True)
     guard: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
@@ -125,5 +121,6 @@ class Transition(UUIDPkMixin, Base):
     branch: Mapped[str | None] = mapped_column(Text, nullable=True)
     requires_action: Mapped[bool] = mapped_column(Boolean, server_default="true")
 
-    __table_args__ = (Index("ix_transition_flow_version_id_from_state_id",
-                            "flow_version_id", "from_state_id"),)
+    __table_args__ = (
+        Index("ix_transition_flow_version_id_from_state_id", "flow_version_id", "from_state_id"),
+    )

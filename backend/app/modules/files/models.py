@@ -98,17 +98,13 @@ class Attachment(UUIDPkMixin, Base):
     storage_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     scanned: Mapped[bool] = mapped_column(Boolean, server_default="false")
     scan_result: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     draft_token_hash: Mapped[bytes | None] = mapped_column(
         ForeignKey("attachment_draft_token.token_hash", ondelete="CASCADE"), nullable=True
     )
 
     __table_args__ = (
-        CheckConstraint(
-            f"size <= {MAX_ATTACHMENT_BYTES}", name="attachment_size_limit"
-        ),
+        CheckConstraint(f"size <= {MAX_ATTACHMENT_BYTES}", name="attachment_size_limit"),
         CheckConstraint(
             "num_nonnulls(application_id, ticket_id, ticket_note_id, todo_comment_id, "
             "comment_id, draft_token_hash) = 1",
@@ -150,6 +146,4 @@ class AttachmentDraftToken(Base):
     token_hash: Mapped[bytes] = mapped_column(LargeBinary, primary_key=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
-    __table_args__ = (
-        Index("ix_attachment_draft_token_expires_at", "expires_at"),
-    )
+    __table_args__ = (Index("ix_attachment_draft_token_expires_at", "expires_at"),)

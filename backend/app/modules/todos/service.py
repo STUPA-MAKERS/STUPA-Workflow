@@ -48,7 +48,7 @@ from app.modules.todos.boards import ensure_personal_board
 from app.modules.todos.grouping import grouped
 from app.modules.todos.lexorank import MAX_LENGTH, RankError, between, spread
 from app.modules.todos.link_view import LinkViewer
-from app.modules.todos.links import HIDDEN, LinkRef, LinkResolver, Resolved
+from app.modules.todos.links import HIDDEN, LinkRef, LinkResolver, Resolved, link_kinds_on
 from app.modules.todos.live import BoardPings
 from app.modules.todos.models import (
     LINK_COLUMNS,
@@ -575,13 +575,15 @@ class TodoService:
                 .group_by(TodoComment.card_id)
             )
         ).all()
-        link_rows = (
+        all_link_rows = (
             await self.session.scalars(
                 select(TodoLink)
                 .where(or_(TodoLink.card_id.in_(ids), TodoLink.todo_id.in_(ids)))
                 .order_by(TodoLink.created_at, TodoLink.id)
             )
         ).all()
+        kinds_on = await link_kinds_on(self.session)
+        link_rows = [link for link in all_link_rows if link.kind in kinds_on]
         assignees = grouped((card_id, principal_id) for card_id, principal_id in assignee_rows)
         people = await person_refs(
             self.session, {pid for pids in assignees.values() for pid in pids}

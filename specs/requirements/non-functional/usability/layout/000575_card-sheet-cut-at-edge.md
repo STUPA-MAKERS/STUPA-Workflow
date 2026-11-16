@@ -2,11 +2,10 @@
 id: "000575"
 title: The details of a card cut at the lower screen edge
 kind: non-functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-09
-implementation:
-  - frontend/src/app/features/todos/card-detail/todo-card-detail.component.scss
+updated: 2026-11-16
+replaced_by: NF/usability/layout/000193
 scope:
   - frontend/src/app/features/todos/card-detail
 ---

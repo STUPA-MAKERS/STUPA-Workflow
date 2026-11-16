@@ -1,46 +1,44 @@
 @if (error()) {
   <app-load-error [message]="'gremien.members.error' | t" (retry)="load()" />
 }
-<app-sticky-bar [sticky]="phone()">
-  <div class="gmb__tools">
-    <app-search-pill
-      class="gmb__search"
-      size="md"
-      [placeholder]="searchPlaceholder()"
-      [label]="'gremien.members.searchLabel' | t"
-      [clearable]="true"
-      [value]="query()"
-      (valueChange)="query.set($event)"
+<div class="gmb__tools">
+  <app-search-pill
+    class="gmb__search"
+    size="md"
+    [placeholder]="searchPlaceholder()"
+    [label]="'gremien.members.searchLabel' | t"
+    [clearable]="true"
+    [value]="query()"
+    (valueChange)="query.set($event)"
+  />
+  <div class="gmb__chips" role="group" [attr.aria-label]="'gremien.filters' | t">
+    <app-filter-select
+      [label]="'gremien.members.role' | t"
+      [options]="roleOptions()"
+      [value]="role()"
+      (valueChange)="role.set($event)"
+      [text]="roleText()"
+      filled
     />
-    <div class="gmb__chips" role="group" [attr.aria-label]="'gremien.filters' | t">
-      <app-filter-select
-        [label]="'gremien.members.role' | t"
-        [options]="roleOptions()"
-        [value]="role()"
-        (valueChange)="role.set($event)"
-        [text]="roleText()"
-        filled
-      />
-      <app-filter-select
-        [label]="'gremien.members.former' | t"
-        [options]="formerOptions()"
-        [value]="former() ? 'former' : ''"
-        (valueChange)="setFormer($event)"
-        [text]="'gremien.members.former' | t"
-        filled
-      />
-      @if (!phone()) {
-        <app-button
-          variant="text"
-          [iconOnly]="true"
-          [ariaLabel]="'gremien.members.export' | t"
-          [disabled]="loading() || !groups().length"
-          (click)="exportCsv()"
-        ><app-icon name="download" /></app-button>
-      }
-    </div>
+    <app-filter-select
+      [label]="'gremien.members.former' | t"
+      [options]="formerOptions()"
+      [value]="former() ? 'former' : ''"
+      (valueChange)="setFormer($event)"
+      [text]="'gremien.members.former' | t"
+      filled
+    />
+    @if (!phone()) {
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="'gremien.members.export' | t"
+        [disabled]="loading() || !groups().length"
+        (click)="exportCsv()"
+      ><app-icon name="download" /></app-button>
+    }
   </div>
-</app-sticky-bar>
+</div>
 
 @if (loading()) {
   <app-skeleton variant="rows" [count]="5" [label]="'gremien.members.loading' | t" />

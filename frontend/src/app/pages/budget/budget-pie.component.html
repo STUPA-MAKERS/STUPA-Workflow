@@ -24,7 +24,11 @@
         <span class="pie__total mono">{{ a.value | money: { currency: currency(), whole: true } }}</span>
       } @else {
         <span class="pie__cap">{{ label() }}</span>
-        <span class="pie__total mono" [class.pie__total--empty]="empty()">{{ total() | money: { currency: currency(), whole: true } }}</span>
+        @if (loading()) {
+          <span class="pie__total"><span class="skel-text pie__totalSkel"></span></span>
+        } @else {
+          <span class="pie__total mono" [class.pie__total--empty]="empty()">{{ total() | money: { currency: currency(), whole: true } }}</span>
+        }
       }
     </div>
   </div>

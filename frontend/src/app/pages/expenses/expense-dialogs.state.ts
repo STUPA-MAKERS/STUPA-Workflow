@@ -5,6 +5,7 @@ import { downloadBlob, liveSearch, type SelectOption, ToastService } from '@stup
 import type { Uuid } from '@core/api/models';
 import {
   BudgetTreeApi,
+  type BudgetYear,
   FISCAL_YEAR_CLOSED,
   type Expense,
   type ExpenseKind,
@@ -13,6 +14,7 @@ import {
   type PaymentMethod,
 } from '../budget/budget-tree.api';
 import { problemCode, problemDetail } from '@core/api/problem';
+import { dateFitsBudgetYear } from '../budget/budget-year-select/budget-year-select.util';
 import { findTopBudgetNode } from '../budget/expense-display.util';
 import type { ExpensesListState } from './expenses-list.state';
 import type { ExpenseSubBookingsState } from './expense-sub-bookings.state';
@@ -30,21 +32,6 @@ export function currentFiscalYear(
   if (now) return now;
   const active = fys.filter((f) => f.active);
   return active.length === 1 ? active[0] : null;
-}
-
-/**
- * The default year of a booking or transfer form, as the server derives it: the
- * only active open year, else the active open year that holds today, else null.
- */
-export function defaultFiscalYear(
-  fys: readonly FiscalYear[],
-  today = new Date(),
-): FiscalYear | null {
-  const active = fys.filter((f) => f.active && !f.closedAt);
-  if (active.length === 1) return active[0];
-  const iso = today.toISOString().slice(0, 10);
-  const now = active.filter((f) => f.startDate <= iso && iso <= f.endDate);
-  return now.length === 1 ? now[0] : null;
 }
 
 /**
@@ -66,6 +53,8 @@ export class ExpenseDialogsState {
   readonly newDescription = signal('');
   readonly newBudgetId = signal('');
   readonly newFiscalYearId = signal('');
+  /** The budget of the pair of a new booking (spec 000879). */
+  readonly newTopId = signal('');
   readonly newApplicationId = signal('');
   readonly appQuery = signal('');
   readonly appCandidates = signal<{ id: string; title: string }[]>([]);
@@ -87,7 +76,6 @@ export class ExpenseDialogsState {
     error: () => this.appCandidates.set([]),
   });
 
-  readonly fiscalYearOptions = signal<SelectOption[]>([]);
   readonly newInvoiceDate = signal('');
   readonly newPaymentDate = signal('');
   readonly newCorrespondent = signal('');
@@ -150,9 +138,15 @@ export class ExpenseDialogsState {
   readonly tFromId = signal('');
   readonly tToId = signal('');
   readonly tFiscalYearId = signal('');
+  /** The pair of the new transfer: a past year needs a payment date in the year. */
+  readonly tPair = signal<BudgetYear | null>(null);
+  readonly tPaymentDate = signal('');
+  /** The pair of the new booking: a past year needs a date in the year. */
+  readonly newPair = signal<BudgetYear | null>(null);
+  /** The budget of the pair of a new transfer. */
+  readonly tTopId = signal('');
   readonly tAmount = signal('');
   readonly tDescription = signal('');
-  readonly transferFyOptions = signal<SelectOption[]>([]);
 
   /**
    * The fiscal year per top-level budget that the cost-centre list counts the free amount
@@ -175,7 +169,18 @@ export class ExpenseDialogsState {
       this.tFromId() !== this.tToId() &&
       !!this.tFiscalYearId() &&
       Number(this.tAmount()) > 0 &&
-      !!this.tDescription().trim(),
+      !!this.tDescription().trim() &&
+      this.transferDateFits(),
+  );
+  /** The payment date of the new transfer lies in its year, when the year is past. */
+  readonly transferDateFits = computed(() =>
+    dateFitsBudgetYear(this.tPair(), this.tPaymentDate()),
+  );
+  /** The payment date, else the invoice date, of the new booking lies in a past year. */
+  readonly bookingDateFits = computed(
+    () =>
+      !!this.newApplicationId() ||
+      dateFitsBudgetYear(this.newPair(), this.newPaymentDate() || this.newInvoiceDate()),
   );
 
   /**
@@ -185,7 +190,7 @@ export class ExpenseDialogsState {
   readonly canSubmitCreate = computed(() => {
     if (!this.newDescription().trim() || !(Number(this.newAmount()) > 0)) return false;
     if (this.newApplicationId()) return true;
-    return !!this.newBudgetId() && !!this.newFiscalYearId();
+    return !!this.newBudgetId() && !!this.newFiscalYearId() && this.bookingDateFits();
   });
 
   /** Called with the new booking after a create, so the page can open it. */
@@ -259,6 +264,8 @@ export class ExpenseDialogsState {
     this.newDescription.set('');
     this.newBudgetId.set(this.list.budgetId() || '');
     this.newFiscalYearId.set('');
+    this.newTopId.set('');
+    this.newPair.set(null);
     this.newApplicationId.set('');
     this.newInvoiceId.set('');
     this.newInvoiceDate.set('');
@@ -270,8 +277,6 @@ export class ExpenseDialogsState {
     this.newNote.set('');
     this.appQuery.set('');
     this.appCandidates.set([]);
-    this.fiscalYearOptions.set([]);
-    if (this.list.budgetId()) this.loadFiscalYears(this.list.budgetId());
     this.event.load(null);
     this.createOpen.set(true);
     if (opts.invoiceId) this.preselectInvoice(opts.invoiceId);
@@ -282,7 +287,7 @@ export class ExpenseDialogsState {
    * invoice date stay empty, because a copy is paid on another day. A booking of an
    * application keeps the application, and the server takes the cost centre and the
    * fiscal year from it. Else the copy keeps the cost centre and the fiscal year, or
-   * the active open year when the year of `e` is closed. The amount of a parent is the
+   * the year the field of the pair starts with when the year of `e` cannot be chosen. The amount of a parent is the
    * sum of its sub-bookings, and the copy takes it as a plain amount without children.
    */
   openDuplicate(e: Expense): void {
@@ -297,16 +302,13 @@ export class ExpenseDialogsState {
     this.newNote.set(e.note ?? '');
     if (e.applicationId && e.kind === 'expense') {
       this.newBudgetId.set('');
-      this.fiscalYearOptions.set([]);
       this.pickApp({
         id: e.applicationId,
         title: e.applicationTitle || this.i18n.translate('expenses.col.application'),
       });
     } else {
       this.newBudgetId.set(e.budgetId);
-      this.newFiscalYearId.set('');
-      this.fiscalYearOptions.set([]);
-      this.loadFiscalYears(e.budgetId, e.fiscalYearId);
+      this.newFiscalYearId.set(e.fiscalYearId);
     }
     if (e.invoiceId) this.keepInvoice(e.invoiceId);
   }
@@ -361,29 +363,35 @@ export class ExpenseDialogsState {
     this.appCandidates.set([]);
   }
 
+  /** The cost centre of a new booking. The pair of budget and year stays (spec 000879). */
   onPickBudget(id: string): void {
     this.newBudgetId.set(id);
-    this.newFiscalYearId.set('');
-    this.fiscalYearOptions.set([]);
-    if (id) this.loadFiscalYears(id);
   }
 
-  /** `prefer`: the year to pick when it is open, else `defaultFiscalYear` is picked. */
-  private loadFiscalYears(budgetId: string, prefer = ''): void {
-    const top = findTopBudgetNode(this.list.budgetTree(), budgetId);
-    if (!top) return;
-    this.api.listFiscalYears(top.id).subscribe({
-      next: (fys: FiscalYear[]) => {
-        this.rememberTopYear(top.id, fys);
-        if (this.newBudgetId() !== budgetId) return;
-        const open = fys.filter((f) => !f.closedAt);
-        this.fiscalYearOptions.set(open.map((f) => ({ value: f.id, label: f.display })));
-        const fallback = defaultFiscalYear(open);
-        if (prefer && open.some((f) => f.id === prefer)) this.newFiscalYearId.set(prefer);
-        else if (fallback) this.newFiscalYearId.set(fallback.id);
-      },
-      error: () => this.fiscalYearOptions.set([]),
-    });
+  /**
+   * The pair of a new booking: its budget and its fiscal year. A cost centre of another
+   * budget goes, because the cost centre comes from the budget of the pair.
+   */
+  onPickPair(pair: BudgetYear): void {
+    this.newPair.set(pair);
+    this.newTopId.set(pair.budgetId);
+    this.newFiscalYearId.set(pair.fiscalYearId);
+    const top = findTopBudgetNode(this.list.budgetTree(), this.newBudgetId());
+    if (this.newBudgetId() && top?.id !== pair.budgetId) this.newBudgetId.set('');
+  }
+
+  /** The pair of a new transfer. A leg in another budget goes. */
+  onTransferPair(pair: BudgetYear): void {
+    this.tPair.set(pair);
+    this.tTopId.set(pair.budgetId);
+    this.tFiscalYearId.set(pair.fiscalYearId);
+    const tree = this.list.budgetTree();
+    if (this.tFromId() && findTopBudgetNode(tree, this.tFromId())?.id !== pair.budgetId) {
+      this.tFromId.set('');
+    }
+    if (this.tToId() && findTopBudgetNode(tree, this.tToId())?.id !== pair.budgetId) {
+      this.tToId.set('');
+    }
   }
 
   onPickInvoice(id: string): void {
@@ -596,10 +604,11 @@ export class ExpenseDialogsState {
     this.tFromId.set(this.list.budgetId() || '');
     this.tToId.set('');
     this.tFiscalYearId.set('');
+    this.tTopId.set('');
+    this.tPair.set(null);
+    this.tPaymentDate.set('');
     this.tAmount.set('');
     this.tDescription.set('');
-    this.transferFyOptions.set([]);
-    if (this.tFromId()) this.loadTransferFy(this.tFromId());
     this.transferOpen.set(true);
   }
 
@@ -612,12 +621,8 @@ export class ExpenseDialogsState {
     const from = this.tFromId();
     const to = this.tToId();
     if (!from && !to) return;
-    const tree = this.list.budgetTree();
-    const sameTop =
-      !!from && !!to && findTopBudgetNode(tree, from)?.id === findTopBudgetNode(tree, to)?.id;
     this.tToId.set(from);
-    if (sameTop) this.tFromId.set(to);
-    else this.onTransferFrom(to);
+    this.tFromId.set(to);
   }
 
   /**
@@ -642,26 +647,9 @@ export class ExpenseDialogsState {
     }
   }
 
+  /** The source of a new transfer. The pair of budget and year stays (spec 000879). */
   onTransferFrom(id: string): void {
     this.tFromId.set(id);
-    this.tFiscalYearId.set('');
-    this.transferFyOptions.set([]);
-    if (id) this.loadTransferFy(id);
-  }
-
-  private loadTransferFy(budgetId: string): void {
-    const top = findTopBudgetNode(this.list.budgetTree(), budgetId);
-    if (!top) return;
-    this.api.listFiscalYears(top.id).subscribe({
-      next: (fys: FiscalYear[]) => {
-        this.rememberTopYear(top.id, fys);
-        const open = fys.filter((f) => !f.closedAt);
-        this.transferFyOptions.set(open.map((f) => ({ value: f.id, label: f.display })));
-        const fallback = defaultFiscalYear(open);
-        if (fallback) this.tFiscalYearId.set(fallback.id);
-      },
-      error: () => this.transferFyOptions.set([]),
-    });
   }
 
   /** The transfers tab refreshes if it already loaded, so the two views never disagree. */
@@ -676,6 +664,7 @@ export class ExpenseDialogsState {
         fiscalYearId: this.tFiscalYearId(),
         amount: this.tAmount(),
         description: this.tDescription().trim(),
+        paymentDate: this.tPaymentDate() || null,
       })
       .subscribe({
         next: () => {

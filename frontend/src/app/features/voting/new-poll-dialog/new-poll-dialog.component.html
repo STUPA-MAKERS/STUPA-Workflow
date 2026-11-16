@@ -5,6 +5,14 @@
   (closed)="cancel()"
 >
   <form class="npd" (submit)="$event.preventDefault(); submit(false)">
+    <app-segmented
+      width="equal"
+      class="npd__seg"
+      [ariaLabel]="'meetings.vote.kind.label' | t"
+      [options]="kindOptions()"
+      [value]="kind()"
+      (valueChange)="setKind($event)"
+    />
     <app-select
       name="gremium"
       [id]="'npd-gremium'"
@@ -14,7 +22,7 @@
       [ngModel]="gremium()"
       (ngModelChange)="gremium.set($event)"
     />
-    <app-textarea [label]="'poll.dialog.question' | t">
+    <app-textarea [label]="(circular() ? 'meetings.vote.question' : 'poll.dialog.question') | t">
       <textarea
         id="npd-question"
         rows="3"
@@ -24,7 +32,14 @@
       ></textarea>
     </app-textarea>
 
-    <app-poll-editor idPrefix="npd" [(draft)]="draft" />
+    @if (circular()) {
+      <p class="npd__rule" role="note">
+        <app-icon name="info" [size]="16" />
+        <span>{{ (minDays() === 1 ? 'circular.new.rule1' : 'circular.new.rule') | t: { n: minDays() } }}</span>
+      </p>
+    } @else {
+      <app-poll-editor idPrefix="npd" [(draft)]="draft" />
+    }
 
     <div class="npd__end">
       <app-datepicker

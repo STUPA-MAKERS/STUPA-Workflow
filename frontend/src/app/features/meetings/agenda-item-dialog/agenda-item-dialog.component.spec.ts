@@ -131,6 +131,114 @@ describe('AgendaItemDialogComponent', () => {
     expect(screen.getByLabelText(/Titel/)).toBeInTheDocument();
   });
 
+  /** §F/finance/budget/000876: the plans have their own kind, in a Gremium that decides a plan. */
+  it('lists a waiting Haushaltsplan under its own kind and puts it on the agenda', async () => {
+    const { http, fixture, added } = await setup();
+    http.expectOne('/api/meetings/m-1/agenda/assignable-plans').flush({
+      decides: true,
+      plans: [
+        {
+          planVersionId: 'pv-1',
+          budgetName: 'VS-Mittel',
+          fiscalYear: '2026',
+          number: 0,
+          step: 'Beschluss',
+          title: 'Haushaltsplan VS-Mittel 2026: Beschluss',
+        },
+      ],
+    });
+    flushApps(http, fixture);
+    const apps = within(screen.getByRole('radiogroup', { name: /Zuweisbare Anträge/ })).getAllByRole('radio');
+    expect(apps).toHaveLength(3);
+    await userEvent.click(screen.getByRole('radio', { name: 'Haushalt' }));
+    expect(screen.getByPlaceholderText('Haushaltsplan suchen')).toBeInTheDocument();
+    const rows = within(screen.getByRole('radiogroup', { name: 'Haushaltspläne' })).getAllByRole('radio');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveAccessibleName(/Haushaltsplan VS-Mittel 2026: Beschluss/);
+    expect(screen.getByText('Zum Beschluss')).toBeInTheDocument();
+    expect(submitButton()).toBeDisabled();
+    await userEvent.click(rows[0]);
+    await userEvent.click(submitButton());
+    const req = http.expectOne('/api/meetings/m-1/agenda');
+    expect(req.request.body).toEqual({ planVersionId: 'pv-1', nonPublic: false });
+    req.flush([]);
+    expect(added).toHaveBeenCalled();
+  });
+
+  /** §F/finance/budget/000876: a draft is a row for a reading, and the row says so. */
+  it('lists a draft of a Haushaltsplan for a reading', async () => {
+    const { http, fixture, added } = await setup();
+    http.expectOne('/api/meetings/m-1/agenda/assignable-plans').flush({
+      decides: true,
+      plans: [
+        {
+          planVersionId: 'pv-2',
+          budgetName: 'VS-Mittel',
+          fiscalYear: '2027',
+          number: 0,
+          step: 'Lesung',
+          title: 'Haushaltsplan VS-Mittel 2027: Lesung',
+          reading: true,
+        },
+      ],
+    });
+    flushApps(http, fixture);
+    await userEvent.click(screen.getByRole('radio', { name: 'Haushalt' }));
+    const rows = within(screen.getByRole('radiogroup', { name: 'Haushaltspläne' })).getAllByRole('radio');
+    expect(rows[0]).toHaveAccessibleName(/Haushaltsplan VS-Mittel 2027: Lesung/);
+    expect(screen.getByText('Entwurf zur Lesung')).toBeInTheDocument();
+    await userEvent.click(rows[0]);
+    await userEvent.click(submitButton());
+    const req = http.expectOne('/api/meetings/m-1/agenda');
+    expect(req.request.body).toEqual({ planVersionId: 'pv-2', nonPublic: false });
+    req.flush([]);
+    expect(added).toHaveBeenCalled();
+  });
+
+  /** §F/finance/budget/000876: the kind shows also when no plan is due, and says so. */
+  it('says that no Haushaltsplan is due, and that none matches a search', async () => {
+    const { http, fixture } = await setup();
+    http.expectOne('/api/meetings/m-1/agenda/assignable-plans').flush({ decides: true, plans: [] });
+    flushApps(http, fixture);
+    await userEvent.click(screen.getByRole('radio', { name: 'Haushalt' }));
+    expect(screen.getByText('Kein Haushaltsplan steht an')).toBeInTheDocument();
+  });
+
+  it('names the search that matches no Haushaltsplan', async () => {
+    const { http, fixture } = await setup();
+    http.expectOne('/api/meetings/m-1/agenda/assignable-plans').flush({
+      decides: true,
+      plans: [
+        { planVersionId: 'pv-1', budgetName: 'VS', fiscalYear: '2026', number: 0, step: 'B', title: 'Plan VS' },
+      ],
+    });
+    flushApps(http, fixture);
+    await userEvent.click(screen.getByRole('radio', { name: 'Haushalt' }));
+    await userEvent.type(screen.getByPlaceholderText('Haushaltsplan suchen'), 'xyz');
+    expect(screen.getByText('Kein Haushaltsplan passt zu „xyz“')).toBeInTheDocument();
+  });
+
+  /** §F/finance/budget/000876: a Gremium that decides no plan has no kind "Haushalt". */
+  it('hides the kind Haushalt in a Gremium that decides no plan', async () => {
+    const { http, fixture, cmp } = await setup();
+    http.expectOne('/api/meetings/m-1/agenda/assignable-plans').flush({ decides: false, plans: [] });
+    flushApps(http, fixture);
+    expect(screen.queryByRole('radio', { name: 'Haushalt' })).toBeNull();
+    cmp.setKind('plan');
+    expect(cmp.kind()).toBe('application');
+  });
+
+  it('hides the kind Haushalt when the plans cannot be read', async () => {
+    const { http, fixture } = await setup();
+    http
+      .expectOne('/api/meetings/m-1/agenda/assignable-plans')
+      .flush({}, { status: 403, statusText: 'Forbidden' });
+    flushApps(http, fixture);
+    const group = screen.getByRole('radiogroup', { name: /Zuweisbare Anträge/ });
+    expect(within(group).getAllByRole('radio')).toHaveLength(3);
+    expect(screen.queryByRole('radio', { name: 'Haushalt' })).toBeNull();
+  });
+
   /** The dialog sends one request at a time. */
   it('adds a free-text item', async () => {
     const { http, fixture, cmp, added } = await setup();
@@ -144,6 +252,24 @@ describe('AgendaItemDialogComponent', () => {
     expect(req.request.body).toEqual({ title: 'Verschiedenes', nonPublic: false });
     req.flush([]);
     expect(added).toHaveBeenCalledWith([]);
+  });
+
+  /** §000861: a free-text item takes a description; the kind Antrag shows no field. */
+  it('freetextDescription: sends the description of a free-text item', async () => {
+    const { http, fixture } = await setup();
+    flushApps(http, fixture);
+    expect(screen.queryByLabelText('Beschreibung')).toBeNull();
+    await userEvent.click(screen.getByRole('radio', { name: 'Freitext' }));
+    await userEvent.type(screen.getByLabelText(/Titel/), 'Bericht');
+    await userEvent.type(screen.getByLabelText('Beschreibung'), ' Zeile 1{Enter}Zeile 2 ');
+    await userEvent.click(submitButton());
+    const req = http.expectOne('/api/meetings/m-1/agenda');
+    expect(req.request.body).toEqual({
+      title: 'Bericht',
+      nonPublic: false,
+      description: 'Zeile 1\nZeile 2',
+    });
+    req.flush([]);
   });
 
   /** The to-do kind is offered only with todo.write in the gremium. */

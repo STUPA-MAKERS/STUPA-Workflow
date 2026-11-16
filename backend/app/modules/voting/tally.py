@@ -20,6 +20,15 @@ is yes plus no.
 `absolute`: absolute majority of every cast vote, `2*yes > cast`, tie at `2*yes == cast`.
 `two_thirds`: passed at `3*yes >= 2*decisive`, rejected at `3*no >= 2*decisive`, any
 other case is a tie (blocking minority).
+`members_majority`: passed at `2*yes > eligible`, else rejected.
+`members_two_thirds`: passed at `3*yes >= 2*eligible`, else rejected.
+The two members rules count against the eligible count of the vote, so an abstention
+and a missing ballot have the effect of a no ballot. They have no tie, and without an
+eligible count they reject (fail-closed).
+
+Quorum: a vote with `quorumBasis = present` (a meeting vote) compares the present persons
+of the roster with the eligible count, and `quorumMinPresent` asks for a least number of
+them. Each other vote compares the cast ballots.
 
 `tieBreak` resolves a tie to passed, rejected or tie. A missed quorum always gives
 rejected (fail-closed), whatever the majority rule says.
@@ -49,14 +58,20 @@ from dataclasses import dataclass, replace
 from decimal import Decimal
 from typing import Literal, assert_never
 
-from app.shared.config_schemas import ElectionConfig, PollConfig, Quorum, VoteConfig
+from app.shared.config_schemas import (
+    ElectionConfig,
+    MajorityRule,
+    PollConfig,
+    Quorum,
+    QuorumBasis,
+    VoteConfig,
+)
 
 YES = "yes"
 NO = "no"
 ABSTAIN = "abstain"
 
 VoteResult = Literal["passed", "rejected", "tie"]
-MajorityRule = Literal["simple", "absolute", "two_thirds"]
 FailedReason = Literal["quorum", "majority"]
 
 
@@ -121,6 +136,48 @@ def _quorum_met(quorum: Quorum | None, participation: int, eligible: int) -> boo
     )
 
 
+def _quorum_reached(
+    quorum: Quorum | None,
+    basis: QuorumBasis,
+    min_present: int | None,
+    *,
+    ballots: int,
+    eligible: int,
+    present: int | None,
+) -> bool:
+    """Check the quorum of a vote against the ballots or the present persons.
+
+    ``present`` is the number of present roster persons of a meeting vote, or None for
+    a vote without a meeting. A vote with the basis ``present`` and a present count
+    compares that count; each other vote compares ``ballots``. The least number of
+    present persons applies only with a present count.
+    """
+    by_present = basis == "present" and present is not None
+    enough = present is None or min_present is None or present >= min_present
+    turnout = present if by_present and present is not None else ballots
+    return enough and _quorum_met(quorum, turnout, eligible)
+
+
+def meeting_quorate(
+    percent: int | None, min_present: int | None, *, present: int, members: int
+) -> bool:
+    """Say if a meeting has its quorum, by the rule that closes its votes.
+
+    ``percent`` is the quorum of the Gremium for the kind of the meeting, and
+    ``min_present`` its least number of present persons. A Gremium with neither has
+    no quorum, and each of its votes meets the quorum, so the meeting does too. The
+    protocol reads this function, so its statement never differs from the votes.
+    """
+    return _quorum_reached(
+        None if percent is None else Quorum(type="percent", value=percent),
+        "present",
+        min_present,
+        ballots=present,
+        eligible=members,
+        present=present,
+    )
+
+
 def _by_sign(margin: int) -> VoteResult:
     """Give passed for a positive margin, rejected for a negative one and tie for zero."""
     return "passed" if margin > 0 else ("rejected" if margin < 0 else "tie")
@@ -138,11 +195,12 @@ def _two_thirds(yes: int, no: int) -> VoteResult:
     return "passed" if passes else ("rejected" if rejects else "tie")
 
 
-def _majority(rule: MajorityRule, yes: int, no: int, cast: int) -> VoteResult:
+def _majority(rule: MajorityRule, yes: int, no: int, cast: int, eligible: int) -> VoteResult:
     """Apply the majority rule to the yes and no counts.
 
     The `two_thirds` rule accepts at a share of 2/3 or more, and rejects symmetrically.
     When neither side reaches 2/3, a blocking minority holds and the result is a tie.
+    A members rule counts the yes ballots against ``eligible`` and has no tie.
 
     Returns:
         passed, rejected or tie. A tie here is raw and still needs `tieBreak`.
@@ -154,15 +212,26 @@ def _majority(rule: MajorityRule, yes: int, no: int, cast: int) -> VoteResult:
             return _by_sign(2 * yes - cast)
         case "two_thirds":
             return _two_thirds(yes, no)
+        case "members_majority":
+            return "passed" if eligible > 0 and 2 * yes > eligible else "rejected"
+        case "members_two_thirds":
+            return "passed" if eligible > 0 and 3 * yes >= 2 * eligible else "rejected"
         case _:
             assert_never(rule)
 
 
-def result(config: VoteConfig, counts: Mapping[str, int], eligible: int) -> Outcome:
+def result(
+    config: VoteConfig,
+    counts: Mapping[str, int],
+    eligible: int,
+    *,
+    present: int | None = None,
+) -> Outcome:
     """Apply the quorum and the majority rule to get the outcome.
 
     The quorum turnout counts every cast vote. Abstentions drop out only when
-    ``abstainCountsQuorum`` is false.
+    ``abstainCountsQuorum`` is false. A meeting vote passes ``present``, the present
+    persons of its roster: with ``quorumBasis = present`` the quorum counts them.
     """
     yes = counts.get(YES, 0)
     no = counts.get(NO, 0)
@@ -170,15 +239,22 @@ def result(config: VoteConfig, counts: Mapping[str, int], eligible: int) -> Outc
     cast = sum(counts.values())
 
     participation = cast if config.abstain_counts_quorum else cast - abstain
-    quorum_met = _quorum_met(config.quorum, participation, eligible)
+    quorum_met = _quorum_reached(
+        config.quorum,
+        config.quorum_basis,
+        config.quorum_min_present,
+        ballots=participation,
+        eligible=eligible,
+        present=present,
+    )
     lead = leading(counts)
 
-    raw = _majority(config.majority_rule, yes, no, cast) if quorum_met else "rejected"
+    raw = _majority(config.majority_rule, yes, no, cast, eligible) if quorum_met else "rejected"
     final: VoteResult = config.tie_break if raw == "tie" else raw
     return Outcome(result=final, quorum_met=quorum_met, leading=lead)
 
 
-ElectionResult = Literal["elected", "runoff", "tie", "rejected"]
+ElectionResult = Literal["elected", "runoff", "tie", "rejected", "no_majority"]
 
 
 def encode_election_choice(candidate_ids: Sequence[str]) -> str:
@@ -224,16 +300,58 @@ class ElectionOutcome:
         return {**self.counts, "abstain": self.abstentions}
 
 
+def _election_quorum(
+    config: ElectionConfig, participation: int, eligible: int, present: int | None
+) -> bool:
+    """Check the quorum of an election: the rule of a motion."""
+    return _quorum_reached(
+        config.quorum,
+        config.quorum_basis,
+        config.quorum_min_present,
+        ballots=participation,
+        eligible=eligible,
+        present=present,
+    )
+
+
+def _members_majority(votes: int, eligible: int) -> bool:
+    """Tell whether ``votes`` is more than half of the eligible count.
+
+    An unknown count (0) is fail-closed: no number of votes reaches it.
+    """
+    return eligible > 0 and votes * 2 > eligible
+
+
+#: From this Wahlgang on the simple majority elects (§F/meetings/voting/000971).
+SIMPLE_MAJORITY_ROUND = 3
+
+
+def needs_members_majority(config: ElectionConfig, round_: int) -> bool:
+    """Tell whether this Wahlgang of the election needs the majority of the members.
+
+    The first and the second Wahlgang of a ``members_majority`` election need it, the
+    third takes the simple majority (§F/meetings/voting/000971).
+    """
+    return config.members_majority and round_ < SIMPLE_MAJORITY_ROUND
+
+
 def _yes_no_outcome(
-    config: ElectionConfig, choices: Sequence[str | None], eligible: int
+    config: ElectionConfig,
+    choices: Sequence[str | None],
+    eligible: int,
+    present: int | None,
+    round_: int,
 ) -> ElectionOutcome:
     counts = tally(("yes", "no", "abstain"), choices)
     ballots = sum(counts.values())
     participation = ballots if config.abstain_counts_quorum else ballots - counts["abstain"]
-    quorum_met = _quorum_met(config.quorum, participation, eligible)
-    elected = quorum_met and counts["yes"] > counts["no"]
+    quorum_met = _election_quorum(config, participation, eligible, present)
+    members = needs_members_majority(config, round_)
+    enough = _members_majority(counts["yes"], eligible) if members else True
+    elected = quorum_met and enough and counts["yes"] > counts["no"]
+    missed: ElectionResult = "no_majority" if quorum_met and not enough else "rejected"
     return ElectionOutcome(
-        result="elected" if elected else "rejected",
+        result="elected" if elected else missed,
         quorum_met=quorum_met,
         counts={"yes": counts["yes"], "no": counts["no"]},
         abstentions=counts["abstain"],
@@ -250,6 +368,7 @@ def tally_election(
     eligible: int,
     *,
     round_: int = 1,
+    present: int | None = None,
 ) -> ElectionOutcome:
     """Count an election and find the elected candidates.
 
@@ -259,14 +378,20 @@ def tally_election(
     elected. When more candidates have votes than there are seats, the first
     ``seats`` win, unless a tie crosses the seat boundary: then the candidates above
     the boundary are elected and the lot decides among the tied ones, also with
-    several seats (no runoff). A missed quorum elects nobody.
+    several seats (no runoff). A missed quorum elects nobody. ``present`` is the present
+    count of a meeting election (see ``result``).
+
+    With ``majorityRule = members_majority`` (one seat) a candidate is elected only
+    with more votes than half of ``eligible``. Otherwise the result is ``no_majority``.
+    This holds for the first and the second Wahlgang (``round_``). The third takes the
+    simple majority, and its tie goes to the lot (§F/meetings/voting/000971).
 
     The sort is stable, so candidates with equal votes keep the order of the candidate
     list.
     """
     raw = tuple(choices)
     if config.yes_no:
-        return _yes_no_outcome(config, raw, eligible)
+        return _yes_no_outcome(config, raw, eligible, present, round_)
     known = config.candidate_ids
     known_ids = frozenset(known)
     picks = tuple(_list_picks(item, known_ids, config.seats) for item in raw)
@@ -275,7 +400,7 @@ def tally_election(
     ballots = len(raw)
     full_abstentions = sum(1 for ballot in picks if not ballot)
     participation = ballots if config.abstain_counts_quorum else ballots - full_abstentions
-    quorum_met = _quorum_met(config.quorum, participation, eligible)
+    quorum_met = _election_quorum(config, participation, eligible, present)
     missed = ElectionOutcome(
         result="rejected",
         quorum_met=False,
@@ -284,7 +409,28 @@ def tally_election(
         ballots=ballots,
     )
     ranked = tuple(sorted((cid for cid in known if counts[cid] > 0), key=lambda c: -counts[c]))
-    return _seat_outcome(missed, ranked, config.seats) if quorum_met else missed
+    if not quorum_met:
+        return missed
+    if needs_members_majority(config, round_):
+        return _members_outcome(missed, ranked, eligible)
+    return _seat_outcome(missed, ranked, config.seats)
+
+
+def _members_outcome(
+    base: ElectionOutcome, ranked: tuple[str, ...], eligible: int
+) -> ElectionOutcome:
+    """Elect the first candidate of a quorate election for one seat, or nobody.
+
+    The candidate needs more votes than half of the eligible count, so at most one
+    candidate reaches the number, and no lot decides (§F/meetings/voting/000912).
+    """
+    won = bool(ranked) and _members_majority(base.counts[ranked[0]], eligible)
+    return replace(
+        base,
+        result="elected" if won else "no_majority",
+        quorum_met=True,
+        elected=ranked[:1] if won else (),
+    )
 
 
 def _list_picks(raw: str | None, known: Collection[str], limit: int) -> tuple[str, ...]:
@@ -324,9 +470,40 @@ def _seat_outcome(base: ElectionOutcome, ranked: tuple[str, ...], seats: int) ->
     )
 
 
-def draw_lot(
-    among: Sequence[str], seats: int, choose: Callable[[Sequence[str]], str]
-) -> list[str]:
+#: The candidates of the third Wahlgang (§F/meetings/voting/000971).
+THIRD_ROUND_FIELD = 2
+
+
+@dataclass(frozen=True, slots=True)
+class RoundField:
+    """The candidates of a next Wahlgang: the sure ones and a tie for the open places."""
+
+    sure: tuple[str, ...]
+    tied: tuple[str, ...] = ()
+    open_places: int = 0
+
+
+def third_round_field(candidate_ids: Sequence[str], counts: Mapping[str, int]) -> RoundField:
+    """Find the two candidates with the most votes in the second Wahlgang.
+
+    Two candidates or fewer all stand. A tie that crosses the second place leaves
+    places open: the lot decides among ``tied`` (§F/meetings/voting/000971). The sort
+    is stable, so the order of the candidate list holds among equal votes.
+    """
+    ranked = tuple(sorted(candidate_ids, key=lambda c: -counts.get(c, 0)))
+    if len(ranked) <= THIRD_ROUND_FIELD:
+        return RoundField(sure=ranked)
+    boundary = counts.get(ranked[THIRD_ROUND_FIELD - 1], 0)
+    above = tuple(c for c in ranked if counts.get(c, 0) > boundary)
+    tied = tuple(c for c in ranked if counts.get(c, 0) == boundary)
+    return (
+        RoundField(sure=(*above, *tied))
+        if (len(above) + len(tied)) == THIRD_ROUND_FIELD
+        else RoundField(sure=above, tied=tied, open_places=THIRD_ROUND_FIELD - len(above))
+    )
+
+
+def draw_lot(among: Sequence[str], seats: int, choose: Callable[[Sequence[str]], str]) -> list[str]:
     """Draw ``seats`` distinct candidates from ``among`` with ``choose``.
 
     The caller passes ``secrets.choice``; a test passes a fixed chooser. The draw

@@ -48,6 +48,15 @@ describe('GremiumMeetingsComponent', () => {
     localStorage.clear();
   });
 
+  /** § 000924 */
+  it('shows the mark of an approved protocol in place of "final"', async () => {
+    const rows = [gremiumMeeting({ id: 'm-1', title: '33. Sitzung', date: '2026-10-06', protocolStatus: 'final', protocolApproved: true })];
+    const view = await setup({ api: gremienApiMock({ meetings: jest.fn(() => of(rows)) }) });
+    restore = view.restore;
+    expect(view.cmp.groups()[0].rows[0].status.key).toBe('gremien.meetings.protocolApproved');
+    expect(screen.getByText('Protokoll genehmigt')).toBeInTheDocument();
+  });
+
   it('groups the coming meetings first, then the closed ones by month', async () => {
     const view = await setup();
     restore = view.restore;

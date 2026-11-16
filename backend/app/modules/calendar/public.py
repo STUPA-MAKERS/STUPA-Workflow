@@ -39,6 +39,7 @@ from app.modules.meetings.agenda_service import title_of
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.protocol.public import visible_clause
+from app.modules.site_config.features import Feature, feature_on
 from app.shared.errors import NotFoundError
 from app.shared.schemas import FrozenCamelModel
 from app.shared.search import escape_like
@@ -164,6 +165,9 @@ class PublicCalendarService:
     async def _meetings(
         self, *conditions: ColumnElement[bool], newest: bool = False, limit: int | None = None
     ) -> list[tuple[Meeting, str]]:
+        """The public meetings; none while `Sitzungen` is off."""
+        if not await feature_on(self.session, Feature.MEETINGS):
+            return []
         return [
             (row[0], row[1])
             for row in await self.session.execute(

@@ -2,7 +2,8 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { skipLoading } from '@stupa-makers/ui-kit';
 import { cached, detailContext, listContext } from '@core/cache/cache.interceptor';
-import type { Observable } from 'rxjs';
+import { of, Subject, type Observable } from 'rxjs';
+import { FeatureService } from '@core/features/feature.service';
 import { map } from 'rxjs/operators';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { Uuid } from '@core/api/models';
@@ -73,6 +74,8 @@ export interface TransferCreate {
   readonly fiscalYearId: Uuid;
   readonly amount: string;
   readonly description: string;
+  /** A past fiscal year needs it, and it must lie in that year. */
+  readonly paymentDate?: string | null;
 }
 
 /**
@@ -357,8 +360,6 @@ export interface BudgetTreeNode {
   readonly active: boolean;
   /** Display color for the pie and the tree. `null` means automatic. */
   readonly color: string | null;
-  /** Hide in the budget tab. This is display only and the rollups do not change. */
-  readonly hiddenInBudget: boolean;
   /** Visibility gremium: its members see this subtree in the budget tab as a root.
    *  They need no global budget.* permissions. */
   readonly viewGremiumId: Uuid | null;
@@ -372,6 +373,15 @@ export interface BudgetTreeNode {
    *  uses it. */
   readonly fiscalStartMonth: number;
   readonly fiscalStartDay: number;
+  /** The plan switch of a top-level node: its years can have a Haushaltsplan. */
+  readonly planEnabled?: boolean;
+  /** A plan line of the budget starts "deckungsfähig" when it becomes an expense line. */
+  readonly planCoverableDefault?: boolean;
+  /**
+   * For a top-level node the fiscal years with a plan version in force, for a node below
+   * it the fiscal years whose version in force has a line for the node.
+   */
+  readonly plannedIn?: readonly Uuid[];
   readonly byFiscalYear: readonly BudgetAllocationView[];
   readonly children: readonly BudgetTreeNode[];
 }
@@ -386,12 +396,14 @@ export interface BudgetNode {
   readonly currency: string;
   readonly active: boolean;
   readonly color?: string | null;
-  readonly hiddenInBudget?: boolean;
   readonly decisionGremiumId?: Uuid | null;
   readonly effectiveDecisionGremiumId?: Uuid | null;
   readonly decisionGremiumSourceId?: Uuid | null;
   readonly fiscalStartMonth?: number;
   readonly fiscalStartDay?: number;
+  readonly planEnabled?: boolean;
+  /** A plan line of the budget starts "deckungsfähig" when it becomes an expense line. */
+  readonly planCoverableDefault?: boolean;
 }
 
 /** The problem code of a money mutation on a closed fiscal year (409). */
@@ -430,13 +442,36 @@ export interface BudgetNodeUpdate {
   readonly name?: string;
   readonly active?: boolean;
   readonly color?: string | null;
-  readonly hiddenInBudget?: boolean;
   /** Visibility gremium. `null` clears the assignment. */
   readonly viewGremiumId?: Uuid | null;
   /** Deciding gremium of the node. `null` clears it; the node then inherits. */
   readonly decisionGremiumId?: Uuid | null;
   readonly fiscalStartMonth?: number;
   readonly fiscalStartDay?: number;
+  readonly planCoverableDefault?: boolean;
+}
+
+/** A top-level budget with one fiscal year that a new booking can take (spec 000879). */
+/** What the dialog of the close of a fiscal year names before the person confirms. */
+export interface FiscalYearCloseCheck {
+  /** The Anträge of the year that are not in an end state. */
+  readonly openApplications: number;
+  /** The plan of the year has a Nachtrag that is still a draft. */
+  readonly draftSupplement: boolean;
+}
+
+export interface BudgetYear {
+  readonly budgetId: Uuid;
+  readonly budgetName: string;
+  readonly fiscalYearId: Uuid;
+  /** The fiscal year as text: ``YYYY`` or ``YYYY/YY``. */
+  readonly display: string;
+  /** The year that holds the date of today. */
+  readonly current: boolean;
+  /** The year has ended: it takes a booking only with a date in the year. */
+  readonly past: boolean;
+  readonly startDate: string;
+  readonly endDate: string;
 }
 
 export interface FiscalYearCreate {
@@ -489,13 +524,24 @@ function queryParams(query: object): Readonly<Record<string, string>> {
 export class BudgetTreeApi {
   private readonly http = inject(HttpClient);
   private readonly base = inject(API_BASE_URL);
+  private readonly features = inject(FeatureService);
+
+  /**
+   * A save of a Kostenstelle ended after its section went off the page, for example the
+   * save of a text that the person typed and then went back. The budget page that shows
+   * then reads the tree again, because its first read can be older than that save.
+   */
+  readonly changed = new Subject<void>();
 
   /**
    * The budget and dashboard pages have their own loading indicator; every other call only fills
    * the nav or a dropdown, so it suppresses the global overlay. It is cached, because five pages
-   * ask for the whole tree and a mutation under `/budgets` drops every entry there.
+   * ask for the whole tree and a mutation under `/budgets` drops every entry there. While
+   * `Budget` is off the tree is empty without a request (spec 000758), so a filter or a
+   * choice of cost centres on another page has nothing to show.
    */
   tree(gremiumId?: string): Observable<BudgetTreeNode[]> {
+    if (!this.features.isOn('budget')) return of([]);
     const params = gremiumId ? { gremium: gremiumId } : undefined;
     return this.http.get<BudgetTreeNode[]>(`${this.base}/budgets`, {
       params,
@@ -513,6 +559,17 @@ export class BudgetTreeApi {
 
   deleteNode(id: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/budgets/${id}`);
+  }
+
+  /**
+   * The pairs of a budget and a fiscal year that a new booking can take. `late` adds the
+   * past years that are not closed, for a booking and a transfer.
+   */
+  listBudgetYears(late = false): Observable<BudgetYear[]> {
+    return this.http.get<BudgetYear[]>(`${this.base}/budget-years`, {
+      context: skipLoading(),
+      params: late ? { late: 'true' } : {},
+    });
   }
 
   listFiscalYears(topId: Uuid): Observable<FiscalYear[]> {
@@ -548,6 +605,14 @@ export class BudgetTreeApi {
    *  bookings, allocations or applications still reference the year. */
   deleteFiscalYear(topId: Uuid, fyId: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/budgets/${topId}/fiscal-years/${fyId}`);
+  }
+
+  /** What the close of a fiscal year leaves open. Needs P(`budget.structure`). */
+  fiscalYearCloseCheck(topId: Uuid, fyId: Uuid): Observable<FiscalYearCloseCheck> {
+    return this.http.get<FiscalYearCloseCheck>(
+      `${this.base}/budgets/${topId}/fiscal-years/${fyId}/close-check`,
+      { context: skipLoading() },
+    );
   }
 
   /** Close a fiscal year, or reopen it. Needs P(`budget.structure`). */
@@ -738,11 +803,12 @@ import { simplifyPathKey } from '@shared/budget-path';
 /** Re-exported from `@shared/budget-path`, so the imports from this file keep working. */
 export { simplifyPathKey };
 
-/** Tree (recursive) -> flat option list (pre-order, "pathKey - name", simplified). */
+/** Tree (recursive) -> flat option list (pre-order, "pathKey - name", simplified). A picker
+ *  shows no inactive Kostenstelle and none below it. */
 export function flattenBudgetOptions(
   nodes: readonly BudgetTreeNode[],
 ): readonly { readonly value: Uuid; readonly label: string }[] {
-  return nodes.flatMap((n) => [
+  return nodes.filter((n) => n.active).flatMap((n) => [
     { value: n.id, label: `${simplifyPathKey(n.pathKey)} – ${n.name}` },
     ...(n.children?.length ? flattenBudgetOptions(n.children) : []),
   ]);

@@ -6,9 +6,11 @@
  * never public on its own; its title and date appear only as part of a protocol.
  */
 
+import type { MajorityRule } from '@core/api/models';
+
 /** The result of one decision. */
 /** A personnel election gives `elected`, `runoff`, `tie` or `rejected`. */
-export type PublicVoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff';
+export type PublicVoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff' | 'no_majority';
 
 /** A gremium that publishes its protocols (`GET /public/committees`). */
 export interface PublicGremium {
@@ -55,7 +57,7 @@ export interface PublicDecision {
   /** The counts per option, for example `ja`/`nein`/`enthaltung` or `yes`/`no`/`abstain`. */
   readonly counts: Record<string, number>;
   readonly result: PublicVoteResult | null;
-  readonly majorityRule: 'simple' | 'absolute' | 'two_thirds';
+  readonly majorityRule: MajorityRule;
   readonly secret: boolean;
   /** The vote is already in the TOP text as a callout: the page shows no second box. */
   readonly inText?: boolean;
@@ -116,4 +118,30 @@ export interface PublicProtocolQuery {
   readonly q?: string;
   readonly limit?: number;
   readonly offset?: number;
+}
+
+/**
+ * One public decision (`GET /public/decisions`, spec 000926). An election has its
+ * question and its date only: no meeting title, no result and no counts.
+ */
+export interface PublicDecisionRow {
+  /** The protocol that records the decision; a circular vote has none (`null`). */
+  readonly protocolId: string | null;
+  readonly gremium: PublicGremiumRef;
+  /** The meeting date, `YYYY-MM-DD`. */
+  readonly date: string;
+  readonly semester: string;
+  readonly kind: 'motion' | 'election' | 'circular';
+  readonly question: string | null;
+  readonly meetingTitle: string | null;
+  readonly result: PublicVoteResult | null;
+  readonly counts: Record<string, number>;
+}
+
+/** One page of the public decisions. */
+export interface PublicDecisionPage {
+  readonly items: readonly PublicDecisionRow[];
+  readonly total: number;
+  readonly limit: number;
+  readonly offset: number;
 }

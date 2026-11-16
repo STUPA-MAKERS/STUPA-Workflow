@@ -1,7 +1,9 @@
 # Specs
 
-The binding rules of STUPA-Workflow. One file holds one rule. The rules for specs are in
-[style/specs/](style/specs/). Copy [TEMPLATE.md](TEMPLATE.md) to start a new rule.
+The binding rules of STUPA-Workflow. One file holds one rule. A protocol spec in `protocols/`
+holds one whole data exchange format. The rules for specs are in [style/specs/](style/specs/).
+Copy [TEMPLATE.md](TEMPLATE.md) to start a new rule, and
+[TEMPLATE-protocol.md](TEMPLATE-protocol.md) to start a new protocol spec.
 
 ## Tree
 
@@ -11,12 +13,12 @@ specs/
     backend/   database, functional, python
     frontend/  angular, functional
     shared/    agents, api, functional, git, testing, tooling, writing
-    specs/     content, format, structure, uml
+    specs/     content, format, protocols, structure, uml
   requirements/
     functional/
       administration/  accounts, admin, audit, backups, files, privacy, translations
       applications/    applications, dashboard, flow, forms
-      collaboration/   notifications, search, tickets, todos
+      collaboration/   committees, notifications, search, tickets, todos
       finance/         budget, invoices
       integrations/    external, mcp, webhooks
       meetings/        calendar, delegations, meetings, protocols, voting
@@ -28,6 +30,8 @@ specs/
       privacy/        personal-data
       security/       access, files, integrity, network
       usability/      controls, layout
+  protocols/
+    integrations/  webhooks
 ```
 
 The second level is the area, the third level is the topic. A topic folder holds the rule
@@ -45,7 +49,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/accounts/000159](requirements/functional/administration/accounts/000159_ohne-namen.md) | An account without a name shows Ohne Namen | approved |
 | [F/administration/accounts/000160](requirements/functional/administration/accounts/000160_membership-sync.md) | Membership sync deletes rows without history | approved |
 | [F/administration/accounts/000265](requirements/functional/administration/accounts/000265_refused-logins.md) | A deactivated or merged account cannot log in | approved |
-| [F/administration/accounts/000266](requirements/functional/administration/accounts/000266_member-role.md) | Every user holds the member role | approved |
+| [F/administration/accounts/000266](requirements/functional/administration/accounts/000266_member-role.md) | Every user holds the member role | replaced |
 | [F/administration/accounts/000267](requirements/functional/administration/accounts/000267_gremium-rights.md) | Gremium rights come only from the membership | approved |
 | [F/administration/accounts/000268](requirements/functional/administration/accounts/000268_magic-link-lifetime.md) | A magic link is valid until an event ends it | approved |
 | [F/administration/accounts/000269](requirements/functional/administration/accounts/000269_applicant-edit.md) | An applicant session can edit | approved |
@@ -75,6 +79,20 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/000383](requirements/functional/administration/admin/000383_revert-forward.md) | A config revert goes forward | approved |
 | [F/administration/admin/000405](requirements/functional/administration/admin/000405_revert-permissions.md) | A revert needs the right of the original change | approved |
 | [F/administration/admin/000638](requirements/functional/administration/admin/000638_admin-menu-icons.md) | Each entry of the admin menu has its own icon | approved |
+| [F/administration/admin/000756](requirements/functional/administration/admin/000756_feature-switches.md) | An admin switches each feature on and off | approved |
+| [F/administration/admin/000757](requirements/functional/administration/admin/000757_feature-off-server.md) | A feature that is off is closed on the server | approved |
+| [F/administration/admin/000758](requirements/functional/administration/admin/000758_feature-off-ui.md) | A feature that is off does not show in the UI | approved |
+| [F/administration/admin/000759](requirements/functional/administration/admin/000759_feature-keeps-data.md) | A switch keeps the data of the feature | approved |
+| [F/administration/admin/000760](requirements/functional/administration/admin/000760_feature-dependencies.md) | A feature that needs another feature goes off with it | approved |
+| [F/administration/admin/000761](requirements/functional/administration/admin/000761_feature-in-use.md) | A feature in use by the Antrag flow cannot go off | approved |
+| [F/administration/admin/000762](requirements/functional/administration/admin/000762_features-page.md) | The admin page Funktionen holds the feature switches | approved |
+| [F/administration/admin/000891](requirements/functional/administration/admin/000891_export-logo.md) | Exported PDFs carry the export logo of the branding | approved |
+| [F/administration/admin/000892](requirements/functional/administration/admin/000892_pdf-footer-graphic.md) | Every PDF carries the footer graphic of the branding | approved |
+| [F/administration/admin/000906](requirements/functional/administration/admin/000906_gremium-defaults.md) | A new Gremium starts with the meeting defaults | approved |
+| [F/administration/admin/000917](requirements/functional/administration/admin/000917_meeting-periods.md) | The meeting settings hold the periods of the Geschäftsordnung | approved |
+| [F/administration/admin/000942](requirements/functional/administration/admin/000942_periods-fixed-at-start.md) | A changed period does not reach a started case | approved |
+| [F/administration/admin/000980](requirements/functional/administration/admin/000980_embedded-pdfs-follow-sitzungen.md) | The embedded PDFs belong to the feature Sitzungen | approved |
+| [F/administration/admin/001005](requirements/functional/administration/admin/001005_pdf-default-preview.md) | The branding page shows the built-in PDF graphics | approved |
 | [F/administration/audit/000291](requirements/functional/administration/audit/000291_record-in-tx.md) | An audit entry is written in the same transaction | approved |
 | [F/administration/audit/000292](requirements/functional/administration/audit/000292_chain-check.md) | The audit chain is checked every night | approved |
 | [F/administration/audit/000293](requirements/functional/administration/audit/000293_three-permissions.md) | Read, check and revert are separate permissions | approved |
@@ -127,6 +145,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/applications/000753](requirements/functional/applications/applications/000753_observer-no-pii.md) | An observer does not see personal fields | approved |
 | [F/applications/applications/000754](requirements/functional/applications/applications/000754_observer-mails.md) | An observer gets the status mails | approved |
 | [F/applications/applications/000755](requirements/functional/applications/applications/000755_observer-removal.md) | A removed observer loses the access at once | approved |
+| [F/applications/applications/000880](requirements/functional/applications/applications/000880_pdf-export.md) | An Antrag downloads as PDF | approved |
+| [F/applications/applications/000881](requirements/functional/applications/applications/000881_pdf-content.md) | The Antrag PDF shows the Antrag like the detail page | approved |
+| [F/applications/applications/000882](requirements/functional/applications/applications/000882_pdf-no-pii-without-right.md) | The Antrag PDF shows only what the reader may see | approved |
+| [F/applications/applications/000883](requirements/functional/applications/applications/000883_pdf-name.md) | The Antrag PDF is named after the Antrag | approved |
+| [F/applications/applications/000888](requirements/functional/applications/applications/000888_pdf-signatures.md) | The Antrag PDF of an Antragsart can end with a signature section | approved |
 | [F/applications/dashboard/000421](requirements/functional/applications/dashboard/000421_dashboard.md) | The start page is a work list with a side sheet | approved |
 | [F/applications/dashboard/000550](requirements/functional/applications/dashboard/000550_start-due-cards.md) | Start shows the due cards of the person | approved |
 | [F/applications/dashboard/000650](requirements/functional/applications/dashboard/000650_start-apply-button-tab-line.md) | Antrag stellen stands in the tab line of the desktop start page | approved |
@@ -168,6 +191,12 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/forms/000288](requirements/functional/applications/forms/000288_finite-numbers.md) | Numbers are finite decimals | approved |
 | [F/applications/forms/000289](requirements/functional/applications/forms/000289_form-revision.md) | A form change is versioned and audited | approved |
 | [F/applications/forms/000471](requirements/functional/applications/forms/000471_type-retention.md) | Antrag types can keep their own retention | approved |
+| [F/collaboration/committees/001010](requirements/functional/collaboration/committees/001010_info-tab.md) | A Gremium has an Info tab | approved |
+| [F/collaboration/committees/001011](requirements/functional/collaboration/committees/001011_info-edit-permission.md) | Only info.write edits the Info of a Gremium | approved |
+| [F/collaboration/committees/001012](requirements/functional/collaboration/committees/001012_info-links.md) | An Info link has a label and a web address | approved |
+| [F/collaboration/committees/001013](requirements/functional/collaboration/committees/001013_info-markdown.md) | The Info text is sanitized Markdown | approved |
+| [F/collaboration/committees/001014](requirements/functional/collaboration/committees/001014_info-save.md) | An Info save is versioned and audited | approved |
+| [F/collaboration/committees/001015](requirements/functional/collaboration/committees/001015_info-empty.md) | An empty Info tab shows only to its editors | approved |
 | [F/collaboration/notifications/000151](requirements/functional/collaboration/notifications/000151_task-mail-recipients.md) | Task mails go only to who can act | approved |
 | [F/collaboration/notifications/000152](requirements/functional/collaboration/notifications/000152_team-mails-opt-in.md) | Team mails about Anträge are off by default | approved |
 | [F/collaboration/notifications/000153](requirements/functional/collaboration/notifications/000153_sandboxed-templates.md) | Mail placeholders use camelCase | approved |
@@ -177,6 +206,13 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/notifications/000309](requirements/functional/collaboration/notifications/000309_mail-preferences.md) | A person controls their mail kinds | approved |
 | [F/collaboration/notifications/000310](requirements/functional/collaboration/notifications/000310_mail-languages.md) | Mail texts are in German and English | approved |
 | [F/collaboration/notifications/000312](requirements/functional/collaboration/notifications/000312_task-reminders.md) | Task reminders follow the admin setting | approved |
+| [F/collaboration/notifications/000998](requirements/functional/collaboration/notifications/000998_mail-platform-name.md) | A mail names the platform by its branding name | approved |
+| [F/collaboration/notifications/000999](requirements/functional/collaboration/notifications/000999_mail-logo.md) | The head of a mail shows the logo of the branding | approved |
+| [F/collaboration/notifications/001000](requirements/functional/collaboration/notifications/001000_mail-accent.md) | The button and the links of a mail use the accent colour | approved |
+| [F/collaboration/notifications/001001](requirements/functional/collaboration/notifications/001001_mail-footer-text.md) | The footer of a mail shows the E-Mail-Fußzeile | approved |
+| [F/collaboration/notifications/001002](requirements/functional/collaboration/notifications/001002_mail-footer-copyright.md) | The footer of a mail shows the copyright line | approved |
+| [F/collaboration/notifications/001003](requirements/functional/collaboration/notifications/001003_mail-footer-legal-links.md) | The footer of a mail shows the legal links | approved |
+| [F/collaboration/notifications/001004](requirements/functional/collaboration/notifications/001004_mail-dark-colours.md) | A mail has light and dark colours | approved |
 | [F/collaboration/search/000328](requirements/functional/collaboration/search/000328_reuse-gates.md) | Search reuses the gate of each module | approved |
 | [F/collaboration/search/000329](requirements/functional/collaboration/search/000329_query-length.md) | Search needs two characters | approved |
 | [F/collaboration/search/000330](requirements/functional/collaboration/search/000330_per-kind-cap.md) | Search shows 5 hits per kind | approved |
@@ -249,19 +285,101 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000258](requirements/functional/finance/budget/000258_sub-bookings.md) | A booking can have sub-bookings | approved |
 | [F/finance/budget/000259](requirements/functional/finance/budget/000259_gremium-view.md) | Gremium members see their cost centres | approved |
 | [F/finance/budget/000629](requirements/functional/finance/budget/000629_booking-lowers-bound.md) | A booking lowers the bound amount of its Antrag | approved |
+| [F/finance/budget/000790](requirements/functional/finance/budget/000790_cost-centre-side.md) | A Kostenstelle below the top level has a side | replaced |
+| [F/finance/budget/000791](requirements/functional/finance/budget/000791_budget-plan.md) | A fiscal year has one Haushaltsplan with versions | approved |
+| [F/finance/budget/000792](requirements/functional/finance/budget/000792_plan-version-steps.md) | A plan version passes the steps of its budget | approved |
+| [F/finance/budget/000793](requirements/functional/finance/budget/000793_plan-version-editable.md) | Only a draft version can be edited | approved |
+| [F/finance/budget/000794](requirements/functional/finance/budget/000794_plan-line.md) | A plan line holds the Ansatz of one Kostenstelle | approved |
+| [F/finance/budget/000795](requirements/functional/finance/budget/000795_plan-balanced.md) | A plan version is balanced before the decision | approved |
+| [F/finance/budget/000796](requirements/functional/finance/budget/000796_one-version-in-force.md) | One version of a plan is in force | approved |
+| [F/finance/budget/000797](requirements/functional/finance/budget/000797_allocation-from-plan.md) | The plan in force sets the allocations | approved |
+| [F/finance/budget/000798](requirements/functional/finance/budget/000798_allocation-locked-by-plan.md) | A year with a plan in force refuses a direct allocation change | approved |
+| [F/finance/budget/000799](requirements/functional/finance/budget/000799_nachtrag-from-in-force.md) | A Nachtrag starts as a copy of the version in force | approved |
+| [F/finance/budget/000800](requirements/functional/finance/budget/000800_plan-permission.md) | A plan write needs budget.structure | approved |
+| [F/finance/budget/000801](requirements/functional/finance/budget/000801_plan-closed-year.md) | A closed fiscal year refuses plan changes | approved |
+| [F/finance/budget/000802](requirements/functional/finance/budget/000802_plan-audit.md) | Each plan state change is audited | approved |
+| [F/finance/budget/000803](requirements/functional/finance/budget/000803_plan-switch-creates-stammplan.md) | A new fiscal year of a Haushalt with the plan switch gets its draft at once | approved |
+| [F/finance/budget/000804](requirements/functional/finance/budget/000804_budget-tab-views.md) | The Haushalt tab has the views Bewirtschaftung and Planung | approved |
+| [F/finance/budget/000805](requirements/functional/finance/budget/000805_planning-list.md) | The list of Planung shows the plan as a tree | approved |
+| [F/finance/budget/000806](requirements/functional/finance/budget/000806_plan-page-steps.md) | The plan page shows the steps of the version | approved |
+| [F/finance/budget/000807](requirements/functional/finance/budget/000807_plan-page-sums.md) | The plan page shows the sums and the balance | approved |
+| [F/finance/budget/000808](requirements/functional/finance/budget/000808_plan-page-tables.md) | The plan page lists income and expenses in two tables | approved |
+| [F/finance/budget/000809](requirements/functional/finance/budget/000809_plan-page-nachtrag-columns.md) | A Nachtrag is shown beside the version in force | approved |
+| [F/finance/budget/000810](requirements/functional/finance/budget/000810_draft-edit-in-table.md) | A draft is edited in the table | approved |
+| [F/finance/budget/000811](requirements/functional/finance/budget/000811_plan-submit-needs-balance.md) | An unbalanced draft cannot go to the vote | approved |
+| [F/finance/budget/000812](requirements/functional/finance/budget/000812_draft-field-saves-on-leave.md) | An amount field of a draft saves when the person leaves it | approved |
+| [F/finance/budget/000814](requirements/functional/finance/budget/000814_plan-switch.md) | A top-level Kostenstelle has a plan switch | approved |
+| [F/finance/budget/000815](requirements/functional/finance/budget/000815_planning-detail.md) | The detail of Planung shows the plan or one line | approved |
+| [F/finance/budget/000816](requirements/functional/finance/budget/000816_plan-line-marks.md) | A plan line of an expense holds the Vermerke | approved |
+| [F/finance/budget/000817](requirements/functional/finance/budget/000817_cost-centre-side-set.md) | The side is set on a direct child of the top level | replaced |
+| [F/finance/budget/000818](requirements/functional/finance/budget/000818_plan-line-is-membership.md) | A plan line makes a Kostenstelle part of the year | approved |
+| [F/finance/budget/000819](requirements/functional/finance/budget/000819_plan-line-remove.md) | A draft version can lose a line | approved |
+| [F/finance/budget/000820](requirements/functional/finance/budget/000820_cost-centre-in-plan-no-delete.md) | A Kostenstelle of a decided plan cannot be deleted | approved |
+| [F/finance/budget/000821](requirements/functional/finance/budget/000821_plan-line-snapshot.md) | A decided version keeps the name and the key of each line | approved |
+| [F/finance/budget/000822](requirements/functional/finance/budget/000822_year-shows-plan-members.md) | A year with a plan shows only its Kostenstellen | approved |
+| [F/finance/budget/000823](requirements/functional/finance/budget/000823_plan-steps-per-budget.md) | A budget holds the steps of its Haushaltsplan | approved |
+| [F/finance/budget/000824](requirements/functional/finance/budget/000824_plan-version-keeps-steps.md) | A version keeps the steps it started with | approved |
+| [F/finance/budget/000825](requirements/functional/finance/budget/000825_plan-step-recorded.md) | A person records a passed step | approved |
+| [F/finance/budget/000826](requirements/functional/finance/budget/000826_plan-step-by-vote.md) | An accepted vote of the Gremium passes its step | replaced |
+| [F/finance/budget/000827](requirements/functional/finance/budget/000827_plan-steps-edit.md) | The steps of a budget are edited in its edit form | approved |
+| [F/finance/budget/000828](requirements/functional/finance/budget/000828_admin-lists-budgets.md) | Verwaltung lists only the budgets | approved |
+| [F/finance/budget/000829](requirements/functional/finance/budget/000829_cost-centre-create-in-budget-tab.md) | A Kostenstelle is created in the Haushalt tab | approved |
+| [F/finance/budget/000830](requirements/functional/finance/budget/000830_cost-centre-create-in-draft.md) | A Kostenstelle created in a draft gets a line | approved |
+| [F/finance/budget/000831](requirements/functional/finance/budget/000831_cost-centre-edit-in-budget-tab.md) | A Kostenstelle is edited in the Haushalt tab | approved |
+| [F/finance/budget/000832](requirements/functional/finance/budget/000832_cost-centre-delete-in-budget-tab.md) | A Kostenstelle is deleted in the Haushalt tab | approved |
+| [F/finance/budget/000833](requirements/functional/finance/budget/000833_allocation-set-in-budget-tab.md) | The allocation of a year without a plan in force is set in the Haushalt tab | approved |
+| [F/finance/budget/000834](requirements/functional/finance/budget/000834_inactive-cost-centre-hidden.md) | An inactive Kostenstelle is hidden in the Haushalt tab | approved |
+| [F/finance/budget/000835](requirements/functional/finance/budget/000835_plan-version-delete.md) | A draft version can be deleted | approved |
+| [F/finance/budget/000836](requirements/functional/finance/budget/000836_fiscal-year-delete-with-plan.md) | A fiscal year with a decided plan cannot be deleted | approved |
+| [F/finance/budget/000837](requirements/functional/finance/budget/000837_plan-copy-from-year.md) | A new plan can copy the plan of another year | approved |
+| [F/finance/budget/000838](requirements/functional/finance/budget/000838_plan-step-vote.md) | The vote of a plan step runs in a meeting of its Gremium | approved |
+| [F/finance/budget/000839](requirements/functional/finance/budget/000839_plan-back-to-draft-ends-votes.md) | A version back in draft ends the votes of its steps | approved |
+| [F/finance/budget/000840](requirements/functional/finance/budget/000840_plan-page-confirmations.md) | The plan page asks before an action that binds or deletes | approved |
+| [F/finance/budget/000841](requirements/functional/finance/budget/000841_plan-step-named.md) | A request that records a step names the step | approved |
+| [F/finance/budget/000842](requirements/functional/finance/budget/000842_plan-write-lock.md) | A write in the tree of a budget takes the lock of the budget | approved |
+| [F/finance/budget/000844](requirements/functional/finance/budget/000844_gremium-with-budget-not-deleted.md) | A Gremium with a budget is not deleted | approved |
+| [F/finance/budget/000845](requirements/functional/finance/budget/000845_fiscal-year-only-through-its-budget.md) | A fiscal year changes only through its own budget | approved |
+| [F/finance/budget/000846](requirements/functional/finance/budget/000846_allocation-two-decimal-places.md) | An allocation by hand has at most two decimal places | approved |
+| [F/finance/budget/000848](requirements/functional/finance/budget/000848_plan-page-other-budget.md) | Another budget takes the budget before off the plan page | approved |
+| [F/finance/budget/000849](requirements/functional/finance/budget/000849_cost-centre-settings-save-order.md) | The settings of a Kostenstelle save one change after the other | approved |
+| [F/finance/budget/000850](requirements/functional/finance/budget/000850_cost-centre-text-saved-on-close.md) | A typed text of a Kostenstelle is saved when its section goes off the page | approved |
+| [F/finance/budget/000851](requirements/functional/finance/budget/000851_tree-read-order.md) | A budget page drops the answer of an older tree read | approved |
+| [F/finance/budget/000852](requirements/functional/finance/budget/000852_budget-law-terms.md) | The budget pages use the words Haushalt, Titel, Ansatz and Haushaltsplan | approved |
+| [F/finance/budget/000853](requirements/functional/finance/budget/000853_plan-line-side.md) | The side of a Titel is a part of its plan line | approved |
+| [F/finance/budget/000854](requirements/functional/finance/budget/000854_plan-starts-as-draft.md) | A Haushaltsplan starts as a draft | approved |
+| [F/finance/budget/000855](requirements/functional/finance/budget/000855_plan-state-by-hand.md) | A person with an own permission sets the state of a plan by hand | approved |
+| [F/finance/budget/000874](requirements/functional/finance/budget/000874_plan-coverable-default.md) | A budget says if its new plan lines start deckungsfähig | approved |
+| [F/finance/budget/000875](requirements/functional/finance/budget/000875_plan-export.md) | A version of a Haushaltsplan exports as XLSX and as PDF | approved |
+| [F/finance/budget/000876](requirements/functional/finance/budget/000876_plan-in-protocol.md) | A plan on the agenda is an Anlage of the protocol | approved |
+| [F/finance/budget/000877](requirements/functional/finance/budget/000877_rename-in-draft.md) | A Kostenstelle of a Haushalt with a plan gets a new key or name in a draft | approved |
+| [F/finance/budget/000878](requirements/functional/finance/budget/000878_path-key-one-hyphen.md) | The path key of a Kostenstelle has one hyphen | approved |
+| [F/finance/budget/000879](requirements/functional/finance/budget/000879_budget-year-before-cost-centre.md) | A person chooses Haushalt and Haushaltsjahr before the Kostenstelle | approved |
+| [F/finance/budget/000889](requirements/functional/finance/budget/000889_year-before-needs-plan.md) | The columns of the year before show only when that year has a plan | approved |
+| [F/finance/budget/000890](requirements/functional/finance/budget/000890_deciding-gremium-reads-haushalt.md) | A Gremium that decides a plan reads the Haushalt | approved |
+| [F/finance/budget/000927](requirements/functional/finance/budget/000927_gremium-delete-takes-tree-lock.md) | The delete of a Gremium takes the lock of each tree that names it | approved |
+| [F/finance/budget/000928](requirements/functional/finance/budget/000928_plan-readable-question.md) | A page asks whether the reader reads a plan and gets no 403 | approved |
+| [F/finance/budget/000929](requirements/functional/finance/budget/000929_plan-line-with-bookings-stays.md) | The line of a Kostenstelle with bookings is not removed | approved |
+| [F/finance/budget/000930](requirements/functional/finance/budget/000930_fiscal-year-audit.md) | The create and the change of a fiscal year are in the audit log | approved |
+| [F/finance/budget/000964](requirements/functional/finance/budget/000964_plan-pdf-head-line.md) | The head line of the plan PDF sits tight between the title and the table | approved |
+| [F/finance/budget/000968](requirements/functional/finance/budget/000968_plan-pdf-parent-amounts-in-brackets.md) | The plan PDF shows the amounts of a line with lines below it in brackets | approved |
+| [F/finance/budget/000990](requirements/functional/finance/budget/000990_late-booking-in-past-year.md) | A past fiscal year that is not closed takes a booking with a date in the year | approved |
+| [F/finance/budget/000991](requirements/functional/finance/budget/000991_close-names-open-antraege.md) | The close of a fiscal year names what stays open, and an Antrag can leave a closed year | approved |
+| [F/finance/budget/000992](requirements/functional/finance/budget/000992_stichtag-keeps-closed-years.md) | A new Stichtag moves only the fiscal years that are not closed | approved |
+| [F/finance/budget/001020](requirements/functional/finance/budget/001020_plan-table-amounts-one-edge.md) | The amounts of a plan table end on one edge | approved |
+| [F/finance/budget/001021](requirements/functional/finance/budget/001021_plan-change-needs-comparison.md) | A plan shows the Änderung only against an Ansatz | approved |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
 | [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | approved |
-| [F/finance/invoices/000262](requirements/functional/finance/invoices/000262_invoice-segments.md) | The invoice list has four segments | approved |
+| [F/finance/invoices/000262](requirements/functional/finance/invoices/000262_invoice-segments.md) | The invoice list has four segments | replaced |
 | [F/finance/invoices/000263](requirements/functional/finance/invoices/000263_zugferd-import.md) | A ZUGFeRD invoice fills the form | approved |
 | [F/integrations/external/000176](requirements/functional/integrations/external/000176_optional.md) | Integrations are optional | approved |
 | [F/integrations/external/000177](requirements/functional/integrations/external/000177_preview-access.md) | A link preview uses the access of the viewer | approved |
 | [F/integrations/mcp/000174](requirements/functional/integrations/mcp/000174_acts-as-user.md) | The MCP server acts as the logged-in user | approved |
 | [F/integrations/mcp/000272](requirements/functional/integrations/mcp/000272_token-scope.md) | An agent token has a scope and a lifetime | approved |
-| [F/integrations/mcp/000273](requirements/functional/integrations/mcp/000273_forbidden-permissions.md) | An agent never casts a ballot or merges accounts | approved |
+| [F/integrations/mcp/000273](requirements/functional/integrations/mcp/000273_forbidden-permissions.md) | An agent never casts a ballot or merges accounts | replaced |
 | [F/integrations/mcp/000274](requirements/functional/integrations/mcp/000274_revoke-grants.md) | Tokens can be revoked | approved |
 | [F/integrations/mcp/000385](requirements/functional/integrations/mcp/000385_version-bump.md) | The MCP version moves with its tools | replaced |
 | [F/integrations/mcp/000386](requirements/functional/integrations/mcp/000386_no-ballot-tool.md) | The MCP has no ballot tool | approved |
-| [F/integrations/mcp/000387](requirements/functional/integrations/mcp/000387_idp-roles-read-only.md) | Memberships and roles are read-only in the MCP | approved |
+| [F/integrations/mcp/000387](requirements/functional/integrations/mcp/000387_idp-roles-read-only.md) | Memberships and roles are read-only in the MCP | replaced |
 | [F/integrations/mcp/000462](requirements/functional/integrations/mcp/000462_forbidden-permissions.md) | No agent token gets a human-only permission | approved |
 | [F/integrations/webhooks/000298](requirements/functional/integrations/webhooks/000298_retry.md) | A failed delivery is retried with backoff | approved |
 | [F/integrations/webhooks/000299](requirements/functional/integrations/webhooks/000299_idempotent-delivery.md) | A delivery runs once per key | approved |
@@ -301,6 +419,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/calendar/000742](requirements/functional/meetings/calendar/000742_termin-invite-search-rows.md) | The invitation search of a Termin shows its hits as rows with an avatar | approved |
 | [F/meetings/calendar/000744](requirements/functional/meetings/calendar/000744_week-span-blocks.md) | A timed entry over several days is a block on each of its days in the week view | approved |
 | [F/meetings/calendar/000746](requirements/functional/meetings/calendar/000746_week-whole-day.md) | The week view shows the whole day from 00:00 to 24:00 | approved |
+| [F/meetings/calendar/000973](requirements/functional/meetings/calendar/000973_rule-with-day-times.md) | A recurrence rule with times of the day gives only the first date | approved |
+| [F/meetings/calendar/000974](requirements/functional/meetings/calendar/000974_feed-read-time-limit.md) | The read of an external feed has a time limit | approved |
 | [F/meetings/delegations/000110](requirements/functional/meetings/delegations/000110_per-gremium.md) | Vote delegation is a Gremium setting | approved |
 | [F/meetings/delegations/000111](requirements/functional/meetings/delegations/000111_delegation-blocks-presence.md) | A member with an active delegation is not present | approved |
 | [F/meetings/delegations/000112](requirements/functional/meetings/delegations/000112_one-pool.md) | The substitute pool is the only substitute rule | approved |
@@ -315,8 +435,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/delegations/000420](requirements/functional/meetings/delegations/000420_lead-enters-substitute.md) | The lead can enter a pool substitute | approved |
 | [F/meetings/delegations/000445](requirements/functional/meetings/delegations/000445_pool-seat-cap.md) | Pool seats never exceed the member seats | approved |
 | [F/meetings/delegations/000446](requirements/functional/meetings/delegations/000446_pool-seat-free.md) | The member frees the pool seat | approved |
-| [F/meetings/delegations/000447](requirements/functional/meetings/delegations/000447_pool-seat-live.md) | Pool seats need only a live meeting | approved |
+| [F/meetings/delegations/000447](requirements/functional/meetings/delegations/000447_pool-seat-live.md) | Pool seats need only a live meeting | replaced |
 | [F/meetings/delegations/000461](requirements/functional/meetings/delegations/000461_external-delegates.md) | External delegates need a Gremium switch | approved |
+| [F/meetings/delegations/000909](requirements/functional/meetings/delegations/000909_delegate-limit.md) | A delegate holds a limited number of delegations | approved |
+| [F/meetings/delegations/000910](requirements/functional/meetings/delegations/000910_no-delegation-in-election.md) | An election takes no delegation ballot | approved |
+| [F/meetings/delegations/000938](requirements/functional/meetings/delegations/000938_pool-substitute-votes-in-election.md) | A pool substitute votes in an election | approved |
 | [F/meetings/meetings/000092](requirements/functional/meetings/meetings/000092_open-window.md) | A meeting opens in a configured window | approved |
 | [F/meetings/meetings/000093](requirements/functional/meetings/meetings/000093_state-order.md) | Meeting states move only forward | approved |
 | [F/meetings/meetings/000094](requirements/functional/meetings/meetings/000094_close-with-open-vote.md) | A meeting with an open vote does not close | approved |
@@ -329,7 +452,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/000101](requirements/functional/meetings/meetings/000101_application-top-row.md) | A TOP with an Antrag shows the Antrag as its first row | approved |
 | [F/meetings/meetings/000102](requirements/functional/meetings/meetings/000102_top-attachments-internal.md) | TOP attachments are internal | approved |
 | [F/meetings/meetings/000103](requirements/functional/meetings/meetings/000103_attendance.md) | Lead-set attendance wins | approved |
-| [F/meetings/meetings/000104](requirements/functional/meetings/meetings/000104_qr-only-without-quorum.md) | Public participation only without quorum | approved |
+| [F/meetings/meetings/000104](requirements/functional/meetings/meetings/000104_qr-only-without-quorum.md) | Public participation only without quorum | replaced |
 | [F/meetings/meetings/000105](requirements/functional/meetings/meetings/000105_admit-guests.md) | The meeting lead admits each guest | approved |
 | [F/meetings/meetings/000106](requirements/functional/meetings/meetings/000106_guest-modes.md) | Guests vote or only watch | approved |
 | [F/meetings/meetings/000107](requirements/functional/meetings/meetings/000107_guest-view.md) | Guests see public TOPs only | approved |
@@ -351,6 +474,23 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/000607](requirements/functional/meetings/meetings/000607_agenda-row-no-drag-handle.md) | An agenda row shows no drag handle | approved |
 | [F/meetings/meetings/000610](requirements/functional/meetings/meetings/000610_attendance-month-without-meeting.md) | A month without a meeting is a narrow column with a dash | approved |
 | [F/meetings/meetings/000611](requirements/functional/meetings/meetings/000611_attendance-cell-badges.md) | An attendance cell holds its badges | approved |
+| [F/meetings/meetings/000861](requirements/functional/meetings/meetings/000861_freetext-top-description.md) | A free-text TOP takes a description that opens its text as a quote | approved |
+| [F/meetings/meetings/000903](requirements/functional/meetings/meetings/000903_meeting-kind.md) | A meeting has a kind | approved |
+| [F/meetings/meetings/000904](requirements/functional/meetings/meetings/000904_guests-may-vote.md) | Guest ballots are a Gremium setting | approved |
+| [F/meetings/meetings/000905](requirements/functional/meetings/meetings/000905_public-watch-with-quorum.md) | A Gremium with a quorum lets guests only watch | approved |
+| [F/meetings/meetings/000907](requirements/functional/meetings/meetings/000907_meeting-place-form.md) | A meeting has a place and a form | approved |
+| [F/meetings/meetings/000918](requirements/functional/meetings/meetings/000918_late-invite-warning.md) | A late meeting date shows a warning | approved |
+| [F/meetings/meetings/000920](requirements/functional/meetings/meetings/000920_unexcused-count.md) | The Gremium page counts the unexcused absences of a term | approved |
+| [F/meetings/meetings/000921](requirements/functional/meetings/meetings/000921_absence-notice.md) | The lead gets a mail before a member reaches the absence limit | approved |
+| [F/meetings/meetings/000922](requirements/functional/meetings/meetings/000922_late-excuse.md) | A member can give an excuse after the meeting | approved |
+| [F/meetings/meetings/000923](requirements/functional/meetings/meetings/000923_attendance-export.md) | The attendance of a Gremium exports as XLSX | approved |
+| [F/meetings/meetings/000940](requirements/functional/meetings/meetings/000940_repeat-names-first-meeting.md) | A repeat meeting names its first meeting | approved |
+| [F/meetings/meetings/000941](requirements/functional/meetings/meetings/000941_absence-term-choice.md) | The absence count and the export offer each term | approved |
+| [F/meetings/meetings/000943](requirements/functional/meetings/meetings/000943_late-excuse-notice.md) | A late excuse sends a mail to the lead | approved |
+| [F/meetings/meetings/000946](requirements/functional/meetings/meetings/000946_one-present-count.md) | A meeting shows one count of present members | approved |
+| [F/meetings/meetings/000948](requirements/functional/meetings/meetings/000948_term-start-per-gremium.md) | Each Gremium has its own start month of the term | approved |
+| [F/meetings/meetings/000951](requirements/functional/meetings/meetings/000951_attendance-until-final.md) | The lead corrects the attendance until the protocol is final | approved |
+| [F/meetings/meetings/000982](requirements/functional/meetings/meetings/000982_closed-meeting-open-until-final.md) | A closed meeting stays open for corrections until its protocol is final | approved |
 | [F/meetings/protocols/000115](requirements/functional/meetings/protocols/000115_keeper-permission.md) | The keeper holds protocol.write | approved |
 | [F/meetings/protocols/000116](requirements/functional/meetings/protocols/000116_finalize.md) | Finalize needs a closed meeting and protocol.finalize | approved |
 | [F/meetings/protocols/000117](requirements/functional/meetings/protocols/000117_delete-draft-only.md) | Only a draft protocol is deleted | approved |
@@ -360,7 +500,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/protocols/000354](requirements/functional/meetings/protocols/000354_built-from-tops.md) | The protocol is built from the TOP texts | approved |
 | [F/meetings/protocols/000355](requirements/functional/meetings/protocols/000355_public-variant.md) | A non-public TOP gives a second PDF | approved |
 | [F/meetings/protocols/000356](requirements/functional/meetings/protocols/000356_render-before-commit.md) | A failed render keeps the draft | approved |
-| [F/meetings/protocols/000357](requirements/functional/meetings/protocols/000357_roster-quorum.md) | The quorum uses the roster of the meeting | approved |
+| [F/meetings/protocols/000357](requirements/functional/meetings/protocols/000357_roster-quorum.md) | The quorum of a protocol uses the counts of the close | approved |
 | [F/meetings/protocols/000358](requirements/functional/meetings/protocols/000358_protocol-mail.md) | The protocol mail carries the PDF | approved |
 | [F/meetings/protocols/000359](requirements/functional/meetings/protocols/000359_cd-variant.md) | The CD variant selects the layout | approved |
 | [F/meetings/protocols/000360](requirements/functional/meetings/protocols/000360_text-is-data.md) | Protocol text is data, never code | approved |
@@ -370,6 +510,34 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/protocols/000689](requirements/functional/meetings/protocols/000689_blackout-internal.md) | Internal views show a marked segment as marked | approved |
 | [F/meetings/protocols/000690](requirements/functional/meetings/protocols/000690_blackout-format-bar.md) | The format bar marks a segment for blackout | approved |
 | [F/meetings/protocols/000691](requirements/functional/meetings/protocols/000691_blackout-mail.md) | A marked segment sends the public PDF to the mailing list | approved |
+| [F/meetings/protocols/000862](requirements/functional/meetings/protocols/000862_pdf-embed.md) | A protocol text embeds a PDF | approved |
+| [F/meetings/protocols/000863](requirements/functional/meetings/protocols/000863_pdf-file-badge.md) | An embedded PDF shows as a file badge | approved |
+| [F/meetings/protocols/000864](requirements/functional/meetings/protocols/000864_pdf-appendix.md) | The protocol PDF appends each embedded PDF as an Anlage | approved |
+| [F/meetings/protocols/000865](requirements/functional/meetings/protocols/000865_pdf-watermark.md) | Each page of an Anlage has a watermark | approved |
+| [F/meetings/protocols/000866](requirements/functional/meetings/protocols/000866_pdf-reference-link.md) | The place of an embedded PDF links to its Anlage | approved |
+| [F/meetings/protocols/000867](requirements/functional/meetings/protocols/000867_pdf-public-variant.md) | The PDF of a non-public TOP stays internal | approved |
+| [F/meetings/protocols/000868](requirements/functional/meetings/protocols/000868_pdf-budget.md) | A protocol holds at most 20 Anlagen | approved |
+| [F/meetings/protocols/000870](requirements/functional/meetings/protocols/000870_top-time-recorded.md) | The move to a TOP records its time | approved |
+| [F/meetings/protocols/000871](requirements/functional/meetings/protocols/000871_top-time-in-pdf.md) | The protocol PDF shows the time above each TOP | approved |
+| [F/meetings/protocols/000872](requirements/functional/meetings/protocols/000872_time-note-syntax.md) | A protocol text marks a time note | approved |
+| [F/meetings/protocols/000873](requirements/functional/meetings/protocols/000873_time-note-tool.md) | A toolbar tool inserts a time note | approved |
+| [F/meetings/protocols/000884](requirements/functional/meetings/protocols/000884_application-appendix.md) | An Antrag on the agenda is an Anlage of the protocol | approved |
+| [F/meetings/protocols/000885](requirements/functional/meetings/protocols/000885_application-snapshot.md) | The Anlage holds the Antrag as the Sitzung treated it | approved |
+| [F/meetings/protocols/000886](requirements/functional/meetings/protocols/000886_application-public-redaction.md) | The public Anlage blacks out the personal data | approved |
+| [F/meetings/protocols/000908](requirements/functional/meetings/protocols/000908_protocol-header-place-form.md) | The protocol names the kind, the place and the form of the meeting | approved |
+| [F/meetings/protocols/000916](requirements/functional/meetings/protocols/000916_circular-in-protocol.md) | The next protocol lists the Umlaufverfahren | replaced |
+| [F/meetings/protocols/000924](requirements/functional/meetings/protocols/000924_protocol-approved.md) | A final protocol can be marked as approved | approved |
+| [F/meetings/protocols/000925](requirements/functional/meetings/protocols/000925_protocol-draft-mail.md) | The keeper sends the protocol draft to the members | approved |
+| [F/meetings/protocols/000934](requirements/functional/meetings/protocols/000934_circular-decisions-public.md) | A circular decision is public where the protocol is public | replaced |
+| [F/meetings/protocols/000937](requirements/functional/meetings/protocols/000937_draft-mail-limits.md) | The draft mail waits for the end of the meeting and asks before a repeat | approved |
+| [F/meetings/protocols/000950](requirements/functional/meetings/protocols/000950_protocol-draft-pdf.md) | The draft of a protocol reads as a PDF after the meeting | approved |
+| [F/meetings/protocols/000952](requirements/functional/meetings/protocols/000952_finalize-asks-first.md) | The finalize of a protocol asks first | approved |
+| [F/meetings/protocols/000965](requirements/functional/meetings/protocols/000965_blackout-block.md) | Protocol text marks a block for blackout | approved |
+| [F/meetings/protocols/000966](requirements/functional/meetings/protocols/000966_blackout-block-attachments.md) | An attachment in a blackout block stays out of the public protocol | approved |
+| [F/meetings/protocols/000969](requirements/functional/meetings/protocols/000969_blackout-known-names.md) | The editor blacks out a known name after it is typed | approved |
+| [F/meetings/protocols/000970](requirements/functional/meetings/protocols/000970_known-names.md) | The known names are the persons of the platform | approved |
+| [F/meetings/protocols/000983](requirements/functional/meetings/protocols/000983_final-protocol-back-to-draft.md) | A final protocol goes back to draft until it is approved | approved |
+| [F/meetings/protocols/000997](requirements/functional/meetings/protocols/000997_sent-only-with-mail.md) | A protocol counts as sent only when its mail went out | approved |
 | [F/meetings/voting/000024](requirements/functional/meetings/voting/000024_every-vote-is-secret.md) | Every vote is secret | approved |
 | [F/meetings/voting/000025](requirements/functional/meetings/voting/000025_ballot-does-not-change.md) | A cast ballot does not change | approved |
 | [F/meetings/voting/000026](requirements/functional/meetings/voting/000026_tie-rejects-motion.md) | A tie rejects a motion | approved |
@@ -382,14 +550,45 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/voting/000379](requirements/functional/meetings/voting/000379_close-with-branch.md) | The close and its branch commit together | approved |
 | [F/meetings/voting/000380](requirements/functional/meetings/voting/000380_quorum-close.md) | An unmet quorum blocks the manual close | approved |
 | [F/meetings/voting/000381](requirements/functional/meetings/voting/000381_eligible-count.md) | The eligible count comes from the roster | approved |
-| [F/meetings/voting/000382](requirements/functional/meetings/voting/000382_delegation-ballot.md) | A delegation ballot is a second ballot | approved |
+| [F/meetings/voting/000382](requirements/functional/meetings/voting/000382_delegation-ballot.md) | A delegation ballot is a ballot of its own | approved |
+| [F/meetings/voting/000894](requirements/functional/meetings/voting/000894_members-majority.md) | A vote can need the majority of the members | approved |
+| [F/meetings/voting/000895](requirements/functional/meetings/voting/000895_members-two-thirds.md) | A vote can need two thirds of the members | approved |
+| [F/meetings/voting/000896](requirements/functional/meetings/voting/000896_members-rule-fails-closed.md) | A members rule without an eligible count rejects | approved |
+| [F/meetings/voting/000897](requirements/functional/meetings/voting/000897_majority-rule-choice.md) | The vote form offers five majority rules | approved |
+| [F/meetings/voting/000898](requirements/functional/meetings/voting/000898_members-rule-no-guests.md) | A vote with a members rule has no guest ballots | approved |
+| [F/meetings/voting/000899](requirements/functional/meetings/voting/000899_plan-vote-members-majority.md) | The vote on a Haushaltsplan needs the majority of the members | approved |
+| [F/meetings/voting/000900](requirements/functional/meetings/voting/000900_quorum-counts-present.md) | The quorum of a meeting vote counts the present members | approved |
+| [F/meetings/voting/000901](requirements/functional/meetings/voting/000901_quorum-min-present.md) | A Gremium can need a least number of present members | approved |
+| [F/meetings/voting/000902](requirements/functional/meetings/voting/000902_repeat-quorum.md) | A Wiederholungssitzung has its own quorum | approved |
+| [F/meetings/voting/000912](requirements/functional/meetings/voting/000912_election-members-majority.md) | An election for one seat can need the majority of the members | approved |
+| [F/meetings/voting/000914](requirements/functional/meetings/voting/000914_circular-vote.md) | A Gremium can decide by Umlaufverfahren | approved |
+| [F/meetings/voting/000915](requirements/functional/meetings/voting/000915_circular-objection.md) | An objection ends an Umlaufverfahren | approved |
+| [F/meetings/voting/000932](requirements/functional/meetings/voting/000932_one-cast-for-all-ballots.md) | One cast counts for the own ballot and all represented ballots | approved |
+| [F/meetings/voting/000933](requirements/functional/meetings/voting/000933_turnout-counts-persons.md) | The turnout of a running vote counts persons | approved |
+| [F/meetings/voting/000935](requirements/functional/meetings/voting/000935_quorum-not-per-vote.md) | A vote takes its quorum from the Gremium | approved |
+| [F/meetings/voting/000936](requirements/functional/meetings/voting/000936_cancelled-circular-in-list.md) | The vote list shows a circular vote that an objection ended | approved |
+| [F/meetings/voting/000939](requirements/functional/meetings/voting/000939_member-count-at-open.md) | A vote without a meeting counts the members at its open | approved |
+| [F/meetings/voting/000944](requirements/functional/meetings/voting/000944_circular-mails.md) | A circular vote sends a mail at its open and before its end | approved |
+| [F/meetings/voting/000947](requirements/functional/meetings/voting/000947_objection-button.md) | The objection to a circular vote is a button | approved |
+| [F/meetings/voting/000949](requirements/functional/meetings/voting/000949_circular-in-decisions-only.md) | A circular decision shows in the list of decisions and in no protocol | approved |
+| [F/meetings/voting/000971](requirements/functional/meetings/voting/000971_election-three-rounds.md) | An election by the majority of the members has up to three Wahlgänge | approved |
+| [F/meetings/voting/000993](requirements/functional/meetings/voting/000993_repeat-vote-way-back.md) | A repeated application vote moves the application in one step and has a way back | approved |
+| [F/meetings/voting/000994](requirements/functional/meetings/voting/000994_one-open-vote.md) | A meeting has one open vote at a time | approved |
+| [F/meetings/voting/000995](requirements/functional/meetings/voting/000995_cancelled-vote-frees-item.md) | A cancelled vote does not block the vote of an application item | approved |
+| [F/meetings/voting/000996](requirements/functional/meetings/voting/000996_round-and-repeat-lock.md) | The next Wahlgang and the repeat of an election lock each other | approved |
+| [F/meetings/voting/001006](requirements/functional/meetings/voting/001006_vote-card-states-result-once.md) | The vote card states the result once | approved |
+| [F/meetings/voting/001007](requirements/functional/meetings/voting/001007_vote-card-one-action.md) | The vote card has one main action and a menu | approved |
 | [F/public/public-pages/000170](requirements/functional/public/public-pages/000170_no-public-meetings.md) | Meetings are never public | replaced |
 | [F/public/public-pages/000171](requirements/functional/public/public-pages/000171_public-protocols.md) | Only final protocols of public Gremien are public | approved |
-| [F/public/public-pages/000172](requirements/functional/public/public-pages/000172_public-protocol-content.md) | A public protocol has no names and no internal TOPs | approved |
+| [F/public/public-pages/000172](requirements/functional/public/public-pages/000172_public-protocol-content.md) | A public protocol has no names and no non-public TOPs | approved |
 | [F/public/public-pages/000173](requirements/functional/public/public-pages/000173_noindex.md) | Public pages are not indexed | approved |
 | [F/public/public-pages/000589](requirements/functional/public/public-pages/000589_login-choice.md) | Anmelden offers the account login and the e-mail link | approved |
 | [F/public/public-pages/000687](requirements/functional/public/public-pages/000687_blackout-public.md) | The public variants black out a marked segment | approved |
 | [F/public/public-pages/000688](requirements/functional/public/public-pages/000688_blackout-bar-width.md) | A black bar has one fixed width and the text colour | approved |
+| [F/public/public-pages/000887](requirements/functional/public/public-pages/000887_blackout-bar-baseline.md) | A black bar in the PDF sits on the baseline of its line | approved |
+| [F/public/public-pages/000926](requirements/functional/public/public-pages/000926_public-decisions.md) | The decisions of a public Gremium are public | approved |
+| [F/public/public-pages/000945](requirements/functional/public/public-pages/000945_public-decisions-last-result.md) | The public decisions show the last result of a TOP | approved |
+| [F/public/public-pages/000967](requirements/functional/public/public-pages/000967_blackout-block-public.md) | The public variants show a blackout block as one bar | approved |
 | [NF/accessibility/conformance/000490](requirements/non-functional/accessibility/conformance/000490_wcag-22-aa.md) | Every view meets WCAG 2.2 level AA | approved |
 | [NF/accessibility/conformance/000491](requirements/non-functional/accessibility/conformance/000491_axe-every-route.md) | Every route passes an axe check in both themes | approved |
 | [NF/accessibility/conformance/000492](requirements/non-functional/accessibility/conformance/000492_template-lint.md) | The template lint has the accessibility rules | approved |
@@ -451,6 +650,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/compatibility/deploy/000394](requirements/non-functional/compatibility/deploy/000394_migrate-first.md) | A deploy runs the migration first | approved |
 | [NF/compatibility/deploy/000435](requirements/non-functional/compatibility/deploy/000435_caddy-edge.md) | Caddy is the edge proxy | approved |
 | [NF/compatibility/deploy/000627](requirements/non-functional/compatibility/deploy/000627_deploy-reports-schema-drift.md) | A deploy reports a schema that differs from the models | approved |
+| [NF/compatibility/deploy/000975](requirements/non-functional/compatibility/deploy/000975_worker-watchdog.md) | A worker that hangs ends its process | approved |
+| [NF/compatibility/deploy/000978](requirements/non-functional/compatibility/deploy/000978_build-downloads.md) | An image build fetches no signing key and repeats a download | approved |
+| [NF/compatibility/deploy/000981](requirements/non-functional/compatibility/deploy/000981_pinned-digests.md) | Images and CI actions are pinned by digest | approved |
 | [NF/compatibility/links/000592](requirements/non-functional/compatibility/links/000592_old-german-urls.md) | An old German URL redirects to its English URL | approved |
 | [NF/compatibility/pwa/000220](requirements/non-functional/compatibility/pwa/000220_zoom.md) | Zoom is blocked only in the installed app | approved |
 | [NF/compatibility/pwa/000221](requirements/non-functional/compatibility/pwa/000221_android-nav-bar.md) | The Android navigation bar has the manifest colour | approved |
@@ -461,6 +663,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/performance/loading/000189](requirements/non-functional/performance/loading/000189_load-bar.md) | The load bar shows only for slow foreground reads | approved |
 | [NF/performance/loading/000190](requirements/non-functional/performance/loading/000190_batch-reads.md) | A list reads its rows in one request | approved |
 | [NF/performance/loading/000191](requirements/non-functional/performance/loading/000191_search-as-you-type.md) | Search runs as you type | approved |
+| [NF/performance/loading/000847](requirements/non-functional/performance/loading/000847_read-after-write-is-fresh.md) | A read after a write does not stand on a read from before it | approved |
+| [NF/performance/loading/000893](requirements/non-functional/performance/loading/000893_skeleton-shape.md) | A skeleton has the shape of the loaded page | approved |
 | [NF/privacy/personal-data/000185](requirements/non-functional/privacy/personal-data/000185_no-raw-ids.md) | The UI shows no raw IDs | approved |
 | [NF/privacy/personal-data/000186](requirements/non-functional/privacy/personal-data/000186_no-plain-ip.md) | The login audit has no plain IP address | approved |
 | [NF/privacy/personal-data/000187](requirements/non-functional/privacy/personal-data/000187_guest-pseudonyms.md) | Guests get pseudonyms | replaced |
@@ -477,15 +681,17 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/security/access/000277](requirements/non-functional/security/access/000277_hashed-tokens.md) | Tokens are stored only as hashes | approved |
 | [NF/security/access/000278](requirements/non-functional/security/access/000278_anti-enumeration.md) | A magic-link request does not reveal accounts | approved |
 | [NF/security/access/000279](requirements/non-functional/security/access/000279_oidc-discovery.md) | OIDC endpoints come from discovery | approved |
-| [NF/security/access/000304](requirements/non-functional/security/access/000304_no-token-backup.md) | No agent token reaches a backup | approved |
+| [NF/security/access/000304](requirements/non-functional/security/access/000304_no-token-backup.md) | No agent token reaches a backup | replaced |
 | [NF/security/access/000350](requirements/non-functional/security/access/000350_socket-origin.md) | A meeting socket checks the origin | approved |
 | [NF/security/access/000352](requirements/non-functional/security/access/000352_guest-device.md) | A guest joins with one device | approved |
 | [NF/security/access/000453](requirements/non-functional/security/access/000453_csrf-token.md) | Cookie writes need the CSRF token | approved |
 | [NF/security/access/000460](requirements/non-functional/security/access/000460_default-write-limit.md) | Writes have a default rate limit | approved |
 | [NF/security/access/000463](requirements/non-functional/security/access/000463_scope-caps-gremium-rights.md) | A scope caps every gremium right of a token | approved |
 | [NF/security/access/000470](requirements/non-functional/security/access/000470_audit-read-global.md) | The audit read is global | approved |
-| [NF/security/access/000472](requirements/non-functional/security/access/000472_public-application-post.md) | The public Antrag POST is protected | approved |
+| [NF/security/access/000472](requirements/non-functional/security/access/000472_public-application-post.md) | The public Antrag POST is protected | replaced |
 | [NF/security/access/000590](requirements/non-functional/security/access/000590_email-session-live-check.md) | An e-mail session reads its Anträge at each request | approved |
+| [NF/security/access/000976](requirements/non-functional/security/access/000976_pdf-render-limit.md) | A PDF made on request has a rate limit | approved |
+| [NF/security/access/000977](requirements/non-functional/security/access/000977_observer-add-limit.md) | Adding observers has a rate limit | approved |
 | [NF/security/files/000178](requirements/non-functional/security/files/000178_stream-downloads.md) | Downloads stream through the API | approved |
 | [NF/security/files/000181](requirements/non-functional/security/files/000181_scan-uploads.md) | Uploaded files are scanned | approved |
 | [NF/security/files/000264](requirements/non-functional/security/files/000264_invoice-download.md) | An invoice file is served as a download | approved |
@@ -496,6 +702,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/security/files/000373](requirements/non-functional/security/files/000373_cd-logo-download.md) | A CD logo is served as a download | approved |
 | [NF/security/files/000388](requirements/non-functional/security/files/000388_token-file.md) | The MCP token file is private | approved |
 | [NF/security/files/000469](requirements/non-functional/security/files/000469_invoice-xml-no-entities.md) | The ZUGFeRD XML parser resolves no entities | approved |
+| [NF/security/files/000869](requirements/non-functional/security/files/000869_pdf-upload.md) | An embedded PDF is checked on upload | approved |
+| [NF/security/files/000979](requirements/non-functional/security/files/000979_embedded-pdf-read-right.md) | An embedded PDF needs the read right of its Sitzung | approved |
 | [NF/security/integrity/000183](requirements/non-functional/security/integrity/000183_audit-chain.md) | The audit log is append-only | approved |
 | [NF/security/integrity/000184](requirements/non-functional/security/integrity/000184_sandboxed-mail.md) | Mail templates run sandboxed | approved |
 | [NF/security/integrity/000295](requirements/non-functional/security/integrity/000295_canonical-hash.md) | The hash input is canonical | approved |
@@ -531,15 +739,15 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/000529](requirements/non-functional/usability/controls/000529_menu-row-tile.md) | A menu row is an inset rounded tile | approved |
 | [NF/usability/controls/000560](requirements/non-functional/usability/controls/000560_no-counts-in-headings-and-selectors.md) | Headings and selectors show no counts | approved |
 | [NF/usability/controls/000561](requirements/non-functional/usability/controls/000561_segment-pill.md) | A segmented control is a pill track | approved |
-| [NF/usability/controls/000562](requirements/non-functional/usability/controls/000562_phone-toast-top.md) | A phone toast shows at the top | approved |
-| [NF/usability/controls/000563](requirements/non-functional/usability/controls/000563_phone-one-toast.md) | A phone shows one toast at a time | approved |
-| [NF/usability/controls/000564](requirements/non-functional/usability/controls/000564_phone-toast-close.md) | A phone toast closes by a swipe or by its time | approved |
-| [NF/usability/controls/000565](requirements/non-functional/usability/controls/000565_phone-toast-card.md) | A phone toast is a tinted glass card | approved |
-| [NF/usability/controls/000566](requirements/non-functional/usability/controls/000566_phone-toast-icon-action.md) | A phone toast action is an icon button | approved |
-| [NF/usability/controls/000568](requirements/non-functional/usability/controls/000568_wide-toast-card.md) | A wide-screen toast is the same glass card | approved |
+| [NF/usability/controls/000562](requirements/non-functional/usability/controls/000562_phone-toast-top.md) | A toast shows at the top of a phone and at the bottom end of a wide screen | approved |
+| [NF/usability/controls/000563](requirements/non-functional/usability/controls/000563_phone-one-toast.md) | A phone shows one toast at a time | replaced |
+| [NF/usability/controls/000564](requirements/non-functional/usability/controls/000564_phone-toast-close.md) | A toast closes by a swipe, by its close button or by its time | approved |
+| [NF/usability/controls/000565](requirements/non-functional/usability/controls/000565_phone-toast-card.md) | A toast is a tinted glass card | approved |
+| [NF/usability/controls/000566](requirements/non-functional/usability/controls/000566_phone-toast-icon-action.md) | A phone toast action is an icon button | replaced |
+| [NF/usability/controls/000568](requirements/non-functional/usability/controls/000568_wide-toast-card.md) | A wide-screen toast is the same glass card | replaced |
 | [NF/usability/controls/000570](requirements/non-functional/usability/controls/000570_avatar-stack-cover.md) | An avatar in a stack covers the one before it | approved |
 | [NF/usability/controls/000576](requirements/non-functional/usability/controls/000576_load-error-toast.md) | A load error shows as a toast with a retry action | approved |
-| [NF/usability/controls/000577](requirements/non-functional/usability/controls/000577_load-error-toast-stays.md) | A load error toast stays until it is closed | approved |
+| [NF/usability/controls/000577](requirements/non-functional/usability/controls/000577_load-error-toast-stays.md) | A load error toast stays until it is closed | replaced |
 | [NF/usability/controls/000581](requirements/non-functional/usability/controls/000581_card-add-buttons-dashed.md) | The add buttons of a card look like its chips with a dashed border | approved |
 | [NF/usability/controls/000582](requirements/non-functional/usability/controls/000582_empty-linked-section.md) | An empty "Verknüpft" section shows an empty state | approved |
 | [NF/usability/controls/000597](requirements/non-functional/usability/controls/000597_one-ghost-row-in-sections.md) | A section in a detail and a small tile show one ghost row | approved |
@@ -564,6 +772,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/000701](requirements/non-functional/usability/controls/000701_date-shortcut-resolves-on-commit.md) | A date shortcut becomes the date when the field commits | approved |
 | [NF/usability/controls/000702](requirements/non-functional/usability/controls/000702_date-shortcut-month-end.md) | A month or year shortcut stops at the end of the month | approved |
 | [NF/usability/controls/000741](requirements/non-functional/usability/controls/000741_load-more-button.md) | A button that loads more rows of a list is centred with a chevron | approved |
+| [NF/usability/controls/000931](requirements/non-functional/usability/controls/000931_back-closes-budget-dialogs.md) | Back closes the dialogs of the Haushalt | approved |
 | [NF/usability/layout/000192](requirements/non-functional/usability/layout/000192_one-geometry.md) | All list and detail pages share one geometry | approved |
 | [NF/usability/layout/000193](requirements/non-functional/usability/layout/000193_scroll-edges.md) | A scroll edge fades, or cuts at a line | approved |
 | [NF/usability/layout/000194](requirements/non-functional/usability/layout/000194_phone-breakpoint.md) | The phone layout starts below 768 px | approved |
@@ -591,9 +800,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/000531](requirements/non-functional/usability/layout/000531_head-under-sheet.md) | The page head stays in view under an open sheet | approved |
 | [NF/usability/layout/000532](requirements/non-functional/usability/layout/000532_stacked-glass.md) | A sheet over a sheet is as opaque as the first one | approved |
 | [NF/usability/layout/000567](requirements/non-functional/usability/layout/000567_phone-fab-folds.md) | A phone FAB folds to its icon on scroll | approved |
-| [NF/usability/layout/000575](requirements/non-functional/usability/layout/000575_card-sheet-cut-at-edge.md) | The details of a card cut at the lower screen edge | approved |
+| [NF/usability/layout/000575](requirements/non-functional/usability/layout/000575_card-sheet-cut-at-edge.md) | The details of a card cut at the lower screen edge | replaced |
 | [NF/usability/layout/000580](requirements/non-functional/usability/layout/000580_card-end-clears-bottom-bar.md) | The end of a card keeps room above the bottom bar | approved |
-| [NF/usability/layout/000599](requirements/non-functional/usability/layout/000599_glass-head-top-fade.md) | A glass list head fades into the page colour at the top screen edge | approved |
+| [NF/usability/layout/000599](requirements/non-functional/usability/layout/000599_glass-head-top-fade.md) | A glass list head fades into the page colour at the top screen edge | replaced |
 | [NF/usability/layout/000601](requirements/non-functional/usability/layout/000601_scrollbar-below-glass-head.md) | The scroll bar of a list column starts below its glass head | approved |
 | [NF/usability/layout/000602](requirements/non-functional/usability/layout/000602_composer-bottom-gap.md) | The comment input has the same gap below as at its side | approved |
 | [NF/usability/layout/000609](requirements/non-functional/usability/layout/000609_attendance-matrix-row-group.md) | The attendance matrix looks like a row group | approved |
@@ -609,6 +818,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/000677](requirements/non-functional/usability/layout/000677_public-page-title-size.md) | A public page has a title of 28 px | approved |
 | [NF/usability/layout/000743](requirements/non-functional/usability/layout/000743_week-day-lines-on-pull.md) | The day lines of the week grid stay when the hours are pulled | approved |
 | [NF/usability/layout/000745](requirements/non-functional/usability/layout/000745_week-blocks-overlap.md) | A later entry lies on an earlier one in the week view | approved |
+| [NF/usability/layout/001016](requirements/non-functional/usability/layout/001016_no-sticky-bar-in-tab-pager.md) | A search bar in a paged tab does not stick | approved |
+| [P/integrations/webhooks/000963](protocols/integrations/webhooks/000963_webhook-delivery.md) | A webhook delivery is a signed JSON POST | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |
 | [S/backend/database/000070](style/backend/database/000070_idempotent-tables.md) | A migration that adds a table is idempotent | approved |
@@ -626,13 +837,13 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/backend/python/000064](style/backend/python/000064_resolve-names.md) | Names are resolved on the server | replaced |
 | [S/backend/python/000065](style/backend/python/000065_merge-columns.md) | A principal column is known to the account merge | approved |
 | [S/backend/python/000066](style/backend/python/000066_public-routes.md) | Public endpoints are a fixed list | replaced |
-| [S/backend/python/000473](style/backend/python/000473_no-role-check.md) | A permission check never reads principal.roles | approved |
+| [S/backend/python/000473](style/backend/python/000473_no-role-check.md) | A permission check never reads principal.roles | replaced |
 | [S/backend/python/000474](style/backend/python/000474_services-do-not-commit.md) | Service functions do not commit | approved |
 | [S/backend/python/000640](style/backend/python/000640_service-commit-ratchet.md) | A CI ratchet lowers the commits in services | approved |
 | [S/backend/python/000643](style/backend/python/000643_module-layers.md) | A backend module imports only from its layer and from lower layers | approved |
 | [S/backend/python/000644](style/backend/python/000644_shared-imports-no-module.md) | The shared code imports no module | approved |
 | [S/backend/python/000645](style/backend/python/000645_model-in-subject-module.md) | A model is in the module of its subject | approved |
-| [S/backend/python/000646](style/backend/python/000646_import-exception-ratchet.md) | A CI ratchet lowers the accepted import violations | approved |
+| [S/backend/python/000646](style/backend/python/000646_import-exception-ratchet.md) | A CI ratchet lowers the accepted import violations | replaced |
 | [S/backend/python/000648](style/backend/python/000648_notifications-mail-engine-only.md) | The module notifications holds the mail engine only | approved |
 | [S/backend/python/000649](style/backend/python/000649_auth-audit-no-upward-import.md) | The modules auth and audit import no higher module | approved |
 | [S/backend/python/000651](style/backend/python/000651_no-import-exception.md) | The import contract has no exception | approved |
@@ -672,6 +883,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/shared/api/000468](style/shared/api/000468_specific-conflict-code.md) | A conflict names a specific code | approved |
 | [S/shared/api/000475](style/shared/api/000475_oauth-error-shape.md) | The OAuth token endpoint uses the RFC 6749 error shape | approved |
 | [S/shared/api/000591](style/shared/api/000591_english-urls.md) | Every URL is in English | approved |
+| [S/shared/api/000843](style/shared/api/000843_unstorable-text.md) | A text that the database cannot store answers 422 | approved |
 | [S/shared/functional/000081](style/shared/functional/000081_body-shape.md) | A function body has one shape | approved |
 | [S/shared/functional/000082](style/shared/functional/000082_readability-limit.md) | Readability limits the single expression | approved |
 | [S/shared/functional/000083](style/shared/functional/000083_bind-once.md) | A local is bound once | approved |
@@ -700,7 +912,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/shared/git/000436](style/shared/git/000436_release-flow.md) | A release goes from development to main by pull request | approved |
 | [S/shared/git/000477](style/shared/git/000477_readme-links-git-specs.md) | The README links to the git specs | approved |
 | [S/shared/git/000628](style/shared/git/000628_required-checks.md) | The branches development and main require the CI checks | approved |
-| [S/shared/testing/000044](style/shared/testing/000044_test-first.md) | Tests come first | approved |
+| [S/shared/testing/000044](style/shared/testing/000044_test-first.md) | A change comes with its tests | approved |
 | [S/shared/testing/000045](style/shared/testing/000045_coverage-gates.md) | Coverage gates hold | approved |
 | [S/shared/testing/000046](style/shared/testing/000046_critical-modules.md) | Critical modules have full branch coverage | approved |
 | [S/shared/testing/000047](style/shared/testing/000047_own-test-keys.md) | An integration test uses its own keys | approved |
@@ -736,6 +948,12 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/specs/format/000008](style/specs/format/000008_labels.md) | Labels in a rule are fixed | approved |
 | [S/specs/format/000032](style/specs/format/000032_section-sign-reference.md) | Code refers to a rule with the § sign | approved |
 | [S/specs/format/000033](style/specs/format/000033_file-name.md) | The file name is number and name | approved |
+| [S/specs/protocols/000957](style/specs/protocols/000957_whole-format.md) | A protocol spec describes one whole format | approved |
+| [S/specs/protocols/000958](style/specs/protocols/000958_schema-file.md) | A JSON format has a JSON Schema file beside its spec | approved |
+| [S/specs/protocols/000959](style/specs/protocols/000959_checked-example.md) | The example of a JSON format matches its schema | approved |
+| [S/specs/protocols/000960](style/specs/protocols/000960_breaking-change.md) | A breaking change of a format is a new protocol spec | approved |
+| [S/specs/protocols/000961](style/specs/protocols/000961_code-against-schema.md) | A test checks the output of the code against the schema | approved |
+| [S/specs/protocols/000962](style/specs/protocols/000962_protocols-key.md) | A rule names the formats that it uses | approved |
 | [S/specs/structure/000009](style/specs/structure/000009_precedence.md) | A spec wins over other guidance | approved |
 | [S/specs/structure/000010](style/specs/structure/000010_tree.md) | The tree sorts by kind, then by area and topic | approved |
 | [S/specs/structure/000011](style/specs/structure/000011_folder-names.md) | Folder names are lower case kebab case | approved |

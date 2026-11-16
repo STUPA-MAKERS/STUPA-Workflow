@@ -337,9 +337,7 @@ class CreateOps(ApplicationsServiceBase):
         return state
 
 
-def _file_refs(
-    fields: list[FormFieldDef], data: dict[str, Any]
-) -> Iterator[tuple[str, str]]:
+def _file_refs(fields: list[FormFieldDef], data: dict[str, Any]) -> Iterator[tuple[str, str]]:
     """Yield ``(field key, reference)`` for each value of a ``file`` field."""
     return (
         (field.key, ref)

@@ -1,0 +1,34 @@
+:host {
+  display: block;
+}
+
+.ft__row {
+  justify-content: center;
+}
+.ft__row--skel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+}
+.ft__label {
+  flex: 1 1 12rem;
+  min-width: 0;
+  color: var(--color-text);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+// The track of `app-switch`.
+.ft__skelSwitch {
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+}
+
+.ft__uses {
+  margin-bottom: var(--space-4);
+}
+.ft__useList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

@@ -103,14 +103,90 @@ describe('MeetingSettingsDialogComponent', () => {
     expect(req.request.body.endTime).toBeNull();
   });
 
-  it('locks every field of a closed meeting and saves nothing', async () => {
-    const { http, fixture, cmp } = await setup({ ...MEETING, status: 'closed' } as Meeting);
+  /** § 000918 */
+  describe('late invitation', () => {
+    const inDays = (n: number): string => {
+      const d = new Date();
+      d.setDate(d.getDate() + n);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const PLANNED = { ...MEETING, gremiumId: 'g-1', kind: 'ordinary', date: inDays(2) } as Meeting;
+    const PERIODS = { guestsVoteAllowed: false, quorumPercent: null, inviteDaysOrdinary: 7, inviteDaysExtraordinary: 3 };
+
+    it('warns only for a new date that misses the period, and saves', async () => {
+      localStorage.setItem('ap.locale', 'de');
+      const { http, fixture, cmp } = await setup(PLANNED);
+      http.expectOne('/api/committees/g-1/meeting-defaults').flush(PERIODS);
+      flushRoster(http, fixture);
+      expect(screen.queryByText(/Ladungsfrist/)).toBeNull();
+      cmp.date.set(inDays(4));
+      fixture.detectChanges();
+      expect(screen.getByText('Die Ladungsfrist von 7 Tagen ist nicht mehr einzuhalten.')).toBeInTheDocument();
+      cmp.date.set(inDays(9));
+      fixture.detectChanges();
+      expect(screen.queryByText(/Ladungsfrist/)).toBeNull();
+      cmp.date.set(inDays(4));
+      cmp.save();
+      expect(http.expectOne('/api/meetings/m-1').request.body.date).toBe(inDays(4));
+    });
+
+    it('warns when a new kind has a longer period than the date keeps', async () => {
+      localStorage.setItem('ap.locale', 'de');
+      const special = { ...PLANNED, kind: 'extraordinary', date: inDays(5) } as Meeting;
+      const { http, fixture, cmp } = await setup(special);
+      http.expectOne('/api/committees/g-1/meeting-defaults').flush(PERIODS);
+      flushRoster(http, fixture);
+      expect(cmp.lateInvite()).toBeNull();
+      cmp.kind.set('ordinary');
+      expect(cmp.lateInvite()).toBe(7);
+    });
+
+    it('stays silent when the periods do not load, for a late answer and after the start', async () => {
+      const { http, fixture, cmp } = await setup(PLANNED);
+      const first = http.expectOne('/api/committees/g-1/meeting-defaults');
+      flushRoster(http, fixture);
+      fixture.componentRef.setInput('meeting', { ...PLANNED, id: 'm-2' } as Meeting);
+      fixture.detectChanges();
+      first.flush(PERIODS);
+      expect(cmp.defaults()).toBeNull();
+      http.expectOne('/api/committees/g-1/meeting-defaults').error(new ProgressEvent('x'));
+      cmp.date.set(inDays(4));
+      expect(cmp.lateInvite()).toBeNull();
+      fixture.componentRef.setInput('meeting', { ...PLANNED, id: 'm-3', status: 'live' } as Meeting);
+      fixture.detectChanges();
+      http.expectNone('/api/committees/g-1/meeting-defaults');
+      cmp.date.set(inDays(4));
+      expect(cmp.lateInvite()).toBeNull();
+    });
+  });
+
+  /** § 000982 */
+  it('locks every field of a closed meeting with a final protocol and saves nothing', async () => {
+    const { http, fixture, cmp } = await setup({ ...MEETING, status: 'closed' } as Meeting, true);
     flushRoster(http, fixture);
-    expect(screen.getByText(/Sitzung ist geschlossen/)).toBeInTheDocument();
+    expect(screen.getByText(/Das Protokoll ist final/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
     expect(screen.getByLabelText(/Titel/)).toBeDisabled();
     cmp.save();
     http.verify();
+  });
+
+  /** § 000982 (closedMeeting) */
+  it('keeps the title of a closed meeting open until the protocol is final', async () => {
+    const { http, fixture, cmp, toasts } = await setup({ ...MEETING, status: 'closed' } as Meeting);
+    flushRoster(http, fixture);
+    expect(screen.getByText(/Sitzung ist geschlossen/)).toBeInTheDocument();
+    expect(cmp.keeperLocked()).toBe(true);
+    expect(cmp.publicLocked()).toBe(true);
+    const field = screen.getByLabelText(/Titel/);
+    expect(field).toBeEnabled();
+    await userEvent.clear(field);
+    await userEvent.type(field, 'Korrigiert');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    const req = http.expectOne('/api/meetings/m-1');
+    expect(req.request.body).toMatchObject({ title: 'Korrigiert' });
+    req.flush({ code: 'protocol_final' }, { status: 409, statusText: 'Conflict' });
+    expect(toasts()).toContain('Das Protokoll ist final — die Sitzung kann nicht mehr geändert werden.');
   });
 
   it('saves a new title, without the outer blanks', async () => {
@@ -216,6 +292,111 @@ describe('MeetingSettingsDialogComponent', () => {
     http.verify();
   });
 
+  describe('kind, place and form', () => {
+    const FULL = { ...MEETING, kind: 'ordinary', location: 'Raum 9-108', form: 'presence' } as unknown as Meeting;
+
+    /** §F/meetings/meetings/000903, §F/meetings/meetings/000907 */
+    it('sends only what changed', async () => {
+      const { http, fixture, cmp } = await setup(FULL);
+      flushRoster(http, fixture);
+      expect(await optionLabels(screen.getByLabelText('Sitzungsart'))).toContain('Wiederholungssitzung');
+      cmp.save();
+      const same = http.expectOne('/api/meetings/m-1');
+      expect(same.request.body).not.toHaveProperty('kind');
+      expect(same.request.body).not.toHaveProperty('location');
+      expect(same.request.body).not.toHaveProperty('form');
+      same.flush(FULL);
+      cmp.kind.set('extraordinary');
+      cmp.location.set('  ');
+      cmp.form.set('video');
+      cmp.save();
+      const req = http.expectOne('/api/meetings/m-1');
+      expect(req.request.body).toEqual(
+        expect.objectContaining({ kind: 'extraordinary', location: null, form: 'video' }),
+      );
+      expect(req.request.body).not.toHaveProperty('repeatOfId');
+    });
+
+    /** §F/meetings/meetings/000940 */
+    it('asks a planned repeat meeting for its first meeting and sends a new one', async () => {
+      const planned = { ...FULL, gremiumId: 'g-1', date: '2026-11-10' } as unknown as Meeting;
+      const { http, fixture, cmp, toasts } = await setup(planned);
+      flushRoster(http, fixture);
+      http.expectOne('/api/committees/g-1/meeting-defaults').error(new ProgressEvent('x'));
+      http.expectOne('/api/meetings?gremiumId=g-1').flush([
+        { id: 'm-1', title: '35. Sitzung', date: '2026-11-10', status: 'planned', votes: [], createdAt: 'x' },
+        { id: 'm-0', title: '34. Sitzung', date: '2026-11-03', status: 'closed', votes: [], createdAt: 'x' },
+      ]);
+      fixture.detectChanges();
+      expect(screen.queryByLabelText(/Erste Sitzung/)).toBeNull();
+      cmp.kind.set('repeat');
+      fixture.detectChanges();
+      expect(await optionLabels(screen.getByLabelText(/Erste Sitzung/))).toEqual(['34. Sitzung · 03.11.2026']);
+      cmp.save();
+      expect(toasts()).toContain('Eine Wiederholungssitzung braucht ihre erste Sitzung.');
+      http.expectNone('/api/meetings/m-1');
+      cmp.repeatOf.set('m-0');
+      cmp.save();
+      const req = http.expectOne('/api/meetings/m-1');
+      expect(req.request.body).toEqual(expect.objectContaining({ kind: 'repeat', repeatOfId: 'm-0' }));
+      req.flush(
+        { type: 'about:blank', status: 422, code: 'repeat_needs_first_meeting' },
+        { status: 422, statusText: 'Unprocessable' },
+      );
+      expect(toasts()).toContain('Die erste Sitzung muss eine frühere Sitzung des Gremiums sein.');
+    });
+
+    /** §F/meetings/meetings/000940 */
+    it('keeps the first meeting of a started repeat meeting', async () => {
+      const live = { ...FULL, status: 'live', kind: 'repeat', repeatOfId: 'm-0' } as unknown as Meeting;
+      const { http, fixture, cmp } = await setup(live);
+      flushRoster(http, fixture);
+      expect(screen.queryByLabelText(/Erste Sitzung/)).toBeNull();
+      cmp.save();
+      expect(http.expectOne('/api/meetings/m-1').request.body).not.toHaveProperty('repeatOfId');
+    });
+
+    /** §F/meetings/meetings/000940 */
+    it('sends the same first meeting not again, and waits for the list', async () => {
+      const planned = { ...FULL, gremiumId: 'g-1', kind: 'repeat', repeatOfId: 'm-0' } as unknown as Meeting;
+      const { http, fixture, cmp } = await setup(planned);
+      flushRoster(http, fixture);
+      http.expectOne('/api/committees/g-1/meeting-defaults').error(new ProgressEvent('x'));
+      const list = http.expectOne('/api/meetings?gremiumId=g-1');
+      cmp.save();
+      http.expectNone('/api/meetings/m-1');
+      list.flush([{ id: 'm-0', title: '34. Sitzung', status: 'closed', votes: [], createdAt: 'x' }]);
+      cmp.save();
+      expect(http.expectOne('/api/meetings/m-1').request.body).not.toHaveProperty('repeatOfId');
+    });
+
+    it('has no list of first meetings after a failed read', async () => {
+      const planned = { ...FULL, gremiumId: 'g-1', kind: 'repeat', repeatOfId: 'm-0' } as unknown as Meeting;
+      const { http, fixture, cmp } = await setup(planned);
+      flushRoster(http, fixture);
+      http.expectOne('/api/committees/g-1/meeting-defaults').error(new ProgressEvent('x'));
+      http.expectOne('/api/meetings?gremiumId=g-1').error(new ProgressEvent('x'));
+      expect(cmp.repeatOfMissing()).toBe(true);
+    });
+
+    /** §F/meetings/meetings/000903 */
+    it('locks the kind of a started meeting and refuses a place that is too long', async () => {
+      const { http, fixture, cmp } = await setup({ ...FULL, status: 'live' } as unknown as Meeting);
+      flushRoster(http, fixture);
+      expect(cmp.kindLocked()).toBe(true);
+      cmp.kind.set('repeat');
+      cmp.location.set('x'.repeat(201));
+      fixture.detectChanges();
+      expect(cmp.valid()).toBe(false);
+      expect(screen.getByRole('dialog')).toHaveTextContent('Der Ort darf höchstens 200 Zeichen haben.');
+      cmp.location.set('Aula');
+      cmp.save();
+      const req = http.expectOne('/api/meetings/m-1');
+      expect(req.request.body).not.toHaveProperty('kind');
+      expect(req.request.body).toEqual(expect.objectContaining({ location: 'Aula' }));
+    });
+  });
+
   describe('public participation', () => {
     const LINK = { joinCode: '7KQ4MP', joinUrl: 'https://x.example/j/7KQ4MP', qr: { size: 1, rows: ['1'] } };
     const LIVE = {
@@ -224,16 +405,30 @@ describe('MeetingSettingsDialogComponent', () => {
       canManage: true,
       publicJoin: true,
       guestsMode: 'vote',
+      guestsVoteAllowed: true,
       pendingGuests: 2,
       admittedGuests: 5,
     } as unknown as Meeting;
 
     it('offers the switch only to the lead and sends only the changed fields', async () => {
-      const { http, fixture, cmp } = await setup({ ...MEETING, canManage: true, publicJoin: false, guestsMode: 'vote' } as unknown as Meeting);
+      const { http, fixture, cmp } = await setup({ ...MEETING, canManage: true, publicJoin: false, guestsMode: 'vote', guestsVoteAllowed: true } as unknown as Meeting);
       flushRoster(http, fixture);
       await userEvent.click(screen.getByRole('switch', { name: /Öffentliche Teilnahme/ }));
       await userEvent.click(screen.getByRole('radio', { name: /Gäste schauen nur zu/ }));
       expect(cmp.confirmOff()).toBe(false);
+      await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+      const req = http.expectOne('/api/meetings/m-1');
+      expect(req.request.body).toEqual(expect.objectContaining({ publicJoin: true, guestsMode: 'watch' }));
+    });
+
+    /** §F/meetings/meetings/000904 */
+    it('shows no choice and keeps "nur zuschauen" where guests get no ballot', async () => {
+      const { http, fixture, cmp } = await setup({ ...MEETING, canManage: true, publicJoin: false, guestsMode: 'vote', guestsVoteAllowed: false } as unknown as Meeting);
+      flushRoster(http, fixture);
+      expect(cmp.guestsMode()).toBe('watch');
+      await userEvent.click(screen.getByRole('switch', { name: /Öffentliche Teilnahme/ }));
+      expect(screen.getByText('Gäste schauen in diesem Gremium nur zu.')).toBeInTheDocument();
+      expect(screen.queryByRole('radio', { name: /Gäste dürfen abstimmen/ })).toBeNull();
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
       const req = http.expectOne('/api/meetings/m-1');
       expect(req.request.body).toEqual(expect.objectContaining({ publicJoin: true, guestsMode: 'watch' }));
@@ -269,8 +464,8 @@ describe('MeetingSettingsDialogComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
       http
         .expectOne('/api/meetings/m-1')
-        .flush({ code: 'public_join_needs_no_quorum' }, { status: 422, statusText: 'x' });
-      expect(toasts()).toContain('Öffentliche Teilnahme ist nur in Gremien ohne Quorum möglich.');
+        .flush({ code: 'guests_vote_needs_no_quorum' }, { status: 422, statusText: 'x' });
+      expect(toasts()).toContain('In diesem Gremium dürfen Gäste nicht abstimmen.');
       expect(toasts()).toContain(
         'Eine Abstimmung mit Gästen ist offen. Schließe sie, bevor Gäste nur noch zuschauen.',
       );

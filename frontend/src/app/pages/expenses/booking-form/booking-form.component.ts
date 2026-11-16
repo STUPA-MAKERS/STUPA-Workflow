@@ -28,6 +28,7 @@ import { formatMoney } from '@shared/format-money';
 import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
 import { BookingRowComponent } from '../../budget/booking-row/booking-row.component';
 import { SumRowComponent } from '../../budget/booking-row/sum-row.component';
+import { BudgetYearSelectComponent } from '../../budget/budget-year-select/budget-year-select.component';
 import { CostCentreSelectComponent } from '../../budget/cost-centre-select/cost-centre-select.component';
 import type {
   BudgetTreeNode,
@@ -39,6 +40,7 @@ import {
   type CostCentreLabel,
   costCentreLabel,
   costCentreTrail,
+  findTopBudgetNode,
   signedEur,
 } from '../../budget/expense-display.util';
 import type { ExpenseDialogsState } from '../expense-dialogs.state';
@@ -99,6 +101,7 @@ const PAYMENT_METHODS: readonly ('' | PaymentMethod)[] = [
     AutocompleteComponent,
     ButtonComponent,
     ChipGroupComponent,
+    BudgetYearSelectComponent,
     CostCentreSelectComponent,
     CurrencyInputComponent,
     DatepickerComponent,
@@ -173,6 +176,16 @@ export class BookingFormComponent {
   /** The cost centre the form writes: the new booking, or the edited one. */
   protected readonly ccId = computed(() =>
     this.mode() === 'create' ? this.state().newBudgetId() : this.state().editBudgetId(),
+  );
+
+  /** The budget of the picked cost centre: the field of the pair starts with its year. */
+  protected readonly preferTop = computed(
+    () => findTopBudgetNode(this.tree(), this.state().newBudgetId())?.id ?? '',
+  );
+
+  /** The cost centres of the budget of the pair (spec 000879). */
+  protected readonly pairTree = computed(() =>
+    this.tree().filter((top) => top.id === this.state().newTopId()),
   );
 
   /** The fiscal year the cost-centre list counts the free amounts in. */

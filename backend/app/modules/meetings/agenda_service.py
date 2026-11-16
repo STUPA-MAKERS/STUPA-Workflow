@@ -8,16 +8,17 @@ items in the protocol.
 
 State rules:
 
-* Add, reorder, rename and remove need a `planned` or `live` meeting. A closed
-  meeting gives 409 `meeting_closed`.
+* Add, reorder and remove need a `planned` or `live` meeting. A closed
+  meeting gives 409 `meeting_closed`: the list and the order of the items close with
+  the meeting (§F/meetings/meetings/000982).
 * Remove gives 409 `agenda_item_has_vote` while the item has an open or closed vote.
   It deletes the draft and cancelled votes of the item first, each with a
   `vote_delete` audit entry. To delete these votes the caller needs the
   `canManageVotes` right, else 403.
 * Add and remove lock the meeting row, as the meeting close and the vote open do.
-* The Markdown body and the `nonPublic` flag are open from the planning until the
-  protocol leaves the draft. The minute-taker can thus write the minutes of an item
-  before the meeting starts.
+* The title, the Markdown body and the `nonPublic` flag are open from the planning
+  until the protocol leaves the draft (409 `protocol_final`). The minute-taker can
+  thus write the minutes of an item before the meeting starts.
 
 The done mark of an item ("TOP abhaken") follows the minutes window too. A person
 sets and removes it by hand, and the move to the next item sets it for the item that
@@ -32,6 +33,7 @@ edit after the close is a correction of the minutes and is audited, without the 
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -42,6 +44,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
+from app.modules.budget.plan_models import BudgetPlanVersion
 from app.modules.flow.models import State
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.meetings.protocol_models import Protocol
@@ -59,6 +62,15 @@ def title_of(data: dict[str, Any] | None) -> str | None:
     value = data.get("title")
     return value.strip() if isinstance(value, str) and value.strip() else None
 
+
+def block_quote(text: str) -> str:
+    """Turn a plain text into a Markdown block quote (spec 000861).
+
+    The function trims the text and gives each line the prefix ``> ``. An empty line
+    becomes ``>``, so the quote does not break into two quotes.
+    """
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").strip().split("\n")
+    return "\n".join(f"> {line.rstrip()}" if line.strip() else ">" for line in lines)
 
 
 def agenda_order() -> tuple[ColumnElement[Any], ...]:
@@ -89,6 +101,7 @@ def _item_out(
         id=row.id,
         applicationId=row.application_id,
         todoId=row.todo_id,
+        planVersionId=getattr(row, "plan_version_id", None),
         title=row.title or app_title,
         applicationTitle=app_title,
         body=row.body,
@@ -142,14 +155,14 @@ class AgendaService:
             )
 
     async def _assert_minutes_open(self, meeting: Meeting) -> None:
-        """Refuse a body or ``nonPublic`` edit outside the minutes window.
+        """Refuse a title, body or ``nonPublic`` edit outside the minutes window.
 
         The window is a ``planned`` or ``live`` meeting, or a closed meeting whose
         protocol is still a draft. A ``planned`` meeting has no protocol yet, but the
         text of its items is already the start of the minutes.
 
         Raises:
-            ConflictError: The protocol is no longer a draft (``protocol_locked``).
+            ConflictError: The protocol is no longer a draft (``protocol_final``).
         """
         if meeting.status == "closed":
             status = await self.session.scalar(
@@ -158,7 +171,7 @@ class AgendaService:
             if status != "draft":
                 raise ConflictError(
                     "the protocol is no longer a draft — the minutes can no longer change",
-                    code="protocol_locked",
+                    code="protocol_final",
                 )
 
     async def _audit(
@@ -245,7 +258,33 @@ class AgendaService:
             if state_ids
             else {}
         )
-        return [_item_out(r, apps, states) for r in rows]
+        drafts = await self._draft_plans(rows)
+        return [
+            _item_out(r, apps, states).model_copy(
+                update={"plan_reading": getattr(r, "plan_version_id", None) in drafts}
+            )
+            for r in rows
+        ]
+
+    async def _draft_plans(self, rows: Sequence[MeetingAgendaItem]) -> frozenset[UUID]:
+        """Return the plan versions of the items that are a draft, so the item reads them."""
+        plan_ids = [
+            plan_id for r in rows if (plan_id := getattr(r, "plan_version_id", None)) is not None
+        ]
+        return (
+            frozenset(
+                (
+                    await self.session.scalars(
+                        select(BudgetPlanVersion.id).where(
+                            BudgetPlanVersion.id.in_(plan_ids),
+                            BudgetPlanVersion.state == "draft",
+                        )
+                    )
+                ).all()
+            )
+            if plan_ids
+            else frozenset()
+        )
 
     async def set_body(
         self,
@@ -279,10 +318,7 @@ class AgendaService:
         """
         meeting = await self._meeting(meeting_id)
         row = await self.item(meeting_id, item_id)
-        renames = title is not None
-        if renames:
-            self._assert_agenda_open(meeting)
-        if body is not None or non_public is not None:
+        if title is not None or body is not None or non_public is not None:
             await self._assert_minutes_open(meeting)
         new_body = body is not None and body != row.body
         if body is not None and new_body:
@@ -333,7 +369,7 @@ class AgendaService:
 
         Raises:
             NotFoundError: The meeting has no agenda item with this id.
-            ConflictError: The protocol is no longer a draft (``protocol_locked``).
+            ConflictError: The protocol is no longer a draft (``protocol_final``).
         """
         meeting = await self._meeting(meeting_id)
         await self.set_done_in_tx(meeting, item_id, done=done, actor=actor)
@@ -359,7 +395,7 @@ class AgendaService:
 
         Raises:
             NotFoundError: The meeting has no agenda item with this id.
-            ConflictError: The protocol is no longer a draft (``protocol_locked``).
+            ConflictError: The protocol is no longer a draft (``protocol_final``).
         """
         row = await self.item(meeting.id, item_id)
         await self._assert_minutes_open(meeting)
@@ -476,6 +512,7 @@ class AgendaService:
         non_public: bool = False,
         *,
         actor: str | None = None,
+        description: str | None = None,
     ) -> list[AgendaItemOut]:
         """Add an agenda item for an application or for free text, then commit.
 
@@ -493,6 +530,7 @@ class AgendaService:
             title=title,
             non_public=non_public,
             actor=actor,
+            description=description,
         ):
             await self.session.commit()
         return await self.list(meeting_id)
@@ -505,11 +543,14 @@ class AgendaService:
         non_public: bool = False,
         *,
         actor: str | None = None,
+        description: str | None = None,
     ) -> bool:
         """Add an agenda item in the transaction of the caller. It does not commit.
 
         A `title` creates a free-text item. The method then ignores
-        `application_id`. Without a title the application must be in a vote
+        `application_id`. A `description` of a free-text item becomes the start of its
+        text as a Markdown block quote (spec 000861); the method ignores it for an
+        application item. Without a title the application must be in a vote
         state of the Gremium of the meeting. A second add for the same
         application changes nothing. The flow engine calls this method before its
         own commit, so the state change and the new item stay atomic. A new item
@@ -530,7 +571,7 @@ class AgendaService:
         meeting = await self._meeting(meeting_id, for_update=True)
         self._assert_agenda_open(meeting)
         if title is not None:
-            await self._add_freetext(meeting_id, title.strip(), non_public, actor)
+            await self._add_freetext(meeting_id, title.strip(), non_public, actor, description)
             return True
 
         app = await self.session.get(Application, application_id, populate_existing=True)
@@ -563,13 +604,22 @@ class AgendaService:
         return True
 
     async def _add_freetext(
-        self, meeting_id: UUID, title: str, non_public: bool, actor: str | None
+        self,
+        meeting_id: UUID,
+        title: str,
+        non_public: bool,
+        actor: str | None,
+        description: str | None = None,
     ) -> None:
-        """Add a free-text item with its own title and write ``agenda_item_add``."""
+        """Add a free-text item with its own title and write ``agenda_item_add``.
+
+        A description that is not blank becomes the text of the item as a block quote.
+        """
         item = MeetingAgendaItem(
             meeting_id=meeting_id,
             application_id=None,
             title=title,
+            body=block_quote(description) if description and description.strip() else None,
             position=await self._next_position(meeting_id),
             non_public=non_public,
         )
@@ -626,6 +676,58 @@ class AgendaService:
             item=item,
             nonPublic=non_public,
             todoId=str(todo_id),
+        )
+        return item
+
+    async def add_plan_in_tx(
+        self,
+        meeting_id: UUID,
+        *,
+        plan_version_id: UUID,
+        title: str,
+        non_public: bool = False,
+        actor: str | None = None,
+    ) -> MeetingAgendaItem:
+        """Add an agenda item for a version of a Haushaltsplan, without a commit.
+
+        The item has no application; its ``title`` names the plan and its
+        ``plan_version_id`` the version. The caller checks that the version waits for
+        the Gremium of the meeting. A new item writes ``agenda_item_add``.
+
+        Raises:
+            NotFoundError: The meeting does not exist.
+            ConflictError: The meeting is closed (``meeting_closed``), or the version
+                is already on the agenda (``plan_already_on_agenda``).
+        """
+        meeting = await self._meeting(meeting_id, for_update=True)
+        self._assert_agenda_open(meeting)
+        existing = await self.session.scalar(
+            select(MeetingAgendaItem.id).where(
+                MeetingAgendaItem.meeting_id == meeting_id,
+                MeetingAgendaItem.plan_version_id == plan_version_id,
+            )
+        )
+        if existing is not None:
+            raise ConflictError(
+                "the plan is already on the agenda of this meeting",
+                code="plan_already_on_agenda",
+            )
+        item = MeetingAgendaItem(
+            meeting_id=meeting_id,
+            application_id=None,
+            plan_version_id=plan_version_id,
+            title=title,
+            position=await self._next_position(meeting_id),
+            non_public=non_public,
+        )
+        self.session.add(item)
+        await self.session.flush()
+        await self._audit(
+            AuditAction.AGENDA_ITEM_ADD,
+            actor=actor,
+            item=item,
+            nonPublic=non_public,
+            planVersionId=str(plan_version_id),
         )
         return item
 

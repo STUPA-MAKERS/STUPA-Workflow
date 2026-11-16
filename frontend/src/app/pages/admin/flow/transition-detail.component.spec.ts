@@ -19,7 +19,6 @@ const TREE: BudgetTreeNode[] = [
     currency: 'EUR',
     active: true,
     color: null,
-    hiddenInBudget: false,
     viewGremiumId: null,
     fiscalStartMonth: 1,
     fiscalStartDay: 1,
@@ -158,6 +157,18 @@ describe('TransitionDetailComponent', () => {
     expect(screen.getAllByText('Studierendenschaft')).toHaveLength(2);
     expect(screen.getByText('Unbekannte Kostenstelle')).toBeInTheDocument();
     expect(screen.queryByText('gone')).toBeNull();
+  });
+
+  /** Spec 000761: the editor offers no step of a feature that is off. */
+  it('offers no action of a feature that is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['budget', 'meetings']));
+    const { c } = await setup({ from: 'a', to: 'b', actions: [] });
+    localStorage.removeItem('ap.features.off');
+    const values = c.actionOptions().map((o: { value: string }) => o.value);
+    expect(values).toContain('webhook');
+    expect(values).not.toContain('addToNextSession');
+    expect(values).not.toContain('assignBudget');
+    expect(values).not.toContain('assignBudgetFromMap');
   });
 
   it('hides the cost-center actions when the target takes its gremium from the cost center', async () => {

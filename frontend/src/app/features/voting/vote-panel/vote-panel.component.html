@@ -61,6 +61,7 @@
     [secret]="secret()"
     [own]="own()"
     [proxyName]="proxyName()"
+    [proxyCount]="proxyCount()"
     [proxyCast]="proxyCast()"
     [caster]="caster()"
     [layout]="ballotLayout()"
@@ -98,6 +99,7 @@
     [counts]="v.tally.counts"
     [voteId]="v.id"
     [canManage]="!!v.canManage"
+    [round]="v.round ?? 1"
     (changed)="changed.emit($event)"
   />
 } @else if (showBars()) {

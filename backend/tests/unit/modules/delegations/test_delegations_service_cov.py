@@ -37,6 +37,7 @@ from app.modules.delegations.schemas import (
 )
 from app.modules.delegations.service import (
     DelegationService,
+    Represented,
     _independently_eligible,
     _membership_with_vote_cast,
     meeting_start_utc,
@@ -52,6 +53,7 @@ from app.shared.errors import (
 )
 from tests._support.flow_fakes import fake_session, result
 
+PID = uuid4()
 NOW = datetime(2026, 6, 6, 12, 0, tzinfo=UTC)
 GREMIUM_ID = uuid4()
 MEETING_ID = uuid4()
@@ -102,6 +104,8 @@ def _gremium(
         allow_vote_delegation=allow,
         delegation_lead_minutes=lead,
         delegation_allow_external=external,
+        delegation_max_per_delegate=2,
+        delegation_in_elections=False,
     )
 
 
@@ -134,34 +138,39 @@ def test_meeting_start_utc_converts() -> None:
 
 async def test_voting_check_no_meeting() -> None:
     db = fake_session()
-    assert await voting_delegation_check(db, "me", None, str(GREMIUM_ID), NOW) == (False, None)
+    assert await voting_delegation_check(db, "me", None, str(GREMIUM_ID), NOW) == (False, ())
     assert db.statements == []
 
 
 async def test_voting_check_bad_group() -> None:
     db = fake_session()
-    assert await voting_delegation_check(db, "me", MEETING_ID, "nope", NOW) == (False, None)
+    assert await voting_delegation_check(db, "me", MEETING_ID, "nope", NOW) == (False, ())
 
 
 async def test_voting_check_outgoing_blocked() -> None:
-    db = fake_session(result((True, True, "me")))
-    assert await voting_delegation_check(db, "me", MEETING_ID, str(GREMIUM_ID), NOW) == (True, None)
+    db = fake_session(result((True, True, False, "me", PID)))
+    assert await voting_delegation_check(db, "me", MEETING_ID, str(GREMIUM_ID), NOW) == (True, ())
 
 
 async def test_voting_check_incoming_carries_delegator_sub() -> None:
-    db = fake_session(result((False, True, "deg")))
+    db = fake_session(result((False, True, False, "deg", PID), (False, True, True, "seat", PID)))
     assert await voting_delegation_check(db, "me", MEETING_ID, str(GREMIUM_ID), NOW) == (
         False,
-        "deg",
+        (
+            Represented(sub="deg", principal_id=PID, pool=False),
+            Represented(sub="seat", principal_id=PID, pool=True),
+        ),
     )
+
+
+async def test_voting_check_outgoing_pool_seat_does_not_block() -> None:
+    db = fake_session(result((True, True, True, "me", PID)))
+    assert await voting_delegation_check(db, "me", MEETING_ID, str(GREMIUM_ID), NOW) == (False, ())
 
 
 async def test_voting_check_nonvoting_neutral() -> None:
-    db = fake_session(result((True, False, "me"), (False, False, "x")))
-    assert await voting_delegation_check(db, "me", MEETING_ID, str(GREMIUM_ID), NOW) == (
-        False,
-        None,
-    )
+    db = fake_session(result((True, False, False, "me", PID), (False, False, False, "x", PID)))
+    assert await voting_delegation_check(db, "me", MEETING_ID, str(GREMIUM_ID), NOW) == (False, ())
 
 
 async def test_meeting_not_found_raises() -> None:
@@ -240,7 +249,7 @@ def _create_db(
     delegate: SimpleNamespace,
     pool_ids: list[Any],
     member_ids: list[Any],
-    existing: list[tuple[Any, Any, bool]],
+    existing: list[tuple[Any, Any, bool, bool]],
 ) -> Any:
     """Script the fake session for a create.
 
@@ -299,7 +308,7 @@ async def test_create_nonvoting_existing_to_same_recipient_does_not_conflict() -
     creates the new non-voting delegation.
     """
     me, delegate = _me(), _me("other")
-    existing_row = (uuid4(), delegate.id, False)
+    existing_row = (uuid4(), delegate.id, False, False)
     db = _create_db(
         meeting=_meeting(),
         gremium=_gremium(),
@@ -323,7 +332,7 @@ async def test_create_voting_existing_other_recipient_no_conflict() -> None:
     there is no 409.
     """
     me, delegate = _me(), _me("other")
-    existing_row = (uuid4(), uuid4(), True)
+    existing_row = (uuid4(), uuid4(), False, True)
     db = _create_db(
         meeting=_meeting(),
         gremium=_gremium(),
@@ -655,6 +664,40 @@ async def test_vote_status_blocked_and_exercising() -> None:
     assert status.exercising is True
     assert status.delegated_to_name == "Vertreter"
     assert status.delegated_by_name == "Vertretener"
+    assert status.delegated_by_names == ["Vertretener"]
+
+
+async def test_vote_status_names_every_represented_member() -> None:
+    """Two incoming voting delegations give two names, oldest first (000932)."""
+    me = _me()
+    first, second = uuid4(), uuid4()
+    rows = [
+        (SimpleNamespace(delegator_principal_id=pid, delegate_principal_id=me.id), False)
+        for pid in (first, second)
+    ]
+    db = fake_session(result(me), result(*rows), _names((first, "Ada", None), (second, "Bo", None)))
+    db.get_results = [_vote()]
+    status = await _svc(db).vote_status(VOTE_ID, _actor())
+    assert status.delegated_by_names == ["Ada", "Bo"]
+    assert status.delegated_by_name == "Ada, Bo"
+
+
+@pytest.mark.parametrize(("switch", "names"), [(False, []), (True, ["Ada"])])
+async def test_vote_status_election_reads_the_gremium_switch(
+    switch: bool, names: list[str]
+) -> None:
+    """An election names a delegator only with `delegation_in_elections` (000910)."""
+    me = _me()
+    by_id = uuid4()
+    incoming = SimpleNamespace(delegator_principal_id=by_id, delegate_principal_id=me.id)
+    db = fake_session(result(me), result((incoming, False)), _names((by_id, "Ada", None)))
+    db.scalar_results = [switch]
+    vote = _vote()
+    vote.kind = "election"
+    db.get_results = [vote]
+    status = await _svc(db).vote_status(VOTE_ID, _actor())
+    assert status.delegated_by_names == names
+    assert status.exercising is switch
 
 
 async def test_vote_status_no_rows_empty_names() -> None:
@@ -996,7 +1039,7 @@ async def test_create_double_outgoing_conflict() -> None:
         delegate=delegate,
         pool_ids=[],
         member_ids=[delegate.id],
-        existing=[(me.id, uuid4(), False)],
+        existing=[(me.id, uuid4(), False, False)],
     )
     with pytest.raises(ConflictError, match="already delegated"):
         await _svc(db).create(
@@ -1014,7 +1057,7 @@ async def test_create_chain_actor_is_recipient_validation() -> None:
         delegate=delegate,
         pool_ids=[],
         member_ids=[delegate.id],
-        existing=[(uuid4(), me.id, False)],
+        existing=[(uuid4(), me.id, False, False)],
     )
     with pytest.raises(ValidationProblem, match="delegate on"):
         await _svc(db).create(
@@ -1032,7 +1075,7 @@ async def test_create_chain_recipient_delegated_away_validation() -> None:
         delegate=delegate,
         pool_ids=[],
         member_ids=[delegate.id],
-        existing=[(delegate.id, uuid4(), False)],
+        existing=[(delegate.id, uuid4(), False, False)],
     )
     with pytest.raises(ValidationProblem, match="delegated their own"):
         await _svc(db).create(
@@ -1040,8 +1083,8 @@ async def test_create_chain_recipient_delegated_away_validation() -> None:
         )
 
 
-async def test_create_second_voting_delegation_conflict() -> None:
-    """Refuse a second voting delegation, because the recipient carries a voting right."""
+async def test_create_second_voting_delegation_is_allowed() -> None:
+    """Allow a second voting delegation to the same recipient below the limit (000909)."""
     me, delegate = _me(), _me("other")
     db = _create_db(
         meeting=_meeting(),
@@ -1050,13 +1093,78 @@ async def test_create_second_voting_delegation_conflict() -> None:
         delegate=delegate,
         pool_ids=[],
         member_ids=[delegate.id],
-        existing=[(uuid4(), delegate.id, True)],
+        existing=[(uuid4(), delegate.id, False, True)],
     )
-    with pytest.raises(ConflictError, match="carries"):
+    out = await _svc(db, voting=True).create(
+        DelegationCreate(meetingId=MEETING_ID, delegateId=delegate.id, delegateVoting=True),
+        _actor(),
+    )
+    assert out.delegate_voting is True
+
+
+async def test_create_over_the_limit_conflict() -> None:
+    """Refuse a delegation to a recipient who holds the most delegations (000909).
+
+    The pool row of the recipient does not count, so two rows without the pool reach
+    the limit of 2.
+    """
+    me, delegate = _me(), _me("other")
+    db = _create_db(
+        meeting=_meeting(),
+        gremium=_gremium(),
+        me=me,
+        delegate=delegate,
+        pool_ids=[],
+        member_ids=[delegate.id],
+        existing=[
+            (uuid4(), delegate.id, True, True),
+            (uuid4(), delegate.id, False, True),
+            (uuid4(), delegate.id, False, False),
+        ],
+    )
+    with pytest.raises(ConflictError, match="holds the most") as exc:
+        await _svc(db).create(
+            DelegationCreate(meetingId=MEETING_ID, delegateId=delegate.id), _actor()
+        )
+    assert exc.value.code == "delegate_limit"
+
+
+async def test_create_pool_row_does_not_count_for_the_limit() -> None:
+    """One pool row and one other row stay below the limit of 2."""
+    me, delegate = _me(), _me("other")
+    db = _create_db(
+        meeting=_meeting(),
+        gremium=_gremium(),
+        me=me,
+        delegate=delegate,
+        pool_ids=[],
+        member_ids=[delegate.id],
+        existing=[(uuid4(), delegate.id, True, True), (uuid4(), delegate.id, False, True)],
+    )
+    out = await _svc(db).create(
+        DelegationCreate(meetingId=MEETING_ID, delegateId=delegate.id), _actor()
+    )
+    assert out.via_pool is False
+
+
+async def test_create_pool_substitute_carries_one_vote_conflict() -> None:
+    """Refuse a second voting delegation to a pool substitute."""
+    me, delegate = _me(), _me("other")
+    db = _create_db(
+        meeting=_meeting(),
+        gremium=_gremium(),
+        me=me,
+        delegate=delegate,
+        pool_ids=[delegate.id],
+        member_ids=[],
+        existing=[(uuid4(), delegate.id, True, True)],
+    )
+    with pytest.raises(ConflictError, match="carries") as exc:
         await _svc(db, voting=True).create(
             DelegationCreate(meetingId=MEETING_ID, delegateId=delegate.id, delegateVoting=True),
             _actor(),
         )
+    assert exc.value.code == "delegate_already_voting"
 
 
 async def test_list_non_admin_without_principal_is_empty() -> None:

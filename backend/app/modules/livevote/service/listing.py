@@ -274,13 +274,15 @@ class ListingOps(PermissionOps, VoteReadOps):
         all_gids = {m.gremium_id for m in meetings}
         gremium_rows = (
             await self.session.execute(
-                select(Gremium.id, Gremium.name, Gremium.quorum_percent).where(
-                    Gremium.id.in_(all_gids)
-                )
+                select(
+                    Gremium.id, Gremium.name, Gremium.quorum_percent, Gremium.guests_may_vote
+                ).where(Gremium.id.in_(all_gids))
             )
         ).all()
         gremium_names: dict[UUID, str] = {row[0]: row[1] for row in gremium_rows}
-        quorum_gids = {row[0] for row in gremium_rows if len(row) > 2 and row[2] is not None}
+        guest_vote_gids = {
+            row[0] for row in gremium_rows if len(row) > 3 and row[2] is None and row[3]
+        }
         prot_ids = {m.protokollant_id for m in meetings if m.protokollant_id is not None}
         prot_names: dict[UUID, str | None] = (
             {
@@ -315,6 +317,7 @@ class ListingOps(PermissionOps, VoteReadOps):
         keepers_by_meeting = await keeper_summaries(self.session, [m.id for m in meetings])
         guests_by_meeting = await self._guest_counts([m.id for m in meetings])
         windows = await self._open_windows(meetings)
+        seats_by_meeting = await self._present_seats(meetings)
 
         def decorated(m: Meeting) -> MeetingOut:
             is_prot = m.protokollant_id is not None and m.protokollant_id == my_id
@@ -341,7 +344,8 @@ class ListingOps(PermissionOps, VoteReadOps):
                 agenda=agenda_by_meeting[m.id],
                 keepers=keepers_by_meeting[m.id],
                 guests=guests_by_meeting.get(m.id, (0, 0)),
-                public_join_allowed=m.gremium_id not in quorum_gids,
+                seats=seats_by_meeting.get(m.id, 0),
+                guests_vote_allowed=m.gremium_id in guest_vote_gids,
                 window=windows[m.id],
             )
 

@@ -45,6 +45,7 @@ from worker.scan import scan_attachment
 from worker.task_reminders import process_task_reminders
 from worker.tickets import anonymize_tickets
 from worker.todos import archive_done_todos
+from worker.watchdog import watchdog_on_shutdown, watchdog_on_startup
 from worker.webhook import deliver_webhook
 from worker.webhook import on_startup as webhook_on_startup
 
@@ -81,6 +82,9 @@ async def _on_startup(ctx: dict[str, Any]) -> None:
     It also builds the flow action dispatcher once. The deadline cron, the automatic
     transitions and the vote auto-close read it from `ctx['flow_dispatcher']`, so a
     transition that the worker fires runs the same actions as one from the API.
+
+    The watchdog starts last: it ends a worker whose event loop hangs
+    (§NF/compatibility/deploy/000975).
     """
     await mail_on_startup(ctx)
     await scan_on_startup(ctx)
@@ -89,6 +93,7 @@ async def _on_startup(ctx: dict[str, Any]) -> None:
     await deadlines_on_startup(ctx)
     await backup_on_startup(ctx)
     await cd_builtin_on_startup(ctx)
+    await watchdog_on_startup(ctx)
     ctx.update(
         flow_dispatcher=build_worker_dispatcher(
             ctx.get("redis"), get_sessionmaker(), ctx.get("settings")
@@ -126,7 +131,8 @@ async def refresh_budget_stats(ctx: dict[str, Any]) -> str:
 
 
 async def _shutdown(ctx: dict[str, Any]) -> None:  # pragma: no cover
-    """Dispose the cached budget engine on worker stop (release the pool)."""
+    """Stop the watchdog and dispose the cached budget engine (release the pool)."""
+    await watchdog_on_shutdown(ctx)
     if _budget_engine.cache_info().currsize:
         await _budget_engine().dispose()
         _budget_engine.cache_clear()

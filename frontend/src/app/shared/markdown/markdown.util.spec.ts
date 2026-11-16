@@ -1,4 +1,4 @@
-import { hasOpenBlackout, markdownToSafeHtml } from './markdown.util';
+import { documentIdsIn, hasOpenBlackout, markdownToSafeHtml } from './markdown.util';
 
 describe('markdownToSafeHtml', () => {
   it('escapes raw HTML before rendering (XSS-safe)', () => {
@@ -166,6 +166,34 @@ describe('markdownToSafeHtml', () => {
     expect(markdownToSafeHtml('> [!FOO] bar')).toBe('<blockquote><p>[!FOO] bar</p></blockquote>');
   });
 
+  it('renders an embedded PDF as a file badge, or as its name without badges (000863)', () => {
+    const id = '0b8f3c3e-4d6a-4f43-9a1e-2f0c1d2e3f40';
+    const src = `Siehe [Angebot \\[neu\\].pdf](/api/media/documents/${id}).`;
+    const docs = {
+      pages: { [id]: 3 },
+      pagesText: (n: number) => `${n} Seiten`,
+      label: (name: string) => `PDF öffnen: ${name}`,
+    };
+    const html = markdownToSafeHtml(src, { documents: docs });
+    expect(html).toContain(`<button type="button" class="mdv__doc" data-doc="${id}" aria-label="PDF öffnen: Angebot [neu].pdf">`);
+    expect(html).toContain('<span class="mdv__doc-name">Angebot [neu].pdf</span>');
+    expect(html).toContain('<span class="mdv__doc-pages">3 Seiten</span>');
+    expect(markdownToSafeHtml(src)).toBe('<p>Siehe Angebot [neu].pdf.</p>');
+    expect(markdownToSafeHtml(`[x](/api/media/documents/${id}/x)`, { documents: docs })).not.toContain('mdv__doc');
+    expect(documentIdsIn(`[a](/api/media/documents/${id}) [b](/api/media/documents/${id})`)).toEqual([id]);
+  });
+
+  it('renders a time note as one line with its time (000872)', () => {
+    expect(markdownToSafeHtml('> [!anmerkung 8:05] **Anna** geht')).toBe(
+      '<p class="mdv__time-note">08:05 Uhr · <strong>Anna</strong> geht</p>',
+    );
+    expect(markdownToSafeHtml('> [!anmerkung 18:42]')).toBe('<p class="mdv__time-note">18:42 Uhr</p>');
+    expect(markdownToSafeHtml('> [!anmerkung 25:00] x')).toBe('<blockquote><p>[!anmerkung 25:00] x</p></blockquote>');
+    expect(markdownToSafeHtml('> [!anmerkung 9:00] a\n> b')).toBe(
+      '<p class="mdv__time-note">09:00 Uhr · a</p><blockquote><p>b</p></blockquote>',
+    );
+  });
+
   it('honours headingOffset', () => {
     expect(markdownToSafeHtml('# Titel', { headingOffset: 0 })).toBe('<h1>Titel</h1>');
     expect(markdownToSafeHtml('###### Tief', { headingOffset: 3 })).toBe('<h6>Tief</h6>');
@@ -322,3 +350,50 @@ describe('hasOpenBlackout (000686)', () => {
   });
 });
 
+
+describe('blackout blocks (000965, 000967)', () => {
+  const blackout = { mark: 'Wird öffentlich geschwärzt', bar: 'geschwärzt', block: 'Abschnitt geschwärzt' };
+  const doc = '[Brief.pdf](/api/media/documents/0b9d1d3e-7a39-4b3f-9a4e-3c1f2a5b6c7d)';
+
+  it('renders the blocks of a block in one box with the mark', () => {
+    const html = markdownToSafeHtml(`Vorher.\n%%\nErster Absatz\n\n- Punkt\n\n${doc}\n%%\nDanach.`, { blackout });
+    expect(html).toContain('<div class="md-blackout-block" title="Wird öffentlich geschwärzt">');
+    expect(html).toContain('<p>Erster Absatz</p>');
+    expect(html).toContain('<li>Punkt</li>');
+    expect(html).toContain('<p>Vorher.</p>');
+    expect(html).toContain('<p>Danach.</p>');
+    expect(html).not.toContain('%%');
+  });
+
+  it('renders the empty block as the bar of a block', () => {
+    const html = markdownToSafeHtml('Vorher.\n%%\n%%\nDanach.', { blackout });
+    expect(html).toContain('<div class="md-bar-block" role="img" aria-label="Abschnitt geschwärzt"></div>');
+  });
+
+  it.each([
+    ['Text\n%%\nGeheim', true],
+    ['%%\nGeheim\n%%', false],
+    ['%%\nA %%B%%\n%%', false],
+    ['%%\nA\n%%\n%%\nB', true],
+  ])('hasOpenBlackout(%j) gives %s', (text, open) => {
+    expect(hasOpenBlackout(text)).toBe(open);
+  });
+});
+
+describe('blackout blocks, edge cases (000686, 000967)', () => {
+  it('renders an open block as text', () => {
+    const html = markdownToSafeHtml('Vorher.\n%%\nOffen', { blackout: { mark: 'm', bar: 'b' } });
+    expect(html).toContain('<p>%%</p>');
+    expect(html).toContain('<p>Offen</p>');
+    expect(html).not.toContain('md-blackout-block');
+  });
+
+  it('labels the bar of a block with the bar text when no block text is given', () => {
+    const html = markdownToSafeHtml('%%\n%%', { blackout: { mark: 'm', bar: 'geschwärzt' } });
+    expect(html).toContain('aria-label="geschwärzt"');
+  });
+
+  it('renders a block without blackout texts', () => {
+    expect(markdownToSafeHtml('%%\nText\n%%')).toContain('<div class="md-blackout-block" title="">');
+  });
+});

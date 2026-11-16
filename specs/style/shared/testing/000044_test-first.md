@@ -1,10 +1,10 @@
 ---
 id: "000044"
-title: Tests come first
+title: A change comes with its tests
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
+updated: 2026-11-16
 implementation:
   - backend/tests/
   - frontend/src/
@@ -15,7 +15,8 @@ scope:
   - mcp/antragsplattform_mcp/tests
 ---
 
-# Tests come first
+# A change comes with its tests
 
-A change must start with a failing test, then the minimal code, then the clean-up. A test must
-not use `skip` or `xfail` without a written reason.
+A change must come with the tests of its rule in the same pull request. The author must write
+the code and its tests first and must then let CI run them (000048). A test must not use
+`skip` or `xfail` without a written reason.

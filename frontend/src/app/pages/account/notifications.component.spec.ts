@@ -191,4 +191,18 @@ describe('AccountNotificationsComponent', () => {
     await setup([{ kind: 'brand_new_kind', enabled: true }]);
     expect(screen.getByRole('switch')).toHaveAccessibleName('brand_new_kind');
   });
+
+  /** Spec 000758: a kind of a feature that is off has no switch. */
+  it('shows no switch for the kinds of a feature that is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['meetings', 'todos']));
+    await setup([
+      { kind: 'status_update', enabled: true },
+      { kind: 'protocol', enabled: true },
+      { kind: 'todo_due', enabled: true },
+      { kind: 'appointment', enabled: true },
+    ]);
+    localStorage.removeItem('ap.features.off');
+    expect(screen.getAllByRole('switch')).toHaveLength(2);
+    expect(screen.queryByText('Protokolle')).toBeNull();
+  });
 });

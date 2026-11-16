@@ -259,3 +259,39 @@ describe('the head of a repeat', () => {
     );
   });
 });
+
+/** §F/meetings/voting/000912: the same lines as the backend `build_election_snippet`. */
+describe('the snippet of an election with the majority of the members', () => {
+  const election = (elected: string[]): MeetingVote =>
+    vote({
+      kind: 'election',
+      question: 'Vorsitz',
+      counts: null,
+      election: {
+        seats: 1,
+        majorityRule: 'members_majority',
+        secret: true,
+        candidates: [
+          { id: 'c1', name: 'Anna' },
+          { id: 'c2', name: 'Ben' },
+        ],
+      },
+      electionResult: { counts: { c1: 3, c2: 2 }, abstentions: 0, ballots: 5, elected },
+    } as Partial<MeetingVote>);
+
+  it('names the rule and the missed majority', () => {
+    expect(voteSnippet(election([])).split('\n')).toEqual([
+      '> [!abstimmung] **Vorsitz**',
+      '> Wahl · 1 Posten · Mehrheit der Mitglieder',
+      '> Anna: 3 · Ben: 2 · Enthaltungen: 0',
+      '> Gewählt: niemand',
+      '> Keine Mehrheit der Mitglieder.',
+    ]);
+  });
+
+  it('names only the elected person after a majority', () => {
+    const text = voteSnippet(election(['c1']));
+    expect(text).toContain('> Gewählt: Anna');
+    expect(text).not.toContain('Keine Mehrheit');
+  });
+});

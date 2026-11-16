@@ -26,14 +26,8 @@ _UPGRADE: tuple[str, ...] = (
 )
 
 _DOWNGRADE: tuple[str, ...] = (
-    (
-        "ALTER TABLE applicant ADD COLUMN IF NOT EXISTS "
-        "anonymized_at timestamptz"
-    ),
-    (
-        "ALTER TABLE form_field ADD COLUMN IF NOT EXISTS "
-        "is_pii boolean NOT NULL DEFAULT false"
-    ),
+    ("ALTER TABLE applicant ADD COLUMN IF NOT EXISTS anonymized_at timestamptz"),
+    ("ALTER TABLE form_field ADD COLUMN IF NOT EXISTS is_pii boolean NOT NULL DEFAULT false"),
 )
 
 

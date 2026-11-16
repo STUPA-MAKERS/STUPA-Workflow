@@ -4,7 +4,9 @@ title: A webhook request is signed with a timestamp
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
+updated: 2026-11-16
+protocols:
+  - "P/integrations/webhooks/000963"
 implementation:
   - backend/app/modules/webhooks/signing.py
 scope:

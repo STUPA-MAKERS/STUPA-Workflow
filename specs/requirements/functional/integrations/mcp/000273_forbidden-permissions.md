@@ -2,11 +2,10 @@
 id: "000273"
 title: An agent never casts a ballot or merges accounts
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation:
-  - backend/app/modules/auth/oauth.py
+updated: 2026-11-16
+replaced_by: F/integrations/mcp/000462
 scope:
   - backend/app/modules/auth
   - backend/app/deps.py

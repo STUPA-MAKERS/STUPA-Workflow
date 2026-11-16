@@ -2,16 +2,10 @@
 id: "000646"
 title: A CI ratchet lowers the accepted import violations
 kind: style
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-10
-tests:
-  - "backend/tests/unit/scripts/test_check_ratchets.py:test_import_exceptions_are_counted_per_contract"
-implementation:
-  - backend/pyproject.toml
-  - scripts/check_ratchets.py
-  - scripts/ratchet-baseline/import-exceptions.json
-  - .github/workflows/ci.yml
+updated: 2026-11-16
+replaced_by: S/backend/python/000651
 scope:
   - backend/pyproject.toml
   - scripts/

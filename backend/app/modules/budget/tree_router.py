@@ -48,10 +48,12 @@ from app.modules.budget.tree_schemas import (
     BudgetNodeOut,
     BudgetNodeUpdate,
     BudgetTreeNodeOut,
+    BudgetYearOut,
     ExpenseCreate,
     ExpenseKind,
     ExpenseOut,
     ExpenseUpdate,
+    FiscalYearCloseCheck,
     FiscalYearCreate,
     FiscalYearOut,
     FiscalYearUpdate,
@@ -96,8 +98,8 @@ def get_budget_tree_service(
 ) -> BudgetTreeService:
     """Build the budget tree service for an authenticated principal.
 
-    Only the invoice import uses the storage. ``actor`` is the principal ``sub`` for the
-    audit trail of the money mutations.
+    The invoice import and the export logo of a plan PDF use the storage. ``actor`` is
+    the principal ``sub`` for the audit trail of the money mutations.
     """
     storage = getattr(request.app.state, "object_storage", None)
     return BudgetTreeService(session, storage=storage, settings=settings, actor=principal.sub)
@@ -135,9 +137,7 @@ async def _require_node_view(
         raise ForbiddenError("no access to this cost centre")
 
 
-async def _booking_scope(
-    service: BudgetTreeService, principal: Principal
-) -> set[UUID] | None:
+async def _booking_scope(service: BudgetTreeService, principal: Principal) -> set[UUID] | None:
     """Return the gremium scope for linked bookings, or ``None`` for the full view."""
     if _has_full_view(principal):
         return None
@@ -168,9 +168,7 @@ async def list_budget_tree(
     return await service.get_tree(gremium_id=gremium_id, visible_gremium_ids=member)
 
 
-def _find_subtree(
-    roots: Sequence[BudgetTreeNodeOut], node_id: UUID
-) -> BudgetTreeNodeOut | None:
+def _find_subtree(roots: Sequence[BudgetTreeNodeOut], node_id: UUID) -> BudgetTreeNodeOut | None:
     """Return the node with `node_id` from the forest, depth first, or None."""
     hits = (node if node.id == node_id else _find_subtree(node.children, node_id) for node in roots)
     return next((hit for hit in hits if hit is not None), None)
@@ -326,9 +324,7 @@ async def delete_budget_expense(expense_id: UUID, service: ServiceDep) -> None:
 @router.get(
     "/budget-expenses/{expense_id}/sub-bookings",
     response_model=list[ExpenseOut],
-    dependencies=[
-        Depends(require_any_permission(*BUDGET_READ_PERMISSIONS))
-    ],
+    dependencies=[Depends(require_any_permission(*BUDGET_READ_PERMISSIONS))],
     responses=_errors(401, 403, 404),
 )
 async def list_sub_bookings(expense_id: UUID, service: ServiceDep) -> list[ExpenseOut]:
@@ -379,9 +375,7 @@ async def book_expense(
 @router.get(
     "/expenses",
     response_model=Page[ExpenseOut],
-    dependencies=[
-        Depends(require_any_permission(*BUDGET_READ_PERMISSIONS))
-    ],
+    dependencies=[Depends(require_any_permission(*BUDGET_READ_PERMISSIONS))],
     responses=_errors(401, 403, 404),
 )
 async def list_expenses(
@@ -792,6 +786,32 @@ async def get_invoice_file(invoice_id: UUID, service: ServiceDep) -> Response:
 
 
 @router.get(
+    "/budget-years",
+    response_model=list[BudgetYearOut],
+    responses=_errors(401, 403),
+)
+async def list_budget_years(
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal())],
+    late: Annotated[bool, Query()] = False,
+) -> list[BudgetYearOut]:
+    """List the pairs of a budget and a fiscal year that a new booking can take.
+
+    A form asks for the pair before the cost center. A year is in the list when it is
+    not closed and not past, and in a budget with a plan only when its plan is in
+    force. `late` adds the past years that are not closed: the form of a booking and
+    of a transfer asks for them, the assignment of an Antrag does not. The full view
+    gives every budget. Without it the list holds the budgets with a cost center that
+    a Gremium of the principal reads.
+    """
+    if _has_full_view(principal):
+        return await service.choosable_pairs(None, late=late)
+    return await service.choosable_pairs(
+        await _member_gremium_ids(service, principal.sub), late=late
+    )
+
+
+@router.get(
     "/budgets/{budget_id}/fiscal-years",
     response_model=list[FiscalYearOut],
     responses=_errors(401, 403, 404, 422),
@@ -844,6 +864,25 @@ async def update_fiscal_year(
     return await service.update_fiscal_year(budget_id, fiscal_year_id, payload)
 
 
+@router.get(
+    "/budgets/{budget_id}/fiscal-years/{fiscal_year_id}/close-check",
+    response_model=FiscalYearCloseCheck,
+    responses=_errors(401, 403, 404, 422),
+)
+async def check_fiscal_year_close(
+    budget_id: UUID,
+    fiscal_year_id: UUID,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal("budget.structure"))],
+) -> FiscalYearCloseCheck:
+    """Say what the close of a fiscal year leaves open.
+
+    The answer names the Anträge of the year that are not in an end state and a
+    Nachtrag of the plan in draft. The dialog of the close shows both.
+    """
+    return await service.close_check(budget_id, fiscal_year_id)
+
+
 @router.post(
     "/budgets/{budget_id}/fiscal-years/{fiscal_year_id}/close",
     response_model=FiscalYearOut,
@@ -861,9 +900,7 @@ async def close_fiscal_year(
     assignments on it answer 409 `fiscal_year_closed`. A closed year stays
     closed on a second call.
     """
-    return await service.set_fiscal_year_closed(
-        budget_id, fiscal_year_id, closed=True
-    )
+    return await service.set_fiscal_year_closed(budget_id, fiscal_year_id, closed=True)
 
 
 @router.post(
@@ -878,9 +915,7 @@ async def reopen_fiscal_year(
     principal: Annotated[Principal, Depends(require_principal("budget.structure"))],
 ) -> FiscalYearOut:
     """Reopen a closed fiscal year. Its money data can change again."""
-    return await service.set_fiscal_year_closed(
-        budget_id, fiscal_year_id, closed=False
-    )
+    return await service.set_fiscal_year_closed(budget_id, fiscal_year_id, closed=False)
 
 
 @router.delete(
@@ -889,9 +924,7 @@ async def reopen_fiscal_year(
     dependencies=[Depends(require_principal("budget.structure"))],
     responses=_errors(401, 403, 404, 409, 422),
 )
-async def delete_fiscal_year(
-    budget_id: UUID, fiscal_year_id: UUID, service: ServiceDep
-) -> None:
+async def delete_fiscal_year(budget_id: UUID, fiscal_year_id: UUID, service: ServiceDep) -> None:
     """Delete a fiscal year of a top-level budget.
 
     A fiscal year that still carries bookings, allocations or assigned

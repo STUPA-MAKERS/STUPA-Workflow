@@ -32,7 +32,7 @@ from app.main import create_app
 from app.modules.audit.models import AuditEntry
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
-from app.modules.gremien.models import Gremium
+from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.livevote.broker import InMemoryBroker
 from app.modules.livevote.router import get_broker_rest, get_broker_ws, get_ws_principal
 from app.modules.livevote.service import BrokerPublisher
@@ -55,6 +55,9 @@ pytestmark = pytest.mark.integration
 
 LEAD_SUB = "lead-pub"
 ALTCHA_SECRET = "altcha-secret-public-meeting-000000"
+
+
+WHEN = {"date": "2026-11-01", "startTime": "18:00"}
 
 
 @pytest.fixture
@@ -137,6 +140,7 @@ async def seed(
     guests_mode: str = "vote",
     present: int = 2,
     quorum_percent: int | None = None,
+    guests_may_vote: bool = True,
 ) -> Seed:
     """A live meeting with two public free-text items, one non-public item, members.
 
@@ -144,7 +148,12 @@ async def seed(
     """
     tag = uuid.uuid4().hex[:8]
     async with maker() as session:
-        gremium = Gremium(name=f"Fachschaft {tag}", slug=f"fs-{tag}", quorum_percent=quorum_percent)
+        gremium = Gremium(
+            name=f"Fachschaft {tag}",
+            slug=f"fs-{tag}",
+            quorum_percent=quorum_percent,
+            guests_may_vote=guests_may_vote,
+        )
         session.add(gremium)
         lead = PrincipalRow(sub=LEAD_SUB, display_name="Lea Lead", email=f"l-{tag}@x.de")
         existing = await session.scalar(select(PrincipalRow).where(PrincipalRow.sub == LEAD_SUB))
@@ -188,10 +197,21 @@ async def seed(
             await session.flush()
             items.append(item.id)
         members = []
+        role = GremiumRole(
+            gremium_id=gremium.id,
+            key=f"member-{tag}",
+            name_i18n={"de": "Mitglied"},
+            permissions=["vote.cast"],
+        )
+        session.add(role)
+        await session.flush()
         for n in range(present):
             p = PrincipalRow(sub=f"m{n}-{tag}", display_name=f"M{n}", email=f"m{n}-{tag}@x.de")
             session.add(p)
             await session.flush()
+            session.add(
+                GremiumMembership(principal_id=p.id, gremium_id=gremium.id, gremium_role_id=role.id)
+            )
             session.add(
                 MeetingAttendance(meeting_id=meeting.id, principal_id=p.id, status="present")
             )
@@ -523,7 +543,8 @@ async def test_guest_votes_without_quorum_and_late_admission(
 ) -> None:
     """Let guests vote without a quorum, also after a late admission.
 
-    The quorum is 100 % of 2 members, so a members-only vote without ballots cannot close.
+    The quorum is 100 % of 2 members, so a members-only vote with 1 present member cannot
+    close.
     The vote with guests counts 2 present members and 1 guest. A guest admitted while the
     vote runs votes too. Without a quorum the vote closes with 2 guest ballots although no
     member voted. A members-only vote keeps the quorum and refuses the close without
@@ -543,7 +564,7 @@ async def test_guest_votes_without_quorum_and_late_admission(
         ok = a.post(
             f"/api/public/meetings/{code}/votes/{vote['id']}/ballot", json={"choice": "yes"}
         )
-        assert ok.status_code == 200 and ok.json() == {"status": "cast"}
+        assert ok.status_code == 200 and ok.json() == {"status": "cast", "ballots": 1}
         dup = a.post(
             f"/api/public/meetings/{code}/votes/{vote['id']}/ballot", json={"choice": "no"}
         )
@@ -583,6 +604,16 @@ async def test_guest_votes_without_quorum_and_late_admission(
         assert closed.json()["result"] == "passed"
         assert closed.json()["tally"]["presentMembers"] == 2
         assert closed.json()["tally"]["presentGuests"] == 2
+        async with maker() as session:
+            await session.execute(
+                update(MeetingAttendance)
+                .where(
+                    MeetingAttendance.meeting_id == s.meeting_id,
+                    MeetingAttendance.principal_id == s.members[1],
+                )
+                .values(status="absent")
+            )
+            await session.commit()
         members_only = open_vote(lead, s, s.secret_item, guestsVote=False)
         assert members_only["guestsVote"] is False and members_only["quorum"] is not None
         refused = lead.post(f"/api/votes/{members_only['id']}/close")
@@ -833,7 +864,8 @@ async def test_guest_websocket_filters_names_and_non_public_votes(
     """Filter the names and the non-public votes on the guest socket.
 
     Another request reaches the lead, never this guest. The vote of the non-public item
-    never arrives. A missing or unknown token closes the handshake.
+    never arrives: not its open and not its cancel. The lead cancels it first, because a
+    meeting has one open vote at a time. A missing or unknown token closes the handshake.
     """
     s = await seed(maker)
     code = await code_of(maker, s.meeting_id)
@@ -859,6 +891,7 @@ async def test_guest_websocket_filters_names_and_non_public_votes(
             status = _drain_until(ws, "guest_status", seen=seen)
             assert status["status"] == "admitted"
             np_vote = open_vote(lead, s, s.np_item)
+            assert lead.post(f"/api/votes/{np_vote['id']}/cancel").status_code == 200
             public_vote = open_vote(lead, s, s.public_item)
             opened = _drain_until(ws, "vote_opened", seen=seen)
             assert opened["voteId"] == public_vote["id"]
@@ -940,13 +973,22 @@ async def test_altcha_csrf_and_rate_limits(
     c.app.dependency_overrides.clear()
 
 
-async def test_public_join_only_without_a_quorum(
+async def test_a_gremium_with_a_quorum_lets_guests_only_watch(
     maker: async_sessionmaker[AsyncSession], ctx: Ctx
 ) -> None:
+    """Switch public participation on for a Gremium with a quorum.
+
+    §F/meetings/meetings/000905: the meeting is public in the mode "nur zuschauen", and
+    the mode "Gäste dürfen abstimmen" gives 422.
+    """
     s = await seed(maker, status="planned", public_join=False, quorum_percent=50)
     with TestClient(ctx.app) as lead:
         resp = lead.patch(f"/api/meetings/{s.meeting_id}", json={"publicJoin": True})
-        assert resp.status_code == 422 and resp.json()["code"] == "public_join_needs_no_quorum"
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["publicJoin"] is True and resp.json()["guestsMode"] == "watch"
+        assert resp.json()["guestsVoteAllowed"] is False
+        vote = lead.patch(f"/api/meetings/{s.meeting_id}", json={"guestsMode": "vote"})
+        assert vote.status_code == 422 and vote.json()["code"] == "guests_vote_needs_no_quorum"
         created = lead.post(
             "/api/meetings",
             json={
@@ -957,11 +999,116 @@ async def test_public_join_only_without_a_quorum(
                 "publicJoin": True,
             },
         )
-        assert created.status_code == 422
-        detail = lead.get(f"/api/meetings/{s.meeting_id}").json()
-        assert detail["publicJoinAllowed"] is False
+        assert created.status_code == 200, created.text
+        assert created.json()["publicJoin"] is True and created.json()["guestsMode"] == "watch"
+        refused = lead.post(
+            "/api/meetings",
+            json={
+                "gremiumId": str(s.gremium_id),
+                "title": "Neu 2",
+                "publicJoin": True,
+                "guestsMode": "vote",
+            },
+        )
+        assert refused.status_code == 422
         defaults = lead.get(f"/api/committees/{s.gremium_id}/meeting-defaults").json()
-        assert defaults == {"publicJoinAllowed": False, "quorumPercent": 50}
+        assert defaults == {
+            "guestsVoteAllowed": False,
+            "quorumPercent": 50,
+            "inviteDaysOrdinary": 7,
+            "inviteDaysExtraordinary": 3,
+        }
+
+
+async def test_guest_mode_follows_the_switch_of_the_gremium(
+    maker: async_sessionmaker[AsyncSession], ctx: Ctx
+) -> None:
+    """Set the guest mode of a meeting.
+
+    §F/meetings/meetings/000904: with the switch off the mode "Gäste dürfen abstimmen"
+    gives 422 `guests_vote_off` and a new meeting starts in "nur zuschauen". With the
+    switch on a new meeting starts with guest ballots.
+    """
+    off = await seed(
+        maker, status="planned", public_join=False, guests_mode="watch", guests_may_vote=False
+    )
+    on = await seed(maker, status="planned", public_join=False, guests_mode="watch")
+    with TestClient(ctx.app) as lead:
+        resp = lead.patch(f"/api/meetings/{off.meeting_id}", json={"guestsMode": "vote"})
+        assert resp.status_code == 422 and resp.json()["code"] == "guests_vote_off"
+        created = lead.post(
+            "/api/meetings", json={"gremiumId": str(off.gremium_id), "title": "A", **WHEN}
+        )
+        assert created.status_code == 200, created.text
+        assert created.json()["guestsMode"] == "watch"
+        assert created.json()["guestsVoteAllowed"] is False
+        allowed = lead.patch(f"/api/meetings/{on.meeting_id}", json={"guestsMode": "vote"})
+        assert allowed.status_code == 200 and allowed.json()["guestsMode"] == "vote"
+        created = lead.post(
+            "/api/meetings", json={"gremiumId": str(on.gremium_id), "title": "B", **WHEN}
+        )
+        assert created.status_code == 200, created.text
+        assert created.json()["guestsMode"] == "vote"
+        assert created.json()["guestsVoteAllowed"] is True
+
+
+async def test_meeting_kind_place_and_form(
+    maker: async_sessionmaker[AsyncSession], ctx: Ctx
+) -> None:
+    """Create a meeting with a place and a form, and change the kind of a live meeting.
+
+    §F/meetings/meetings/000903: a new meeting is `ordinary`, and the kind changes only
+    while the meeting is planned (409). §F/meetings/meetings/000940: a repeat meeting
+    names an earlier meeting of the Gremium as its first meeting (422), and another
+    kind stores none. §F/meetings/meetings/000907: the place and the
+    form are stored, a new meeting is `presence`, a place over 200 characters gives 422.
+    """
+    s = await seed(maker, status="live", public_join=False)
+    with TestClient(ctx.app) as lead:
+        plain = lead.post(
+            "/api/meetings", json={"gremiumId": str(s.gremium_id), "title": "A", **WHEN}
+        )
+        assert plain.status_code == 200, plain.text
+        body = plain.json()
+        assert (body["kind"], body["location"], body["form"]) == ("ordinary", None, "presence")
+        repeat = {
+            "gremiumId": str(s.gremium_id),
+            "title": "B",
+            **WHEN,
+            "kind": "repeat",
+            "location": "Raum 9-108",
+            "form": "hybrid",
+        }
+        alone = lead.post("/api/meetings", json=repeat)
+        assert alone.status_code == 422, alone.text
+        assert alone.json()["code"] == "repeat_needs_first_meeting"
+        unknown = lead.post("/api/meetings", json={**repeat, "repeatOfId": str(uuid.uuid4())})
+        assert unknown.status_code == 422, unknown.text
+        assert unknown.json()["code"] == "repeat_first_meeting_invalid"
+        created = lead.post("/api/meetings", json={**repeat, "repeatOfId": str(s.meeting_id)})
+        assert created.status_code == 200, created.text
+        body = created.json()
+        assert (body["kind"], body["location"], body["form"]) == ("repeat", "Raum 9-108", "hybrid")
+        assert body["repeatOfId"] == str(s.meeting_id)
+        itself = lead.patch(f"/api/meetings/{body['id']}", json={"repeatOfId": body["id"]})
+        assert itself.status_code == 422, itself.text
+        assert itself.json()["code"] == "repeat_first_meeting_invalid"
+        patched = lead.patch(
+            f"/api/meetings/{body['id']}",
+            json={"kind": "extraordinary", "location": None, "form": "video"},
+        )
+        assert patched.status_code == 200, patched.text
+        body = patched.json()
+        assert (body["kind"], body["location"], body["form"]) == ("extraordinary", None, "video")
+        assert body["repeatOfId"] is None
+        too_long = lead.patch(f"/api/meetings/{body['id']}", json={"location": "x" * 201})
+        assert too_long.status_code == 422
+        live = lead.patch(f"/api/meetings/{s.meeting_id}", json={"kind": "repeat"})
+        assert live.status_code == 409 and live.json()["code"] == "meeting_not_planned"
+        same = lead.patch(f"/api/meetings/{s.meeting_id}", json={"kind": "ordinary"})
+        assert same.status_code == 200, same.text
+        place = lead.patch(f"/api/meetings/{s.meeting_id}", json={"location": "Aula"})
+        assert place.status_code == 200 and place.json()["location"] == "Aula"
 
 
 async def test_admitted_device_joining_another_meeting_leaves_the_first(

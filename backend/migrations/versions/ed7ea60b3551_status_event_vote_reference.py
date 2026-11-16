@@ -55,9 +55,7 @@ def upgrade() -> None:
         END $$
         """
     )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_status_event_vote_id ON status_event (vote_id)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS ix_status_event_vote_id ON status_event (vote_id)")
     op.execute(
         """
         UPDATE status_event AS se

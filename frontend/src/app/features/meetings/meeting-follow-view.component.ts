@@ -39,6 +39,7 @@ import {
   type OwnAttendanceChange,
   ParticipantAttendanceComponent,
 } from './participant-attendance/participant-attendance.component';
+import { LateExcuseDialogComponent } from './late-excuse-dialog/late-excuse-dialog.component';
 import { ParticipantRosterComponent } from './participant-roster/participant-roster.component';
 import { ParticipantVoteComponent } from './participant-vote/participant-vote.component';
 import { ParticipantVoteService } from './participant-vote/participant-vote.service';
@@ -46,6 +47,7 @@ import { TopSheetComponent } from './top-sheet/top-sheet.component';
 import { VoteCardComponent } from './vote-card/vote-card.component';
 import { CalendarSubscribeComponent } from './calendar-subscribe/calendar-subscribe.component';
 import { MeetingHeadComponent } from './meeting-head/meeting-head.component';
+import { firstMeetingLink } from './meeting-kind.util';
 import { clock, shortTime, weekdayDate } from '@shared/date-format';
 
 /** The length of the protocol excerpt on a phone, in characters. */
@@ -91,6 +93,7 @@ const EXCERPT_LENGTH = 160;
     SideSheetComponent,
     AgendaPaneComponent,
     TopSheetComponent,
+    LateExcuseDialogComponent,
     ParticipantAttendanceComponent,
     ParticipantVoteComponent,
     ParticipantRosterComponent,
@@ -113,6 +116,9 @@ export class MeetingFollowViewComponent {
   readonly back = output<void>();
   /** An own attendance report. */
   readonly attendanceChange = output<{ member: Attendance } & OwnAttendanceChange>();
+  /** A late excuse is stored. Carries the new roster (§ 000922). */
+  readonly lateExcused = output<Attendance[]>();
+  protected readonly lateExcuseOpen = signal(false);
 
   protected readonly phone = mediaQuery(MEDIA.phone);
   protected readonly wide = mediaQuery(MEDIA.wide);
@@ -236,6 +242,9 @@ export class MeetingFollowViewComponent {
 
   /** The member handed this meeting to a substitute. */
   protected readonly delegated = computed(() => !!this.delegationContext()?.myDelegation);
+
+  /** The first meeting of a Wiederholungssitzung (§ 000940). */
+  protected readonly firstLink = computed(() => firstMeetingLink(this.meeting(), this.i18n));
 
   /** "Studierendenparlament · Di., 29.09.2026 · seit 18:04". */
   protected readonly subLine = computed(() => {
@@ -362,6 +371,11 @@ export class MeetingFollowViewComponent {
   protected backToNow(): void {
     this.selectedId.set(null);
     this.fullText.set(false);
+  }
+
+  protected onLateExcused(roster: Attendance[]): void {
+    this.lateExcuseOpen.set(false);
+    this.lateExcused.emit(roster);
   }
 
   protected reportAttendance(change: OwnAttendanceChange): void {

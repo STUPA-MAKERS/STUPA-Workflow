@@ -1,3 +1,4 @@
+import { FeatureService } from '@core/features/feature.service';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -149,6 +150,8 @@ export class FormEditorComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
   private readonly i18n = inject(I18nService);
+  /** "Mit Budget" shows only while `Budget` is on (spec 000761). */
+  protected readonly budgetOn = inject(FeatureService).isOn('budget');
   protected readonly langFieldLabel = langFieldLabel;
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
@@ -164,6 +167,8 @@ export class FormEditorComponent {
   protected readonly description = signal<I18nMap>({ de: '', en: '' });
   /** "With budget": the application may select a pot (application_type.has_budget). */
   protected readonly hasBudget = signal(false);
+  /** The Antrag PDF of this type ends with the signature section (spec 000888). */
+  protected readonly pdfSignatures = signal(false);
   /** Comparison-offers rule: required + minimum count. */
   protected readonly cmpRequired = signal(false);
   protected readonly cmpMinCount = signal(2);
@@ -249,6 +254,7 @@ export class FormEditorComponent {
   private readonly originalType = signal({
     title: { de: '', en: '' } as I18nMap,
     hasBudget: false,
+    pdfSignatures: false,
     cmpRequired: false,
     cmpMinCount: 2,
   });
@@ -264,6 +270,7 @@ export class FormEditorComponent {
     return (
       !sameI18n(this.title(), o.title) ||
       this.hasBudget() !== o.hasBudget ||
+      this.pdfSignatures() !== o.pdfSignatures ||
       this.cmpRequired() !== o.cmpRequired ||
       this.cmpMinCount() !== o.cmpMinCount
     );
@@ -325,6 +332,7 @@ export class FormEditorComponent {
         if (t) {
           this.title.set({ de: '', en: '', ...t.name });
           this.hasBudget.set(t.hasBudget);
+          this.pdfSignatures.set(t.pdfSignatures ?? false);
           const co = t.comparisonOffers;
           this.cmpRequired.set(co?.required ?? false);
           this.cmpMinCount.set(co?.minCount ?? 2);
@@ -935,6 +943,7 @@ export class FormEditorComponent {
     this.originalType.set({
       title: { ...this.title() },
       hasBudget: this.hasBudget(),
+      pdfSignatures: this.pdfSignatures(),
       cmpRequired: this.cmpRequired(),
       cmpMinCount: this.cmpMinCount(),
     });
@@ -957,6 +966,7 @@ export class FormEditorComponent {
           .updateApplicationType(id, {
             name: { ...this.title() },
             hasBudget: this.hasBudget(),
+            pdfSignatures: this.pdfSignatures(),
             comparisonOffers: {
               required: this.cmpRequired(),
               minCount: this.cmpMinCount(),

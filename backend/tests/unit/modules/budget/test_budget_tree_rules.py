@@ -14,18 +14,30 @@ from app.modules.budget import tree_rules as r
 
 
 def test_is_valid_key() -> None:
-    """A key is alphanumeric without the separator and at most ``_KEY_MAX`` long."""
+    """A key is alphanumeric without the separator and at most ``_KEY_MAX`` long.
+
+    Rule: §F/finance/budget/000246.
+    """
     assert r.is_valid_key("VS")
     assert r.is_valid_key("800")
     assert not r.is_valid_key("VS-800")
     assert not r.is_valid_key("")
+    assert not r.is_valid_key("AB\n")
     assert r.is_valid_key("A" * r._KEY_MAX)
     assert not r.is_valid_key("A" * (r._KEY_MAX + 1))
 
 
-def test_compose_path_key() -> None:
-    assert r.compose_path_key(None, "VS") == "VS"
-    assert r.compose_path_key("VS-800", "04") == "VS-800-04"
+def test_compose_tree_path() -> None:
+    assert r.compose_tree_path(None, "VS") == "VS"
+    assert r.compose_tree_path("VS", "800") == "VS-800"
+    assert r.compose_tree_path("VS-800", "04") == "VS-800-04"
+
+
+def test_the_path_key_has_one_hyphen() -> None:
+    assert r.path_key_of("VSM") == "VSM"
+    assert r.path_key_of("VSM-801") == "VSM-801"
+    assert r.path_key_of("VSM-801-33") == "VSM-80133"
+    assert r.path_key_of("VSM-8-01-33") == "VSM-80133"
 
 
 def test_descendant_paths() -> None:
@@ -95,12 +107,12 @@ def test_rollup_committed() -> None:
 def _node(
     nid, parent, gremium, key, path, name="N", currency="EUR", active=True,
     color=None, fiscal_start_month=1, fiscal_start_day=1,
-    hidden_in_budget=False, view_gremium_id=None, decision_gremium_id=None,
+    view_gremium_id=None, decision_gremium_id=None,
 ):
     return (
         nid, parent, gremium, key, path, name, currency, active,
         color, fiscal_start_month, fiscal_start_day,
-        hidden_in_budget, view_gremium_id, decision_gremium_id,
+        view_gremium_id, decision_gremium_id,
     )
 
 
@@ -211,7 +223,7 @@ def test_scope_forest_picks_assigned_subtrees_as_roots() -> None:
         _node("other", "top", None, "900", "VS-900"),
     ]
     forest = r.build_forest(nodes, [], [])
-    scoped = r.scope_forest(forest, {g})
+    scoped = r.scope_forest(forest, {"mid"})
     assert [n["id"] for n in scoped] == ["mid"]
     assert [c["id"] for c in scoped[0]["children"]] == ["leaf"]
 
@@ -224,7 +236,7 @@ def test_scope_forest_outer_assignment_wins_and_empty_scope() -> None:
         _node("mid", "top", None, "800", "VS-800", view_gremium_id=g),
     ]
     forest = r.build_forest(nodes, [], [])
-    scoped = r.scope_forest(forest, {g})
+    scoped = r.scope_forest(forest, {"top", "mid"})
     assert [n["id"] for n in scoped] == ["top"]
     assert r.scope_forest(forest, set()) == []
     assert r.scope_forest(forest, {uuid.uuid4()}) == []
@@ -253,3 +265,28 @@ def test_transfer_pair_changed() -> None:
     assert r.transfer_pair_changed(a, b, b, None)
     assert r.transfer_pair_changed(a, b, None, a)
     assert r.transfer_pair_changed(a, b, b, a)
+
+
+def test_a_year_is_choosable_when_it_is_open_not_past_and_decided() -> None:
+    """Rule: §F/finance/budget/000879."""
+    today = date(2026, 11, 14)
+    end = date(2026, 12, 31)
+    assert r.is_choosable_year(end, today, closed=False, plan_in_force=None)
+    assert r.is_choosable_year(today, today, closed=False, plan_in_force=True)
+    assert not r.is_choosable_year(end, today, closed=True, plan_in_force=None)
+    assert not r.is_choosable_year(date(2026, 11, 13), today, closed=False, plan_in_force=None)
+    assert not r.is_choosable_year(end, today, closed=False, plan_in_force=False)
+
+
+def test_a_past_year_takes_a_late_booking_with_a_date_in_the_year() -> None:
+    """Rule: §F/finance/budget/000990."""
+    today = date(2027, 1, 20)
+    start, end = date(2026, 1, 1), date(2026, 12, 31)
+    assert r.is_choosable_year(end, today, closed=False, plan_in_force=None, late=True)
+    assert not r.is_choosable_year(end, today, closed=True, plan_in_force=None, late=True)
+    assert not r.is_choosable_year(end, today, closed=False, plan_in_force=False, late=True)
+    assert r.late_booking_date_fits(start, end, today, date(2026, 12, 30))
+    assert r.late_booking_date_fits(start, end, today, start)
+    assert not r.late_booking_date_fits(start, end, today, None)
+    assert not r.late_booking_date_fits(start, end, today, date(2027, 1, 2))
+    assert r.late_booking_date_fits(start, end, date(2026, 6, 1), None)

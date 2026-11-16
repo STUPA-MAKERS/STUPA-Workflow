@@ -28,7 +28,14 @@ run.
 
 | Query parameter | Values | Default |
 |---|---|---|
-| `variant` | `protocol-stupa`, `protocol-asta`, `protocol` | the logos come from the `gremium` key |
+| `variant` | `protocol-stupa`, `protocol-asta`, `protocol`, `plan` | the logos come from the `gremium` key |
+
+The variant `plan` prints one version of a Haushaltsplan on A4 landscape. It reads no
+Markdown body. The `config` field holds a `plan` object: `title`, `mark` (the state on
+each page, empty for a version in force), `head` (pairs of a label and a value),
+`headers`, `money` (the places of the right-aligned columns) and `rows`. A row has a
+`kind` (`group`, `line`, `sum`, `balance`), a `depth` and one text cell per column. The
+service prints each cell as it comes and computes no figure.
 
 To send uploaded logos, use `multipart/form-data` with these fields:
 

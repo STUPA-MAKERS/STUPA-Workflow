@@ -15,6 +15,7 @@ import {
   type GremiumAttendance,
   type GremiumAttendanceRow,
 } from '@core/api/gremien.service';
+import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -29,6 +30,7 @@ import {
   MEDIA,
   mediaQuery,
   SkeletonComponent,
+  ToastService,
 } from '@stupa-makers/ui-kit';
 import { AttendanceDetailComponent } from '../attendance-detail/attendance-detail.component';
 import { GREMIEN_NOW } from '../gremien.store';
@@ -47,18 +49,35 @@ import {
   oneDecimal,
   personName,
   presetRange,
+  rangeDays,
   rangeLabel,
   rowTotals,
   semesterOf,
+  shiftMonth,
   sortRows,
   toCsv,
 } from '../gremien.util';
-import { monthShort, monthYear } from '@shared/date-format';
+import { localToday, monthShort, monthYear } from '@shared/date-format';
 import { assertNever } from '@shared/util/immutable';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 const PRESETS: readonly RangePreset[] = ['last6', 'last12', 'last24', 'semester', 'prevSemester'];
+/** The choice of the current term in "Zeitraum"; a named term is `term:YYYY-MM-DD`. */
+const CURRENT_TERM = 'term';
+const TERM = /^term(:\d{4}-\d{2}-\d{2})?$/;
+
+type AttendanceQuery = MonthRange | { readonly term: string };
+
+function isTerm(preset: string): boolean {
+  return TERM.test(preset);
+}
+
+/** The twelve months of the term that starts on `start` (`YYYY-MM-DD`). */
+function termRange(start: string): MonthRange {
+  const from = start.slice(0, 7);
+  return { from, to: shiftMonth(from, 11) };
+}
 const SORTS: readonly AttendanceSort[] = ['quotaAsc', 'quotaDesc', 'name'];
 const SORT_KEYS: Record<AttendanceSort, TranslationKey> = {
   quotaAsc: 'gremien.attendance.sortQuotaAsc',
@@ -94,6 +113,10 @@ export interface RowModel {
   readonly role: string;
   readonly totals: RowTotals;
   readonly cells: readonly CellModel[];
+  /** "2 von 3 unentschuldigt" for the current term, '' without an unexcused absence. */
+  readonly unexcused: string;
+  /** The next unexcused absence reaches the limit, or the limit is reached. */
+  readonly nearLimit: boolean;
 }
 
 /**
@@ -112,9 +135,15 @@ export interface RowModel {
  *   "Ø anwesend je Sitzung". The head row and the first column stick while the matrix
  *   scrolls in both directions.
  * - A click on a cell opens the meetings of that month (`AttendanceDetailComponent`).
- * - The chips "Zeitraum" (last 6, 12 or 24 months, this or the last semester), "Rolle"
+ * - The chips "Zeitraum" (each term of the Gremium, the current one at the start; last 6,
+ *   12 or 24 months, this or the last semester; spec 000941), "Rolle"
  *   and "Sortierung" (quota ascending by default). "Als CSV exportieren" saves the
  *   matrix from the same answer, in the browser.
+ * - Under the name of a person stands the number of unexcused absences of the chosen
+ *   term (the current one with a range of months) with the limit ("2 von 3 unentschuldigt"), in the warning colour from the
+ *   limit minus one on (spec 000920).
+ * - "Anwesenheitsliste (XLSX)" shows with `session.manage` in the Gremium: the server
+ *   builds the list of the chosen range for the Sitzungsgeld (spec 000923).
  * - A phone shows a card per person with a small cell per month; a tap opens the bottom
  *   sheet with every meeting of the range.
  * - A range without a meeting shows a grey skeleton of the matrix, not an error.
@@ -142,6 +171,8 @@ export interface RowModel {
 export class GremiumAttendanceComponent {
   private readonly api = inject(GremienApiService);
   private readonly i18n = inject(I18nService);
+  private readonly auth = inject(AuthService);
+  private readonly toast = inject(ToastService);
   private readonly now = inject(GREMIEN_NOW);
 
   readonly gremiumId = input.required<string>();
@@ -152,19 +183,50 @@ export class GremiumAttendanceComponent {
   readonly phone = mediaQuery(MEDIA.phone);
   private readonly detail = viewChild(AttendanceDetailComponent);
 
-  readonly preset = signal<RangePreset>('last6');
+  /** A preset of months, or a term: `term` is the current one, `term:YYYY-MM-DD` a named one. */
+  readonly preset = signal<string>(CURRENT_TERM);
+  /** The first day of each term on offer, from the last answer. */
+  private readonly terms = signal<readonly string[]>([]);
   readonly role = signal('');
   readonly sort = signal<AttendanceSort>('quotaAsc');
   readonly loading = signal(true);
   readonly error = signal(false);
   readonly data = signal<GremiumAttendance | null>(null);
+  /** The server builds the XLSX list. */
+  readonly exporting = signal(false);
+  /** The person leads meetings of the Gremium (`session.manage`), or is an admin. */
+  readonly canExportList = computed(() => this.auth.canInGremium(this.gremiumId(), 'session.manage'));
   private sub: Subscription | null = null;
 
-  readonly range = computed<MonthRange>(() => presetRange(this.preset(), this.now()));
+  /** What the server gets: a day of the term, or the months of the preset. */
+  private readonly query = computed<AttendanceQuery>(() => {
+    const preset = this.preset();
+    if (!isTerm(preset)) return presetRange(preset as RangePreset, this.now());
+    return { term: preset.slice(CURRENT_TERM.length + 1) || localToday(this.now()) };
+  });
 
-  readonly rangeOptions = computed<FilterSelectOption[]>(() =>
-    PRESETS.map((p) => ({ value: p, label: this.presetLabel(p) })),
-  );
+  readonly range = computed<MonthRange>(() => {
+    const preset = this.preset();
+    if (!isTerm(preset)) return presetRange(preset as RangePreset, this.now());
+    const start = preset.slice(CURRENT_TERM.length + 1) || this.terms()[0];
+    return start ? termRange(start) : presetRange('last12', this.now());
+  });
+
+  readonly rangeOptions = computed<FilterSelectOption[]>(() => {
+    const locale = this.i18n.locale();
+    const term = (value: string, range: MonthRange): FilterSelectOption => ({
+      value,
+      label: this.i18n.translate('gremien.attendance.term', {
+        range: rangeLabel(range.from, range.to, locale),
+      }),
+    });
+    const [current, ...past] = this.terms();
+    return [
+      term(CURRENT_TERM, current ? termRange(current) : this.range()),
+      ...past.map((start) => term(`${CURRENT_TERM}:${start}`, termRange(start))),
+      ...PRESETS.map((p) => ({ value: p, label: this.presetLabel(p) })),
+    ];
+  });
   readonly rangeText = computed(() => {
     const r = this.range();
     return `${this.i18n.translate('gremien.attendance.range')}: ${rangeLabel(r.from, r.to, this.i18n.locale())}`;
@@ -229,6 +291,10 @@ export class GremiumAttendanceComponent {
         name,
         role: localized(row.roleName, locale, row.roleKey ?? ''),
         totals: rowTotals(row, data.months),
+        unexcused: row.unexcused
+          ? this.i18n.translate('gremien.attendance.unexcused', { n: row.unexcused, limit: data.absenceLimit })
+          : '',
+        nearLimit: row.unexcused >= data.absenceLimit - 1,
         cells: row.cells.map((cell, i) => {
           const view = cellView(cell, data.months[i]?.meetings ?? 0);
           const empty = (data.months[i]?.meetings ?? 0) === 0;
@@ -254,17 +320,18 @@ export class GremiumAttendanceComponent {
   constructor() {
     effect(() => {
       const id = this.gremiumId();
-      const range = this.range();
-      untracked(() => this.load(id, range));
+      const query = this.query();
+      untracked(() => this.load(id, query));
     });
   }
 
-  load(id = this.gremiumId(), range = this.range()): void {
+  load(id = this.gremiumId(), query = this.query()): void {
     this.sub?.unsubscribe();
     this.loading.set(true);
     this.error.set(false);
-    this.sub = this.api.attendance(id, range).subscribe({
+    this.sub = this.api.attendance(id, query).subscribe({
       next: (data) => {
+        this.terms.set(data.terms);
         this.data.set(data);
         this.loading.set(false);
       },
@@ -277,7 +344,7 @@ export class GremiumAttendanceComponent {
   }
 
   setPreset(value: string): void {
-    this.preset.set((PRESETS as readonly string[]).includes(value) ? (value as RangePreset) : 'last6');
+    this.preset.set(isTerm(value) || (PRESETS as readonly string[]).includes(value) ? value : CURRENT_TERM);
   }
 
   setSort(value: string): void {
@@ -371,6 +438,23 @@ export class GremiumAttendanceComponent {
       new Blob([toCsv([head, ...body])], { type: 'text/csv;charset=utf-8' }),
       `${fileSlug(this.gremiumName())}-anwesenheit-${range.from}-${range.to}.csv`,
     );
+  }
+
+  /** "Anwesenheitsliste (XLSX)": the list of the chosen range, built by the server. */
+  exportList(): void {
+    if (this.exporting()) return;
+    const days = rangeDays(this.range());
+    this.exporting.set(true);
+    this.api.attendanceExport(this.gremiumId(), days.from, days.to).subscribe({
+      next: (blob) => {
+        this.exporting.set(false);
+        downloadBlob(blob, `${fileSlug(this.gremiumName())}-anwesenheitsliste-${days.from}-${days.to}.xlsx`);
+      },
+      error: () => {
+        this.exporting.set(false);
+        this.toast.error(this.i18n.translate('gremien.attendance.exportFailed'));
+      },
+    });
   }
 
   private presetLabel(preset: RangePreset): string {

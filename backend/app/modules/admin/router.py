@@ -64,6 +64,7 @@ from app.modules.admin.schemas import (
     FlowVersionOut,
     GremiumAdminOut,
     GremiumCreate,
+    GremiumDefaults,
     GremiumMailRecipients,
     GremiumMembershipMappingCreate,
     GremiumMembershipMappingOut,
@@ -82,10 +83,12 @@ from app.modules.admin.schemas import (
     HelpTicketsSettings,
     LoginSettingsOut,
     LoginSettingsUpdate,
+    MeetingPeriods,
     MeetingSettingsOut,
     MeetingSettingsUpdate,
     MergePreviewOut,
     MergeResultOut,
+    PdfAssetOut,
     PrincipalMergeIn,
     PrincipalOut,
     PrincipalRevokeIn,
@@ -105,11 +108,13 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.service import CdVariantService, ConfigService
 from app.modules.admin.service.cd_variants import SquareLogoRef
+from app.modules.admin.service.pdf_branding import PdfBrandingService
 from app.modules.admin.site_config_service import ManifestScheme, SiteConfigService
 from app.modules.applications.guest_settings import GuestSettingsService
 from app.modules.auth.login_settings import LoginSettingsService
 from app.modules.auth.policy import can_view_gremium
 from app.modules.delegations.mails import DelegationMailer, get_delegation_mailer
+from app.modules.files.pdf_branding import PdfSlot
 from app.modules.gremien.gremium_roles import GremiumRoleService
 from app.modules.gremien.role_schemas import (
     GremiumMembershipOut,
@@ -117,9 +122,11 @@ from app.modules.gremien.role_schemas import (
     GremiumRoleOut,
     GremiumRoleUpdate,
 )
-from app.modules.livevote.open_window import MeetingSettingsService
+from app.modules.livevote.open_window import MeetingSettingsService, gremium_defaults
+from app.modules.meetings.periods import periods
 from app.modules.site_config.branding import Branding
 from app.modules.site_config.cd_logos import LogoSlot
+from app.modules.site_config.features import FeatureSwitches
 from app.shared.antiabuse import body_cap
 from app.shared.config_schemas import FlowGraph, export_json_schemas
 from app.shared.errors import ForbiddenError, NotFoundError, ProblemDetail
@@ -187,7 +194,16 @@ def get_cd_variant_service(
     return CdVariantService(session, storage=storage, settings=settings)
 
 
+def get_pdf_branding_service(
+    session: DbSession, request: Request, settings: SettingsDep
+) -> PdfBrandingService:
+    """Build the PDF branding service. Without MinIO the upload and the file answer 503."""
+    storage = getattr(request.app.state, "object_storage", None)
+    return PdfBrandingService(session, storage=storage, settings=settings)
+
+
 ServiceDep = Annotated[ConfigService, Depends(get_config_service)]
+PdfBrandingServiceDep = Annotated[PdfBrandingService, Depends(get_pdf_branding_service)]
 SiteServiceDep = Annotated[SiteConfigService, Depends(get_site_config_service)]
 GremiumRoleServiceDep = Annotated[GremiumRoleService, Depends(get_gremium_role_service)]
 OidcMappingServiceDep = Annotated[OidcMappingService, Depends(get_oidc_mapping_service)]
@@ -205,6 +221,8 @@ TypesAdmin = Annotated[Principal, Depends(require_principal("admin.types"))]
 #: Deleting an application type is destructive, so it has its own permission.
 TypesDeleteAdmin = Annotated[Principal, Depends(require_principal("admin.types_delete"))]
 SiteAdmin = Annotated[Principal, Depends(require_principal("admin.site"))]
+#: The feature switches change the platform for every person, so they have their own key.
+FeaturesAdmin = Annotated[Principal, Depends(require_principal("admin.features"))]
 RolesAdmin = Annotated[Principal, Depends(require_principal("admin.roles"))]
 WebhookAdmin = Annotated[Principal, Depends(require_principal("webhook.manage"))]
 UsersAdmin = Annotated[Principal, Depends(require_principal("admin.users"))]
@@ -256,9 +274,7 @@ _GREMIEN_OR_GREMIUM_ROLES = Depends(
 #: The principal search serves the user page, the gremium members, the person picker
 #: of the substitute pool and the person picker of the account erasure.
 _PRINCIPAL_READERS = Depends(
-    require_any_permission(
-        "admin.gremien", "admin.users", "admin.delegations", "privacy.manage"
-    )
+    require_any_permission("admin.gremien", "admin.users", "admin.delegations", "privacy.manage")
 )
 #: The members page and the "represents" choice of the substitute pool read members.
 _MEMBERSHIP_READERS = Depends(require_any_permission("admin.gremien", "admin.delegations"))
@@ -1208,9 +1224,7 @@ async def update_webhook(
     status_code=204,
     responses=_errors(401, 403, 404),
 )
-async def delete_webhook(
-    webhook_id: UUID, service: ServiceDep, principal: WebhookAdmin
-) -> None:
+async def delete_webhook(webhook_id: UUID, service: ServiceDep, principal: WebhookAdmin) -> None:
     """Delete a webhook and its delivery history.
 
     The delete cascades to ``webhook_delivery``, so there is no 409 guard. The
@@ -1292,9 +1306,7 @@ def get_meeting_settings_service(session: DbSession) -> MeetingSettingsService:
     return MeetingSettingsService(session)
 
 
-MeetingSettingsServiceDep = Annotated[
-    MeetingSettingsService, Depends(get_meeting_settings_service)
-]
+MeetingSettingsServiceDep = Annotated[MeetingSettingsService, Depends(get_meeting_settings_service)]
 
 
 def get_login_settings_service(session: DbSession) -> LoginSettingsService:
@@ -1302,9 +1314,7 @@ def get_login_settings_service(session: DbSession) -> LoginSettingsService:
     return LoginSettingsService(session)
 
 
-LoginSettingsServiceDep = Annotated[
-    LoginSettingsService, Depends(get_login_settings_service)
-]
+LoginSettingsServiceDep = Annotated[LoginSettingsService, Depends(get_login_settings_service)]
 
 
 @router.get(
@@ -1314,7 +1324,7 @@ LoginSettingsServiceDep = Annotated[
     responses=_errors(401, 403),
 )
 async def get_meeting_settings(service: MeetingSettingsServiceDep) -> MeetingSettingsOut:
-    """Return the open window of meetings, in minutes before the planned start."""
+    """Return the earliest open of meetings, in minutes before the planned start."""
     row = await service.get()
     await service.session.commit()
     return MeetingSettingsOut.model_validate(row, from_attributes=True)
@@ -1330,20 +1340,83 @@ async def put_meeting_settings(
     service: MeetingSettingsServiceDep,
     principal: DeadlinesAdmin,
 ) -> MeetingSettingsOut:
-    """Replace both values.
+    """Replace the value.
 
-    ``openLeadMinutes`` is the earliest open before the planned start. Before
-    ``confirmLeadMinutes`` the open needs an extra confirmation, so the value must not
-    be larger than ``openLeadMinutes`` (422). The change applies to every planned
-    meeting at once and writes a ``config_change`` audit entry that the audit log
-    cannot revert.
+    ``openLeadMinutes`` is the earliest open before the planned start. The change
+    applies to every planned meeting at once and writes a ``config_change`` audit
+    entry that the audit log cannot revert.
     """
-    row = await service.update(
-        open_lead_minutes=payload.open_lead_minutes,
-        confirm_lead_minutes=payload.confirm_lead_minutes,
-        actor=principal.sub,
-    )
+    row = await service.update(open_lead_minutes=payload.open_lead_minutes, actor=principal.sub)
     return MeetingSettingsOut.model_validate(row, from_attributes=True)
+
+
+@router.get(
+    "/gremium-defaults",
+    response_model=GremiumDefaults,
+    dependencies=[_GREMIEN],
+    responses=_errors(401, 403),
+)
+async def get_gremium_defaults(service: MeetingSettingsServiceDep) -> GremiumDefaults:
+    """Return the values that the form of a new Gremium starts with."""
+    row = await service.get()
+    await service.session.commit()
+    return GremiumDefaults.model_validate(gremium_defaults(row))
+
+
+@router.put(
+    "/gremium-defaults",
+    response_model=GremiumDefaults,
+    responses=_errors(400, 401, 403, 422),
+)
+async def put_gremium_defaults(
+    payload: GremiumDefaults,
+    service: MeetingSettingsServiceDep,
+    principal: GremienAdmin,
+) -> GremiumDefaults:
+    """Replace the values that the form of a new Gremium starts with.
+
+    A change touches no Gremium that exists. It writes a ``config_change`` audit entry
+    that the audit log cannot revert.
+    """
+    row = await service.update_gremium_defaults(
+        payload.model_dump(by_alias=True), actor=principal.sub
+    )
+    await service.session.commit()
+    return GremiumDefaults.model_validate(gremium_defaults(row))
+
+
+@router.get(
+    "/meeting-periods",
+    response_model=MeetingPeriods,
+    dependencies=[Depends(require_principal("admin.deadlines"))],
+    responses=_errors(401, 403),
+)
+async def get_meeting_periods(service: MeetingSettingsServiceDep) -> MeetingPeriods:
+    """Return the periods of the Geschäftsordnung."""
+    row = await service.get()
+    await service.session.commit()
+    return MeetingPeriods.model_validate(periods(row))
+
+
+@router.put(
+    "/meeting-periods",
+    response_model=MeetingPeriods,
+    responses=_errors(400, 401, 403, 422),
+)
+async def put_meeting_periods(
+    payload: MeetingPeriods,
+    service: MeetingSettingsServiceDep,
+    principal: DeadlinesAdmin,
+) -> MeetingPeriods:
+    """Replace the periods of the Geschäftsordnung.
+
+    The change applies at once: to the warning of the meeting form, to the late
+    excuse, to the absence count and to a new Umlaufverfahren. It writes a
+    ``config_change`` audit entry that the audit log cannot revert.
+    """
+    row = await service.update_periods(payload.model_dump(by_alias=True), actor=principal.sub)
+    await service.session.commit()
+    return MeetingPeriods.model_validate(periods(row))
 
 
 @router.get(
@@ -1416,6 +1489,88 @@ async def put_site_config(
 
 
 @router.get(
+    "/pdf-assets/{slot}",
+    response_model=PdfAssetOut | None,
+    dependencies=[_SITE],
+    responses=_errors(401, 403, 422),
+)
+async def get_pdf_asset(slot: PdfSlot, service: PdfBrandingServiceDep) -> PdfAssetOut | None:
+    """Read a graphic of the PDF branding, or `null` when the slot is empty.
+
+    `logo` is the export logo (spec 000891), `footer` the footer graphic (spec 000892).
+    """
+    return await service.get(slot)
+
+
+@router.put(
+    "/pdf-assets/{slot}",
+    response_model=PdfAssetOut,
+    dependencies=[Depends(_enforce_cd_logo_body)],
+    responses=_errors(401, 403, 413, 415, 422, 503),
+)
+async def put_pdf_asset(
+    slot: PdfSlot,
+    service: PdfBrandingServiceDep,
+    principal: SiteAdmin,
+    file: Annotated[UploadFile, File()],
+) -> PdfAssetOut:
+    """Upload a graphic of the PDF branding.
+
+    The server decides the type from the magic bytes: PNG, JPEG, WebP, SVG or PDF. SVG
+    and PDF pass, because these bytes reach the render service and never the browser.
+    """
+    data = await file.read()
+    out, old_key = await service.upload(slot, data, filename=file.filename, actor=principal.sub)
+    await service.session.commit()
+    await service.remove_object(old_key)
+    return out
+
+
+@router.post(
+    "/pdf-assets/{slot}/default",
+    response_model=PdfAssetOut,
+    responses=_errors(401, 403, 422),
+)
+async def reset_pdf_asset(
+    slot: PdfSlot, service: PdfBrandingServiceDep, principal: SiteAdmin
+) -> PdfAssetOut:
+    """Set the built-in graphic of the slot again: the STUPA logo or the Skyline."""
+    out, old_key = await service.reset(slot, principal.sub)
+    await service.session.commit()
+    await service.remove_object(old_key)
+    return out
+
+
+@router.delete("/pdf-assets/{slot}", status_code=204, responses=_errors(401, 403, 404, 422))
+async def delete_pdf_asset(
+    slot: PdfSlot, service: PdfBrandingServiceDep, principal: SiteAdmin
+) -> None:
+    """Empty the slot; the PDFs then carry no graphic there."""
+    key = await service.delete(slot, principal.sub)
+    await service.session.commit()
+    await service.remove_object(key)
+
+
+@router.get(
+    "/pdf-assets/{slot}/file",
+    dependencies=[_SITE],
+    responses=_errors(401, 403, 404, 422, 503),
+)
+async def get_pdf_asset_file(slot: PdfSlot, service: PdfBrandingServiceDep) -> Response:
+    """Download the upload of the slot, always as an attachment.
+
+    Hardening: the route does not echo the stored type, because a stored SVG would
+    render inline in the app origin and run script.
+    """
+    data, name = await service.file_bytes(slot)
+    return Response(
+        content=data,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": content_disposition("attachment", name)},
+    )
+
+
+@router.get(
     "/help-tickets",
     response_model=HelpTicketsSettings,
     dependencies=[_SITE],
@@ -1440,6 +1595,36 @@ async def put_help_tickets(
     422. An open branding draft keeps its other changes and takes the new values.
     """
     return await service.put_help_tickets(payload, principal.sub)
+
+
+@router.get(
+    "/features",
+    response_model=FeatureSwitches,
+    dependencies=[Depends(require_principal("admin.features"))],
+    responses=_errors(401, 403),
+)
+async def get_features(service: SiteServiceDep) -> FeatureSwitches:
+    """Read the stored feature switches of the active site configuration."""
+    return await service.features()
+
+
+@router.put(
+    "/features",
+    response_model=FeatureSwitches,
+    responses=_errors(401, 403, 409, 422),
+)
+async def put_features(
+    payload: FeatureSwitches, service: SiteServiceDep, principal: FeaturesAdmin
+) -> FeatureSwitches:
+    """Save the feature switches as a new active site-config version.
+
+    A switch that goes off while the active flow or an Antragsart uses the feature
+    gives 409 ``feature_in_use``; ``errors`` names each use. An unknown feature key
+    gives 422.
+    """
+    saved = await service.put_features(payload, principal.sub)
+    await service.session.commit()
+    return saved
 
 
 @public_router.get("/site-config", response_model=PublicSiteConfigOut)

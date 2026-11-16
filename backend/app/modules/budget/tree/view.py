@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from itertools import groupby
 from typing import Any, Literal
@@ -11,9 +11,11 @@ from uuid import UUID
 from sqlalchemy import func, select
 
 from app.modules.applications.models import Application
-from app.modules.budget import tree_rules
+from app.modules.budget import plan_rules, tree_rules
+from app.modules.budget.access import viewed_by
+from app.modules.budget.plan_models import BudgetPlan, BudgetPlanLine, BudgetPlanVersion
 from app.modules.budget.tree.service_base import _ZERO, BudgetTreeServiceBase
-from app.modules.budget.tree_models import Budget, BudgetAllocation, BudgetExpense
+from app.modules.budget.tree_models import Budget, BudgetAllocation, BudgetExpense, FiscalYear
 from app.modules.budget.tree_rules import _SEP
 from app.modules.budget.tree_schemas import BudgetTreeNodeOut
 from app.modules.flow.models import State
@@ -80,20 +82,52 @@ class TreeViewOps(BudgetTreeServiceBase):
     async def can_view_node(self, budget_id: UUID, member_gremium_ids: set[UUID]) -> bool:
         """Tell if a member of a Gremium can see the node.
 
-        The result is true when the node itself or an ancestor belongs to one of
-        the Gremien of the member.
+        The result is true when one of the Gremien of the member reads the node itself
+        or an ancestor (`access.viewed_by`).
         """
         if not member_gremium_ids:
             return False
         node = await self._get_node(budget_id)
-        segments = node.path_key.split(_SEP)
+        segments = node.tree_path.split(_SEP)
         prefixes = [_SEP.join(segments[: i + 1]) for i in range(len(segments))]
-        rows = (
+        hit = await self.session.scalar(
+            select(Budget.id)
+            .where(Budget.tree_path.in_(prefixes), viewed_by(member_gremium_ids))
+            .limit(1)
+        )
+        return hit is not None
+
+    async def _planned_in(self) -> Mapping[object, Sequence[object]]:
+        """Return the fiscal years in which the Haushaltsplan counts each cost center.
+
+        A top-level node has the years with a version in force. A node below it has
+        the years whose version in force holds a line for it.
+        """
+        in_force = (
+            select(BudgetPlanVersion.id, BudgetPlan.fiscal_year_id)
+            .join(BudgetPlan, BudgetPlan.id == BudgetPlanVersion.plan_id)
+            .where(BudgetPlanVersion.state == "in_force")
+            .subquery()
+        )
+        tops = (
             await self.session.execute(
-                select(Budget.view_gremium_id).where(Budget.path_key.in_(prefixes))
+                select(FiscalYear.budget_id, in_force.c.fiscal_year_id).join(
+                    in_force, in_force.c.fiscal_year_id == FiscalYear.id
+                )
             )
-        ).scalars()
-        return any(v in member_gremium_ids for v in rows if v is not None)
+        ).all()
+        lines = (
+            await self.session.execute(
+                select(BudgetPlanLine.budget_id, in_force.c.fiscal_year_id).join(
+                    in_force, in_force.c.id == BudgetPlanLine.version_id
+                )
+            )
+        ).all()
+        pairs = [(row[0], row[1]) for row in (*tops, *lines)]
+        return {
+            node: [year for other, year in pairs if other == node]
+            for node in dict.fromkeys(node for node, _year in pairs)
+        }
 
     async def get_tree(
         self,
@@ -120,18 +154,18 @@ class TreeViewOps(BudgetTreeServiceBase):
         too, so an expense never counts twice.
 
         Without a global ``budget.*`` permission only the assigned subtrees become
-        roots: those whose ``view_gremium_id`` is one of the Gremien of the member.
+        roots: those that one of the Gremien of the member reads (`access.viewed_by`).
         """
         nodes = sorted(
             (await self.session.execute(select(Budget))).scalars().all(),
-            key=lambda b: _natural_path_key(b.path_key),
+            key=lambda b: _natural_path_key(b.tree_path),
         )
         allocs = (await self.session.execute(select(BudgetAllocation))).scalars().all()
         app_rows = (
             await self.session.execute(
                 select(
                     Application.id,
-                    Budget.path_key,
+                    Budget.tree_path,
                     Application.fiscal_year_id,
                     Application.amount,
                     func.coalesce(Application.approved_amount, Application.amount),
@@ -150,7 +184,7 @@ class TreeViewOps(BudgetTreeServiceBase):
         expense_rows = (
             await self.session.execute(
                 select(
-                    Budget.path_key,
+                    Budget.tree_path,
                     BudgetExpense.fiscal_year_id,
                     BudgetExpense.amount,
                     BudgetExpense.kind,
@@ -167,14 +201,10 @@ class TreeViewOps(BudgetTreeServiceBase):
         requested_rows = _positive_rows(shares, "requested")
 
         expended_rows = [
-            (fy, path, amount)
-            for path, fy, amount, kind, _app in expense_rows
-            if kind == "expense"
+            (fy, path, amount) for path, fy, amount, kind, _app in expense_rows if kind == "expense"
         ]
         income_rows = [
-            (fy, path, amount)
-            for path, fy, amount, kind, _app in expense_rows
-            if kind == "income"
+            (fy, path, amount) for path, fy, amount, kind, _app in expense_rows if kind == "income"
         ]
 
         node_tuples = [
@@ -183,21 +213,20 @@ class TreeViewOps(BudgetTreeServiceBase):
                 n.parent_id,
                 n.gremium_id,
                 n.key,
-                n.path_key,
+                n.tree_path,
                 n.name,
                 n.currency,
                 n.active,
                 n.color,
                 n.fiscal_start_month,
                 n.fiscal_start_day,
-                bool(n.hidden_in_budget),
                 n.view_gremium_id,
                 n.decision_gremium_id,
             )
             for n in nodes
         ]
         alloc_tuples = [(a.budget_id, a.fiscal_year_id, a.allocated) for a in allocs]
-        forest = tree_rules.build_forest(
+        plain = tree_rules.build_forest(
             node_tuples,
             alloc_tuples,
             bound_rows,
@@ -206,9 +235,22 @@ class TreeViewOps(BudgetTreeServiceBase):
             income_rows,
             gremium_id=gremium_id,
         )
+        forest = plan_rules.with_plan_fields(
+            plain,
+            {n.id: bool(n.plan_enabled) for n in nodes},
+            await self._planned_in(),
+            {n.id: bool(n.plan_coverable_default) for n in nodes},
+        )
         scoped = (
             forest
             if visible_gremium_ids is None
-            else tree_rules.scope_forest(forest, set(visible_gremium_ids))
+            else tree_rules.scope_forest(
+                forest,
+                set(
+                    await self.session.scalars(
+                        select(Budget.id).where(viewed_by(visible_gremium_ids))
+                    )
+                ),
+            )
         )
         return [BudgetTreeNodeOut.model_validate(d) for d in scoped]

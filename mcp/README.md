@@ -37,7 +37,7 @@ Configure it in your MCP client. Set the platform URL with `ANTRAGSPLATTFORM_URL
 - `ANTRAGSPLATTFORM_URL` (required) — the platform base URL.
 - `ANTRAGSPLATTFORM_SCOPE` (optional) — space-separated OAuth scopes. The default is the
   full curated set (`read applications:write votes:write budget:write meetings:write
-  tickets:write todos:write forms:write flows:write admin:write`). Narrow it to limit what the agent can do.
+  tickets:write todos:write committees:write forms:write flows:write admin:write`). Narrow it to limit what the agent can do.
 
 The platform must have OIDC configured. It must also register the public client id of
 this server (`antragsplattform-mcp`, set with `OAUTH_MCP_CLIENT_ID`). The platform accepts
@@ -77,7 +77,7 @@ Applications: `list_applications`, `get_application`, `get_application_timeline`
 Flow: `list_transitions`, `fire_transition`.
 Votes: `get_vote`, `create_application_vote`, `open_vote`, `close_vote`, `cancel_vote`,
 `create_meeting_vote` (also as a prepared draft), `open_meeting_vote`, `delete_meeting_vote`,
-`vote_draw_lot` (personnel
+`vote_draw_lot` and `vote_next_round` (personnel
 elections). There is no `cast_ballot` tool, because only
 a human may cast a ballot.
 Budget: `list_budgets`, `get_budget_applications`, `book_expense`, `list_expenses`.

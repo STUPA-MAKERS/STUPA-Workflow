@@ -329,9 +329,7 @@ class ApplicationsServiceBase:
         """
         return await gremium_actor_name(self.session, app.gremium_id)
 
-    async def _applicant_actors(
-        self, app: Application, *, magic_link_view: bool
-    ) -> frozenset[str]:
+    async def _applicant_actors(self, app: Application, *, magic_link_view: bool) -> frozenset[str]:
         """Return the actor values that name the applicant of one application.
 
         The applicant view keeps these actors and shows the Gremium for all others.
@@ -437,9 +435,7 @@ class ApplicationsServiceBase:
             decision=await self._decision_out(app, applicant_view=applicant_view),
         )
 
-    async def _decision_out(
-        self, app: Application, *, applicant_view: bool
-    ) -> DecisionOut | None:
+    async def _decision_out(self, app: Application, *, applicant_view: bool) -> DecisionOut | None:
         """Return the valid decision of an application, or None before one.
 
         The applicant view names the Gremium only: no vote link, no meeting and no
@@ -526,14 +522,10 @@ class ApplicationsServiceBase:
             and not (gremium is not None and v not in own)
         }
         refs = await self._author_refs(subs)
-        return {
-            v: _actor_out(v, gremium if v not in own else None, refs.get(v)) for v in wanted
-        }
+        return {v: _actor_out(v, gremium if v not in own else None, refs.get(v)) for v in wanted}
 
 
-def _actor_out(
-    value: str, gremium: ActorOut | None, ref: tuple[str, UUID] | None
-) -> ActorOut:
+def _actor_out(value: str, gremium: ActorOut | None, ref: tuple[str, UUID] | None) -> ActorOut:
     """Resolve one stored actor value.
 
     ``gremium`` is the Gremium actor that replaces a member in the applicant view, else

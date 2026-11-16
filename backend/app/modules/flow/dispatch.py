@@ -186,12 +186,8 @@ def build_worker_dispatcher(
     resolved = settings or get_settings()
     return ChainActionDispatcher(
         [
-            NotificationActionDispatcher(
-                sessionmaker, mail_queue_from_pool(redis), resolved
-            ),
-            WebhookActionDispatcher(
-                sessionmaker, webhook_queue_from_pool(redis), resolved
-            ),
+            NotificationActionDispatcher(sessionmaker, mail_queue_from_pool(redis), resolved),
+            WebhookActionDispatcher(sessionmaker, webhook_queue_from_pool(redis), resolved),
             FlowExtrasActionDispatcher(sessionmaker),
         ]
     )

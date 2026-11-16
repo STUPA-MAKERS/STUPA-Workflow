@@ -15,7 +15,14 @@ from app.modules.admin.service.service_base import ConfigServiceBase
 from app.modules.application_types.models import ApplicationType
 from app.modules.audit.actions import AuditAction
 from app.modules.forms.models import FormVersion
-from app.shared.errors import ConflictError, NotFoundError
+from app.modules.site_config.features import Feature, feature_on
+from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
+
+
+def _set_pdf_signatures(row: ApplicationType, wanted: bool | None) -> None:
+    """Set the switch for the signature section of the Antrag PDF; ``None`` keeps it."""
+    if wanted is not None:
+        row.pdf_signatures = wanted
 
 
 def _type_out(row: ApplicationType, version: int | None = None) -> ApplicationTypeOut:
@@ -26,6 +33,7 @@ def _type_out(row: ApplicationType, version: int | None = None) -> ApplicationTy
         key=row.key,
         name_i18n=row.name_i18n,
         has_budget=row.has_budget,
+        pdf_signatures=row.pdf_signatures,
         comparison_offers=row.comparison_offers,
         retention_months=row.retention_months,
         active_form_version_id=row.active_form_version_id,
@@ -69,11 +77,13 @@ class ApplicationTypeOps(ConfigServiceBase):
                 f"application type {payload.key!r} already exists",
                 code="application_type_exists",
             )
+        await self._check_budget_on(payload.has_budget)
         row = ApplicationType(
             key=payload.key,
             name_i18n=payload.name_i18n,
             gremium_id=payload.gremium_id,
             has_budget=payload.has_budget,
+            pdf_signatures=payload.pdf_signatures,
             comparison_offers=(
                 payload.comparison_offers.model_dump(by_alias=True)
                 if payload.comparison_offers is not None
@@ -87,6 +97,18 @@ class ApplicationTypeOps(ConfigServiceBase):
         await self.session.commit()
         return _type_out(row)
 
+    async def _check_budget_on(self, wants_budget: bool) -> None:
+        """Refuse a new budget of an Antragsart while `Budget` is off.
+
+        Raises:
+            ValidationProblem: The type would get a budget and the feature is off.
+        """
+        if wants_budget and not await feature_on(self.session, Feature.BUDGET):
+            raise ValidationProblem(
+                "An Antragsart cannot have a budget while Budget is switched off.",
+                errors=[{"field": "hasBudget", "msg": "feature_disabled"}],
+            )
+
     async def update_application_type(
         self, type_id: UUID, payload: ApplicationTypeUpdate, actor: str
     ) -> ApplicationTypeOut:
@@ -96,12 +118,14 @@ class ApplicationTypeOps(ConfigServiceBase):
         global default. An omitted field stays unchanged.
         """
         row = await self._get_type(type_id)
+        await self._check_budget_on(bool(payload.has_budget) and not row.has_budget)
         if payload.name_i18n is not None:
             row.name_i18n = payload.name_i18n
         if payload.gremium_id is not None:
             row.gremium_id = payload.gremium_id
         if payload.has_budget is not None:
             row.has_budget = payload.has_budget
+        _set_pdf_signatures(row, payload.pdf_signatures)
         if payload.comparison_offers is not None:
             row.comparison_offers = payload.comparison_offers.model_dump(by_alias=True)
         if "retention_months" in payload.model_fields_set:

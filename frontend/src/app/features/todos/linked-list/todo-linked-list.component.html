@@ -36,7 +36,7 @@
           <li class="tl__row">
             <app-icon class="tl__icon" [name]="l.icon" [size]="18" />
             <span class="tl__text">
-              <a class="tl__link" [routerLink]="l.link" target="_blank" rel="noopener">{{
+              <a class="tl__link" [routerLink]="l.link" [queryParams]="l.queryParams ?? null" target="_blank" rel="noopener">{{
                 l.title
               }}</a>
               <span class="tl__sub">{{ l.sub }}</span>

@@ -146,6 +146,15 @@ describe('FormsListComponent — display helpers', () => {
     expect(c.keyPreview()).toBe('mein-antrag');
   });
 
+  /** Spec 000761: an Antragsart cannot get a budget while Budget is off. */
+  it('has no budget column and no "Mit Budget" while Budget is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['budget']));
+    const { c } = await setup();
+    localStorage.removeItem('ap.features.off');
+    expect(c.columns().map((col: { key: string }) => col.key)).not.toContain('budget');
+    expect(c.budgetOn).toBe(false);
+  });
+
   it('exposes a row id and a column set', async () => {
     const { c } = await setup();
     expect(c.rowId(type('f9', 'X'))).toBe('f9');

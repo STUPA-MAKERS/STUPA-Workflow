@@ -8,6 +8,7 @@
   [statusKind]="status().kind"
   [statusText]="status().key | t"
   [sub]="phone() ? phoneSubLine() : subLine()"
+  [link]="firstLink()"
   (back)="back.emit()"
 >
   @if (!wide()) {
@@ -91,6 +92,7 @@
         [saving]="savingAttendance()"
         [delegated]="delegated()"
         (change)="reportAttendance($event)"
+        (lateExcuse)="lateExcuseOpen.set(true)"
       >
         <ng-container [ngTemplateOutlet]="rosterButtonTpl" />
       </app-participant-attendance>
@@ -139,6 +141,7 @@
             [saving]="savingAttendance()"
             [delegated]="delegated()"
             (change)="reportAttendance($event)"
+            (lateExcuse)="lateExcuseOpen.set(true)"
           >
             <ng-container [ngTemplateOutlet]="rosterButtonTpl" />
           </app-participant-attendance>
@@ -214,6 +217,7 @@
             [saving]="savingAttendance()"
             [delegated]="delegated()"
             (change)="reportAttendance($event)"
+            (lateExcuse)="lateExcuseOpen.set(true)"
           />
           <app-participant-roster [rows]="attendance()" [protokollantId]="m.protokollantId" />
         </div>
@@ -308,3 +312,9 @@
     (pick)="pick($event)"
   />
 </ng-template>
+
+<app-late-excuse-dialog
+  [meetingId]="lateExcuseOpen() ? meeting().id : null"
+  (closed)="lateExcuseOpen.set(false)"
+  (excused)="onLateExcused($event)"
+/>

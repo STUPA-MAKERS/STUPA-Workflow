@@ -15,11 +15,16 @@ from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, WebSocket
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import DbSession, require_principal
 from app.modules.auth.principal import Principal
+from app.modules.budget.access import has_budget_read
+from app.modules.budget.plan_schemas import AssignablePlansOut
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
+from app.modules.gremien.gremium_roles import gremium_reader_ids
 from app.modules.livevote.broker import InMemoryBroker, MeetingBroker
 from app.modules.livevote.connection import (
     WS_FORBIDDEN,
@@ -32,6 +37,7 @@ from app.modules.livevote.events import ErrorEvent
 from app.modules.livevote.guests import GuestService
 from app.modules.livevote.locks import InMemoryLocker, Locker
 from app.modules.livevote.mails import MeetingMailer, get_meeting_mailer
+from app.modules.livevote.open_window import load_meeting_settings
 from app.modules.livevote.schemas import (
     AgendaAddBody,
     AgendaBodyBody,
@@ -42,6 +48,7 @@ from app.modules.livevote.schemas import (
     GuestNameBody,
     JoinLinkOut,
     JoinTargetOut,
+    LateExcuseBody,
     MeetingCreate,
     MeetingDefaultsOut,
     MeetingGremiumOut,
@@ -57,6 +64,7 @@ from app.modules.livevote.service import BrokerPublisher, MeetingService
 from app.modules.livevote.vote_build import build_meeting_vote
 from app.modules.livevote.vote_open import (
     assert_application_votable,
+    assert_no_open_vote,
     assert_vote_window,
     draft_open_checks,
 )
@@ -275,14 +283,20 @@ async def get_meeting_defaults(
 ) -> MeetingDefaultsOut:
     """What a new meeting of the gremium allows.
 
-    Public participation needs a gremium without a quorum; the create dialog reads it
-    before the meeting exists. The caller must manage the gremium (``session.manage``
+    Guests vote only where the Gremium allows it and has no quorum; the create dialog
+    reads it before the meeting exists. The caller must manage the gremium (``session.manage``
     or admin).
     """
     if not await service.can_manage(gremium_id, principal):
         raise ForbiddenError("not allowed to manage meetings for this committee")
     quorum = await service.gremium_quorum_percent(gremium_id)
-    return MeetingDefaultsOut(publicJoinAllowed=quorum is None, quorumPercent=quorum)
+    periods = await load_meeting_settings(service.session)
+    return MeetingDefaultsOut(
+        guestsVoteAllowed=await service.guests_vote_allowed(gremium_id),
+        quorumPercent=quorum,
+        inviteDaysOrdinary=periods.invite_days_ordinary,
+        inviteDaysExtraordinary=periods.invite_days_extraordinary,
+    )
 
 
 @router.get("/meetings", response_model=list[MeetingOut], responses=_errors(401, 403, 422))
@@ -401,7 +415,14 @@ async def delete_meeting(meeting_id: UUID, service: ServiceDep, principal: Reade
     responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def patch_meeting(
-    meeting_id: UUID, payload: MeetingPatch, service: ServiceDep, principal: ReaderDep
+    meeting_id: UUID,
+    payload: MeetingPatch,
+    service: ServiceDep,
+    principal: ReaderDep,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    mailer: MeetingMailerDep,
 ) -> MeetingOut:
     """Control or plan a meeting and broadcast ``meeting_state``.
 
@@ -417,9 +438,12 @@ async def patch_meeting(
     The status runs only planned, live, closed (409 ``invalid_status_transition``
     otherwise). The close answers 409 ``open_vote`` while a vote of the meeting is
     open, and it cancels the draft votes of the meeting. The start has an open window
-    (``opensAt``/``confirmUntil`` of the meeting): before ``opensAt`` it answers 409
-    ``meeting_too_early``, and before ``confirmUntil`` it needs ``confirmEarly``, else
-    409 ``early_open_unconfirmed``.
+    (``opensAt`` of the meeting): before ``opensAt`` it answers 409
+    ``meeting_too_early``.
+
+    The close of an ordinary meeting sends the mail ``absence_limit`` to the persons
+    with ``session.manage`` for each member whose unexcused absences of the term reach
+    ``absenceLimit`` minus 1 or ``absenceLimit``.
 
     The protocol service is imported locally, because ``protocol`` depends on ``livevote``
     and a module-level import would cycle. The protocol uses the session of the service, so
@@ -432,6 +456,9 @@ async def patch_meeting(
 
         await ProtocolService(service.session).get_or_create(meeting_id, author=principal.sub)
         return await service.get(meeting_id, principal)
+    if payload.status == "closed" and updated.status == "closed":
+        pool = getattr(request.app.state, "arq_pool", None)
+        background.add_task(mailer.absence_limit, settings, meeting_id, pool)
     return updated
 
 
@@ -532,6 +559,42 @@ async def set_own_attendance(
     )
 
 
+@router.post(
+    "/meetings/{meeting_id}/attendance/me/late-excuse",
+    response_model=list[AttendanceOut],
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def excuse_own_absence(
+    meeting_id: UUID,
+    payload: LateExcuseBody,
+    attendance: AttendanceDep,
+    service: ServiceDep,
+    principal: ReaderDep,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    mailer: MeetingMailerDep,
+) -> list[AttendanceOut]:
+    """Change the own ``absent`` of a closed meeting to ``excused``.
+
+    The reason (``note``) is required. The window ends ``lateExcuseDays`` days after
+    the close (409 ``late_excuse_expired``). A meeting that is not closed answers 409
+    ``meeting_not_closed``, a caller without an ``absent`` record 409 ``not_absent``.
+    The change writes ``attendance_set`` with ``late: true``, never with the reason.
+    The excuse applies at once. The mail ``late_excuse`` tells the persons with
+    ``session.manage`` in the Gremium of it, with the reason.
+    """
+    await service.assert_can_read(meeting_id, principal)
+    can_write = await service.can_write_meeting(meeting_id, principal)
+    roster = await attendance.excuse_late(
+        meeting_id, principal.sub, payload.note, now=datetime.now(UTC), can_write=can_write
+    )
+    await attendance.session.commit()
+    pool = getattr(request.app.state, "arq_pool", None)
+    background.add_task(mailer.late_excuse, settings, meeting_id, principal.sub, pool)
+    return roster
+
+
 async def _require_lead(service: MeetingService, meeting_id: UUID, principal: Principal) -> None:
     """Allow only the meeting lead (`canWrite`): manager, protokollant or `protocol.write`."""
     if not await service.can_write_meeting(meeting_id, principal):
@@ -626,7 +689,11 @@ async def open_meeting_vote(
     An open vote also needs the protokollant of the meeting (403), because the
     person who keeps the minutes runs the room. An application
     agenda item allows exactly one vote, because that vote fires the pass or fail
-    branch on close. A free-text agenda item allows several generic questions.
+    branch on close. An agenda item of a Haushaltsplan allows exactly one vote too: a
+    motion of the members, with the quorum of the Gremium. Its version must wait for
+    the Gremium of the meeting (409 ``plan_step_not_waiting``), and an accepted vote
+    passes the step while a refused vote sends the version back to the draft. A
+    free-text agenda item allows several generic questions.
     ``eligibleGroup`` is the Gremium of the meeting. The server derives the quorum
     denominator from the roster (members with ``vote.cast``) and never from client
     input. The route broadcasts ``vote_opened``, or ``meeting_state`` for a draft.
@@ -655,14 +722,17 @@ async def open_meeting_vote(
     if not payload.draft:
         await service.assert_can_run_votes(meeting_id, principal)
     assert_vote_window(meeting, draft=payload.draft)
+    if not payload.draft:
+        assert_no_open_vote(meeting)
     item = await agenda.item(meeting_id, payload.agenda_item_id)
+    plan_version_id: UUID | None = getattr(item, "plan_version_id", None)
     source = (
         await repeat_source(service.session, meeting_id, item.id, payload.repeat_of)
         if payload.repeat_of is not None
         else None
     )
     if (
-        item.application_id is not None
+        (item.application_id is not None or plan_version_id is not None)
         and source is None
         and await service.agenda_item_has_vote(item.id)
     ):
@@ -671,6 +741,10 @@ async def open_meeting_vote(
             code="agenda_decision_vote_exists",
         )
     built = await build_meeting_vote(service, meeting, item, payload)
+    if plan_version_id is not None:
+        await BudgetTreeService(service.session, actor=principal.sub).waiting_plan(
+            plan_version_id, meeting.gremium_id
+        )
     if item.application_id is not None:
         moved_on = (
             source is not None and await assert_reopenable(service.session, source) is not None
@@ -680,10 +754,11 @@ async def open_meeting_vote(
             await reopen_application(service.session, source, actor=principal.sub)
         if not moved_on or reopens:
             await assert_application_votable(service, meeting, item.application_id)
+    of_plan = built.model_copy(update={"plan_version_id": plan_version_id})
     create = (
-        built.model_copy(update={"repeat_of_id": source.id, "attempt": (source.attempt or 1) + 1})
+        of_plan.model_copy(update={"repeat_of_id": source.id, "attempt": (source.attempt or 1) + 1})
         if source is not None
-        else built
+        else of_plan
     )
     vote = await voting.create_internal(
         item.application_id,
@@ -731,9 +806,7 @@ async def open_prepared_meeting_vote(
     if not meeting.can_manage_votes:
         raise ForbiddenError("not allowed to open a vote in this meeting")
     await service.assert_can_run_votes(meeting_id, principal)
-    eligible = await draft_open_checks(
-        service, agenda, meeting, vote_id, actor=principal.sub
-    )
+    eligible = await draft_open_checks(service, agenda, meeting, vote_id, actor=principal.sub)
     opened = await voting.open(
         vote_id, now=datetime.now(UTC), actor=principal.sub, eligible_count=eligible
     )
@@ -804,6 +877,8 @@ async def delete_meeting_vote(
     the close the vote is part of the record, and the route answers 409
     ``meeting_closed``. Only a ``draft`` or ``cancelled`` vote can go: an open or
     closed vote gives 409 ``vote_not_deletable``. Every delete writes ``vote_delete``.
+    The delete of a prepared repeat gives the application back the decision of the
+    vote that it repeated, when the repeat already moved the application back.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_manage_votes:
@@ -830,6 +905,44 @@ async def list_assignable(
     return await agenda.assignable(meeting_id)
 
 
+async def _budget_scope(session: AsyncSession, principal: Principal) -> set[UUID] | None:
+    """Return the Gremien that give the person a view of budgets, or ``None`` for all."""
+    return None if has_budget_read(principal) else await gremium_reader_ids(session, principal.sub)
+
+
+@router.get(
+    "/meetings/{meeting_id}/agenda/assignable-plans",
+    response_model=AssignablePlansOut,
+    responses=_errors(401, 403, 404),
+)
+async def list_assignable_plans(
+    meeting_id: UUID, agenda: AgendaDep, service: ServiceDep, principal: ReaderDep
+) -> AssignablePlansOut:
+    """The plan versions that the agenda can take and that are not yet on it.
+
+    These are the versions that wait for this Gremium, and the drafts of the budgets
+    whose plan the Gremium decides in a step and that the person can read, for a
+    reading without a decision. ``decides`` says if the Gremium decides a plan at all,
+    so the dialog shows the plans only there (spec 000876).
+
+    Only a person who can edit the agenda reads them (403), because the list names
+    plans that the Gremium did not see yet.
+    """
+    meeting = await service.get(meeting_id, principal)
+    if not meeting.can_write:
+        raise ForbiddenError("not allowed to edit the agenda")
+    on_agenda = {item.plan_version_id for item in await agenda.list(meeting_id)}
+    budget = BudgetTreeService(agenda.session, actor=principal.sub)
+    waiting = await budget.waiting_plans(meeting.gremium_id)
+    drafts = await budget.reading_plans(
+        meeting.gremium_id, await _budget_scope(agenda.session, principal)
+    )
+    return AssignablePlansOut(
+        decides=bool(waiting) or bool(await budget.plan_budget_ids(meeting.gremium_id)),
+        plans=tuple(plan for plan in (*waiting, *drafts) if plan.plan_version_id not in on_agenda),
+    )
+
+
 @router.post(
     "/meetings/{meeting_id}/agenda",
     response_model=list[AgendaItemOut],
@@ -843,7 +956,13 @@ async def add_agenda_item(
     principal: ReaderDep,
     request: Request,
 ) -> list[AgendaItemOut]:
-    """Add an agenda item: an application, a free-text item or a to-do card.
+    """Add an agenda item: an application, a free-text item, a to-do card or a plan.
+
+    With ``planVersionId`` the version of the Haushaltsplan must wait for the decision
+    of the Gremium of the meeting (409 ``plan_step_not_waiting``), or be a draft of a
+    budget that the person can read (403), for a reading; a second item of the
+    same version answers 409 ``plan_already_on_agenda``. The item takes the budget, the
+    fiscal year, the version and the step as its title.
 
     Only the meeting lead or an admin may edit the agenda. A closed meeting answers
     409 ``meeting_closed``. With ``todoId`` the card must be readable (404), live
@@ -872,12 +991,29 @@ async def add_agenda_item(
         await agenda.session.commit()
         await publish_pings(todo_broker(request.app.state), todos.pings.drain())
         return await agenda.list(meeting_id)
+    if payload.plan_version_id is not None:
+        budget = BudgetTreeService(agenda.session, actor=principal.sub)
+        plan = await budget.reading_plan(
+            payload.plan_version_id,
+            meeting.gremium_id,
+            await _budget_scope(agenda.session, principal),
+        ) or await budget.waiting_plan(payload.plan_version_id, meeting.gremium_id)
+        await agenda.add_plan_in_tx(
+            meeting_id,
+            plan_version_id=plan.plan_version_id,
+            title=plan.title,
+            non_public=payload.non_public,
+            actor=principal.sub,
+        )
+        await agenda.session.commit()
+        return await agenda.list(meeting_id)
     return await agenda.add(
         meeting_id,
         payload.application_id,
         payload.title,
         non_public=payload.non_public,
         actor=principal.sub,
+        description=payload.description,
     )
 
 
@@ -1002,7 +1138,7 @@ async def set_agenda_done(
 
     The gate is the gate of the item text: ``canWrite``, and in a live meeting with a
     protokollant only the protokollant (403 ``not_protokollant``). A closed meeting
-    whose protocol is no longer a draft answers 409 ``protocol_locked``. Writes
+    whose protocol is no longer a draft answers 409 ``protocol_final``. Writes
     ``agenda_item_done`` or ``agenda_item_reopened`` and sends ``agenda_changed``.
     """
     meeting = await service.get(meeting_id, principal)

@@ -104,9 +104,7 @@ async def request_magic_link(
         return
 
     link_ttl_days = (await load_guest_settings(db)).link_ttl_days
-    expires_at = (
-        _now() + timedelta(days=link_ttl_days) if link_ttl_days is not None else None
-    )
+    expires_at = _now() + timedelta(days=link_ttl_days) if link_ttl_days is not None else None
     token = tokens.generate_token()
     db.add(
         MagicLink(
@@ -183,9 +181,7 @@ async def verify_magic_link(
         )
     ).scalar_one_or_none()
     redeemed = aliased(MagicLink)
-    redeemed_at = (
-        select(redeemed.created_at).where(redeemed.id == row.id).scalar_subquery()
-    )
+    redeemed_at = select(redeemed.created_at).where(redeemed.id == row.id).scalar_subquery()
     await db.execute(
         update(MagicLink)
         .where(

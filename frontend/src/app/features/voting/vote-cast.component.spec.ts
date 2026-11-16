@@ -92,6 +92,8 @@ async function setup(opts: {
   page?: { split: boolean };
   /** The read answers twice, as a vote read ahead does: the kept vote, then this one. */
   newer?: Partial<Vote>;
+  /** The reader may read the Haushaltsplan of the vote. */
+  planReadable?: boolean;
 } = {}) {
   const served: Vote = {
     canCast: opts.canCast ?? true,
@@ -119,7 +121,8 @@ async function setup(opts: {
       { id: 'ag3', position: 2 },
     ]),
   );
-  const api = { getVote, castBallot, deleteVote, getMeeting, listAgenda };
+  const planOfVersionReadable = jest.fn((_id: string) => of(opts.planReadable ?? false));
+  const api = { getVote, castBallot, deleteVote, getMeeting, listAgenda, planOfVersionReadable };
   const voteStatus = opts.delegationError
     ? jest.fn(() => throwError(() => new Error('boom')))
     : jest.fn(() => of(opts.delegation ?? NO_DELEGATION));
@@ -179,6 +182,7 @@ async function setup(opts: {
     castBallot,
     deleteVote,
     getMeeting,
+    planOfVersionReadable,
     voteStatus,
     toast,
     waiting,
@@ -282,7 +286,7 @@ describe('VoteCastComponent', () => {
     const { toast, getVote } = await setup({ castError: conflict('already_voted') });
     getVote.mockClear();
     await castOwn();
-    expect(toast.error).toHaveBeenCalledWith('Du hast bereits abgestimmt.');
+    expect(toast.error).toHaveBeenCalledWith('Deine Stimme ist bereits abgegeben.');
     expect(screen.getByText('Danke! Deine Stimme ist abgegeben.')).toBeInTheDocument();
     expect(getVote).toHaveBeenCalledWith('v1', { quiet: true });
   });
@@ -303,6 +307,7 @@ describe('VoteCastComponent', () => {
   it('hides only the represented row on a 403 from a represented cast and reads the state again', async () => {
     const { getVote, voteStatus, toast } = await setup({
       castError: { status: 403 },
+      vote: vote({ myBallot: { cast: true, choice: 'yes' } }),
       delegation: { ...NO_DELEGATION, exercising: true, delegatedByName: 'Jonas Weber' },
     });
     getVote.mockClear();
@@ -350,21 +355,42 @@ describe('VoteCastComponent', () => {
     expect(screen.getByText(/an \? übertragen/)).toBeInTheDocument();
   });
 
-  it('offers own and represented rows; the represented one casts with asDelegation', async () => {
+  /** §F/meetings/voting/000932 */
+  it('casts once for the own ballot and the represented members', async () => {
     const { castBallot } = await setup({
+      delegation: {
+        ...NO_DELEGATION,
+        exercising: true,
+        delegatedByName: 'Anna Beispiel, Jonas Weber',
+        delegatedByNames: ['Anna Beispiel', 'Jonas Weber'],
+      },
+    });
+    const unit = within(
+      screen.getByRole('group', {
+        name: 'Deine Stimme, 3 Stimmrechte, auch für Anna Beispiel, Jonas Weber',
+      }),
+    );
+    expect(screen.queryByRole('group', { name: /Als Vertretung/ })).not.toBeInTheDocument();
+    await userEvent.click(unit.getByRole('button', { name: 'Nein' }));
+    await userEvent.click(confirmButton());
+    expect(castBallot).toHaveBeenCalledTimes(1);
+    expect(castBallot).toHaveBeenCalledWith('v1', 'no', false);
+  });
+
+  it('casts the represented ballot with asDelegation when the own ballot is in', async () => {
+    const { castBallot } = await setup({
+      vote: vote({ myBallot: { cast: true, choice: 'yes' } }),
       delegation: { ...NO_DELEGATION, exercising: true, delegatedByName: 'Jonas Weber' },
     });
     const proxy = within(screen.getByRole('group', { name: 'Als Vertretung für Jonas Weber' }));
     await userEvent.click(proxy.getByRole('button', { name: 'Enthaltung' }));
     await userEvent.click(confirmButton());
     expect(castBallot).toHaveBeenCalledWith('v1', 'abstain', true);
-    await castOwn('Nein');
-    expect(castBallot).toHaveBeenLastCalledWith('v1', 'no', false);
   });
 
   it('names an unknown represented member with a placeholder', async () => {
     await setup({ delegation: { ...NO_DELEGATION, exercising: true } });
-    expect(screen.getByRole('group', { name: 'Als Vertretung für ?' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Deine Stimme, auch für ?' })).toBeInTheDocument();
   });
 
   it('restores the represented lock from representedCast', async () => {
@@ -1044,6 +1070,148 @@ describe('VoteCastComponent', () => {
       const { fixture } = await setup({ vote: pollVote(over), canManage });
       expect(fixture.componentInstance.pollAction()).toBeNull();
       if (!canManage) expect(fixture.componentInstance.hasMenu()).toBe(false);
+    });
+
+  describe('Umlaufverfahren (§000914, §000915)', () => {
+    const circular = (over: Partial<Vote> = {}) =>
+      vote({
+        kind: 'circular',
+        meetingId: null,
+        agendaItemId: null,
+        applicationId: null,
+        config: { options: ['yes', 'no', 'abstain'], majorityRule: 'members_majority' },
+        ...over,
+      });
+
+    async function withApi(v: Vote, opts: { canManage?: boolean; canCast?: boolean; fail?: boolean } = {}) {
+      const view = await setup({
+        vote: v,
+        canManage: opts.canManage ?? false,
+        canCast: opts.canCast ?? true,
+        page: { split: true },
+      });
+      const api = view.fixture.debugElement.injector.get(ApiClient) as unknown as Record<string, jest.Mock>;
+      api['openVote'] = jest.fn(() => of(void 0));
+      api['objectToCircular'] = jest.fn(() =>
+        opts.fail
+          ? throwError(() => conflict('vote_not_open'))
+          : of(circular({ status: 'cancelled', cancelReason: 'objection' })),
+      );
+      return { ...view, api };
+    }
+
+    it('a manager starts a draft', async () => {
+      const draft = await withApi(circular({ status: 'draft' }), { canManage: true });
+      expect(draft.fixture.componentInstance.pollAction()).toBe('start');
+      draft.fixture.componentInstance.onMenu('start');
+      expect(draft.api['openVote']).toHaveBeenCalledWith('v1');
+      expect(draft.toast.success).toHaveBeenCalledWith('Umlaufverfahren gestartet');
+    });
+
+    it('a manager never ends an open one by hand', async () => {
+      const open = await withApi(circular(), { canManage: true });
+      expect(open.fixture.componentInstance.pollAction()).toBeNull();
+    });
+
+    it('an eligible member objects with a button and a confirmation (§F/meetings/voting/000947)', async () => {
+      const { api, toast, page, fixture } = await withApi(circular());
+      const cmp = fixture.componentInstance;
+      expect(cmp.canObject()).toBe(true);
+      expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Widersprechen' }));
+      expect(cmp.confirmObject()).toBe(true);
+      expect(screen.getByText(/beendet die Abstimmung für alle Mitglieder/)).toBeInTheDocument();
+      expect(api['objectToCircular']).not.toHaveBeenCalled();
+      cmp.doObject();
+      expect(api['objectToCircular']).toHaveBeenCalledWith('v1');
+      expect(cmp.confirmObject()).toBe(false);
+      expect(cmp.vote()?.status).toBe('cancelled');
+      expect(toast.success).toHaveBeenCalledWith('Umlaufverfahren durch Widerspruch abgebrochen');
+      expect(page?.notify).toHaveBeenCalledWith({ id: 'v1', kind: 'updated' });
+    });
+
+    it('a refused objection says why and reads the vote again', async () => {
+      const { toast, getVote, fixture } = await withApi(circular(), { fail: true });
+      const cmp = fixture.componentInstance;
+      cmp.confirmObject.set(true);
+      cmp.doObject();
+      expect(toast.error).toHaveBeenCalled();
+      expect(cmp.objecting()).toBe(false);
+      expect(cmp.confirmObject()).toBe(false);
+      expect(getVote).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([
+      ['without a ballot', circular(), false],
+      ['on a closed one', circular({ status: 'closed', result: 'passed' }), true],
+      ['on a motion', vote(), true],
+    ])('offers no objection %s', async (_name, v, canCast) => {
+      const { fixture } = await withApi(v, { canCast });
+      expect(fixture.componentInstance.canObject()).toBe(false);
+    });
+
+    it('objects to nothing without a vote', async () => {
+      const { fixture } = await setup({ routeId: null });
+      fixture.componentInstance.doObject();
+      expect(fixture.componentInstance.objecting()).toBe(false);
+    });
+  });
+  });
+
+  describe('vote on a step of a Haushaltsplan (§F/finance/budget/000838)', () => {
+    const planVote = (over: Partial<Vote> = {}) =>
+      vote({ meetingId: null, agendaItemId: null, applicationId: null, planVersionId: 'pv1', status: 'draft', ...over });
+
+    async function withPlan(v: Vote, opts: { readable?: boolean; canManage?: boolean; fail?: boolean } = {}) {
+      const view = await setup({ vote: v, canManage: opts.canManage ?? true, planReadable: opts.readable ?? true, page: { split: true } });
+      const api = view.fixture.debugElement.injector.get(ApiClient) as unknown as Record<string, jest.Mock>;
+      const answer = () => (opts.fail ? throwError(() => conflict('vote_not_open')) : of(void 0));
+      api['openVote'] = jest.fn(answer);
+      api['closeVote'] = jest.fn(answer);
+      const navigate = jest.spyOn(view.fixture.debugElement.injector.get(Router), 'navigate').mockResolvedValue(true);
+      return { ...view, api, navigate };
+    }
+    const items = async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen' }));
+      return screen.getAllByRole('menuitem').map((i) => i.textContent?.trim());
+    };
+
+    it('offers no start and no end on the vote page, because the vote runs in its meeting', async () => {
+      await withPlan(planVote({ meetingId: 'm1' }));
+      expect(await items()).not.toContain('Starten');
+      await userEvent.keyboard('{Escape}');
+      TestBed.resetTestingModule();
+      await withPlan(planVote({ status: 'open' }));
+      expect(await items()).toEqual(['Haushaltsplan öffnen']);
+    });
+
+    it('opens the Haushaltsplan of the vote for a reader of the plan', async () => {
+      const view = await withPlan(planVote({ status: 'open' }), { canManage: false });
+      expect(await items()).toEqual(['Haushaltsplan öffnen']);
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Haushaltsplan öffnen' }));
+      expect(view.navigate).toHaveBeenCalledWith(['/budget/plan'], { queryParams: { planVersion: 'pv1' } });
+    });
+
+    it('offers no link to a member who cannot read the plan, and asks nothing for another vote', async () => {
+      const member = await withPlan(planVote({ status: 'open' }), { canManage: false, readable: false });
+      expect(member.planOfVersionReadable).toHaveBeenCalledWith('pv1');
+      expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).toBeNull();
+      TestBed.resetTestingModule();
+      const other = await setup({ vote: draftVote(), canManage: true });
+      expect(other.planOfVersionReadable).not.toHaveBeenCalled();
+    });
+
+    it('drops the answer of the plan read when the page shows another vote', async () => {
+      const late = new Subject<boolean>();
+      const view = await setup({ vote: planVote({ status: 'open' }) });
+      view.planOfVersionReadable.mockReturnValueOnce(late);
+      view.getVote.mockReturnValue(of({ ...planVote({ id: 'v2', planVersionId: 'pv2', status: 'open' }), canCast: true, canManage: false }));
+      view.params.next(convertToParamMap({ id: 'v2' }));
+      view.getVote.mockReturnValue(of({ ...vote({ id: 'v3', meetingId: null }), canCast: true, canManage: false }));
+      view.params.next(convertToParamMap({ id: 'v3' }));
+      late.next(true);
+      view.fixture.detectChanges();
+      expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).toBeNull();
     });
   });
 });

@@ -1,9 +1,10 @@
 """Public routes of the protocols page, without login.
 
 The routes serve the public version of the final protocols of the gremien with
-`protocols_public`. Every route is read-only, has a rate limit per IP, and
-answers 404 for anything that is not public (fail closed). The security
-middleware adds `X-Robots-Tag: noindex` to every answer under `/api/public/`.
+`protocols_public`, and the list of their decisions (spec 000926). Every route
+is read-only, has a rate limit per IP, and answers 404 for anything that is not
+public (fail closed). The security middleware adds `X-Robots-Tag: noindex` to
+every answer under `/api/public/`.
 
 There is no public meeting route here, by design: a meeting is public only as
 the title and the date of a final protocol.
@@ -27,6 +28,7 @@ from app.modules.protocol.public import (
     PublicProtocolService,
     PublicSemesterOut,
 )
+from app.modules.protocol.public_decisions import PublicDecisionPage, list_public_decisions
 from app.shared.antiabuse import rate_limit_public_protocol_pdf, rate_limit_public_protocols
 from app.shared.errors import ProblemDetail
 from app.shared.filenames import content_disposition
@@ -128,6 +130,34 @@ async def list_public_semesters(
 ) -> list[PublicSemesterOut]:
     """Count the public protocols per semester, newest semester first."""
     return await service.list_semesters(_filter(gremium, q=q))
+
+
+@router.get(
+    "/decisions",
+    response_model=PublicDecisionPage,
+    dependencies=[_READ_LIMIT],
+    responses=_errors(422, 429),
+)
+async def list_public_decisions_route(
+    service: ServiceDep,
+    gremium: GremiumQuery = None,
+    semester: Annotated[str | None, Query(pattern=SEMESTER_PATTERN)] = None,
+    year: Annotated[int | None, Query(ge=1900, le=2999)] = None,
+    q: SearchQuery = None,
+    limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
+    offset: Annotated[int, Query(ge=0, le=100_000)] = 0,
+) -> PublicDecisionPage:
+    """List the decisions of the public protocols, newest meeting first.
+
+    A decision appears only when its protocol is public and its TOP is not internal.
+    A motion gives its question, its date, the meeting title, its result and the sums
+    of the votes. An election gives its question and its date only. No answer holds
+    the name of a person. The filters are those of the protocol list; `q` searches
+    the question.
+    """
+    return await list_public_decisions(
+        service, _filter(gremium, semester, year, q), limit=limit, offset=offset
+    )
 
 
 @router.get(

@@ -411,6 +411,17 @@ describe('ApiClient', () => {
     req.flush({ id: 'c', authorKind: 'principal', body: '', visibility: 'internal', at: '2026-06-05T13:00:00Z' });
   });
 
+  it('§F/finance/budget/000838, §F/finance/budget/000928: says if the reader may read the Haushaltsplan of a version', () => {
+    const answers: boolean[] = [];
+    api.planOfVersionReadable('pv1').subscribe((ok) => answers.push(ok));
+    http.expectOne('/api/budget-plan-versions/pv1/readable').flush({ readable: true });
+    api.planOfVersionReadable('pv1').subscribe((ok) => answers.push(ok));
+    http.expectOne('/api/budget-plan-versions/pv1/readable').flush({ readable: false });
+    api.planOfVersionReadable('pv1').subscribe((ok) => answers.push(ok));
+    http.expectOne('/api/budget-plan-versions/pv1/readable').flush({}, { status: 500, statusText: 'Server Error' });
+    expect(answers).toEqual([true, false, false]);
+  });
+
   it('GETs a vote state + tally from /votes/{id}', (done) => {
     api.getVote('v1').subscribe((vote) => {
       expect(vote.status).toBe('open');
@@ -436,7 +447,14 @@ describe('ApiClient', () => {
 
   it('GETs the vote list from /votes with repeated status and the filters', (done) => {
     api
-      .listVotes({ status: ['closed', 'cancelled'], gremiumId: 'g1', q: 'Haus', limit: 30, offset: 60 })
+      .listVotes({
+        status: ['closed', 'cancelled'],
+        gremiumId: 'g1',
+        q: 'Haus',
+        cancelledReason: 'objection',
+        limit: 30,
+        offset: 60,
+      })
       .subscribe((page) => {
         expect(page.total).toBe(0);
         done();
@@ -446,6 +464,7 @@ describe('ApiClient', () => {
     expect(req.request.params.getAll('status')).toEqual(['closed', 'cancelled']);
     expect(req.request.params.get('gremiumId')).toBe('g1');
     expect(req.request.params.get('q')).toBe('Haus');
+    expect(req.request.params.get('cancelledReason')).toBe('objection');
     expect(req.request.params.get('limit')).toBe('30');
     expect(req.request.params.get('offset')).toBe('60');
     req.flush({ items: [], total: 0, limit: 30, offset: 60 });
@@ -540,6 +559,15 @@ describe('ApiClient', () => {
     const req = http.expectOne((r) => r.url === '/api/applications');
     expect(req.request.params.keys()).toHaveLength(0);
     req.flush({ items: [], total: 0, limit: 20, offset: 0 });
+  });
+
+  it('downloads the PDF of an application with its headers', () => {
+    let name: string | null = null;
+    api.applicationPdf('a1').subscribe((res) => (name = res.headers.get('Content-Disposition')));
+    const req = http.expectOne((r) => r.url === '/api/applications/a1/pdf');
+    expect(req.request.responseType).toBe('blob');
+    req.flush(new Blob(['%PDF']), { headers: { 'Content-Disposition': 'attachment; filename="a.pdf"' } });
+    expect(name).toBe('attachment; filename="a.pdf"');
   });
 
   it('exports xlsx with no query (default {} param)', () => {
@@ -884,6 +912,42 @@ describe('ApiClient', () => {
     req.flush([]);
   });
 
+  /** § 000922 */
+  it('POSTs a late excuse with its reason', () => {
+    api.excuseLate('m-1', 'Krank').subscribe();
+    const req = http.expectOne('/api/meetings/m-1/attendance/me/late-excuse');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ note: 'Krank' });
+    req.flush([]);
+  });
+
+  /** § 000925, § 000924 */
+  it('POSTs the draft mail and PUTs or DELETEs the approval of a protocol', () => {
+    let sent: unknown;
+    api.sendProtocolDraft('p-1').subscribe((v) => (sent = v));
+    const mail = http.expectOne('/api/protocols/p-1/draft-mail');
+    expect(mail.request.method).toBe('POST');
+    mail.flush({ recipients: 3 });
+    expect(sent).toEqual({ recipients: 3 });
+    const wire = { id: 'p-1', meetingId: 'm-1', markdown: '', status: 'final' };
+    let approved: unknown;
+    api.setProtocolApproval('p-1', 'm-2').subscribe((v) => (approved = v));
+    const put = http.expectOne({ method: 'PUT', url: '/api/protocols/p-1/approval' });
+    expect(put.request.body).toEqual({ meetingId: 'm-2' });
+    put.flush({ ...wire, approvedAt: 'x', approvedMeetingId: 'm-2', approvedMeetingTitle: 'S', approvedMeetingDate: '2026-10-29' });
+    expect(approved).toMatchObject({ approvedAt: 'x', approvedMeetingId: 'm-2', approvedMeetingTitle: 'S', approvedMeetingDate: '2026-10-29' });
+    api.setProtocolApproval('p-1', null).subscribe((v) => (approved = v));
+    http.expectOne({ method: 'DELETE', url: '/api/protocols/p-1/approval' }).flush(wire);
+    expect(approved).toMatchObject({ approvedAt: null, approvedMeetingId: null, approvedMeetingTitle: null, approvedMeetingDate: null });
+  });
+
+  it('POSTs the reopen of a final protocol', () => {
+    let draft: unknown;
+    api.reopenProtocol('p-1').subscribe((v) => (draft = v));
+    http.expectOne({ method: 'POST', url: '/api/protocols/p-1/reopen' }).flush({ id: 'p-1', meetingId: 'm-1', markdown: '', status: 'draft' });
+    expect(draft).toMatchObject({ id: 'p-1', status: 'draft', isFinal: false });
+  });
+
   it('PUTs the reason of an excuse only when given', () => {
     api.setOwnAttendance('m-1', 'excused', 'Krank').subscribe();
     expect(http.expectOne('/api/meetings/m-1/attendance/me').request.body).toEqual({
@@ -918,6 +982,19 @@ describe('ApiClient', () => {
     req.flush([]);
   });
 
+  it('lists the plans that wait for the Gremium and puts one on the agenda', () => {
+    api.listAssignablePlans('m-1').subscribe();
+    const list = http.expectOne('/api/meetings/m-1/agenda/assignable-plans');
+    expect(list.request.method).toBe('GET');
+    list.flush({ decides: false, plans: [] });
+    api.addAgendaPlan('m-1', 'pv-1', true).subscribe();
+    const add = http.expectOne('/api/meetings/m-1/agenda');
+    expect(add.request.body).toEqual({ planVersionId: 'pv-1', nonPublic: true });
+    add.flush([]);
+    api.addAgendaPlan('m-1', 'pv-1').subscribe();
+    expect(http.expectOne('/api/meetings/m-1/agenda').request.body.nonPublic).toBe(false);
+  });
+
   it('adds an application agenda item', () => {
     api.addAgendaItem('m-1', 'app-1').subscribe();
     const req = http.expectOne('/api/meetings/m-1/agenda');
@@ -945,6 +1022,13 @@ describe('ApiClient', () => {
     api.addAgendaFreetext('m-1', 'Personal', true).subscribe();
     const req = http.expectOne('/api/meetings/m-1/agenda');
     expect(req.request.body).toEqual({ title: 'Personal', nonPublic: true });
+    req.flush([]);
+  });
+
+  it('adds a freetext agenda item with a description', () => {
+    api.addAgendaFreetext('m-1', 'Bericht', false, 'Info').subscribe();
+    const req = http.expectOne('/api/meetings/m-1/agenda');
+    expect(req.request.body).toEqual({ title: 'Bericht', nonPublic: false, description: 'Info' });
     req.flush([]);
   });
 
@@ -1047,6 +1131,33 @@ describe('ApiClient', () => {
       branchFired: false,
     });
     expect(fired).toBe(false);
+  });
+
+  it('creates an Umlaufverfahren, reads its rules and posts an objection', () => {
+    const body = {
+      kind: 'circular' as const,
+      eligibleGroup: 'g-1',
+      question: 'Beschaffung Beamer?',
+      closesAt: '2026-12-01T12:00:00Z',
+      draft: false,
+    };
+    api.createCircular(body).subscribe();
+    const create = http.expectOne('/api/votes');
+    expect(create.request.method).toBe('POST');
+    expect(create.request.body).toEqual(body);
+    create.flush({ id: 'v-1' });
+
+    let days = 0;
+    api.circularRules().subscribe((r) => (days = r.minDays));
+    const rules = http.expectOne('/api/votes/circular-rules');
+    expect(rules.request.method).toBe('GET');
+    rules.flush({ minDays: 3 });
+    expect(days).toBe(3);
+
+    api.objectToCircular('v-1').subscribe();
+    const objection = http.expectOne('/api/votes/v-1/objection');
+    expect(objection.request.method).toBe('POST');
+    objection.flush({ id: 'v-1' });
   });
 
   it('cancels a vote', () => {

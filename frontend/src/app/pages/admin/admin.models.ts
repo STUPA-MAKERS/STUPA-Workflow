@@ -6,6 +6,7 @@
  * developable and testable. Branding/site-config uses the local `/api/admin/site-config`
  * path, which is not part of the API spec.
  */
+import type { FeatureKey } from '@core/features/feature.service';
 import type {
   DataDiff,
   DataDiffWire,
@@ -229,8 +230,20 @@ export interface Gremium {
   readonly delegationLeadMinutes?: number;
   /** Allow delegation to users outside the gremium & substitute pool. */
   readonly delegationAllowExternal?: boolean;
+  /** The most delegations that one person holds in one meeting. A pool entry does not count. */
+  readonly delegationMaxPerDelegate?: number;
+  /** An election takes the ballot of a delegation. */
+  readonly delegationInElections?: boolean;
   /** Default quorum as a percent of eligible voters who must attend. null = none. */
   readonly quorumPercent?: number | null;
+  /** The least number of present persons for the quorum of a meeting vote. null = none. */
+  readonly quorumMinPresent?: number | null;
+  /** The quorum of a Wiederholungssitzung in percent. null = the normal quorum. */
+  readonly repeatQuorumPercent?: number | null;
+  /** Guests of a public meeting can get a ballot. Only without a quorum. */
+  readonly guestsMayVote?: boolean;
+  /** The month (1 to 12) on whose first day a term of the gremium starts (§ 000948). */
+  readonly termStartMonth?: number;
   /** Number of members. Only the admin list (`GET /admin/committees`) gives it. */
   readonly memberCount?: number;
   /** Number of gremium roles, the forced roles included. Admin list only. */
@@ -256,7 +269,17 @@ export interface GremiumCreateBody {
   readonly allowVoteDelegation?: boolean;
   readonly delegationLeadMinutes?: number;
   readonly delegationAllowExternal?: boolean;
+  readonly delegationMaxPerDelegate?: number;
+  readonly delegationInElections?: boolean;
   readonly quorumPercent?: number | null;
+  /** The least number of present persons for the quorum of a meeting vote. null = none. */
+  readonly quorumMinPresent?: number | null;
+  /** The quorum of a Wiederholungssitzung in percent. null = the normal quorum. */
+  readonly repeatQuorumPercent?: number | null;
+  /** Guests of a public meeting can get a ballot. Only without a quorum. */
+  readonly guestsMayVote?: boolean;
+  /** Without a value the gremium takes the month of the meeting periods. */
+  readonly termStartMonth?: number;
   readonly protocolsPublic?: boolean;
 }
 
@@ -269,7 +292,16 @@ export interface GremiumUpdateBody {
   readonly allowVoteDelegation?: boolean;
   readonly delegationLeadMinutes?: number;
   readonly delegationAllowExternal?: boolean;
+  readonly delegationMaxPerDelegate?: number;
+  readonly delegationInElections?: boolean;
   readonly quorumPercent?: number | null;
+  /** The least number of present persons for the quorum of a meeting vote. null = none. */
+  readonly quorumMinPresent?: number | null;
+  /** The quorum of a Wiederholungssitzung in percent. null = the normal quorum. */
+  readonly repeatQuorumPercent?: number | null;
+  /** Guests of a public meeting can get a ballot. Only without a quorum. */
+  readonly guestsMayVote?: boolean;
+  readonly termStartMonth?: number;
   readonly protocolsPublic?: boolean;
 }
 
@@ -687,6 +719,8 @@ export interface ApplicationTypeFull {
   readonly name: I18nMap;
   readonly gremiumId?: Uuid | null;
   readonly hasBudget: boolean;
+  /** The Antrag PDF ends with the signature section (spec 000888). */
+  readonly pdfSignatures?: boolean;
   readonly comparisonOffers?: ComparisonOffers | null;
   /** DSGVO retention in months. null = the global default. */
   readonly retentionMonths?: number | null;
@@ -708,6 +742,7 @@ export interface ApplicationTypeUpdateBody {
   readonly name?: I18nMap;
   readonly gremiumId?: Uuid | null;
   readonly hasBudget?: boolean;
+  readonly pdfSignatures?: boolean;
   readonly comparisonOffers?: ComparisonOffers | null;
 }
 
@@ -820,6 +855,7 @@ export const GREMIUM_PERMISSIONS = [
   'vote.cast',
   'protocol.write',
   'protocol.finalize',
+  'info.write',
 ] as const;
 
 /**
@@ -1084,13 +1120,11 @@ export const MAX_LINK_TTL_DAYS = 3650;
 
 /**
  * The open window of meetings (P admin.deadlines): `GET/PUT /admin/meeting-settings`.
- * Both values are minutes before the planned start of a meeting.
+ * The value is minutes before the planned start of a meeting.
  */
 export interface MeetingSettings {
   /** The earliest open (0 to 10080). */
   readonly openLeadMinutes: number;
-  /** Before this point the open needs an extra confirmation (0 to `openLeadMinutes`). */
-  readonly confirmLeadMinutes: number;
 }
 
 /**
@@ -1107,6 +1141,51 @@ export interface LoginSettings {
   readonly updatedAt?: string | null;
   readonly updatedBy?: string | null;
 }
+
+/**
+ * The values that the form of a new Gremium starts with (P admin.gremien):
+ * `GET/PUT /admin/gremium-defaults`. A change touches no Gremium that exists.
+ */
+export interface GremiumDefaults {
+  readonly quorumPercent: number | null;
+  readonly repeatQuorumPercent: number | null;
+  readonly guestsMayVote: boolean;
+  readonly allowVoteDelegation: boolean;
+  readonly delegationLeadMinutes: number;
+  readonly delegationMaxPerDelegate: number;
+}
+
+/**
+ * The periods of the Geschäftsordnung (P admin.deadlines): `GET/PUT /admin/meeting-periods`
+ * (§ 000917). The `…Days` values are days.
+ */
+export interface MeetingPeriods {
+  /** Days between the invitation and an ordinary meeting. */
+  readonly inviteDaysOrdinary: number;
+  /** Days between the invitation and a meeting of every other kind. */
+  readonly inviteDaysExtraordinary: number;
+  /** Days after a meeting until the draft of the protocol is due. */
+  /** Days after the close of a meeting in which a member can still give an excuse. */
+  readonly lateExcuseDays: number;
+  /** The number of unexcused absences in one term that ends a Mandat. */
+  readonly absenceLimit: number;
+  /** The shortest window of an Umlaufbeschluss, in days. */
+  readonly circularMinDays: number;
+  /** The month (1 to 12) in which a term starts. */
+  readonly termStartMonth: number;
+}
+
+export type MeetingPeriodKey = keyof MeetingPeriods;
+
+/** The lowest and the highest value of each {@link MeetingPeriods} field. */
+export const MEETING_PERIOD_BOUNDS: Readonly<Record<MeetingPeriodKey, readonly [number, number]>> = {
+  inviteDaysOrdinary: [1, 365],
+  inviteDaysExtraordinary: [1, 365],
+  lateExcuseDays: [1, 365],
+  absenceLimit: [1, 50],
+  circularMinDays: [1, 365],
+  termStartMonth: [1, 12],
+};
 
 /** Upper bound of both {@link MeetingSettings} values (`MAX_LEAD_MINUTES`, one week). */
 export const MAX_LEAD_MINUTES = 10080;
@@ -1238,6 +1317,12 @@ export interface Branding {
 }
 
 /**
+ * The page "Funktionen" (`GET`/`PUT /admin/features`, permission `admin.features`): the
+ * stored switch of each feature. A save writes a new active site-config version.
+ */
+export type FeatureSwitches = Readonly<Record<FeatureKey, boolean>>;
+
+/**
  * The page "Hilfe & Tickets" (`GET`/`PUT /admin/help-tickets`, permission `admin.site`).
  * A save writes a new active site-config version.
  */
@@ -1277,6 +1362,28 @@ export const LOGO_ACCEPT_MIME: readonly string[] = [
   'image/vnd.microsoft.icon',
 ] as const;
 export const LOGO_MAX_SIZE_MB = 2;
+
+/** A slot of the PDF branding: the export logo or the footer graphic (specs 000891, 000892). */
+export type PdfSlot = 'logo' | 'footer';
+
+/**
+ * A graphic of the PDF branding. `builtin` is the default (the STUPA logo, the Skyline);
+ * an upload has its name, type and size. Its bytes go to the PDF renderer only, never to
+ * the browser, so SVG and PDF are allowed here, and the page shows no preview of it.
+ */
+export interface PdfAsset {
+  readonly builtin: boolean;
+  readonly fileName: string | null;
+  readonly mime: string | null;
+  readonly size: number | null;
+}
+export const PDF_ASSET_ACCEPT_MIME: readonly string[] = [
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/svg+xml',
+  'application/pdf',
+] as const;
 
 /** Re-export so admin code imports only from `admin.models`. */
 export type { FormFieldDef };

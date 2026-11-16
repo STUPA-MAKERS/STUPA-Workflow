@@ -17,9 +17,7 @@ from app.shared.errors import ServiceUnavailableError, UnsupportedMediaTypeError
 
 #: The official EICAR test signature. It is not a real virus. Quarantine tests and fakes
 #: use it.
-EICAR_TEST_BYTES = (
-    rb"X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
-)
+EICAR_TEST_BYTES = rb"X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
 
 
 class ScannerError(RuntimeError):

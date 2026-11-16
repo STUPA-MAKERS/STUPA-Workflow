@@ -67,9 +67,7 @@ def upgrade() -> None:
         "ADD COLUMN IF NOT EXISTS revalidated_at timestamptz NOT NULL DEFAULT now()"
     )
     op.execute(f"ALTER TABLE auth_session DROP CONSTRAINT IF EXISTS {_CHECK}")
-    op.execute(
-        f"ALTER TABLE auth_session ADD CONSTRAINT {_CHECK} CHECK (client IN ('web', 'pwa'))"
-    )
+    op.execute(f"ALTER TABLE auth_session ADD CONSTRAINT {_CHECK} CHECK (client IN ('web', 'pwa'))")
 
 
 def downgrade() -> None:

@@ -37,6 +37,7 @@ from app.modules.applications.service.service_base import (
     state_since_subquery,
 )
 from app.modules.auth.principal import Principal
+from app.modules.budget.access import viewed_by
 from app.modules.budget.tree_models import Budget
 from app.modules.flow.models import State
 from app.modules.gremien.models import Gremium
@@ -110,9 +111,9 @@ class ListingOps(ApplicationsServiceBase):
         rows the page does not contain.
 
         An unconfirmed guest application stays invisible until the applicant confirms the email.
-        The cost-center filter covers the subtree through the `path_key` prefix; an unknown cost
-        center gives an empty list. The fuzzy search reads meaningful text only: the title and
-        the string answer values of the `data` JSONB, no ids, enums or numbers (see
+        The cost-center filter covers the subtree through the prefix of the tree path; an
+        unknown cost center gives an empty list. The fuzzy search reads meaningful text only:
+        the title and the string answer values of the `data` JSONB, no ids, enums or numbers (see
         `_search_text` for the dialects and the PII projection). An active search puts the most
         relevant row first, and the chosen sort acts as a deterministic tiebreak. `created_to`
         is inclusive, so the filter ends at 00:00 UTC of the next day.
@@ -203,14 +204,14 @@ class ListingOps(ApplicationsServiceBase):
     async def _budget_scope(self, budget_id: UUID) -> ColumnElement[bool]:
         """Keep the applications in the subtree of a cost center, or none for an unknown one."""
         node_path = await self.session.scalar(
-            select(Budget.path_key).where(Budget.id == budget_id)
+            select(Budget.tree_path).where(Budget.id == budget_id)
         )
         if node_path is None:
             return false()
         descendants = select(Budget.id).where(
             or_(
-                Budget.path_key == node_path,
-                Budget.path_key.like(f"{node_path}-%"),
+                Budget.tree_path == node_path,
+                Budget.tree_path.like(f"{node_path}-%"),
             )
         )
         return Application.budget_id.in_(descendants)
@@ -323,7 +324,7 @@ class ListingOps(ApplicationsServiceBase):
         paths mirror `access._committee_can_read`, which the detail view uses:
 
         * a cost center (the node or an ancestor) with `view_gremium_id` in a member
-          Gremium, which opens the whole subtree through the `path_key` prefix,
+          Gremium, which opens the whole subtree through the prefix of the tree path,
         * the current `vote` state decided by a member Gremium (the snapshot
           `application.vote_gremium_id`), and
         * legacy: a vote in a meeting of a member Gremium, found over `vote` and
@@ -346,9 +347,7 @@ class ListingOps(ApplicationsServiceBase):
         if not member_ids:
             return []
         root_paths = (
-            await self.session.scalars(
-                select(Budget.path_key).where(Budget.view_gremium_id.in_(member_ids))
-            )
+            await self.session.scalars(select(Budget.tree_path).where(viewed_by(member_ids)))
         ).all()
         budget_scope = (_view_subtrees(root_paths),) if root_paths else ()
 
@@ -471,9 +470,7 @@ class ListingOps(ApplicationsServiceBase):
         ]
         since_by_app = await self._state_since_map(app.id for app, _ in tasks)
         return [
-            _list_item(
-                app, state_out, since_by_app.get(app.id, app.created_at), archived_at=None
-            )
+            _list_item(app, state_out, since_by_app.get(app.id, app.created_at), archived_at=None)
             for app, state_out in tasks
         ]
 
@@ -572,9 +569,7 @@ def _archived_filter(archived: bool | None) -> ColumnElement[bool] | None:
             return None
 
 
-def _sort_column(
-    sort: str, since_sq: Subquery
-) -> ColumnElement[Any] | InstrumentedAttribute[Any]:
+def _sort_column(sort: str, since_sq: Subquery) -> ColumnElement[Any] | InstrumentedAttribute[Any]:
     """Return the column of a list sort key; an unknown key sorts by the creation time."""
     match sort:
         case "amount":
@@ -602,12 +597,7 @@ def _sqlite_projection(keys: Sequence[str]) -> ColumnElement[Any]:
 def _view_subtrees(root_paths: Sequence[str]) -> ColumnElement[bool]:
     """Keep the applications in the subtree of one of the view cost centers."""
     scoped = select(Budget.id).where(
-        or_(
-            *[
-                or_(Budget.path_key == rp, Budget.path_key.like(f"{rp}-%"))
-                for rp in root_paths
-            ]
-        )
+        or_(*[or_(Budget.tree_path == rp, Budget.tree_path.like(f"{rp}-%")) for rp in root_paths])
     )
     return Application.budget_id.in_(scoped)
 

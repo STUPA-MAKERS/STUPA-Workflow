@@ -17,6 +17,7 @@ import pytest
 
 from app.modules.auth import policy
 from app.modules.auth.principal import Principal
+from app.modules.meetings.present import Present
 from app.modules.voting import poll as poll_mod
 from app.modules.voting.poll import PollService
 from app.modules.voting.schemas import (
@@ -36,11 +37,13 @@ from app.modules.voting.tally import (
 from app.shared.config_schemas import PollConfig, VoteConfig
 from app.shared.errors import ConflictError, ForbiddenError, ValidationProblem
 from tests._support.flow_fakes import fake_session, result
+from tests.unit.conftest import Presence
 from tests.unit.modules.voting.test_voting_service_unit import (  # noqa: F401 - fixture
     GID,
     NOW,
     _FakeFlow,
     _patch_flow,
+    _persons,
     _vote,
     _voter,
 )
@@ -340,9 +343,10 @@ async def test_get_closed_date_poll_counts_the_yes_answers() -> None:
     assert out.tally.quorum_met is True
 
 
-async def test_get_open_poll_hides_the_count() -> None:
+async def test_get_open_poll_hides_the_count(monkeypatch: pytest.MonkeyPatch) -> None:
     vote = _pvote()
     db = fake_session(result(vote), result('["o1"]'), result('["o1"]'))
+    monkeypatch.setattr(VotingService, "voters", _persons(1))
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False
     assert out.tally.counts == {}
@@ -558,18 +562,19 @@ async def test_close_poll_without_now_stamps_the_time() -> None:
     assert out.closed_at is not None
 
 
-async def test_close_meeting_poll_fixes_the_attendance() -> None:
+async def test_close_meeting_poll_fixes_the_attendance(presence: Presence) -> None:
     """The close of a meeting poll stores 4 present members and 2 admitted guests."""
     vote = _pvote(meeting_id=uuid4())
     db = fake_session(result(vote), result('["o1"]'))
-    db.scalar_results = [4, 2]
+    presence.here = Present(members=4)
+    db.scalar_results = [None, 2]
     out = await VotingService(db).close(vote.id, _voter(), now=NOW)
     assert out.tally.present_members == 4
     assert out.tally.present_guests == 2
     assert out.tally.eligible == 10
 
 
-async def test_close_meeting_poll_with_guests_counts_them_as_eligible() -> None:
+async def test_close_meeting_poll_with_guests_counts_them_as_eligible(presence: Presence) -> None:
     """The admitted guests of a meeting poll with guests count as eligible.
 
     The fake session serves the admitted guests, no guest ballots and no guest markers.
@@ -583,7 +588,8 @@ async def test_close_meeting_poll_with_guests_counts_them_as_eligible() -> None:
         result(),
         result(),
     )
-    db.scalar_results = [3]
+    presence.here = Present(members=3)
+    db.scalar_results = [None]
     out = await VotingService(db).close(vote.id, _voter(), now=NOW)
     assert out.tally.eligible == 4
     assert vote.eligible_count == 4

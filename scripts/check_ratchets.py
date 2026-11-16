@@ -9,7 +9,7 @@
   whose name contains `Session`. Such a class stands in for a database session. A new test of a
   query runs on a real Postgres (000641), because a fake session returns the rows that the test
   wrote down, and a wrong `WHERE` then passes.
-- `import-exceptions` (§ S/backend/python/000646): the entries of `ignore_imports` per import
+- `import-exceptions` (§ S/backend/python/000651): the entries of `ignore_imports` per import
   contract in `backend/pyproject.toml`. An entry is an import that breaks the layers of the
   modules (000643) or goes from the shared code into a module (000644). `lint-imports` fails
   for an entry that matches no import, so an entry goes away together with its import.

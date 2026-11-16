@@ -1,10 +1,12 @@
-"""arq step of the polls: the reminder mail 24 h before the end.
+"""arq step of the polls and the Umlaufverfahren: the reminder mail 24 h before the end.
 
 ``process_poll_reminders`` runs inside the deadline cron (``worker/deadlines.py``), so
-every minute. A poll of a Gremium (``kind = 'poll'``, no meeting) is due when it is
+every minute. A poll or an Umlaufverfahren of a Gremium (``kind`` ``poll`` or
+``circular``, no meeting; §F/meetings/voting/000944) is due when it is
 open, has no reminder yet (``reminded_at`` NULL), ends within the next 24 h, and runs
 at least 24 h from its open to its end. A shorter poll gets no reminder. The step
-sends ``poll_reminder`` to the eligible members without an answer and sets
+sends ``poll_reminder`` or ``circular_reminder`` to the eligible members without an
+answer and sets
 ``reminded_at``, also when nobody is left to remind, so the poll gets one reminder.
 The close at the end is the vote close of the same cron (``_process_votes``).
 
@@ -22,9 +24,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
+from app.modules.site_config.features import Feature
 from app.modules.voting.models import Vote
-from app.modules.voting.poll_mails import send_poll_mail
+from app.modules.voting.poll_mails import MAIL_KINDS, send_poll_mail
 from app.settings import Settings, load_settings
+from worker.features import job_feature_on
 
 logger = logging.getLogger("worker.polls")
 
@@ -54,8 +58,11 @@ async def process_poll_reminders(ctx: dict[str, Any], now: datetime | None = Non
     Returns:
         The number of polls with an enqueued reminder.
 
-    One bad poll is logged and does not stop the run.
+    One bad poll is logged and does not stop the run. No mail goes out while
+    `Abstimmungen` is off.
     """
+    if not await job_feature_on(_sessionmaker(ctx), Feature.VOTING):
+        return 0
     moment = now or datetime.now(UTC)
     settings: Settings = ctx.get("settings") or load_settings()
     queue = _mail_queue(ctx)
@@ -64,7 +71,7 @@ async def process_poll_reminders(ctx: dict[str, Any], now: datetime | None = Non
             await session.scalars(
                 select(Vote)
                 .where(
-                    Vote.kind == "poll",
+                    Vote.kind.in_(MAIL_KINDS),
                     Vote.meeting_id.is_(None),
                     Vote.status == "open",
                     Vote.reminded_at.is_(None),

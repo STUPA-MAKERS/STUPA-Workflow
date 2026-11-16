@@ -2,11 +2,10 @@
 id: "000563"
 title: A phone shows one toast at a time
 kind: non-functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-09
-implementation:
-  - frontend/vendor/ui-kit/src/lib/toast/toast.service.ts
+updated: 2026-11-16
+replaced_by: NF/usability/controls/000562
 scope:
   - frontend/vendor/ui-kit
 ---

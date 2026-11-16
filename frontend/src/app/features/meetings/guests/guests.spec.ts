@@ -16,6 +16,9 @@ import {
 import { AttendanceSheetComponent } from '../attendance-sheet/attendance-sheet.component';
 import { MeetingGuestsService } from '../meeting-guests.service';
 
+/** The members hold a voting right, so the present one counts (spec 000946). */
+const VOTERS = ATTENDANCE.map((a) => ({ ...a, canVote: true }));
+
 const GUESTS = [
   guestRow({ id: 'g-1', displayName: 'Emma Nguyen', requestedAt: '2026-10-05T16:50:00Z' }),
   guestRow({ id: 'g-2', displayName: 'Tobias Lang', requestedAt: new Date(Date.now() - 5_000).toISOString() }),
@@ -49,7 +52,7 @@ async function setup(over: Partial<Meeting> = {}, media: string[] = []) {
   const m = meeting({ publicJoin: true, joinCode: '7KQ4MP', admittedGuests: 1, pendingGuests: 2, ...over });
   const showQr = jest.fn();
   const view = await render(AttendanceSheetComponent, {
-    inputs: { open: true, meeting: m, attendance: ATTENDANCE, saving: false, viewers: [], conflictId: null },
+    inputs: { open: true, meeting: m, attendance: VOTERS, saving: false, viewers: [], conflictId: null },
     on: { showQr },
     providers: [
       provideHttpClient(),

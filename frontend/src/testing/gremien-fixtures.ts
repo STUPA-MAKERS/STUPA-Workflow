@@ -8,6 +8,7 @@ import type {
   GremienApiService,
   GremiumAttendance,
   GremiumDecision,
+  GremiumInfo,
   GremiumMeeting,
   GremiumMember,
   GremiumMemberAttendance,
@@ -67,6 +68,9 @@ export function attendance(over: Partial<GremiumAttendance> = {}): GremiumAttend
   return {
     fromMonth: '2026-09',
     toMonth: '2026-10',
+    termStart: '2026-10-01',
+    terms: ['2026-10-01', '2025-10-01'],
+    absenceLimit: 3,
     months: [
       { month: '2026-09', meetings: 2 },
       { month: '2026-10', meetings: 0 },
@@ -78,6 +82,7 @@ export function attendance(over: Partial<GremiumAttendance> = {}): GremiumAttend
         roleKey: 'member',
         roleName: { de: 'Mitglied', en: 'Member' },
         isSelf: false,
+        unexcused: 2,
         cells: [
           { month: '2026-09', member: true, present: 1, excused: 1, delegated: 1 },
           { month: '2026-10', member: true, present: 0, excused: 0, delegated: 0 },
@@ -89,6 +94,7 @@ export function attendance(over: Partial<GremiumAttendance> = {}): GremiumAttend
         roleKey: 'vorstand',
         roleName: { de: 'Vorstand', en: 'Board' },
         isSelf: true,
+        unexcused: 0,
         cells: [
           { month: '2026-09', member: true, present: 2, excused: 0, delegated: 0 },
           { month: '2026-10', member: true, present: 0, excused: 0, delegated: 0 },
@@ -100,6 +106,7 @@ export function attendance(over: Partial<GremiumAttendance> = {}): GremiumAttend
         roleKey: 'member',
         roleName: { de: 'Mitglied', en: 'Member' },
         isSelf: false,
+        unexcused: 0,
         cells: [
           { month: '2026-09', member: false, present: 0, excused: 0, delegated: 0 },
           { month: '2026-10', member: true, present: 0, excused: 0, delegated: 0 },
@@ -145,6 +152,19 @@ export function decision(over: Partial<GremiumDecision> = {}): GremiumDecision {
   };
 }
 
+/** The Info of a gremium; the default is empty and not editable, so the tab hides. */
+export function gremiumInfo(over: Partial<GremiumInfo> = {}): GremiumInfo {
+  return {
+    bodyMd: '',
+    links: [],
+    version: 0,
+    updatedAt: null,
+    updatedByName: null,
+    canEdit: false,
+    ...over,
+  };
+}
+
 export type GremienApiMock = { [K in keyof GremienApiService]: jest.Mock };
 
 /** The API of the tab, answering with the data above. */
@@ -154,8 +174,11 @@ export function gremienApiMock(over: Partial<GremienApiMock> = {}): GremienApiMo
     members: jest.fn(() => of([member()])),
     meetings: jest.fn(() => of([gremiumMeeting()])),
     attendance: jest.fn(() => of(attendance())),
+    attendanceExport: jest.fn(() => of(new Blob(['x']))),
     memberAttendance: jest.fn(() => of(memberAttendance())),
     decisions: jest.fn(() => of({ items: [decision()], nextCursor: null })),
+    info: jest.fn(() => of(gremiumInfo())),
+    saveInfo: jest.fn(() => of(gremiumInfo({ version: 1, canEdit: true }))),
     ...over,
   };
 }

@@ -1,3 +1,4 @@
+@use 'breakpoints' as bp;
 @use 'field' as f;
 
 @mixin crumbs($sel) {
@@ -91,6 +92,138 @@
   @media (hover: hover) {
     #{$sel}--tonal:hover {
       background: var(--color-surface-4);
+    }
+  }
+}
+
+// The frame that the lists "Protokolle" and "Beschlüsse" share: the page column, the head, the
+// toolbar with the chips, the empty state, the semester title, the card of one row with its date
+// block, and the pill buttons. A page adds only the parts of its own card.
+@mixin list-page {
+  :host {
+    display: flex;
+    flex: 1 0 auto;
+    justify-content: center;
+  }
+
+  .pp {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    width: min(67.5rem, 100%);
+    padding-block: var(--space-6);
+  }
+  .pp__head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  @include crumbs('.pp__crumbs');
+  .pp__title {
+    margin: 0;
+    font-size: var(--fs-d2);
+    line-height: var(--lh-d2);
+    font-weight: var(--fw-semibold);
+  }
+
+  .pp__toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  .pp__chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .pp__spacer {
+    flex: 1 1 auto;
+  }
+  .pp__count {
+    color: var(--color-text-muted);
+    font-size: var(--fs-sm);
+  }
+
+  .pp__none {
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-4);
+    border-radius: var(--radius-2xl);
+    background: var(--color-surface-1);
+  }
+
+  // The section title of the design system (`app-section`): small accent type on the inset of
+  // the cards, and no count beside it.
+  .pp__group {
+    margin: var(--space-2) 0 0;
+    padding: 0 var(--space-1);
+    color: var(--color-accent-text);
+    font-size: 0.84375rem;
+    line-height: 1.25rem;
+    font-weight: var(--fw-semibold);
+  }
+
+  .pp__card {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-5);
+    padding: var(--space-5) var(--space-6);
+    border-radius: var(--radius-2xl);
+    background: var(--color-surface-1);
+  }
+  .pp__date {
+    flex: none;
+  }
+  .pp__main {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+  .pp__titles {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  @include pill-button('.pp__btn');
+  .pp__view {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--color-accent-text);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-semibold);
+    text-decoration: none;
+  }
+  .pp__view:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+  .pp__more {
+    align-self: center;
+    margin-top: var(--space-2);
+  }
+
+  @include bp.phone {
+    .pp {
+      gap: var(--space-3);
+      padding-block: var(--space-4);
+    }
+    .pp__title {
+      font-size: var(--fs-h1);
+      line-height: var(--lh-h1);
+    }
+    .pp__card {
+      flex-wrap: wrap;
+      gap: var(--space-3);
+      padding: var(--space-4);
+    }
+    .pp__main {
+      flex-basis: calc(100% - 64px);
     }
   }
 }

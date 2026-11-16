@@ -53,13 +53,9 @@ class Principal(UUIDPkMixin, Base):
     email: Mapped[str | None] = mapped_column(CITEXT, nullable=True)
     display_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     oidc_groups: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
-    last_login: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     #: Deactivated principals must not log in.
-    active: Mapped[bool] = mapped_column(
-        Boolean, server_default="true", default=True
-    )
+    active: Mapped[bool] = mapped_column(Boolean, server_default="true", default=True)
     #: Personal iCal feed token that the user can rotate. The subscription URL carries it
     #: in plaintext. The sensitivity is low: it exposes only the titles and times of the
     #: meetings of the own Gremien. A rotation revokes the old URL.
@@ -71,17 +67,13 @@ class Principal(UUIDPkMixin, Base):
     merged_into: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("principal.id", ondelete="RESTRICT"), nullable=True
     )
-    merged_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    merged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         Index("uq_principal_calendar_token", "calendar_token", unique=True),
         Index("ix_principal_merged_into", "merged_into"),
         CheckConstraint("merged_into IS NULL OR merged_into <> id", name="not_self_merged"),
-        CheckConstraint(
-            "(merged_into IS NULL) = (merged_at IS NULL)", name="merged_at_set"
-        ),
+        CheckConstraint("(merged_into IS NULL) = (merged_at IS NULL)", name="merged_at_set"),
     )
 
 
@@ -99,9 +91,7 @@ class RolePermission(Base):
 
     __tablename__ = "role_permission"
 
-    role_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("role.id", ondelete="CASCADE")
-    )
+    role_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("role.id", ondelete="CASCADE"))
     permission: Mapped[str] = mapped_column(Text)
 
     __table_args__ = (PrimaryKeyConstraint("role_id", "permission"),)
@@ -118,9 +108,7 @@ class RoleAssignment(UUIDPkMixin, Base):
 
     __tablename__ = "role_assignment"
 
-    principal_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("principal.id", ondelete="CASCADE")
-    )
+    principal_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("principal.id", ondelete="CASCADE"))
     role_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("role.id", ondelete="CASCADE"))
     granted_by: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -139,9 +127,7 @@ class AuthSession(UUIDPkMixin, CreatedAtMixin, Base):
     __tablename__ = "auth_session"
 
     sid: Mapped[str] = mapped_column(Text, unique=True)
-    principal_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("principal.id", ondelete="CASCADE")
-    )
+    principal_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("principal.id", ondelete="CASCADE"))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     refresh_token: Mapped[str | None] = mapped_column(Text, nullable=True)
     id_token: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -182,19 +168,13 @@ class LoginSettings(Base):
         server_default=str(DEFAULT_PWA_SESSION_DAYS),
         default=DEFAULT_PWA_SESSION_DAYS,
     )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_by: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         CheckConstraint("id = 1", name="singleton"),
-        CheckConstraint(
-            f"web_session_days BETWEEN 1 AND {MAX_SESSION_DAYS}", name="web_days"
-        ),
-        CheckConstraint(
-            f"pwa_session_days BETWEEN 1 AND {MAX_SESSION_DAYS}", name="pwa_days"
-        ),
+        CheckConstraint(f"web_session_days BETWEEN 1 AND {MAX_SESSION_DAYS}", name="web_days"),
+        CheckConstraint(f"pwa_session_days BETWEEN 1 AND {MAX_SESSION_DAYS}", name="pwa_days"),
     )
 
 
@@ -219,9 +199,7 @@ class ApplicantSession(UUIDPkMixin, CreatedAtMixin, Base):
     )
     email: Mapped[str | None] = mapped_column(CITEXT, nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    revoked_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         Index("ix_applicant_session_application_id", "application_id"),
@@ -244,9 +222,7 @@ class EmailLoginLink(UUIDPkMixin, CreatedAtMixin, Base):
     email: Mapped[str] = mapped_column(CITEXT)
     token_hash: Mapped[bytes] = mapped_column(LargeBinary, unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    used_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (Index("ix_email_login_link_expires_at", "expires_at"),)
 

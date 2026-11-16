@@ -17,7 +17,10 @@ import type {
   FlowGraph,
   FormDraft,
   GuestSettings,
+  GremiumDefaults,
+  MeetingPeriods,
   MeetingSettings,
+  FeatureSwitches,
   HelpTicketsSettings,
   LoginSettings,
   MailTemplate,
@@ -66,6 +69,7 @@ export const MOCK_PERMISSIONS: readonly string[] = [
   'budget.structure',
   'budget.book',
   'budget.export',
+  'budget.plan.set_state',
   'application.export',
   'webhook.manage',
   'admin.calendars',
@@ -211,7 +215,7 @@ export const MOCK_PRINCIPALS: readonly AdminPrincipal[] = [
 export const MOCK_GREMIUM_STUPA_ID = 'g0000000-0000-0000-0000-000000000001';
 
 export const MOCK_GREMIEN: readonly Gremium[] = [
-  { id: MOCK_GREMIUM_STUPA_ID, name: 'Studierendenparlament', slug: 'stupa', cdVariantId: 'cd-stupa', defaultLang: 'de', allowVoteDelegation: true, delegationLeadMinutes: 60, delegationAllowExternal: false, quorumPercent: 50 },
+  { id: MOCK_GREMIUM_STUPA_ID, name: 'Studierendenparlament', slug: 'stupa', cdVariantId: 'cd-stupa', defaultLang: 'de', allowVoteDelegation: true, delegationLeadMinutes: 60, delegationAllowExternal: false, delegationMaxPerDelegate: 2, delegationInElections: false, quorumPercent: 50 },
   { id: 'g-asta', name: 'AStA', slug: 'asta', cdVariantId: 'cd-asta', defaultLang: 'de', allowVoteDelegation: false, delegationLeadMinutes: 0, delegationAllowExternal: false, quorumPercent: null },
 ];
 
@@ -380,7 +384,24 @@ export const MOCK_WEBHOOK_STATUS: readonly WebhookDeliveryStatus[] = [
 
 /** The guest settings of the mock backend (the server defaults). */
 export const MOCK_GUEST_SETTINGS: GuestSettings = { confirmTtlHours: 12, linkTtlDays: null };
-export const MOCK_MEETING_SETTINGS: MeetingSettings = { openLeadMinutes: 60, confirmLeadMinutes: 10 };
+export const MOCK_GREMIUM_DEFAULTS: GremiumDefaults = {
+  quorumPercent: 40,
+  repeatQuorumPercent: 25,
+  guestsMayVote: false,
+  allowVoteDelegation: false,
+  delegationLeadMinutes: 120,
+  delegationMaxPerDelegate: 2,
+};
+export const MOCK_MEETING_SETTINGS: MeetingSettings = { openLeadMinutes: 60 };
+
+export const MOCK_MEETING_PERIODS: MeetingPeriods = {
+  inviteDaysOrdinary: 7,
+  inviteDaysExtraordinary: 3,
+  lateExcuseDays: 7,
+  absenceLimit: 3,
+  circularMinDays: 3,
+  termStartMonth: 10,
+};
 
 /** The settings of the page "Hilfe & Tickets", as the backend defaults them. */
 export const MOCK_HELP_TICKETS: HelpTicketsSettings = {
@@ -388,6 +409,17 @@ export const MOCK_HELP_TICKETS: HelpTicketsSettings = {
   publicEnabled: true,
   notifyNew: true,
   retentionMonths: 12,
+};
+
+/** The feature switches of the mock: every feature on, as the backend defaults them. */
+export const MOCK_FEATURES: FeatureSwitches = {
+  todos: true,
+  calendar: true,
+  meetings: true,
+  voting: true,
+  budget: true,
+  invoices: true,
+  tickets: true,
 };
 
 /** The SSO login lifetimes of the mock: the defaults of the server. */

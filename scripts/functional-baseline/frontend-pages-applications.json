@@ -1,6 +1,6 @@
 {
   "frontend/src/app/pages/applications/applications-detail.component.ts": 3,
-  "frontend/src/app/pages/applications/applications-list.component.ts": 3,
+  "frontend/src/app/pages/applications/applications-list.component.ts": 2,
   "frontend/src/app/pages/applications/attachments-panel.component.ts": 2,
   "frontend/src/app/pages/applications/capture/application-capture.component.ts": 1
 }

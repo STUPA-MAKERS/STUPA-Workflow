@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.modules.notifications.brand import MailBrand
 from app.modules.notifications.layout import (
     reason_text,
     render_layout,
@@ -25,9 +26,9 @@ def test_render_layout_wraps_content_with_footer() -> None:
     out = render_layout(
         content_html="<p>Inhalt</p>",
         title='Update zu "Beamer" <kaufen>',
-        site_name="StuPa <Plattform>",
+        brand=MailBrand(name="StuPa <Plattform>"),
         base_url="https://antrag.example.org/",
-        reason=reason_text("status_update", "de"),
+        reason=reason_text("status_update", "de", "StuPa"),
         lang="de",
     )
     assert out.startswith("<!DOCTYPE html>")
@@ -56,6 +57,6 @@ def test_text_to_html_keeps_trailing_punctuation_outside_link() -> None:
 
 
 def test_reason_text_falls_back_to_generic_and_en() -> None:
-    assert reason_text("nope", "de") == reason_text("generic", "de")
-    assert reason_text("magic_link", "fr") == reason_text("magic_link", "en")
-    assert reason_text("magic_link", "en") != reason_text("magic_link", "de")
+    assert reason_text("nope", "de", "P") == reason_text("generic", "de", "P")
+    assert reason_text("magic_link", "fr", "P") == reason_text("magic_link", "en", "P")
+    assert reason_text("magic_link", "en", "P") != reason_text("magic_link", "de", "P")

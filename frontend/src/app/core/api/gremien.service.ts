@@ -1,5 +1,6 @@
 /**
- * API of the tab "Gremien" (`/api/committees`). Every call reads only.
+ * API of the tab "Gremien" (`/api/committees`). Every call reads, except `saveInfo`, the
+ * save of the Info tab (gremium permission `info.write`).
  *
  * The server shows a gremium to an active member, to `gremium.view_all` and to the admin
  * role. Any other caller gets 404 for a gremium, so a hidden gremium looks like a missing
@@ -54,6 +55,8 @@ export interface GremiumOverview {
   /** A meeting of the gremium runs now. */
   readonly live: boolean;
   readonly quorumPercent: number | null;
+  /** The least number of present persons for the quorum of a meeting vote. */
+  readonly quorumMinPresent?: number | null;
   readonly protocolsPublic: boolean;
   readonly allowVoteDelegation: boolean;
   /** The square logo of the CD variant (`/api/committees/{id}/logo`), else null. */
@@ -84,6 +87,8 @@ export interface GremiumMeeting {
   /** The members of the meeting window, plus the people with a record. */
   readonly memberCount: number;
   readonly protocolStatus: GremiumProtocolStatus | null;
+  /** The final protocol has the mark "genehmigt" (§ 000924). */
+  readonly protocolApproved?: boolean;
 }
 
 /** One month of the attendance range: `YYYY-MM` and the number of closed meetings. */
@@ -110,6 +115,8 @@ export interface GremiumAttendanceRow {
   readonly roleKey: string | null;
   readonly roleName: LocalizedText | null;
   readonly isSelf: boolean;
+  /** The unexcused absences of the chosen term (§ 000920, § 000941). */
+  readonly unexcused: number;
   /** One cell per month of `months`, in the same order. */
   readonly cells: readonly GremiumAttendanceCell[];
 }
@@ -118,6 +125,12 @@ export interface GremiumAttendanceRow {
 export interface GremiumAttendance {
   readonly fromMonth: string;
   readonly toMonth: string;
+  /** The first day of the chosen term (`YYYY-MM-DD`). `unexcused` counts from it. */
+  readonly termStart: string;
+  /** The first day of each term on offer, the newest first; the first one is the current term. */
+  readonly terms: readonly string[];
+  /** The number of unexcused absences in one term that ends a Mandat. */
+  readonly absenceLimit: number;
   readonly months: readonly GremiumAttendanceMonth[];
   readonly rows: readonly GremiumAttendanceRow[];
 }
@@ -131,6 +144,8 @@ export interface GremiumMemberMeeting {
   readonly status: GremiumAttendanceState;
   /** The person who received the vote, for `delegated`. */
   readonly delegateName: string | null;
+  /** The end of the late-excuse window, only on an own `absent` row while it is open (§ 000922). */
+  readonly lateExcuseUntil?: string | null;
 }
 
 /** `GET /committees/{id}/attendance/{principalId}?month=`. */
@@ -158,7 +173,7 @@ export interface GremiumDecision {
   /** The requested amount of the application, as a decimal string ("2890.00"). */
   readonly amount: string | number | null;
   readonly secret: boolean;
-  /** `simple`, `absolute` or `two_thirds`; null for an election. */
+  /** One of the five majority rules (`MajorityRule`); null for an election. */
   readonly majorityRule: string | null;
   /** The sums of a motion; null for an election. */
   readonly counts: GremiumDecisionCounts | null;
@@ -187,6 +202,30 @@ export interface GremiumDecisionQuery {
   readonly kind?: GremiumDecisionKind | null;
   /** `YYYY-MM-DD`: only votes closed on this day or later. */
   readonly since?: string | null;
+}
+
+/** One labelled link of the Info tab: a label and an `https`, `http` or `mailto` URL. */
+export interface GremiumInfoLink {
+  readonly label: string;
+  readonly url: string;
+}
+
+/** The Info tab of a gremium (specs 001010-001015). An unsaved Info has version 0. */
+export interface GremiumInfo {
+  readonly bodyMd: string;
+  readonly links: readonly GremiumInfoLink[];
+  readonly version: number;
+  readonly updatedAt: IsoDateTime | null;
+  readonly updatedByName: string | null;
+  /** The caller holds `info.write` in the gremium. */
+  readonly canEdit: boolean;
+}
+
+/** A save of the Info tab: text and links together, with the version that was read. */
+export interface GremiumInfoSave {
+  readonly bodyMd: string;
+  readonly links: readonly GremiumInfoLink[];
+  readonly version: number;
 }
 
 /**
@@ -219,12 +258,35 @@ export class GremienApiService {
     });
   }
 
-  /** The months `from` to `to` (`YYYY-MM`). Without them the server gives the last six. */
-  attendance(gremiumId: Uuid, range: { from?: string; to?: string } = {}): Observable<GremiumAttendance> {
-    const params = httpParams({ from: range.from || undefined, to: range.to || undefined });
+  /**
+   * The months `from` to `to` (`YYYY-MM`). Without them the server gives the last six.
+   * `term` is a day (`YYYY-MM-DD`) of the term that `unexcused` counts; with it and
+   * without a range the server gives the months of this term (§ 000941).
+   */
+  attendance(
+    gremiumId: Uuid,
+    range: { from?: string; to?: string; term?: string } = {},
+  ): Observable<GremiumAttendance> {
+    const params = httpParams({
+      from: range.from || undefined,
+      to: range.to || undefined,
+      term: range.term || undefined,
+    });
     return this.http.get<GremiumAttendance>(`${this.base}/committees/${gremiumId}/attendance`, {
       params,
       context: skipLoading(),
+    });
+  }
+
+  /**
+   * GET /committees/{id}/attendance/export.xlsx — one row per person with the number of
+   * closed ordinary meetings with `present`, for the days `from` to `to` (`YYYY-MM-DD`).
+   * Needs `session.manage` in the Gremium (§ 000923).
+   */
+  attendanceExport(gremiumId: Uuid, from: string, to: string): Observable<Blob> {
+    return this.http.get(`${this.base}/committees/${gremiumId}/attendance/export.xlsx`, {
+      params: new HttpParams().set('from', from).set('to', to),
+      responseType: 'blob',
     });
   }
 
@@ -247,5 +309,17 @@ export class GremienApiService {
       params,
       context: skipLoading(),
     });
+  }
+
+  /** The Info tab of a gremium: the Markdown text, the links and `canEdit`. */
+  info(gremiumId: Uuid): Observable<GremiumInfo> {
+    return this.http.get<GremiumInfo>(`${this.base}/committees/${gremiumId}/info`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** Save text and links; a stale `version` gives 409 `gremium_info_version_conflict`. */
+  saveInfo(gremiumId: Uuid, body: GremiumInfoSave): Observable<GremiumInfo> {
+    return this.http.put<GremiumInfo>(`${this.base}/committees/${gremiumId}/info`, body);
   }
 }

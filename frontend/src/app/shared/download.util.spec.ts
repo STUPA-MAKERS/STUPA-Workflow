@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
 import { Subject, throwError } from 'rxjs';
-import { exportDownload } from './download.util';
+import { exportDownload, filenameFromDisposition } from './download.util';
 
 describe('exportDownload', () => {
   const realCreate = URL.createObjectURL;
@@ -49,5 +49,14 @@ describe('exportDownload', () => {
     exportDownload(busy, () => throwError(() => err), 'x.xlsx', onError);
     expect(busy()).toBe(false);
     expect(onError).toHaveBeenCalledWith(err);
+  });
+});
+
+describe('filenameFromDisposition', () => {
+  it('takes the exact UTF-8 name first, then the plain name, then the fallback', () => {
+    expect(filenameFromDisposition("attachment; filename=\"a.pdf\"; filename*=UTF-8''%C3%A4.pdf", 'x')).toBe('ä.pdf');
+    expect(filenameFromDisposition('attachment; filename="a.pdf"', 'x')).toBe('a.pdf');
+    expect(filenameFromDisposition("attachment; filename=\"a.pdf\"; filename*=UTF-8''%E0%A4", 'x')).toBe('a.pdf');
+    expect(filenameFromDisposition(null, 'Antrag.pdf')).toBe('Antrag.pdf');
   });
 });

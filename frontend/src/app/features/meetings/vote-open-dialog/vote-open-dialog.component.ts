@@ -60,7 +60,15 @@ import {
 } from '../../voting/poll.util';
 import { personLabel } from '@shared/person-label.util';
 
-const MAJORITY_RULES: readonly MajorityRule[] = ['simple', 'absolute', 'two_thirds'];
+const MAJORITY_RULES: readonly MajorityRule[] = [
+  'simple',
+  'absolute',
+  'two_thirds',
+  'members_majority',
+  'members_two_thirds',
+];
+/** The rules that count against all members: such a vote has no guest ballots. */
+const MEMBERS_RULES: readonly MajorityRule[] = ['members_majority', 'members_two_thirds'];
 const KINDS: readonly VoteKind[] = ['motion', 'election', 'poll'];
 /** The bounds of the server (`ElectionConfig`). */
 export const MAX_SEATS = 50;
@@ -204,6 +212,12 @@ export class VoteOpenDialogComponent {
   /** `motion`: a decision. `election`: a personnel election. */
   readonly kind = signal<VoteKind>('motion');
   readonly seats = signal(1);
+  /** The election for one seat needs the majority of the members (spec 000912). */
+  readonly electionMembers = signal(false);
+  /** The rule applies: it is on and the election has one seat. */
+  readonly membersElection = computed(
+    () => this.isElection() && this.seats() === 1 && this.electionMembers(),
+  );
   readonly candidates = signal<CandidateDraft[]>([]);
   /** The free name that the lead types for a new candidate. */
   readonly freeName = signal('');
@@ -215,7 +229,7 @@ export class VoteOpenDialogComponent {
     KINDS.map((v) => ({ value: v, label: this.i18n.translate(`meetings.vote.kind.${v}`) })),
   );
   /** An election and a poll are only possible on a free-text item. */
-  readonly electionAllowed = computed(() => !this.item()?.applicationId);
+  readonly electionAllowed = computed(() => !this.item()?.applicationId && !this.item()?.planVersionId);
   readonly isElection = computed(() => this.kind() === 'election');
   readonly isPoll = computed(() => this.kind() === 'poll');
 
@@ -259,6 +273,7 @@ export class VoteOpenDialogComponent {
   /** "Jede Person hat 2 Stimmen …": the rule of the election in one sentence. */
   readonly ruleSentence = computed(() => {
     const seats = this.seats();
+    if (this.membersElection()) return this.i18n.translate('election.rule.members');
     if (seats === 1 && this.candidates().length === 1) {
       return this.i18n.translate('election.rule.yesNo');
     }
@@ -267,16 +282,26 @@ export class VoteOpenDialogComponent {
       : this.i18n.translate('election.rule.multi', { n: seats });
   });
 
-  readonly ruleOptions = computed<SegmentedOption[]>(() =>
+  readonly ruleOptions = computed<SelectFieldOption[]>(() =>
     MAJORITY_RULES.map((v) => ({ value: v, label: this.i18n.translate(`meetings.vote.rule.${v}`) })),
+  );
+  /** The item of a Haushaltsplan: the server sets the majority of the members. */
+  readonly planItem = computed(() => !!this.item()?.planVersionId);
+  /** The rule counts against all members, so no guest votes. */
+  readonly membersRule = computed(
+    () =>
+      this.membersElection() ||
+      (!this.isElection() && !this.isPoll() && MEMBERS_RULES.includes(this.majorityRule())),
   );
 
   /** The switch exists only when the meeting lets guests vote. */
   readonly guestsAllowed = computed(
     () => this.meeting().publicJoin && this.meeting().guestsMode === 'vote',
   );
-  /** A non-public item never lets guests vote. */
-  readonly guestsLocked = computed(() => !!this.item()?.nonPublic);
+  /** A non-public item, the item of a Haushaltsplan and a members rule never let guests vote. */
+  readonly guestsLocked = computed(
+    () => !!this.item()?.nonPublic || this.planItem() || this.membersRule(),
+  );
   /** "TOP 3 · Zuschuss Erstsemester-Party WS 26/27". */
   readonly subtitle = computed(() => {
     const it = this.item();
@@ -312,11 +337,12 @@ export class VoteOpenDialogComponent {
     this.draft.set(emptyDraft(it.amount ?? null));
     this.questionEdited = false;
     this.question.set(it.applicationId ? this.prefill(it) : (it.title ?? ''));
-    this.majorityRule.set('simple');
-    this.guestsVote.set(this.guestsAllowed() && !it.nonPublic);
+    this.majorityRule.set(it.planVersionId ? 'members_majority' : 'simple');
+    this.guestsVote.set(this.guestsAllowed() && !it.nonPublic && !it.planVersionId);
     this.submitting.set(false);
     this.kind.set('motion');
     this.seats.set(1);
+    this.electionMembers.set(false);
     this.candidates.set([]);
     this.freeName.set('');
     this.poll.set(emptyPollDraft());
@@ -329,11 +355,12 @@ export class VoteOpenDialogComponent {
     this.kind.set(kind);
     this.questionEdited = true;
     this.question.set(vote.question ?? '');
-    this.majorityRule.set(vote.majorityRule ?? 'simple');
+    this.majorityRule.set(it.planVersionId ? 'members_majority' : (vote.majorityRule ?? 'simple'));
     this.guestsVote.set(this.guestsAllowed() && !it.nonPublic && !!vote.guestsVote);
     if (it.applicationId) this.draft.set(draftOf(vote.proposal, it.amount ?? null));
     if (kind === 'election' && vote.election) {
       this.seats.set(vote.election.seats);
+      this.electionMembers.set(vote.election.majorityRule === 'members_majority');
       const first = this.takeKeys(vote.election.candidates.length);
       this.candidates.set(
         vote.election.candidates.map((c, i) => ({
@@ -469,6 +496,7 @@ export class VoteOpenDialogComponent {
             name: c.name,
             ...(c.principalId ? { principalId: c.principalId } : {}),
           })),
+          ...(this.membersElection() ? { majorityRule: 'members_majority' as const } : {}),
           secret: true,
           ...guests,
         }

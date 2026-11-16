@@ -43,7 +43,6 @@ const BUDGET_TREE = [
     currency: 'EUR',
     active: true,
     color: null,
-    hiddenInBudget: false,
     viewGremiumId: null,
     fiscalStartMonth: 1,
     fiscalStartDay: 1,
@@ -59,7 +58,6 @@ const BUDGET_TREE = [
         currency: 'EUR',
         active: true,
         color: null,
-        hiddenInBudget: false,
         viewGremiumId: null,
         fiscalStartMonth: 1,
         fiscalStartDay: 1,
@@ -159,6 +157,15 @@ function buildValid(c: any): void {
 
 describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  /** Spec 000761: a state cannot start a vote while Abstimmungen is off. */
+  it('offers the vote state only while Abstimmungen is on', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['voting']));
+    const off = await setup();
+    localStorage.removeItem('ap.features.off');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((off.fixture.componentInstance as any).stateKinds).toEqual(['normal']);
+  });
 
   it('reports an empty graph as invalid and shows no save', async () => {
     await setup();

@@ -7,6 +7,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
+  ButtonComponent,
   FabComponent,
   ConfirmDialogComponent,
   EmptyStateComponent,
@@ -26,6 +27,7 @@ import { problemCode } from '@core/api/problem';
 import { AdminApiService } from '../admin-api.service';
 import type { CdVariantOption, Gremium } from '../admin.models';
 import { GremiumRoleMatrixComponent } from '../gremium-roles/gremium-role-matrix.component';
+import { GremiumDefaultsDialogComponent } from './gremium-defaults-dialog/gremium-defaults-dialog.component';
 import { GremiumDialogComponent } from './gremium-dialog/gremium-dialog.component';
 import { expandSet } from '@shared/expand-set';
 import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
@@ -33,8 +35,9 @@ import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-stat
 /**
  * The message of a refused gremium delete. The delete applies the rules of the meeting
  * delete to every meeting of the gremium: an open vote gives 409 `open_vote`, a final
- * protocol without `meeting.delete_finalized` gives 403 `meeting_finalized`. Any other
- * refusal keeps the generic message.
+ * protocol without `meeting.delete_finalized` gives 403 `meeting_finalized`. A Gremium
+ * that a budget belongs to gives 409 `gremium_has_budget`. Any other refusal keeps the
+ * generic message.
  */
 function deleteErrorKey(err: unknown): TranslationKey {
   switch (problemCode(err)) {
@@ -42,6 +45,8 @@ function deleteErrorKey(err: unknown): TranslationKey {
       return 'admin.gremien.deleteOpenVote';
     case 'meeting_finalized':
       return 'admin.gremien.deleteFinalized';
+    case 'gremium_has_budget':
+      return 'admin.gremien.deleteHasBudget';
     default:
       return 'admin.gremien.deleteFailed';
   }
@@ -62,7 +67,8 @@ interface Setting {
  * edit, delete and the toggle. An open row shows the settings (gaps N38) and the role
  * matrix of the gremium (`app-gremium-role-matrix`); the first row starts open. The
  * memberships come from the OIDC groups, so this page has no member editing. The dialog
- * `app-gremium-dialog` creates and edits a gremium.
+ * `app-gremium-dialog` creates and edits a gremium. The header button "Vorgaben" opens
+ * the values that the form of a new gremium starts with (§ 000906).
  *
  * The disclosure is a native button, because it needs aria-expanded on the button itself.
  */
@@ -71,6 +77,8 @@ interface Setting {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ButtonComponent,
+    GremiumDefaultsDialogComponent,
     LoadStateComponent,
     SectionComponent,
     ExpandRowComponent,
@@ -114,6 +122,8 @@ export class AdminGremienComponent {
   protected readonly dialogGremium = signal<Gremium | null | undefined>(undefined);
   /** The last gremium of the dialog. It stays while the dialog closes. */
   protected readonly lastDialogGremium = signal<Gremium | null>(null);
+  /** The dialog "Vorgaben für neue Gremien" is open. */
+  protected readonly defaultsOpen = signal(false);
   readonly confirmDelete = signal<Gremium | null>(null);
   readonly deleting = signal(false);
 
@@ -188,6 +198,15 @@ export class AdminGremienComponent {
             ? t('admin.gremien.noQuorum')
             : t('admin.gremien.percent', { value: g.quorumPercent }),
       },
+      ...(g.repeatQuorumPercent === null || g.repeatQuorumPercent === undefined
+        ? []
+        : [
+            {
+              label: t('admin.gremien.repeatQuorumShort'),
+              value: t('admin.gremien.percent', { value: g.repeatQuorumPercent }),
+            },
+          ]),
+      { label: t('admin.gremien.guestsMayVote'), value: yesNo(g.guestsMayVote) },
       { label: t('admin.gremien.delegation'), value: yesNo(g.allowVoteDelegation) },
       { label: t('admin.gremien.publicShort'), value: yesNo(g.protocolsPublic) },
       ...(g.allowVoteDelegation
@@ -202,6 +221,14 @@ export class AdminGremienComponent {
             {
               label: t('admin.gremien.delegationExternal'),
               value: yesNo(g.delegationAllowExternal),
+            },
+            {
+              label: t('admin.gremien.delegationMax'),
+              value: String(g.delegationMaxPerDelegate ?? 2),
+            },
+            {
+              label: t('admin.gremien.delegationInElections'),
+              value: yesNo(g.delegationInElections),
             },
           ]
         : []),

@@ -36,9 +36,11 @@ from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date as _date
+from datetime import datetime
 from datetime import time as _time
 from functools import partial, reduce
 from itertools import accumulate
+from zoneinfo import ZoneInfo
 
 from app.modules.media.refs import is_image_path
 
@@ -182,6 +184,7 @@ def sanitize_user_markdown(markdown: str) -> str:
     stripped = _strip_eval_refdefs(_PYTEX_IFFALSE_RE.sub("", markdown))
     return _UNSAFE_IMAGE_RE.sub(_neutralize_unsafe_image, _strip_until_clean(stripped, 3))
 
+
 #: Gremium `cd_variant` values that select a protocol render variant.
 _PROTOCOL_VARIANTS = frozenset({"stupa", "asta"})
 
@@ -223,6 +226,10 @@ class ProtocolDoc:
         excused: The excused members, a group of their own.
         started_at: The real start in local time (`YYYY-MM-DD HH:MM`), or the planned start
             when the meeting has no recorded start.
+        kind: The kind of the meeting (`ordinary`, `extraordinary`, `repeat`,
+            `constituent`). The header shows its German name.
+        location: The place of the meeting. Without it the header has no place line.
+        form: The form of the meeting (`presence`, `hybrid`, `video`).
         quorate: The quorum from the present members against the active members. `None`
             means no statement.
     """
@@ -240,8 +247,25 @@ class ProtocolDoc:
     excused: Sequence[str] = ()
     absent: Sequence[str] = ()
     started_at: str | None = None
+    kind: str | None = None
+    location: str | None = None
+    form: str | None = None
     datalines: Sequence[str] = ()
     quorate: bool | None = None
+
+
+#: The German names of the meeting kinds and forms in the protocol header.
+MEETING_KIND_LABELS: Mapping[str, str] = {
+    "ordinary": "Ordentliche Sitzung",
+    "extraordinary": "Außerordentliche Sitzung",
+    "repeat": "Wiederholungssitzung",
+    "constituent": "Konstituierende Sitzung",
+}
+MEETING_FORM_LABELS: Mapping[str, str] = {
+    "presence": "Präsenz",
+    "hybrid": "Hybrid",
+    "video": "Videokonferenz",
+}
 
 
 #: Signature block of the renderer (`unterschriften`). The frontmatter
@@ -314,6 +338,9 @@ def _frontmatter(doc: ProtocolDoc) -> list[str]:
         *_yaml_entry("beginn", _hhmm(doc.start_time)),
         *_yaml_entry("ende", _hhmm(doc.end_time)),
         *_yaml_entry("started_at", doc.started_at),
+        *_yaml_entry("sitzungsart", MEETING_KIND_LABELS.get(doc.kind or "")),
+        *_yaml_entry("ort", doc.location or None),
+        *_yaml_entry("form", MEETING_FORM_LABELS.get(doc.form or "")),
         *_yaml_entry("protokoll", doc.protokollant),
         *_yaml_keepers(doc.keepers),
         *_yaml_list("anwesend", doc.present),
@@ -338,9 +365,7 @@ def build_protocol_document(doc: ProtocolDoc) -> str:
     return "\n".join([*_frontmatter(doc), "", *([body] if body else [])]).rstrip() + "\n"
 
 
-def guest_vote_note(
-    present_members: int | None, present_guests: int | None, cast: int
-) -> str:
+def guest_vote_note(present_members: int | None, present_guests: int | None, cast: int) -> str:
     """Describe the base of a vote with guests, as counts and never as names.
 
     Such a vote has no quorum; the majority of the cast ballots decides. The line
@@ -417,6 +442,10 @@ class ElectionSnippet:
     closed: bool = True
     #: The number of a repeat ("erneut abstimmen"); 1 for an election that repeats nothing.
     attempt: int = 1
+    #: The election needs the majority of the members (one seat, spec 000912).
+    members_majority: bool = False
+    #: The names that the lot gave a place in the third Wahlgang (spec 000971).
+    next_round_lot_names: Sequence[str] = ()
 
 
 def _election_head(view: ElectionSnippet) -> str:
@@ -451,9 +480,39 @@ def _election_outcome(view: ElectionSnippet, *, public: bool) -> list[str]:
     return [
         f"> Gewählt: {names}",
         *([f"> {others} weitere Kandidierende"] if public and others > 0 else []),
+        *(["> Keine Mehrheit der Mitglieder."] if _needs_members(view) and not elected else []),
+        *_next_round_lot(view, public=public),
         *(["> Durch Los entschieden."] if view.by_lot else []),
         *(["> Gleichstand: das Los steht aus."] if view.lot_pending else []),
         *([runoff] if view.runoff_seats else []),
+    ]
+
+
+#: From this Wahlgang on the simple majority elects (spec 000971).
+_SIMPLE_MAJORITY_ROUND = 3
+
+
+def _needs_members(view: ElectionSnippet) -> bool:
+    """Tell whether this Wahlgang needs the majority of the members."""
+    return view.members_majority and view.round < _SIMPLE_MAJORITY_ROUND
+
+
+def _majority_note(view: ElectionSnippet) -> str:
+    """Return the majority part of the kind line of a `members_majority` election."""
+    if not view.members_majority:
+        return ""
+    return " · Mehrheit der Mitglieder" if _needs_members(view) else " · einfache Mehrheit"
+
+
+def _next_round_lot(view: ElectionSnippet, *, public: bool) -> list[str]:
+    """Return the line on the lot for a place in the third Wahlgang."""
+    if not view.next_round_lot_names:
+        return []
+    who = ", ".join(_md_escape(n) for n in view.next_round_lot_names)
+    return [
+        "> Gleichstand: das Los bestimmt einen Platz im 3. Wahlgang."
+        if public
+        else f"> Gleichstand: das Los bestimmt für den 3. Wahlgang: {who}"
     ]
 
 
@@ -471,14 +530,24 @@ def build_election_snippet(view: ElectionSnippet, *, public: bool = False) -> st
     („Frage (2. Wahlgang)“). A repeat of an election counts on in the same way
     (`attempt`), but its kind line names no runoff. Each round then has its own head line,
     which `replace_vote_blocks` and `votes_in_body` match on.
+
+    An election with the rule `members_majority` names the rule in its kind line, and
+    a ballot without such a majority says „Keine Mehrheit der Mitglieder.“ Its third
+    Wahlgang names the simple majority instead, and its further Wahlgänge are no runoff
+    (spec 000971). The second Wahlgang names a lot for a place in the third.
     """
-    runoff = f" · Stichwahl ({view.round}. Wahlgang)" if view.round > 1 else ""
+    runoff = (
+        f" · Stichwahl ({view.round}. Wahlgang)"
+        if view.round > 1 and not view.members_majority
+        else ""
+    )
+    members = _majority_note(view)
     ballot = _election_ballot(view) if view.closed and not public else []
     outcome = _election_outcome(view, public=public) if view.closed else []
     return "\n".join(
         [
             f"> [!abstimmung] **{_election_head(view)}**",
-            f"> Wahl · {view.seats} Posten{runoff}",
+            f"> Wahl · {view.seats} Posten{runoff}{members}",
             *ballot,
             *outcome,
         ]
@@ -609,9 +678,7 @@ def _claim(
     return assigned if k is None else {**assigned, k: n}
 
 
-def _assign_blocks(
-    texts: Sequence[tuple[str, ...]], snippets: Sequence[str]
-) -> Mapping[int, int]:
+def _assign_blocks(texts: Sequence[tuple[str, ...]], snippets: Sequence[str]) -> Mapping[int, int]:
     """Assign each block to at most one vote: the exact text first, then the head line."""
     empty: Mapping[int, int] = {}
     exact = reduce(partial(_claim, _whole, texts), enumerate(snippets), empty)
@@ -785,3 +852,13 @@ def _yaml_scalar(value: str) -> str:
 def _md_escape(text: str) -> str:
     """Minimal escape for inline Markdown text (newline → space)."""
     return text.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
+
+
+def top_time_note(started_at: datetime | None, tz: ZoneInfo) -> str:
+    """Return the empty time note in front of a TOP heading, or "" without a time.
+
+    The note `> [!anmerkung HH:MM]` shows the local time at which the meeting
+    moved to the TOP. The typst template draws it grey and centered above the
+    heading.
+    """
+    return f"> [!anmerkung {started_at.astimezone(tz):%H:%M}]" if started_at is not None else ""

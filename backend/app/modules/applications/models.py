@@ -95,12 +95,8 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     current_state_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("state.id"), nullable=True
     )
-    gremium_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("gremium.id"), nullable=True
-    )
-    budget_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("budget.id"), nullable=True
-    )
+    gremium_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("gremium.id"), nullable=True)
+    budget_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("budget.id"), nullable=True)
     fiscal_year_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("fiscal_year.id"), nullable=True
     )
@@ -116,9 +112,7 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     email_confirmed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    archived_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     captured_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     capture_intake: Mapped[str | None] = mapped_column(Text, nullable=True)
     received_on: Mapped[date | None] = mapped_column(Date, nullable=True)
@@ -160,9 +154,7 @@ class ApplicationLink(Base):
         ForeignKey("application.id", ondelete="CASCADE")
     )
     linked_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    linked_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    linked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
         CheckConstraint("application_id <> predecessor_id", name="not_self"),
@@ -188,9 +180,7 @@ class ApplicationLinkEvent(UUIDPkMixin, Base):
     )
     action: Mapped[str] = mapped_column(Text)
     actor: Mapped[str | None] = mapped_column(Text, nullable=True)
-    at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
         CheckConstraint("action IN ('set','removed')", name="action"),
@@ -216,9 +206,7 @@ class ApplicationObserver(UUIDPkMixin, Base):
     )
     email: Mapped[str] = mapped_column(CITEXT)
     added_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    added_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
         UniqueConstraint("application_id", "email"),
@@ -244,9 +232,7 @@ class Applicant(UUIDPkMixin, Base):
     )
     email: Mapped[str | None] = mapped_column(CITEXT, nullable=True)
     name: Mapped[str | None] = mapped_column(Text, nullable=True)
-    anonymized_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    anonymized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class SubmissionVersion(UUIDPkMixin, Base):
@@ -260,9 +246,7 @@ class SubmissionVersion(UUIDPkMixin, Base):
     version: Mapped[int] = mapped_column(Integer)
     data: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     changed_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     diff: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (UniqueConstraint("application_id", "version"),)
@@ -285,17 +269,13 @@ class StatusEvent(UUIDPkMixin, Base):
     application_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("application.id", ondelete="CASCADE")
     )
-    from_state_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("state.id"), nullable=True
-    )
+    from_state_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("state.id"), nullable=True)
     to_state_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("state.id"))
     transition_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("transition.id"), nullable=True
     )
     actor: Mapped[str | None] = mapped_column(Text, nullable=True)
-    at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     vote_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("vote.id", ondelete="SET NULL"), nullable=True
@@ -341,13 +321,9 @@ class ApplicationDecision(UUIDPkMixin, Base):
     status_event_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("status_event.id", ondelete="SET NULL"), nullable=True
     )
-    decided_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     decided_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    superseded_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         Index("ix_application_decision_application_id", "application_id"),
@@ -388,12 +364,8 @@ class MagicLink(UUIDPkMixin, CreatedAtMixin, Base):
         ForeignKey("application.id", ondelete="CASCADE")
     )
     token_hash: Mapped[bytes] = mapped_column(LargeBinary)
-    expires_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    used_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (Index("ix_magic_link_token_hash", "token_hash", unique=True),)
 
@@ -415,9 +387,7 @@ class GuestApplicationSettings(Base):
         Integer, server_default="12", default=DEFAULT_CONFIRM_TTL_HOURS
     )
     link_ttl_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_by: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
@@ -456,16 +426,10 @@ class Comment(UUIDPkMixin, Base):
     mentions: Mapped[list[str]] = mapped_column(
         JSONB, default=list, server_default=text("'[]'::jsonb")
     )
-    at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
-        CheckConstraint(
-            "author_kind IN ('principal','applicant')", name="comment_author_kind"
-        ),
-        CheckConstraint(
-            "visibility IN ('internal','public')", name="comment_visibility"
-        ),
+        CheckConstraint("author_kind IN ('principal','applicant')", name="comment_author_kind"),
+        CheckConstraint("visibility IN ('internal','public')", name="comment_visibility"),
         Index("ix_comment_application_id_at", "application_id", "at"),
     )

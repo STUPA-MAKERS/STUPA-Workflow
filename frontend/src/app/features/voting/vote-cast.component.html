@@ -44,6 +44,7 @@
             [context]="context()"
             [own]="own()"
             [proxyName]="proxyName()"
+            [proxyCount]="proxyCount()"
             [proxyCast]="proxyCast()"
             [caster]="caster"
             [notice]="notice()"
@@ -53,8 +54,14 @@
             (castFailed)="onCastFailed($event)"
             (changed)="onElectionChanged()"
           >
-            @if ((!phone() && beamerLink()) || hasMenu()) {
+            @if ((!phone() && beamerLink()) || hasMenu() || canObject()) {
               <span vpnActions class="vc__actions">
+                @if (canObject()) {
+                  <app-button variant="danger" size="sm" (click)="confirmObject.set(true)">
+                    <app-icon name="x" />
+                    {{ 'circular.object.action' | t }}
+                  </app-button>
+                }
                 @if (!phone() && beamerLink()) {
                   <app-button variant="tonal" size="sm" (click)="goBeamer()">
                     <app-icon name="monitor" />
@@ -91,4 +98,14 @@
   [busy]="deleting()"
   (confirm)="doDelete()"
   (cancel)="confirmDelete.set(false)"
+/>
+
+<app-confirm-dialog
+  [open]="confirmObject()"
+  [title]="'circular.object.title' | t"
+  [body]="'circular.object.body' | t"
+  [confirmLabel]="'circular.object.action' | t"
+  [busy]="objecting()"
+  (confirm)="doObject()"
+  (cancel)="confirmObject.set(false)"
 />

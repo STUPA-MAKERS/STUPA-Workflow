@@ -126,15 +126,14 @@ async def _has_scoped_budget_view(db: DbSession, sub: str) -> bool:
 
     The frontend uses the flag to show the budget tab.
     """
+    from app.modules.budget.access import viewed_by
     from app.modules.budget.tree_models import Budget
     from app.modules.gremien.gremium_roles import gremium_reader_ids
 
     member = await gremium_reader_ids(db, sub)
     if not member:
         return False
-    hit = await db.scalar(
-        select(Budget.id).where(Budget.view_gremium_id.in_(member)).limit(1)
-    )
+    hit = await db.scalar(select(Budget.id).where(viewed_by(member)).limit(1))
     return hit is not None
 
 
@@ -150,9 +149,7 @@ async def _session_manage_gremien(db: DbSession, principal: Principal) -> list[U
     return sorted(await held_gremium_ids(db, principal, "session.manage"), key=str)
 
 
-async def _gremium_permissions(
-    db: DbSession, principal: Principal
-) -> dict[UUID, list[str]]:
+async def _gremium_permissions(db: DbSession, principal: Principal) -> dict[UUID, list[str]]:
     """Return the gremium permissions of the principal per Gremium.
 
     Each membership counts. The OAuth scope cap removes each key that
@@ -168,9 +165,7 @@ async def _gremium_permissions(
     }
 
 
-def _scoped_keys(
-    principal: Principal, keys: Iterable[str], held: frozenset[str]
-) -> list[str]:
+def _scoped_keys(principal: Principal, keys: Iterable[str], held: frozenset[str]) -> list[str]:
     """Return the `keys` in their order that the role holds and the scope cap lets through."""
     return [p for p in keys if p in held and principal.scope_allows(p)]
 

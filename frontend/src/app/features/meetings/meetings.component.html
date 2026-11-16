@@ -19,6 +19,7 @@
       [savingAttendance]="savingAttendance()"
       (back)="goBack()"
       (attendanceChange)="setAttendance($event.member, $event.status, $event.note)"
+      (lateExcused)="attendance.set($event)"
     />
   } @else {
   <app-meeting-page
@@ -163,13 +164,6 @@
     />
   }
 
-  <app-early-open-dialog
-    [open]="earlyOpenAsk()"
-    [meeting]="m"
-    (closed)="earlyOpenAsk.set(false)"
-    (confirmed)="startMeeting(true)"
-  />
-
   <app-close-meeting-dialog
     [open]="dialogs.closeOpen()"
     [meeting]="m"
@@ -192,6 +186,7 @@
   [open]="finalizeDialogOpen()"
   [meetingTitle]="meeting()?.title ?? ''"
   [finalizing]="finalizing()"
+  [publicGremium]="protocol()?.gremiumProtocolsPublic ?? false"
   [initialWithheld]="protocol()?.publicWithheld ?? false"
   (closed)="finalizeDialogOpen.set(false)"
   (confirmed)="confirmFinalize($event)"

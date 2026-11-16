@@ -62,6 +62,10 @@ class AttendanceOut(FrozenCamelModel, frozen=True):
     #: The member has an own vote now (gremium permission ``vote.cast``). Only such a
     #: member can delegate, so the lead offers "Vertretung eintragen" only for them.
     can_vote: bool = Field(default=False, alias="canVote")
+    #: Until this moment the member can still change the own ``absent`` to ``excused``
+    #: (``lateExcuseDays`` after the close). Only the own row of a closed meeting
+    #: carries it, and only while the window is open.
+    late_excuse_until: _datetime | None = Field(default=None, alias="lateExcuseUntil")
 
 
 class MeetingMemberOut(FrozenCamelModel, frozen=True):
@@ -82,6 +86,10 @@ class AgendaItemOut(FrozenCamelModel, frozen=True):
     application_id: UUID | None = Field(default=None, alias="applicationId")
     #: The to-do card of an item of kind to-do (the item title is the card title).
     todo_id: UUID | None = Field(default=None, alias="todoId")
+    #: The version of a Haushaltsplan that an item of kind plan decides.
+    plan_version_id: UUID | None = Field(default=None, alias="planVersionId")
+    #: The version of the plan is a draft: the item reads it and takes no vote.
+    plan_reading: bool = Field(default=False, alias="planReading")
     #: The title of the item: its own title, else the title of its application.
     title: str | None = None
     #: The title of the application. None for a free-text item.

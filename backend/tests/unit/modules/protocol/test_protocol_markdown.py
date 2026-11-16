@@ -58,6 +58,30 @@ def test_document_without_optional_fields() -> None:
     assert "typ: protokoll" in md
 
 
+def test_header_names_the_kind_the_place_and_the_form() -> None:
+    """The header data of the render call carry the kind, the place and the form.
+
+    §F/meetings/protocols/000908. A meeting without a place has no place line.
+    """
+    md = build_protocol_document(_doc(kind="repeat", location="Raum 9-108", form="hybrid"))
+    head = md.split("---")[1]
+    assert 'sitzungsart: "Wiederholungssitzung"' in head
+    assert 'ort: "Raum 9-108"' in head
+    assert 'form: "Hybrid"' in head
+    plain = build_protocol_document(_doc(kind="ordinary", location="", form="presence"))
+    head = plain.split("---")[1]
+    assert 'sitzungsart: "Ordentliche Sitzung"' in head
+    assert 'form: "Präsenz"' in head
+    assert "ort:" not in head
+    labels = {
+        kind: build_protocol_document(_doc(kind=kind, form=form)).split("---")[1]
+        for kind, form in (("extraordinary", "video"), ("constituent", "presence"))
+    }
+    assert 'sitzungsart: "Außerordentliche Sitzung"' in labels["extraordinary"]
+    assert 'form: "Videokonferenz"' in labels["extraordinary"]
+    assert 'sitzungsart: "Konstituierende Sitzung"' in labels["constituent"]
+
+
 def test_frontmatter_injection_is_quoted() -> None:
     """A title with a colon, a newline or --- must not break the frontmatter open.
 

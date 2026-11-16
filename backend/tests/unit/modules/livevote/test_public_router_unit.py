@@ -116,7 +116,7 @@ def test_public_rest_routes(rest: Any) -> None:
     vote = uuid4()
     assert client.post(
         f"/api/public/meetings/7KQ4MP/votes/{vote}/ballot", json={"choice": "yes"}
-    ).json() == {"status": "cast"}
+    ).json() == {"status": "cast", "ballots": 1}
     left = client.delete("/api/public/meetings/7KQ4MP/me")
     assert left.status_code == 204 and 'mg_token=""' in left.headers["set-cookie"]
     assert ("me", "tok") in fake.calls and ("cast", "yes") in fake.calls

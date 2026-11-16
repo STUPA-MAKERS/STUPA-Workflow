@@ -4,7 +4,7 @@ title: The public calendar page shows the public entries
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-11
+updated: 2026-11-16
 implementation:
   - backend/app/modules/calendar/public_router.py
   - frontend/src/app/features/calendar/calendar.component.ts
@@ -19,12 +19,12 @@ scope:
 # The public calendar page shows the public entries
 
 The page `/public-calendar` must be open without a sign-in. It must show the public Termine
-(§F/meetings/calendar/000730) and the public meetings (§F/meetings/calendar/000732) and no other
+(F/meetings/calendar/000730) and the public meetings (F/meetings/calendar/000732) and no other
 kind of entry: no cards, no events, no external calendars.
 
 The page must have the views of the calendar tab: the month grid and the week view on a desktop
-(§F/meetings/calendar/000728), the list of days on a phone (§F/meetings/calendar/000726), and the
-search (§F/meetings/calendar/000727). It must have the filter by Gremium and no other filter. A
+(F/meetings/calendar/000728), the list of days on a phone (F/meetings/calendar/000726), and the
+search (F/meetings/calendar/000727). It must have the filter by Gremium and no other filter. A
 press on an entry must open its public fields in a dialog, or in a bottom sheet on a phone. The
 page must have no button that creates a Termin.
 

@@ -16,7 +16,8 @@ import base64
 import hashlib
 import logging
 from dataclasses import dataclass, field
-from email.message import EmailMessage
+from email.headerregistry import Address
+from email.message import EmailMessage, MIMEPart
 from typing import Protocol
 
 from app.settings import Settings
@@ -56,6 +57,36 @@ class MailAttachment:
 
 
 @dataclass(frozen=True, slots=True)
+class MailInline:
+    """An image that the HTML part shows by its content id (``cid:<cid>``).
+
+    The logo of the branding travels this way: a mail client shows an inline part
+    without a click, and the mail loads nothing from a server.
+    """
+
+    cid: str
+    mime: str
+    content: bytes
+
+    def to_payload(self) -> dict[str, object]:
+        """Return the queue form, with the content base64-encoded."""
+        return {
+            "cid": self.cid,
+            "mime": self.mime,
+            "content": base64.b64encode(self.content).decode("ascii"),
+        }
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, object]) -> MailInline:
+        """Build the inline image from its queue form."""
+        return cls(
+            cid=str(payload["cid"]),
+            mime=str(payload["mime"]),
+            content=base64.b64decode(str(payload["content"])),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class MailMessage:
     """A ready-to-send mail (pure value, serializable for the queue).
 
@@ -71,6 +102,7 @@ class MailMessage:
     from_addr: str | None = None
     from_name: str | None = None
     attachments: tuple[MailAttachment, ...] = ()
+    inline: tuple[MailInline, ...] = ()
 
     def recipient_domains(self) -> list[str]:
         """Return the recipient domains (for logs free of personal data)."""
@@ -87,12 +119,14 @@ class MailMessage:
             "from_addr": self.from_addr,
             "from_name": self.from_name,
             "attachments": [a.to_payload() for a in self.attachments],
+            "inline": [i.to_payload() for i in self.inline],
         }
 
     @classmethod
     def from_payload(cls, payload: dict[str, object]) -> MailMessage:
         """Rebuild the message from the queue payload (inverse of `to_payload`)."""
         raw_attachments = payload.get("attachments") or []
+        raw_inline = payload.get("inline") or []
         return cls(
             to=tuple(payload["to"]),  # type: ignore[arg-type]
             subject=str(payload["subject"]),
@@ -104,6 +138,10 @@ class MailMessage:
             attachments=tuple(
                 MailAttachment.from_payload(a)
                 for a in raw_attachments  # type: ignore[union-attr]
+            ),
+            inline=tuple(
+                MailInline.from_payload(i)
+                for i in raw_inline  # type: ignore[union-attr]
             ),
         )
 
@@ -118,17 +156,35 @@ def compute_idempotency_key(*parts: str) -> str:
     return f"mail:{digest}"
 
 
+def _add_inline(html_part: MIMEPart, images: tuple[MailInline, ...]) -> None:
+    """Add each inline image to the HTML part as a related part with its content id."""
+    for image in images:
+        html_part.add_related(
+            image.content,
+            maintype=image.mime.partition("/")[0],
+            subtype=image.mime.partition("/")[2],
+            cid=f"<{image.cid}>",
+            disposition="inline",
+        )
+
+
 def build_email_message(msg: MailMessage, settings: Settings) -> EmailMessage:
-    """Build an RFC-5322 `EmailMessage` (text, optional HTML, attachments)."""
+    """Build an RFC-5322 `EmailMessage` (text, optional HTML, attachments).
+
+    The sender name goes through `Address`, which quotes and encodes it: the name comes
+    from the branding, so it can hold a comma, a quote or a non-ASCII letter. An inline
+    image joins the HTML part as a related part, so only the HTML shows it.
+    """
     email = EmailMessage()
     from_addr = msg.from_addr or settings.mail_from
-    from_name = msg.from_name or settings.mail_from_name
-    email["From"] = f"{from_name} <{from_addr}>" if from_name else from_addr
+    from_name = " ".join((msg.from_name or settings.mail_from_name).split())
+    email["From"] = Address(display_name=from_name, addr_spec=from_addr) if from_name else from_addr
     email["To"] = ", ".join(msg.to)
     email["Subject"] = msg.subject
     email.set_content(msg.text)
     if msg.html:
         email.add_alternative(msg.html, subtype="html")
+        _add_inline(list(email.iter_parts())[-1], msg.inline)
     for attachment in msg.attachments:
         maintype, _, subtype = attachment.mime.partition("/")
         email.add_attachment(

@@ -25,6 +25,10 @@
   column-gap: var(--space-6);
   row-gap: 0;
 }
+// Without the sheet "Heute" the list takes the whole width.
+:host(.dash--wide.dash--noToday) {
+  grid-template-columns: minmax(0, 1fr);
+}
 :host(.dash--wide) > .dash__top {
   grid-area: 1 / 1;
 }

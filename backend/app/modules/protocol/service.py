@@ -13,7 +13,7 @@ The service binds to an `AsyncSession` and drives the protocol lifecycle.
   meeting. It writes `protocol_finalize`.
 * `finalize` renders the Markdown through typst into a PDF. It stores the PDF
   in MinIO and mails it to MAIL_LIST(gremium). It sets `status='final'` and
-  `sent_at`.
+  `finalized_at`, and `sent_at` when the mail goes out.
 
 The service reuses the typst client, the object storage and the mail queue of
 `app.modules.pdf` and `app.modules.notifications` without a change.
@@ -43,40 +43,42 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.models import Application
+from app.modules.applications.service import ApplicationsService
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
-from app.modules.files.storage import ObjectStorage, StorageError
-from app.modules.gremien.models import Gremium
-from app.modules.livevote.service import MeetingService
-from app.modules.media.service import MediaService
-from app.modules.meetings.agenda_service import agenda_order, title_of
-from app.modules.meetings.keepers import agenda_positions, keeper_periods, principal_names
-from app.modules.meetings.models import Meeting, MeetingAgendaItem, MeetingAttendance
-from app.modules.meetings.protocol_models import Protocol, ProtocolVoteRef
-from app.modules.meetings.roster import meeting_roster_filter, roster_filter
-from app.modules.notifications.layout import (
-    append_link_text,
-    reason_text,
-    render_layout,
-    text_to_html,
-)
-from app.modules.notifications.links import protocol_link, public_protocol_url
-from app.modules.notifications.mail import (
-    MailAttachment,
-    MailMessage,
-    compute_idempotency_key,
-)
-from app.modules.notifications.queue import MailQueue
-from app.modules.notifications.recipients import RecipientResolver
-from app.modules.notifications.service import filter_recipients_by_preference
-from app.modules.pdf.typst_client import TypstClient, TypstError
-from app.modules.protocol.cd_resolver import (
+from app.modules.documents.service import ANLAGE_MARK, ApplicationPdfService, anlage_reference
+from app.modules.files.cd_resolver import (
     cd_render_config,
     cd_variant_key_for_gremium,
     resolve_cd_variant_by_key,
 )
+from app.modules.files.pdf_branding import (
+    active_pdf_branding,
+    footer_render_assets,
+    footer_render_config,
+)
+from app.modules.files.storage import ObjectStorage, StorageError
+from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
+from app.modules.livevote.service import MeetingService
+from app.modules.media.models import MarkdownDocument
+from app.modules.media.service import MediaService
+from app.modules.meetings.agenda_service import agenda_order, title_of
+from app.modules.meetings.keepers import agenda_positions, keeper_periods, principal_names
+from app.modules.meetings.models import Meeting, MeetingAgendaItem, MeetingAttendance
+from app.modules.meetings.present import VOTE_PERMISSION, meeting_present
+from app.modules.meetings.protocol_models import Protocol, ProtocolVoteRef
+from app.modules.notifications.brand import load_mail_brand
+from app.modules.notifications.compose import branded_mail
+from app.modules.notifications.links import protocol_link, public_protocol_url
+from app.modules.notifications.mail import MailAttachment, compute_idempotency_key
+from app.modules.notifications.queue import MailQueue
+from app.modules.notifications.recipients import RecipientResolver
+from app.modules.notifications.service import filter_recipients_by_preference
+from app.modules.pdf.typst_client import TypstClient, TypstError
+from app.modules.protocol import approval
+from app.modules.protocol.approval import approval_fields
 from app.modules.protocol.filename import protocol_pdf_filename
 from app.modules.protocol.markdown import (
     ElectionLine,
@@ -94,8 +96,10 @@ from app.modules.protocol.markdown import (
     mark_vote_blocks,
     protocol_variant_for,
     replace_vote_blocks,
+    top_time_note,
     votes_in_body,
 )
+from app.modules.protocol.plan_anlage import attach_plans, plan_reference, with_plan_reference
 from app.modules.protocol.public import (
     PublicAttendance,
     PublicDecision,
@@ -109,6 +113,7 @@ from app.modules.protocol.schemas import ProtocolOut
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import ElectionResultOut, PollResultOut, VoteOut
 from app.modules.voting.service import VotingService
+from app.modules.voting.tally import meeting_quorate
 from app.settings import Settings, get_settings
 from app.shared.blackout import black_out, has_open_marker
 from app.shared.config_schemas import ElectionConfig, PollConfig, PollOption
@@ -163,8 +168,9 @@ BackfillOutcome = Literal["done", "transient", "failed"]
 class HeaderMeta:
     """The person-related header data of one protocol variant.
 
-    `present_count` holds the true number of attendees and feeds the quorum, also
-    in the public variant that leaves the names out.
+    `present_count` holds the one present count of the meeting
+    (§F/meetings/meetings/000946) and feeds the quorum, also in the public variant
+    that leaves the names out.
     """
 
     protokollant: str | None = None
@@ -177,6 +183,17 @@ class HeaderMeta:
     absent_count: int = 0
     guest_count: int = 0
     datalines: Sequence[str] = field(default_factory=list)
+
+
+def _mark_final(protocol: Protocol, now: datetime, *, sent: bool) -> None:
+    """Set a protocol to final at `now`, with the mark of the mail only when one goes out.
+
+    A protocol that went back to draft keeps the mark of its first mail, because that
+    mail is out and the draft must stay (spec 000983).
+    """
+    protocol.status = "final"
+    protocol.finalized_at = now
+    protocol.sent_at = now if sent else protocol.sent_at
 
 
 class ProtocolService:
@@ -206,9 +223,7 @@ class ProtocolService:
         """
         base = select(Protocol).where(Protocol.id == protocol_id)
         stmt = (
-            base.with_for_update().execution_options(populate_existing=True)
-            if for_update
-            else base
+            base.with_for_update().execution_options(populate_existing=True) if for_update else base
         )
         protocol = (await self.session.execute(stmt)).scalar_one_or_none()
         if protocol is None:
@@ -231,9 +246,7 @@ class ProtocolService:
             raise NotFoundError(f"meeting {meeting_id} not found")
         return meeting
 
-    async def authorize_write_meeting(
-        self, meeting_id: UUID, principal: Principal
-    ) -> None:
+    async def authorize_write_meeting(self, meeting_id: UUID, principal: Principal) -> None:
         """Check the write access to the protocol of a meeting (create or load).
 
         One of these rights is enough: the admin role, the Gremium permission
@@ -277,9 +290,7 @@ class ProtocolService:
         protocol = await self._get(protocol_id)
         await self._meeting_service().assert_can_read(protocol.meeting_id, principal)
 
-    async def authorize_read_meeting(
-        self, meeting_id: UUID, principal: Principal
-    ) -> None:
+    async def authorize_read_meeting(self, meeting_id: UUID, principal: Principal) -> None:
         """Check the read access to the protocol of a meeting (GET …/protocol)."""
         await self._meeting_service().assert_can_read(meeting_id, principal)
 
@@ -317,9 +328,7 @@ class ProtocolService:
         try:
             return await self.storage.get(protocol.pdf_storage_key)
         except StorageError as exc:
-            raise ServiceUnavailableError(
-                "Protocol PDF temporarily unavailable."
-            ) from exc
+            raise ServiceUnavailableError("Protocol PDF temporarily unavailable.") from exc
 
     async def pdf_filename(self, protocol_id: UUID, *, public: bool = False) -> str:
         """Return the download name of the protocol PDF: meeting title and day.
@@ -345,9 +354,7 @@ class ProtocolService:
         try:
             return await self.storage.get(protocol.public_pdf_storage_key)
         except StorageError as exc:
-            raise ServiceUnavailableError(
-                "Protocol PDF temporarily unavailable."
-            ) from exc
+            raise ServiceUnavailableError("Protocol PDF temporarily unavailable.") from exc
 
     async def _to_out(self, protocol: Protocol) -> ProtocolOut:
         gremium = await self.session.get(Gremium, protocol.gremium_id)
@@ -361,13 +368,13 @@ class ProtocolService:
             sentAt=protocol.sent_at,
             publicWithheld=bool(getattr(protocol, "public_withheld", False)),
             gremiumProtocolsPublic=bool(getattr(gremium, "protocols_public", False)),
+            draftSentAt=getattr(protocol, "draft_sent_at", None),
+            **await approval_fields(self.session, protocol),
         )
 
     async def _by_meeting(self, meeting_id: UUID) -> Protocol | None:
         return (
-            await self.session.execute(
-                select(Protocol).where(Protocol.meeting_id == meeting_id)
-            )
+            await self.session.execute(select(Protocol).where(Protocol.meeting_id == meeting_id))
         ).scalar_one_or_none()
 
     @staticmethod
@@ -403,9 +410,7 @@ class ProtocolService:
             raise NotFoundError(f"protocol for meeting {meeting_id} not found")
         return await self._to_out(protocol)
 
-    async def get_or_create(
-        self, meeting_id: UUID, *, author: str | None = None
-    ) -> ProtocolOut:
+    async def get_or_create(self, meeting_id: UUID, *, author: str | None = None) -> ProtocolOut:
         """Create or load the protocol of a meeting (idempotent).
 
         The method is race-safe. On a parallel POST, `INSERT … ON CONFLICT
@@ -480,12 +485,20 @@ class ProtocolService:
         The `protocol_vote_ref` rows cascade on the foreign key. The audit log
         records the removal, because the draft text itself is not recoverable.
 
+        A draft that was final once (spec 000983) went out by mail, so it stays a
+        record and answers 409 too.
+
         Raises:
             NotFoundError: No protocol has this id (404).
-            ConflictError: The protocol is final or under render (409).
+            ConflictError: The protocol is final, under render, or was final once (409).
         """
         protocol = await self._get(protocol_id)
         self._ensure_draft(protocol)
+        if getattr(protocol, "sent_at", None) is not None:
+            raise ConflictError(
+                "The protocol went out once and is a record. It cannot be deleted.",
+                code="protocol_finalized",
+            )
         await audit_record(
             self.session,
             actor=actor,
@@ -500,9 +513,7 @@ class ProtocolService:
         await self.session.delete(protocol)
         await self.session.commit()
 
-    async def embed_votes(
-        self, protocol_id: UUID, vote_ids: Sequence[UUID]
-    ) -> ProtocolOut:
+    async def embed_votes(self, protocol_id: UUID, vote_ids: Sequence[UUID]) -> ProtocolOut:
         """Append votes as snippets and write `protocol_vote_ref` (idempotent).
 
         A vote that is already embedded gets no second snippet. An unknown vote gives
@@ -664,6 +675,40 @@ class ProtocolService:
         await self.session.commit()
         return await self._to_out(protocol)
 
+    async def set_approval(
+        self, protocol_id: UUID, meeting_id: UUID | None, *, now: datetime, actor: str
+    ) -> ProtocolOut:
+        """Set or remove the approval mark of a protocol (spec 000924).
+
+        ``meeting_id`` is the meeting that approved the protocol; None removes the mark.
+        The caller commits.
+
+        Raises:
+            ConflictError: The protocol is not final (409 ``protocol_not_final``).
+            ValidationProblem: The meeting is not another meeting of the same Gremium
+                (422 ``invalid_approval_meeting``).
+        """
+        protocol = await self._get(protocol_id, for_update=True)
+        if meeting_id is None:
+            await approval.unapprove(self.session, protocol, actor=actor)
+        else:
+            await approval.approve(self.session, protocol, meeting_id, now=now, actor=actor)
+        return await self._to_out(protocol)
+
+    async def reopen(self, protocol_id: UUID, *, actor: str) -> ProtocolOut:
+        """Set a final protocol back to draft (spec 000983). The caller commits.
+
+        The protocol leaves the public pages, because they show a final protocol only.
+        The next finalization renders and sends again.
+
+        Raises:
+            ConflictError: The protocol is not final (409 ``protocol_not_final``), or it
+                has an approval mark (409 ``protocol_approved``).
+        """
+        protocol = await self._get(protocol_id, for_update=True)
+        await approval.reopen(self.session, protocol, actor=actor)
+        return await self._to_out(protocol)
+
     async def revert_to_draft(self, protocol_id: UUID) -> None:
         """Roll a protocol back from `rendering` to `draft`.
 
@@ -704,18 +749,31 @@ class ProtocolService:
 
         mail_public = await self._mails_public(protocol)
         gremium = await self.session.get(Gremium, protocol.gremium_id)
+        await attach_plans(self.session, self.storage, self.typst, protocol.meeting_id, now.date())
         uploads, mail_pdf = (
             await self._render_both(protocol, mail_public=mail_public)
             if mail_public or bool(getattr(gremium, "protocols_public", False))
             else await self._render_internal(protocol)
         )
-        protocol.status = "final"
-        protocol.sent_at = now
+        recipients = await self._mail_recipients(protocol)
+        _mark_final(protocol, now, sent=bool(recipients))
         await self.session.flush()
         await self.session.commit()
         await self._store(uploads)
-        await self._send(protocol, mail_pdf)
+        await self._send(protocol, mail_pdf, recipients, at=now)
         return await self._to_out(protocol)
+
+    async def _mail_recipients(self, protocol: Protocol) -> list[str]:
+        """Return the addresses that get the mail of the final protocol.
+
+        The list is empty without a mail queue and for a Gremium without a recipient.
+        The finalization then sets no `sent_at`, so the page does not say that the
+        protocol was sent.
+        """
+        if self.mail_queue is None:
+            return []
+        members = await self._recipients(protocol.gremium_id)
+        return list(await filter_recipients_by_preference(self.session, members, "protocol"))
 
     async def _render_both(
         self, protocol: Protocol, *, mail_public: bool
@@ -897,6 +955,9 @@ class ProtocolService:
         snippets. If not, it falls back to the free text in `protocol.markdown`, which
         is then the whole public body too.
 
+        The document holds no circular vote of the Gremium: such a decision shows in the
+        list of decisions only (§F/meetings/voting/000949).
+
         `public=True` redacts a non-public item and the header metadata. The mailed
         variant must not carry the names of the attendees, of the excused members, of
         the absentees or of the protocol keepers. `_header_meta` then returns empty name
@@ -940,6 +1001,9 @@ class ProtocolService:
                     if date is not None and start_time is not None
                     else None
                 ),
+                kind=getattr(meeting, "kind", None),
+                location=getattr(meeting, "location", None),
+                form=getattr(meeting, "form", None),
                 protokollant=header.protokollant,
                 keepers=header.keepers,
                 present=header.present,
@@ -1002,16 +1066,32 @@ class ProtocolService:
             for p in periods
         ]
 
+    async def _voting_members(self, gremium_id: UUID) -> int:
+        """Count the members of the Gremium whose role holds `vote.cast`."""
+        return (
+            await self.session.scalar(
+                select(func.count(GremiumMembership.principal_id.distinct()))
+                .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
+                .where(
+                    GremiumMembership.gremium_id == gremium_id,
+                    GremiumRole.permissions.contains([VOTE_PERMISSION]),
+                )
+            )
+        ) or 0
+
     async def _quorate(
         self, gremium: object | None, meeting: Meeting | None, present_count: int
     ) -> bool | None:
-        """Compute the quorum from the attendees and the members of the meeting.
+        """Compute the quorum from the present count and the members with a voting right.
 
-        The members are the roster of the meeting: the members of the Gremium,
-        plus each principal with an attendance record (see
-        `app.modules.meetings.roster`). Without a meeting the members of the
-        Gremium count. The threshold is `gremium.quorum_percent` when
-        that value is set. If not, the threshold is more than half of the members.
+        A closed meeting gives the member count that its close fixed, so a new render
+        gives the same quorum (§F/meetings/protocols/000357). A meeting that is not
+        closed, and a meeting without a fixed count, counts the members of the Gremium
+        whose role holds `vote.cast` now. The rule is the one that closes the votes of
+        the meeting (`meeting_quorate`): the quorum of the Gremium in percent, in a
+        Wiederholungssitzung its repeat quorum when that is set, and the least number
+        of present persons. A Gremium without a quorum is always quorate, as its votes
+        are.
 
         Returns:
             The quorum result, or `None` when the Gremium or its members are missing.
@@ -1020,23 +1100,26 @@ class ProtocolService:
         gremium_id = getattr(gremium, "id", None)
         if gremium_id is None:
             return None
-        where = (
-            meeting_roster_filter(meeting)
-            if meeting is not None and getattr(meeting, "gremium_id", None) == gremium_id
-            else roster_filter(gremium_id)
-        )
+        fixed: int | None = getattr(meeting, "eligible_count", None)
         members = (
-            await self.session.scalar(
-                select(func.count()).select_from(PrincipalRow).where(where)
-            )
-        ) or 0
-        percent = getattr(gremium, "quorum_percent", None)
-        quorate = (
-            present_count * 100 >= percent * members
-            if percent is not None
-            else present_count * 2 > members
+            fixed
+            if fixed is not None and getattr(meeting, "status", None) == "closed"
+            else await self._voting_members(gremium_id)
         )
-        return None if members == 0 else quorate
+        repeat: int | None = (
+            getattr(gremium, "repeat_quorum_percent", None)
+            if getattr(meeting, "kind", None) == "repeat"
+            else None
+        )
+        percent: int | None = (
+            repeat if repeat is not None else getattr(gremium, "quorum_percent", None)
+        )
+        min_present: int | None = getattr(gremium, "quorum_min_present", None)
+        return (
+            None
+            if members == 0
+            else meeting_quorate(percent, min_present, present=present_count, members=members)
+        )
 
     async def _header_meta(self, meeting: Meeting | None, *, public: bool = False) -> HeaderMeta:
         """Resolve the protocol keepers and the attendance groups for the header.
@@ -1056,9 +1139,7 @@ class ProtocolService:
             return HeaderMeta()
         rows = (
             await self.session.execute(
-                select(
-                    MeetingAttendance.status, PrincipalRow.display_name, PrincipalRow.sub
-                )
+                select(MeetingAttendance.status, PrincipalRow.display_name, PrincipalRow.sub)
                 .join(PrincipalRow, PrincipalRow.id == MeetingAttendance.principal_id)
                 .where(MeetingAttendance.meeting_id == meeting.id)
                 .order_by(PrincipalRow.display_name)
@@ -1067,7 +1148,7 @@ class ProtocolService:
         present = [name or sub for status, name, sub in rows if status == "present"]
         excused = [name or sub for status, name, sub in rows if status == "excused"]
         absent = [name or sub for status, name, sub in rows if status == "absent"]
-        present_count = len(present)
+        present_count = await meeting_present(self.session, meeting)
         from app.modules.livevote.guests import GuestService
 
         guests = await GuestService(self.session).attended_count(meeting.id)
@@ -1112,12 +1193,16 @@ class ProtocolService:
     async def _texts(self, protocol: Protocol) -> list[tuple[int | None, str]]:
         """Return the Markdown texts: the TOP bodies with their numbers, then the free text."""
         bodies = (
-            await self.session.execute(
-                select(MeetingAgendaItem.body)
-                .where(MeetingAgendaItem.meeting_id == protocol.meeting_id)
-                .order_by(*agenda_order())
+            (
+                await self.session.execute(
+                    select(MeetingAgendaItem.body)
+                    .where(MeetingAgendaItem.meeting_id == protocol.meeting_id)
+                    .order_by(*agenda_order())
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         tops = [(number, body) for number, body in enumerate(bodies, start=1) if body]
         return [*tops, *([(None, protocol.markdown)] if protocol.markdown else [])]
 
@@ -1210,12 +1295,16 @@ class ProtocolService:
         `inText` tells the detail page to show no second box for it.
         """
         items = (
-            await self.session.execute(
-                select(MeetingAgendaItem)
-                .where(MeetingAgendaItem.meeting_id == meeting_id)
-                .order_by(*agenda_order())
+            (
+                await self.session.execute(
+                    select(MeetingAgendaItem)
+                    .where(MeetingAgendaItem.meeting_id == meeting_id)
+                    .order_by(*agenda_order())
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         if not items:
             return ""
         app_ids = [
@@ -1254,16 +1343,20 @@ class ProtocolService:
         """Build the Markdown block and the public TOP of one agenda item.
 
         A non-public item of the public variant gets the neutral heading and the
-        placeholder, and its TOP keeps the number only.
+        placeholder, and its TOP keeps the number only. An item that the meeting
+        reached gets an empty time note in front of its heading, also when it is
+        non-public, because the time tells nothing about the subject.
         """
         app_id = getattr(item, "application_id", None)
         own = item.title or (app_titles.get(app_id) if app_id is not None else None)
         heading = (own or "Tagesordnungspunkt").strip()
-        return (
+        block, top = (
             _redacted_item(number)
             if public and item.non_public
             else await self._item_with_votes(number, item, heading, voting, public=public)
         )
+        note = top_time_note(getattr(item, "started_at", None), self._tz())
+        return (f"{note}\n\n{block}" if note else block), top
 
     async def _item_with_votes(
         self,
@@ -1277,33 +1370,48 @@ class ProtocolService:
         """Build the block of an agenda item from its body and its non-cancelled votes.
 
         A vote whose snippet is already in the body gets no second box, and a repeated
-        vote gets its mark line, in the body or below its own box.
+        vote gets its mark line, in the body or below its own box. An item of a
+        Haushaltsplan ends with the reference to the PDF of the plan, once the finalize
+        stored it (spec 000876).
         """
         stripped = item.body.strip() if item.body and item.body.strip() else ""
         raw = black_out(stripped) if public else stripped
         votes = (
-            await self.session.execute(
-                select(Vote)
-                .where(
-                    Vote.agenda_item_id == item.id,
-                    Vote.status != "cancelled",
+            (
+                await self.session.execute(
+                    select(Vote)
+                    .where(
+                        Vote.agenda_item_id == item.id,
+                        Vote.status != "cancelled",
+                    )
+                    .order_by(Vote.created_at)
                 )
-                .order_by(Vote.created_at)
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         views = [await voting.get(vote.id) for vote in votes]
         marks = _repeat_marks(votes, views)
         tz = self._tz()
         body = replace_vote_blocks(raw, _election_pairs(views, tz)) if public else raw
         plain = [_snippet(view, "Beschlussfrage", public=public, tz=tz) for view in views]
         found = votes_in_body(body, plain)
-        marked = mark_vote_blocks(
+        voted = mark_vote_blocks(
             body,
             [
                 (snippet, marks[vote.id])
                 for vote, snippet, in_text in zip(votes, plain, found, strict=True)
                 if in_text and vote.id in marks
             ],
+        )
+        document_id = getattr(item, "plan_document_id", None)
+        document = (
+            await self.session.get(MarkdownDocument, document_id)
+            if document_id is not None
+            else None
+        )
+        marked = with_plan_reference(
+            voted, plan_reference(document.name, document.id) if document is not None else None
         )
         snippets = [
             f"{snippet}\n> {marks[vote.id]}" if vote.id in marks else snippet
@@ -1314,18 +1422,59 @@ class ProtocolService:
             for view, in_text in zip(views, found, strict=True)
             if getattr(view, "status", None) == "closed" and getattr(view, "kind", None) != "poll"
         ]
+        anlage = (
+            [anlage_reference(item.id, heading, public=public)]
+            if getattr(item, "application_id", None) is not None
+            else []
+        )
         block = [
             f"# {heading}",
+            *anlage,
             *([demote_headings(marked)] if marked else []),
             *(snippet for snippet, in_text in zip(snippets, found, strict=True) if not in_text),
         ]
         top = PublicTop(number=number, title=heading, markdown=marked or None, decisions=decisions)
         return "\n\n".join(block), top
 
+    async def _anlage_assets(self, protocol: Protocol, *, public: bool) -> dict[str, bytes]:
+        """Render the Antrag Anlagen of the TOPs of the meeting (spec 000884).
+
+        Each TOP of an Antrag appends the Antrag PDF in the version that the Sitzung
+        treated. The public variant blacks out the personal data and leaves out the
+        Anlage of a non-public TOP.
+        """
+        items = list(
+            (
+                await self.session.scalars(
+                    select(MeetingAgendaItem).where(
+                        MeetingAgendaItem.meeting_id == protocol.meeting_id,
+                        MeetingAgendaItem.application_id.is_not(None),
+                    )
+                )
+            ).all()
+        )
+        if not items:
+            return {}
+        pdfs = ApplicationPdfService(
+            self.session,
+            storage=self.storage,
+            typst=self.typst,
+            settings=self.settings or get_settings(),
+        )
+        return await pdfs.anlage_assets(ApplicationsService(self.session), items, public=public)
+
     async def _render_pdf(
-        self, protocol: Protocol, markdown: str, *, public: bool = False
+        self,
+        protocol: Protocol,
+        markdown: str,
+        *,
+        public: bool = False,
+        watermark: str | None = None,
     ) -> bytes | None:
         """Render the Markdown with typst and return the PDF bytes.
+
+        `watermark` puts a text across every page (the draft that goes to the members,
+        spec 000925). Such a render is no stored version: it sets no key column.
 
         The render runs BEFORE the commit. The method sets the key column but does
         NOT upload. The storage `put` runs after the commit in `_store`.
@@ -1337,6 +1486,7 @@ class ProtocolService:
         another one. A protocol always renders with a protocol variant: the design
         contributes logos, but it does not pick the document shape, because a report
         shape loses the TOP numbering, the vote boxes and the signature page. The
+        footer graphic of the PDF branding (spec 000892) goes on each page. The
         uploaded images of the text go next to the logos. An image that is missing or
         exceeds the budget stays out, and the PDF shows its alt text. The body is
         user-written. The render service converts it into data before Typst sees it, so
@@ -1358,15 +1508,29 @@ class ProtocolService:
         if self.storage is None or self.typst is None:
             return None
         try:
-            cd = await resolve_cd_variant_by_key(
-                self.session, self.storage, protocol.cd_variant
-            )
+            cd = await resolve_cd_variant_by_key(self.session, self.storage, protocol.cd_variant)
             variant = protocol_variant_for(protocol.cd_variant)
-            config = cd_render_config(cd) if cd else None
-            images = await MediaService(self.session, storage=self.storage).render_assets(
-                markdown
+            branding = await active_pdf_branding(self.session, self.storage)
+            config = {
+                **(cd_render_config(cd) if cd else {}),
+                **footer_render_config(branding),
+                **({"watermark": watermark} if watermark else {}),
+            }
+            media = MediaService(self.session, storage=self.storage)
+            images = await media.render_assets(markdown)
+            documents = await media.render_documents(markdown)
+            anlagen = (
+                await self._anlage_assets(protocol, public=public)
+                if ANLAGE_MARK in markdown
+                else {}
             )
-            assets = {**(cd.assets if cd else {}), **images} or None
+            assets = {
+                **(cd.assets if cd else {}),
+                **footer_render_assets(branding),
+                **images,
+                **documents,
+                **anlagen,
+            } or None
             pdf = await self.typst.render_pdf(
                 markdown, variant=variant, config=config, assets=assets
             )
@@ -1375,9 +1539,9 @@ class ProtocolService:
                 raise BadRequestError(
                     f"Protocol could not be rendered: {exc}", code="render_failed"
                 ) from exc
-            raise ServiceUnavailableError(
-                "Protocol rendering temporarily unavailable."
-            ) from exc
+            raise ServiceUnavailableError("Protocol rendering temporarily unavailable.") from exc
+        if watermark:
+            return pdf
         key = (
             protocol_public_storage_key(protocol.id)
             if public
@@ -1409,12 +1573,23 @@ class ProtocolService:
             for key, pdf in uploads:
                 await self.storage.put(key, pdf, "application/pdf")
         except StorageError as exc:
-            raise ServiceUnavailableError(
-                "Protocol rendering temporarily unavailable."
-            ) from exc
+            raise ServiceUnavailableError("Protocol rendering temporarily unavailable.") from exc
 
-    async def _send(self, protocol: Protocol, pdf: bytes | None) -> None:
+    async def _send(
+        self,
+        protocol: Protocol,
+        pdf: bytes | None,
+        to: Sequence[str] | None = None,
+        *,
+        at: datetime,
+    ) -> None:
         """Mail the protocol to MAIL_LIST(gremium) under an idempotency key.
+
+        `to` holds the recipients that the finalization already read. Without it the
+        method reads them itself.
+
+        The key holds the time of the finalization, so a protocol that went back to
+        draft sends again on its next finalization (spec 000983).
 
         The mail carries the PDF as an attachment. The subject and the body name the
         Gremium and the meeting. The HTML version uses the branded mail layout.
@@ -1431,8 +1606,7 @@ class ProtocolService:
         """
         if self.mail_queue is None:
             return
-        members = await self._recipients(protocol.gremium_id)
-        recipients = await filter_recipients_by_preference(self.session, members, "protocol")
+        recipients = to if to is not None else await self._mail_recipients(protocol)
         if not recipients:
             return
         gremium = await self.session.get(Gremium, protocol.gremium_id)
@@ -1443,8 +1617,10 @@ class ProtocolService:
             if meeting is not None and meeting.date is not None
             else None
         )
-        subject = "Sitzungsprotokoll" + (f" {gremium_name}" if gremium_name else "") + (
-            f" — {day}" if day else ""
+        subject = (
+            "Sitzungsprotokoll"
+            + (f" {gremium_name}" if gremium_name else "")
+            + (f" — {day}" if day else "")
         )
         settings = self.settings or get_settings()
         link = protocol_link(settings, protocol.meeting_id)
@@ -1471,7 +1647,6 @@ class ProtocolService:
             else "Das Sitzungsprotokoll wurde finalisiert."
         )
         body = intro + ("\n\n" + "\n".join(lines) if lines else "") + "\n"
-        text = append_link_text(body, link.url, link.label("de"))
         filename = (
             protocol_pdf_filename(meeting.title, meeting_day(meeting))
             if meeting is not None
@@ -1482,25 +1657,19 @@ class ProtocolService:
             if pdf is not None
             else ()
         )
-        html = render_layout(
-            content_html=text_to_html(body),
-            title=subject,
-            site_name=settings.mail_from_name,
-            base_url=settings.public_base_url,
-            reason=reason_text("protocol", "de"),
-            lang="de",
-            action_url=link.url,
-            action_label=link.label("de"),
-        )
         await self.mail_queue.enqueue(
-            MailMessage(
+            branded_mail(
+                brand=await load_mail_brand(self.session, settings),
+                settings=settings,
                 to=tuple(recipients),
                 subject=subject,
-                text=text,
-                html=html,
+                text=body,
+                reason="protocol",
+                lang="de",
                 idempotency_key=compute_idempotency_key(
-                    "protocol_finalized", str(protocol.id)
+                    "protocol_finalized", str(protocol.id), at.isoformat()
                 ),
+                link=link,
                 attachments=attachments,
             )
         )
@@ -1532,9 +1701,7 @@ class ProtocolService:
             ConflictError: The protocol is final or under render.
         """
         if protocol.status == "final":
-            raise ConflictError(
-                "Protocol is finalized and read-only.", code="protocol_finalized"
-            )
+            raise ConflictError("Protocol is finalized and read-only.", code="protocol_finalized")
         if protocol.status == "rendering":
             raise ConflictError(
                 "Protocol is being rendered and is read-only.", code="protocol_rendering"
@@ -1686,6 +1853,7 @@ def election_snippet_of(
     lines = sorted(listed, key=lambda line: -line.votes) if by_votes else listed
     lot = result.lot if result is not None else None
     runoff = result.runoff if result is not None else None
+    place_lot = result.next_round_lot if result is not None else None
     return ElectionSnippet(
         question=(question or "Wahlgang").strip() or "Wahlgang",
         seats=election.seats,
@@ -1695,11 +1863,15 @@ def election_snippet_of(
         yes=result.yes if result is not None else None,
         no=result.no if result is not None else None,
         by_lot=lot is not None and lot.drawn is not None,
+        next_round_lot_names=[names.get(cid, cid) for cid in (place_lot.drawn or ())]
+        if place_lot is not None
+        else [],
         lot_pending=lot is not None and lot.drawn is None,
         runoff_names=[names.get(cid, cid) for cid in runoff.candidate_ids] if runoff else [],
         runoff_seats=runoff.seats if runoff else 0,
         closed=result is not None,
         attempt=attempt,
+        members_majority=election.members_majority,
     )
 
 
@@ -1752,9 +1924,7 @@ def poll_snippet_of(
     )
 
 
-def _poll_lines(
-    result: PollResultOut, labels: Mapping[str, str], *, date: bool
-) -> list[PollLine]:
+def _poll_lines(result: PollResultOut, labels: Mapping[str, str], *, date: bool) -> list[PollLine]:
     """Map the stored result of a poll on its option lines, in the stored order."""
     order = [oid for oid in result.order if oid in labels] or list(labels)
     top = frozenset(result.top)

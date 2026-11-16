@@ -6,6 +6,7 @@ import type {
   PublicFooterLink,
   PublicSiteConfig,
 } from '@core/api/models';
+import { FeatureService } from '@core/features/feature.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { applyAccent, normalizeHex } from '@core/theme/accent';
 import { ThemeService } from '@stupa-makers/ui-kit';
@@ -64,6 +65,7 @@ export class BrandingService {
   private readonly injector = inject(Injector);
   private readonly i18n = inject(I18nService);
   private readonly theme = inject(ThemeService);
+  private readonly features = inject(FeatureService);
 
   /** Configured full name (empty ⇒ fallback). */
   private readonly _configuredName = signal('');
@@ -237,10 +239,11 @@ export class BrandingService {
 
   /**
    * Call once at app start. Loads the active branding config and ignores failures: a failed
-   * load keeps everything empty, so the i18n default fallbacks stay.
+   * load keeps everything empty, so the i18n default fallbacks stay. The feature switches of
+   * the config go to `FeatureService`.
    */
   init(): void {
-    this.injector.get(ApiClient).publicSiteConfig().subscribe({
+    this.injector.get(ApiClient).publicSiteConfig(this.features.configVersion()).subscribe({
       next: (cfg) => {
         this.applyBranding(cfg.branding);
         if (typeof cfg.confirmTtlHours === 'number' && cfg.confirmTtlHours > 0) {
@@ -252,9 +255,10 @@ export class BrandingService {
         if (cfg.attachmentLimits) this._attachmentLimits.set(cfg.attachmentLimits);
         if (cfg.help?.wikiUrl) this._wikiUrl.set(cfg.help.wikiUrl);
         this._ticketsPublic.set(cfg.tickets?.publicEnabled === true);
+        this.features.apply(cfg.features);
         this._loaded.set(true);
       },
-      error: () => {},
+      error: () => this.features.loadFailed(),
     });
   }
 }

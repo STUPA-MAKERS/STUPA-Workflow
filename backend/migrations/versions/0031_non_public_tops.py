@@ -26,10 +26,7 @@ _UPGRADE: tuple[str, ...] = (
         "ALTER TABLE meeting_agenda_item ADD COLUMN IF NOT EXISTS "
         "non_public boolean NOT NULL DEFAULT false"
     ),
-    (
-        "ALTER TABLE protocol ADD COLUMN IF NOT EXISTS "
-        "public_pdf_storage_key text"
-    ),
+    ("ALTER TABLE protocol ADD COLUMN IF NOT EXISTS public_pdf_storage_key text"),
 )
 
 _DOWNGRADE: tuple[str, ...] = (

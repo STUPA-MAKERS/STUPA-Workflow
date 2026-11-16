@@ -81,9 +81,7 @@ async def _default_role(session: AsyncSession, gremium_id: UUID) -> GremiumRole:
     return created
 
 
-async def _desired_roles(
-    session: AsyncSession, groups: set[str]
-) -> dict[UUID, UUID]:
+async def _desired_roles(session: AsyncSession, groups: set[str]) -> dict[UUID, UUID]:
     """Return the gremium role per gremium that ``groups`` give, as ``{gremium: role}``."""
     if not groups:
         return {}
@@ -153,9 +151,7 @@ async def _add_membership(
     return membership.id
 
 
-async def sync_principal_memberships(
-    session: AsyncSession, row: PrincipalRow
-) -> bool:
+async def sync_principal_memberships(session: AsyncSession, row: PrincipalRow) -> bool:
     """Make the memberships of one principal match its OIDC groups and the mappings.
 
     The function does not commit. The caller owns the transaction. Each added, changed
@@ -168,9 +164,7 @@ async def sync_principal_memberships(
     Returns:
         True when the function changed at least one membership.
     """
-    groups = (
-        set() if row.merged_into is not None else {str(g) for g in (row.oidc_groups or [])}
-    )
+    groups = set() if row.merged_into is not None else {str(g) for g in (row.oidc_groups or [])}
     desired = await _desired_roles(session, groups)
     existing = (
         await session.scalars(

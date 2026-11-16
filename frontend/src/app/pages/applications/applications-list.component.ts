@@ -64,6 +64,7 @@ import { flowColorKind } from '@shared/ui';
 import { exportDownload } from '@shared/download.util';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { BudgetTreeApi, type BudgetTreeNode } from '../budget/budget-tree.api';
+import { activeOnly } from '../budget/cost-centre/cost-centre.util';
 import { CostCentreSelectComponent } from '../budget/cost-centre-select/cost-centre-select.component';
 import { ApplicationsPageService } from './applications-page.service';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
@@ -501,7 +502,7 @@ export class ApplicationsListComponent {
       error: () => this.types.set([]),
     });
     this.budgetApi.tree().subscribe({
-      next: (tree) => this.budgetTree.set(pruneHidden(tree)),
+      next: (tree) => this.budgetTree.set([...activeOnly(tree)]),
       error: () => this.budgetTree.set([]),
     });
 
@@ -1015,13 +1016,6 @@ export class ApplicationsListComponent {
     );
     if (next !== seen) this.seenStates.set(next);
   }
-}
-
-/** Remove the cost centres hidden in the budget tab, and their subtrees. */
-function pruneHidden(nodes: readonly BudgetTreeNode[]): BudgetTreeNode[] {
-  return nodes
-    .filter((n) => !n.hiddenInBudget)
-    .map((n) => ({ ...n, children: pruneHidden(n.children) }));
 }
 
 /** The toast key of a failed transition: 403 and 409 have their own text. */

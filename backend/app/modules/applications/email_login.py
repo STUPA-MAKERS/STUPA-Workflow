@@ -73,9 +73,7 @@ async def _call(result: None | Awaitable[None]) -> None:
 
 async def application_ids(db: AsyncSession, email: str) -> frozenset[str]:
     """Return the ids of every application whose applicant e-mail is the address."""
-    rows = await db.scalars(
-        select(ApplicantRow.application_id).where(ApplicantRow.email == email)
-    )
+    rows = await db.scalars(select(ApplicantRow.application_id).where(ApplicantRow.email == email))
     return frozenset(str(app_id) for app_id in rows)
 
 
@@ -155,9 +153,7 @@ async def assign_to_accounts(db: AsyncSession, app_ids: Iterable[object]) -> Non
             .order_by(Application.id, PrincipalRow.last_login.desc().nulls_last())
         )
     ).all()
-    owners = {
-        app_id: next(group)[1:] for app_id, group in groupby(rows, key=itemgetter(0))
-    }
+    owners = {app_id: next(group)[1:] for app_id, group in groupby(rows, key=itemgetter(0))}
     for app_id, (principal_id, sub) in owners.items():
         await db.execute(
             update(Application)

@@ -69,18 +69,20 @@ import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
 /**
  * The status chip: every vote, the open votes, the ended votes, the drafts. A cancelled
- * vote never shows in the list; it stays reachable from its application or meeting.
+ * vote does not show in the list; it stays reachable from its application or meeting. The
+ * one exception is the circular vote that an objection ended (§F/meetings/voting/000936):
+ * it has no application and no meeting, so the list shows it among the ended votes.
  */
 export type VoteStatusFilter = '' | 'open' | 'ended' | 'draft';
 
-/** The kind chip: every kind, the motions, the elections, the polls. */
+/** The kind chip: every kind, the motions, the elections, the polls, the Umlaufverfahren. */
 export type VoteKindFilter = '' | VoteKind;
-const KINDS: readonly VoteKind[] = ['motion', 'election', 'poll'];
+const KINDS: readonly VoteKind[] = ['motion', 'election', 'poll', 'circular'];
 
 const STATUS_QUERY: Readonly<Record<VoteStatusFilter, readonly VoteStatus[]>> = {
-  '': ['open', 'closed'],
+  '': ['open', 'closed', 'cancelled'],
   open: ['open'],
-  ended: ['closed'],
+  ended: ['closed', 'cancelled'],
   draft: ['draft'],
 };
 
@@ -517,6 +519,7 @@ export class VotingComponent implements OnDestroy {
         gremiumId: this.gremiumId() || undefined,
         q: this.q() || undefined,
         kind: this.kindFilter() || undefined,
+        cancelledReason: 'objection',
         limit,
         offset,
       })
@@ -727,8 +730,9 @@ export class VotingComponent implements OnDestroy {
       (item.status === 'closed' && item.result
         ? closedStatus(item.kind, item.result)
         : this.statusOf(item.status));
+    const ofGremium = (poll || item.kind === 'circular') && !item.meetingId;
     const where =
-      poll && !item.meetingId && item.gremiumName
+      ofGremium && item.gremiumName
         ? this.gremiumWhere(item.gremiumName, ended ? null : item.closesAt)
         : this.meetingWhere(item);
     const ballot: VoteRow['ballot'] = item.myBallot.cast
@@ -736,7 +740,7 @@ export class VotingComponent implements OnDestroy {
       : item.status === 'open' && item.canCast
         ? 'pending'
         : null;
-    const [when, whenTitle] = this.whenOf(item, poll && !item.meetingId);
+    const [when, whenTitle] = this.whenOf(item, ofGremium);
     return {
       item,
       createdAt: (ended ? (item.closedAt ?? item.openedAt) : item.openedAt) ?? item.createdAt,

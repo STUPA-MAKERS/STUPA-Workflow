@@ -66,47 +66,35 @@ describe('MeetingSessionService', () => {
   });
 
   /**
-   * The early open sends no PATCH, and the page reads the meeting again for a fresh window. When
-   * the dialog confirms, the PATCH carries confirmEarly and the question closes.
+   * The open before the window sends no PATCH, and the page reads the meeting again for a fresh
+   * window. In the window the open sends the PATCH at once (§F/meetings/meetings/000092).
    */
-  it('refuses an open before the window and asks before an early open', () => {
+  it('refuses an open before the window and opens in it without a question', () => {
     const { http, session, toasts } = setup();
     const at = (min: number): string => new Date(Date.now() + min * 60_000).toISOString();
-    session.meeting.set(M({ opensAt: at(60), confirmUntil: at(110) }));
+    session.meeting.set(M({ opensAt: at(60) }));
     session.startMeeting();
     http.expectOne({ method: 'GET', url: '/api/meetings/m-1' }).flush({ id: 'm-1', title: 'x', status: 'planned', opensAt: at(60), votes: [], createdAt: 'x' });
     http.verify();
     expect(toasts()).toContain('Die Sitzung lässt sich noch nicht eröffnen.');
-    expect(session.earlyOpenAsk()).toBe(false);
 
-    session.meeting.set(M({ opensAt: at(-20), confirmUntil: at(30) }));
+    session.meeting.set(M({ opensAt: at(-20) }));
     session.startMeeting();
-    http.verify();
-    expect(session.earlyOpenAsk()).toBe(true);
-    session.startMeeting(true);
-    expect(session.earlyOpenAsk()).toBe(false);
     const req = http.expectOne('/api/meetings/m-1');
-    expect(req.request.body).toEqual({ status: 'live', confirmEarly: true });
+    expect(req.request.body).toEqual({ status: 'live' });
     req.flush({ id: 'm-1', title: 'x', status: 'live', protocolId: null, votes: [], createdAt: 'x' });
     expect(session.meeting()?.status).toBe('live');
   });
 
   /** The toast shows the German text, not the English server detail. */
-  it('asks when the server still finds the open early, and maps a too-early refusal', () => {
+  it('maps a too-early refusal of the server', () => {
     const { http, session, toasts } = setup();
     session.meeting.set(M());
     session.startMeeting();
     http
       .expectOne('/api/meetings/m-1')
-      .flush({ code: 'early_open_unconfirmed', detail: 'early' }, { status: 409, statusText: 'Conflict' });
-    expect(session.earlyOpenAsk()).toBe(true);
-
-    session.startMeeting(true);
-    http
-      .expectOne('/api/meetings/m-1')
       .flush({ code: 'meeting_too_early', detail: 'too early' }, { status: 409, statusText: 'Conflict' });
     http.expectOne('/api/meetings/m-1').flush({ id: 'm-1', title: 'x', status: 'planned', votes: [], createdAt: 'x' });
-    expect(session.earlyOpenAsk()).toBe(false);
     expect(toasts()).toContain('Die Sitzung lässt sich noch nicht eröffnen.');
     expect(toasts().some((t) => t.includes('too early'))).toBe(false);
   });
@@ -161,6 +149,89 @@ describe('MeetingSessionService', () => {
       .flush({ detail: 'Kein Recht' }, { status: 403, statusText: 'Forbidden' });
     expect(session.publicationSaving()).toBe(false);
     expect(toasts().some((t) => t.startsWith('Aktion fehlgeschlagen.'))).toBe(true);
+  });
+
+  /** § 000925 */
+  it('sends the protocol draft once and reports the number of addresses or the failure', () => {
+    const { http, session, toasts } = setup();
+    session.sendProtocolDraft();
+    http.verify();
+    session.protocol.set({ ...PROTOCOL });
+    session.sendProtocolDraft();
+    session.sendProtocolDraft();
+    const req = http.expectOne('/api/protocols/p-1/draft-mail');
+    expect(req.request.method).toBe('POST');
+    expect(session.draftSending()).toBe(true);
+    req.flush({ recipients: 12, draftSentAt: '2026-11-03T18:30:00Z' });
+    expect(session.draftSending()).toBe(false);
+    expect(session.protocol()?.draftSentAt).toBe('2026-11-03T18:30:00Z');
+    expect(toasts()).toContain('Entwurf an 12 Adressen gesendet.');
+    session.sendProtocolDraft();
+    session.protocol.set(null);
+    http.expectOne('/api/protocols/p-1/draft-mail').flush({ recipients: 1, draftSentAt: '2026-11-04T18:30:00Z' });
+    expect(session.protocol()).toBeNull();
+    session.protocol.set({ ...PROTOCOL });
+    session.sendProtocolDraft();
+    http.expectOne('/api/protocols/p-1/draft-mail').flush({ recipients: 0, draftSentAt: null });
+    expect(session.protocol()?.draftSentAt).toBeUndefined();
+    expect(toasts()).toContain('Kein Mitglied des Gremiums hat eine E-Mail-Adresse. Der Entwurf ging an niemanden.');
+    expect(toasts()).not.toContain('Entwurf an 0 Adressen gesendet.');
+    session.sendProtocolDraft();
+    http.expectOne('/api/protocols/p-1/draft-mail').flush({}, { status: 503, statusText: 'Unavailable' });
+    expect(session.draftSending()).toBe(false);
+    expect(toasts()).toContain('Aktion fehlgeschlagen.');
+  });
+
+  /** § 000924 */
+  it('marks the protocol as approved, removes the mark and reports a refusal', () => {
+    const { http, session, toasts } = setup();
+    session.setProtocolApproval('m-2');
+    http.verify();
+    const final = { ...PROTOCOL, status: 'final' as const, isFinal: true, isLocked: true };
+    session.protocol.set(final);
+    session.setProtocolApproval('m-2');
+    session.setProtocolApproval('m-3');
+    const put = http.expectOne('/api/protocols/p-1/approval');
+    expect(put.request.method).toBe('PUT');
+    expect(put.request.body).toEqual({ meetingId: 'm-2' });
+    put.flush({ ...PROTOCOL, status: 'final', approvedAt: '2026-10-29T18:00:00Z', approvedMeetingId: 'm-2' });
+    expect(session.protocol()?.approvedMeetingId).toBe('m-2');
+    expect(toasts()).toContain('Das Protokoll ist als genehmigt markiert.');
+    session.setProtocolApproval(null);
+    const del = http.expectOne('/api/protocols/p-1/approval');
+    expect(del.request.method).toBe('DELETE');
+    del.flush({ ...PROTOCOL, status: 'final' });
+    expect(session.protocol()?.approvedAt).toBeNull();
+    expect(toasts()).toContain('Die Genehmigung ist entfernt.');
+    session.setProtocolApproval('m-9');
+    http
+      .expectOne('/api/protocols/p-1/approval')
+      .flush({ detail: 'Andere Sitzung' }, { status: 422, statusText: 'Unprocessable' });
+    expect(session.approvalSaving()).toBe(false);
+    expect(toasts()).toContain('Aktion fehlgeschlagen.: Andere Sitzung');
+  });
+
+  /** § 000983 */
+  it('sets the final protocol back to draft and reports a refusal', () => {
+    const { http, session, toasts } = setup();
+    session.reopenProtocol();
+    http.verify();
+    session.protocol.set({ ...PROTOCOL, status: 'final' as const, isFinal: true, isLocked: true });
+    session.reopenProtocol();
+    session.reopenProtocol();
+    const post = http.expectOne('/api/protocols/p-1/reopen');
+    expect(post.request.method).toBe('POST');
+    post.flush({ ...PROTOCOL, status: 'draft' });
+    expect(session.protocol()?.isFinal).toBe(false);
+    expect(session.reopenSaving()).toBe(false);
+    expect(toasts()).toContain('Das Protokoll ist wieder ein Entwurf.');
+    session.reopenProtocol();
+    http
+      .expectOne('/api/protocols/p-1/reopen')
+      .flush({ code: 'protocol_approved' }, { status: 409, statusText: 'Conflict' });
+    expect(session.reopenSaving()).toBe(false);
+    expect(toasts()).toContain('Das Protokoll ist genehmigt. Entferne zuerst die Genehmigung.');
+    http.match(() => true);
   });
 
   /** A member receives no code and no requests, so the meeting keeps its values. */

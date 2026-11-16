@@ -1,7 +1,9 @@
 import { render, screen, within } from '@testing-library/angular';
 import { of, throwError } from 'rxjs';
+import { ApiClient } from '@core/api/api-client.service';
 import { GremienApiService } from '@core/api/gremien.service';
-import { downloadBlob, MEDIA } from '@stupa-makers/ui-kit';
+import { AuthService } from '@core/auth/auth.service';
+import { downloadBlob, MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { runAxe } from '../../../../testing/a11y';
 import { GREMIEN_TEST_NOW, attendance, gremienApiMock } from '../../../../testing/gremien-fixtures';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
@@ -23,7 +25,9 @@ function readBlob(blob: Blob): Promise<string> {
   });
 }
 
-async function setup(opts: { api?: ReturnType<typeof gremienApiMock>; phone?: boolean; fill?: boolean } = {}) {
+async function setup(
+  opts: { api?: ReturnType<typeof gremienApiMock>; phone?: boolean; fill?: boolean; manage?: boolean } = {},
+) {
   localStorage.setItem('ap.locale', 'de');
   const restore = matchMediaQueries(...(opts.phone ? [MEDIA.phone] : []));
   const api = opts.api ?? gremienApiMock();
@@ -32,9 +36,16 @@ async function setup(opts: { api?: ReturnType<typeof gremienApiMock>; phone?: bo
     providers: [
       { provide: GremienApiService, useValue: api },
       { provide: GREMIEN_NOW, useValue: GREMIEN_TEST_NOW },
+      { provide: AuthService, useValue: { canInGremium: () => opts.manage ?? false } },
+      { provide: ApiClient, useValue: {} },
     ],
   });
-  return { ...view, api, restore, cmp: view.fixture.componentInstance };
+  const toasts = () =>
+    view.fixture.debugElement.injector
+      .get(ToastService)
+      .toasts()
+      .map((t) => t.message);
+  return { ...view, api, restore, toasts, cmp: view.fixture.componentInstance };
 }
 
 describe('GremiumAttendanceComponent', () => {
@@ -50,9 +61,9 @@ describe('GremiumAttendanceComponent', () => {
   it('shows the matrix with the counts, the marks, the sums and the average', async () => {
     const view = await setup({ fill: true });
     restore = view.restore;
-    expect(view.api.attendance).toHaveBeenCalledWith('g-1', { from: '2026-05', to: '2026-10' });
+    expect(view.api.attendance).toHaveBeenCalledWith('g-1', { term: '2026-10-15' });
     expect((view.container as HTMLElement).classList.contains('gat-host--fill')).toBe(true);
-    expect(view.cmp.rangeText()).toBe('Zeitraum: Mai – Okt 2026');
+    expect(view.cmp.rangeText()).toBe('Zeitraum: Okt 2026 – Sep 2027');
 
     const table = screen.getByRole('table');
     const heads = within(table).getAllByRole('columnheader').map((h) => h.textContent?.replace(/\s+/g, ' ').trim());
@@ -133,7 +144,10 @@ describe('GremiumAttendanceComponent', () => {
   it('reads another range with each preset and names the semesters', async () => {
     const view = await setup();
     restore = view.restore;
+    expect(view.cmp.preset()).toBe('term');
     expect(view.cmp.rangeOptions().map((o) => o.label)).toEqual([
+      'Amtszeit Okt 2026 – Sep 2027',
+      'Amtszeit Okt 2025 – Sep 2026',
       'Letzte 6 Monate',
       'Letzte 12 Monate',
       'Letzte 24 Monate',
@@ -146,8 +160,12 @@ describe('GremiumAttendanceComponent', () => {
     view.cmp.setPreset('prevSemester');
     view.fixture.detectChanges();
     expect(view.api.attendance).toHaveBeenLastCalledWith('g-1', { from: '2026-04', to: '2026-09' });
+    view.cmp.setPreset('term:2025-10-01');
+    view.fixture.detectChanges();
+    expect(view.api.attendance).toHaveBeenLastCalledWith('g-1', { term: '2025-10-01' });
+    expect(view.cmp.rangeText()).toBe('Zeitraum: Okt 2025 – Sep 2026');
     view.cmp.setPreset('odd');
-    expect(view.cmp.preset()).toBe('last6');
+    expect(view.cmp.preset()).toBe('term');
   });
 
   it('exports the matrix as CSV', async () => {
@@ -155,7 +173,7 @@ describe('GremiumAttendanceComponent', () => {
     restore = view.restore;
     screen.getByRole('button', { name: 'Als CSV exportieren' }).click();
     const [blob, name] = (downloadBlob as jest.Mock).mock.calls[0] as [Blob, string];
-    expect(name).toBe('studierendenparlament-anwesenheit-2026-05-2026-10.csv');
+    expect(name).toBe('studierendenparlament-anwesenheit-2026-10-2027-09.csv');
     const lines = (await readBlob(blob)).replace(String.fromCharCode(0xfeff), '').split('\r\n');
     expect(lines[0]).toBe(
       'Mitglied;Rolle;September 2026 Sitzungen;September 2026 anwesend;September 2026 entschuldigt;September 2026 übertragen;' +
@@ -164,6 +182,70 @@ describe('GremiumAttendanceComponent', () => {
     );
     expect(lines[1]).toBe('Finn Schulze;Mitglied;2;1;1;1;0;0;0;0;1;2;50');
     expect(lines[3]).toBe('Kai Meier;Mitglied;;;;;0;0;0;0;0;0;');
+  });
+
+  /** § 000920 */
+  it('names the unexcused absences of the term with the limit, in the warning colour near it', async () => {
+    const view = await setup();
+    restore = view.restore;
+    const finn = screen.getByRole('rowheader', { name: /Finn Schulze/ });
+    expect(finn).toHaveTextContent('2 von 3 unentschuldigt');
+    expect(finn.querySelector('.gat__absent')?.classList.contains('gat__absent--near')).toBe(true);
+    expect(screen.getByRole('rowheader', { name: /Anna Berg/ }).querySelector('.gat__absent')).toBeNull();
+  });
+
+  it('shows the unexcused absences on a phone card too, plain below the limit', async () => {
+    const data = attendance({ absenceLimit: 5 });
+    const view = await setup({ phone: true, api: gremienApiMock({ attendance: jest.fn(() => of(data)) }) });
+    restore = view.restore;
+    const mark = screen.getByText('2 von 5 unentschuldigt');
+    expect(mark.classList.contains('gat__absent--near')).toBe(false);
+  });
+
+  /** § 000923 */
+  it('exports the attendance list of the range as XLSX for a person who leads meetings', async () => {
+    const view = await setup({ manage: true });
+    restore = view.restore;
+    screen.getByRole('button', { name: 'Anwesenheitsliste (XLSX)' }).click();
+    expect(view.api.attendanceExport).toHaveBeenCalledWith('g-1', '2026-10-01', '2027-09-30');
+    const [, name] = (downloadBlob as jest.Mock).mock.calls[0] as [Blob, string];
+    expect(name).toBe('studierendenparlament-anwesenheitsliste-2026-10-01-2027-09-30.xlsx');
+    expect(view.cmp.exporting()).toBe(false);
+  });
+
+  it('hides the XLSX export without the right', async () => {
+    const plain = await setup();
+    restore = plain.restore;
+    expect(screen.queryByRole('button', { name: 'Anwesenheitsliste (XLSX)' })).toBeNull();
+  });
+
+  it('reports a failed export', async () => {
+    const view = await setup({
+      manage: true,
+      api: gremienApiMock({ attendanceExport: jest.fn(() => throwError(() => new Error('x'))) }),
+    });
+    restore = view.restore;
+    view.cmp.exportList();
+    expect(view.toasts()).toContain('Die Anwesenheitsliste konnte nicht erstellt werden.');
+    expect(downloadBlob).not.toHaveBeenCalled();
+  });
+
+  it('starts no second export while one runs', async () => {
+    const { Subject } = await import('rxjs');
+    const pending = new Subject<Blob>();
+    const view = await setup({ manage: true, api: gremienApiMock({ attendanceExport: jest.fn(() => pending) }) });
+    restore = view.restore;
+    view.cmp.exportList();
+    view.cmp.exportList();
+    expect(view.api.attendanceExport).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads the matrix again after a late excuse', async () => {
+    const view = await setup();
+    restore = view.restore;
+    view.api.attendance.mockClear();
+    view.fixture.debugElement.query((d) => d.name === 'app-attendance-detail').triggerEventHandler('changed');
+    expect(view.api.attendance).toHaveBeenCalledTimes(1);
   });
 
   it('exports nothing before the data is there', async () => {
@@ -210,10 +292,10 @@ describe('GremiumAttendanceComponent', () => {
     restore = view.restore;
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Als CSV exportieren' })).toBeNull();
-    const cards = screen.getAllByRole('button', { name: /anwesend$/ });
+    const cards = screen.getAllByRole('button', { name: /anwesend/ });
     expect(cards.map((c) => c.getAttribute('aria-label'))).toEqual([
       'Anna Berg, 2 von 2 anwesend',
-      'Finn Schulze, 1 von 2 anwesend',
+      'Finn Schulze, 1 von 2 anwesend, 2 von 3 unentschuldigt',
       'Kai Meier, 0 von 0 anwesend',
     ]);
     expect(cards[1].querySelector('.gat__dot--ex')).toBeTruthy();
@@ -222,7 +304,7 @@ describe('GremiumAttendanceComponent', () => {
     view.fixture.detectChanges();
     expect(view.api.memberAttendance).toHaveBeenCalledWith('g-1', 'p-1', '2026-09');
     expect(screen.getByRole('dialog', { name: 'Finn Schulze' })).toHaveTextContent(
-      'Mitglied · 1 von 2 anwesend · Mai – Okt 2026',
+      'Mitglied · 1 von 2 anwesend · Okt 2026 – Sep 2027',
     );
     expect(await runAxe(view.container)).toHaveNoViolations();
   });
@@ -237,6 +319,7 @@ describe('GremiumAttendanceComponent', () => {
           roleKey: null,
           roleName: null,
           isSelf: false,
+          unexcused: 0,
           cells: [{ month: '2026-09', member: true, present: 1, excused: 0, delegated: 0 }, { month: '2026-11', member: true, present: 0, excused: 0, delegated: 0 }, { month: '2026-12', member: true, present: 0, excused: 0, delegated: 0 }],
         },
         { ...data.rows[0], cells: data.rows[0].cells.slice(0, 1) },

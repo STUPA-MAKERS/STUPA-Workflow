@@ -24,9 +24,7 @@ class OAuthAuthorizationCode(UUIDPkMixin, CreatedAtMixin, Base):
     __tablename__ = "oauth_authorization_code"
 
     code_hash: Mapped[bytes] = mapped_column(LargeBinary, unique=True)
-    principal_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("principal.id", ondelete="CASCADE")
-    )
+    principal_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("principal.id", ondelete="CASCADE"))
     client_id: Mapped[str] = mapped_column(Text)
     redirect_uri: Mapped[str] = mapped_column(Text)
     #: S256 challenge, base64url.
@@ -36,9 +34,7 @@ class OAuthAuthorizationCode(UUIDPkMixin, CreatedAtMixin, Base):
     #: Token lifetime in seconds, chosen in the consent. NULL means the token never expires.
     access_ttl_seconds: Mapped[int | None] = mapped_column(nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    used_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class OAuthToken(UUIDPkMixin, CreatedAtMixin, Base):
@@ -46,9 +42,7 @@ class OAuthToken(UUIDPkMixin, CreatedAtMixin, Base):
 
     __tablename__ = "oauth_token"
 
-    principal_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("principal.id", ondelete="CASCADE")
-    )
+    principal_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("principal.id", ondelete="CASCADE"))
     client_id: Mapped[str] = mapped_column(Text)
     access_token_hash: Mapped[bytes] = mapped_column(LargeBinary, unique=True)
     refresh_token_hash: Mapped[bytes | None] = mapped_column(
@@ -64,8 +58,6 @@ class OAuthToken(UUIDPkMixin, CreatedAtMixin, Base):
     refresh_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    revoked_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (Index("ix_oauth_token_principal_id", "principal_id"),)

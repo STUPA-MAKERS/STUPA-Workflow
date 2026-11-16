@@ -104,8 +104,8 @@ async def test_save_refuses_unknown_cost_centers(session: AsyncSession) -> None:
         graph["transitions"].append({"from": "review", "to": "done", "actions": [action]})
         with pytest.raises(ValidationProblem):
             await _save(session, graph)
-    top = Budget(parent_id=None, key=f"K{uuid.uuid4().hex[:8]}", path_key="", name="T")
-    top.path_key = top.key
+    key = f"K{uuid.uuid4().hex[:8]}"
+    top = Budget(parent_id=None, key=key, path_key=key, name="T")
     session.add(top)
     await session.commit()
     graph = _graph(fixed)

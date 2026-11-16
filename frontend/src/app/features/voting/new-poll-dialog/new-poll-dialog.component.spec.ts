@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { of, throwError } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
-import type { PollCreateBody, Vote } from '@core/api/models';
+import type { CircularCreateBody, PollCreateBody, Vote } from '@core/api/models';
 import { AdminOptionsService } from '../../../pages/admin/admin-options.service';
 import { NewPollDialogComponent } from './new-poll-dialog.component';
 
@@ -12,10 +12,16 @@ const NOW = new Date(2026, 9, 22, 12, 0).getTime();
 
 /** The user has vote.manage in g1 and g2, not in g3. */
 async function setup(
-  opts: { gremien?: { value: string; label: string }[]; fail?: boolean; optionsFail?: boolean; gremiumId?: string } = {},
+  opts: { gremien?: { value: string; label: string }[]; fail?: boolean; optionsFail?: boolean; gremiumId?: string; rulesFail?: boolean } = {},
 ) {
   const createPoll = jest.fn((_body: PollCreateBody) =>
     opts.fail ? throwError(() => new Error('boom')) : of({ id: 'p1' } as Vote),
+  );
+  const createCircular = jest.fn((_body: CircularCreateBody) =>
+    opts.fail ? throwError(() => new Error('boom')) : of({ id: 'c1' } as Vote),
+  );
+  const circularRules = jest.fn(() =>
+    opts.rulesFail ? throwError(() => new Error('x')) : of({ minDays: 5 }),
   );
   const gremien = opts.gremien ?? [
     { value: 'g1', label: 'STUPA' },
@@ -28,7 +34,7 @@ async function setup(
     inputs: { open: true, gremiumId: opts.gremiumId ?? '' },
     on: { created, closed },
     providers: [
-      { provide: ApiClient, useValue: { createPoll } },
+      { provide: ApiClient, useValue: { createPoll, createCircular, circularRules } },
       { provide: AuthService, useValue: { canInGremium: (id: string) => id !== 'g3' } },
       {
         provide: AdminOptionsService,
@@ -38,7 +44,7 @@ async function setup(
       },
     ],
   });
-  return { ...view, cmp: view.fixture.componentInstance, createPoll, created, closed };
+  return { ...view, cmp: view.fixture.componentInstance, createPoll, createCircular, created, closed };
 }
 
 /** Fill a valid single poll of g1 that ends tomorrow at 18:00. */
@@ -64,7 +70,7 @@ describe('NewPollDialogComponent', () => {
   it('offers the Gremien with vote.manage and the fields of the spec', async () => {
     const { cmp } = await setup();
     expect(cmp.gremiumOptions().map((o) => o.label)).toEqual(['STUPA', 'AStA']);
-    expect(screen.getByRole('heading', { name: 'Umfrage anlegen' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Abstimmung anlegen' })).toBeInTheDocument();
     expect(screen.getByLabelText('Frage')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Terminumfrage' })).toBeInTheDocument();
     expect(screen.getByLabelText(/Endet am/)).toBeInTheDocument();
@@ -131,5 +137,59 @@ describe('NewPollDialogComponent', () => {
     cmp.submit(false);
     await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
     expect(closed).toHaveBeenCalled();
+  });
+
+  describe('Umlaufverfahren (§000914)', () => {
+    it('takes the Gremium, the question and the end only', async () => {
+      const { cmp, fixture } = await setup();
+      cmp.setKind('other');
+      cmp.setKind(null);
+      expect(cmp.circular()).toBe(false);
+      cmp.setKind('circular');
+      fixture.detectChanges();
+      expect(screen.getByLabelText('Beschlussfrage')).toBeInTheDocument();
+      expect(screen.queryByRole('radio', { name: 'Terminumfrage' })).toBeNull();
+      expect(screen.getByRole('note')).toHaveTextContent('mindestens 5 Tage');
+      cmp.setKind('poll');
+      expect(cmp.circular()).toBe(false);
+    });
+
+    it('needs an end at least the days of the server ahead', async () => {
+      const { cmp } = await setup();
+      cmp.setKind('circular');
+      cmp.gremium.set('g1');
+      cmp.question.set(' Lastenanhänger beschaffen? ');
+      cmp.endTime.set('12:00');
+      cmp.endDate.set('2026-10-26');
+      expect(cmp.canSubmit()).toBe(false);
+      cmp.endDate.set('2026-10-27');
+      expect(cmp.canSubmit()).toBe(true);
+    });
+
+    it('keeps three days when the rules do not load', async () => {
+      const { cmp } = await setup({ rulesFail: true });
+      expect(cmp.minDays()).toBe(3);
+    });
+
+    it('starts the Umlaufverfahren, or saves it as a draft', async () => {
+      const { cmp, createCircular, createPoll, created } = await setup();
+      cmp.setKind('circular');
+      cmp.gremium.set('g1');
+      cmp.question.set(' Lastenanhänger beschaffen? ');
+      cmp.endDate.set('2026-11-02');
+      cmp.endTime.set('18:00');
+      cmp.submit(false);
+      expect(createCircular).toHaveBeenCalledWith({
+        kind: 'circular',
+        eligibleGroup: 'g1',
+        question: 'Lastenanhänger beschaffen?',
+        closesAt: new Date('2026-11-02T18:00').toISOString(),
+        draft: false,
+      });
+      expect(createPoll).not.toHaveBeenCalled();
+      expect(created).toHaveBeenCalledWith({ id: 'c1' });
+      cmp.submit(true);
+      expect(createCircular).toHaveBeenLastCalledWith(expect.objectContaining({ draft: true }));
+    });
   });
 });

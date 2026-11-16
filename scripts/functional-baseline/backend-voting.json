@@ -1,5 +1,6 @@
 {
   "backend/app/modules/voting/election.py": 3,
   "backend/app/modules/voting/poll.py": 4,
-  "backend/app/modules/voting/service.py": 22
+  "backend/app/modules/voting/service/close.py": 14,
+  "backend/app/modules/voting/service/create.py": 8
 }

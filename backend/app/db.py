@@ -50,9 +50,7 @@ class UUIDPkMixin:
 class CreatedAtMixin:
     """Row creation timestamp, set by the database with `now()`."""
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class TimestampMixin(CreatedAtMixin):

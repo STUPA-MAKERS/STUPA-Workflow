@@ -11,6 +11,7 @@ is revertable where that makes sense.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -53,6 +54,20 @@ _BUDGET_REVERT_PERM: dict[AuditAction, str] = {
     AuditAction.BUDGET_EXPENSE_CREATE: "budget.book",
     AuditAction.BUDGET_EXPENSE_UPDATE: "budget.book",
 }
+
+
+#: A save of the feature switches needs ``admin.features``, not ``admin.site``, and so
+#: does its revert.
+FEATURES_REVERT_PERM = "admin.features"
+
+
+def _is_features_save(entity_type: str, data: Mapping[str, object]) -> bool:
+    """Return whether the audit entry is a save of the feature switches.
+
+    Such an entry carries ``section = features``. Its revert sets only the switches
+    back, and a revert of that revert is again a save of the switches.
+    """
+    return entity_type == ENTITY_SITE_CONFIG and data.get("section") == "features"
 
 
 def _uuid_or_none(raw: object) -> UUID | None:
@@ -107,9 +122,7 @@ class RevertService:
                 operation (403).
         """
         entry = (
-            await self.session.execute(
-                select(AuditEntry).where(AuditEntry.id == audit_entry_id)
-            )
+            await self.session.execute(select(AuditEntry).where(AuditEntry.id == audit_entry_id))
         ).scalar_one_or_none()
         if entry is None:
             raise NotFoundError(f"audit entry {audit_entry_id} not found")
@@ -121,9 +134,7 @@ class RevertService:
             return await self._revert_status(entry, actor, principal)
         if entry.action in REVERTABLE_BUDGET_ACTIONS:
             return await self._revert_budget(entry, actor, principal)
-        raise ConflictError(
-            "This audit entry is not revertable.", code="not_revertable"
-        )
+        raise ConflictError("This audit entry is not revertable.", code="not_revertable")
 
     @staticmethod
     def _require(principal: Principal | None, perm: str, what: str) -> None:
@@ -136,9 +147,7 @@ class RevertService:
             ForbiddenError: The principal does not hold ``perm``.
         """
         if principal is not None and not principal.has(perm):
-            raise ForbiddenError(
-                f"Missing permission to revert {what} (requires {perm})."
-            )
+            raise ForbiddenError(f"Missing permission to revert {what} (requires {perm}).")
 
     async def _revert_config(
         self, entry: AuditEntry, actor: str, principal: Principal | None
@@ -150,11 +159,12 @@ class RevertService:
         if recorded is None:
             raise NotFoundError(f"config revision {revision_id} not found")
 
-        perm = _CONFIG_REVERT_PERM.get(recorded.entity_type)
+        features_only = _is_features_save(recorded.entity_type, entry.data or {})
+        perm = (
+            FEATURES_REVERT_PERM if features_only else _CONFIG_REVERT_PERM.get(recorded.entity_type)
+        )
         if perm is None:
-            raise ForbiddenError(
-                f"Cannot revert unknown config entity {recorded.entity_type}."
-            )
+            raise ForbiddenError(f"Cannot revert unknown config entity {recorded.entity_type}.")
         self._require(principal, perm, f"{recorded.entity_type} config")
 
         if recorded.prev_revision_id is None:
@@ -184,6 +194,7 @@ class RevertService:
                 "revertedAuditId": entry.id,
                 "revertedRevisionId": str(recorded.id),
             },
+            features_only=features_only,
         )
         return RevertResult(
             entity_type=recorded.entity_type,
@@ -212,9 +223,7 @@ class RevertService:
         from_raw = data.get("fromStateId")
         to_raw = data.get("toStateId")
         if not app_id or not from_raw or not to_raw:
-            raise ConflictError(
-                "This status change is not revertable.", code="not_revertable"
-            )
+            raise ConflictError("This status change is not revertable.", code="not_revertable")
         event_raw = data.get("statusEventId")
         swap = (
             DecisionSwap(
@@ -247,9 +256,7 @@ class RevertService:
 
         perm = _BUDGET_REVERT_PERM.get(AuditAction(entry.action))
         if perm is None:  # pragma: no cover - covered by REVERTABLE_BUDGET_ACTIONS
-            raise ConflictError(
-                "This audit entry is not revertable.", code="not_revertable"
-            )
+            raise ConflictError("This audit entry is not revertable.", code="not_revertable")
         self._require(principal, perm, "a budget money mutation")
 
         await BudgetTreeService(self.session, actor=actor).revert_audit(entry, actor)

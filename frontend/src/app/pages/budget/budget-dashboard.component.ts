@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, type ParamMap, Router, RouterLink } from '@angular/router';
 import { NgTemplateOutlet } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Subject, forkJoin, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -9,7 +10,10 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { Uuid } from '@core/api/models';
 import {
+  FabComponent,
   ButtonComponent,
+  ConfirmDialogComponent,
+  CurrencyInputComponent,
   DialogComponent,
   EmptyStateComponent,
   FilterSelectComponent,
@@ -21,8 +25,10 @@ import {
   type RowMenuSection,
   ScrollFadeDirective,
   SearchPillComponent,
+  SegmentedComponent,
   type Seg,
   SegBarComponent,
+  type SelectOption,
   SheetBarComponent,
   SheetBarTitleDirective,
   SideSheetComponent,
@@ -30,6 +36,7 @@ import {
   ToastService,
   PageHeaderComponent,
   SectionComponent,
+  StatusTextComponent,
 } from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
 import { exportDownload } from '@shared/download.util';
@@ -46,6 +53,15 @@ import {
 import { BudgetPieComponent, type PieSlice } from './budget-pie.component';
 import { BudgetSunburstComponent, type SunburstMetric } from './budget-sunburst.component';
 import { nodeColors, resolveNodeColors } from './budget-color.util';
+import { defaultFiscalYearId } from './fiscal-year.util';
+import { CostCentreCreateComponent, type CostCentreCreated } from './cost-centre/cost-centre-create.component';
+import { CostCentreSettingsComponent } from './cost-centre/cost-centre-settings.component';
+import { activeOnly, costCentreError, createKey, levelKey } from './cost-centre/cost-centre.util';
+import { pageItemTitle } from '../../layout/page-title.service';
+import { BudgetPlanApi, type BudgetPlan } from './plan/budget-plan.api';
+import { amountProblem, inForce, memberIds, yearMembers } from './plan/budget-plan.util';
+import { AdminApiService } from '../admin/admin-api.service';
+import { problemCode } from '@core/api/problem';
 import { toggled } from '@shared/util/immutable';
 import { formatMoney } from '@shared/format-money';
 import { BudgetItemListComponent } from './budget-items/budget-item-list.component';
@@ -89,7 +105,7 @@ interface TreeRow {
   readonly percent: number | null;
 }
 
-/** One row of "Auslastung je Budget". */
+/** One row of "Auslastung". */
 interface UsageRow {
   readonly node: BudgetTreeNode;
   readonly color: string;
@@ -145,6 +161,13 @@ export const APPS_SHOWN = 5;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     TodoLinkedListComponent,
+    FabComponent,
+    StatusTextComponent,
+    ConfirmDialogComponent,
+    CostCentreCreateComponent,
+    CostCentreSettingsComponent,
+    CurrencyInputComponent,
+    FormsModule,
     SectionComponent,
     LoadErrorComponent,
     PageHeaderComponent,
@@ -163,6 +186,7 @@ export const APPS_SHOWN = 5;
     BudgetItemsDialogComponent,
     RowMenuComponent,
     SearchPillComponent,
+    SegmentedComponent,
     SegBarComponent,
     SideSheetComponent,
     SkeletonComponent,
@@ -180,6 +204,8 @@ export class BudgetDashboardComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
+  private readonly planApi = inject(BudgetPlanApi);
+  private readonly adminApi = inject(AdminApiService);
 
   /** The pane sits beside the sheet only on a wide viewport. */
   readonly wide = mediaQuery(MEDIA.wide);
@@ -187,10 +213,36 @@ export class BudgetDashboardComponent {
    *  from the start. */
   readonly phone = mediaQuery(MEDIA.phone);
 
+  /** The choices of the view switch of the Budget tab. */
+  readonly modeOptions = computed(() => [
+    { value: 'run', label: this.i18n.translate('budget.view.run') },
+    { value: 'plan', label: this.i18n.translate('budget.view.plan') },
+  ]);
+  /** The top-level cost centre whose Haushaltsplan the view Planung opens: the selected
+   *  root when its plan switch is on, else the first root with the switch on. The view
+   *  switch shows only when there is one. */
+  readonly planTop = computed<BudgetTreeNode | null>(() => {
+    const enabled = this.tree().filter((n) => !n.parentId && n.planEnabled);
+    return enabled.find((n) => n.id === this.selectedBudgetId()) ?? enabled[0] ?? null;
+  });
+
+  /** Open the view Planung with the year of this view. */
+  setMode(mode: string | null): void {
+    const top = this.planTop();
+    if (mode !== 'plan' || !top) return;
+    void this.router.navigate(['/budget/plan'], {
+      queryParams: {
+        budget: top.id,
+        fy: top.id === this.selectedBudgetId() ? this.selectedFyId() : null,
+        costCentre: top.id === this.selectedBudgetId() && this.selectedKsId() !== top.id ? this.selectedKsId() || null : null,
+      },
+    });
+  }
+
   readonly canExport = computed(() => this.auth.can('budget.export'));
   /** The bookings page needs a global budget permission; a gremium scope alone has none. */
   readonly canSeeBookings = computed(() => this.auth.canAny(...BUDGET_PERMISSIONS));
-  /** Only a reader with `budget.structure` can open /admin/cost-centres and add a year. */
+  /** Only a reader with `budget.structure` can open /admin/budgets and add a year. */
   readonly canManageStructure = computed(() => this.auth.can('budget.structure'));
   readonly exporting = signal(false);
 
@@ -221,12 +273,58 @@ export class BudgetDashboardComponent {
     'available',
   ];
 
-  /** Tree without the hidden cost centres. `hiddenInBudget` removes the node and its
-   *  subtree from the budget tab. This changes the display only: the values still count
-   *  in the parent rollups. */
-  private readonly visibleTree = computed<readonly BudgetTreeNode[]>(() =>
-    pruneHidden(this.tree()),
+  /** The tree without the inactive Kostenstellen and their subtrees. This changes the
+   *  display only: the values still count in the parent rollups. A person with
+   *  `budget.structure` sees them, marked "inaktiv", to set them active again. */
+  private readonly visibleTree = computed<readonly BudgetTreeNode[]>(() => {
+    const shown = this.canManageStructure() ? this.tree() : activeOnly(this.tree());
+    const members = memberIds(inForce(this.yearPlan()?.versions ?? []));
+    return members
+      ? shown.map((n) => (n.id === this.selectedBudgetId() ? yearMembers(n, members, this.selectedFyId()) : n))
+      : shown;
+  });
+
+  /**
+   * The Haushaltsplan of the selected year: `undefined` while it is not read, `null` for a
+   * year without a plan. A year with a version in force shows only its Kostenstellen.
+   */
+  readonly yearPlan = signal<BudgetPlan | null | undefined>(undefined);
+  /** The selected root is a budget and its selected year has no version in force, so its
+   *  Kostenstellen and allocations are set here by hand. */
+  readonly byHand = computed(() => {
+    const plan = this.yearPlan();
+    return (
+      this.canManageStructure() &&
+      plan !== undefined &&
+      !inForce(plan?.versions ?? []) &&
+      !!this.selectedTop() &&
+      !!this.selectedFyId()
+    );
+  });
+  private readonly selectedTop = computed(
+    () => this.tree().find((n) => n.id === this.selectedBudgetId() && !n.parentId) ?? null,
   );
+  readonly createTop = this.selectedTop;
+  readonly createOpen = signal(false);
+  /** The Kostenstelle that waits for the confirmation of its delete. */
+  readonly deleteTarget = signal<BudgetTreeNode | null>(null);
+  /** The text of the delete confirmation: the name and the path of the Kostenstelle. */
+  readonly deleteBody = computed(() => {
+    const node = this.deleteTarget();
+    return node ? this.i18n.translate('budget.tree.deleteConfirm', { name: node.name, path: node.pathKey }) : '';
+  });
+  readonly gremiumOptions = signal<readonly SelectOption[]>([]);
+  /** The allocation a person typed and did not leave yet. */
+  private readonly allocationDraft = signal<string | null>(null);
+  /** The parents of a new Kostenstelle: the budget with each Kostenstelle below it. */
+  readonly parentNodes = computed<readonly BudgetTreeNode[]>(() => {
+    const top = this.selectedTop();
+    return top ? [top] : [];
+  });
+  /** The selected Kostenstelle is below a budget, so the page edits and deletes it. */
+  readonly editable = computed(() => this.canManageStructure() && !!this.current()?.parentId);
+  /** The allocation of the selected year is set by hand and the year is open. */
+  readonly allocatable = computed(() => this.byHand() && !this.selectedYear()?.closedAt);
 
   /** Roots of the tree: the forest roots of the server response that HAVE a fiscal year.
    *  The full view gives the top budgets; a gremium scope gives the assigned sub cost
@@ -380,9 +478,18 @@ export class BudgetDashboardComponent {
     return keys.map((k) => ({ key: k, label: this.figureLabel(k), value: f[k] }));
   });
 
+  /** The amount of a year is the Ansatz when the Haushalt has a Haushaltsplan, else the Zuteilung. */
   figureLabel(key: FigureKey): string {
-    return this.i18n.translate(`budget.dash.fig.${key}` as TranslationKey);
+    const planned = key === 'allocated' && !!this.selectedTop()?.planEnabled;
+    return this.i18n.translate(planned ? 'budget.dash.fig.planned' : (`budget.dash.fig.${key}` as TranslationKey));
   }
+
+  /** The heading of the section of a node: Haushalt, Titel or Kostenstelle. */
+  levelKey(node: BudgetTreeNode): TranslationKey {
+    return levelKey(node, this.selectedTop());
+  }
+  /** The floating button creates a Titel below the Haushalt, a Kostenstelle below a node. */
+  readonly createKey = computed(() => createKey(this.selectedKsId(), this.selectedTop()));
 
   /** The selected cost centre has sub cost centres to distribute over. */
   readonly hasChildren = computed(() => (this.selectedKs()?.children.length ?? 0) > 0);
@@ -422,7 +529,7 @@ export class BudgetDashboardComponent {
     this.metric.set(value as DistributionMetric);
   }
 
-  /** "Auslastung je Budget": the direct sub cost centres, or the cost centre itself when
+  /** "Auslastung": the direct sub cost centres, or the cost centre itself when
    *  it has none. */
   readonly usageRows = computed<UsageRow[]>(() => {
     const ks = this.selectedKs();
@@ -549,6 +656,9 @@ export class BudgetDashboardComponent {
     { depth: 1, width: 60 },
   ];
 
+  /** Name widths (%) of the rows the skeleton draws in the use per child. */
+  readonly skeletonUsage: readonly number[] = [55, 70, 48, 40];
+
   readonly showSkeleton = computed(
     () => this.loading() || (!this.selectedFyId() && this.pendingFiscalYears() > 0),
   );
@@ -559,6 +669,11 @@ export class BudgetDashboardComponent {
    * another.
    */
   constructor() {
+    this.api.changed.pipe(takeUntilDestroyed()).subscribe(() => this.refreshTree());
+    pageItemTitle(() => {
+      const ks = this.current();
+      return ks?.parentId ? ks.name : null;
+    });
     this.appsKey
       .pipe(
         switchMap(({ ks, fy, bookings }) =>
@@ -589,6 +704,11 @@ export class BudgetDashboardComponent {
       });
 
     this.load();
+    if (this.canManageStructure())
+      this.adminApi.listGremienOptions().subscribe({
+        next: (list) => this.gremiumOptions.set(list.map((g) => ({ value: g.id, label: g.name }))),
+        error: () => this.gremiumOptions.set([]),
+      });
 
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
       this.urlParams = qp;
@@ -612,15 +732,22 @@ export class BudgetDashboardComponent {
    * The tree and the years are cached reads, which emit a second time when the fresh answer
    * differs. A root therefore counts once, and only in the newest round: a second tree answer
    * starts a new round, and a late answer of the old one must not count against it.
+   *
+   * The tree read has a number like each later one: a read for a save of the page before
+   * can go out after it and be answered first, and its tree is then the newer one.
    */
   protected load(): void {
     this.loading.set(true);
     this.error.set(false);
+    this.treeSent += 1;
+    const sent = this.treeSent;
     this.api.tree().subscribe({
-      next: (tree) => {
-        this.tree.set(tree);
+      next: (answer) => {
+        if (sent >= this.treeShown) this.tree.set(answer);
+        this.treeShown = Math.max(sent, this.treeShown);
+        const tree = this.tree();
         this.loading.set(false);
-        const tops = tree.filter((n) => !n.hiddenInBudget);
+        const tops = this.shownTops(tree);
         const round = ++this.fyRound;
         this.pendingFiscalYears.set(tops.length);
         for (const top of tops) {
@@ -651,6 +778,11 @@ export class BudgetDashboardComponent {
     });
   }
 
+  /** The roots the reader sees: an inactive one only with `budget.structure`. */
+  private shownTops(tree: readonly BudgetTreeNode[]): readonly BudgetTreeNode[] {
+    return this.canManageStructure() ? tree : tree.filter((n) => n.active);
+  }
+
   /** Restore the first selection from the query params. Else take the first root and
    *  its newest fiscal year. */
   private restored = false;
@@ -672,7 +804,7 @@ export class BudgetDashboardComponent {
    * while the tree and the fiscal years trickle in.
    */
   private applyUrlSelection(): void {
-    const tops = this.tree().filter((n) => !n.hiddenInBudget);
+    const tops = this.shownTops(this.tree());
     const next = this.resolveSelection(tops);
     if (next === null) return;
     if (
@@ -692,9 +824,15 @@ export class BudgetDashboardComponent {
    * One resolver for both entry points, so a deep link cannot mean one thing on arrival
    * and another when it is followed later.
    *
+   * A root that the URL names waits for its years too, so the root of the cost centre does not
+   * take its place only because its years landed first.
+   * A cost centre of the URL that is not below the chosen root is dropped: the root itself is
+   * shown, so the page never names a cost centre beside a budget that is not its own.
+   *
    * A search hit is `?costCentre=…` alone, so the root comes from the cost centre itself when the URL does
-   * not name one. A URL that names a root whose years have not landed yet waits rather than settle
-   * for the first ready root, because the choice is latched.
+   * not name one. The choice is latched, so it waits until the years of every root have landed:
+   * the default is then the first root of the tree that has a year, and not the root whose
+   * years arrived first.
    */
   private resolveSelection(
     tops: readonly BudgetTreeNode[],
@@ -710,15 +848,16 @@ export class BudgetDashboardComponent {
     const qpBudget = qp.get('budget');
     const derived = ks && this.nodeById().get(ks) ? this.rootOf(ks) : null;
     const wanted = selectable(qpBudget) ? qpBudget : selectable(derived) ? derived : null;
-    if (wanted === null && (ks || qpBudget) && this.pendingFiscalYears() > 0) return null;
+    const named = !!qpBudget && !!this.nodeById().get(qpBudget) && !selectable(qpBudget);
+    if ((wanted === null || named) && this.pendingFiscalYears() > 0) return null;
     const budgetId = wanted ?? withFy[0].id;
 
     const fys = this.fiscalYearsByBudget()[budgetId];
     const fy = qp.get('fy');
     return {
       budgetId,
-      ksId: ks && this.nodeById().get(ks) ? ks : budgetId,
-      fyId: fy && fys.some((f) => f.id === fy) ? fy : newestFyId(fys),
+      ksId: ks && derived === budgetId ? ks : budgetId,
+      fyId: fy && fys.some((f) => f.id === fy) ? fy : defaultFiscalYearId(fys),
     };
   }
 
@@ -733,11 +872,118 @@ export class BudgetDashboardComponent {
    *  the applications of the new cost centre and year. */
   private setSelection(budgetId: string, ksId: string, fyId: string): void {
     const changed = ksId !== this.selectedKsId() || fyId !== this.selectedFyId();
+    const yearChanged = budgetId !== this.selectedBudgetId() || fyId !== this.selectedFyId();
     this.selectedBudgetId.set(budgetId);
     this.selectedKsId.set(ksId);
     this.selectedFyId.set(fyId);
+    this.allocationDraft.set(null);
+    if (yearChanged) this.loadYearPlan();
     if (ksId) this.expandPath(ksId);
     if (changed || this.apps() === null) this.loadApps();
+  }
+
+  /** Read the plan of the selected year. Only a budget with the plan switch on has one. */
+  private loadYearPlan(): void {
+    const top = this.selectedTop();
+    const fy = this.selectedFyId();
+    if (!top?.planEnabled || !fy) {
+      this.yearPlan.set(top ? null : undefined);
+      return;
+    }
+    this.yearPlan.set(undefined);
+    this.planApi.plan(top.id, fy as Uuid).subscribe({
+      next: (plan) => {
+        if (fy !== this.selectedFyId()) return;
+        this.yearPlan.set(plan);
+        if (!this.selectedKs()) this.setSelection(top.id, top.id, fy);
+      },
+      error: () => this.yearPlan.set(fy === this.selectedFyId() ? null : this.yearPlan()),
+    });
+  }
+
+  private treeSent = 0;
+  private treeShown = 0;
+
+  /**
+   * Read the tree again after a write, without the skeleton of the first load. `select`
+   * names the Kostenstelle that the page then shows. The answer of a read that went out
+   * before the read on the page is dropped, because it can hold the state before a save.
+   * A page that has not taken its budget from the URL yet selects nothing here, because a
+   * selection would write the URL without its budget, Kostenstelle and year. A failed read
+   * after a refused save says nothing (`quiet`), because the person must read the cause of
+   * the refusal, and a phone shows one message at a time.
+   */
+  refreshTree(select: string | null = null, quiet = false): void {
+    this.treeSent += 1;
+    const sent = this.treeSent;
+    this.api.tree().subscribe({
+      next: (tree) => {
+        if (sent < this.treeShown) return;
+        this.treeShown = sent;
+        this.tree.set(tree);
+        if (select && this.nodeById().get(select)) this.selectKs(select);
+        else if (!this.selectedKs() && this.selectedBudgetId()) this.selectKs(this.selectedBudgetId());
+      },
+      error: () => quiet || this.toast.error(this.i18n.translate('budget.error')),
+    });
+  }
+
+  /** The dialog created a Kostenstelle: the page shows it. */
+  onCreated(created: CostCentreCreated): void {
+    this.createOpen.set(false);
+    this.refreshTree(created.id);
+  }
+
+  /** Delete the Kostenstelle after the confirmation. A refusal shows its reason. */
+  deleteNode(): void {
+    const node = this.deleteTarget();
+    this.deleteTarget.set(null);
+    if (!node) return;
+    this.api.deleteNode(node.id).subscribe({
+      next: () => {
+        this.toast.success(this.i18n.translate('budget.tree.toast.deleted'));
+        this.selectedKsId.set(node.parentId ?? this.selectedBudgetId());
+        this.refreshTree();
+        this.syncUrl();
+      },
+      error: (err: unknown) =>
+        this.toast.error(this.i18n.translate(costCentreError(problemCode(err), 'budget.tree.toast.deleteFailed'))),
+    });
+  }
+
+  editAllocation(value: string | null): void {
+    this.allocationDraft.set(value ?? '');
+  }
+
+  /** The amount of the allocation field: the text a person types, else the saved allocation. */
+  readonly allocationValue = computed<string | number>(() => this.allocationDraft() ?? this.figures().allocated);
+
+  /**
+   * The allocation field lost the focus: save the typed amount. An empty field saves
+   * nothing, and a refused amount goes: the field then shows the saved allocation again.
+   */
+  saveAllocation(): void {
+    const ks = this.current();
+    const value = this.allocationDraft();
+    this.allocationDraft.set(null);
+    if (!ks || value === null || value === '' || Number(value) === this.figures().allocated) return;
+    const problem = amountProblem(value);
+    if (problem) {
+      this.toast.error(
+        this.i18n.translate(problem === 'negative' ? 'budget.plan.error.amountNegative' : 'budget.plan.error.amountTooLarge'),
+      );
+      return;
+    }
+    this.api.setAllocation(ks.id, this.selectedFyId() as Uuid, value).subscribe({
+      next: () => {
+        this.toast.success(this.i18n.translate('budget.cc.toast.allocated'));
+        this.refreshTree();
+      },
+      error: (err: unknown) => {
+        this.toast.error(this.i18n.translate(costCentreError(problemCode(err), 'budget.cc.error.allocation')));
+        this.refreshTree();
+      },
+    });
   }
 
   protected loadApps(): void {
@@ -772,7 +1018,7 @@ export class BudgetDashboardComponent {
     const root = this.rootOf(id) ?? id;
     if (root !== this.selectedBudgetId()) {
       const fys = this.fiscalYearsByBudget()[root] ?? [];
-      const fy = this.fyIdFor(root) || newestFyId(fys);
+      const fy = this.fyIdFor(root) || defaultFiscalYearId(fys);
       this.setSelection(root, id, fy);
     } else {
       this.setSelection(root, id, this.selectedFyId());
@@ -803,6 +1049,13 @@ export class BudgetDashboardComponent {
     this.itemsOpen.set(true);
   }
 
+  /** The action on the structure: the delete of the selected Kostenstelle. */
+  private structureItems(): RowMenuSection[] {
+    return this.editable()
+      ? [{ items: [{ id: 'delete', label: this.i18n.translate('budget.cc.delete'), icon: 'trash', danger: true }] }]
+      : [];
+  }
+
   /** The actions of the page, as the "more" menu of a phone. */
   actionSections(): RowMenuSection[] {
     const exportItem: RowMenuItem = {
@@ -819,27 +1072,21 @@ export class BudgetDashboardComponent {
       ...(this.canExport() ? [exportItem] : []),
       ...(this.canSeeBookings() ? [bookingsItem] : []),
     ];
-    return [{ items }];
+    return [{ items }, ...this.structureItems()];
   }
 
   /** The ⋮ menu of the head on a wide screen (§ 000670): what is no icon button. */
   moreSections(): RowMenuSection[] {
-    return [
-      {
-        items: [
-          {
-            id: 'bookings',
-            label: this.i18n.translate('budget.usage.viewExpenses'),
-            icon: 'receipt',
-          },
-        ],
-      },
-    ];
+    const bookings: RowMenuSection[] = this.canSeeBookings()
+      ? [{ items: [{ id: 'bookings', label: this.i18n.translate('budget.usage.viewExpenses'), icon: 'receipt' }] }]
+      : [];
+    return [...bookings, ...this.structureItems()];
   }
 
   onAction(item: RowMenuItem): void {
     if (item.id === 'export') this.onExport();
     else if (item.id === 'bookings') this.openBookings();
+    else if (item.id === 'delete') this.deleteTarget.set(this.current());
   }
 
   openBookings(): void {
@@ -878,19 +1125,6 @@ function toFigures(a: BudgetAllocationView): Figures {
 export function utilisation(f: Figures): number | null {
   const total = f.available + f.committed;
   return total > 0 ? Math.round((f.committed / total) * 100) : null;
-}
-
-/** The id of the newest fiscal year (the highest start year), or `''` without one. */
-function newestFyId(fys: readonly FiscalYear[]): string {
-  const newest = fys.reduce<FiscalYear | null>((n, f) => (!n || f.year > n.year ? f : n), null);
-  return newest?.id ?? '';
-}
-
-/** Remove the cost centres hidden in the budget tab, and their subtrees. */
-function pruneHidden(nodes: readonly BudgetTreeNode[]): readonly BudgetTreeNode[] {
-  return nodes
-    .filter((n) => !n.hiddenInBudget)
-    .map((n) => ({ ...n, children: pruneHidden(n.children) }));
 }
 
 /** Every node of a forest, each before its subtree. */

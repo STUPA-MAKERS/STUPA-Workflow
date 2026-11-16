@@ -591,6 +591,19 @@ async def test_revert_status_moves_back_without_restored_state() -> None:
     assert sid == event.id
 
 
+async def test_revert_status_leaves_the_commit_to_the_caller() -> None:
+    """`commit=False` writes the event and the audit entry and does not commit."""
+    to_id, from_id = uuid4(), uuid4()
+    app = _app(to_id, uuid4())
+    db = fake_session(result(app), result(rowcount=1))
+    sid = await FlowService(db).revert_status(
+        app.id, from_state_id=from_id, to_state_id=to_id, actor="admin",
+        reverted_audit_id=7, note="vote:repeat", commit=False,
+    )
+    assert db.committed == 0
+    assert db.added[0].note == "vote:repeat" and sid == db.added[0].id
+
+
 def _target_state(state_id: object, flow_id: object) -> SimpleNamespace:
     """Build a target state of a flow."""
     return SimpleNamespace(id=state_id, flow_version_id=flow_id, kind="normal", config={})

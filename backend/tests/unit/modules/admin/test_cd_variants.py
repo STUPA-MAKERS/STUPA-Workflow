@@ -35,10 +35,10 @@ from app.modules.admin.schemas import (
 from app.modules.admin.service import ConfigService
 from app.modules.admin.service.cd_variants import CD_LOGO_PREFIX, CdVariantService
 from app.modules.files import scanner as scanner_mod
+from app.modules.files.cd_resolver import cd_variant_key_for_gremium, resolve_cd_variant_by_key
 from app.modules.files.scanner import ScanVerdict
 from app.modules.files.storage import StorageError
 from app.modules.gremien.models import Gremium
-from app.modules.protocol.cd_resolver import cd_variant_key_for_gremium, resolve_cd_variant_by_key
 from app.modules.site_config.cd_logos import (
     ALLOWED_CD_LOGO_MIME,
     MAX_CD_LOGO_BYTES,
@@ -171,7 +171,10 @@ def gremium_row(**kw: Any) -> Gremium:
         allow_vote_delegation=False,
         delegation_lead_minutes=0,
         delegation_allow_external=False,
+        delegation_max_per_delegate=2,
+        delegation_in_elections=False,
         quorum_percent=None,
+        term_start_month=10,
     )
     row.id = kw.pop("id", uuid.uuid4())
     return row

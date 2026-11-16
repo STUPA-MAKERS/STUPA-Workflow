@@ -91,6 +91,7 @@ async function setup(opts: Options = {}) {
   restore = matchMediaQueries(...(opts.media ?? [MEDIA.wide, MEDIA.notPhone]));
   const back = jest.fn();
   const attendanceChange = jest.fn();
+  const lateExcused = jest.fn();
   const view = await render(MeetingFollowViewComponent, {
     inputs: {
       meeting: opts.meeting ?? member(),
@@ -98,7 +99,7 @@ async function setup(opts: Options = {}) {
       attendance: opts.attendance ?? [ME],
       savingAttendance: false,
     },
-    on: { back, attendanceChange },
+    on: { back, attendanceChange, lateExcused },
     providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
@@ -115,12 +116,49 @@ async function setup(opts: Options = {}) {
     http.match(`/api/delegations/votes/${v.id}/status`).forEach((r) => r.flush(status));
     view.fixture.detectChanges();
   };
-  return { ...view, http, back, attendanceChange, context, voteReads };
+  return { ...view, http, back, attendanceChange, lateExcused, context, voteReads };
 }
 
 afterEach(() => restore());
 
 describe('MeetingFollowViewComponent', () => {
+  /** § 000922 */
+  it('opens the late excuse of an own absence and hands the new roster on', async () => {
+    const absent: Attendance = { ...ME, status: 'absent', source: 'lead', lateExcuseUntil: '2099-01-01T00:00:00Z' };
+    const { http, lateExcused, context, fixture } = await setup({
+      meeting: member({ status: 'closed', currentAgendaItemId: null }),
+      attendance: [absent],
+    });
+    context();
+    await userEvent.click(screen.getByRole('button', { name: /^Deine Anwesenheit:/ }));
+    fixture.detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Nachträglich entschuldigen' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nachträglich entschuldigen' });
+    await userEvent.type(within(dialog).getByLabelText(/Grund/), 'Krank');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Entschuldigen' }));
+    const roster = [{ ...absent, status: 'excused', lateExcuseUntil: null }];
+    http.expectOne('/api/meetings/m-1/attendance/me/late-excuse').flush(roster);
+    fixture.detectChanges();
+    expect(lateExcused).toHaveBeenCalledWith(roster);
+    expect(screen.queryByRole('dialog', { name: 'Nachträglich entschuldigen' })).toBeNull();
+  });
+
+  it('closes the late excuse on "Abbrechen"', async () => {
+    const absent: Attendance = { ...ME, status: 'absent', source: 'lead', lateExcuseUntil: '2099-01-01T00:00:00Z' };
+    const { lateExcused, context, fixture } = await setup({
+      meeting: member({ status: 'closed', currentAgendaItemId: null }),
+      attendance: [absent],
+    });
+    context();
+    await userEvent.click(screen.getByRole('button', { name: /^Deine Anwesenheit:/ }));
+    fixture.detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Nachträglich entschuldigen' }));
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Nachträglich entschuldigen' })).getByRole('button', { name: 'Abbrechen' }));
+    fixture.detectChanges();
+    expect(screen.queryByRole('dialog', { name: 'Nachträglich entschuldigen' })).toBeNull();
+    expect(lateExcused).not.toHaveBeenCalled();
+  });
+
   describe('planned meeting (board Teilnahme-Vorher)', () => {
     const planned = () => member({ status: 'planned', startedAt: null, currentAgendaItemId: null });
 
@@ -261,21 +299,21 @@ describe('MeetingFollowViewComponent', () => {
     });
 
     /** Step 1 picks, and step 2 casts the own ballot over REST. */
-    it('shows the open vote with the two-step ballot of the own row and the represented row', async () => {
+    it('shows the open vote with the two-step ballot that counts for the represented member too', async () => {
       const open = vote({ id: 'v-1', agendaItemId: 't-2', voted: 14, present: 19 });
       const { context, voteReads, http } = await setup({ meeting: member({ votes: [open] }) });
       context();
       voteReads(rest(), { blocked: false, delegatedToName: null, exercising: true, delegatedByName: 'Jonas Weber' });
       const side = screen.getByRole('complementary', { name: 'Teilnahme' });
       expect(within(side).getByText('Abstimmung offen')).toBeInTheDocument();
-      expect(within(side).getByRole('group', { name: 'Deine Stimme' })).toBeInTheDocument();
-      expect(within(side).getByRole('group', { name: 'Als Vertretung für Jonas Weber' })).toBeInTheDocument();
+      const unit = within(side).getByRole('group', { name: 'Deine Stimme, auch für Jonas Weber' });
+      expect(within(side).queryByRole('group', { name: /Als Vertretung/ })).toBeNull();
       expect(within(side).getByText('14 von 19 Anwesenden haben abgestimmt')).toBeInTheDocument();
       const dock = screen.getByRole('contentinfo', { name: 'Stand der Sitzung' });
       expect(within(dock).getByText(/Deine Stimme/)).toBeInTheDocument();
       expect(within(dock).getByText('offen')).toBeInTheDocument();
       expect(within(dock).getByText('Vertretung: noch offen')).toBeInTheDocument();
-      await userEvent.click(within(within(side).getByRole('group', { name: 'Deine Stimme' })).getByRole('button', { name: 'Ja' }));
+      await userEvent.click(within(unit).getByRole('button', { name: 'Ja' }));
       await userEvent.click(within(side).getByRole('button', { name: 'Stimme abgeben: Ja' }));
       const cast = http.expectOne('/api/votes/v-1/ballot');
       expect(cast.request.body).toEqual({ choice: 'yes', asDelegation: false });

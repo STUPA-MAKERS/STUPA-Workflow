@@ -1,3 +1,4 @@
+import { FeatureService } from '@core/features/feature.service';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -79,6 +80,8 @@ export class FormsListComponent {
   private readonly api = inject(AdminApiService);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
+  /** "Mit Budget" shows only while `Budget` is on (spec 000761). */
+  protected readonly budgetOn = inject(FeatureService).isOn('budget');
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
 
@@ -148,7 +151,9 @@ export class FormsListComponent {
   protected readonly columns = computed<ColumnDef[]>(() => [
     { key: 'name', label: this.i18n.translate('admin.forms.col.name'), card: 'title' },
     { key: 'gremium', label: this.i18n.translate('admin.forms.col.gremium') },
-    { key: 'budget', label: this.i18n.translate('admin.forms.col.budget'), width: '8rem' },
+    ...(this.budgetOn
+      ? [{ key: 'budget', label: this.i18n.translate('admin.forms.col.budget'), width: '8rem' }]
+      : []),
     { key: 'status', label: this.i18n.translate('admin.forms.col.status'), width: '7rem' },
     { key: 'version', label: this.i18n.translate('admin.forms.col.version'), width: '5rem' },
     {

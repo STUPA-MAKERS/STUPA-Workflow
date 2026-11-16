@@ -19,17 +19,20 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.principal import Principal
+from app.modules.gremien.models import Gremium
 from app.modules.livevote.guests import GuestEvents, GuestService
-from app.modules.livevote.open_window import check_open
+from app.modules.livevote.open_window import check_open, load_meeting_settings
+from app.modules.livevote.repeat import first_meeting_id
 from app.modules.livevote.schemas import MeetingCreate, MeetingOut, MeetingPatch
 from app.modules.livevote.service.handover import HandoverOps
 from app.modules.meetings.agenda_service import AgendaService
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
+from app.modules.meetings.present import fix_counts, present_count
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteOut
 from app.shared.errors import (
@@ -46,6 +49,16 @@ logger = logging.getLogger(__name__)
 #: no-op and not in this set.
 _TRANSITIONS: frozenset[tuple[str, str]] = frozenset({("planned", "live"), ("live", "closed")})
 
+#: The planning values that close with the meeting. The settings dialog sends each value
+#: with every save, so the same value again is no change.
+_CLOSED_WITH_MEETING: tuple[str, ...] = (
+    "protokollant_id",
+    "kind",
+    "repeat_of_id",
+    "public_join",
+    "guests_mode",
+)
+
 #: The planning fields that MEETING_UPDATE records, as (model attribute, JSON key).
 _AUDITED_FIELDS: tuple[tuple[str, str], ...] = (
     ("status", "status"),
@@ -54,6 +67,10 @@ _AUDITED_FIELDS: tuple[tuple[str, str], ...] = (
     ("start_time", "startTime"),
     ("end_time", "endTime"),
     ("protokollant_id", "protokollantId"),
+    ("kind", "kind"),
+    ("repeat_of_id", "repeatOfId"),
+    ("location", "location"),
+    ("form", "form"),
 )
 
 
@@ -63,6 +80,19 @@ def _snapshot(meeting: Meeting) -> dict[str, str | None]:
         (key, getattr(meeting, attr)) for attr, key in _AUDITED_FIELDS
     )
     return {key: None if value is None else str(value) for key, value in values}
+
+
+def _apply_kind_place_form(meeting: Meeting, payload: MeetingPatch) -> None:
+    """Write the kind, the place and the form that the patch sent. A null place clears it."""
+    changes: dict[str, str | None] = {
+        **({} if payload.kind is None else {"kind": payload.kind}),
+        **(
+            {"location": payload.location or None} if "location" in payload.model_fields_set else {}
+        ),
+        **({} if payload.form is None else {"form": payload.form}),
+    }
+    for attr, value in changes.items():
+        setattr(meeting, attr, value)
 
 
 def _merged(first: GuestEvents | None, closed: GuestEvents | None) -> GuestEvents | None:
@@ -91,6 +121,11 @@ class LifecycleOps(HandoverOps):
         protokollant_id = await self._resolve_protokollant(
             payload.gremium_id, payload.protokollant_id
         )
+        if payload.guests_mode == "vote":
+            await self._assert_guests_vote_allowed(payload.gremium_id)
+        guests_mode = payload.guests_mode or (
+            "vote" if await self.guests_vote_allowed(payload.gremium_id) else "watch"
+        )
         meeting = Meeting(
             gremium_id=payload.gremium_id,
             title=payload.title,
@@ -98,13 +133,22 @@ class LifecycleOps(HandoverOps):
             start_time=payload.start_time,
             end_time=payload.end_time,
             status="planned",
+            kind=payload.kind,
+            repeat_of_id=await first_meeting_id(
+                self.session,
+                kind=payload.kind,
+                gremium_id=payload.gremium_id,
+                first_id=payload.repeat_of_id,
+                day=payload.date,
+            ),
+            late_excuse_days=(await load_meeting_settings(self.session)).late_excuse_days,
+            location=payload.location or None,
+            form=payload.form,
             created_by=principal.sub,
             protokollant_id=protokollant_id,
             public_join=payload.public_join,
-            guests_mode=payload.guests_mode,
+            guests_mode=guests_mode,
         )
-        if payload.public_join:
-            await self._assert_public_join_allowed(payload.gremium_id)
         self.session.add(meeting)
         await self.session.flush()
         if payload.public_join:
@@ -177,7 +221,10 @@ class LifecycleOps(HandoverOps):
 
         The status runs only forward. A repeat of the current status is a no-op. ``closed``
         is terminal, and a meeting that does not take place is deleted, not closed. A closed
-        meeting is frozen, because the protocol refers to its planning data. The open window
+        meeting keeps its protokollant, its kind and its guest settings. Its title, date,
+        times, place and form stay open until the protocol is final
+        (§F/meetings/meetings/000982), because the keeper finds an error in them when the
+        keeper writes the protocol. The open window
         reads the stored planning before this patch changes it, so a date change in the same
         patch cannot move the window.
 
@@ -202,10 +249,12 @@ class LifecycleOps(HandoverOps):
         Raises:
             ConflictError: The status change is not ``planned`` to ``live`` or ``live``
                 to ``closed`` (``invalid_status_transition``), the meeting still has an
-                open vote on close (``open_vote``), the start has no protokollant, the
-                start is before the open window (``meeting_too_early``) or early and not
-                confirmed (``early_open_unconfirmed``), or the meeting is closed and
-                the patch changes its planning.
+                open vote on close (``open_vote``), an election waits for the lot on close
+                (``lot_pending``), the start has no protokollant, the
+                start is before the open window (``meeting_too_early``), the meeting
+                is closed and the patch changes a value that closed with it
+                (``meeting_closed``), or the protocol of the closed meeting is no longer
+                a draft (``protocol_final``).
         """
         wants_public = payload.public_join is not None or payload.guests_mode is not None
         wants_manage = (
@@ -214,6 +263,10 @@ class LifecycleOps(HandoverOps):
             or "start_time" in payload.model_fields_set
             or "end_time" in payload.model_fields_set
             or "protokollant_id" in payload.model_fields_set
+            or "kind" in payload.model_fields_set
+            or "repeat_of_id" in payload.model_fields_set
+            or "location" in payload.model_fields_set
+            or "form" in payload.model_fields_set
             or wants_public
         )
         wants_write = payload.status is not None or payload.active_application_id is not None
@@ -266,18 +319,30 @@ class LifecycleOps(HandoverOps):
                 "a vote of this meeting is still open — close or cancel it first",
                 code="open_vote",
             )
+        if closing and await self.lot_pending(meeting.id):
+            raise ConflictError(
+                "an election of this meeting ended in a tie — draw the lot first",
+                code="lot_pending",
+            )
 
         if meeting.status == "closed" and wants_manage:
+            await self._assert_correction(meeting, payload)
+
+        if (
+            payload.kind is not None
+            and payload.kind != meeting.kind
+            and meeting.status != "planned"
+        ):
             raise ConflictError(
-                "the session is closed — its settings can no longer be changed",
-                code="meeting_closed",
+                "the kind of a meeting changes only before the meeting starts",
+                code="meeting_not_planned",
             )
 
         before = _snapshot(meeting)
         now = datetime.now(UTC)
         if status_change and payload.status == "live":
             window = (await self._open_windows([meeting]))[meeting.id]
-            check_open(window, now=now, confirmed=payload.confirm_early)
+            check_open(window, now=now)
         guest_events = (
             await self._apply_public(meeting, payload, principal, now) if wants_public else None
         )
@@ -299,6 +364,9 @@ class LifecycleOps(HandoverOps):
             )
         if payload.title is not None:
             meeting.title = payload.title
+        _apply_kind_place_form(meeting, payload)
+        if {"kind", "repeat_of_id"} & payload.model_fields_set:
+            await self._apply_first_meeting(meeting, payload)
         if "date" in payload.model_fields_set:
             meeting.date = payload.date
         if "start_time" in payload.model_fields_set:
@@ -328,10 +396,9 @@ class LifecycleOps(HandoverOps):
         all_guest_events = _merged(guest_events, closed_events)
         if payload.status is not None:
             meeting.status = payload.status
+        await self._stamp_current(meeting, now)
         kept_keeper = (
-            {"protokollantId": before["protokollantId"]}
-            if moved_keeper or switched_keeper
-            else {}
+            {"protokollantId": before["protokollantId"]} if moved_keeper or switched_keeper else {}
         )
         after = {**_snapshot(meeting), **kept_keeper}
         changes = {
@@ -374,6 +441,25 @@ class LifecycleOps(HandoverOps):
             meeting, old_item, item_id, principal.sub, now
         )
 
+    async def _stamp_current(self, meeting: Meeting, now: datetime) -> None:
+        """Record the start time of the current agenda item of a live meeting.
+
+        Only the first time counts: an item that has a time keeps it, so a move back
+        does not change the time of a TOP. A planned meeting records nothing, so the
+        time is the one at which the meeting really reached the item. The start of the
+        meeting stamps the item that was current before the start.
+        """
+        if meeting.status != "live" or meeting.current_agenda_item_id is None:
+            return
+        await self.session.execute(
+            update(MeetingAgendaItem)
+            .where(
+                MeetingAgendaItem.id == meeting.current_agenda_item_id,
+                MeetingAgendaItem.started_at.is_(None),
+            )
+            .values(started_at=now)
+        )
+
     async def _change_protokollant(
         self, meeting: Meeting, payload: MeetingPatch, principal: Principal, now: datetime
     ) -> bool:
@@ -414,6 +500,22 @@ class LifecycleOps(HandoverOps):
         )
         return False
 
+    async def _apply_first_meeting(self, meeting: Meeting, payload: MeetingPatch) -> None:
+        """Store the first meeting of a repeat meeting, or clear it for another kind.
+
+        The kind of the patch is already on the meeting. A patch without `repeatOfId`
+        keeps the stored first meeting (spec 000940).
+        """
+        named = "repeat_of_id" in payload.model_fields_set
+        meeting.repeat_of_id = await first_meeting_id(
+            self.session,
+            kind=meeting.kind,
+            gremium_id=meeting.gremium_id,
+            first_id=payload.repeat_of_id if named else meeting.repeat_of_id,
+            day=payload.date if "date" in payload.model_fields_set else meeting.date,
+            meeting_id=meeting.id,
+        )
+
     async def _close(
         self, meeting: Meeting, actor: str, now: datetime
     ) -> tuple[list[Vote], GuestEvents]:
@@ -427,6 +529,11 @@ class LifecycleOps(HandoverOps):
         """
         await self.close_periods(meeting, now)
         meeting.closed_at = now
+        fix_counts(
+            meeting,
+            await present_count(self.session, meeting.id),
+            await self.vote_eligible_count(meeting.gremium_id),
+        )
         from app.modules.voting.service import VotingService
 
         cancelled = await VotingService(self.session).cancel_drafts_for_meeting(
@@ -453,7 +560,7 @@ class LifecycleOps(HandoverOps):
         """
         old_public, old_mode = meeting.public_join, meeting.guests_mode
         new_public = old_public if payload.public_join is None else payload.public_join
-        new_mode = old_mode if payload.guests_mode is None else payload.guests_mode
+        new_mode = await self._new_guests_mode(meeting, payload, new_public)
         if (old_public, old_mode) == (new_public, new_mode):
             return None
         if old_mode == "vote" and new_mode == "watch" and await self._guest_vote_open(meeting.id):
@@ -461,8 +568,8 @@ class LifecycleOps(HandoverOps):
                 "A vote with guests is open. Close it before the guests only watch.",
                 code="guest_vote_open",
             )
-        if new_public and not old_public:
-            await self._assert_public_join_allowed(meeting.gremium_id)
+        if new_mode == "vote" and old_mode != "vote":
+            await self._assert_guests_vote_allowed(meeting.gremium_id)
         meeting.public_join = new_public
         meeting.guests_mode = new_mode
         guests = GuestService(self.session)
@@ -487,30 +594,45 @@ class LifecycleOps(HandoverOps):
         )
         return events
 
-    async def _assert_public_join_allowed(self, gremium_id: UUID) -> None:
-        """Allow public participation only in a gremium without a quorum.
+    async def _new_guests_mode(
+        self, meeting: Meeting, payload: MeetingPatch, new_public: bool
+    ) -> str:
+        """Return the guest mode after the patch.
 
-        A gremium with a quorum (STUPA, AStA) decides by the members only; the feature
-        serves the gremien without a quorum (Fachschaften).
+        A meeting can hold the mode ``vote`` from before its Gremium took the ballot
+        from guests. Switching public participation on without a mode then gives
+        ``watch``, because the guests of this Gremium only watch.
+        """
+        if payload.guests_mode is not None:
+            return payload.guests_mode
+        stale = meeting.guests_mode == "vote" and new_public and not meeting.public_join
+        if stale and not await self.guests_vote_allowed(meeting.gremium_id):
+            return "watch"
+        return meeting.guests_mode
+
+    async def _assert_guests_vote_allowed(self, gremium_id: UUID) -> None:
+        """Refuse the guest mode ``vote`` where the Gremium gives guests no ballot.
+
+        A Gremium with a quorum (STUPA, AStA) decides by its members only, so its
+        guests only watch. A Gremium without a quorum follows its switch
+        ``guests_may_vote``.
 
         Raises:
-            ValidationProblem: ``public_join_needs_no_quorum``.
+            ValidationProblem: ``guests_vote_needs_no_quorum`` or ``guests_vote_off``.
         """
-        if await self.gremium_has_quorum(gremium_id):
+        row = await self.session.get(Gremium, gremium_id)
+        if getattr(row, "quorum_percent", None) is not None:
             raise ValidationProblem(
-                "Public participation needs a gremium without a quorum.",
-                code="public_join_needs_no_quorum",
-                errors=[{"field": "publicJoin", "msg": "the gremium has a quorum"}],
+                "Guests only watch in a gremium with a quorum.",
+                code="guests_vote_needs_no_quorum",
+                errors=[{"field": "guestsMode", "msg": "the gremium has a quorum"}],
             )
-
-    async def gremium_has_quorum(self, gremium_id: UUID) -> bool:
-        """Tell if the gremium sets a default quorum (the vote config of its meetings)."""
-        from app.modules.gremien.models import Gremium
-
-        percent = await self.session.scalar(
-            select(Gremium.quorum_percent).where(Gremium.id == gremium_id)
-        )
-        return percent is not None
+        if not bool(getattr(row, "guests_may_vote", False)):
+            raise ValidationProblem(
+                "This gremium gives guests no ballot.",
+                code="guests_vote_off",
+                errors=[{"field": "guestsMode", "msg": "guest ballots are off for the gremium"}],
+            )
 
     async def _guest_vote_open(self, meeting_id: UUID) -> bool:
         """Tell if the meeting has an open vote with guests."""
@@ -574,6 +696,39 @@ class LifecycleOps(HandoverOps):
         """
         if self.publisher is not None:
             await self.publisher.agenda_changed(meeting_id, item_id)
+
+    async def _assert_correction(self, meeting: Meeting, payload: MeetingPatch) -> None:
+        """Refuse a patch of a closed meeting that is no correction of its head data.
+
+        The title, the date, the times, the place and the form of a closed meeting stay
+        open until the protocol is final (§F/meetings/meetings/000982). A protocol in
+        its render counts as final.
+
+        Raises:
+            ConflictError: The patch changes another planning value (``meeting_closed``),
+                or the protocol is no longer a draft (``protocol_final``).
+        """
+        if any(
+            name in payload.model_fields_set
+            and getattr(payload, name) is not None
+            and getattr(payload, name) != getattr(meeting, name)
+            for name in _CLOSED_WITH_MEETING
+        ):
+            raise ConflictError(
+                "the session is closed — only its title, date, times, place and form can "
+                "still change",
+                code="meeting_closed",
+            )
+        from app.modules.meetings.protocol_models import Protocol
+
+        state = await self.session.scalar(
+            select(Protocol.status).where(Protocol.meeting_id == meeting.id)
+        )
+        if state in ("rendering", "final"):
+            raise ConflictError(
+                "the protocol is final — the session can no longer change",
+                code="protocol_final",
+            )
 
     async def _protocol_final(self, meeting_id: UUID) -> bool:
         """Report whether the protocol of the meeting is final.
@@ -695,7 +850,13 @@ class LifecycleOps(HandoverOps):
 
         The session flushes at once, because a Gremium delete that follows must not cascade
         over a meeting row that the session still has to delete.
+
+        A protocol that this meeting approved loses its mark (§F/meetings/protocols/000924):
+        without the meeting the mark names nothing. The import is local, because
+        ``protocol`` depends on ``livevote``.
         """
+        from app.modules.protocol.approval import drop_approvals_by
+
         data: dict[str, Any] = {
             "title": meeting.title,
             "gremiumId": str(meeting.gremium_id),
@@ -712,5 +873,6 @@ class LifecycleOps(HandoverOps):
             target_id=str(meeting.id),
             data=data,
         )
+        await drop_approvals_by(self.session, meeting.id)
         await self.session.delete(meeting)
         await self.session.flush()

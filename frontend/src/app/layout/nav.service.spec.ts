@@ -120,4 +120,31 @@ describe('NavService', () => {
     const paths = new Set((routes[0].children ?? []).map((r) => `/${r.path}`));
     for (const item of NAV_ITEMS) expect(paths).toContain(item.path);
   });
+
+  /** Spec 000758: a feature that is off has no entry in the navigation. */
+  describe('with features off', () => {
+    afterEach(() => localStorage.clear());
+
+    const ALL = { ...BASE, roles: ['admin'], permissions: ['budget.book', 'ticket.manage', 'vote.manage', 'session.manage'] };
+
+    it.each([
+      ['todos', ['todos']],
+      ['calendar', ['calendar']],
+      ['meetings', ['meetings']],
+      ['voting', ['voting']],
+      ['budget', ['budget', 'expenses']],
+      ['invoices', ['invoices']],
+      ['tickets', ['tickets']],
+    ])('hides the entries of %s', (feature, hidden) => {
+      localStorage.setItem('ap.features.off', JSON.stringify([feature]));
+      const keys = keysFor(ALL as Principal);
+      for (const key of hidden) expect(keys).not.toContain(key);
+      expect(keys).toContain('applications');
+    });
+
+    it('shows every entry of a feature while all are on', () => {
+      const keys = keysFor(ALL as Principal);
+      for (const item of NAV_ITEMS.filter((i) => i.feature)) expect(keys).toContain(item.key);
+    });
+  });
 });

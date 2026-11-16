@@ -23,13 +23,9 @@ from sqlalchemy import and_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.notifications.brand import MailBrand, load_mail_brand
+from app.modules.notifications.compose import branded_mail
 from app.modules.notifications.kinds import NOTIFICATION_KINDS, kind_default
-from app.modules.notifications.layout import (
-    append_link_text,
-    reason_text,
-    render_layout,
-    text_to_html,
-)
 from app.modules.notifications.links import MailLink
 from app.modules.notifications.mail import MailAttachment, MailMessage, compute_idempotency_key
 from app.modules.notifications.models import (
@@ -59,11 +55,15 @@ logger = logging.getLogger("app.notifications")
 
 MAGIC_LINK_TEMPLATE_KEY = "magic_link"
 
+#: The placeholders that every mail template can use, next to the ones of its catalogue
+#: entry. The editor lists them with each builtin template.
+COMMON_PLACEHOLDERS: dict[str, str] = {"platformName": "Name der Plattform (aus dem Branding)"}
+
 #: Builtin magic-link subject, used when the DB has no ``magic_link`` template. The
 #: body states no lifetime, because by default a link has no expiry.
 _BUILTIN_MAGIC_LINK_SUBJECT = {
-    "de": "Ihr Zugangslink zur Antragsplattform",
-    "en": "Your access link for the application platform",
+    "de": "Ihr Zugangslink für {{ platformName }}",
+    "en": "Your access link for {{ platformName }}",
 }
 _BUILTIN_MAGIC_LINK_BODY = {
     "de": "Hallo,\n\nüber diesen Link gelangen Sie zu Ihrem Antrag:\n{{ link }}\n\n"
@@ -152,6 +152,40 @@ class NotificationService:
         self.queue = queue
         self.settings = settings or get_settings()
         self.resolver = RecipientResolver(session, expand_specs)
+        self._brand: MailBrand | None = None
+
+    async def brand(self) -> MailBrand:
+        """Return the mail brand of the active branding; the service reads it once."""
+        if self._brand is None:
+            self._brand = await load_mail_brand(self.session, self.settings)
+        return self._brand
+
+    async def render_context(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Return the context of a render: ``platformName`` plus the values of the caller.
+
+        Every template can name the platform as ``{{ platformName }}``
+        (§ F/collaboration/notifications/000998).
+        """
+        return {"platformName": (await self.brand()).name, **context}
+
+    async def _render_builtin(
+        self,
+        *,
+        subject_i18n: dict[str, str],
+        body_i18n: dict[str, str],
+        context: dict[str, Any],
+        lang: str | None,
+        body_html_i18n: dict[str, str] | None = None,
+    ) -> RenderedMail:
+        """Render a builtin subject and body in ``lang`` or the default language."""
+        return render_mail(
+            subject_i18n=subject_i18n,
+            body_i18n=body_i18n,
+            body_html_i18n=body_html_i18n,
+            context=await self.render_context(context),
+            lang=lang or self.settings.mail_default_lang,
+            default_lang=self.settings.mail_default_lang,
+        )
 
     async def create_template(self, payload: MailTemplateCreate) -> MailTemplateOut:
         """Create a mail template.
@@ -309,7 +343,7 @@ class NotificationService:
         if tpl is None:
             raise NotFoundError(f"mail template {template_id} not found")
         try:
-            rendered = self._render(tpl, context=req.context, lang=req.lang)
+            rendered = await self._render(tpl, context=req.context, lang=req.lang)
         except TemplateRenderError as exc:
             raise ValidationProblem(
                 "Template render failed.",
@@ -332,7 +366,7 @@ class NotificationService:
             placeholders={},
         )
         try:
-            rendered = self._render(transient, context=req.context, lang=req.lang)
+            rendered = await self._render(transient, context=req.context, lang=req.lang)
         except TemplateRenderError as exc:
             raise ValidationProblem(
                 "Template render failed.",
@@ -503,19 +537,18 @@ class NotificationService:
                 attachments=attachments,
             )
         try:
-            rendered = render_mail(
+            rendered = await self._render_builtin(
                 subject_i18n=builtin_subject,
                 body_i18n=builtin_body,
                 body_html_i18n=builtin_html,
                 context=full_context,
-                lang=lang or self.settings.mail_default_lang,
-                default_lang=self.settings.mail_default_lang,
+                lang=lang,
             )
         except TemplateRenderError as exc:
             logger.warning("builtin template %r render failed: %s", template_key, exc)
             return False
         return await self._enqueue(
-            self._message(rendered, wanted, kind, idempotency_parts, link, attachments)
+            await self._message(rendered, wanted, kind, idempotency_parts, link, attachments)
         )
 
     async def handle_notify_action(
@@ -622,14 +655,15 @@ class NotificationService:
                 link=link,
             )
             return int(ok)
-        rendered = render_mail(
+        rendered = await self._render_builtin(
             subject_i18n=spec.subject_i18n if spec else _BUILTIN_NOTIFY_SUBJECT,
             body_i18n=spec.body_i18n if spec else _BUILTIN_NOTIFY_BODY,
             context=full_context,
-            lang=lang or self.settings.mail_default_lang,
-            default_lang=self.settings.mail_default_lang,
+            lang=lang,
         )
-        return int(await self._enqueue(self._message(rendered, recipients, reason, idem, link)))
+        return int(
+            await self._enqueue(await self._message(rendered, recipients, reason, idem, link))
+        )
 
     async def send_magic_link(self, *, email: str, link: str, lang: str | None = None) -> None:
         """Render and enqueue the magic-link mail in `lang`.
@@ -639,26 +673,15 @@ class NotificationService:
         configured default language. A template without that language falls back to the
         default, as every other mail does.
         """
-        tpl = await self._get_template_by_key(MAGIC_LINK_TEMPLATE_KEY)
-        rendered = (
-            self._render(tpl, context={"link": link}, lang=lang)
-            if tpl is not None
-            else render_mail(
-                subject_i18n=_BUILTIN_MAGIC_LINK_SUBJECT,
-                body_i18n=_BUILTIN_MAGIC_LINK_BODY,
-                context={"link": link},
-                lang=lang or self.settings.mail_default_lang,
-                default_lang=self.settings.mail_default_lang,
-            )
+        await self._send_builtin_or_template(
+            key=MAGIC_LINK_TEMPLATE_KEY,
+            subject_i18n=_BUILTIN_MAGIC_LINK_SUBJECT,
+            body_i18n=_BUILTIN_MAGIC_LINK_BODY,
+            email=email,
+            context={"link": link},
+            lang=lang,
+            idempotency=("magic_link", email, link),
         )
-        msg = MailMessage(
-            to=(email,),
-            subject=rendered.subject,
-            text=rendered.text,
-            html=self._layout_html(rendered, "magic_link"),
-            idempotency_key=compute_idempotency_key("magic_link", email, link),
-        )
-        await self._enqueue(msg)
 
     async def send_email_login(self, *, email: str, link: str, lang: str | None = None) -> None:
         """Render and enqueue the login link of the e-mail login in `lang`."""
@@ -686,67 +709,32 @@ class NotificationService:
         """Render a mail from its DB template or its builtin and enqueue it to `email`."""
         tpl = await self._get_template_by_key(key)
         rendered = (
-            self._render(tpl, context=context, lang=lang)
+            await self._render(tpl, context=context, lang=lang)
             if tpl is not None
-            else render_mail(
-                subject_i18n=subject_i18n,
-                body_i18n=body_i18n,
-                context=context,
-                lang=lang or self.settings.mail_default_lang,
-                default_lang=self.settings.mail_default_lang,
+            else await self._render_builtin(
+                subject_i18n=subject_i18n, body_i18n=body_i18n, context=context, lang=lang
             )
         )
-        await self._enqueue(
-            MailMessage(
-                to=(email,),
-                subject=rendered.subject,
-                text=rendered.text,
-                html=self._layout_html(rendered, "magic_link"),
-                idempotency_key=compute_idempotency_key(*idempotency),
-            )
-        )
+        await self._enqueue(await self._message(rendered, [email], "magic_link", idempotency, None))
 
     async def _get_template_by_key(self, key: str) -> MailTemplate | None:
         return (
             await self.session.scalars(select(MailTemplate).where(MailTemplate.key == key))
         ).first()
 
-    def _render(
+    async def _render(
         self, tpl: MailTemplate, *, context: dict[str, Any], lang: str | None
     ) -> RenderedMail:
         return render_mail(
             subject_i18n=tpl.subject_i18n,
             body_i18n=tpl.body_i18n,
             body_html_i18n=tpl.body_html_i18n or None,
-            context=context,
+            context=await self.render_context(context),
             lang=lang or self.settings.mail_default_lang,
             default_lang=self.settings.mail_default_lang,
         )
 
-    def _layout_html(
-        self, rendered: RenderedMail, reason: str, link: MailLink | None = None
-    ) -> str:
-        """Wrap the mail content in the branded HTML layout.
-
-        The method uses the template HTML as content. Jinja2 renders that HTML with
-        autoescape. When the template has no HTML, the method escapes the text body and
-        wraps it. Every mail therefore has one consistent HTML version with the footer
-        that says why the reader gets it. ``link`` adds the button to the element of
-        the mail.
-        """
-        inner = rendered.html or text_to_html(rendered.text)
-        return render_layout(
-            content_html=inner,
-            title=rendered.subject,
-            site_name=self.settings.mail_from_name,
-            base_url=self.settings.public_base_url,
-            reason=reason_text(reason, rendered.lang),
-            lang=rendered.lang,
-            action_url=link.url if link is not None else None,
-            action_label=link.label(rendered.lang) if link is not None else None,
-        )
-
-    def _message(
+    async def _message(
         self,
         rendered: RenderedMail,
         recipients: list[str],
@@ -755,22 +743,25 @@ class NotificationService:
         link: MailLink | None,
         attachments: tuple[MailAttachment, ...] = (),
     ) -> MailMessage:
-        """Build the mail: the text with the link line, the HTML with the layout.
+        """Build the branded mail of a render (see `compose.branded_mail`).
 
-        The HTML comes from the text before the link line, so the HTML shows the link
-        as a button only.
+        The template HTML is the content of the frame. Jinja2 renders that HTML with
+        autoescape. When the template has no HTML, the frame escapes the text body and
+        wraps it. Every mail therefore has one consistent HTML version with the footer
+        that says why the reader gets it. ``link`` adds the button to the element of
+        the mail.
         """
-        text = (
-            append_link_text(rendered.text, link.url, link.label(rendered.lang))
-            if link is not None
-            else rendered.text
-        )
-        return MailMessage(
+        return branded_mail(
+            brand=await self.brand(),
+            settings=self.settings,
             to=tuple(recipients),
             subject=rendered.subject,
-            text=text,
-            html=self._layout_html(rendered, reason, link),
+            text=rendered.text,
+            html=rendered.html,
+            reason=reason,
+            lang=rendered.lang,
             idempotency_key=compute_idempotency_key(*idempotency_parts),
+            link=link,
             attachments=attachments,
         )
 
@@ -795,12 +786,12 @@ class NotificationService:
         if not recipients:
             return False
         try:
-            rendered = self._render(tpl, context=context, lang=lang)
+            rendered = await self._render(tpl, context=context, lang=lang)
         except TemplateRenderError as exc:
             logger.warning("template %r render failed: %s", tpl.key, exc)
             return False
         return await self._enqueue(
-            self._message(rendered, recipients, reason, idempotency_parts, link, attachments)
+            await self._message(rendered, recipients, reason, idempotency_parts, link, attachments)
         )
 
     async def _enqueue(self, msg: MailMessage) -> bool:
@@ -943,7 +934,7 @@ def _builtin_out(spec: MailTemplateSpec) -> MailTemplateOut:
         subject_i18n=spec.subject_i18n,
         body_i18n=spec.body_i18n,
         body_html_i18n={},
-        placeholders=spec.placeholders,
+        placeholders={**spec.placeholders, **COMMON_PLACEHOLDERS},
         source="builtin",
     )
 

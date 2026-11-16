@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import distinct, func, or_, select
+from sqlalchemy import distinct, func, or_, select, update
 
 from app.modules.admin.schemas import (
     GremiumAdminOut,
@@ -21,7 +21,13 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.files.service import FilesService
 from app.modules.gremien.gremium_roles import GremiumRoleService
-from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
+from app.modules.gremien.models import (
+    DEFAULT_TERM_START_MONTH,
+    Gremium,
+    GremiumMembership,
+    GremiumRole,
+)
+from app.modules.meetings.models import Meeting, MeetingSettings
 from app.modules.site_config.models import CdVariant
 from app.modules.todos.boards import ensure_gremium_board
 from app.modules.todos.models import TodoBoard, TodoCard, TodoComment
@@ -38,9 +44,56 @@ def _gremium_out(row: Gremium) -> GremiumOut:
         allow_vote_delegation=row.allow_vote_delegation,
         delegation_lead_minutes=row.delegation_lead_minutes,
         delegation_allow_external=row.delegation_allow_external,
+        delegation_max_per_delegate=row.delegation_max_per_delegate,
+        delegation_in_elections=bool(row.delegation_in_elections),
         quorum_percent=row.quorum_percent,
+        quorum_min_present=row.quorum_min_present,
+        repeat_quorum_percent=row.repeat_quorum_percent,
+        guests_may_vote=bool(row.guests_may_vote),
+        term_start_month=row.term_start_month,
         protocols_public=bool(row.protocols_public),
     )
+
+
+def _guests_vote(row: Gremium) -> bool:
+    """Tell if guests can get a ballot: the switch is on and the Gremium has no quorum."""
+    return bool(row.guests_may_vote) and row.quorum_percent is None
+
+
+def _apply_quorum(row: Gremium, payload: GremiumUpdate) -> None:
+    """Write the quorum fields, the guest switch and the term start that the patch sent.
+
+    The three quorum fields can be cleared to null.
+    """
+    nullable = ("quorum_percent", "quorum_min_present", "repeat_quorum_percent")
+    writes: dict[str, int | bool | None] = {
+        **{name: getattr(payload, name) for name in nullable if name in payload.model_fields_set},
+        **({} if payload.guests_may_vote is None else {"guests_may_vote": payload.guests_may_vote}),
+        **(
+            {}
+            if payload.term_start_month is None
+            else {"term_start_month": payload.term_start_month}
+        ),
+    }
+    for name, value in writes.items():
+        setattr(row, name, value)
+
+
+_DELEGATION_FIELDS = (
+    "allow_vote_delegation",
+    "delegation_lead_minutes",
+    "delegation_allow_external",
+    "delegation_max_per_delegate",
+    "delegation_in_elections",
+)
+
+
+def _apply_delegation(row: Gremium, payload: GremiumUpdate) -> None:
+    """Write the delegation settings that the patch sent. None means "not sent"."""
+    writes = {name: getattr(payload, name) for name in _DELEGATION_FIELDS}
+    for name, value in writes.items():
+        if value is not None:
+            setattr(row, name, value)
 
 
 class GremiumOps(ConfigServiceBase):
@@ -111,7 +164,13 @@ class GremiumOps(ConfigServiceBase):
             allow_vote_delegation=payload.allow_vote_delegation,
             delegation_lead_minutes=payload.delegation_lead_minutes,
             delegation_allow_external=payload.delegation_allow_external,
+            delegation_max_per_delegate=payload.delegation_max_per_delegate,
+            delegation_in_elections=payload.delegation_in_elections,
             quorum_percent=payload.quorum_percent,
+            quorum_min_present=payload.quorum_min_present,
+            repeat_quorum_percent=payload.repeat_quorum_percent,
+            guests_may_vote=payload.guests_may_vote,
+            term_start_month=await self._term_start_month(payload.term_start_month),
             protocols_public=payload.protocols_public,
         )
         self.session.add(row)
@@ -127,6 +186,18 @@ class GremiumOps(ConfigServiceBase):
         )
         await self.session.commit()
         return _gremium_out(row)
+
+    async def _term_start_month(self, given: int | None) -> int:
+        """Return the term start of a new gremium: the given month, else the setting.
+
+        The value of the meeting settings is only this start value (000948).
+        """
+        if given is not None:
+            return given
+        stored = await self.session.scalar(
+            select(MeetingSettings.term_start_month).where(MeetingSettings.id == 1)
+        )
+        return DEFAULT_TERM_START_MONTH if stored is None else int(stored)
 
     async def gremium_protocols_public(self, gremium_id: UUID) -> bool:
         """Return the flag ``protocols_public`` of a gremium, False when it is missing."""
@@ -199,14 +270,11 @@ class GremiumOps(ConfigServiceBase):
             row.cd_variant_id = payload.cd_variant_id
         if payload.default_lang is not None:
             row.default_lang = payload.default_lang
-        if payload.allow_vote_delegation is not None:
-            row.allow_vote_delegation = payload.allow_vote_delegation
-        if payload.delegation_lead_minutes is not None:
-            row.delegation_lead_minutes = payload.delegation_lead_minutes
-        if payload.delegation_allow_external is not None:
-            row.delegation_allow_external = payload.delegation_allow_external
-        if "quorum_percent" in payload.model_fields_set:
-            row.quorum_percent = payload.quorum_percent
+        _apply_delegation(row, payload)
+        guests_voted = _guests_vote(row)
+        _apply_quorum(row, payload)
+        if guests_voted and not _guests_vote(row):
+            await self._guests_only_watch(row)
         publish = payload.protocols_public
         data: dict[str, object] | None = (
             {"field": "protocolsPublic", "old": bool(row.protocols_public), "new": publish}
@@ -218,6 +286,22 @@ class GremiumOps(ConfigServiceBase):
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "gremium", row.id, data)
         await self.session.commit()
         return _gremium_out(row)
+
+    async def _guests_only_watch(self, row: Gremium) -> None:
+        """Set the open meetings of the Gremium to the guest mode ``watch``.
+
+        The mode of a meeting must not outlive the rule of its Gremium: a quorum or
+        the switch ``guests_may_vote`` off takes the ballot from the guests.
+        """
+        await self.session.execute(
+            update(Meeting)
+            .where(
+                Meeting.gremium_id == row.id,
+                Meeting.status != "closed",
+                Meeting.guests_mode == "vote",
+            )
+            .values(guests_mode="watch")
+        )
 
     async def delete_gremium(self, gremium_id: UUID, principal: Principal) -> None:
         """Delete a gremium.
@@ -239,7 +323,10 @@ class GremiumOps(ConfigServiceBase):
         pre-check runs first, so no audit entry is written for a doomed delete. A
         gremium that decides a running vote (``application.vote_gremium_id``) is
         refused too, because the application would stay in its vote state without a
-        deciding gremium.
+        deciding gremium. A gremium that a budget belongs to is refused as well,
+        because ``budget.gremium_id`` is CASCADE: the delete would take the cost
+        centres, the bookings and the Haushaltsplan along without the rules of the
+        budget delete and without an audit entry for them.
 
         The to-do comment file rows are locked before the first audit entry, because
         ``finalize_scan`` of an infected file locks its row first and then waits for
@@ -248,7 +335,8 @@ class GremiumOps(ConfigServiceBase):
         audit entry each. The objects go only after the commit, because a failed
         commit brings the rows back and a row without its object is a broken file.
 
-        The delete locks the gremium row first. A concurrent insert of a meeting
+        The delete locks the tree of each cost center that names the gremium, and then
+        the gremium row (`_lock_budget_trees`). A concurrent insert of a meeting
         (or a vote of one) takes a key-share lock on that row through its foreign
         key, so it waits for the delete and then fails on the missing gremium. It
         never lands in the cascade without the rules.
@@ -260,9 +348,11 @@ class GremiumOps(ConfigServiceBase):
                 (``meeting_finalized``, 403).
             ConflictError: An application of this gremium or of one of its
                 application types still exists, the gremium decides the running vote of an
-                application (`gremium_decides_vote`), or a vote of the gremium
-                is open (`open_vote`) (409).
+                application (`gremium_decides_vote`), a budget belongs to the
+                gremium (`gremium_has_budget`), or a vote of the gremium is open
+                (`open_vote`) (409).
         """
+        await self._lock_budget_trees(gremium_id)
         row = await self.session.scalar(
             select(Gremium)
             .where(Gremium.id == gremium_id)
@@ -298,6 +388,16 @@ class GremiumOps(ConfigServiceBase):
                 "application out of its vote state first.",
                 code="gremium_decides_vote",
             )
+        from app.modules.budget.tree_models import Budget
+
+        budget = await self.session.scalar(
+            select(Budget.id).where(Budget.gremium_id == gremium_id).limit(1)
+        )
+        if budget is not None:
+            raise ConflictError(
+                "A budget belongs to the Gremium. Delete the budget first.",
+                code="gremium_has_budget",
+            )
         comment_ids = await self._lock_gremium_todos(gremium_id)
         files = FilesService(self.session, storage=self.storage)
         await files.lock_for_messages("todo_comment", comment_ids)
@@ -309,6 +409,34 @@ class GremiumOps(ConfigServiceBase):
         await self._audit(principal.sub, AuditAction.CONFIG_CHANGE, "gremium", gremium_id)
         await self.session.commit()
         await files.remove_objects(storage_keys)
+
+    async def _lock_budget_trees(self, gremium_id: UUID) -> None:
+        """Lock the tree of each cost center that names the gremium, before the gremium.
+
+        The delete clears `view_gremium_id` and `decision_gremium_id` of those cost
+        centers through the foreign key, so it writes in their trees. A write in a tree
+        takes the lock of the tree first and the gremium second. The delete keeps that
+        order, because two requests that take the two locks in two orders stop each
+        other and the database ends one of them with an error. The ids are in a fixed
+        order, so two deletes do not wait for each other.
+        """
+        from app.modules.budget.tree.service_base import lock_tree
+        from app.modules.budget.tree_models import Budget
+
+        named = (
+            await self.session.scalars(
+                select(Budget.id)
+                .where(
+                    or_(
+                        Budget.view_gremium_id == gremium_id,
+                        Budget.decision_gremium_id == gremium_id,
+                    )
+                )
+                .order_by(Budget.id)
+            )
+        ).all()
+        for budget_id in named:
+            await lock_tree(self.session, budget_id)
 
     async def _lock_gremium_todos(self, gremium_id: UUID) -> list[UUID]:
         """Lock the to-do board of a gremium and its cards, and return its comment ids.
@@ -401,13 +529,9 @@ class GremiumOps(ConfigServiceBase):
             )
 
     async def _gremium_by_slug(self, slug: str) -> Gremium | None:
-        return (
-            await self.session.scalars(select(Gremium).where(Gremium.slug == slug))
-        ).first()
+        return (await self.session.scalars(select(Gremium).where(Gremium.slug == slug))).first()
 
-    async def get_gremium_mail_recipients(
-        self, gremium_id: UUID
-    ) -> GremiumMailRecipients:
+    async def get_gremium_mail_recipients(self, gremium_id: UUID) -> GremiumMailRecipients:
         """Return the extra protocol recipients (``gremium.protocol_recipients``)."""
         gremium = await self.session.get(Gremium, gremium_id)
         if gremium is None:

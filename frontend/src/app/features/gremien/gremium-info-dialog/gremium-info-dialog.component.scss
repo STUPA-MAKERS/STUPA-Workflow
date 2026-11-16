@@ -1,0 +1,74 @@
+@use '../../../shared/ui/dialog-form' as df;
+
+@include df.host;
+.gid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+  container-type: inline-size;
+}
+.gid__text {
+  --textarea-min-height: 10rem;
+}
+.gid__preview {
+  min-height: 10rem;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow-wrap: anywhere;
+}
+.gid__none {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.gid__error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--fs-small);
+}
+
+.gid__links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.gid__cap {
+  padding: 0;
+  margin-block-end: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+}
+.gid__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.gid__fields {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: var(--space-2);
+  min-width: 0;
+}
+.gid__rowTools {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding-block-start: var(--space-5);
+}
+@container (max-width: 30rem) {
+  .gid__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.gid__add {
+  padding-inline-start: var(--space-1);
+}

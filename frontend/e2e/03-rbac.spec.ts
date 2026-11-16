@@ -9,7 +9,7 @@ import { expectPublicFrame } from './helpers';
  * stack has no mock Keycloak (the mock is off). The test checks that the
  * guarded content stays hidden and that the visitor lands on login or forbidden.
  */
-const GUARDED = ['/applications', '/admin', '/admin/cost-centres', '/admin/forms'];
+const GUARDED = ['/applications', '/admin', '/admin/budgets', '/admin/forms'];
 
 for (const path of GUARDED) {
   test(`@gating Unauth sieht ${path} nicht`, async ({ page }) => {

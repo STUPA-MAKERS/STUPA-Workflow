@@ -7,6 +7,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 
+from app.modules.applications.access import EDIT_ANY_PERMISSION, Access, can_read_pii
 from app.modules.applications.decision import amount_deviates, decisions_by_event
 from app.modules.applications.models import (
     Applicant,
@@ -96,6 +97,31 @@ class ReadOps(ApplicationsServiceBase):
             out.model_copy(update={"observer": True, "submitted_by": submitted_by})
             if observer
             else out
+        )
+
+    async def get_for(self, access: Access) -> ApplicationOut:
+        """Read one application as the reader of `access` sees it on the detail page.
+
+        Only a principal gets the applicant block and the internal view. A reader without
+        the PII right gets ``data`` without the ``isPII`` fields. An observer gets the
+        observer view. The detail route and the PDF export read through this method, so
+        the PDF never shows more than the page.
+        """
+        principal = access.principal if not access.is_observer else None
+        pii = await can_read_pii(self.session, access)
+        return await self.get(
+            access.application_id,
+            include_pii=principal is not None and pii,
+            requester_sub=principal.sub if principal is not None else None,
+            requester_can_manage=principal.has("application.manage")
+            if principal is not None
+            else False,
+            requester_edits_any=principal is not None and principal.has(EDIT_ANY_PERMISSION),
+            allow_unconfirmed=access.is_owning_applicant,
+            strip_pii_fields=not pii,
+            applicant_view=access.is_applicant_view,
+            magic_link_view=access.is_owning_applicant,
+            observer=access.is_observer,
         )
 
     async def timeline(

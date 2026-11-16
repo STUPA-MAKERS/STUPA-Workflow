@@ -283,14 +283,18 @@ describe('mockApiInterceptor', () => {
       expect(form.sections.length).toBeGreaterThan(0);
     });
 
-    it('GET /committees/{id}/meeting-defaults → a quorum for the StuPa, public join elsewhere', async () => {
+    it('GET /committees/{id}/meeting-defaults → a quorum for the StuPa, a guest ballot elsewhere', async () => {
       expect(await get('/api/committees/g0000000-0000-0000-0000-000000000001/meeting-defaults')).toEqual({
-        publicJoinAllowed: false,
+        guestsVoteAllowed: false,
         quorumPercent: 50,
+        inviteDaysOrdinary: 7,
+        inviteDaysExtraordinary: 3,
       });
       expect(await get('/api/committees/g-other/meeting-defaults')).toEqual({
-        publicJoinAllowed: true,
+        guestsVoteAllowed: true,
         quorumPercent: null,
+        inviteDaysOrdinary: 7,
+        inviteDaysExtraordinary: 3,
       });
     });
 
@@ -435,7 +439,7 @@ describe('mockApiInterceptor', () => {
       const tree = await get<N[]>('/api/budgets');
       expect(tree).toHaveLength(1);
       const root = tree[0];
-      expect(root.children[1].children[0].pathKey).toBe('HH-200-210');
+      expect(root.children[1].children[0].pathKey).toBe('HH-200210');
       const a = root.byFiscalYear[0];
       expect(Number(a.available)).toBe(Number(a.allocated) - Number(a.committed) + Number(a.income));
       const gestaltung = root.children[1].children[2];
@@ -455,7 +459,7 @@ describe('mockApiInterceptor', () => {
       expect(all.length).toBe(5);
       const fs = await get<A[]>('/api/budgets/b1000000-0000-0000-0000-000000000020/applications');
       expect(fs.length).toBe(3);
-      expect(fs.every((x) => x.pathKey.startsWith('HH-200-'))).toBe(true);
+      expect(fs.every((x) => x.pathKey.startsWith('HH-200'))).toBe(true);
       const old = await get<A[]>(
         `/api/budgets/${root}/applications`,
         new HttpParams().set('fiscalYear', 'f1000000-0000-0000-0000-000000000002'),
@@ -832,21 +836,24 @@ describe('mockApiInterceptor', () => {
       expect(s.delegatedByName).toBeTruthy();
     });
 
+    /** §F/meetings/voting/000932: the own cast counts for the represented member too. */
     it('POST /votes/{id}/ballot keeps the ballots and refuses a second one', async () => {
-      const cast = (body: unknown) =>
-        firstValueFrom(http.post<{ status: string }>('/api/votes/vote-ballots/ballot', body));
-      expect((await cast({ choice: 'no' })).status).toBe('cast');
+      const cast = (body: unknown, id = 'vote-ballots') =>
+        firstValueFrom(http.post<{ status: string; ballots: number }>(`/api/votes/${id}/ballot`, body));
+      expect(await cast({ choice: 'no' })).toEqual({ status: 'cast', ballots: 2 });
       await expect(cast({ choice: 'yes' })).rejects.toMatchObject({
         status: 409,
         error: { code: 'already_voted' },
       });
-      expect((await cast({ asDelegation: true })).status).toBe('cast');
+      await expect(cast({ asDelegation: true })).rejects.toMatchObject({ status: 409 });
       const v = await get<{ myBallot: { cast: boolean; choice: string }; representedCast: boolean; tally: { voted: number } }>(
         '/api/votes/vote-ballots',
       );
       expect(v.myBallot).toEqual({ cast: true, choice: 'no' });
       expect(v.representedCast).toBe(true);
       expect(v.tally.voted).toBe(10);
+      expect(await cast({ asDelegation: true }, 'vote-proxy-first')).toEqual({ status: 'cast', ballots: 1 });
+      expect(await cast({ choice: 'yes' }, 'vote-proxy-first')).toEqual({ status: 'cast', ballots: 1 });
     });
 
     it('POST /votes/{id}/ballot without a body still counts', async () => {
@@ -1875,6 +1882,10 @@ describe('mockApiInterceptor', () => {
     );
     expect(page.total).toBe(2);
     expect(page.items[0].tops[0]).not.toHaveProperty('markdown');
+    expect(await firstValueFrom(http.get('/api/public/decisions'))).toMatchObject({
+      total: 1,
+      items: [{ protocolId: 'pp-0001', result: 'passed', meetingTitle: '34. Sitzung des Studierendenparlaments' }],
+    });
     expect(await firstValueFrom(http.get('/api/public/protocols/semesters'))).toEqual([
       { key: 'ss-2026', count: 2 },
     ]);

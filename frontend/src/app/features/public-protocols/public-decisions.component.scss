@@ -1,0 +1,50 @@
+@use 'breakpoints' as bp;
+@use 'public-protocols.shared' as pp;
+
+@include pp.list-page;
+
+.pp__meta,
+.pp__tally {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+@include pp.dot-list('.pp__meta');
+@include pp.dot-list('.pp__tally');
+.pp__cardTitle {
+  margin: 0;
+  font-size: var(--fs-h3);
+  line-height: var(--lh-h3);
+  font-weight: var(--fw-semibold);
+  overflow-wrap: anywhere;
+}
+.pp__result {
+  color: var(--color-accent-text);
+  font-weight: var(--fw-semibold);
+}
+.pp__result--no {
+  color: var(--color-danger);
+}
+.pp__kind {
+  font-weight: var(--fw-semibold);
+}
+
+.pp__side {
+  display: flex;
+  flex: none;
+  align-items: center;
+  align-self: center;
+}
+.pp__view {
+  white-space: nowrap;
+}
+
+@include bp.phone {
+  .pp__side {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  // A touch target is 44px high.
+  .pp__view {
+    min-height: 44px;
+  }
+}

@@ -9,6 +9,7 @@ import {
   input,
   model,
   output,
+  type Signal,
   signal,
   untracked,
   viewChild,
@@ -33,12 +34,25 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import {
+  type KnownName,
   MarkdownEditorComponent,
+  type MarkdownDocumentInfo,
+  type MarkdownDocumentRef,
+  type MarkdownDocumentUploader,
   type MarkdownFormat,
   type MarkdownImageUploader,
 } from '@stupa-makers/ui-kit/markdown-editor';
 import { ImageAltService } from '@shared/markdown/image-alt.service';
-import { MediaApiService } from '@shared/markdown/media-api.service';
+import {
+  DocumentViewerComponent,
+  type ShownDocument,
+} from '@shared/markdown/document-viewer.component';
+import {
+  MEDIA_DOCUMENT_TYPES,
+  MediaApiService,
+  type MediaDocument,
+  markdownDocument,
+} from '@shared/markdown/media-api.service';
 import {
   MarkdownImageUploadDirective,
   imageUploadErrorKey,
@@ -48,8 +62,16 @@ import { ProtocolBarComponent } from '../protocol-bar/protocol-bar.component';
 import { type LinkedLead, TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { voteResultResolver } from '../vote-result/vote-result';
 import { hasOpenBlackout } from '../../../shared/markdown/markdown.util';
-import { applyRawFormat, insertRawTable } from './raw-format';
-import { topApplicationLead } from '../top-application-lead.util';
+import {
+  applyRawFormat,
+  rawKnownName,
+  insertRawInline,
+  insertRawTable,
+  insertRawTimeNote,
+  protocolNow,
+} from './raw-format';
+import { topLead } from '../top-application-lead.util';
+import { KnownNamesService } from './known-names.service';
 
 /** The autosave state of the text of the open item. */
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -58,6 +80,24 @@ export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 export type EditorMode = 'formatted' | 'raw';
 
 const NO_FORMATS: ReadonlySet<MarkdownFormat> = new Set();
+
+/** The i18n key of a PDF upload error, from the HTTP status of the problem response. */
+export function documentUploadErrorKey(status?: number): TranslationKey {
+  switch (status) {
+    case 403:
+      return 'markdown.document.error.forbidden';
+    case 413:
+      return 'markdown.document.error.tooLarge';
+    case 415:
+      return 'markdown.document.error.type';
+    case 429:
+      return 'markdown.image.error.rate';
+    case 503:
+      return 'markdown.image.error.storage';
+    default:
+      return 'markdown.document.error.upload';
+  }
+}
 
 /** A button of the format bar. */
 interface FormatTool {
@@ -118,6 +158,7 @@ const TOOLS: readonly FormatTool[] = [
     IconComponent,
     MarkdownEditorComponent,
     MarkdownImageUploadDirective,
+    DocumentViewerComponent,
     NoteComponent,
     ProtocolBarComponent,
     ScrollFadeDirective,
@@ -132,6 +173,7 @@ export class TopSheetComponent {
   private readonly i18n = inject(I18nService);
   private readonly injector = inject(Injector);
   private readonly toast = inject(ToastService);
+  private readonly namesService = inject(KnownNamesService);
 
   readonly meeting = input.required<Meeting>();
   readonly protocol = input.required<Protocol | null>();
@@ -173,7 +215,7 @@ export class TopSheetComponent {
    */
   readonly barControls = input(true);
   /**
-   * The viewer may rename the item (`canChangeAgenda`). A click on the title then opens
+   * The viewer may rename the item (`canEditTop`). A click on the title then opens
    * the title field in place of the heading. An application item keeps the title of its
    * application in its row below the title.
    */
@@ -292,6 +334,98 @@ export class TopSheetComponent {
     }
   };
 
+  /**
+   * Upload a PDF of the formatted view to the protocol of the meeting (spec 000862). An
+   * error shows as a toast; the editor then inserts nothing.
+   */
+  protected readonly documentUpload: MarkdownDocumentUploader = async (file) => {
+    const doc = await this.sendDocument(file);
+    return { src: doc.url, name: doc.name };
+  };
+
+  /** The page count of a PDF badge, from its info route; cached per path. */
+  private readonly pageCounts = signal<ReadonlyMap<string, Promise<number | null>>>(new Map());
+  protected readonly documentInfo: MarkdownDocumentInfo = (src) => {
+    const known = this.pageCounts().get(src);
+    if (known) return known;
+    const next = firstValueFrom(this.injector.get(MediaApiService).documentInfo(src)).then(
+      (info) => info.pages,
+      () => null,
+    );
+    this.pageCounts.update((counts) => new Map([...counts, [src, next]]));
+    return next;
+  };
+
+  /** The PDF in the overlay (spec 000863). */
+  protected readonly shownDocument = signal<ShownDocument | null>(null);
+
+  protected openDocument(ref: MarkdownDocumentRef): void {
+    this.shownDocument.set({ name: ref.name, url: ref.src });
+  }
+
+  private async sendDocument(file: File): Promise<MediaDocument> {
+    try {
+      return await firstValueFrom(
+        this.injector.get(MediaApiService).uploadDocument(this.meeting().id, file),
+      );
+    } catch (err) {
+      this.toast.error(
+        this.i18n.translate(documentUploadErrorKey((err as { status?: number } | null)?.status)),
+      );
+      throw err;
+    }
+  }
+
+  /** "PDF einfügen": the file dialog of the editor, or of the Markdown source. */
+  insertDocument(): void {
+    if (this.mode() !== 'raw') {
+      this.editor()?.pickDocument();
+      return;
+    }
+    const area = this.rawArea()?.nativeElement;
+    if (!area || area.readOnly) return;
+    const picker = document.createElement('input');
+    picker.setAttribute('type', 'file');
+    picker.setAttribute('accept', MEDIA_DOCUMENT_TYPES.join(','));
+    picker.toggleAttribute('multiple', true);
+    picker.addEventListener('change', () => void this.uploadRawDocuments(Array.from(picker.files ?? [])));
+    picker.click();
+  }
+
+  /** A paste of PDF files into the Markdown source uploads them (images go to the directive). */
+  protected onRawPaste(event: ClipboardEvent): void {
+    const pdfs = pdfFiles(event.clipboardData?.files);
+    if (!pdfs.length || !this.editable()) return;
+    event.preventDefault();
+    void this.uploadRawDocuments(pdfs);
+  }
+
+  /** A drop of PDF files on the Markdown source uploads them at the caret. */
+  protected onRawDrop(event: DragEvent): void {
+    const pdfs = pdfFiles(event.dataTransfer?.files);
+    if (!pdfs.length || !this.editable()) return;
+    event.preventDefault();
+    void this.uploadRawDocuments(pdfs);
+  }
+
+  /** Upload PDFs one after the other and put each reference at the caret of the source. */
+  private async uploadRawDocuments(files: readonly File[]): Promise<void> {
+    await files.reduce(async (done, file) => {
+      await done;
+      const doc = await this.sendDocument(file).catch(() => null);
+      const area = this.rawArea()?.nativeElement;
+      const t = this.top();
+      if (!doc || !area || !t || area.readOnly) return;
+      const next = insertRawInline(
+        { text: area.value, start: area.selectionStart, end: area.selectionEnd },
+        markdownDocument(doc.name, doc.id),
+      );
+      Reflect.set(area, 'value', next.text);
+      area.setSelectionRange(next.start, next.end);
+      this.bodyChange.emit({ itemId: t.id, body: next.text });
+    }, Promise.resolve());
+  }
+
   /** The text has a `%%` without its closing pair (000686): the public variant would show the name. */
   protected readonly openBlackout = computed(() => hasOpenBlackout(this.top()?.body ?? ''));
 
@@ -317,7 +451,7 @@ export class TopSheetComponent {
       { text: area.value, start: area.selectionStart, end: area.selectionEnd },
       format,
     );
-    area.value = next.text;
+    Reflect.set(area, 'value', next.text);
     area.focus();
     area.setSelectionRange(next.start, next.end);
     this.bodyChange.emit({ itemId: t.id, body: next.text });
@@ -333,7 +467,27 @@ export class TopSheetComponent {
     const t = this.top();
     if (!area || !t || area.readOnly) return;
     const next = insertRawTable({ text: area.value, start: area.selectionStart, end: area.selectionEnd });
-    area.value = next.text;
+    Reflect.set(area, 'value', next.text);
+    area.focus();
+    area.setSelectionRange(next.start, next.end);
+    this.bodyChange.emit({ itemId: t.id, body: next.text });
+  }
+
+  /**
+   * "Anmerkung": a time note with the current local time after the line of the cursor,
+   * in the editor or in the Markdown source. The cursor goes to the text of the note.
+   */
+  insertTimeNote(): void {
+    const time = protocolNow();
+    if (this.mode() !== 'raw') {
+      this.editor()?.insertTimeNote(time);
+      return;
+    }
+    const area = this.rawArea()?.nativeElement;
+    const t = this.top();
+    if (!area || !t || area.readOnly) return;
+    const next = insertRawTimeNote({ text: area.value, start: area.selectionStart, end: area.selectionEnd }, time);
+    Reflect.set(area, 'value', next.text);
     area.focus();
     area.setSelectionRange(next.start, next.end);
     this.bodyChange.emit({ itemId: t.id, body: next.text });
@@ -354,16 +508,48 @@ export class TopSheetComponent {
     this.bodyChange.emit({ itemId: t.id, body: value });
   }
 
+  /**
+   * The known names for the automatic blackout (000969). The editors read it at each
+   * typed character, so the list loads at the first character and works from the next.
+   * A reader gets no list and loads nothing.
+   */
+  protected readonly knownNames = (): readonly KnownName[] =>
+    this.editable() ? this.namesService.names(this.meeting().id) : [];
+
   /** An edit of the Markdown source. A reader changes nothing. */
-  protected onRawInput(t: AgendaItem, value: string): void {
+  protected onRawInput(t: AgendaItem, area: HTMLTextAreaElement, event: Event): void {
     if (!this.editable()) return;
-    this.bodyChange.emit({ itemId: t.id, body: value });
+    if (event instanceof InputEvent && event.inputType === 'insertText') this.markRawName(area);
+    this.bodyChange.emit({ itemId: t.id, body: area.value });
   }
 
-  /** "TOP 3 · Antrag", or "TOP 3" for a free-text item ("Freitext" says nothing). */
+  /**
+   * Put the marker `%%…%%` around a known name before the caret (000969). The browser
+   * inserts the marked name as its own undo step, so one undo removes the marker.
+   */
+  private markRawName(area: HTMLTextAreaElement): void {
+    const match = rawKnownName(
+      { text: area.value, start: area.selectionStart, end: area.selectionEnd },
+      this.knownNames(),
+    );
+    if (!match) return;
+    const caret = area.selectionStart;
+    const marked = `%%${area.value.slice(match.from, match.to)}%%`;
+    area.setSelectionRange(match.from, match.to);
+    const inserted = 'execCommand' in document && document.execCommand('insertText', false, marked);
+    if (!inserted) area.setRangeText(marked, match.from, match.to);
+    area.setSelectionRange(caret + 4, caret + 4);
+  }
+
+  /** "TOP 3 · Antrag", "TOP 3 · Haushaltsplan", or "TOP 3" for a free-text item. */
   protected kindLine(t: AgendaItem): string {
     const top = this.i18n.translate('meetings.agenda.top', { n: this.topIndex() + 1 });
-    return t.applicationId ? `${top} · ${this.i18n.translate('meetings.agenda.kindApplication')}` : top;
+    const kind = t.applicationId
+      ? 'meetings.agenda.kindApplication'
+      : t.planVersionId
+        ? 'meetings.agenda.planSub'
+        : null;
+    return kind ? `${top} · ${this.i18n.translate(kind)}` : top;
   }
 
   /**
@@ -387,10 +573,8 @@ export class TopSheetComponent {
     return this.follow() && m.status === 'live' && !!m.currentAgendaItemId && this.top()?.id === m.currentAgendaItemId;
   });
 
-  /** The row of the application, the first row of the linked list (`topApplicationLead`). */
-  protected readonly applicationLead = computed<LinkedLead | null>(() =>
-    topApplicationLead(this.top(), this.i18n),
-  );
+  /** The row of the application, the first row of the linked list (`topLead`). */
+  protected readonly applicationLead: Signal<LinkedLead | null> = topLead(this.top, this.injector, this.i18n);
 
   /** The keeper line of a closed meeting: every minute-taker with the TOPs they wrote. */
   protected readonly keepers = computed(() =>
@@ -417,4 +601,9 @@ function textHash(text: string): string {
     .split('')
     .reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 0x01000193), 0x811c9dc5);
   return `${text.length}.${(hash >>> 0).toString(36)}`;
+}
+
+/** The PDF files of a paste or a drop. */
+function pdfFiles(list: FileList | null | undefined): readonly File[] {
+  return Array.from(list ?? []).filter((f) => MEDIA_DOCUMENT_TYPES.includes(f.type));
 }

@@ -247,7 +247,7 @@ describe('ShellComponent', () => {
       expect(nav.getByRole('link', { name: /^Start/ })).toHaveAttribute('href', '/dashboard');
       expect(nav.getByRole('link', { name: /^Anträge/ })).toBeInTheDocument();
       expect(nav.getByRole('link', { name: /^Aufgaben/ })).toBeInTheDocument();
-      for (const hidden of [/^Budget/, /^Buchungen/, /^Rechnungen/, /^Verwaltung/, /^Abstimmungen/, /^Sitzungen/]) {
+      for (const hidden of [/^Haushalt/, /^Buchungen/, /^Rechnungen/, /^Verwaltung/, /^Abstimmungen/, /^Sitzungen/]) {
         expect(nav.queryByRole('link', { name: hidden })).not.toBeInTheDocument();
       }
     });
@@ -272,7 +272,7 @@ describe('ShellComponent', () => {
     it('shows only Budget for a scoped budget view, not the bookings or invoices', async () => {
       await setup({ ...MEMBER, has_scoped_budget_view: true });
       const nav = within(mainNav() as HTMLElement);
-      expect(nav.getByRole('link', { name: /^Budget/ })).toBeInTheDocument();
+      expect(nav.getByRole('link', { name: /^Haushalt/ })).toBeInTheDocument();
       expect(nav.queryByRole('link', { name: /^Buchungen/ })).not.toBeInTheDocument();
     });
 
@@ -287,7 +287,7 @@ describe('ShellComponent', () => {
         'Sitzungen',
         'Gremien',
         'Abstimmungen',
-        'Budget',
+        'Haushalt',
         'Buchungen',
         'Rechnungen',
         'Tickets',
@@ -412,7 +412,7 @@ describe('ShellComponent', () => {
       await userEvent.click(more());
       fixture.detectChanges();
       const sheet = screen.getByRole('dialog', { name: 'Mehr' });
-      for (const name of ['Abstimmungen', 'Budget', 'Buchungen', 'Rechnungen', 'Verwaltung']) {
+      for (const name of ['Abstimmungen', 'Haushalt', 'Buchungen', 'Rechnungen', 'Verwaltung']) {
         expect(within(sheet).getByRole('link', { name })).toBeInTheDocument();
       }
       expect(within(sheet).queryByRole('link', { name: 'Start' })).not.toBeInTheDocument();

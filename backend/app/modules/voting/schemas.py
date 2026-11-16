@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Discriminator, Field, Tag, field_validator, model_validator
 
 from app.modules.applications.decision import DecisionIn
 from app.shared.config_schemas import (
@@ -16,6 +16,7 @@ from app.shared.config_schemas import (
     POLL_MIN_OPTIONS,
     DateAnswer,
     ElectionConfig,
+    MajorityRule,
     PollConfig,
     PollMode,
     Quorum,
@@ -25,9 +26,13 @@ from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
 #: The result of a closed vote. A motion gives ``passed``/``rejected``/``tie``. An
 #: election gives ``elected``, ``runoff`` (a runoff decides the open seats),
-#: ``tie`` (the lot decides) or ``rejected`` (quorum missed, or nobody elected).
-VoteResultValue = Literal["passed", "rejected", "tie", "elected", "runoff"]
-VoteKind = Literal["motion", "election", "poll"]
+#: ``tie`` (the lot decides), ``rejected`` (quorum missed, or nobody elected) or
+#: ``no_majority`` (nobody reached the majority of the members).
+VoteResultValue = Literal["passed", "rejected", "tie", "elected", "runoff", "no_majority"]
+#: ``circular`` is an Umlaufverfahren: a motion of a Gremium without a meeting.
+VoteKind = Literal["motion", "election", "poll", "circular"]
+#: The reason of a cancel that the row keeps. An objection ends a circular vote.
+CancelReason = Literal["objection"]
 
 
 class ElectionRunoffOut(FrozenCamelModel, frozen=True):
@@ -57,6 +62,11 @@ class ElectionLotOut(FrozenCamelModel, frozen=True):
     by_name: str | None = Field(default=None, alias="byName")
 
 
+def _without_sub(lot: ElectionLotOut | None) -> ElectionLotOut | None:
+    """Return the lot without the ``sub`` of the lead who drew it."""
+    return lot if lot is None or lot.by is None else lot.model_copy(update={"by": None})
+
+
 class ElectionResultOut(FrozenCamelModel, frozen=True):
     """The stored result of a closed election (``vote.election_result``)."""
 
@@ -69,6 +79,9 @@ class ElectionResultOut(FrozenCamelModel, frozen=True):
     elected: Sequence[str] = Field(default_factory=tuple)
     runoff: ElectionRunoffOut | None = None
     lot: ElectionLotOut | None = None
+    #: The lot for a place in the third Wahlgang, after a tie for the second place
+    #: of the second Wahlgang (§F/meetings/voting/000971). It elects nobody.
+    next_round_lot: ElectionLotOut | None = Field(default=None, alias="nextRoundLot")
 
     def public(self) -> ElectionResultOut:
         """Return the result without the ``sub`` of the lead who drew the lot.
@@ -76,10 +89,16 @@ class ElectionResultOut(FrozenCamelModel, frozen=True):
         The WebSocket channel of a meeting reaches the beamer and the guests, so it
         carries this form. ``byName`` stays for the lot note.
         """
+        lots = (self.lot, self.next_round_lot)
         return (
             self
-            if self.lot is None or self.lot.by is None
-            else self.model_copy(update={"lot": self.lot.model_copy(update={"by": None})})
+            if all(lot is None or lot.by is None for lot in lots)
+            else self.model_copy(
+                update={
+                    "lot": _without_sub(self.lot),
+                    "next_round_lot": _without_sub(self.next_round_lot),
+                }
+            )
         )
 
 
@@ -167,6 +186,50 @@ class PollCreate(PollIn, frozen=True):
         return stripped
 
 
+class CircularCreate(FrozenStrictCamelModel, frozen=True):
+    """``POST /votes`` - start an Umlaufverfahren of a Gremium, without a meeting.
+
+    ``eligibleGroup`` is the Gremium. ``closesAt`` is the end of the cast window, at
+    least ``circularMinDays`` days ahead. ``draft`` keeps the vote a draft; otherwise
+    it opens at once. The rules are fixed: Ja / Nein / Enthaltung and the majority of
+    the members.
+    """
+
+    kind: Literal["circular"]
+    eligible_group: UUID = Field(alias="eligibleGroup")
+    question: str = Field(min_length=1, max_length=2000)
+    closes_at: datetime = Field(alias="closesAt")
+    draft: bool = False
+
+    @field_validator("question")
+    @classmethod
+    def _strip_question(cls, v: str) -> str:
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("the question is empty")
+        return stripped
+
+
+class CircularRulesOut(FrozenCamelModel, frozen=True):
+    """``GET /votes/circular-rules`` - what the form of a new Umlaufverfahren needs."""
+
+    #: ``circularMinDays``: the least number of days of the cast window.
+    min_days: int = Field(alias="minDays")
+
+
+def _create_kind(value: object) -> str:
+    """Return the kind of a ``POST /votes`` body; a body without ``kind`` is a poll."""
+    kind = value.get("kind", "poll") if isinstance(value, dict) else getattr(value, "kind", "poll")
+    return kind if kind in ("poll", "circular") else "poll"
+
+
+#: The body of ``POST /votes``: a poll or an Umlaufverfahren, told apart by ``kind``.
+GremiumVoteCreate = Annotated[
+    Annotated[PollCreate, Tag("poll")] | Annotated[CircularCreate, Tag("circular")],
+    Discriminator(_create_kind),
+]
+
+
 class PollPatch(FrozenStrictCamelModel, frozen=True):
     """``PATCH /votes/{id}`` - change a poll while it holds no ballot.
 
@@ -196,9 +259,7 @@ class VoteCreate(FrozenStrictCamelModel, frozen=True):
     question: str | None = None
     opens_state_id: UUID | None = Field(default=None, alias="opensStateId")
     closes_at: datetime | None = Field(default=None, alias="closesAt")
-    result_branch_transition_id: UUID | None = Field(
-        default=None, alias="resultBranchTransitionId"
-    )
+    result_branch_transition_id: UUID | None = Field(default=None, alias="resultBranchTransitionId")
     #: The decision proposal: approved amount and conditions. Only an application
     #: vote takes it. A passed vote writes it as the decision of the application.
     proposal: DecisionIn | None = None
@@ -216,6 +277,8 @@ class VoteCreateInternal(FrozenCamelModel, frozen=True):
     config: VoteConfig | ElectionConfig | PollConfig
     eligible_group: UUID = Field(alias="eligibleGroup")
     question: str | None = None
+    #: An Umlaufverfahren: the row gets ``kind = circular`` (``config`` is a VoteConfig).
+    circular: bool = False
     #: The election that a runoff continues, and its round.
     parent_vote_id: UUID | None = Field(default=None, alias="parentVoteId")
     round: int = Field(default=1, ge=1)
@@ -229,21 +292,19 @@ class VoteCreateInternal(FrozenCamelModel, frozen=True):
     eligible_count: int | None = Field(default=None, alias="eligibleCount", ge=0)
     opens_state_id: UUID | None = Field(default=None, alias="opensStateId")
     closes_at: datetime | None = Field(default=None, alias="closesAt")
-    result_branch_transition_id: UUID | None = Field(
-        default=None, alias="resultBranchTransitionId"
-    )
+    result_branch_transition_id: UUID | None = Field(default=None, alias="resultBranchTransitionId")
     #: The decision proposal: approved amount and conditions. Only an application
     #: vote takes it. A passed vote writes it as the decision of the application.
     proposal: DecisionIn | None = None
+    #: The version of a Haushaltsplan that the vote decides (the vote of a plan step).
+    plan_version_id: UUID | None = Field(default=None, alias="planVersionId")
 
     @model_validator(mode="after")
     def _percent_quorum_needs_eligible(self) -> VoteCreateInternal:
         """A percent quorum requires an eligible-voter count (fail-closed)."""
         quorum = None if isinstance(self.config, PollConfig) else self.config.quorum
         if quorum is not None and quorum.type == "percent" and self.eligible_count is None:
-            raise ValueError(
-                "eligibleCount is required when a percent quorum is configured"
-            )
+            raise ValueError("eligibleCount is required when a percent quorum is configured")
         return self
 
 
@@ -290,9 +351,7 @@ class TallyOut(FrozenCamelModel, frozen=True):
     #: Why the vote failed: ``quorum`` = quorum missed (fail-closed), ``majority`` =
     #: quorum met but majority missed. It stays None while the vote is open, and on
     #: passed or tie.
-    failed_reason: Literal["quorum", "majority"] | None = Field(
-        default=None, alias="failedReason"
-    )
+    failed_reason: Literal["quorum", "majority"] | None = Field(default=None, alias="failedReason")
     #: Attendance of a meeting vote: the present members and the admitted guests.
     #: An open vote shows the values of now, a closed vote the values fixed at the
     #: close. None for a vote without a meeting and for a vote that closed before the
@@ -357,14 +416,15 @@ class VoteOut(FrozenCamelModel, frozen=True):
     poll: PollConfig | None = None
     poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
     #: Copies of ``config`` for the vote card, so a client needs no config parse.
-    majority_rule: Literal["simple", "absolute", "two_thirds"] = Field(
-        default="simple", alias="majorityRule"
-    )
+    majority_rule: MajorityRule = Field(default="simple", alias="majorityRule")
     quorum: Quorum | None = None
     #: The real moment when the vote opened (``open`` sets ``opens_at``).
     opened_at: datetime | None = Field(default=None, alias="openedAt")
     #: The real moment when the vote ended (close or cancel). None while it runs.
     closed_at: datetime | None = Field(default=None, alias="closedAt")
+    #: Why the vote was cancelled, when the row keeps it: ``objection`` for an
+    #: Umlaufverfahren that a member objected to.
+    cancel_reason: CancelReason | None = Field(default=None, alias="cancelReason")
     tally: TallyOut
     #: A vote with guests: no quorum, only the majority of the cast ballots. A
     #: copy of ``config.guestsVote`` for the vote card.
@@ -384,6 +444,8 @@ class VoteOut(FrozenCamelModel, frozen=True):
     can_cast: bool = Field(default=False, alias="canCast")
     #: The decision proposal of an application vote, or None.
     proposal: DecisionIn | None = None
+    #: The version of a Haushaltsplan that the vote decides a step of, or None.
+    plan_version_id: UUID | None = Field(default=None, alias="planVersionId")
 
 
 VoteStatus = Literal["draft", "open", "closed", "cancelled"]
@@ -430,6 +492,9 @@ class BallotAccepted(FrozenCamelModel, frozen=True):
     """
 
     status: Literal["cast"] = "cast"
+    #: The number of ballots that the cast wrote: the own ballot and one for each
+    #: represented member.
+    ballots: int = 1
 
 
 class VoteClosed(FrozenCamelModel, frozen=True):
@@ -454,8 +519,6 @@ class VoteClosed(FrozenCamelModel, frozen=True):
     election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
     poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
     closed_at: datetime | None = Field(default=None, alias="closedAt")
-    fired_transition_id: UUID | None = Field(
-        default=None, alias="firedTransitionId"
-    )
+    fired_transition_id: UUID | None = Field(default=None, alias="firedTransitionId")
     new_state_id: UUID | None = Field(default=None, alias="newStateId")
     branch_fired: bool = Field(default=False, alias="branchFired")

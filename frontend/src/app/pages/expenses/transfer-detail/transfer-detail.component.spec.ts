@@ -53,7 +53,7 @@ describe('TransferDetailComponent', () => {
     expect(screen.getByText(/\+2\.500,00/)).toBeInTheDocument();
     expect(screen.getByText('Mara Keller')).toBeInTheDocument();
     expect(screen.getByText('Beschluss des Finanzausschusses')).toBeInTheDocument();
-    expect(screen.getByText(/Die beiden Kostenstellen eines Übertrags sind fest/)).toBeInTheDocument();
+    expect(screen.getByText(/Die beiden Kostenstellen einer Umschichtung sind fest/)).toBeInTheDocument();
   });
 
   it('falls back to the paths and dashes for what it does not know', async () => {
@@ -64,7 +64,7 @@ describe('TransferDetailComponent', () => {
 
   it('runs edit and delete for a booker, and shows neither to a reader', async () => {
     const { view, edit, remove, user } = await setup();
-    await user.click(screen.getByRole('button', { name: 'Übertrag bearbeiten' }));
+    await user.click(screen.getByRole('button', { name: 'Umschichtung bearbeiten' }));
     expect(edit).toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Weitere Aktionen' }));
     await user.click(screen.getByRole('menuitem', { name: 'Löschen' }));

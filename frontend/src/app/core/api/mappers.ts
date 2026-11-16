@@ -291,6 +291,7 @@ export function electionFields(wire: ElectionFields): ElectionFields {
   if (wire.kind === 'poll') {
     return { kind: 'poll', poll: wire.poll ?? null, pollResult: wire.pollResult ?? null };
   }
+  if (wire.kind === 'circular') return { kind: 'circular' };
   if (wire.kind !== 'election') return {};
   return {
     kind: 'election',
@@ -334,13 +335,19 @@ export function mapMeeting(wire: MeetingOutWire): Meeting {
     keeperPeriods: wire.keeperPeriods ?? [],
     plannedHandover: wire.plannedHandover ?? null,
     publicJoin: wire.publicJoin ?? false,
-    guestsMode: wire.guestsMode ?? 'vote',
+    guestsMode: wire.guestsMode ?? 'watch',
     joinCode: wire.joinCode ?? null,
     admittedGuests: wire.admittedGuests ?? 0,
     pendingGuests: wire.pendingGuests ?? 0,
-    publicJoinAllowed: wire.publicJoinAllowed ?? true,
+    presentCount: wire.presentCount ?? null,
+    eligibleCount: wire.eligibleCount ?? null,
+    presentSeats: wire.presentSeats ?? 0,
+    guestsVoteAllowed: wire.guestsVoteAllowed ?? false,
+    kind: wire.kind ?? 'ordinary',
+    repeatOfId: wire.repeatOfId ?? null,
+    location: wire.location ?? null,
+    form: wire.form ?? 'presence',
     opensAt: wire.opensAt ?? null,
-    confirmUntil: wire.confirmUntil ?? null,
   };
 }
 
@@ -364,6 +371,11 @@ export function mapProtocol(wire: ProtocolOutWire): Protocol {
     sentAt: wire.sentAt ?? null,
     publicWithheld: wire.publicWithheld ?? false,
     gremiumProtocolsPublic: wire.gremiumProtocolsPublic ?? false,
+    approvedAt: wire.approvedAt ?? null,
+    approvedMeetingId: wire.approvedMeetingId ?? null,
+    approvedMeetingTitle: wire.approvedMeetingTitle ?? null,
+    approvedMeetingDate: wire.approvedMeetingDate ?? null,
+    draftSentAt: wire.draftSentAt ?? null,
   };
 }
 

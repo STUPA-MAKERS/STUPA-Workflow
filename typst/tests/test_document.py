@@ -93,6 +93,32 @@ def test_backend_document() -> None:
     }
 
 
+def test_the_header_names_the_kind_the_place_and_the_form() -> None:
+    """The kind, the place and the form are the first data rows after the date and time.
+
+    §F/meetings/protocols/000908. A document without a place has no place row.
+    """
+    head = 'sitzungsart: "Wiederholungssitzung"\nort: "Raum 9-108"\nform: "Hybrid"\n'
+    doc = build_document(BACKEND_DOC.replace("protokoll: ", head + "protokoll: "), variant=None)
+    data = doc["data"]
+    assert isinstance(data, list)
+    assert data[2:6] == [
+        ["Sitzungsart", "Wiederholungssitzung"],
+        ["Ort", "Raum 9-108"],
+        ["Form", "Hybrid"],
+        ["Protokoll", "Berta Beispiel"],
+    ]
+    head = 'sitzungsart: "Ordentliche Sitzung"\nform: "Präsenz"\n'
+    doc = build_document(BACKEND_DOC.replace("protokoll: ", head + "protokoll: "), variant=None)
+    data = doc["data"]
+    assert isinstance(data, list)
+    assert data[2:5] == [
+        ["Sitzungsart", "Ordentliche Sitzung"],
+        ["Form", "Präsenz"],
+        ["Protokoll", "Berta Beispiel"],
+    ]
+
+
 def test_title_falls_back_to_gremium_and_date() -> None:
     doc = build_document("---\ngremium: StuPa\ndatum: 2026-06-15 18:30\n---\n", variant=None)
     assert doc["title"] == "Protokoll der Sitzung des StuPa vom 15.06.2026"
@@ -135,6 +161,27 @@ def test_makers_footer_takes_the_right_aligned_logo() -> None:
     assert doc["footer_logos"] == [{"name": "MAKERS-RAlign"}]
 
 
+def test_the_footer_graphic_is_the_skyline_an_asset_or_none() -> None:
+    assert build_document("x", variant=None)["footer_graphic"] == {"name": "Skyline"}
+    doc = build_document("x", variant=None, config={"footer_graphic": "f.svg"}, assets=["f.svg"])
+    assert doc["footer_graphic"] == {"asset": "f.svg"}
+    assert (
+        build_document("x", variant=None, config={"footer_graphic": ""})["footer_graphic"] is None
+    )
+    with pytest.raises(ConversionError, match="footer_graphic"):
+        build_document("x", variant=None, config={"footer_graphic": 3})
+
+
+def test_the_page_watermark_is_the_config_text_or_none() -> None:
+    """§F/meetings/protocols/000925: the draft of a protocol has "Entwurf" on every page."""
+    assert build_document("x", variant=None)["watermark"] is None
+    assert build_document("x", variant=None, config={"watermark": " "})["watermark"] is None
+    doc = build_document("x", variant=None, config={"watermark": " Entwurf "})
+    assert doc["watermark"] == "Entwurf"
+    with pytest.raises(ConversionError, match="watermark"):
+        build_document("x", variant=None, config={"watermark": 3})
+
+
 def test_unknown_logo_and_variant() -> None:
     with pytest.raises(ConversionError, match="unknown logo"):
         build_document("x", variant=None, config={"logos": ["missing.png"]})
@@ -160,3 +207,11 @@ def test_fixture_converts() -> None:
         "rule",
         "signatures",
     }
+
+
+def test_an_antrag_has_no_title_page_and_no_top_numbers() -> None:
+    """§000881: `typ: antrag` drops the title page and the "TOP n" numbers."""
+    doc = build_document('---\ntitle: "A"\ntyp: antrag\n---\n\n# Teil\n', variant=None)
+    assert doc["cover"] is False and doc["numbered"] is False
+    protocol = build_document('---\ntitle: "P"\n---\n\n# TOP\n', variant=None)
+    assert protocol["cover"] is True and protocol["numbered"] is True

@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.modules.applications.comment_mails as mod
 from app.modules.applications.comment_mails import send_comment_notifications
+from app.modules.notifications.layout import append_link_text
+from app.modules.notifications.mail import MailMessage, compute_idempotency_key
 from app.settings import load_settings
 from tests._support.notifications_fakes import FakeQueue, FakeResolver, FakeSession
 
@@ -34,8 +36,19 @@ class _FakeService:
     async def _get_template_by_key(self, key: str) -> None:
         return None
 
-    def _layout_html(self, rendered: Any, reason: str, link: Any = None) -> str:
-        return f"<html>{reason}</html>"
+    async def render_context(self, context: dict[str, Any]) -> dict[str, Any]:
+        return {"platformName": "Plattform", **context}
+
+    async def _message(
+        self, rendered: Any, recipients: list[str], reason: str, idem: Any, link: Any
+    ) -> MailMessage:
+        return MailMessage(
+            to=tuple(recipients),
+            subject=rendered.subject,
+            text=append_link_text(rendered.text, link.url, link.label(rendered.lang)),
+            html=f"<html>{reason}</html>",
+            idempotency_key=compute_idempotency_key(*idem),
+        )
 
     async def _enqueue(self, msg: Any) -> bool:
         self.enqueued.append(msg)

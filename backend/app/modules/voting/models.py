@@ -24,6 +24,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -86,17 +87,11 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     opens_state_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("state.id", ondelete="SET NULL"), nullable=True
     )
-    opens_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    closes_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    opens_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    closes_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     #: The real end of the vote. ``close`` and ``cancel`` set it. NULL while the vote
     #: runs, and for old rows that migration ``vote_closed_at`` could not backfill.
-    closed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(Text, server_default="draft")
     result: Mapped[str | None] = mapped_column(Text, nullable=True)
     result_branch_transition_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -108,6 +103,9 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     #: protocol and the result cards show them as counts, never as names.
     present_members: Mapped[int | None] = mapped_column(Integer, nullable=True)
     present_guests: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: The pool substitutes on a seat at the close, so the quorum of a closed vote does
+    #: not follow a later change of the delegations. NULL as for the two counts above.
+    present_seats: Mapped[int | None] = mapped_column(Integer, nullable=True)
     #: Personnel elections. ``kind`` tells a motion (``config`` = VoteConfig) from
     #: an election (``config`` = ElectionConfig). An election never has an application
     #: and never fires a flow branch. A runoff points to its parent election
@@ -134,16 +132,26 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
         ForeignKey("vote.id", ondelete="SET NULL"), nullable=True
     )
     attempt: Mapped[int] = mapped_column(Integer, server_default="1", default=1)
+    #: The version of a Haushaltsplan that the vote decides: the vote of the Gremium
+    #: of the next step of that version. A passed vote passes the step at its close.
+    #: SET NULL, because a deleted plan must not delete the record of the vote.
+    plan_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("budget_plan_version.id", ondelete="SET NULL"), nullable=True
+    )
+
+    #: Why the vote was cancelled, when the reason is part of the record: ``objection``
+    #: for an Umlaufverfahren (``kind = 'circular'``) that a member objected to. NULL for
+    #: every other cancel; the audit entry ``vote_cancel`` holds the reason of each.
+    cancel_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
+        CheckConstraint("status IN ('draft','open','closed','cancelled')", name="vote_status"),
         CheckConstraint(
-            "status IN ('draft','open','closed','cancelled')", name="vote_status"
-        ),
-        CheckConstraint(
-            "result IS NULL OR result IN ('passed','rejected','tie','elected','runoff')",
+            "result IS NULL OR result IN "
+            "('passed','rejected','tie','elected','runoff','no_majority')",
             name="vote_result",
         ),
-        CheckConstraint("kind IN ('motion','election','poll')", name="vote_kind"),
+        CheckConstraint("kind IN ('motion','election','poll','circular')", name="vote_kind"),
         Index("ix_vote_application_id", "application_id"),
         Index("ix_vote_status_closes_at", "status", "closes_at"),
         Index("ix_vote_repeat_of_id", "repeat_of_id"),
@@ -161,14 +169,15 @@ class VotedMarker(UUIDPkMixin, Base):
 
     __tablename__ = "voted_marker"
 
-    vote_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("vote.id", ondelete="CASCADE")
-    )
+    vote_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("vote.id", ondelete="CASCADE"))
     voter_sub: Mapped[str] = mapped_column(Text)
+    #: True for a ballot whose caster already has a counted ballot in this vote: each
+    #: represented ballot beside the own one, and each further one of a person without
+    #: an own ballot. The turnout of a running vote counts persons, so it leaves these
+    #: out (§F/meetings/voting/000933). The column names no person.
+    same_caster: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
-    __table_args__ = (
-        UniqueConstraint("vote_id", "voter_sub", name="uq_voted_marker_vote_voter"),
-    )
+    __table_args__ = (UniqueConstraint("vote_id", "voter_sub", name="uq_voted_marker_vote_voter"),)
 
 
 class SecretBallot(UUIDPkMixin, Base):
@@ -182,9 +191,7 @@ class SecretBallot(UUIDPkMixin, Base):
 
     __tablename__ = "secret_ballot"
 
-    vote_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("vote.id", ondelete="CASCADE")
-    )
+    vote_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("vote.id", ondelete="CASCADE"))
     choice: Mapped[str] = mapped_column(Text)
 
     __table_args__ = (Index("ix_secret_ballot_vote_id", "vote_id"),)

@@ -25,6 +25,14 @@ class _FakeApi:
         self.calls.append(("PATCH", path, kw.get("json")))
         return {}
 
+    async def put(self, path: str, **kw: Any) -> dict[str, Any]:
+        self.calls.append(("PUT", path, kw.get("json")))
+        return {}
+
+    async def delete(self, path: str, **kw: Any) -> dict[str, Any]:
+        self.calls.append(("DELETE", path, kw.get("json")))
+        return {}
+
 
 @pytest.fixture
 def fake_api(monkeypatch: pytest.MonkeyPatch) -> _FakeApi:
@@ -64,4 +72,19 @@ def test_update_protocol_sends_the_set_fields(fake_api: _FakeApi) -> None:
         {"markdown": "Text"},
         {"publicWithheld": True},
         {"markdown": "Text", "publicWithheld": False},
+    ]
+
+
+def test_draft_mail_approval_and_late_excuse(fake_api: _FakeApi) -> None:
+    asyncio.run(meetings.send_protocol_draft("p1"))
+    asyncio.run(meetings.set_protocol_approval("p1", "m2"))
+    asyncio.run(meetings.set_protocol_approval("p1", None))
+    asyncio.run(meetings.reopen_protocol("p1"))
+    asyncio.run(meetings.excuse_own_absence("m1", "ill"))
+    assert fake_api.calls == [
+        ("POST", "/protocols/p1/draft-mail", None),
+        ("PUT", "/protocols/p1/approval", {"meetingId": "m2"}),
+        ("DELETE", "/protocols/p1/approval", None),
+        ("POST", "/protocols/p1/reopen", None),
+        ("POST", "/meetings/m1/attendance/me/late-excuse", {"note": "ill"}),
     ]

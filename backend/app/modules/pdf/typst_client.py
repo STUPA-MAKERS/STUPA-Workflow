@@ -182,8 +182,7 @@ class TypstClient:
 
         if response.status_code != httpx.codes.OK:
             raise TypstError(
-                f"typst render failed (status {response.status_code}): "
-                f"{_error_detail(response)}",
+                f"typst render failed (status {response.status_code}): {_error_detail(response)}",
                 status=response.status_code,
                 retryable=response.status_code >= 500,
             )

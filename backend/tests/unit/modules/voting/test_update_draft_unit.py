@@ -15,9 +15,9 @@ from uuid import UUID, uuid4
 import pytest
 
 from app.modules.applications.decision import DecisionIn
-from app.modules.voting import service as voting_service
 from app.modules.voting.schemas import VoteCreateInternal
 from app.modules.voting.service import VotingService
+from app.modules.voting.service import create as voting_service
 from app.shared.config_schemas import ElectionConfig, PollConfig, VoteConfig
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 

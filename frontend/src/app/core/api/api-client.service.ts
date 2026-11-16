@@ -1,9 +1,17 @@
-import { HttpClient, type HttpContext, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
+import {
+  HttpClient,
+  type HttpContext,
+  HttpErrorResponse,
+  HttpHeaders,
+  HttpParams,
+  type HttpResponse,
+} from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, catchError, map, of, throwError } from 'rxjs';
 import { detailContext, listContext } from '@core/cache/cache.interceptor';
 import { I18nService } from '@core/i18n/i18n.service';
 import { skipLoading } from '@stupa-makers/ui-kit';
+import type { KnownName } from '@stupa-makers/ui-kit/markdown-editor';
 import { API_BASE_URL } from './api.config';
 import { type ParamValue, httpParams } from './http-params';
 import {
@@ -61,6 +69,7 @@ import type {
   HandoverMode,
   LogoutOut,
   MagicLinkVerifyResult,
+  MajorityRule,
   EmailLoginRequest,
   ApplicantApplications,
   ApplicationObserver,
@@ -71,6 +80,7 @@ import type {
   DecisionProposal,
   AltchaChallenge,
   AssignableApplication,
+  AssignablePlans,
   Attendance,
   AttendanceStatus,
   SelfAttendanceStatus,
@@ -104,6 +114,7 @@ import type {
   TransitionResult,
   Uuid,
   VersionOutWire,
+  CircularCreateBody,
   PollCreateBody,
   PollIn,
   Vote,
@@ -289,6 +300,18 @@ export class ApiClient {
         context: readContext(opts),
       })
       .pipe(map((wire) => mapApplication(wire, lang)));
+  }
+
+  /**
+   * GET /applications/{id}/pdf — the Antrag as PDF, as the reader sees it on the detail
+   * page. The response keeps its headers, because the server names the file.
+   */
+  applicationPdf(id: Uuid): Observable<HttpResponse<Blob>> {
+    return this.http.get(`${this.base}/applications/${id}/pdf`, {
+      observe: 'response',
+      responseType: 'blob',
+      context: skipLoading(),
+    });
   }
 
   /**
@@ -678,6 +701,7 @@ export class ApiClient {
       gremiumId: query.gremiumId || undefined,
       q: query.q || undefined,
       kind: query.kind || undefined,
+      cancelledReason: query.cancelledReason,
       limit: query.limit,
       offset: query.offset,
     });
@@ -709,6 +733,26 @@ export class ApiClient {
    */
   createPoll(body: PollCreateBody): Observable<Vote> {
     return this.http.post<Vote>(`${this.base}/votes`, body);
+  }
+
+  /**
+   * POST /votes — create an Umlaufverfahren of a Gremium (gremium `vote.manage`). Its end
+   * lies at least `circularMinDays` days ahead (422 `circular_window_too_short`).
+   */
+  createCircular(body: CircularCreateBody): Observable<Vote> {
+    return this.http.post<Vote>(`${this.base}/votes`, body);
+  }
+
+  /** GET /votes/circular-rules — the least number of days of an Umlaufverfahren. */
+  circularRules(): Observable<{ readonly minDays: number }> {
+    return this.http.get<{ readonly minDays: number }>(`${this.base}/votes/circular-rules`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** POST /votes/{id}/objection — object to an open Umlaufverfahren; this cancels it. */
+  objectToCircular(voteId: Uuid): Observable<Vote> {
+    return this.http.post<Vote>(`${this.base}/votes/${voteId}/objection`, {});
   }
 
   /** POST /meetings — create a meeting (gremium `session.manage`, or admin). */
@@ -866,6 +910,16 @@ export class ApiClient {
     );
   }
 
+  /**
+   * POST /meetings/{id}/attendance/me/late-excuse — change the own absence of a closed
+   * meeting to an excuse, with the reason (§ 000922). 409 `late_excuse_expired` after the period.
+   */
+  excuseLate(meetingId: Uuid, note: string): Observable<Attendance[]> {
+    return this.http.post<Attendance[]>(`${this.base}/meetings/${meetingId}/attendance/me/late-excuse`, {
+      note,
+    });
+  }
+
   /** PUT /meetings/{id}/attendance/{principalId} — set a member (meeting lead). */
   setMemberAttendance(
     meetingId: Uuid,
@@ -902,6 +956,21 @@ export class ApiClient {
     );
   }
 
+  /** GET /meetings/{id}/agenda/assignable-plans — the plans that the agenda can take (meeting lead). */
+  listAssignablePlans(meetingId: Uuid): Observable<AssignablePlans> {
+    return this.http.get<AssignablePlans>(`${this.base}/meetings/${meetingId}/agenda/assignable-plans`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** POST /meetings/{id}/agenda — put a waiting version of a Haushaltsplan on the agenda. */
+  addAgendaPlan(meetingId: Uuid, planVersionId: Uuid, nonPublic = false): Observable<AgendaItem[]> {
+    return this.http.post<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
+      planVersionId,
+      nonPublic,
+    });
+  }
+
   /**
    * POST /meetings/{id}/agenda — put an application on the agenda (meeting lead).
    * `nonPublic` marks the new item as non-public (NÖ) at once.
@@ -915,12 +984,19 @@ export class ApiClient {
 
   /**
    * POST /meetings/{id}/agenda — create a free-text agenda item (no application).
-   * `nonPublic` marks the new item as non-public (NÖ) at once.
+   * `nonPublic` marks the new item as non-public (NÖ) at once. A `description` becomes
+   * the start of the item text as a block quote (spec 000861).
    */
-  addAgendaFreetext(meetingId: Uuid, title: string, nonPublic = false): Observable<AgendaItem[]> {
+  addAgendaFreetext(
+    meetingId: Uuid,
+    title: string,
+    nonPublic = false,
+    description?: string,
+  ): Observable<AgendaItem[]> {
     return this.http.post<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
       title,
       nonPublic,
+      ...(description ? { description } : {}),
     });
   }
 
@@ -987,7 +1063,7 @@ export class ApiClient {
       agendaItemId: Uuid;
       question?: string | null;
       options?: string[];
-      majorityRule?: 'simple' | 'absolute' | 'two_thirds';
+      majorityRule?: MajorityRule;
       secret?: boolean;
       quorumPercent?: number | null;
       /** Admitted guests vote too (no quorum). `undefined` lets the server choose. */
@@ -1165,9 +1241,28 @@ export class ApiClient {
     return this.http.post<VoteClosed>(`${this.base}/votes/${voteId}/close`, {});
   }
 
+  /**
+   * GET /budget-plan-versions/{id}/readable — say if the reader may read the
+   * Haushaltsplan that holds this version. The vote of a step links to the plan only
+   * then. The server answers 200 for a reader without the right too (§ 000928).
+   */
+  planOfVersionReadable(versionId: Uuid): Observable<boolean> {
+    return this.http
+      .get<{ readonly readable: boolean }>(`${this.base}/budget-plan-versions/${versionId}/readable`, { context: skipLoading() })
+      .pipe(
+        map((answer) => answer.readable),
+        catchError(() => of(false)),
+      );
+  }
+
   /** POST /votes/{id}/draw-lot — draw the lot of a tied election (vote manager). */
   drawElectionLot(voteId: Uuid): Observable<Vote> {
     return this.http.post<Vote>(`${this.base}/votes/${voteId}/draw-lot`, {});
+  }
+
+  /** POST /votes/{id}/next-round — create the draft of the next Wahlgang of an election. */
+  nextElectionRound(voteId: Uuid): Observable<Vote> {
+    return this.http.post<Vote>(`${this.base}/votes/${voteId}/next-round`, {});
   }
 
   /** POST /votes/{id}/cancel — cancel a vote: no result, no branch. */
@@ -1186,8 +1281,10 @@ export class ApiClient {
   }
 
   /** GET /site-config — public (auth-free) active branding config. */
-  publicSiteConfig(): Observable<PublicSiteConfig> {
-    return this.http.get<PublicSiteConfig>(`${this.base}/site-config`);
+  publicSiteConfig(version: string | null = null): Observable<PublicSiteConfig> {
+    return this.http.get<PublicSiteConfig>(`${this.base}/site-config`, {
+      params: version ? { v: version } : {},
+    });
   }
 
   /** POST /meetings/{id}/protocol — create or load the protocol (idempotent). */
@@ -1207,6 +1304,13 @@ export class ApiClient {
         context: readContext(opts),
       })
       .pipe(map(mapProtocol));
+  }
+
+  /** GET /meetings/{id}/known-names — the first and last names for the automatic blackout (000970). */
+  getKnownNames(meetingId: Uuid): Observable<readonly KnownName[]> {
+    return this.http.get<readonly KnownName[]>(`${this.base}/meetings/${meetingId}/known-names`, {
+      context: skipLoading(),
+    });
   }
 
   /** PATCH /protocols/{id} — update markdown. */
@@ -1230,6 +1334,41 @@ export class ApiClient {
   setProtocolWithheld(protocolId: Uuid, publicWithheld: boolean): Observable<Protocol> {
     return this.http
       .patch<ProtocolOutWire>(`${this.base}/protocols/${protocolId}`, { publicWithheld })
+      .pipe(map(mapProtocol));
+  }
+
+  /**
+   * POST /protocols/{id}/draft-mail — send the PDF of a draft, with the watermark
+   * "Entwurf", to the members of the Gremium (§ 000925). The state stays `draft`.
+   */
+  sendProtocolDraft(
+    protocolId: Uuid,
+  ): Observable<{ readonly recipients: number; readonly draftSentAt?: string | null }> {
+    return this.http.post<{ readonly recipients: number; readonly draftSentAt?: string | null }>(
+      `${this.base}/protocols/${protocolId}/draft-mail`,
+      {},
+    );
+  }
+
+  /**
+   * PUT /protocols/{id}/approval — mark a final protocol as approved by `meetingId`;
+   * `null` removes the mark (DELETE). Needs the right to finalize (§ 000924).
+   */
+  setProtocolApproval(protocolId: Uuid, meetingId: Uuid | null): Observable<Protocol> {
+    const url = `${this.base}/protocols/${protocolId}/approval`;
+    const req = meetingId
+      ? this.http.put<ProtocolOutWire>(url, { meetingId })
+      : this.http.delete<ProtocolOutWire>(url);
+    return req.pipe(map(mapProtocol));
+  }
+
+  /**
+   * POST /protocols/{id}/reopen — set a final protocol back to draft. Needs the right to
+   * finalize; 409 `protocol_approved` with an approval mark (§ 000983).
+   */
+  reopenProtocol(protocolId: Uuid): Observable<Protocol> {
+    return this.http
+      .post<ProtocolOutWire>(`${this.base}/protocols/${protocolId}/reopen`, {})
       .pipe(map(mapProtocol));
   }
 

@@ -1,3 +1,5 @@
+import { pollRefusalMessage } from './poll-refusal';
+import { castRefusalText } from './ballot/ballot-refusal';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -195,6 +197,8 @@ export class VoteCastComponent implements OnDestroy {
     if (this.proxyRefused() || !d?.exercising) return null;
     return d.delegatedByName || '?';
   });
+  /** How many members the person represents in this vote. */
+  readonly proxyCount = computed(() => this.delegation()?.delegatedByNames?.length ?? 0);
   readonly proxyCast = computed(() => this.loaded()?.representedCast === true);
 
   /** Why an open vote offers no ballot. */
@@ -224,22 +228,45 @@ export class VoteCastComponent implements OnDestroy {
   });
 
   /**
-   * The poll of a Gremium (no meeting) that the person may manage: "Starten" while it is
-   * a draft, "Umfrage beenden" while it is open. A meeting poll runs in its meeting.
+   * The poll of a Gremium (without a meeting) that the person may manage: "Starten" while
+   * it is a draft, "beenden" while it is open. An Umlaufverfahren starts the same way,
+   * but it ends only at its planned end. A vote of a meeting runs in its meeting, and
+   * so does the vote on a step of a Haushaltsplan.
    */
   readonly pollAction = computed<'start' | 'close' | null>(() => {
     const vote = this.loaded();
-    if (!vote || vote.kind !== 'poll' || vote.meetingId || vote.canManage !== true) return null;
+    const circular = vote?.kind === 'circular';
+    const standalone = !!vote && (vote.kind === 'poll' || circular) && !vote.meetingId;
+    if (!vote || !standalone || vote.canManage !== true) return null;
     if (vote.status === 'draft') return 'start';
-    return vote.status === 'open' ? 'close' : null;
+    return vote.status === 'open' && !circular ? 'close' : null;
   });
+  /**
+   * An eligible member can object to an open Umlaufverfahren; this cancels it. The action
+   * is a button, not a menu item (§F/meetings/voting/000947).
+   */
+  readonly canObject = computed(() => {
+    const vote = this.loaded();
+    return vote?.kind === 'circular' && vote.status === 'open' && vote.canCast === true;
+  });
+  readonly confirmObject = signal(false);
+  readonly objecting = signal(false);
   /** A poll action runs. */
   readonly pollBusy = signal(false);
 
-  /** The ⋮ menu: the poll action, then the delete. */
+  /** The reader may read the Haushaltsplan that the vote decides a step of. */
+  readonly planReadable = signal(false);
+
+  /** The ⋮ menu: the Haushaltsplan of the vote, the poll action, then the delete. */
   readonly menu = computed<readonly RowMenuSection[]>(() => {
     const action = this.pollAction();
-    const pollItems: readonly RowMenuItem[] = action ? [this.pollMenuItem(action)] : [];
+    const planItems: readonly RowMenuItem[] = this.planReadable()
+      ? [{ id: 'plan', label: this.i18n.translate('voting.plan.open'), icon: 'link' }]
+      : [];
+    const pollItems: readonly RowMenuItem[] = [
+      ...planItems,
+      ...(action ? [this.pollMenuItem(action)] : []),
+    ];
     const deleteItems: readonly RowMenuItem[] = this.canDelete()
       ? [
           {
@@ -324,6 +351,9 @@ export class VoteCastComponent implements OnDestroy {
       case 'close':
         this.runPoll(id);
         return;
+      case 'plan':
+        void this.router.navigate(['/budget/plan'], { queryParams: { planVersion: this.loaded()?.planVersionId } });
+        return;
       default:
         return;
     }
@@ -339,6 +369,16 @@ export class VoteCastComponent implements OnDestroy {
     }
   }
 
+  /** The toast after a poll action. */
+  private pollToast(action: 'start' | 'close'): TranslationKey {
+    switch (action) {
+      case 'start':
+        return this.loaded()?.kind === 'circular' ? 'circular.toast.started' : 'poll.toast.started';
+      case 'close':
+        return 'poll.toast.closed';
+    }
+  }
+
   /** "Starten" opens the draft of a poll, "Umfrage beenden" closes it before its end. */
   private runPoll(action: 'start' | 'close'): void {
     const vote = this.loaded();
@@ -349,14 +389,34 @@ export class VoteCastComponent implements OnDestroy {
     call.subscribe({
       next: () => {
         this.pollBusy.set(false);
-        this.toast.success(
-          this.i18n.translate(action === 'start' ? 'poll.toast.started' : 'poll.toast.closed'),
-        );
+        this.toast.success(this.i18n.translate(this.pollToast(action)));
         this.page?.notify({ id: vote.id, kind: 'updated' });
         this.reload();
       },
       error: (err: unknown) => {
         this.pollBusy.set(false);
+        this.toast.error(pollRefusalMessage(err, (key, params) => this.i18n.translate(key, params)));
+        this.reload();
+      },
+    });
+  }
+
+  /** The member confirmed the objection: the server cancels the Umlaufverfahren. */
+  doObject(): void {
+    const vote = this.loaded();
+    if (!vote || this.objecting()) return;
+    this.objecting.set(true);
+    this.api.objectToCircular(vote.id).subscribe({
+      next: (cancelled) => {
+        this.objecting.set(false);
+        this.confirmObject.set(false);
+        this.loaded.set(cancelled);
+        this.toast.success(this.i18n.translate('circular.object.done'));
+        this.page?.notify({ id: vote.id, kind: 'updated' });
+      },
+      error: (err: unknown) => {
+        this.objecting.set(false);
+        this.confirmObject.set(false);
         const detail = problemDetail(err);
         const base = this.i18n.translate('meetings.toast.actionFailed');
         this.toast.error(detail ? `${base}: ${detail}` : base);
@@ -387,7 +447,7 @@ export class VoteCastComponent implements OnDestroy {
     if (error.status === 403) {
       if (failure.asDelegation) this.proxyRefused.set(true);
       else this.notEligible.set(true);
-      this.toast.error(this.i18n.translate('voting.cast.notEligible'));
+      this.toast.error(this.i18n.translate(castRefusalText(failure) ?? 'voting.cast.notEligible'));
       this.reload();
       const id = this.loaded()?.id;
       if (id) this.loadDelegation(id);
@@ -396,7 +456,8 @@ export class VoteCastComponent implements OnDestroy {
     if (error.status === 409) {
       this.toast.error(
         this.i18n.translate(
-          failure.alreadyVoted ? 'voting.cast.toast.alreadyVoted' : 'voting.cast.toast.conflict',
+          castRefusalText(failure) ??
+            (failure.alreadyVoted ? 'voting.cast.toast.alreadyVoted' : 'voting.cast.toast.conflict'),
         ),
       );
       this.reload();
@@ -453,6 +514,7 @@ export class VoteCastComponent implements OnDestroy {
     this.delegation.set(null);
     this.proxyRefused.set(false);
     this.confirmDelete.set(false);
+    this.planReadable.set(false);
     this.phase.set('loading');
     if (!id) {
       this.phase.set('error');
@@ -464,6 +526,7 @@ export class VoteCastComponent implements OnDestroy {
         if (this.currentId !== id) return;
         const first = this.loaded() === null;
         this.loaded.set(vote);
+        if (first) this.checkPlan(vote);
         this.notEligible.set(vote.canCast !== true || !!this.delegation()?.blocked);
         this.phase.set('ready');
         if (!first) return;
@@ -588,6 +651,15 @@ export class VoteCastComponent implements OnDestroy {
         if (was && was !== v.status) this.page?.notify({ id, kind: 'updated' });
       },
       error: () => {},
+    });
+  }
+
+  /** Offer the link to the Haushaltsplan of the vote only to a reader of that plan. */
+  private checkPlan(vote: Vote): void {
+    this.planReadable.set(false);
+    if (!vote.planVersionId) return;
+    this.api.planOfVersionReadable(vote.planVersionId).subscribe((readable) => {
+      if (this.currentId === vote.id) this.planReadable.set(readable);
     });
   }
 

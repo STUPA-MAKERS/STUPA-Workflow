@@ -166,6 +166,18 @@ def enforce_media_body_cap(request: Request, settings: SettingsDep) -> None:
         raise PayloadTooLargeError(f"Request body exceeds {limit} bytes.")
 
 
+def enforce_document_body_cap(request: Request, settings: SettingsDep) -> None:
+    """Answer 413 when the ``Content-Length`` of an embedded PDF is clearly too large.
+
+    The limit is ``markdown_document_max_bytes`` plus room for the multipart frame.
+    The route reads the file under the authoritative cap, also for a chunked body.
+    """
+    limit = settings.markdown_document_max_bytes + _MULTIPART_OVERHEAD_BYTES
+    raw = request.headers.get("content-length")
+    if raw is not None and raw.isdigit() and int(raw) > limit:
+        raise PayloadTooLargeError(f"Request body exceeds {limit} bytes.")
+
+
 async def _enforce(limiter: RateLimiter, key: str, *, limit: int, window: int, detail: str) -> None:
     result = await limiter.hit(key, limit=limit, window_seconds=window)
     if not result.allowed:
@@ -365,6 +377,78 @@ async def rate_limit_media_images(
         limiter,
         f"media-images:principal:{principal.sub}",
         limit=settings.rl_media_images_per_hour,
+        window=_HOUR,
+        detail="Too many uploads. Try again later.",
+    )
+
+
+async def rate_limit_pdf_render(
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
+    applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
+) -> None:
+    """A route that renders a PDF in the request: ``rl_pdf_render_per_hour`` per session.
+
+    §NF/security/access/000976. The routes are the PDF of an Antrag, the export of a
+    Haushaltsplan and the preview of a protocol draft. The render service has two
+    places, so a session that calls such a route in a loop holds back the render of a
+    protocol. The key is the ``sub`` of the principal, or the identity of the applicant.
+    The limit applies to an OAuth token (MCP) too. Without a session this dependency
+    does nothing, and the route answers 401.
+    """
+    identity = (
+        f"principal:{principal.sub}"
+        if principal is not None
+        else f"applicant:{applicant.identity}"
+        if applicant is not None
+        else None
+    )
+    if identity is None:
+        return
+    await _enforce(
+        limiter,
+        f"pdf-render:{identity}",
+        limit=settings.rl_pdf_render_per_hour,
+        window=_HOUR,
+        detail="Too many PDF downloads. Try again later.",
+    )
+
+
+async def enforce_observer_add_limit(
+    limiter: RateLimiter, settings: Settings, application_id: object
+) -> None:
+    """The add of an observer: ``rl_observers_per_hour`` per Antrag.
+
+    §NF/security/access/000977. Each add sends a mail to a free address. The route
+    calls this after its access check, so a caller without the right does not use up
+    the budget of the Antrag. A removed observer does not give the count back.
+    """
+    await _enforce(
+        limiter,
+        f"observers:application:{application_id}",
+        limit=settings.rl_observers_per_hour,
+        window=_HOUR,
+        detail="Too many observers added. Try again later.",
+    )
+
+
+async def rate_limit_media_documents(
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
+) -> None:
+    """``POST /media/documents``: ``rl_media_documents_per_hour`` per principal.
+
+    Like the images, the key is the ``sub`` and the limit applies to an OAuth token
+    too: every upload costs a virus scan and a pypdf read of up to 20 MiB.
+    """
+    if principal is None:
+        return
+    await _enforce(
+        limiter,
+        f"media-documents:principal:{principal.sub}",
+        limit=settings.rl_media_documents_per_hour,
         window=_HOUR,
         detail="Too many uploads. Try again later.",
     )

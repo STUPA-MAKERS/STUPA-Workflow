@@ -25,16 +25,20 @@ import uuid
 from collections.abc import AsyncIterator
 
 import pytest
-from sqlalchemy import Engine
+from sqlalchemy import Engine, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.modules.account.router import _has_scoped_budget_view
 from app.modules.admin.service.forms import FormVersionWriter
 from app.modules.application_types.models import ApplicationType
-from app.modules.applications.access import require_app_read
+from app.modules.applications.access import committee_gremium_ids, require_app_read
+from app.modules.applications.models import Application
 from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service import ApplicationsService
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
+from app.modules.budget.plan_models import BudgetPlanStep
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_models import Budget
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.schemas import FormVersionCreate
@@ -302,3 +306,74 @@ async def test_pool_substitute_reads_like_a_member(session: AsyncSession) -> Non
     for app_id in (sc.app_cost_other, sc.app_vote_other, sc.app_unrelated):
         with pytest.raises(ForbiddenError):
             await require_app_read(app_id, session, substitute, None)
+
+
+async def test_a_gremium_that_decides_the_plan_reads_the_haushalt(session: AsyncSession) -> None:
+    """A member of a Gremium in a plan step reads the Haushalt like its view Gremium.
+
+    Rule: §F/finance/budget/000890.
+    """
+    sc = await _seed(session)
+    tag = uuid.uuid4().hex[:8]
+    gremium = await session.scalar(
+        select(GremiumMembership.gremium_id)
+        .join(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
+        .where(PrincipalRow.sub == sc.member_sub)
+    )
+    assert gremium is not None
+    top = Budget(parent_id=None, key=f"HH{tag}", path_key=f"HH{tag}", name="Haushalt")
+    session.add(top)
+    await session.flush()
+    leaf = Budget(parent_id=top.id, key="1", path_key=f"HH{tag}-1", name="Titel")
+    session.add_all(
+        [leaf, BudgetPlanStep(budget_id=top.id, position=0, name="B", gremium_id=gremium)]
+    )
+    app, _ = await ApplicationsService(session).create(
+        ApplicationCreate.model_validate(
+            {
+                "typeId": str(
+                    await session.scalar(
+                        select(Application.type_id).where(Application.id == sc.app_cost)
+                    )
+                ),
+                "data": {"title": "Antrag", "cost": "100.00"},
+                "applicantEmail": "x@example.org",
+            }
+        ),
+        actor=sc.other_sub,
+    )
+    await session.flush()
+    app.budget_id = leaf.id
+    await session.commit()
+    member = Principal(sub=sc.member_sub, permissions=set())
+    budget = BudgetTreeService(session, actor=sc.member_sub)
+
+    async def _listed() -> bool:
+        page = await ApplicationsService(session).list_applications(
+            owner_sub=sc.member_sub, committee_sub=sc.member_sub, limit=50, offset=0
+        )
+        return app.id in {i.id for i in page.items}
+
+    async def _roots() -> set[uuid.UUID]:
+        return {n.id for n in await budget.get_tree(visible_gremium_ids={gremium})}
+
+    # The plan switch is off: the step gives no view.
+    assert not await _listed()
+    assert not await budget.can_view_node(leaf.id, {gremium})
+    assert top.id not in await budget.visible_budget_ids({gremium})
+    assert top.id not in await _roots()
+    assert gremium not in await committee_gremium_ids(session, app.id)
+    with pytest.raises(ForbiddenError):
+        await require_app_read(app.id, session, member, None)
+
+    top.plan_enabled = True
+    await session.commit()
+    assert await _listed()
+    assert await budget.can_view_node(leaf.id, {gremium})
+    assert {top.id, leaf.id} <= await budget.visible_budget_ids({gremium})
+    assert top.id in await _roots()
+    assert await budget.get_tree(visible_gremium_ids=set()) == []
+    assert gremium in await committee_gremium_ids(session, app.id)
+    assert (await require_app_read(app.id, session, member, None)).actor == sc.member_sub
+    assert await _has_scoped_budget_view(session, sc.member_sub)
+    assert not await budget.can_view_node(leaf.id, {uuid.uuid4()})

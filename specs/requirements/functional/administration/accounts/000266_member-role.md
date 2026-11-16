@@ -2,12 +2,10 @@
 id: "000266"
 title: Every user holds the member role
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation:
-  - backend/app/modules/auth/rbac.py
-  - backend/app/modules/auth/bootstrap.py
+updated: 2026-11-16
+replaced_by: F/administration/accounts/000154
 scope:
   - backend/app/modules/auth
   - backend/app/deps.py

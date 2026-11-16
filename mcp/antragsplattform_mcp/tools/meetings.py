@@ -36,7 +36,7 @@ async def get_vote(vote_id: str) -> dict:
     Every vote is secret and exposes the counts only. `openedAt` and `closedAt` are the
     real open and end times; `closesAt` is the planned end of the cast window.
     `myBallot.cast` tells whether the caller cast the own ballot (never the choice), and
-    `representedCast` tells whether the caller cast the ballot of a delegator.
+    `representedCast` tells whether every member that the caller represents has a ballot.
 
     A personnel election has `kind: "election"`, the candidates in `election` and,
     after the close, `electionResult` (`counts` per candidate id, `abstentions`,
@@ -56,6 +56,21 @@ async def vote_draw_lot(vote_id: str) -> dict:
     `vote.manage` or `session.manage` in the gremium of the vote (or admin). Audited.
     """
     return await api().post(f"/votes/{vote_id}/draw-lot")
+
+
+@group.tool
+async def vote_next_round(vote_id: str) -> dict:
+    """Create the next Wahlgang of an election without the majority of the members.
+
+    Only a closed election with `majorityRule: "members_majority"` and the result
+    `no_majority` takes the call, after its first or its second Wahlgang. The answer is
+    the draft of the next Wahlgang on the same agenda item; the protokollant opens it.
+    The third Wahlgang takes the simple majority and has the two candidates with the
+    most votes; the server draws the lot for a tied place. 409 `no_next_round`,
+    `next_round_exists`, `not_an_election` or `meeting_closed`. Requires the gremium
+    permission `vote.manage` or `session.manage` in the gremium of the vote (or admin).
+    """
+    return await api().post(f"/votes/{vote_id}/next-round")
 
 
 @group.tool
@@ -157,10 +172,8 @@ async def update_meeting(meeting_id: str, patch: S.MeetingPatch) -> dict:
     (close or cancel it first), and it cancels the draft votes. A closed meeting
     keeps its title, date, time and minute-taker.
 
-    The start has an open window (`opensAt`, `confirmUntil` on the meeting): before
-    `opensAt` it gives 409 `meeting_too_early`, and before `confirmUntil` it needs
-    `confirmEarly: true` (else 409 `early_open_unconfirmed`). Ask the user before you
-    confirm an early open.
+    The start has an open window (`opensAt` on the meeting): before `opensAt` it gives
+    409 `meeting_too_early`.
 
     A new minute-taker needs protocol.write in the gremium (422
     `protokollant_needs_protocol_write`). While the meeting is live, a new
@@ -287,14 +300,20 @@ async def add_agenda_item(
     meeting_id: str,
     application_id: str | None = None,
     title: str | None = None,
+    description: str | None = None,
+    plan_version_id: str | None = None,
 ) -> dict:
     """Add an agenda item to a meeting.
 
-    Give EXACTLY ONE of `application_id` for an application item or `title` for a
-    free-text item. Requires write access to the meeting: session.manage
-    or protocol.write in its gremium, the assigned minute-taker, or admin. Only a
-    planned or live meeting takes a new item; a closed meeting gives 409
-    `meeting_closed`. Returns the whole agenda after the add.
+    Give EXACTLY ONE of `application_id` for an application item, `plan_version_id`
+    for a version of a Haushaltsplan that waits for the Gremium of the meeting
+    (`list_assignable_agenda_plans`), or `title` for a free-text item. A plan that
+    does not wait gives 409 `plan_step_not_waiting`, a plan already on this agenda
+    409 `plan_already_on_agenda`. `description` goes only with `title`: the text of the new item
+    starts with it as a Markdown block quote, so it goes into the protocol. Requires
+    write access to the meeting: session.manage or protocol.write in its gremium, the
+    assigned minute-taker, or admin. Only a planned or live meeting takes a new item;
+    a closed meeting gives 409 `meeting_closed`. Returns the whole agenda after the add.
 
     A second free-text item with the same title is a second item. If the call fails
     without an answer from the platform, read the agenda with `get_agenda` before you
@@ -302,7 +321,12 @@ async def add_agenda_item(
     """
     return await api().post(
         f"/meetings/{meeting_id}/agenda",
-        json=params(applicationId=application_id, title=title),
+        json=params(
+            applicationId=application_id,
+            planVersionId=plan_version_id,
+            title=title,
+            description=description,
+        ),
     )
 
 
@@ -320,7 +344,7 @@ async def update_agenda_item(
     or protocol.write in its gremium, the assigned minute-taker, or admin.
 
     The `body` needs a live meeting, or a closed meeting whose protocol is still a
-    draft (409 `meeting_not_started` or `protocol_locked` otherwise). The `title`
+    draft (409 `meeting_not_started` or `protocol_final` otherwise). The `title`
     needs a planned or live meeting (409 `meeting_closed` otherwise).
     """
     return await api().patch(
@@ -361,6 +385,19 @@ async def reorder_agenda(meeting_id: str, item_ids: list[str]) -> dict:
 async def list_assignable_agenda_items(meeting_id: str) -> dict:
     """List the applications that you can add as agenda items to this meeting."""
     return await api().get(f"/meetings/{meeting_id}/agenda/assignable")
+
+
+@group.tool
+async def list_assignable_agenda_plans(meeting_id: str) -> dict:
+    """List the versions of a Haushaltsplan that the agenda of the meeting can take.
+
+    The answer has `decides` (the Gremium of the meeting decides a plan in a step) and
+    `plans`: the versions that wait for the Gremium and the drafts for a reading
+    (`reading: true`). Each row has `planVersionId`, `budgetName`, `fiscalYear`,
+    `number`, `step` and the `title` of the agenda item. Requires write access to the
+    meeting.
+    """
+    return await api().get(f"/meetings/{meeting_id}/agenda/assignable-plans")
 
 
 @group.tool
@@ -561,6 +598,64 @@ async def finalize_protocol(protocol_id: str, public_withheld: bool | None = Non
     """
     body = {} if public_withheld is None else {"publicWithheld": public_withheld}
     return await api().post(f"/protocols/{protocol_id}/finalize", json=body)
+
+
+@group.tool
+async def send_protocol_draft(protocol_id: str) -> dict:
+    """Mail the PDF of a protocol draft to the members of its Gremium.
+
+    Each page of the PDF has the watermark "Entwurf". The protocol stays a draft.
+    Requires the write access to the protocol. A protocol that is not a draft gives
+    409 `protocol_not_draft`, and a protocol of a live meeting 409 `meeting_live`.
+    Returns `{recipients, draftSentAt}`: the number of addresses and the time of the
+    last send. `draftSentAt` of the protocol is set when a draft already went out: ask
+    the user before you send it again. The send goes into the audit log
+    (`protocol_draft_mail`).
+    """
+    return await api().post(f"/protocols/{protocol_id}/draft-mail")
+
+
+@group.tool
+async def set_protocol_approval(protocol_id: str, approved_in_meeting_id: str | None) -> dict:
+    """Mark a final protocol as approved, or remove the mark.
+
+    `approved_in_meeting_id` is the meeting that approved the protocol: another
+    meeting of the same Gremium (else 422 `invalid_approval_meeting`). `None` removes
+    the mark. Requires the gremium permission protocol.finalize. A protocol that is
+    not final gives 409 `protocol_not_final`. The change goes into the audit log
+    (`protocol_approval`).
+    """
+    path = f"/protocols/{protocol_id}/approval"
+    if approved_in_meeting_id is None:
+        return await api().delete(path)
+    return await api().put(path, json={"meetingId": approved_in_meeting_id})
+
+
+@group.tool
+async def reopen_protocol(protocol_id: str) -> dict:
+    """Set a final protocol back to draft, so that it can be corrected.
+
+    Requires the gremium permission protocol.finalize. A protocol that is not final
+    gives 409 `protocol_not_final`, and one with an approval mark 409
+    `protocol_approved`: remove the mark first. The public pages no longer show the
+    protocol until it is final again, and the next finalize sends the PDF to the mailing
+    list again, so ask the user before you call this. The change goes into the audit log
+    (`protocol_reopen`).
+    """
+    return await api().post(f"/protocols/{protocol_id}/reopen")
+
+
+@group.tool
+async def excuse_own_absence(meeting_id: str, note: str) -> dict:
+    """Change the own `absent` of a closed meeting to `excused`, with the reason.
+
+    The window ends `lateExcuseDays` days after the close (409 `late_excuse_expired`).
+    The roster row of the caller has `lateExcuseUntil` while the window is open. A
+    meeting that is not closed gives 409 `meeting_not_closed`, a caller without an
+    `absent` record 409 `not_absent`.
+    """
+    path = f"/meetings/{meeting_id}/attendance/me/late-excuse"
+    return await api().post(path, json={"note": note})
 
 
 @group.tool

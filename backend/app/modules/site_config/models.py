@@ -1,7 +1,7 @@
 """Config tables of the admin module.
 
-The module owns ``site_config_version`` and the corporate-design tables ``cd_variant``
-with ``cd_variant_logo``.
+The module owns ``site_config_version``, the corporate-design tables ``cd_variant``
+with ``cd_variant_logo``, and ``pdf_asset``.
 """
 
 from __future__ import annotations
@@ -115,4 +115,31 @@ class SiteConfigVersion(UUIDPkMixin, CreatedAtMixin, Base):
             unique=True,
             postgresql_where=text("active"),
         ),
+    )
+
+
+class PdfAsset(UUIDPkMixin, CreatedAtMixin, Base):
+    """A graphic of the PDF branding (specs 000891, 000892), one row per slot.
+
+    ``slot`` is ``logo`` (the export logo) or ``footer`` (the graphic at the foot of
+    each page). A row names either an upload (``object_key`` with its file name, sniffed
+    ``mime`` and ``size``) or a built-in graphic of the render service (``builtin``,
+    for example ``STUPA``), never both. No row means no graphic. The bytes reach the
+    render service only, never the browser, so SVG and PDF are allowed. ``created_by``
+    holds the OIDC ``sub`` of the uploader, so it carries no PII.
+    """
+
+    __tablename__ = "pdf_asset"
+
+    slot: Mapped[str] = mapped_column(Text, unique=True)
+    builtin: Mapped[str | None] = mapped_column(Text, nullable=True)
+    object_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    file_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mime: Mapped[str | None] = mapped_column(Text, nullable=True)
+    size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("slot IN ('logo', 'footer')", name="slot"),
+        CheckConstraint("(builtin IS NULL) <> (object_key IS NULL)", name="source"),
     )

@@ -188,8 +188,7 @@ class CdVariantService(ConfigServiceBase):
             )
         ).all()
         return [
-            _variant_out(row, [logo for logo in logos if logo.variant_id == row.id])
-            for row in rows
+            _variant_out(row, [logo for logo in logos if logo.variant_id == row.id]) for row in rows
         ]
 
     async def list_variant_options(self) -> list[CdVariantOptionOut]:
@@ -336,9 +335,7 @@ class CdVariantService(ConfigServiceBase):
             if replaced
             else None
         )
-        await self._audit(
-            actor, AuditAction.CONFIG_CHANGE, "cd_variant", variant_id, audit_data
-        )
+        await self._audit(actor, AuditAction.CONFIG_CHANGE, "cd_variant", variant_id, audit_data)
         await self.session.commit()
         for old in replaced:
             if old.object_key is not None:
@@ -461,9 +458,7 @@ class CdVariantService(ConfigServiceBase):
             ValidationProblem: The list does not match the logos of the slot (422).
         """
         await self._get_or_404(variant_id)
-        rows = [
-            logo for logo in await self._logos_of(variant_id) if logo.slot == payload.slot
-        ]
+        rows = [logo for logo in await self._logos_of(variant_id) if logo.slot == payload.slot]
         by_id = {logo.id: logo for logo in rows}
         if len(payload.logo_ids) != len(rows) or set(payload.logo_ids) != set(by_id):
             raise ValidationProblem(
@@ -477,9 +472,7 @@ class CdVariantService(ConfigServiceBase):
         return [_logo_out(by_id[logo_id]) for logo_id in payload.logo_ids]
 
     async def _by_key(self, key: str) -> CdVariant | None:
-        return (
-            await self.session.scalars(select(CdVariant).where(CdVariant.key == key))
-        ).first()
+        return (await self.session.scalars(select(CdVariant).where(CdVariant.key == key))).first()
 
     async def _get_or_404(self, variant_id: UUID) -> CdVariant:
         row = await self.session.get(CdVariant, variant_id)

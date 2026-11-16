@@ -89,10 +89,10 @@ const TREE: BudgetTreeNode[] = [
     id: 'b1',
     parentId: null,
     name: 'Haushalt',
-    hiddenInBudget: false,
+    active: true,
     children: [
-      { id: 'b2', parentId: 'b1', name: 'Kultur', hiddenInBudget: false, children: [] },
-      { id: 'b3', parentId: 'b1', name: 'Versteckt', hiddenInBudget: true, children: [] },
+      { id: 'b2', parentId: 'b1', name: 'Kultur', active: true, children: [] },
+      { id: 'b3', parentId: 'b1', name: 'Versteckt', active: false, children: [] },
     ],
   } as unknown as BudgetTreeNode,
 ];

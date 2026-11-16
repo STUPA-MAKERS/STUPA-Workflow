@@ -99,6 +99,14 @@ class AuditAction(StrEnum):
         PROTOCOL_PUBLICATION: A protocol held back from the public protocols page or
             released. ``data`` carries the meeting, the gremium and the old and new
             ``publicWithheld``.
+        PROTOCOL_DRAFT_MAIL: The draft of a protocol sent to the members of the
+            Gremium. ``data`` carries the meeting, the gremium and the number of
+            recipients, never an address.
+        PROTOCOL_APPROVAL: A final protocol marked as approved, or the mark removed.
+            ``data`` carries the meeting, the gremium and the approving meeting
+            (``approvedMeetingId``, null for a removed mark).
+        PROTOCOL_REOPEN: A final protocol set back to draft before its approval
+            (spec 000983). ``data`` carries the meeting and the Gremium.
         PROTOKOLLANT_HANDOVER: Handover of the minutes in a live meeting. ``data``
             carries the ``mode`` (``now``, ``next_item``, ``activate`` when an agenda
             move starts the planned period, ``cancel`` when the planned handover goes
@@ -139,11 +147,17 @@ class AuditAction(StrEnum):
         BUDGET_NODE_CREATE: The ``BUDGET_*`` entries cover cost-center CRUD,
             allocation, bookings, transfers, invoices and moves of an application to
             another cost center or fiscal year. ``data`` carries ids and amounts.
+        BUDGET_PLAN_VERSION_CREATE: The ``BUDGET_PLAN_*`` entries cover the
+            Haushaltsplan: a new version, a state change of a version and a change of a
+            line. ``data`` names the plan, the version and the amounts.
         BACKUP_CREATE: The ``BACKUP_*`` entries are gated by ``backup.manage``.
             ``data`` carries the backup id, the kind and size metadata, never archive
             contents. A restore replaces the database, so the BACKUP_RESTORE entry
             lands in the chain of the restored state, after the safety backup that the
             restore takes first.
+        GREMIUM_INFO_UPDATE: A save of the Info tab of a Gremium (``info.write``).
+            ``data`` carries the gremium id, the new version, the length of the text
+            and the number of links, never the text or a link.
     """
 
     LOGIN = "login"
@@ -192,6 +206,9 @@ class AuditAction(StrEnum):
     PROTOCOL_DELETE = "protocol_delete"
     PROTOCOL_FINALIZE = "protocol_finalize"
     PROTOCOL_PUBLICATION = "protocol_publication"
+    PROTOCOL_DRAFT_MAIL = "protocol_draft_mail"
+    PROTOCOL_APPROVAL = "protocol_approval"
+    PROTOCOL_REOPEN = "protocol_reopen"
     PROTOKOLLANT_HANDOVER = "protokollant_handover"
     VOTE_DELETE = "vote_delete"
     VOTE_OPEN = "vote_open"
@@ -221,6 +238,8 @@ class AuditAction(StrEnum):
     BUDGET_NODE_CREATE = "budget_node_create"
     BUDGET_NODE_UPDATE = "budget_node_update"
     BUDGET_NODE_DELETE = "budget_node_delete"
+    BUDGET_FISCAL_YEAR_CREATE = "budget_fiscal_year_create"
+    BUDGET_FISCAL_YEAR_UPDATE = "budget_fiscal_year_update"
     BUDGET_FISCAL_YEAR_DELETE = "budget_fiscal_year_delete"
     BUDGET_FISCAL_YEAR_CLOSE = "budget_fiscal_year_close"
     BUDGET_FISCAL_YEAR_REOPEN = "budget_fiscal_year_reopen"
@@ -234,11 +253,23 @@ class AuditAction(StrEnum):
     BUDGET_INVOICE_DELETE = "budget_invoice_delete"
     BUDGET_ASSIGN = "budget_assign"
     BUDGET_MOVE_FISCAL_YEAR = "budget_move_fiscal_year"
+    BUDGET_SIDE_SET = "budget_side_set"
+    BUDGET_PLAN_SWITCH = "budget_plan_switch"
+    BUDGET_PLAN_VERSION_CREATE = "budget_plan_version_create"
+    BUDGET_PLAN_VERSION_DELETE = "budget_plan_version_delete"
+    BUDGET_PLAN_STATE = "budget_plan_state"
+    BUDGET_PLAN_STATE_SET = "budget_plan_state_set"
+    BUDGET_PLAN_STEPS_SET = "budget_plan_steps_set"
+    BUDGET_PLAN_STEP = "budget_plan_step"
+    BUDGET_PLAN_STEP_REQUEST = "budget_plan_step_request"
+    BUDGET_PLAN_STEP_VOTE = "budget_plan_step_vote"
+    BUDGET_PLAN_LINE_SET = "budget_plan_line_set"
     BACKUP_CREATE = "backup_create"
     BACKUP_DELETE = "backup_delete"
     BACKUP_EXPORT = "backup_export"
     BACKUP_IMPORT = "backup_import"
     BACKUP_RESTORE = "backup_restore"
+    GREMIUM_INFO_UPDATE = "gremium_info_update"
 
 
 REVERTABLE_BUDGET_ACTIONS: frozenset[AuditAction] = frozenset(

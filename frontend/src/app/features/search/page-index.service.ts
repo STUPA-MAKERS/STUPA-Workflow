@@ -1,6 +1,8 @@
 import { Injectable, computed, inject } from '@angular/core';
 import type { Data, Routes } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
+import { routeFeatures } from '@core/features/feature.guard';
+import { FeatureService } from '@core/features/feature.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { routes } from '../../app.routes';
 
@@ -34,6 +36,7 @@ interface PageCandidate {
 export class PageIndexService {
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
+  private readonly features = inject(FeatureService);
 
   readonly visible = computed<readonly PageEntry[]>(() => {
     if (!this.auth.isAuthenticated()) return [];
@@ -56,7 +59,8 @@ export class PageIndexService {
       const path = [prefix, route.path ?? ''].filter(Boolean).join('/');
       const data = route.data;
       const children = route.children ? this.collect(route.children, path) : [];
-      const offered = !!data && this.offered(path, data);
+      const offered =
+        !!data && this.features.isOn(...routeFeatures(route)) && this.offered(path, data);
       return offered ? [...children, { path: `/${path}`, data }] : children;
     });
   }

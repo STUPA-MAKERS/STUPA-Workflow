@@ -2057,3 +2057,249 @@ def test_drop_dead_columns(alembic_cfg: Config, engine: Engine) -> None:
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM vote WHERE id = :v"), {"v": vote})
     command.upgrade(alembic_cfg, "head")
+
+
+def _plan_tree(conn: Connection, key: str) -> dict[str, object]:
+    """Insert a budget with two Titel, a Kostenstelle and three years, before fea8282a392b."""
+
+    def node(k: str, parent: object, side: str | None, *, plan: bool = False) -> object:
+        return conn.execute(
+            text(
+                "INSERT INTO budget (key, path_key, name, parent_id, side, plan_enabled) "
+                "VALUES (:k, :p, :k, :parent, :side, :plan) RETURNING id"
+            ),
+            {"k": k, "p": f"{key}-{k}", "parent": parent, "side": side, "plan": plan},
+        ).scalar_one()
+
+    def year(number: int, *, closed: bool = False) -> object:
+        return conn.execute(
+            text(
+                "INSERT INTO fiscal_year (budget_id, year, start_date, end_date, closed_at) "
+                "VALUES (:b, :y, make_date(:y, 1, 1), make_date(:y, 12, 31), "
+                "CASE WHEN :closed THEN now() END) RETURNING id"
+            ),
+            {"b": top, "y": number, "closed": closed},
+        ).scalar_one()
+
+    top = node(key, None, None, plan=True)
+    inc = node("1", top, "income")
+    exp = node("8", top, "expense")
+    leaf = node("81", exp, "expense")
+    return {
+        "top": top, "inc": inc, "exp": exp, "leaf": leaf,
+        "made": year(2026), "bare": year(2027), "closed": year(2025, closed=True),
+    }
+
+
+def _plan_version(conn: Connection, fy: object, state: str, steps: str = "[]") -> object:
+    plan = conn.execute(
+        text("INSERT INTO budget_plan (fiscal_year_id) VALUES (:fy) RETURNING id"), {"fy": fy}
+    ).scalar_one()
+    return conn.execute(
+        text(
+            "INSERT INTO budget_plan_version (plan_id, number, state, steps, in_force_at) "
+            "VALUES (:p, 0, :s, CAST(:steps AS jsonb), now()) RETURNING id"
+        ),
+        {"p": plan, "s": state, "steps": steps},
+    ).scalar_one()
+
+
+def test_the_side_moves_from_the_node_to_the_plan_line(
+    alembic_cfg: Config, engine: Engine
+) -> None:
+    """Migration fea8282a392b: the line of a Titel takes the side of its node.
+
+    A line below a Titel holds no side of its own, the node loses the column, and the
+    role ``admin`` gets the permission for the state by hand. The downgrade gives the
+    node its side again.
+    """
+    command.downgrade(alembic_cfg, "8d53b821d874")
+    with engine.begin() as conn:
+        t = _plan_tree(conn, "MIGA")
+        version = _plan_version(conn, t["made"], "in_force", '[{"name": "Beschluss"}]')
+        for node in ("inc", "exp", "leaf"):
+            conn.execute(
+                text(
+                    "INSERT INTO budget_plan_line (version_id, budget_id, amount, name) "
+                    "VALUES (:v, :b, 5, 'alt')"
+                ),
+                {"v": version, "b": t[node]},
+            )
+
+    command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+        sides = dict(
+            conn.execute(
+                text("SELECT budget_id, side FROM budget_plan_line WHERE version_id = :v"),
+                {"v": version},
+            ).all()
+        )
+        assert sides == {t["inc"]: "income", t["exp"]: "expense", t["leaf"]: None}
+        assert conn.execute(
+            text("SELECT state FROM budget_plan_version WHERE id = :v"), {"v": version}
+        ).scalar_one() == "in_force"
+        assert conn.execute(
+            text(
+                "SELECT count(*) FROM information_schema.columns "
+                "WHERE table_name = 'budget' AND column_name = 'side'"
+            )
+        ).scalar_one() == 0
+        assert conn.execute(
+            text(
+                "SELECT count(*) FROM role_permission rp JOIN role r ON r.id = rp.role_id "
+                "WHERE rp.permission = 'budget.plan.set_state' AND r.key = 'admin'"
+            )
+        ).scalar_one() == 1
+
+    command.downgrade(alembic_cfg, "8d53b821d874")
+    with engine.begin() as conn:
+        assert dict(
+            conn.execute(
+                text("SELECT id, side FROM budget WHERE id IN (:a, :b)"),
+                {"a": t["inc"], "b": t["exp"]},
+            ).all()
+        ) == {t["inc"]: "income", t["exp"]: "expense"}
+    command.upgrade(alembic_cfg, "head")
+
+
+def test_a_plan_of_the_switch_goes_back_to_the_draft(
+    alembic_cfg: Config, engine: Engine
+) -> None:
+    """Migration fea8282a392b: a plan that only the switch made is a draft again.
+
+    The allocations stay. An open year without a plan gets a draft from its
+    allocations, where a parent holds the sum of its children. A closed year gets none.
+    """
+    command.downgrade(alembic_cfg, "8d53b821d874")
+    with engine.begin() as conn:
+        t = _plan_tree(conn, "MIGB")
+        made = _plan_version(conn, t["made"], "in_force")
+        conn.execute(
+            text(
+                "INSERT INTO budget_plan_line (version_id, budget_id, amount, name, path_key) "
+                "VALUES (:v, :b, 7, 'alt', 'ALT')"
+            ),
+            {"v": made, "b": t["leaf"]},
+        )
+        for fy in ("made", "bare", "closed"):
+            conn.execute(
+                text(
+                    "INSERT INTO budget_allocation (budget_id, fiscal_year_id, allocated) "
+                    "VALUES (:b, :fy, 7), (:e, :fy, 99)"
+                ),
+                {"b": t["leaf"], "e": t["exp"], "fy": t[fy]},
+            )
+
+    command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+        assert conn.execute(
+            text("SELECT state, in_force_at FROM budget_plan_version WHERE id = :v"), {"v": made}
+        ).one() == ("draft", None)
+        assert conn.execute(
+            text("SELECT name, path_key FROM budget_plan_line WHERE version_id = :v"), {"v": made}
+        ).one() == (None, None)
+        assert conn.execute(
+            text("SELECT count(*) FROM budget_allocation WHERE fiscal_year_id = :fy"),
+            {"fy": t["made"]},
+        ).scalar_one() == 2
+        drafted = conn.execute(
+            text(
+                "SELECT l.budget_id, l.amount, l.side, v.state, v.number "
+                "FROM budget_plan p JOIN budget_plan_version v ON v.plan_id = p.id "
+                "JOIN budget_plan_line l ON l.version_id = v.id WHERE p.fiscal_year_id = :fy"
+            ),
+            {"fy": t["bare"]},
+        ).all()
+        assert {row[0]: (row[1], row[2], row[3], row[4]) for row in drafted} == {
+            t["inc"]: (0, None, "draft", 0),
+            t["exp"]: (7, None, "draft", 0),
+            t["leaf"]: (7, None, "draft", 0),
+        }
+        assert conn.execute(
+            text("SELECT count(*) FROM budget_plan WHERE fiscal_year_id = :fy"),
+            {"fy": t["closed"]},
+        ).scalar_one() == 0
+
+
+def _old_tree(conn: Connection, paths: tuple[str, ...]) -> dict[str, object]:
+    """Insert cost centers by their path keys in the form before 9c1f5d3a7e42."""
+    ids: dict[str, object] = {}
+    for path in paths:
+        parent, _, key = path.rpartition("-")
+        ids[path] = conn.execute(
+            text(
+                "INSERT INTO budget (key, path_key, name, parent_id) "
+                "VALUES (:k, :p, :k, :parent) RETURNING id"
+            ),
+            {"k": key, "p": path, "parent": ids.get(parent)},
+        ).scalar_one()
+    return ids
+
+
+def test_path_keys_take_the_form_with_one_hyphen(alembic_cfg: Config, engine: Engine) -> None:
+    """Migration 9c1f5d3a7e42: the path key has one hyphen, the tree path keeps the tree.
+
+    The line of a decided plan takes the new form too. The way back gives the path key
+    with a hyphen per level again. Rule: §F/finance/budget/000878.
+    """
+    command.downgrade(alembic_cfg, "4b8e2f6c1a93")
+    with engine.begin() as conn:
+        ids = _old_tree(conn, ("MIGP", "MIGP-801", "MIGP-801-33"))
+        fy = conn.execute(
+            text(
+                "INSERT INTO fiscal_year (budget_id, year, start_date, end_date) "
+                "VALUES (:b, 2026, '2026-01-01', '2026-12-31') RETURNING id"
+            ),
+            {"b": ids["MIGP"]},
+        ).scalar_one()
+        version = _plan_version(conn, fy, "in_force")
+        conn.execute(
+            text(
+                "INSERT INTO budget_plan_line (version_id, budget_id, amount, name, path_key) "
+                "VALUES (:v, :b, 7, 'alt', 'MIGP-801-33')"
+            ),
+            {"v": version, "b": ids["MIGP-801-33"]},
+        )
+
+    command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+        rows = conn.execute(
+            text("SELECT tree_path, path_key FROM budget WHERE tree_path LIKE 'MIGP%'")
+        ).all()
+        assert {(row[0], row[1]) for row in rows} == {
+            ("MIGP", "MIGP"), ("MIGP-801", "MIGP-801"), ("MIGP-801-33", "MIGP-80133"),
+        }
+        assert conn.execute(
+            text("SELECT path_key FROM budget_plan_line WHERE version_id = :v"), {"v": version}
+        ).scalar_one() == "MIGP-80133"
+
+    command.downgrade(alembic_cfg, "4b8e2f6c1a93")
+    with engine.begin() as conn:
+        assert set(
+            conn.execute(text("SELECT path_key FROM budget WHERE path_key LIKE 'MIGP%'")).scalars()
+        ) == {"MIGP", "MIGP-801", "MIGP-801-33"}
+    command.upgrade(alembic_cfg, "head")
+
+
+def test_two_cost_centres_with_one_path_key_stop_the_upgrade(
+    alembic_cfg: Config, engine: Engine
+) -> None:
+    """Migration 9c1f5d3a7e42 names the cost centers that would share a path key.
+
+    It changes no row before it stops. Rule: §F/finance/budget/000878.
+    """
+    command.downgrade(alembic_cfg, "4b8e2f6c1a93")
+    with engine.begin() as conn:
+        _old_tree(conn, ("MIGQ", "MIGQ-80", "MIGQ-80-133", "MIGQ-801", "MIGQ-801-33"))
+    try:
+        with pytest.raises(RuntimeError, match="MIGQ-80133 for MIGQ-80-133, MIGQ-801-33"):
+            command.upgrade(alembic_cfg, "head")
+        with engine.begin() as conn:
+            assert conn.execute(
+                text("SELECT count(*) FROM budget WHERE path_key = 'MIGQ-80-133'")
+            ).scalar_one() == 1
+    finally:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM budget WHERE path_key LIKE 'MIGQ-80%-%'"))
+            conn.execute(text("DELETE FROM budget WHERE path_key LIKE 'MIGQ%'"))
+        command.upgrade(alembic_cfg, "head")

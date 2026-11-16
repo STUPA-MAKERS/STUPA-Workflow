@@ -27,3 +27,23 @@ export function exportDownload(
     },
   });
 }
+
+/**
+ * The file name of a `Content-Disposition` header: the exact UTF-8 name of
+ * `filename*=UTF-8''…`, else the plain `filename="…"`, else `fallback`. The server sets
+ * both forms, because the plain one must stay ASCII.
+ */
+export function filenameFromDisposition(header: string | null, fallback: string): string {
+  const exact = /filename\*=UTF-8''([^;]+)/i.exec(header ?? '')?.[1];
+  const plain = /filename="([^"]+)"/i.exec(header ?? '')?.[1];
+  const decoded = exact ? safeDecode(exact) : null;
+  return decoded || plain || fallback;
+}
+
+function safeDecode(value: string): string | null {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}

@@ -38,6 +38,7 @@ import {
   liveOpenedVote,
 } from './meetings-display.util';
 import { problemCode, problemDetail } from '@core/api/problem';
+import type { TranslationKey } from '@core/i18n/translations';
 import { withEntry } from '@shared/util/immutable';
 
 /** The shortest time between two live drafts of the protokollant. */
@@ -49,6 +50,14 @@ const DRAFT_INTERVAL_MS = 300;
  * RBAC here gates the UI only. The server authorizes every action.
  * Provided by MeetingsComponent.
  */
+/** The refusals of the draft mail and of the approval mark, with their text. */
+const PROTOCOL_REFUSALS: Readonly<Record<string, TranslationKey>> = {
+  meeting_live: 'meetings.toast.draftLive',
+  protocol_not_final: 'meetings.toast.protocolNotFinal',
+  invalid_approval_meeting: 'meetings.toast.approvalMeetingInvalid',
+  protocol_approved: 'meetings.toast.protocolApprovedLocked',
+};
+
 @Injectable()
 export class MeetingSessionService implements OnDestroy {
   private readonly api = inject(ApiClient);
@@ -90,8 +99,6 @@ export class MeetingSessionService implements OnDestroy {
   readonly savingDate = signal(false);
 
   readonly finalizing = signal(false);
-  /** "Sitzung schon eröffnen?" is open: the open is early and waits for the confirmation. */
-  readonly earlyOpenAsk = signal(false);
   /** Poll fallback while the worker renders the protocol. */
   private renderPollTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -238,10 +245,7 @@ export class MeetingSessionService implements OnDestroy {
    *
    * The open window: before `opensAt` the page refuses at once (the button is off anyway) and reads
    * the meeting again, because the window may have moved. The server 409 `meeting_too_early` (the
-   * clocks differ) does the same. Before `confirmUntil` the open is early: the first call opens
-   * "Sitzung schon eröffnen?" (`earlyOpenAsk`), and the dialog calls again with `confirmEarly`.
-   * When the server still finds the open early (the clocks differ), its 409
-   * `early_open_unconfirmed` opens the dialog too.
+   * clocks differ) does the same. From `opensAt` on the open needs nothing more.
    *
    * The close is a dialog of its own (`CloseMeetingDialogComponent`), and a planned
    * meeting that does not take place is deleted, not closed.
@@ -249,25 +253,18 @@ export class MeetingSessionService implements OnDestroy {
    * The window may have moved (settings, a date change in another tab), so the start reads it
    * again.
    */
-  startMeeting(confirmEarly = false): void {
+  startMeeting(): void {
     const m = this.meeting();
-    this.earlyOpenAsk.set(false);
     if (!m || m.status !== 'planned') return;
     if (!m.protokollantId) {
       this.toast.error(this.i18n.translate('meetings.toast.protokollantRequired'));
       return;
     }
-    const phase = openWindowState(m, Date.now());
-    if (phase === 'tooEarly') {
+    if (openWindowState(m, Date.now()) === 'tooEarly') {
       this.tooEarly();
       return;
     }
-    if (phase === 'early' && !confirmEarly) {
-      this.earlyOpenAsk.set(true);
-      return;
-    }
-    const body: MeetingPatchBody = confirmEarly ? { status: 'live', confirmEarly } : { status: 'live' };
-    this.api.patchMeeting(m.id, body).subscribe({
+    this.api.patchMeeting(m.id, { status: 'live' }).subscribe({
       next: (updated) => {
         this.meeting.set(updated);
         if (updated.status === 'live' && updated.protocolId && this.canWrite()) {
@@ -275,12 +272,7 @@ export class MeetingSessionService implements OnDestroy {
         }
       },
       error: (err: unknown) => {
-        const code = problemCode(err);
-        if (code === 'early_open_unconfirmed') {
-          this.earlyOpenAsk.set(true);
-          return;
-        }
-        if (code === 'meeting_too_early') {
+        if (problemCode(err) === 'meeting_too_early') {
           this.tooEarly();
           return;
         }
@@ -294,9 +286,13 @@ export class MeetingSessionService implements OnDestroy {
    * meeting may have changed in another tab.
    */
   private statusChangeFailed(err: unknown): void {
-    const detail = problemDetail(err);
-    const base = this.i18n.translate('meetings.toast.actionFailed');
-    this.toast.error(detail ? `${base}: ${detail}` : base);
+    if (problemCode(err) === 'quorum_not_met') {
+      this.toast.error(this.i18n.translate('meetings.toast.quorumNotMet'));
+    } else {
+      const detail = problemDetail(err);
+      const base = this.i18n.translate('meetings.toast.actionFailed');
+      this.toast.error(detail ? `${base}: ${detail}` : base);
+    }
     const m = this.meeting();
     if (m) {
       this.api.getMeeting(m.id, { quiet: true }).subscribe({
@@ -396,9 +392,13 @@ export class MeetingSessionService implements OnDestroy {
   /** Show the server reason (for example 409) and reload the meeting. The vote
    *  may have changed on the server, for example to cancelled. */
   private voteActionFailed(err: unknown): void {
-    const detail = problemDetail(err);
-    const base = this.i18n.translate('meetings.toast.actionFailed');
-    this.toast.error(detail ? `${base}: ${detail}` : base);
+    if (problemCode(err) === 'quorum_not_met') {
+      this.toast.error(this.i18n.translate('meetings.toast.quorumNotMet'));
+    } else {
+      const detail = problemDetail(err);
+      const base = this.i18n.translate('meetings.toast.actionFailed');
+      this.toast.error(detail ? `${base}: ${detail}` : base);
+    }
     const m = this.meeting();
     if (m) {
       this.api.getMeeting(m.id, { quiet: true }).subscribe({
@@ -443,9 +443,16 @@ export class MeetingSessionService implements OnDestroy {
     });
   }
 
-  /** An application TOP holds exactly one vote. A freetext TOP holds any number. */
+  /**
+   * An application TOP and a plan TOP hold exactly one vote, a draft plan for a reading none. A
+   * cancelled vote does not count, as on the server. A freetext TOP holds any number.
+   */
   canAddVote(item: AgendaItem): boolean {
-    return !item.applicationId || this.votesForTop(item.id).length === 0;
+    if (item.planReading) return false;
+    return (
+      !(item.applicationId || item.planVersionId) ||
+      this.votesForTop(item.id).every((v) => v.status === 'cancelled')
+    );
   }
 
   /** Re-read an existing protocol with GET, which keeps the write rate limit intact. */
@@ -560,6 +567,95 @@ export class MeetingSessionService implements OnDestroy {
     });
   }
 
+  /** The draft mail is on its way to the server. */
+  readonly draftSending = signal(false);
+  /** The mark "genehmigt" is being saved. */
+  readonly approvalSaving = signal(false);
+
+  /** "Entwurf senden": the PDF of the draft goes to the members (§ 000925). */
+  sendProtocolDraft(): void {
+    const proto = this.protocol();
+    if (!proto || this.draftSending()) return;
+    this.draftSending.set(true);
+    this.api.sendProtocolDraft(proto.id).subscribe({
+      next: ({ recipients, draftSentAt }) => {
+        this.draftSending.set(false);
+        if (draftSentAt) this.protocol.update((p) => (p?.id === proto.id ? { ...p, draftSentAt } : p));
+        if (recipients === 0) {
+          this.toast.show(this.i18n.translate('meetings.toast.draftNoRecipient'), 'warning');
+          return;
+        }
+        this.toast.success(
+          this.i18n.translate(recipients === 1 ? 'meetings.toast.draftSent1' : 'meetings.toast.draftSent', {
+            n: recipients,
+          }),
+        );
+      },
+      error: (err: unknown) => {
+        this.draftSending.set(false);
+        this.protocolRefused(err);
+      },
+    });
+  }
+
+  /** Mark the final protocol as approved by a meeting; `null` removes the mark (§ 000924). */
+  setProtocolApproval(meetingId: Uuid | null): void {
+    const proto = this.protocol();
+    if (!proto || this.approvalSaving()) return;
+    this.approvalSaving.set(true);
+    this.api.setProtocolApproval(proto.id, meetingId).subscribe({
+      next: (updated) => {
+        this.approvalSaving.set(false);
+        this.protocol.set(updated);
+        this.toast.success(
+          this.i18n.translate(meetingId ? 'meetings.toast.protocolApproved' : 'meetings.toast.approvalRemoved'),
+        );
+      },
+      error: (err: unknown) => {
+        this.approvalSaving.set(false);
+        this.protocolRefused(err);
+      },
+    });
+  }
+
+  readonly reopenSaving = signal(false);
+
+  /** Set the final protocol back to draft, until it has an approval mark (§ 000983). */
+  reopenProtocol(): void {
+    const proto = this.protocol();
+    if (!proto || this.reopenSaving()) return;
+    this.reopenSaving.set(true);
+    this.api.reopenProtocol(proto.id).subscribe({
+      next: (updated) => {
+        this.reopenSaving.set(false);
+        this.protocol.set(updated);
+        this.toast.success(this.i18n.translate('meetings.toast.protocolReopened'));
+      },
+      error: (err: unknown) => {
+        this.reopenSaving.set(false);
+        this.protocolRefused(err);
+      },
+    });
+  }
+
+  /**
+   * A refused draft mail or approval mark: the toast says the cause in the language of
+   * the page, and the bar reads the protocol again, because a 409 means that its state
+   * moved.
+   */
+  private protocolRefused(err: unknown): void {
+    const known = PROTOCOL_REFUSALS[problemCode(err) ?? ''];
+    if (!known) return this.actionFailed(err);
+    this.toast.error(this.i18n.translate(known));
+    this.refreshProtocol();
+  }
+
+  private actionFailed(err: unknown): void {
+    const detail = problemDetail(err);
+    const base = this.i18n.translate('meetings.toast.actionFailed');
+    this.toast.error(detail ? `${base}: ${detail}` : base);
+  }
+
   private doFinalize(protocolId: Uuid, opts: { publicWithheld?: boolean } = {}): void {
     this.api.finalizeProtocol(protocolId, opts).subscribe({
       next: (updated) => {
@@ -642,6 +738,8 @@ export class MeetingSessionService implements OnDestroy {
         this.savingAttendance.set(false);
         this.attendance.set(rows);
         if (this.attendanceConflict() === principalId) this.attendanceConflict.set(null);
+        // A correction after the close counts the meeting again (§ 000951).
+        if (this.meeting()?.status === 'closed') this.reloadMeeting();
       },
       error: (err: unknown) => {
         this.savingAttendance.set(false);

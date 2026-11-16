@@ -8,6 +8,8 @@
   <form class="msd" (submit)="$event.preventDefault(); save()">
     @if (locked()) {
       <app-note icon="lock">{{ 'meetings.settings.closedHint' | t }}</app-note>
+    } @else if (closedMeeting()) {
+      <app-note icon="lock">{{ 'meetings.settings.closedOpenHint' | t }}</app-note>
     } @else if (keeperLocked()) {
       <app-note icon="lock">{{ 'meetings.protokollant.lockedHint' | t }}</app-note>
     }
@@ -21,6 +23,27 @@
       [ngModel]="title()"
       (ngModelChange)="title.set($event)"
     />
+    <app-select
+      name="kind"
+      [id]="'msd-kind'"
+      [label]="'meetings.kind.label' | t"
+      [options]="kindOptions()"
+      [disabled]="kindLocked()"
+      [ngModel]="kind()"
+      (ngModelChange)="kind.set($event)"
+    />
+    @if (kind() === 'repeat' && !kindLocked()) {
+      <app-select
+        name="repeatOf"
+        [id]="'msd-repeat-of'"
+        [label]="'meetings.repeatOf.label' | t"
+        [placeholder]="'meetings.repeatOf.placeholder' | t"
+        [options]="repeatOfOptions()"
+        [required]="true"
+        [ngModel]="repeatOf()"
+        (ngModelChange)="repeatOf.set($event)"
+      />
+    }
     <app-select
       name="keeper"
       [id]="'msd-keeper'"
@@ -58,13 +81,36 @@
         (ngModelChange)="endTime.set($event)"
       />
     </div>
+    @if (lateInvite(); as days) {
+      <app-note icon="alert" kind="warn" role="status">{{ (days === 1 ? 'meetings.lateInvite1' : 'meetings.lateInvite') | t: { n: days } }}</app-note>
+    }
+    <div class="msd__where">
+      <app-input
+        name="location"
+        [id]="'msd-location'"
+        [label]="'meetings.location.label' | t"
+        [error]="locationError()"
+        [disabled]="locked()"
+        [ngModel]="location()"
+        (ngModelChange)="location.set($event)"
+      />
+      <app-select
+        name="form"
+        [id]="'msd-form'"
+        [label]="'meetings.form.label' | t"
+        [options]="formOptions()"
+        [disabled]="locked()"
+        [ngModel]="form()"
+        (ngModelChange)="form.set($event)"
+      />
+    </div>
     @if (meeting()?.canManage) {
       <app-public-join-settings
         [publicJoin]="publicJoin()"
         (publicJoinChange)="setPublicJoin($event)"
         [(guestsMode)]="guestsMode"
         [disabled]="publicLocked()"
-        [allowed]="meeting()?.publicJoinAllowed ?? true"
+        [voteAllowed]="meeting()?.guestsVoteAllowed ?? false"
         [link]="meeting()?.publicJoin ? link() : null"
         [rotating]="rotating()"
         (rotate)="rotate()"

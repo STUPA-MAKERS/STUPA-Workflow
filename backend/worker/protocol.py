@@ -31,8 +31,10 @@ from app.modules.meetings.protocol_models import Protocol
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
 from app.modules.pdf.typst_client import build_typst_client
 from app.modules.protocol.service import ProtocolService
+from app.modules.site_config.features import Feature
 from app.settings import Settings, load_settings
 from app.shared.errors import ServiceUnavailableError
+from worker.features import job_feature_on
 
 logger = logging.getLogger("app.protocol")
 
@@ -200,9 +202,12 @@ async def heal_public_protocols(ctx: dict[str, Any]) -> str:
     for it. Errors of one gremium only log.
 
     Returns:
-        A short summary: `"gremien=<n> done=<n> failed=<n>"`.
+        A short summary: `"gremien=<n> done=<n> failed=<n>"`, or `"off"` while
+        `Sitzungen` is off.
     """
     maker = _sessionmaker(ctx)
+    if not await job_feature_on(maker, Feature.MEETINGS):
+        return "off"
     async with maker() as session:
         gremien = await _service(ctx, session).gremien_missing_public()
     outcomes = [await _heal_one(ctx, maker, gremium_id) for gremium_id in gremien]

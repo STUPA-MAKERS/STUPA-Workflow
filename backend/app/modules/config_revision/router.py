@@ -35,9 +35,7 @@ _AUTH_ERRORS: dict[int | str, dict[str, Any]] = {401: _PROBLEM, 403: _PROBLEM}
 
 #: Reads: an audit reader or a config editor. The sidebar lives in the editors.
 _READABLE = Depends(
-    require_any_permission(
-        "audit.read", "form.configure", "flow.configure", "admin.site"
-    )
+    require_any_permission("audit.read", "form.configure", "flow.configure", "admin.site")
 )
 
 _RESTORE_PERM: dict[str, str] = {
@@ -58,9 +56,7 @@ ServiceDep = Annotated[ConfigRevisionService, Depends(get_service)]
 def _require_restore_perm(principal: Principal, entity_type: str) -> None:
     perm = _RESTORE_PERM.get(entity_type)
     if perm is None or not principal.has(perm):
-        raise ForbiddenError(
-            f"Missing permission to restore {entity_type} config."
-        )
+        raise ForbiddenError(f"Missing permission to restore {entity_type} config.")
 
 
 @router.get(
@@ -76,9 +72,7 @@ async def list_config_revisions(
 ) -> list[ConfigRevisionOut]:
     """List the snapshots of an entity, newest first, for the version sidebar."""
     rows = await service.list_for(entity_type, entity_id)
-    names = await AuditService(service.session).resolve_actor_names(
-        [r.created_by for r in rows]
-    )
+    names = await AuditService(service.session).resolve_actor_names([r.created_by for r in rows])
     head_id = rows[0].id if rows else None
     return [
         ConfigRevisionOut.from_row(

@@ -28,6 +28,7 @@ async def reapply_snapshot(
     actor: str,
     action: AuditAction,
     extra_data: dict[str, Any] | None = None,
+    features_only: bool = False,
 ) -> None:
     """Replay ``snapshot`` as the new active version of the entity.
 
@@ -35,7 +36,9 @@ async def reapply_snapshot(
     ``config_revision`` and the audit entry with the given ``action`` and
     ``extra_data``. ``entity_type`` is one of ``form``, ``flow`` or ``site_config``.
     ``entity_id`` holds the application type id for a form, or ``global`` for the flow
-    and the site config. ``actor`` is the OIDC ``sub`` to record.
+    and the site config. ``actor`` is the OIDC ``sub`` to record. ``features_only`` is
+    the revert of a save of the feature switches: the site config takes only the
+    switches of the snapshot.
 
     Raises:
         ValidationProblem: ``entity_type`` is not a known config entity.
@@ -55,9 +58,7 @@ async def reapply_snapshot(
             from app.modules.forms.schemas import FormVersionCreate
             from app.shared.config_schemas import FormFieldDef
 
-            fields = [
-                FormFieldDef.model_validate(f) for f in snapshot.get("fields", []) or []
-            ]
+            fields = [FormFieldDef.model_validate(f) for f in snapshot.get("fields", []) or []]
             payload = FormVersionCreate(
                 fields=fields, activate=True, description=snapshot.get("description")
             )
@@ -70,7 +71,7 @@ async def reapply_snapshot(
 
             branding = Branding.model_validate(snapshot)
             await SiteConfigService(session).restore_branding(
-                branding, actor, action=action, extra_data=extra_data
+                branding, actor, action=action, extra_data=extra_data, with_features=features_only
             )
         case _:  # pragma: no cover - defensive; entity_type comes from a closed list
             raise ValidationProblem(

@@ -46,7 +46,7 @@ export class PrefetchService {
         .subscribe({
           next: (roots) => {
             for (const root of roots) {
-              if (root.hiddenInBudget) continue;
+              if (!root.active) continue;
               this.budgets.cachedFiscalYears(root.id).subscribe({ error: () => undefined });
             }
           },

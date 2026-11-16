@@ -37,6 +37,19 @@ describe('AdminApiService — mock mode', () => {
     });
   });
 
+  it('keeps the PDF branding in mock mode: default, upload, reset, remove (specs 000891, 000892)', async () => {
+    const s = svc();
+    const builtin = { builtin: true, fileName: null, mime: null, size: null };
+    expect(await firstValueFrom(s.getPdfAsset('logo'))).toEqual(builtin);
+    const file = new File(['<svg/>'], 'f.svg', { type: 'image/svg+xml' });
+    const up = await firstValueFrom(s.uploadPdfAsset('footer', file));
+    expect(up).toEqual({ builtin: false, fileName: 'f.svg', mime: 'image/svg+xml', size: 6 });
+    expect(await firstValueFrom(s.getPdfAsset('footer'))).toEqual(up);
+    expect(await firstValueFrom(s.resetPdfAsset('footer'))).toEqual(builtin);
+    await firstValueFrom(s.deletePdfAsset('logo'));
+    expect(await firstValueFrom(s.getPdfAsset('logo'))).toBeNull();
+  });
+
   it('deletes a webhook and reports one delivery status per state in mock mode', async () => {
     const s = svc();
     const before = await firstValueFrom(s.listWebhooks());
@@ -126,6 +139,24 @@ describe('AdminApiService — real mode (contract)', () => {
   });
 
   afterEach(() => http.verify());
+
+  it('reads, uploads, resets and removes the PDF branding on its routes', () => {
+    s.getPdfAsset('logo').subscribe();
+    http.expectOne('/api/admin/pdf-assets/logo').flush(null);
+    s.uploadPdfAsset('footer', new File(['x'], 'f.svg')).subscribe();
+    const put = http.expectOne('/api/admin/pdf-assets/footer');
+    expect(put.request.method).toBe('PUT');
+    expect(put.request.body instanceof FormData).toBe(true);
+    put.flush({ builtin: false, fileName: 'f.svg', mime: 'image/svg+xml', size: 1 });
+    s.resetPdfAsset('footer').subscribe();
+    const reset = http.expectOne('/api/admin/pdf-assets/footer/default');
+    expect(reset.request.method).toBe('POST');
+    reset.flush({ builtin: true, fileName: null, mime: null, size: null });
+    s.deletePdfAsset('logo').subscribe();
+    const del = http.expectOne('/api/admin/pdf-assets/logo');
+    expect(del.request.method).toBe('DELETE');
+    del.flush(null);
+  });
 
   it('GETs config schemas from the documented path', () => {
     s.configSchemas().subscribe();
@@ -355,8 +386,8 @@ describe('AdminApiService — real mode (contract)', () => {
       { id: 't1', nameI18n: { de: 'X' }, gremiumId: 'g1', hasBudget: true, retentionMonths: 12, activeFormVersionId: 'fv' },
       { id: 't2' },
     ]);
-    expect(out![0]).toEqual({ id: 't1', name: { de: 'X' }, gremiumId: 'g1', hasBudget: true, retentionMonths: 12, activeFormVersionId: 'fv', activeFormVersion: null });
-    expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, hasBudget: false, retentionMonths: null, activeFormVersionId: null, activeFormVersion: null });
+    expect(out![0]).toEqual({ id: 't1', name: { de: 'X' }, gremiumId: 'g1', hasBudget: true, pdfSignatures: false, retentionMonths: 12, activeFormVersionId: 'fv', activeFormVersion: null });
+    expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, hasBudget: false, pdfSignatures: false, retentionMonths: null, activeFormVersionId: null, activeFormVersion: null });
   });
 
   it('maps the number of the active form version', () => {
@@ -394,12 +425,32 @@ describe('AdminApiService — real mode (contract)', () => {
   it('GETs and PUTs the meeting settings', () => {
     let read: unknown;
     s.getMeetingSettings().subscribe((v) => (read = v));
-    http.expectOne({ method: 'GET', url: '/api/admin/meeting-settings' }).flush({ openLeadMinutes: 60, confirmLeadMinutes: 10 });
-    expect(read).toEqual({ openLeadMinutes: 60, confirmLeadMinutes: 10 });
-    s.putMeetingSettings({ openLeadMinutes: 30, confirmLeadMinutes: 5 }).subscribe();
+    http.expectOne({ method: 'GET', url: '/api/admin/meeting-settings' }).flush({ openLeadMinutes: 60 });
+    expect(read).toEqual({ openLeadMinutes: 60 });
+    s.putMeetingSettings({ openLeadMinutes: 30 }).subscribe();
     const req = http.expectOne({ method: 'PUT', url: '/api/admin/meeting-settings' });
-    expect(req.request.body).toEqual({ openLeadMinutes: 30, confirmLeadMinutes: 5 });
-    req.flush({ openLeadMinutes: 30, confirmLeadMinutes: 5 });
+    expect(req.request.body).toEqual({ openLeadMinutes: 30 });
+    req.flush({ openLeadMinutes: 30 });
+  });
+
+  /** § 000917 */
+  it('GETs and PUTs the meeting periods', () => {
+    const periods = {
+      inviteDaysOrdinary: 7,
+      inviteDaysExtraordinary: 3,
+      lateExcuseDays: 7,
+      absenceLimit: 3,
+      circularMinDays: 3,
+      termStartMonth: 10,
+    };
+    let read: unknown;
+    s.getMeetingPeriods().subscribe((v) => (read = v));
+    http.expectOne({ method: 'GET', url: '/api/admin/meeting-periods' }).flush(periods);
+    expect(read).toEqual(periods);
+    s.putMeetingPeriods({ ...periods, absenceLimit: 4 }).subscribe();
+    const req = http.expectOne({ method: 'PUT', url: '/api/admin/meeting-periods' });
+    expect(req.request.body).toEqual({ ...periods, absenceLimit: 4 });
+    req.flush({ ...periods, absenceLimit: 4 });
   });
 
   it('reads and replaces the login settings', () => {
@@ -428,6 +479,18 @@ describe('AdminApiService — real mode (contract)', () => {
     req.flush({ ...settings, retentionMonths: 6 });
   });
 
+  it('reads and replaces the feature switches', () => {
+    const switches = { todos: true, calendar: true, meetings: true, voting: true, budget: false, invoices: true, tickets: true };
+    let read: unknown;
+    s.getFeatures().subscribe((v) => (read = v));
+    http.expectOne({ method: 'GET', url: '/api/admin/features' }).flush(switches);
+    expect(read).toEqual(switches);
+    s.putFeatures({ ...switches, tickets: false }).subscribe();
+    const req = http.expectOne({ method: 'PUT', url: '/api/admin/features' });
+    expect(req.request.body).toEqual({ ...switches, tickets: false });
+    req.flush(req.request.body);
+  });
+
   it('POSTs a new application type and maps the wire response', () => {
     let created: { hasBudget: boolean; name: unknown } | undefined;
     s.createApplicationType({ key: 'k', name: { de: 'N' }, gremiumId: 'g1', hasBudget: true }).subscribe(
@@ -437,7 +500,7 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ key: 'k', nameI18n: { de: 'N' }, gremiumId: 'g1', hasBudget: true });
     req.flush({ id: 'new-1' });
-    expect(created).toEqual({ id: 'new-1', name: {}, gremiumId: null, hasBudget: false, retentionMonths: null, activeFormVersionId: null });
+    expect(created).toEqual({ id: 'new-1', name: {}, gremiumId: null, hasBudget: false, pdfSignatures: false, retentionMonths: null, activeFormVersionId: null });
   });
 
   it('POSTs an application type with default gremium/budget when omitted', () => {
@@ -450,12 +513,12 @@ describe('AdminApiService — real mode (contract)', () => {
   /** An empty body sets no keys. */
   it('PATCHes only the supplied application-type fields and DELETEs', () => {
     let done = false;
-    s.updateApplicationType('t1', { name: { de: 'N' }, gremiumId: 'g1', hasBudget: false }).subscribe(
+    s.updateApplicationType('t1', { name: { de: 'N' }, gremiumId: 'g1', hasBudget: false, pdfSignatures: true }).subscribe(
       () => (done = true),
     );
     const req = http.expectOne('/api/admin/application-types/t1');
     expect(req.request.method).toBe('PATCH');
-    expect(req.request.body).toEqual({ nameI18n: { de: 'N' }, gremiumId: 'g1', hasBudget: false });
+    expect(req.request.body).toEqual({ nameI18n: { de: 'N' }, gremiumId: 'g1', hasBudget: false, pdfSignatures: true });
     req.flush({});
     expect(done).toBe(true);
 
@@ -1060,9 +1123,16 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(await firstValueFrom(s.getGuestSettings())).toEqual({ confirmTtlHours: 12, linkTtlDays: null });
     await firstValueFrom(s.putGuestSettings({ confirmTtlHours: 48, linkTtlDays: 14 }));
     expect(await firstValueFrom(s.getGuestSettings())).toEqual({ confirmTtlHours: 48, linkTtlDays: 14 });
-    expect(await firstValueFrom(s.getMeetingSettings())).toEqual({ openLeadMinutes: 60, confirmLeadMinutes: 10 });
-    await firstValueFrom(s.putMeetingSettings({ openLeadMinutes: 120, confirmLeadMinutes: 15 }));
-    expect(await firstValueFrom(s.getMeetingSettings())).toEqual({ openLeadMinutes: 120, confirmLeadMinutes: 15 });
+    expect(await firstValueFrom(s.getMeetingSettings())).toEqual({ openLeadMinutes: 60 });
+    await firstValueFrom(s.putMeetingSettings({ openLeadMinutes: 120 }));
+    expect(await firstValueFrom(s.getMeetingSettings())).toEqual({ openLeadMinutes: 120 });
+  });
+
+  it('answers the meeting periods in the mock', async () => {
+    const s = svc();
+    const periods = await firstValueFrom(s.getMeetingPeriods());
+    expect(periods).toMatchObject({ inviteDaysOrdinary: 7, termStartMonth: 10 });
+    expect(await firstValueFrom(s.putMeetingPeriods({ ...periods, absenceLimit: 5 }))).toMatchObject({ absenceLimit: 5 });
   });
 
   it('keeps the help and ticket settings in the mock store', async () => {
@@ -1077,6 +1147,14 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
       notifyNew: false,
       retentionMonths: null,
     });
+  });
+
+  it('keeps the feature switches in the mock store', async () => {
+    const s = svc();
+    const before = await firstValueFrom(s.getFeatures());
+    expect(before.todos).toBe(true);
+    await firstValueFrom(s.putFeatures({ ...before, todos: false }));
+    expect((await firstValueFrom(s.getFeatures())).todos).toBe(false);
   });
 
   it('keeps the login settings in the mock store', async () => {

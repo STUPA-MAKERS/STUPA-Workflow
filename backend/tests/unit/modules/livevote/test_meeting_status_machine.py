@@ -41,6 +41,9 @@ class _Rows:
     def all(self) -> list[Any]:
         return list(self._rows)
 
+    def first(self) -> Any:
+        return self._rows[0] if self._rows else None
+
 
 class _Session:
     """``AsyncSession`` double: ``execute`` serves a FIFO queue, empty by default."""
@@ -147,8 +150,8 @@ def _meeting(status: str = "planned") -> Meeting:
 def _service(meeting: Meeting, *extra: list[Any], publisher: Any = None) -> MeetingService:
     """Build the service on a fake session.
 
-    The session answers `_get` and then the open-vote check of a close, which is empty
-    unless a test queues a vote.
+    The session answers `_get`, then the open-vote check of a close and then its lot
+    check. Each check is empty unless a test queues a row for it.
     """
     return MeetingService(_Session([meeting], *extra), publisher)  # type: ignore[arg-type]
 
@@ -187,6 +190,19 @@ async def test_close_with_open_vote_conflicts(
     assert ei.value.code == "open_vote"
     assert m.status == "live"
     assert m.closed_at is None
+    assert voting.cancel_calls == []
+    assert audit == []
+
+
+async def test_close_with_a_pending_lot_conflicts(
+    audit: list[dict[str, Any]], voting: SimpleNamespace
+) -> None:
+    m = _meeting("live")
+    svc = _service(m, [], [(uuid4(),)])
+    with pytest.raises(ConflictError) as ei:
+        await svc.patch(m.id, MeetingPatch(status="closed"), _admin())
+    assert ei.value.code == "lot_pending"
+    assert m.status == "live"
     assert voting.cancel_calls == []
     assert audit == []
 
@@ -315,12 +331,27 @@ async def test_same_title_writes_no_audit(
     assert audit == []
 
 
-async def test_closed_meeting_keeps_its_title(
+async def test_closed_meeting_takes_a_title_until_the_protocol_is_final(
+    audit: list[dict[str, Any]], voting: SimpleNamespace
+) -> None:
+    """§F/meetings/meetings/000982: a closed meeting takes a correction of its title."""
+    m = _meeting("closed")
+    await MeetingService(_Session([m], scalars=["draft"])).patch(  # type: ignore[arg-type]
+        m.id, MeetingPatch(title="Neu"), _admin()
+    )
+    assert m.title == "Neu"
+    assert [entry["data"]["changes"] for entry in audit] == [{"title": {"from": "GV", "to": "Neu"}}]
+
+
+async def test_closed_meeting_with_a_final_protocol_keeps_its_title(
     audit: list[dict[str, Any]], voting: SimpleNamespace
 ) -> None:
     m = _meeting("closed")
-    with pytest.raises(ConflictError):
-        await _service(m).patch(m.id, MeetingPatch(title="Neu"), _admin())
+    with pytest.raises(ConflictError) as ei:
+        await MeetingService(_Session([m], scalars=["final"])).patch(  # type: ignore[arg-type]
+            m.id, MeetingPatch(title="Neu"), _admin()
+        )
+    assert ei.value.code == "protocol_final"
     assert m.title == "GV"
     assert audit == []
 
@@ -531,32 +562,22 @@ async def test_start_before_the_open_window_conflicts(
 ) -> None:
     m = _soon(180)
     with pytest.raises(ConflictError) as ei:
-        await _service(m).patch(m.id, MeetingPatch(status="live", confirmEarly=True), _admin())
+        await _service(m).patch(m.id, MeetingPatch(status="live"), _admin())
     assert ei.value.code == "meeting_too_early"
     assert m.status == "planned"
     assert m.started_at is None
     assert audit == []
 
 
-async def test_early_start_needs_the_confirmation(
-    audit: list[dict[str, Any]], voting: SimpleNamespace
+@pytest.mark.parametrize("minutes", [30, 5])
+async def test_start_in_the_open_window_needs_no_confirmation(
+    audit: list[dict[str, Any]], voting: SimpleNamespace, minutes: int
 ) -> None:
-    m = _soon(30)
-    with pytest.raises(ConflictError) as ei:
-        await _service(m).patch(m.id, MeetingPatch(status="live"), _admin())
-    assert ei.value.code == "early_open_unconfirmed"
-    assert m.status == "planned"
-    out = await _service(m).patch(m.id, MeetingPatch(status="live", confirmEarly=True), _admin())
-    assert out.status == "live"
-    assert out.opens_at is None
-
-
-async def test_start_shortly_before_the_meeting_needs_no_confirmation(
-    audit: list[dict[str, Any]], voting: SimpleNamespace
-) -> None:
-    m = _soon(5)
+    """§F/meetings/meetings/000092: in the window the open needs nothing more."""
+    m = _soon(minutes)
     out = await _service(m).patch(m.id, MeetingPatch(status="live"), _admin())
     assert out.status == "live"
+    assert out.opens_at is None
 
 
 async def test_planned_meeting_out_carries_the_window(
@@ -565,13 +586,6 @@ async def test_planned_meeting_out_carries_the_window(
     m = _soon(180)
     out = await _service(m).patch(m.id, MeetingPatch(title="Neu"), _admin())
     assert out.opens_at is not None
-    assert out.confirm_until is not None
-    assert out.confirm_until - out.opens_at == timedelta(minutes=50)
-
-
-def test_confirm_early_alone_is_no_patch() -> None:
-    with pytest.raises(ValidationError):
-        MeetingPatch(confirmEarly=True)
 
 
 async def test_date_change_in_the_start_patch_does_not_move_the_window(

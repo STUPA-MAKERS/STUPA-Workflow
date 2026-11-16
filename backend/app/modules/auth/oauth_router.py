@@ -164,9 +164,10 @@ async def finish(
     `/oauth/consent`. `POST /api/oauth/consent` then mints the code.
     """
     tx_cookie = request.cookies.get(settings.oauth_tx_cookie_name)
-    if not tx_cookie or sessions.load_oauth_tx(
-        settings.session_secret, tx_cookie, _TX_MAX_AGE
-    ) is None:
+    if (
+        not tx_cookie
+        or sessions.load_oauth_tx(settings.session_secret, tx_cookie, _TX_MAX_AGE) is None
+    ):
         raise BadRequestError("Invalid or expired OAuth transaction.")
     dest = settings.public_base_url.rstrip("/") + "/oauth/consent"
     return RedirectResponse(dest, status_code=status.HTTP_302_FOUND)
@@ -319,18 +320,13 @@ async def consent_request(
     held = {
         s
         for s in requested
-        if any(
-            principal.has(p) or p in gremium_perms
-            for p in oauth.SCOPES.get(s, frozenset())
-        )
+        if any(principal.has(p) or p in gremium_perms for p in oauth.SCOPES.get(s, frozenset()))
     }
     return {
         "clientId": tx["client_id"],
         "canUseMcp": principal.has("mcp.use"),
         "requestedScopes": [
-            {"key": s, "held": s in held}
-            for s in oauth.SCOPE_ORDER
-            if s in requested
+            {"key": s, "held": s in held} for s in oauth.SCOPE_ORDER if s in requested
         ],
         "lifetimes": list(oauth.LIFETIMES.keys()),
         "defaultLifetime": oauth.DEFAULT_LIFETIME,
@@ -375,9 +371,7 @@ async def consent(
 
     if not body.approve:
         return {
-            "redirect": _loopback_redirect(
-                tx["redirect_uri"], {"error": "access_denied", **state}
-            )
+            "redirect": _loopback_redirect(tx["redirect_uri"], {"error": "access_denied", **state})
         }
 
     if not principal.has("mcp.use"):
@@ -418,21 +412,23 @@ async def list_grants(
     if pid is None:
         return []
     rows = (
-        await db.execute(
-            select(OAuthToken)
-            .where(OAuthToken.principal_id == pid, OAuthToken.revoked_at.is_(None))
-            .order_by(OAuthToken.created_at.desc())
+        (
+            await db.execute(
+                select(OAuthToken)
+                .where(OAuthToken.principal_id == pid, OAuthToken.revoked_at.is_(None))
+                .order_by(OAuthToken.created_at.desc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [
         {
             "id": str(r.id),
             "clientId": r.client_id,
             "scope": r.scope,
             "createdAt": r.created_at.isoformat() if r.created_at else None,
-            "accessExpiresAt": (
-                r.access_expires_at.isoformat() if r.access_expires_at else None
-            ),
+            "accessExpiresAt": (r.access_expires_at.isoformat() if r.access_expires_at else None),
             "refreshExpiresAt": (
                 r.refresh_expires_at.isoformat() if r.refresh_expires_at else None
             ),

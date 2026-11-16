@@ -220,7 +220,8 @@ async def test_finalize_dual_render_with_non_public_top() -> None:
 
     The fake session serves, in order:
 
-    - execute: ``_get``, the internal items (empty), the public items (empty), the members of
+    - execute: ``_get``, the items of ``attach_plans`` (none), the internal items (empty),
+      the public items (empty), the members of
       ``_recipients`` and its mail list;
     - scalar: ``_has_non_public`` (1), the internal protokollant, the internal member count,
       the public protokollant, the public member count, the gremium name for ``_send``.
@@ -232,7 +233,7 @@ async def test_finalize_dual_render_with_non_public_top() -> None:
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
         results=[
-            result(proto),
+            result(proto), result(),
             result(),
             result(),
             result("m@x.de"),
@@ -307,7 +308,8 @@ async def test_assemble_from_agenda_builds_blocks_with_votes() -> None:
 
     The fake session serves, in order:
 
-    - execute: ``_get``, the items, the votes of the first item, ``voting._get_vote``, the
+    - execute: ``_get``, the items of ``attach_plans`` (none), the items, the votes of the
+      first item, ``voting._get_vote``, the
       ballots for ``voting._aggregate``, the votes of the second item (empty), the members
       and the mail list of ``_recipients`` (empty);
     - scalar: ``has_non_public`` (0), the protokollant, the member count.
@@ -323,7 +325,7 @@ async def test_assemble_from_agenda_builds_blocks_with_votes() -> None:
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium(), vote.id: vote},
         results=[
-            result(proto),
+            result(proto), result(),
             result(item_with_vote, item_empty),
             result(vote),
             result(vote),
@@ -366,7 +368,7 @@ async def test_assemble_public_redacts_non_public_top() -> None:
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
         results=[
-            result(proto),
+            result(proto), result(),
             result(np_item, pub_item),
             result(),
             result(),
@@ -405,7 +407,7 @@ async def test_assemble_skips_cancelled_votes_in_query() -> None:
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
         results=[
-            result(proto),
+            result(proto), result(),
             result(item),
             result(),
             result(),
@@ -441,15 +443,38 @@ async def test_quorate_percent_not_met() -> None:
     assert await svc._quorate(gremium, None, present_count=5) is False
 
 
-async def test_quorate_default_majority_rule() -> None:
-    """Without quorum_percent the rule is more than half (present*2 > members)."""
+async def test_quorate_without_a_quorum_is_always_met() -> None:
+    """A Gremium without a quorum is quorate, as each of its votes is (000357)."""
     session = FakeSession()
     svc = _service(session)
     session.scalar_results = [10]
-    gremium = _gremium(quorum_percent=None)
-    assert await svc._quorate(gremium, None, present_count=6) is True
+    assert await svc._quorate(_gremium(quorum_percent=None), None, present_count=1) is True
+
+
+async def test_quorate_uses_the_least_number_of_present_persons() -> None:
+    """The least number of present persons counts beside the percent (000357)."""
+    session = FakeSession()
+    svc = _service(session)
+    gremium = _gremium(quorum_percent=50, quorum_min_present=7)
     session.scalar_results = [10]
-    assert await svc._quorate(gremium, None, present_count=5) is False
+    assert await svc._quorate(gremium, None, present_count=6) is False
+    session.scalar_results = [10]
+    assert await svc._quorate(gremium, None, present_count=7) is True
+
+
+async def test_quorate_of_a_wiederholungssitzung_uses_the_repeat_quorum() -> None:
+    """A meeting of the kind repeat uses the repeat quorum when it is set (000357)."""
+    session = FakeSession()
+    svc = _service(session)
+    gremium = _gremium(quorum_percent=50, repeat_quorum_percent=20)
+    repeat = cast("Any", SimpleNamespace(kind="repeat", status="live", eligible_count=None))
+    normal = cast("Any", SimpleNamespace(kind="ordinary", status="live", eligible_count=None))
+    session.scalar_results = [10]
+    assert await svc._quorate(gremium, repeat, present_count=2) is True
+    session.scalar_results = [10]
+    assert await svc._quorate(gremium, normal, present_count=2) is False
+    session.scalar_results = [10]
+    assert await svc._quorate(_gremium(quorum_percent=50), repeat, present_count=2) is False
 
 
 async def test_quorate_none_without_gremium() -> None:
@@ -593,7 +618,7 @@ async def test_send_subject_and_body_include_gremium_and_date() -> None:
     session = FakeSession(
         store={MID: meeting, GID: _gremium()},
         results=[
-            result(proto),
+            result(proto), result(),
             result(),
             result("a@x.de"),
             result(),

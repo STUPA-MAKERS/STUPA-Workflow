@@ -1,7 +1,8 @@
 """Hierarchical budgets and cost centers plus fiscal years.
 
 ``Budget`` is a tree node with a ``parent_id`` self-FK. The service maintains
-``path_key``, the composed key in the form ``VS-800-04``. ``FiscalYear``
+``tree_path`` (``VS-800-04``, the place in the tree) and ``path_key``
+(``VS-80004``, the key that a person reads). ``FiscalYear``
 belongs to a top-level budget (service check). ``BudgetAllocation`` is the
 top-down allocation ``Budget x FiscalYear``. Available equals allocated, with
 NO roll-up. Consumption rolls up from the approved applications. It is not
@@ -38,8 +39,13 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     """Cost-center node. A NULL ``parent_id`` marks the top level.
 
     Only the top level carries ``gremium_id``. The children inherit it
-    logically. ``key`` is the path segment. ``path_key`` is the composed key,
-    for example ``VS-800-04``. The self-FK uses ``ON DELETE RESTRICT``, so you
+    logically. ``key`` is the path segment. ``tree_path`` joins the keys from the
+    top level down with ``-`` (``VS-800-04``); every search for the nodes below a
+    node reads it, because its prefix is the ancestor. ``path_key`` is the key that
+    a person reads (``VS-80004``, ``tree_rules.path_key_of``); it does not say where
+    a level ends, so no query finds a subtree by it. A row that is written
+    without a tree path takes its path key, which is right for a top-level node.
+    The self-FK uses ``ON DELETE RESTRICT``, so you
     must delete the children first.
     """
 
@@ -53,17 +59,12 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     )
     key: Mapped[str] = mapped_column(Text)
     path_key: Mapped[str] = mapped_column(Text)
+    tree_path: Mapped[str] = mapped_column(Text)
     name: Mapped[str] = mapped_column(Text)
     currency: Mapped[str] = mapped_column(CHAR(3), server_default="EUR")
     active: Mapped[bool] = mapped_column(Boolean, server_default="true")
     #: Display color for the pie charts and the tree. NULL selects an auto color.
     color: Mapped[str | None] = mapped_column(Text, nullable=True)
-    #: Hides the node in the budget tab. Display only: the values still count in
-    #: the parent rollups and in the export. A Python default backs up the
-    #: server default, so a new instance carries a bool before the flush.
-    hidden_in_budget: Mapped[bool] = mapped_column(
-        Boolean, default=False, server_default="false"
-    )
     #: Visibility Gremium: its members see this cost center and its subtree as a
     #: root in the budget tab without a global budget.* permission. This is
     #: independent of the top-level ``gremium_id`` classification.
@@ -85,17 +86,27 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     #: this cutoff.
     fiscal_start_month: Mapped[int] = mapped_column(SmallInteger, server_default="1")
     fiscal_start_day: Mapped[int] = mapped_column(SmallInteger, server_default="1")
+    #: Plan switch of a top-level node: the rules of the Haushaltsplan apply to its
+    #: subtree. A Python default backs up the server default, so a new instance
+    #: carries a bool before the flush.
+    plan_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    #: Setting of a top-level node: a plan line of its subtree starts with the Vermerk
+    #: "deckungsfähig" when it becomes an expense line.
+    plan_coverable_default: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
+
+    def __init__(self, **fields: object) -> None:
+        """Make a node. Without a tree path it takes its path key."""
+        super().__init__(**{"tree_path": fields.get("path_key"), **fields})
 
     __table_args__ = (
         UniqueConstraint("parent_id", "key", name="uq_budget_parent_key"),
         UniqueConstraint("path_key", name="uq_budget_path_key"),
+        UniqueConstraint("tree_path", name="uq_budget_tree_path"),
         CheckConstraint("currency = 'EUR'", name="budget_currency_eur"),
-        CheckConstraint(
-            "fiscal_start_month BETWEEN 1 AND 12", name="budget_fiscal_start_month"
-        ),
-        CheckConstraint(
-            "fiscal_start_day BETWEEN 1 AND 31", name="budget_fiscal_start_day"
-        ),
+        CheckConstraint("fiscal_start_month BETWEEN 1 AND 12", name="budget_fiscal_start_month"),
+        CheckConstraint("fiscal_start_day BETWEEN 1 AND 31", name="budget_fiscal_start_day"),
         Index("ix_budget_parent_id", "parent_id"),
         Index("ix_budget_gremium_id", "gremium_id"),
         Index("ix_budget_decision_gremium_id", "decision_gremium_id"),
@@ -119,9 +130,7 @@ class FiscalYear(UUIDPkMixin, CreatedAtMixin, Base):
 
     __tablename__ = "fiscal_year"
 
-    budget_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("budget.id", ondelete="CASCADE")
-    )
+    budget_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("budget.id", ondelete="CASCADE"))
     year: Mapped[int] = mapped_column(Integer)
     start_date: Mapped[date] = mapped_column(Date)
     end_date: Mapped[date] = mapped_column(Date)
@@ -145,18 +154,14 @@ class BudgetAllocation(UUIDPkMixin, CreatedAtMixin, Base):
 
     __tablename__ = "budget_allocation"
 
-    budget_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("budget.id", ondelete="CASCADE")
-    )
+    budget_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("budget.id", ondelete="CASCADE"))
     fiscal_year_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("fiscal_year.id", ondelete="CASCADE")
     )
     allocated: Mapped[Decimal] = mapped_column(Numeric(12, 2), server_default="0")
 
     __table_args__ = (
-        UniqueConstraint(
-            "budget_id", "fiscal_year_id", name="uq_budget_allocation_budget_fy"
-        ),
+        UniqueConstraint("budget_id", "fiscal_year_id", name="uq_budget_allocation_budget_fy"),
         Index("ix_budget_allocation_fiscal_year_id", "fiscal_year_id"),
     )
 
@@ -177,9 +182,7 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
 
     __tablename__ = "budget_expense"
 
-    budget_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("budget.id", ondelete="CASCADE")
-    )
+    budget_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("budget.id", ondelete="CASCADE"))
     fiscal_year_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("fiscal_year.id", ondelete="CASCADE")
     )
@@ -229,9 +232,7 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
     __table_args__ = (
         CheckConstraint("amount > 0", name="budget_expense_amount_positive"),
         CheckConstraint("currency = 'EUR'", name="budget_expense_currency_eur"),
-        CheckConstraint(
-            "kind IN ('expense', 'income')", name="budget_expense_kind_valid"
-        ),
+        CheckConstraint("kind IN ('expense', 'income')", name="budget_expense_kind_valid"),
         CheckConstraint(
             "payment_method IS NULL OR payment_method IN "
             "('ueberweisung', 'bar', 'lastschrift', 'karte', 'paypal')",

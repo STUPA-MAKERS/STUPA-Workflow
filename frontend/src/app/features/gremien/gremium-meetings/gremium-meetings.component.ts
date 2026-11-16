@@ -62,6 +62,8 @@ const PROTOCOL_STATUS: Record<string, StatusView> = {
   draft: { kind: 'warn', key: 'gremien.meetings.protocolDraft' },
   rendering: { kind: 'neutral', key: 'gremien.meetings.protocolRendering' },
 };
+/** A final protocol with the mark of the meeting that approved it (§ 000924). */
+const APPROVED: StatusView = { kind: 'accent', key: 'gremien.meetings.protocolApproved' };
 const NO_PROTOCOL: StatusView = { kind: 'muted', key: 'gremien.meetings.protocolMissing' };
 
 /**
@@ -224,7 +226,8 @@ export class GremiumMeetingsComponent {
   private toRow(m: GremiumMeeting): MeetingRow {
     const locale = this.i18n.formatLocale();
     const closed = m.status === 'closed';
-    const status = closed ? (PROTOCOL_STATUS[m.protocolStatus ?? ''] ?? NO_PROTOCOL) : meetingStatus(m.status);
+    const protocol = m.protocolApproved ? APPROVED : (PROTOCOL_STATUS[m.protocolStatus ?? ''] ?? NO_PROTOCOL);
+    const status = closed ? protocol : meetingStatus(m.status);
     const parts = this.phone() ? this.phoneParts(m, locale) : this.wideParts(m, locale);
     return {
       meeting: m,

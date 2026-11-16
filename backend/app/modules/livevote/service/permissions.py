@@ -36,8 +36,9 @@ class PermissionOps(MeetingRuleOps, MeetingServiceBase):
         agenda = (await self._agenda_summaries([meeting]))[meeting.id]
         keepers = (await keeper_summaries(self.session, [meeting.id]))[meeting.id]
         guests = (await self._guest_counts([meeting.id])).get(meeting.id, (0, 0))
-        allowed = not await self._gremium_quorum_set(meeting.gremium_id)
+        allowed = await self.guests_vote_allowed(meeting.gremium_id)
         window = (await self._open_windows([meeting]))[meeting.id]
+        seats = (await self._present_seats([meeting])).get(meeting.id, 0)
         if principal is None:
             return self._to_out(
                 meeting,
@@ -48,7 +49,8 @@ class PermissionOps(MeetingRuleOps, MeetingServiceBase):
                 agenda=agenda,
                 keepers=keepers,
                 guests=guests,
-                public_join_allowed=allowed,
+                seats=seats,
+                guests_vote_allowed=allowed,
                 window=window,
             )
         can_manage = await self.can_manage(meeting.gremium_id, principal)
@@ -73,6 +75,7 @@ class PermissionOps(MeetingRuleOps, MeetingServiceBase):
             agenda=agenda,
             keepers=keepers,
             guests=guests,
-            public_join_allowed=allowed,
+            seats=seats,
+            guests_vote_allowed=allowed,
             window=window,
         )

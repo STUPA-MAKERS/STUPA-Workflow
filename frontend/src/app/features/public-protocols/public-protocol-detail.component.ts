@@ -66,6 +66,11 @@ export class PublicProtocolDetailComponent {
     const id = this.protocol()?.id;
     return id ? (image: string) => this.api.imageUrl(id, image) : null;
   });
+  /** The embedded PDFs stream through their public route as well. */
+  protected readonly documentSrc = computed(() => {
+    const id = this.protocol()?.id;
+    return id ? (doc: string) => this.api.documentUrl(id, doc) : null;
+  });
 
   /** The text of each agenda item, split at the vote callouts of its decisions. */
   private readonly parts = computed(

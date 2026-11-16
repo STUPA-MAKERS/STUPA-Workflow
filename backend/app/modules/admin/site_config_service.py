@@ -29,6 +29,7 @@ from app.modules.admin.schemas import (
     PublicTicketsOut,
     SiteConfigOut,
 )
+from app.modules.application_types.models import ApplicationType
 from app.modules.applications.guest_settings import load_guest_settings
 from app.modules.audit.actions import AuditAction
 from app.modules.config_revision.service import (
@@ -43,9 +44,17 @@ from app.modules.site_config.branding import (
     PublicBranding,
     TicketSettings,
 )
+from app.modules.site_config.feature_uses import FeatureUse, flow_uses, type_uses, uses_of
+from app.modules.site_config.features import (
+    ALL_FEATURES,
+    Feature,
+    FeatureSwitches,
+    enabled_features,
+)
 from app.modules.site_config.models import SiteConfigVersion
 from app.modules.site_config.reads import branding_of
 from app.settings import Settings, get_settings
+from app.shared.errors import ConflictError
 
 #: Fallback app names for the case where the config leaves them empty. They match the
 #: defaults in ``frontend/public/manifest.webmanifest``.
@@ -201,11 +210,11 @@ class SiteConfigService:
     async def save(self, branding: Branding, actor: str) -> SiteConfigOut:
         """Save the branding as the new active version.
 
-        The admin pages save directly, without a draft. ``help`` and ``tickets`` in
-        the payload are ignored and keep the values of the active version, because the
-        "Hilfe & Tickets" page is their only writer: an editor that loaded the branding
-        earlier sends stale values back, and a save of them would switch anonymous
-        reports on again unnoticed.
+        The admin pages save directly, without a draft. ``help``, ``tickets`` and
+        ``features`` in the payload are ignored and keep the values of the active
+        version, because the pages "Hilfe & Tickets" and "Funktionen" are their only
+        writers: an editor that loaded the branding earlier sends stale values back, and
+        a save of them would switch anonymous reports or a feature on again unnoticed.
         """
         return await self.restore_branding(branding, actor, action=AuditAction.CONFIG_ACTIVATION)
 
@@ -216,6 +225,7 @@ class SiteConfigService:
         *,
         action: AuditAction = AuditAction.CONFIG_CHANGE,
         extra_data: dict[str, Any] | None = None,
+        with_features: bool = False,
     ) -> SiteConfigOut:
         """Replay a branding config as the new active version (restore or revert).
 
@@ -225,29 +235,64 @@ class SiteConfigService:
         the values of the active version, because the "Hilfe & Tickets" page is
         their only writer: a restore of an older snapshot would otherwise bring
         back its ticket settings, or the defaults (``publicEnabled=true``) for a
-        snapshot without them. The inline logos pass the virus scan first
+        snapshot without them. ``features`` keeps the active value for the same reason,
+        and because the switches need their own permission. ``with_features`` is the
+        revert of a save of the page "Funktionen": it takes only the switches of the
+        snapshot and keeps the rest of the active branding, and it refuses a feature in
+        use like the save does. The inline logos pass the virus scan first
         (``_scan_logos``).
+
+        Raises:
+            ConflictError: ``with_features`` would switch off a feature in use (409
+                ``feature_in_use``).
         """
         await self._scan_logos(branding)
+        active = branding_of(await self._active())
+        if with_features:
+            await self._refuse_in_use(branding.features)
+        payload = (
+            active.model_copy(update={"features": branding.features}).model_dump(by_alias=True)
+            if with_features
+            else _with_sections_of(branding, active)
+        )
+        await self._write(
+            payload,
+            actor,
+            action=action,
+            extra_data={**(extra_data or {}), **({"section": "features"} if with_features else {})},
+        )
+        await self.session.commit()
+        return await self.get()
+
+    async def _write(
+        self,
+        snapshot: dict[str, Any],
+        actor: str,
+        *,
+        action: AuditAction,
+        extra_data: dict[str, Any],
+    ) -> None:
+        """Add ``snapshot`` as the new active version with its config revision.
+
+        The active version is deactivated before the add, because the partial unique
+        index allows one active row. The caller commits.
+        """
         latest = await self._latest()
         base = latest.version if latest is not None else 0
-        payload = _with_help_tickets_of(branding, branding_of(await self._active()))
-        row = SiteConfigVersion(version=base + 1, active=True, branding=payload, created_by=actor)
         await self.session.execute(
             update(SiteConfigVersion).where(SiteConfigVersion.active.is_(True)).values(active=False)
         )
+        row = SiteConfigVersion(version=base + 1, active=True, branding=snapshot, created_by=actor)
         self.session.add(row)
         await self.session.flush()
         await ConfigRevisionService(self.session).record(
             entity_type=ENTITY_SITE_CONFIG,
             entity_id=GLOBAL_ID,
-            snapshot=payload,
+            snapshot=snapshot,
             actor=actor,
             action=action,
-            extra_data={**(extra_data or {}), "siteConfigVersion": row.version},
+            extra_data={**extra_data, "siteConfigVersion": row.version},
         )
-        await self.session.commit()
-        return await self.get()
 
     async def public(self) -> PublicSiteConfigOut:
         """Return the public active branding config (auth-free).
@@ -266,6 +311,7 @@ class SiteConfigService:
             branding=PublicBranding.model_validate(branding.model_dump(by_alias=True)),
             help=PublicHelpOut(wiki_url=branding.help.wiki_url),
             tickets=PublicTicketsOut(public_enabled=branding.tickets.public_enabled),
+            features=_enabled_switches(branding.features),
             confirm_ttl_hours=guest.confirm_ttl_hours,
             link_ttl_days=guest.link_ttl_days,
             attachment_limits=AttachmentLimitsOut(
@@ -294,29 +340,76 @@ class SiteConfigService:
             notifyNew=payload.notify_new,
             retentionMonths=payload.retention_months,
         )
-        active = await self._active()
-        latest = await self._latest()
-        branding = branding_of(active).model_copy(
+        branding = branding_of(await self._active()).model_copy(
             update={"help": help_settings, "tickets": ticket_settings}
         )
-        snapshot = branding.model_dump(by_alias=True)
-        base = latest.version if latest is not None else 0
-        await self.session.execute(
-            update(SiteConfigVersion).where(SiteConfigVersion.active.is_(True)).values(active=False)
-        )
-        row = SiteConfigVersion(version=base + 1, active=True, branding=snapshot, created_by=actor)
-        self.session.add(row)
-        await self.session.flush()
-        await ConfigRevisionService(self.session).record(
-            entity_type=ENTITY_SITE_CONFIG,
-            entity_id=GLOBAL_ID,
-            snapshot=snapshot,
-            actor=actor,
+        await self._write(
+            branding.model_dump(by_alias=True),
+            actor,
             action=AuditAction.CONFIG_ACTIVATION,
-            extra_data={"siteConfigVersion": row.version, "section": "helpTickets"},
+            extra_data={"section": "helpTickets"},
         )
         await self.session.commit()
         return _help_tickets_of(branding)
+
+    async def features(self) -> FeatureSwitches:
+        """Return the stored feature switches of the active branding."""
+        return branding_of(await self._active()).features
+
+    async def put_features(self, payload: FeatureSwitches, actor: str) -> FeatureSwitches:
+        """Save the feature switches as a new active version.
+
+        The method copies the active branding, replaces ``features`` and writes it as a
+        new active version with a config revision and the ``config_activation`` audit
+        entry. The revision carries ``section = features``, so a revert of the entry
+        sets only the switches back. The caller commits.
+
+        Raises:
+            ConflictError: The save would switch off a feature that the active flow
+                or an Antragsart uses (409 ``feature_in_use``). ``errors`` names
+                each use.
+        """
+        await self._refuse_in_use(payload)
+        branding = branding_of(await self._active()).model_copy(update={"features": payload})
+        await self._write(
+            branding.model_dump(by_alias=True),
+            actor,
+            action=AuditAction.CONFIG_ACTIVATION,
+            extra_data={"section": "features"},
+        )
+        return payload
+
+    async def _refuse_in_use(self, switches: FeatureSwitches) -> None:
+        """Refuse switches that turn off a feature in use.
+
+        An Antrag must not stop in a state that waits for a vote or a meeting that
+        nobody can open, so the admin removes each use first.
+
+        Raises:
+            ConflictError: The active flow or an Antragsart uses a feature that
+                ``switches`` turns off (409 ``feature_in_use``).
+        """
+        blocking = uses_of(await self._uses(), ALL_FEATURES - enabled_features(switches))
+        if blocking:
+            raise ConflictError(
+                "The Antrag flow or an Antragsart uses a feature that would go off.",
+                code="feature_in_use",
+                errors=[use.as_error() for use in blocking],
+            )
+
+    async def _uses(self) -> tuple[FeatureUse, ...]:
+        """Return every use of a feature by the active flow and the Antragsarten."""
+        from app.modules.admin.service.flow import FlowOps
+
+        graph = await FlowOps(self.session).get_active_global_flow()
+        budget_types = (
+            await self.session.scalars(
+                select(ApplicationType.name_i18n)
+                .where(ApplicationType.has_budget.is_(True))
+                .order_by(ApplicationType.key)
+            )
+        ).all()
+        return (*flow_uses(graph), *type_uses(budget_types))
 
     async def manifest(self, scheme: ManifestScheme = "light") -> dict[str, Any]:
         """Build the PWA manifest from the active branding config.
@@ -335,11 +428,17 @@ class SiteConfigService:
         }
 
 
-def _with_help_tickets_of(branding: Branding, source: Branding) -> dict[str, Any]:
-    """Dump ``branding`` with ``help`` and ``tickets`` taken from ``source``."""
-    return branding.model_copy(update={"help": source.help, "tickets": source.tickets}).model_dump(
-        by_alias=True
-    )
+def _with_sections_of(branding: Branding, source: Branding) -> dict[str, Any]:
+    """Dump ``branding`` with ``help``, ``tickets`` and ``features`` taken from ``source``."""
+    return branding.model_copy(
+        update={"help": source.help, "tickets": source.tickets, "features": source.features}
+    ).model_dump(by_alias=True)
+
+
+def _enabled_switches(switches: FeatureSwitches) -> FeatureSwitches:
+    """Return the features that are on as switches, for the public config."""
+    enabled = enabled_features(switches)
+    return FeatureSwitches(**{feature.value: feature in enabled for feature in Feature})
 
 
 def _help_tickets_of(branding: Branding) -> HelpTicketsSettings:

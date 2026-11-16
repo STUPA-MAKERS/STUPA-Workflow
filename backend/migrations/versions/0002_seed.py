@@ -101,6 +101,7 @@ _budget = sa.table(
     sa.column("gremium_id", sa.Uuid),
     sa.column("key", sa.Text),
     sa.column("path_key", sa.Text),
+    sa.column("tree_path", sa.Text),
     sa.column("name", sa.Text),
     sa.column("color", sa.Text),
 )
@@ -274,57 +275,93 @@ def _node_id(path_key: str) -> str:
 #: (134 Internationalität, 136 Demokratie/Politische Bildung).
 _VSM_TREE: list = [
     ("1", "Beiträge", []),
-    ("2", "Einnahmen aus wirtschaftlicher Betätigung", [
-        ("100", "Wirtschaftliche Betätigung", []),
-        ("200", "BgA Campusfest", []),
-    ]),
+    (
+        "2",
+        "Einnahmen aus wirtschaftlicher Betätigung",
+        [
+            ("100", "Wirtschaftliche Betätigung", []),
+            ("200", "BgA Campusfest", []),
+        ],
+    ),
     ("3", "Einnahmen aus nicht wirtschaftlicher Betätigung", []),
     ("4", "Entnahmen aus Rücklagen", []),
     ("5", "Sonstige Einnahmen", []),
-    ("6", "Personalausgaben", [
-        ("60", "Personalausgaben", [
-            ("120", "Haushaltsbeauftragte", []),
-            ("123", "Sekretariat", []),
-            ("124", "Hilfskräfte", []),
-        ]),
-        ("61", "Aufwandsentschädigung", []),
-    ]),
+    (
+        "6",
+        "Personalausgaben",
+        [
+            (
+                "60",
+                "Personalausgaben",
+                [
+                    ("120", "Haushaltsbeauftragte", []),
+                    ("123", "Sekretariat", []),
+                    ("124", "Hilfskräfte", []),
+                ],
+            ),
+            ("61", "Aufwandsentschädigung", []),
+        ],
+    ),
     ("7", "Sächliche Verwaltungsausgaben", []),
-    ("8", "Zuschüsse", [
-        ("80", "an zentrale Einrichtungen (Ressorts)", [
-            ("120", "Ressort Finanzen", []),
-            ("121", "Ressort Marketing & Kommunikation", []),
-            ("122", "Ressort Studierendenwerk", []),
-            ("123", "Ressort Verwaltung", []),
-            ("124", "Ressort Wahlen", []),
-            ("130", "Ressort Campusattraktivität", []),
-            ("131", "Ressort IT & Digitalisierung", []),
-            ("132", "Ressort STUPA MAKERS", []),
-            ("133", "Ressort Hochschulsport", []),
-            ("135", "Ressort Kultur & Events", []),
-            ("137", "Ressort Nachhaltigkeit", []),
-            ("138", "Ressort Diversity & Awareness", []),
-            ("139", "Netzwerke und Kooperation", []),
-        ]),
-        ("81", "an dezentrale Einrichtungen", [
-            ("810", "Zuschüsse an Fachschaften", [
-                ("310", "Life Science (LS)", []),
-                ("320", "ESB Business School (ESB)", []),
-                ("360", "Nachhaltigkeit und Technologie (NXT)", []),
-                ("330", "Informatik (INF)", []),
-                ("340", "Technik (TEC)", []),
-                ("350", "Texoversum (TEX)", []),
-            ]),
-            ("811", "Zuschüsse an studentische Initiativen und Vereine", [
-                ("400", "SIV-Projekte", []),
-            ]),
-        ]),
-    ]),
+    (
+        "8",
+        "Zuschüsse",
+        [
+            (
+                "80",
+                "an zentrale Einrichtungen (Ressorts)",
+                [
+                    ("120", "Ressort Finanzen", []),
+                    ("121", "Ressort Marketing & Kommunikation", []),
+                    ("122", "Ressort Studierendenwerk", []),
+                    ("123", "Ressort Verwaltung", []),
+                    ("124", "Ressort Wahlen", []),
+                    ("130", "Ressort Campusattraktivität", []),
+                    ("131", "Ressort IT & Digitalisierung", []),
+                    ("132", "Ressort STUPA MAKERS", []),
+                    ("133", "Ressort Hochschulsport", []),
+                    ("135", "Ressort Kultur & Events", []),
+                    ("137", "Ressort Nachhaltigkeit", []),
+                    ("138", "Ressort Diversity & Awareness", []),
+                    ("139", "Netzwerke und Kooperation", []),
+                ],
+            ),
+            (
+                "81",
+                "an dezentrale Einrichtungen",
+                [
+                    (
+                        "810",
+                        "Zuschüsse an Fachschaften",
+                        [
+                            ("310", "Life Science (LS)", []),
+                            ("320", "ESB Business School (ESB)", []),
+                            ("360", "Nachhaltigkeit und Technologie (NXT)", []),
+                            ("330", "Informatik (INF)", []),
+                            ("340", "Technik (TEC)", []),
+                            ("350", "Texoversum (TEX)", []),
+                        ],
+                    ),
+                    (
+                        "811",
+                        "Zuschüsse an studentische Initiativen und Vereine",
+                        [
+                            ("400", "SIV-Projekte", []),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    ),
     ("9", "Zuwendungen an Stellen außerh. der Studierendenschaft", []),
-    ("10", "Ausgaben aus wirtschaftlicher Betätigung", [
-        ("100", "BgA STUPA", []),
-        ("200", "BgA Campusfest", []),
-    ]),
+    (
+        "10",
+        "Ausgaben aus wirtschaftlicher Betätigung",
+        [
+            ("100", "BgA STUPA", []),
+            ("200", "BgA Campusfest", []),
+        ],
+    ),
     ("11", "Zuführung Rücklagen", []),
 ]
 
@@ -341,6 +378,7 @@ def _flatten(nodes: list, parent_path: str, parent_id: str | None, out: list) ->
                 "gremium_id": None,
                 "key": key,
                 "path_key": path_key,
+                "tree_path": path_key,
                 "name": name,
                 "color": None,
             }
@@ -352,10 +390,7 @@ def upgrade() -> None:
     """Seed the roles, Gremien, CD variants, mail templates and the budget plan."""
     op.bulk_insert(
         _role,
-        [
-            {"id": ROLE_IDS[key], "key": key, "name_i18n": ROLE_NAMES[key]}
-            for key in ROLE_IDS
-        ],
+        [{"id": ROLE_IDS[key], "key": key, "name_i18n": ROLE_NAMES[key]} for key in ROLE_IDS],
     )
     op.bulk_insert(
         _role_permission,
@@ -436,6 +471,7 @@ def upgrade() -> None:
             "gremium_id": _STUPA_ID,
             "key": "VSM",
             "path_key": "VSM",
+            "tree_path": "VSM",
             "name": "VS-Mittel",
             "color": None,
         },
@@ -445,6 +481,7 @@ def upgrade() -> None:
             "gremium_id": _STUPA_ID,
             "key": "QSM",
             "path_key": "QSM",
+            "tree_path": "QSM",
             "name": "QS-Mittel",
             "color": None,
         },
@@ -473,17 +510,13 @@ def downgrade() -> None:
             ).bindparams(d=depth)
         )
     conn.execute(
-        sa.text(
-            "DELETE FROM gremium WHERE id IN (CAST(:s AS uuid), CAST(:a AS uuid))"
-        ).bindparams(s=_STUPA_ID, a=_ASTA_ID)
+        sa.text("DELETE FROM gremium WHERE id IN (CAST(:s AS uuid), CAST(:a AS uuid))").bindparams(
+            s=_STUPA_ID, a=_ASTA_ID
+        )
     )
-    op.execute(
-        sa.delete(_cd_variant).where(_cd_variant.c.id.in_(list(CD_VARIANT_IDS.values())))
-    )
+    op.execute(sa.delete(_cd_variant).where(_cd_variant.c.id.in_(list(CD_VARIANT_IDS.values()))))
     role_ids = list(ROLE_IDS.values())
-    op.execute(
-        sa.delete(_role_permission).where(_role_permission.c.role_id.in_(role_ids))
-    )
+    op.execute(sa.delete(_role_permission).where(_role_permission.c.role_id.in_(role_ids)))
     op.execute(sa.delete(_role).where(_role.c.id.in_(role_ids)))
     _mail_ids = [t["id"] for t in _MAIL_TEMPLATES]
     op.execute(sa.delete(_mail_template).where(_mail_template.c.id.in_(_mail_ids)))

@@ -31,6 +31,8 @@ import { problemCode, problemDetail } from '@core/api/problem';
  * - No vote of the meeting may be open. The server refuses the close with 409
  *   `open_vote` otherwise, and the dialog then shows that reason in the list. The
  *   reason stays until a new state of the meeting shows no open vote.
+ * - No election of the meeting may wait for the lot. The server refuses the close with
+ *   409 `lot_pending` otherwise, and the dialog shows that reason in the list.
  * - The close cancels the planned (draft) votes of the meeting.
  * - The close does NOT finalize the protocol. Finalizing is a step of its own, for a
  *   holder of the Gremium right `protocol.finalize`.
@@ -62,6 +64,25 @@ export class CloseMeetingDialogComponent {
   readonly openVote = computed(
     () => this.refused() || this.meeting().votes.some((v) => v.status === 'open'),
   );
+  /** The server refused the close because an election waits for the lot (409 `lot_pending`). */
+  readonly refusedLot = signal(false);
+  /**
+   * An election of the meeting ended in a tie and its lot is not drawn. An election that
+   * was voted on again does not count: its repeat gives the result.
+   */
+  readonly lotPending = computed(() => this.refusedLot() || this.waitsForLot());
+  private readonly waitsForLot = computed(() => {
+    const votes = this.meeting().votes;
+    const repeated = new Set(
+      votes
+        .filter((v) => v.repeatOfId && (v.status === 'open' || v.status === 'closed'))
+        .map((v) => v.repeatOfId),
+    );
+    return votes.some(
+      (v) =>
+        v.kind === 'election' && v.status === 'closed' && v.result === 'tie' && !repeated.has(v.id),
+    );
+  });
   /** The meeting has planned votes, which the close cancels. */
   readonly hasDrafts = computed(() => this.meeting().votes.some((v) => v.status === 'draft'));
 
@@ -75,12 +96,16 @@ export class CloseMeetingDialogComponent {
         untracked(() => {
           this.closing.set(false);
           this.refused.set(false);
+          this.refusedLot.set(false);
         });
       }
     });
     effect(() => {
       const anyOpen = this.meeting().votes.some((v) => v.status === 'open');
       if (!anyOpen) untracked(() => this.refused.set(false));
+    });
+    effect(() => {
+      if (!this.waitsForLot()) untracked(() => this.refusedLot.set(false));
     });
   }
 
@@ -90,7 +115,7 @@ export class CloseMeetingDialogComponent {
 
   confirm(): void {
     const m = this.meeting();
-    if (m.status !== 'live' || this.closing() || this.openVote()) return;
+    if (m.status !== 'live' || this.closing() || this.openVote() || this.lotPending()) return;
     this.closing.set(true);
     this.api.patchMeeting(m.id, { status: 'closed' }).subscribe({
       next: (updated) => {
@@ -102,6 +127,10 @@ export class CloseMeetingDialogComponent {
         this.closing.set(false);
         if (problemCode(err) === 'open_vote') {
           this.refused.set(true);
+          return;
+        }
+        if (problemCode(err) === 'lot_pending') {
+          this.refusedLot.set(true);
           return;
         }
         const detail = problemDetail(err);

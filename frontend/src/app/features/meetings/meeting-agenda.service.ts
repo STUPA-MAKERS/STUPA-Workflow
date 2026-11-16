@@ -314,7 +314,7 @@ export class MeetingAgendaService implements OnDestroy {
    * Make sure that the server holds the text that this tab shows, and tell if it does.
    *
    * The finalize renders the protocol from the item texts on the server, and a body
-   * save after the finalize gets 409 `protocol_locked`. So the finalize waits for this:
+   * save after the finalize gets 409 `protocol_final`. So the finalize waits for this:
    * it runs a pending autosave at once and waits for a running save. Without either,
    * it sends the text of an earlier failed save again. The observable emits `false` when the server still
    * does not hold the text.

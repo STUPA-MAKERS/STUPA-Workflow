@@ -17,10 +17,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
-from app.modules.voting import service as voting_mod
+from app.modules.delegations.service import Represented
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import MyBallot
 from app.modules.voting.service import VotingService
+from app.modules.voting.service import access as access_mod
+from app.modules.voting.service import cast as voting_mod
 
 NOW = datetime(2026, 10, 6, 12, 0, tzinfo=UTC)
 GID = str(uuid4())
@@ -50,16 +52,23 @@ def _voter(*, token: bool = False, eligible: bool = True) -> Principal:
 @pytest.fixture
 def world(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     """Fake the delegation verdict and the stored ballots."""
-    state = SimpleNamespace(blocked=False, delegator=None, cast_by=set())
+    state = SimpleNamespace(blocked=False, delegators=(), cast_by=set())
 
-    async def _check(*_a: Any) -> tuple[bool, str | None]:
-        return state.blocked, state.delegator
+    async def _check(*_a: Any) -> tuple[bool, tuple[Represented, ...]]:
+        return state.blocked, tuple(
+            Represented(sub=sub, principal_id=uuid4(), pool=False) for sub in state.delegators
+        )
+
+    async def _all_cast(_self: Any, _vote: Any, represented: tuple[Represented, ...]) -> bool:
+        return all(r.sub in state.cast_by for r in represented)
 
     async def _my_ballot(_self: Any, _vote: Any, sub: str) -> MyBallot:
         return MyBallot(cast=sub in state.cast_by)
 
-    monkeypatch.setattr(voting_mod, "voting_delegation_check", _check)
+    for mod in (voting_mod, access_mod):
+        monkeypatch.setattr(mod, "voting_delegation_check", _check)
     monkeypatch.setattr(VotingService, "my_ballot", _my_ballot)
+    monkeypatch.setattr(VotingService, "_all_cast", _all_cast)
     return state
 
 
@@ -101,11 +110,11 @@ async def test_delegated_away_blocks_the_own_ballot(world: SimpleNamespace) -> N
 
 async def test_represented_ballot(world: SimpleNamespace) -> None:
     """A delegate without an own right casts the missing ballot of the delegator."""
-    world.delegator = "boss"
+    world.delegators = ("boss", "chief")
     assert await _svc().can_still_cast(_vote(), _voter(eligible=False), now=NOW)
-    world.cast_by = {"me", "boss"}
+    world.cast_by = {"me", "boss", "chief"}
     assert not await _svc().can_still_cast(_vote(), _voter(), now=NOW)
-    world.cast_by = {"me"}
+    world.cast_by = {"me", "boss"}
     assert await _svc().can_still_cast(_vote(), _voter(), now=NOW)
 
 

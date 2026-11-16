@@ -57,6 +57,9 @@
   "backend/app/modules/translations/service.py": 4,
   "backend/app/modules/voting/election.py": 1,
   "backend/app/modules/voting/poll.py": 1,
-  "backend/app/modules/voting/service.py": 10,
+  "backend/app/modules/voting/service/cast.py": 1,
+  "backend/app/modules/voting/service/close.py": 4,
+  "backend/app/modules/voting/service/create.py": 3,
+  "backend/app/modules/voting/service/delete.py": 2,
   "backend/app/modules/webhooks/service.py": 2
 }

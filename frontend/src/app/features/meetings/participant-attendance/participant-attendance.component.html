@@ -13,6 +13,11 @@
     @if (m.note && value() === 'excused') {
       <p class="pa__muted">{{ m.note }}</p>
     }
+    @if (m.lateExcuseUntil) {
+      <app-button class="pa__late" variant="tonal" size="sm" (click)="lateExcuse.emit()">
+        {{ 'meetings.lateExcuse.title' | t }}
+      </app-button>
+    }
   } @else {
     <app-segmented width="fill"
       class="pa__seg"

@@ -7,6 +7,7 @@ import {
   computed,
   inject,
   input,
+  output,
   signal,
   untracked,
   viewChild,
@@ -23,6 +24,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { StatusView } from '@shared/status-kind.util';
 import {
   AvatarComponent,
+  ButtonComponent,
   EmptyStateComponent,
   FocusDialogDirective,
   MEDIA,
@@ -36,6 +38,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { dayMonth, monthYear } from '@shared/date-format';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import { LateExcuseDialogComponent } from '../../meetings/late-excuse-dialog/late-excuse-dialog.component';
 
 /** The gap between the cell and the popover, and the least gap to the viewport edge. */
 const GAP = 6;
@@ -78,6 +81,11 @@ export const ATTENDANCE_STATE: Record<GremiumAttendanceState, StatusView> = {
  * close it, and the focus goes back to the cell. It reads
  * `GET /committees/{id}/attendance/{principalId}?month=` once per month. The excuse text is
  * never in the answer, so it never shows.
+ *
+ * An own absence shows "Nachträglich entschuldigen" while the window of a late excuse is
+ * open (`lateExcuseUntil`, § 000922). The dialog of the excuse closes the popover first,
+ * because both are in the top layer. After the excuse `changed` tells the matrix to read
+ * again.
  */
 @Component({
   selector: 'app-attendance-detail',
@@ -90,6 +98,8 @@ export const ATTENDANCE_STATE: Record<GremiumAttendanceState, StatusView> = {
     NgTemplateOutlet,
     TranslatePipe,
     AvatarComponent,
+    ButtonComponent,
+    LateExcuseDialogComponent,
     SideSheetComponent,
     SkeletonComponent,
     StatusTextComponent,
@@ -103,6 +113,10 @@ export class AttendanceDetailComponent {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   readonly gremiumId = input.required<string>();
+  /** A late excuse is stored: the numbers of the matrix are stale. */
+  readonly changed = output<void>();
+  /** The meeting of the late excuse. Its dialog is open while it is set. */
+  readonly excuseFor = signal<GremiumMemberMeeting | null>(null);
   /** A phone viewport: the bottom sheet instead of the popover. */
   readonly phone = mediaQuery(MEDIA.phone);
   readonly headingId = `gad-title-${nextId++}`;
@@ -162,6 +176,17 @@ export class AttendanceDetailComponent {
   /** The sheet closed itself (Escape, scrim, close button, swipe). */
   onSheetOpen(open: boolean): void {
     if (!open) this.close(false);
+  }
+
+  /** "Nachträglich entschuldigen" of a row: the popover closes, the dialog opens. */
+  askExcuse(meeting: GremiumMemberMeeting): void {
+    this.close(false);
+    this.excuseFor.set(meeting);
+  }
+
+  onExcused(): void {
+    this.excuseFor.set(null);
+    this.changed.emit();
   }
 
   /** Read the months again after a failed read. */

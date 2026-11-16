@@ -24,7 +24,7 @@ from app.modules.budget.tree_models import (
     Invoice,
 )
 from app.modules.budget.tree_schemas import ExpenseCreate, ExpenseOut, ExpenseUpdate
-from app.shared.errors import NotFoundError, ValidationProblem
+from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from app.shared.paging import Page
 from app.shared.search import dialect_of, trigram_rank
 
@@ -220,7 +220,9 @@ class ExpenseOps(BudgetTreeServiceBase):
         """Return the cost center and the resolved fiscal year of a standalone booking.
 
         Raises:
-            ValidationProblem: `budgetId` is missing, or no fiscal year resolves (422).
+            ValidationProblem: `budgetId` is missing, no fiscal year resolves, or the
+                year is past and neither the payment date nor the invoice date lies
+                in it (422).
         """
         if payload.budget_id is None:
             raise ValidationProblem(
@@ -228,7 +230,13 @@ class ExpenseOps(BudgetTreeServiceBase):
                 errors=[{"field": "budgetId", "msg": "required"}],
             )
         node = await self._get_node(payload.budget_id)
-        return node, await self._resolve_fiscal_year(node, payload.fiscal_year_id), None
+        year = await self._resolve_fiscal_year(
+            node,
+            payload.fiscal_year_id,
+            late=True,
+            on=payload.payment_date or payload.invoice_date,
+        )
+        return node, year, None
 
     async def _require_invoice(self, invoice_id: UUID) -> None:
         """Make sure that the invoice of a booking exists.
@@ -266,6 +274,10 @@ class ExpenseOps(BudgetTreeServiceBase):
         fiscal year: an orphan year, or a phantom row with allocated=0 and a negative
         available sum.
 
+        A booking that is one side of a transfer keeps its amount and its cost center
+        (409 `transfer_leg_fixed`), because the two sides of a transfer must carry the
+        same amount and the pair is fixed. The transfer changes both sides at once.
+
         The audit entry holds the prior and the new values of the patched fields. The
         revert uses the new values to detect a later edit and answers 409 instead of
         overwriting the changes of another user.
@@ -276,9 +288,7 @@ class ExpenseOps(BudgetTreeServiceBase):
         await self._require_open_fiscal_year(expense.fiscal_year_id)
         fields = payload.model_fields_set
         sets_amount = "amount" in fields and payload.amount is not None
-        child_n = (
-            (await self._child_counts([expense_id])).get(expense_id, 0) if sets_amount else 0
-        )
+        child_n = (await self._child_counts([expense_id])).get(expense_id, 0) if sets_amount else 0
         if child_n > 0:
             raise ValidationProblem(
                 "The amount of a booking with sub-bookings is the sum of its sub-bookings.",
@@ -289,6 +299,11 @@ class ExpenseOps(BudgetTreeServiceBase):
                 "A sub-booking inherits its cost-centre from its parent.",
                 code="subbooking_inherited_field",
             )
+        if expense.transfer_id is not None and fields & {"amount", "budget_id"}:
+            raise ConflictError(
+                "This booking is one side of a transfer. Change the transfer instead.",
+                code="transfer_leg_fixed",
+            )
         before: dict[str, object] = {f: _json_safe(getattr(expense, f)) for f in fields}
         target = (
             await self._get_node(payload.budget_id)
@@ -296,7 +311,7 @@ class ExpenseOps(BudgetTreeServiceBase):
             else None
         )
         if target is not None:
-            await self._resolve_fiscal_year(target, expense.fiscal_year_id)
+            await self._resolve_fiscal_year(target, expense.fiscal_year_id, kept=True)
         for name, value in _expense_changes(payload, target).items():
             setattr(expense, name, value)
         if "invoice_id" in fields and payload.invoice_id is not None:

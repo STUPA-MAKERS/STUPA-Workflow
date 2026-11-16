@@ -298,6 +298,24 @@ describe('VotingComponent', () => {
       expect(screen.getByText('Stimme offen')).toBeInTheDocument();
     });
 
+    it('an Umlaufverfahren names its Gremium and its end (§000914)', async () => {
+      await start('/voting', {
+        pages: [
+          page([
+            item('c1', {
+              kind: 'circular',
+              applicationId: null,
+              gremiumName: 'AStA',
+              closesAt: '2026-10-30T11:00:00Z',
+              openedAt: today(9, 5),
+            }),
+          ]),
+        ],
+      });
+      expect(screen.getAllByText('Offen').length).toBeGreaterThan(0);
+      expect(screen.getByText(/^AStA · bis Fr, 30\.10\., \d\d:00$/)).toBeInTheDocument();
+    });
+
     it('an ended Gremium poll names only its Gremium', async () => {
       await start('/voting', {
         pages: [
@@ -321,7 +339,13 @@ describe('VotingComponent', () => {
       expect(listVotes).toHaveBeenCalledWith(expect.objectContaining({ kind: 'poll' }));
       expect(cmp.activeFilterCount()).toBe(1);
       expect(cmp.kindChipLabel()).toBe('Art: Umfrage');
-      expect(cmp.kindOptions().map((o) => o.label)).toEqual(['Alle', 'Beschluss', 'Wahl', 'Umfrage']);
+      expect(cmp.kindOptions().map((o) => o.label)).toEqual([
+        'Alle',
+        'Beschluss',
+        'Wahl',
+        'Umfrage',
+        'Umlaufverfahren',
+      ]);
       const navigate = jest.spyOn(router, 'navigate');
       cmp.setKind('election');
       expect(navigate).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { kind: 'election' } }));
@@ -339,10 +363,10 @@ describe('VotingComponent', () => {
     it('offers "Neue Umfrage" only with vote.manage and opens the new poll', async () => {
       const member = await start('/voting');
       expect(member.cmp.canCreatePoll()).toBe(false);
-      expect(screen.queryByRole('button', { name: 'Umfrage anlegen' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Abstimmung anlegen' })).toBeNull();
       TestBed.resetTestingModule();
       const manager = await start('/voting', { manager: true });
-      expect(screen.getByRole('button', { name: 'Umfrage anlegen' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Abstimmung anlegen' })).toBeInTheDocument();
       const navigate = jest.spyOn(manager.router, 'navigate');
       manager.listVotes.mockClear();
       manager.cmp.pollDialog.set(false);
@@ -439,9 +463,10 @@ describe('VotingComponent', () => {
     it('reads the filters from the URL and sends them', async () => {
       const { listVotes, cmp } = await start('/voting?status=ended&committee=g2&q=Haushalt');
       expect(listVotes).toHaveBeenCalledWith({
-        status: ['closed'],
+        status: ['closed', 'cancelled'],
         gremiumId: 'g2',
         q: 'Haushalt',
+        cancelledReason: 'objection',
         limit: 30,
         offset: 0,
       });
@@ -449,10 +474,15 @@ describe('VotingComponent', () => {
       expect(cmp.gremiumChipLabel()).toBe('Gremium: g2');
     });
 
-    it('ignores an unknown status and sends the default without cancelled votes', async () => {
+    it('ignores an unknown status and asks for the objections among the cancelled votes', async () => {
       const { listVotes, cmp } = await start('/voting?status=running');
       expect(cmp.statusFilter()).toBe('');
-      expect(listVotes).toHaveBeenCalledWith(expect.objectContaining({ status: ['open', 'closed'] }));
+      expect(listVotes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: ['open', 'closed', 'cancelled'],
+          cancelledReason: 'objection',
+        }),
+      );
     });
 
     /** An emptied field shows the whole list at once. */
@@ -530,7 +560,12 @@ describe('VotingComponent', () => {
       const { cmp, listVotes } = await start('/voting?status=draft');
       expect(cmp.statusFilter()).toBe('');
       expect(cmp.statusChipLabel()).toBe('Status');
-      expect(listVotes).toHaveBeenCalledWith(expect.objectContaining({ status: ['open', 'closed'] }));
+      expect(listVotes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: ['open', 'closed', 'cancelled'],
+          cancelledReason: 'objection',
+        }),
+      );
     });
 
     /** A member has no draft option, so the chip shows the raw value. */

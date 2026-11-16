@@ -4,10 +4,10 @@ title: A pool substitute takes a free seat
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
+updated: 2026-11-16
 implementation:
   - backend/app/modules/delegations/pool_seat.py
-  - backend/app/modules/voting/service.py
+  - backend/app/modules/voting/service
 scope:
   - backend/app/modules/delegations
   - frontend/src/app/features/meetings
@@ -18,4 +18,4 @@ scope:
 # A pool substitute takes a free seat
 
 A pool substitute must be able to vote for a member who is not checked in, without an
-announcement and without a delegation. The substitute can be a non-member.
+announcement and without a delegation. The pool seat must need only a live meeting. The substitute can be a non-member.

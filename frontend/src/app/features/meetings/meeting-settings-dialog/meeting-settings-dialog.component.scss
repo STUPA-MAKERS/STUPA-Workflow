@@ -1,5 +1,4 @@
 @use '../../../shared/ui/dialog-form' as df;
-@use 'breakpoints' as bp;
 
 @include df.host;
 
@@ -7,14 +6,5 @@
   @include df.form;
 }
 
-.msd__when {
-  display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--space-3);
-}
-@include bp.phone {
-  .msd__when {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
+@include df.when-where('.msd__when', '.msd__where');
 

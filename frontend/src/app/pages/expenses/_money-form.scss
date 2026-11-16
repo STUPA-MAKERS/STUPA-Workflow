@@ -77,6 +77,11 @@
   gap: var(--space-3);
 }
 
+// The dates of a past year take a whole row each, so the message of the date stays on one line.
+.mf__wide {
+  grid-column: 1 / -1;
+}
+
 .mf__chips {
   --chip-group-height: var(--control-height);
 }

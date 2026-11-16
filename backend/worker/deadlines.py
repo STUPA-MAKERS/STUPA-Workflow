@@ -52,11 +52,13 @@ from app.modules.flow.models import Transition
 from app.modules.flow.service import FlowService
 from app.modules.livevote.broker import RedisBroker
 from app.modules.livevote.service import BrokerPublisher
+from app.modules.site_config.features import Feature
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteClosed
 from app.modules.voting.service import VotingService
 from app.settings import Settings, load_settings
 from app.shared.errors import ConflictError, NotFoundError
+from worker.features import job_feature_on
 from worker.polls import process_poll_reminders
 from worker.todos import process_todo_due
 
@@ -365,9 +367,12 @@ async def lock_open_vote(
 async def _process_votes(ctx: dict[str, Any], now: datetime) -> int:
     """Close the open votes whose time window ended; return how many closed.
 
-    One broken vote is logged and does not abort the cycle.
+    One broken vote is logged and does not abort the cycle. No vote closes while
+    `Abstimmungen` is off, because a switch does not change a record.
     """
     maker = _sessionmaker(ctx)
+    if not await job_feature_on(maker, Feature.VOTING):
+        return 0
     async with maker() as session:
         ids = await due_open_vote_ids(session, now)
     closed = [await _close_one_logged(ctx, vote_id, now) for vote_id in ids]

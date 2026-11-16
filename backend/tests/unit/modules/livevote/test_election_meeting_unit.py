@@ -245,8 +245,8 @@ def _election_row(**over: Any) -> Any:
 async def test_votes_for_reads_an_election() -> None:
     """Read an election in the meeting votes.
 
-    The fake session returns, in order: the votes, the ballots of the motion tally, the
-    ballots of the election and the present members.
+    The fake session returns, in order: the votes, the ballots of the motion tally and
+    the ballots of the election.
     """
     mid = uuid4()
     stored = ElectionResultOut(counts={"c1": 2, "c2": 1}, ballots=3, elected=["c1"])
@@ -264,7 +264,6 @@ async def test_votes_for_reads_an_election() -> None:
                 (row.id, encode_election_choice(["c1"])),
                 (row.id, encode_election_choice(["c2"])),
             ),
-            res((mid, 3)),
         ]
     )
     out = await MeetingService(sess)._votes_for([mid])  # type: ignore[arg-type]
@@ -285,14 +284,14 @@ async def test_votes_for_marks_a_missed_quorum_of_an_election() -> None:
         "quorum": {"type": "count", "value": 5},
     }
     row = _election_row(meeting_id=mid, result="rejected", config=config)
-    sess = _QueueSession(executes=[res(row), res(), res(), res((mid, 3))])
+    sess = _QueueSession(executes=[res(row), res(), res()])
     [item] = (await MeetingService(sess)._votes_for([mid]))[mid]  # type: ignore[arg-type]
     assert item.failed_reason == "quorum"
 
 
 async def test_election_tallies_without_elections() -> None:
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
-    assert await svc._election_tallies([]) == {}
+    assert await svc._election_tallies([], {}) == {}
 
 
 async def test_ballots_of_gives_an_election_only_cast() -> None:
@@ -437,3 +436,53 @@ def test_beamer_gets_the_lot() -> None:
     )
     event: dict[str, object] = {"type": "vote_lot_drawn", "voteId": str(uuid4())}
     assert beamer._filter(event) == event
+
+
+def test_open_election_with_the_majority_of_the_members(setup: Any) -> None:
+    """One seat can need the majority of the members; guests never vote then (000912)."""
+    client, meetings, agenda, voting = setup
+    meetings._meeting_out = _meeting(True, "vote")
+    agenda.item_row = SimpleNamespace(id=uuid4(), application_id=None, non_public=False)
+    resp = client.post(
+        f"/api/meetings/{uuid4()}/votes",
+        json=_election_body(majorityRule="members_majority"),
+    )
+    assert resp.status_code == 200, resp.text
+    config = voting.last_payload.config
+    assert isinstance(config, ElectionConfig)
+    assert config.majority_rule == "members_majority"
+    assert config.guests_vote is False
+
+    refused = client.post(
+        f"/api/meetings/{uuid4()}/votes",
+        json=_election_body(majorityRule="members_majority", guestsVote=True),
+    )
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["code"] == "guests_vote_unavailable"
+
+
+def test_open_election_ignores_another_majority_rule(setup: Any) -> None:
+    client, meetings, agenda, voting = setup
+    meetings._meeting_out = _meeting(False)
+    agenda.item_row = SimpleNamespace(id=uuid4(), application_id=None, non_public=False)
+    resp = client.post(
+        f"/api/meetings/{uuid4()}/votes", json=_election_body(majorityRule="two_thirds")
+    )
+    assert resp.status_code == 200, resp.text
+    assert voting.last_payload.config.majority_rule == "relative"
+
+
+@pytest.mark.parametrize(
+    "over",
+    [
+        {"kind": "circular"},
+        {
+            "majorityRule": "members_majority",
+            "seats": 2,
+            "candidates": [{"name": "A"}, {"name": "B"}, {"name": "C"}],
+        },
+    ],
+)
+def test_open_body_rejects_circular_and_members_with_two_seats(over: dict[str, Any]) -> None:
+    with pytest.raises(ValidationError):
+        MeetingVoteOpenBody.model_validate(_election_body(**over))

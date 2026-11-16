@@ -31,6 +31,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin
+from app.modules.gremien.models import DEFAULT_TERM_START_MONTH
 
 
 class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
@@ -47,6 +48,14 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     #: one hour from `start_time`. With it the value must be after `start_time`.
     end_time: Mapped[_time | None] = mapped_column(Time, nullable=True)
     status: Mapped[str] = mapped_column(Text, server_default="planned")
+    #: The kind of the meeting: ``ordinary``, ``extraordinary``, ``repeat``
+    #: (Wiederholungssitzung, with its own quorum) or ``constituent``. It changes only
+    #: while the meeting is ``planned``.
+    kind: Mapped[str] = mapped_column(Text, server_default="ordinary")
+    #: The place of the meeting as free text, for the invitation and the protocol.
+    location: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: The form of the meeting: ``presence``, ``hybrid`` or ``video``.
+    form: Mapped[str] = mapped_column(Text, server_default="presence")
     #: The real start. The transition from `planned` to `live` sets it once. It
     #: stays NULL for a meeting that started before the column existed: the audit log
     #: holds no start time for it. A reader then falls back to the planned start.
@@ -78,15 +87,35 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     #: (`vote`) or only follow the meeting (`watch`). It has an effect only while
     #: `public_join` is on.
     public_join: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    guests_mode: Mapped[str] = mapped_column(Text, server_default="vote")
+    guests_mode: Mapped[str] = mapped_column(Text, server_default="watch")
     #: The short code of the join link `/j/<code>`. The first switch-on of
     #: `public_join` creates it, and a rotation replaces it. It is unique among the
     #: meetings that are not closed.
     join_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: The first meeting of a Wiederholungssitzung (`kind = repeat`, spec 000940): the
+    #: earlier meeting of the same Gremium that had no quorum. NULL for each other kind
+    #: and for a repeat meeting from before the column.
+    repeat_of_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("meeting.id", ondelete="SET NULL"), nullable=True
+    )
+    #: `lateExcuseDays` of the settings at the time the meeting was made (spec 000942):
+    #: a later change of the setting does not move the window of this meeting. NULL for
+    #: a meeting from before the column: a reader then takes the setting.
+    late_excuse_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: The present count and the number of members with a voting right, fixed at the
+    #: close (000946). The protocol reads them, so a new render of an old meeting gives
+    #: the same count and the same quorum (000357). NULL for a meeting that is not
+    #: closed or that closed before the columns existed: a reader then counts now.
+    present_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    eligible_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (
         CheckConstraint("status IN ('planned','live','closed')", name="meeting_status"),
         CheckConstraint("guests_mode IN ('vote','watch')", name="guests_mode"),
+        CheckConstraint(
+            "kind IN ('ordinary','extraordinary','repeat','constituent')", name="meeting_kind"
+        ),
+        CheckConstraint("form IN ('presence','hybrid','video')", name="meeting_form"),
         Index("ix_meeting_gremium_id", "gremium_id"),
         Index(
             "uq_meeting_join_code_open",
@@ -150,6 +179,17 @@ class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
     todo_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("todo_card.id", ondelete="SET NULL"), nullable=True
     )
+    #: The version of a Haushaltsplan that this item decides (an item of kind plan).
+    #: The item has no application, and its `title` names the budget, the fiscal year,
+    #: the version and the step. A deleted version leaves a free-text item.
+    plan_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("budget_plan_version.id", ondelete="SET NULL"), nullable=True
+    )
+    #: The PDF of the plan that the protocol of the meeting appends as its Anlage
+    #: (spec 000876). The finalize of the protocol sets it.
+    plan_document_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("markdown_document.id", ondelete="SET NULL"), nullable=True
+    )
     #: Markdown body of this agenda item. It flows into the final protocol.
     body: Mapped[str | None] = mapped_column(Text, nullable=True)
     position: Mapped[int] = mapped_column(Integer, server_default="0")
@@ -160,6 +200,10 @@ class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
     #: item sets it for the item that the room leaves. NULL means "not done". The audit
     #: entry `agenda_item_done` records the person who set it.
     done_at: Mapped[_datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: The time at which the live meeting first moved to this item. A move back keeps
+    #: the first time. NULL means that the meeting never reached the item. The protocol
+    #: PDF shows the time above the TOP.
+    started_at: Mapped[_datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("meeting_id", "application_id", name="uq_agenda_meeting_application"),
@@ -170,6 +214,13 @@ class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
             "todo_id",
             unique=True,
             postgresql_where=text("todo_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_agenda_meeting_plan_version",
+            "meeting_id",
+            "plan_version_id",
+            unique=True,
+            postgresql_where=text("plan_version_id IS NOT NULL"),
         ),
     )
 
@@ -289,21 +340,35 @@ class MeetingGuest(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 #: The open window of a meeting: the earliest open is `open_lead_minutes` before the
-#: planned start. Up to `confirm_lead_minutes` before the start the open needs an extra
-#: confirmation. Both are defaults that the deadlines page changes.
+#: planned start. It is a default that the deadlines page changes.
 DEFAULT_OPEN_LEAD_MINUTES = 60
-DEFAULT_CONFIRM_LEAD_MINUTES = 10
 #: One week. A larger lead time makes the window useless.
 MAX_LEAD_MINUTES = 10080
+#: The values that the form of a new Gremium starts with. They come from the
+#: Organisationssatzung and the Geschäftsordnung, and the deadlines page changes them.
+DEFAULT_GREMIUM_QUORUM_PERCENT = 40
+DEFAULT_GREMIUM_REPEAT_QUORUM_PERCENT = 25
+DEFAULT_GREMIUM_DELEGATION_LEAD_MINUTES = 120
+DEFAULT_GREMIUM_DELEGATION_MAX_PER_DELEGATE = 2
+#: The least number of days that an Umlaufverfahren runs (`circularMinDays`).
+DEFAULT_CIRCULAR_MIN_DAYS = 3
+#: The periods of the Geschäftsordnung (§F/administration/admin/000917).
+DEFAULT_INVITE_DAYS_ORDINARY = 7
+DEFAULT_INVITE_DAYS_EXTRAORDINARY = 3
+DEFAULT_LATE_EXCUSE_DAYS = 7
+DEFAULT_ABSENCE_LIMIT = 3
+MAX_PERIOD_DAYS = 365
+MAX_ABSENCE_LIMIT = 50
 
 
 class MeetingSettings(Base):
     """Platform settings of meetings (single row id=1).
 
     `open_lead_minutes` is the earliest open of a meeting, in minutes before its
-    planned start. `confirm_lead_minutes` is the end of the early window: before it
-    the open needs an extra confirmation. It is never larger than
-    `open_lead_minutes`.
+    planned start.
+
+    The `default_*` columns are the values that the form of a new Gremium starts
+    with. A change never touches a Gremium that exists.
     """
 
     __tablename__ = "meeting_settings"
@@ -312,10 +377,61 @@ class MeetingSettings(Base):
     open_lead_minutes: Mapped[int] = mapped_column(
         Integer, server_default=str(DEFAULT_OPEN_LEAD_MINUTES), default=DEFAULT_OPEN_LEAD_MINUTES
     )
-    confirm_lead_minutes: Mapped[int] = mapped_column(
+    default_quorum_percent: Mapped[int | None] = mapped_column(
         Integer,
-        server_default=str(DEFAULT_CONFIRM_LEAD_MINUTES),
-        default=DEFAULT_CONFIRM_LEAD_MINUTES,
+        nullable=True,
+        server_default=str(DEFAULT_GREMIUM_QUORUM_PERCENT),
+        default=DEFAULT_GREMIUM_QUORUM_PERCENT,
+    )
+    default_repeat_quorum_percent: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        server_default=str(DEFAULT_GREMIUM_REPEAT_QUORUM_PERCENT),
+        default=DEFAULT_GREMIUM_REPEAT_QUORUM_PERCENT,
+    )
+    default_guests_may_vote: Mapped[bool] = mapped_column(
+        Boolean, server_default="false", default=False
+    )
+    default_allow_vote_delegation: Mapped[bool] = mapped_column(
+        Boolean, server_default="false", default=False
+    )
+    #: The least number of days of the cast window of an Umlaufverfahren.
+    circular_min_days: Mapped[int] = mapped_column(
+        Integer, server_default=str(DEFAULT_CIRCULAR_MIN_DAYS), default=DEFAULT_CIRCULAR_MIN_DAYS
+    )
+    #: The invitation period of an ordinary meeting, in days.
+    invite_days_ordinary: Mapped[int] = mapped_column(
+        Integer,
+        server_default=str(DEFAULT_INVITE_DAYS_ORDINARY),
+        default=DEFAULT_INVITE_DAYS_ORDINARY,
+    )
+    #: The invitation period of every other meeting kind, in days.
+    invite_days_extraordinary: Mapped[int] = mapped_column(
+        Integer,
+        server_default=str(DEFAULT_INVITE_DAYS_EXTRAORDINARY),
+        default=DEFAULT_INVITE_DAYS_EXTRAORDINARY,
+    )
+    #: The days after the close in which a member can still give an excuse.
+    late_excuse_days: Mapped[int] = mapped_column(
+        Integer, server_default=str(DEFAULT_LATE_EXCUSE_DAYS), default=DEFAULT_LATE_EXCUSE_DAYS
+    )
+    #: The number of unexcused absences in one term that ends a Mandat.
+    absence_limit: Mapped[int] = mapped_column(
+        Integer, server_default=str(DEFAULT_ABSENCE_LIMIT), default=DEFAULT_ABSENCE_LIMIT
+    )
+    #: The month (1 to 12) on whose first day a term starts.
+    term_start_month: Mapped[int] = mapped_column(
+        Integer, server_default=str(DEFAULT_TERM_START_MONTH), default=DEFAULT_TERM_START_MONTH
+    )
+    default_delegation_lead_minutes: Mapped[int] = mapped_column(
+        Integer,
+        server_default=str(DEFAULT_GREMIUM_DELEGATION_LEAD_MINUTES),
+        default=DEFAULT_GREMIUM_DELEGATION_LEAD_MINUTES,
+    )
+    default_delegation_max_per_delegate: Mapped[int] = mapped_column(
+        Integer,
+        server_default=str(DEFAULT_GREMIUM_DELEGATION_MAX_PER_DELEGATE),
+        default=DEFAULT_GREMIUM_DELEGATION_MAX_PER_DELEGATE,
     )
     updated_at: Mapped[_datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -325,7 +441,4 @@ class MeetingSettings(Base):
     __table_args__ = (
         CheckConstraint("id = 1", name="singleton"),
         CheckConstraint(f"open_lead_minutes BETWEEN 0 AND {MAX_LEAD_MINUTES}", name="open_lead"),
-        CheckConstraint(
-            "confirm_lead_minutes BETWEEN 0 AND open_lead_minutes", name="confirm_lead"
-        ),
     )

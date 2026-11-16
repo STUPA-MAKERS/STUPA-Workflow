@@ -27,6 +27,7 @@ from app.modules.gremien.gremium_roles import gremium_ids_with_permission, gremi
 from app.modules.gremien.models import GremiumMembership, GremiumRole
 from app.modules.gremien.pool import substitute_gremien_for_sub
 from app.modules.meetings.models import Meeting
+from app.modules.site_config.features import Feature, feature_on
 from app.modules.voting.service import manages_votes_in_gremium
 from app.shared.errors import ForbiddenError, NotFoundError
 
@@ -177,8 +178,11 @@ class MeetingRuleOps(MeetingReads):
 
         The manager path needs only `session.manage`. The meeting lead includes
         vote management and the agenda-item change, so a `meetings:write` token
-        of a manager can manage votes without `votes:write`.
+        of a manager can manage votes without `votes:write`. Nobody manages a vote while
+        `Abstimmungen` is off (§F/administration/admin/000757).
         """
+        if not await feature_on(self.session, Feature.VOTING):
+            return False
         if await self.can_manage(meeting.gremium_id, principal):
             return True
         if await manages_votes_in_gremium(self.session, meeting.gremium_id, principal):
@@ -215,7 +219,11 @@ class MeetingRuleOps(MeetingReads):
 
         Voting also stays human. `vote.cast` sits in FORBIDDEN_PERMISSIONS, and the
         cast gate refuses every scoped OAuth token.
+
+        Nobody votes while `Abstimmungen` is off (§F/administration/admin/000757).
         """
+        if not await feature_on(self.session, Feature.VOTING):
+            return False
         if meeting.gremium_id in await self._vote_cast_gremium_ids(principal):
             return True
         return meeting.id in await self._delegated_meeting_ids(principal.sub, voting_only=True)

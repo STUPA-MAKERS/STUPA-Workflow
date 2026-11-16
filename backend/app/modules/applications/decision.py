@@ -243,9 +243,7 @@ async def _lock_application(session: AsyncSession, app: Application) -> None:
     Two concurrent decision writes on one application then run one after the other,
     and the second one sees and supersedes the first one.
     """
-    await session.execute(
-        select(Application.id).where(Application.id == app.id).with_for_update()
-    )
+    await session.execute(select(Application.id).where(Application.id == app.id).with_for_update())
 
 
 async def _swap(
@@ -393,9 +391,7 @@ async def redo_decision_swap(
     )
 
 
-async def valid_decision(
-    session: AsyncSession, application_id: UUID
-) -> ApplicationDecision | None:
+async def valid_decision(session: AsyncSession, application_id: UUID) -> ApplicationDecision | None:
     """Return the valid decision of an application, or None."""
     return (
         await session.execute(
@@ -454,7 +450,9 @@ async def decision_source(
     gremium_id = (
         app.gremium_id
         if vote is None
-        else meeting.gremium_id if meeting is not None else _uuid_or_none(vote.eligible_group)
+        else meeting.gremium_id
+        if meeting is not None
+        else _uuid_or_none(vote.eligible_group)
     )
     position = (
         await _agenda_position(session, vote.meeting_id, vote.agenda_item_id)

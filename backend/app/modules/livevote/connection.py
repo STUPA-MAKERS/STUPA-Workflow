@@ -258,8 +258,8 @@ class LiveVoteConnection:
         The vote must belong to the meeting of this connection (channel binding as defense
         in depth). The handler rejects a vote of another meeting, and an unknown vote,
         before the lock and the database. `VotingService.cast` checks the eligibility again.
-        The own cast and the delegated cast take different locks, because both casts are
-        valid.
+        The own cast and the represented cast take the same lock, because the own cast
+        writes the represented ballots too (spec 000932).
 
         The socket resolved the principal at the handshake. Since then an admin may have
         deactivated the account or merged it into another one, whose ballots now carry this
@@ -274,8 +274,7 @@ class LiveVoteConnection:
         if target.meeting_id != self.meeting_id:
             await self._send_error("not_eligible")
             return None
-        suffix = ":proxy" if msg.as_delegation else ""
-        lock_key = f"vote:{msg.vote_id}:cast:{self.principal.sub}{suffix}"
+        lock_key = f"vote:{msg.vote_id}:cast:{self.principal.sub}"
         async with self.locker.acquire(lock_key) as acquired:
             if not acquired:
                 await self._send_error("locked")
@@ -291,8 +290,9 @@ class LiveVoteConnection:
                     now=datetime.now(UTC),
                     as_delegation=msg.as_delegation,
                 )
-            except ForbiddenError:
-                await self._send_error("not_eligible")
+            except ForbiddenError as exc:
+                known = exc.code == "delegation_not_in_election"
+                await self._send_error(exc.code if known and exc.code else "not_eligible")
                 return None
             except AppError as exc:
                 await self._send_error(exc.code or "error")

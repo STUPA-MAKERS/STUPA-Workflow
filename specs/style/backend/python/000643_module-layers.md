@@ -4,7 +4,7 @@ title: A backend module imports only from its layer and from lower layers
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-11
+updated: 2026-11-16
 implementation:
   - backend/pyproject.toml
   - .github/workflows/ci.yml
@@ -16,15 +16,16 @@ scope:
 
 # A backend module imports only from its layer and from lower layers
 
-The backend modules are in five layers, from the top to the bottom:
+The backend modules are in six layers, from the top to the bottom:
 
 1. `admin`, `search`, `privacy`, `backup`, `config_revision`, `audit_log`, `account`,
    `attachments`, `gremien_overview`
 2. `protocol`, `livevote`, `todos`, `tickets`, `calendar`
-3. `voting`, `budget`, `applications`, `flow`, `meetings`, `delegations`
-4. `forms`, `application_types`, `notifications`, `webhooks`, `files`, `media`, `translations`,
+3. `documents`
+4. `voting`, `budget`, `applications`, `flow`, `meetings`, `delegations`
+5. `forms`, `application_types`, `notifications`, `webhooks`, `files`, `media`, `translations`,
    `avatars`
-5. `gremien`, `site_config`, `audit`, `auth`, `antiabuse`, `pdf`
+6. `gremien`, `site_config`, `audit`, `auth`, `antiabuse`, `pdf`
 
 A module must import only from a module of its own layer or of a lower layer. An import inside
 a function counts like an import at the top of the file. A new module must get a layer in this

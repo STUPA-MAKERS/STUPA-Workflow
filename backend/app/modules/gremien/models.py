@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
+    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -18,6 +21,15 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, UUIDPkMixin
+
+#: The most delegations of one delegate in one meeting, for a Gremium without its own value.
+DEFAULT_DELEGATION_MAX_PER_DELEGATE = 2
+#: The upper end of the setting ``delegation_max_per_delegate``.
+MAX_DELEGATIONS_PER_DELEGATE = 20
+
+
+#: The start month of a term when no setting gives one: October.
+DEFAULT_TERM_START_MONTH = 10
 
 
 class Gremium(UUIDPkMixin, CreatedAtMixin, Base):
@@ -41,14 +53,46 @@ class Gremium(UUIDPkMixin, CreatedAtMixin, Base):
     delegation_lead_minutes: Mapped[int] = mapped_column(Integer, server_default="0")
     #: Allow delegation to users outside gremium & substitute pool.
     delegation_allow_external: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    #: The most delegations that one delegate holds in one meeting. A pool seat does
+    #: not count.
+    delegation_max_per_delegate: Mapped[int] = mapped_column(
+        Integer,
+        server_default=str(DEFAULT_DELEGATION_MAX_PER_DELEGATE),
+        default=DEFAULT_DELEGATION_MAX_PER_DELEGATE,
+    )
+    #: An election takes the ballot of a delegation. Off: an election refuses it.
+    delegation_in_elections: Mapped[bool] = mapped_column(
+        Boolean, server_default="false", default=False
+    )
     #: Default quorum for the votes of this gremium. It is the percentage of
     #: eligible voters that must take part, from 0 to 100. NULL = no default.
     quorum_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: The least number of present roster persons for the quorum of a meeting vote.
+    #: NULL = no least number, only the percent counts.
+    quorum_min_present: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: The quorum of a vote in a Wiederholungssitzung (meeting kind ``repeat``), in
+    #: percent. NULL = such a vote uses ``quorum_percent``.
+    repeat_quorum_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: The month on whose first day a term (Amtszeit) of this Gremium starts, 1 to 12.
+    #: A new Gremium takes the value of the meeting settings (000948).
+    term_start_month: Mapped[int] = mapped_column(
+        Integer, server_default=str(DEFAULT_TERM_START_MONTH), default=DEFAULT_TERM_START_MONTH
+    )
+    #: Admitted guests of a public meeting may vote. Off: guests only watch. A Gremium
+    #: with a quorum never lets guests vote, whatever this switch says.
+    guests_may_vote: Mapped[bool] = mapped_column(Boolean, server_default="false")
     #: The final protocols of this gremium appear without login on the public
     #: protocols page, as the public version only. Off by default.
     protocols_public: Mapped[bool] = mapped_column(Boolean, server_default="false")
     #: Extra addresses that get the final protocol in addition to the members.
     protocol_recipients: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
+
+    __table_args__ = (
+        CheckConstraint(
+            f"delegation_max_per_delegate BETWEEN 1 AND {MAX_DELEGATIONS_PER_DELEGATE}",
+            name="delegation_max_per_delegate",
+        ),
+    )
 
 
 class GremiumRole(UUIDPkMixin, Base):
@@ -65,7 +109,8 @@ class GremiumRole(UUIDPkMixin, Base):
     key: Mapped[str] = mapped_column(Text)
     name_i18n: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     #: Granular meeting-domain permissions of this role, as a list of keys:
-    #: session.manage, vote.manage, vote.cast, protocol.write, protocol.finalize.
+    #: session.manage, vote.manage, vote.cast, protocol.write, protocol.finalize,
+    #: todo.write, todo.configure, info.write.
     permissions: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
 
     __table_args__ = (UniqueConstraint("gremium_id", "key", name="uq_gremium_role_gremium_key"),)
@@ -180,4 +225,29 @@ class DelegationSubstitute(UUIDPkMixin, CreatedAtMixin, Base):
             postgresql_where=text("member_principal_id IS NULL"),
         ),
         Index("ix_delegation_substitute_gremium", "gremium_id"),
+    )
+
+
+class GremiumInfo(Base):
+    """The Info tab of a Gremium: one Markdown text and a list of labelled links.
+
+    One row per Gremium, created by the first save. ``links`` holds the list as
+    ``[{"label": ..., "url": ...}]`` in the order of the editor, because text and links
+    save together in one request. ``version`` counts the saves: a save sends the version
+    it read, so two editors cannot overwrite each other unseen (409).
+    """
+
+    __tablename__ = "gremium_info"
+
+    gremium_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("gremium.id", ondelete="CASCADE"), primary_key=True
+    )
+    body_md: Mapped[str] = mapped_column(Text, server_default="")
+    links: Mapped[list[dict[str, str]]] = mapped_column(JSONB, server_default="[]")
+    version: Mapped[int] = mapped_column(Integer, server_default="0")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("principal.id", ondelete="SET NULL"), nullable=True, index=True
     )

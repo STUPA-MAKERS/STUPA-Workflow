@@ -10,6 +10,7 @@
 * ``GET  /api/votes``                   - the votes the caller can read, with the own
   ballot state (no tally).
 * ``POST /api/votes/{id}/draw-lot``     - draw the lot of a tied election.
+* ``POST /api/votes/{id}/next-round``   - create the next Wahlgang of an election.
 * ``POST /api/votes``                   - create the poll of a Gremium (no meeting).
 * ``PATCH /api/votes/{id}``             - change a poll while it holds no ballot.
 
@@ -36,13 +37,18 @@ from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.meetings.publisher import MeetingPublisher, get_meeting_publisher
+from app.modules.voting.circular import CircularService
 from app.modules.voting.election import ElectionService
 from app.modules.voting.poll import PollService
-from app.modules.voting.poll_mails import notify_poll_started
+from app.modules.voting.poll_mails import MAIL_KINDS, notify_poll_started
+from app.modules.voting.repeat import restore_repeated_decision
 from app.modules.voting.schemas import (
     BallotAccepted,
     BallotIn,
-    PollCreate,
+    CancelReason,
+    CircularCreate,
+    CircularRulesOut,
+    GremiumVoteCreate,
     PollPatch,
     VoteClosed,
     VoteCreate,
@@ -89,12 +95,13 @@ ReaderDep = Annotated[Principal, Depends(require_principal())]
 def mail_poll_start(
     vote: VoteOut, background: BackgroundTasks, request: Request, settings: SettingsDep
 ) -> None:
-    """Send ``poll_started`` after the open of a poll of a Gremium (background task).
+    """Send the start mail after the open of a poll or an Umlaufverfahren of a Gremium.
 
-    A meeting poll runs in the room and sends no mail; a motion and an election send
-    none either.
+    It runs as a background task: ``poll_started`` for a poll, ``circular_open`` for an
+    Umlaufverfahren. A meeting poll runs in the room and sends no mail; a motion and an
+    election send none either.
     """
-    if vote.kind != "poll" or vote.meeting_id is not None or vote.status != "open":
+    if vote.kind not in MAIL_KINDS or vote.meeting_id is not None or vote.status != "open":
         return
     pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(notify_poll_started, settings, vote.id, pool)
@@ -106,22 +113,32 @@ def mail_poll_start(
     responses=_errors(400, 401, 403, 422),
 )
 async def create_poll(
-    payload: PollCreate,
+    payload: GremiumVoteCreate,
     service: ServiceDep,
     principal: ReaderDep,
     background: BackgroundTasks,
     request: Request,
     settings: SettingsDep,
 ) -> VoteOut:
-    """Create the poll of a Gremium, without a meeting and without an application.
+    """Create the poll or the Umlaufverfahren of a Gremium, without a meeting.
 
-    Only ``kind: poll``. The caller needs the gremium permission ``vote.manage`` in
-    ``eligibleGroup`` (or the admin role), else 403. ``closesAt`` lies at least one
-    hour ahead (422 ``closes_at_too_soon``); the deadline cron closes the poll then.
+    ``kind: poll`` or ``kind: circular``; a body without ``kind`` is a poll. An
+    Umlaufverfahren is a motion with the majority of the members; ``closesAt`` lies at
+    least ``circularMinDays`` days ahead (422 ``circular_window_too_short``). The rest
+    describes the poll. The caller needs the gremium permission
+    ``vote.manage`` in ``eligibleGroup`` (or the admin role), else 403. ``closesAt`` lies
+    at least one hour ahead (422 ``closes_at_too_soon``); the deadline cron closes the poll then.
     Without ``draft`` the poll opens at once, and the eligible members (``vote.cast``)
-    get the mail ``poll_started``.
+    get the mail ``poll_started``. An Umlaufverfahren that opens sends ``circular_open``
+    to them, and ``circular_reminder`` goes one day before its end to each member
+    without a ballot.
     """
-    vote = await PollService(service).create(payload, principal, now=datetime.now(UTC))
+    now = datetime.now(UTC)
+    vote = (
+        await CircularService(service).create(payload, principal, now=now)
+        if isinstance(payload, CircularCreate)
+        else await PollService(service).create(payload, principal, now=now)
+    )
     mail_poll_start(vote, background, request, settings)
     return vote
 
@@ -216,13 +233,18 @@ async def cancel_vote(
 
     The vote moves from ``open`` to ``cancelled``. It gets no result and fires no
     branch. The application stays in the ``vote`` state. This is the escape hatch when
-    the vote does not reach the quorum, because ``close`` is then blocked.
+    the vote does not reach the quorum, because ``close`` is then blocked. The cancel
+    of a repeat gives the application back the decision of the vote that it repeated.
     Gremium-scoped manage right. A meeting vote also needs the protokollant of the
     meeting, as open and close do: the cancel ends the vote of the room.
     """
     await service.assert_can_run_vote(vote_id, principal)
     vote = await service.cancel(vote_id, now=datetime.now(UTC), actor=principal.sub)
     await publisher.vote_cancelled(vote)
+    if vote.repeat_of_id is not None:
+        await restore_repeated_decision(
+            service.session, vote.application_id, vote.repeat_of_id, actor=principal.sub
+        )
     return vote
 
 
@@ -275,6 +297,12 @@ async def cast_ballot(
     gremium of the vote. The service holds the authorization: it checks the roster of
     the vote for the own ballot and a delegation row for the represented ballot. Both
     need a human session.
+
+    One cast counts for the own ballot and for each member that the caller represents
+    with a voting delegation, and ``ballots`` gives their number. ``asDelegation`` is
+    the cast of a person without an open own ballot. With an open own ballot it
+    answers 409 ``vote_as_unit``. An election takes the delegation ballots only with
+    the gremium switch ``delegationInElections`` (403 ``delegation_not_in_election``).
     """
     accepted = await service.cast(
         vote_id,
@@ -285,6 +313,30 @@ async def cast_ballot(
     )
     await publisher.vote_tally(await service.get(vote_id))
     return accepted
+
+
+@router.post(
+    "/votes/{vote_id}/objection",
+    response_model=VoteOut,
+    responses=_errors(401, 403, 404, 409),
+)
+async def object_to_circular(
+    vote_id: UUID,
+    service: ServiceDep,
+    publisher: PublisherDep,
+    principal: ReaderDep,
+) -> VoteOut:
+    """Object to an open Umlaufverfahren.
+
+    Each eligible member (``vote.cast`` in the Gremium, a human session) can object.
+    The first objection cancels the vote with ``cancelReason: objection``, and the
+    audit entry ``vote_cancel`` names the member. A vote of another kind answers 409
+    ``not_circular``, a vote that is not open 409 ``vote_not_open``.
+    """
+    vote = await CircularService(service).object(vote_id, principal, now=datetime.now(UTC))
+    await service.session.commit()
+    await publisher.vote_cancelled(vote)
+    return vote
 
 
 @router.post(
@@ -313,6 +365,47 @@ async def draw_lot(
     return vote
 
 
+@router.post(
+    "/votes/{vote_id}/next-round",
+    response_model=VoteOut,
+    status_code=201,
+    responses=_errors(401, 403, 404, 409),
+)
+async def next_round(
+    vote_id: UUID,
+    service: ServiceDep,
+    principal: ReaderDep,
+) -> VoteOut:
+    """Create the next Wahlgang of an election without the majority of the members.
+
+    Only a closed ``members_majority`` election with the result ``no_majority`` takes
+    the call, after its first or its second Wahlgang (§F/meetings/voting/000971). The
+    answer is the draft of the next Wahlgang on the same agenda item. The third
+    Wahlgang has the two candidates with the most votes; the server draws the lot for
+    a tied place. Another vote gives 409 ``no_next_round``, a second call 409
+    ``next_round_exists``, a motion 409 ``not_an_election``. Gremium-scoped manage
+    right (the meeting lead). A draft sends no event: the caller shows it from the answer.
+    """
+    await service.assert_can_manage_vote(vote_id, principal)
+    draft = await ElectionService(service).next_round(vote_id, principal, now=datetime.now(UTC))
+    await service.session.commit()
+    return await service.get(draft.id)
+
+
+@router.get(
+    "/votes/circular-rules",
+    response_model=CircularRulesOut,
+    responses=_errors(401),
+)
+async def circular_rules(service: ServiceDep, _principal: ReaderDep) -> CircularRulesOut:
+    """Return the rules that the form of a new Umlaufverfahren needs.
+
+    ``minDays`` is ``circularMinDays``: the least number of days between the start and
+    ``closesAt``.
+    """
+    return CircularRulesOut(minDays=await CircularService(service).min_days())
+
+
 @router.get(
     "/votes",
     response_model=Page[VoteListItem],
@@ -325,6 +418,7 @@ async def list_votes(
     gremium_id: Annotated[UUID | None, Query(alias="gremiumId")] = None,
     q: Annotated[str | None, Query(max_length=200)] = None,
     kind: Annotated[VoteKind | None, Query()] = None,
+    cancelled_reason: Annotated[CancelReason | None, Query(alias="cancelledReason")] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[VoteListItem]:
@@ -335,7 +429,8 @@ async def list_votes(
     ``application.read``, an eligible voter or a manager of the vote. ``status`` repeats
     (``?status=open&status=closed``). Without it the list leaves out the drafts.
     ``gremiumId`` keeps the votes of one gremium, and ``q`` searches the question and
-    the meeting title. ``kind`` keeps the motions, the elections or the polls. Each row
+    the meeting title. ``kind`` keeps the motions, the elections or the polls.
+    ``cancelledReason`` keeps of the cancelled votes only those with this reason. Each row
     carries ``canCast`` and the own ballot (``myBallot``; a secret vote gives only
     ``cast``) and no tally.
     """
@@ -345,6 +440,7 @@ async def list_votes(
         gremium_id=gremium_id,
         q=q,
         kind=kind,
+        cancelled_reason=cancelled_reason,
         limit=limit,
         offset=offset,
     )
@@ -368,7 +464,7 @@ async def get_vote(
     gremien get 403, so there is no cross-tenant read. ``canManage`` and ``canCast``
     tell what the caller may do with the vote. ``myBallot`` holds the own ballot of the
     caller (a secret vote gives only ``cast``), and ``representedCast`` tells whether
-    the caller cast the ballot of a delegator. ``openedAt`` and ``closedAt`` are the real
+    the caller cast the ballot of every delegator. ``openedAt`` and ``closedAt`` are the real
     open and end times. ``closesAt`` is the planned end of the cast window.
     """
     return await service.get_scoped(vote_id, principal)

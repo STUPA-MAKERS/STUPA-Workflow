@@ -20,7 +20,6 @@ from sqlalchemy import (
     Index,
     Text,
     UniqueConstraint,
-    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -30,9 +29,9 @@ from app.db import Base, CreatedAtMixin, UUIDPkMixin
 class MeetingDelegation(UUIDPkMixin, CreatedAtMixin, Base):
     """Delegation for a single meeting with an optional transfer of the voting right.
 
-    At most one takeover of the voting right exists per meeting and delegate, because a principal
-    casts exactly one ballot. A second voting delegation to the same person would lapse without a
-    message, because it is a transfer and not a duplicate.
+    A delegate can hold several delegations in one meeting, up to the limit of the Gremium
+    (``delegation_max_per_delegate``). One cast of the delegate writes one ballot for each
+    delegator with a voting delegation.
     """
 
     __tablename__ = "meeting_delegation"
@@ -57,13 +56,6 @@ class MeetingDelegation(UUIDPkMixin, CreatedAtMixin, Base):
     __table_args__ = (
         UniqueConstraint(
             "meeting_id", "delegator_principal_id", name="uq_meeting_delegation_delegator"
-        ),
-        Index(
-            "uq_meeting_delegation_voting_delegate",
-            "meeting_id",
-            "delegate_principal_id",
-            unique=True,
-            postgresql_where=text("delegate_voting"),
         ),
         Index("ix_meeting_delegation_meeting", "meeting_id"),
         Index("ix_meeting_delegation_delegate", "delegate_principal_id"),

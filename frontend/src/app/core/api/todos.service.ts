@@ -31,7 +31,7 @@ export type TodoLinkKind =
   | 'ticket'
   | 'todo';
 export type TodoVoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
-export type TodoVoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff';
+export type TodoVoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff' | 'no_majority';
 
 export interface TodoBoardSummary {
   readonly id: Uuid;

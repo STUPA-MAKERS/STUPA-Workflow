@@ -12,6 +12,7 @@ from . import (
     admin,
     applications,
     budget,
+    budget_plan,
     finance,
     flow_forms,
     meetings,
@@ -20,7 +21,18 @@ from . import (
     todos,
 )
 
-_GROUPS = (session, applications, flow_forms, meetings, todos, tickets, budget, finance, admin)
+_GROUPS = (
+    session,
+    applications,
+    flow_forms,
+    meetings,
+    todos,
+    tickets,
+    budget,
+    budget_plan,
+    finance,
+    admin,
+)
 
 
 def register_all(mcp: FastMCP) -> None:

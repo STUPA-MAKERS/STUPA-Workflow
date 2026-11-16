@@ -1,0 +1,31 @@
+<app-dialog
+  [open]="open()"
+  [title]="'meetings.approval.title' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="cancel()"
+>
+  <form (submit)="$event.preventDefault(); submit()">
+    <app-load-state [state]="state()" [lines]="1" [errorText]="'gremien.meetings.error' | t" (retry)="load()">
+      <ng-template #content>
+        @if (none()) {
+          <app-empty-state shape="choice" rows="2" [heading]="'meetings.approval.none' | t" />
+        } @else {
+          <app-select
+            name="approvedBy"
+            [id]="'pad-meeting'"
+            [label]="'meetings.approval.meeting' | t"
+            [options]="options()"
+            [required]="true"
+            [ngModel]="choice()"
+            (ngModelChange)="choice.set($event)"
+          />
+        }
+      </ng-template>
+    </app-load-state>
+    <button type="submit" hidden></button>
+  </form>
+  <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
+  <app-button dialog-footer variant="fill" [loading]="saving()" [disabled]="!choice()" (click)="submit()">
+    {{ 'meetings.approval.submit' | t }}
+  </app-button>
+</app-dialog>

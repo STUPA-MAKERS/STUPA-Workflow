@@ -11,13 +11,13 @@ import {
   IconComponent,
   InputComponent,
   LockedFieldComponent,
-  SelectFieldComponent,
   TextareaComponent,
   ScrollFadeDirective,
   SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { formatMoney } from '@shared/format-money';
 import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
+import { BudgetYearSelectComponent } from '../../budget/budget-year-select/budget-year-select.component';
 import { CostCentreSelectComponent } from '../../budget/cost-centre-select/cost-centre-select.component';
 import type { BudgetTreeNode } from '../../budget/budget-tree.api';
 import {
@@ -25,6 +25,7 @@ import {
   costCentreFigures,
   costCentreLabel,
   findBudgetNode,
+  findTopBudgetNode,
 } from '../../budget/expense-display.util';
 import type { FinanceFormLayout } from '../booking-form/booking-form.component';
 import type { ExpenseDialogsState } from '../expense-dialogs.state';
@@ -42,14 +43,14 @@ interface LegFree {
 
 /**
  * The transfer form: move an amount from
- * one cost centre to another in one fiscal year ("Übertrag"), or correct a transfer. It
+ * one cost centre to another in one fiscal year ("Umschichtung"), or correct a transfer. It
  * replaces the detail sheet.
  *
  * New: "Von → nach" with the two legs as cards (each opens `app-cost-centre-select`) and
  * "Frei danach" on each (the free amount now struck through, the amount after the
  * transfer), "Richtung tauschen", then the amount beside the fiscal year and the
  * description over the full width (one column in a narrow pane). The main action names
- * the amount ("500,00 € übertragen"). The edit has the amount and the description beside
+ * the amount ("500,00 € umschichten"). The edit has the amount and the description beside
  * the fiscal year, the dates and the note.
  *
  * Edit: the two cost centres of a transfer are fixed on the server, so the legs show
@@ -64,6 +65,7 @@ interface LegFree {
     ScrollFadeDirective,
     PaneFormHeadComponent,
     ButtonComponent,
+    BudgetYearSelectComponent,
     CostCentreSelectComponent,
     CurrencyInputComponent,
     DatepickerComponent,
@@ -73,7 +75,6 @@ interface LegFree {
     InputComponent,
     LockedFieldComponent,
     NgTemplateOutlet,
-    SelectFieldComponent,
     TextareaComponent,
     TranslatePipe,
   ],
@@ -110,6 +111,16 @@ export class TransferFormComponent {
   });
 
   /** "Frei danach" of the source (minus the amount) and the target (plus the amount). */
+  /** The budget of the picked source: the field of the pair starts with its year. */
+  protected readonly preferTop = computed(
+    () => findTopBudgetNode(this.tree(), this.dialogs().tFromId())?.id ?? '',
+  );
+
+  /** The cost centres of the budget of the pair (spec 000879). */
+  protected readonly pairTree = computed(() =>
+    this.tree().filter((top) => top.id === this.dialogs().tTopId()),
+  );
+
   protected readonly free = computed<{ from: LegFree | null; to: LegFree | null }>(() => {
     const d = this.dialogs();
     return {
@@ -118,7 +129,7 @@ export class TransferFormComponent {
     };
   });
 
-  /** The main action: "500,00 € übertragen", or "Übertragen" without an amount. */
+  /** The main action: "500,00 € umschichten", or "Umschichten" without an amount. */
   protected readonly submitLabel = computed(() => {
     const amount = this.amount();
     return amount > 0

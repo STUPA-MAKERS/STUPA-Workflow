@@ -17,11 +17,12 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, Depends, FastAPI
 from starlette.requests import HTTPConnection
 
 from app.db import dispose_engine, get_sessionmaker
 from app.deps import EmailSessionResolver, get_email_session_resolver
+from app.feature_routes import feature_gate
 from app.logging_config import configure_logging
 from app.middleware import (
     CsrfMiddleware,
@@ -52,12 +53,14 @@ from app.modules.auth.router import router as auth_router
 from app.modules.avatars.router import router as avatars_router
 from app.modules.backup.router import router as backup_router
 from app.modules.budget.form_options import budget_field_options
+from app.modules.budget.plan_router import router as budget_plan_router
 from app.modules.budget.tree_router import router as budget_tree_router
 from app.modules.calendar.public_router import router as public_calendar_router
 from app.modules.calendar.router import admin_router as calendar_admin_router
 from app.modules.calendar.router import router as calendar_router
 from app.modules.config_revision.router import router as config_revision_router
 from app.modules.delegations.router import router as delegations_router
+from app.modules.documents.router import router as application_pdf_router
 from app.modules.files.storage import build_object_storage
 from app.modules.flow.dispatch import ActionDispatcher, build_worker_dispatcher
 from app.modules.flow.router import get_action_dispatcher
@@ -83,6 +86,7 @@ from app.modules.notifications.router import (
 )
 from app.modules.privacy.request_router import router as erasure_request_router
 from app.modules.privacy.router import router as privacy_router
+from app.modules.protocol.documents_router import router as protocol_documents_router
 from app.modules.protocol.public_images_router import router as public_media_router
 from app.modules.protocol.public_router import router as public_protocol_router
 from app.modules.protocol.router import router as protocol_router
@@ -118,17 +122,20 @@ api_router.include_router(application_types_router)
 api_router.include_router(applications_router)
 api_router.include_router(application_links_router)
 api_router.include_router(application_observers_router)
+api_router.include_router(application_pdf_router)
 api_router.include_router(flow_router)
 api_router.include_router(voting_router)
 api_router.include_router(vote_open_router)
 api_router.include_router(livevote_router)
 api_router.include_router(public_meeting_router)
 api_router.include_router(protocol_router)
+api_router.include_router(protocol_documents_router)
 api_router.include_router(public_protocol_router)
 api_router.include_router(notifications_router)
 api_router.include_router(notification_settings_router)
 api_router.include_router(mail_templates_router)
 api_router.include_router(budget_tree_router)
+api_router.include_router(budget_plan_router)
 api_router.include_router(calendar_router)
 api_router.include_router(calendar_admin_router)
 api_router.include_router(public_calendar_router)
@@ -207,9 +214,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         await dispose_engine()
         await close_mail_pool(getattr(app.state, "arq_pool", None))
         state = getattr(app, "state", None)
-        redis_client = (
-            getattr(state, "_antiabuse_redis", None) if state is not None else None
-        )
+        redis_client = getattr(state, "_antiabuse_redis", None) if state is not None else None
         if redis_client is not None:
             await redis_client.aclose()
         await livevote_redis.aclose()
@@ -283,7 +288,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         }
     )
 
-    app.include_router(api_router)
+    app.include_router(api_router, dependencies=[Depends(feature_gate)])
     app.include_router(oauth_well_known_router)
     use_problem_json_contract(app)
     return app

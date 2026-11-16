@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
+import { map, type Observable } from 'rxjs';
 import { BrandingService, DEFAULT_LOGOS } from '@core/branding/branding.service';
 import { I18nService, baseLocale } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -28,7 +29,6 @@ import {
   IconComponent,
   InputComponent,
   NoteComponent,
-  SkeletonComponent,
   SwitchComponent,
   ToastService,
   PageHeaderComponent,
@@ -45,6 +45,9 @@ import { AdminApiService } from '../admin-api.service';
 import {
   type Branding,
   type FooterLink,
+  PDF_ASSET_ACCEPT_MIME,
+  type PdfAsset,
+  type PdfSlot,
   LOGO_ACCEPT_MIME,
   LOGO_MAX_SIZE_MB,
   type LogoSlot,
@@ -93,7 +96,6 @@ import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-stat
     SectionComponent,
     FilePickerComponent,
     FabComponent,
-    SkeletonComponent,
     FormsModule,
     TranslatePipe,
     ButtonComponent,
@@ -121,6 +123,20 @@ export class BrandingEditorComponent {
 
   protected readonly accept = LOGO_ACCEPT_MIME.join(',');
   protected readonly logoSlots: readonly LogoSlot[] = ['wordmark', 'imagemark', 'favicon'];
+  protected readonly pdfAccept = PDF_ASSET_ACCEPT_MIME.join(',');
+  protected readonly pdfSlots: readonly PdfSlot[] = ['logo', 'footer'];
+  /**
+   * The built-in graphics of the render service, copied to the assets (spec 001005): the row
+   * of a slot that holds the default shows its graphic, as the logo rows above do.
+   */
+  protected readonly pdfDefault: Readonly<Record<PdfSlot, string>> = {
+    logo: 'assets/logos/pdf-stupa.svg',
+    footer: 'assets/logos/pdf-skyline.svg',
+  };
+  /** The PDF branding (specs 000891, 000892). It saves at once, not with the draft. */
+  protected readonly pdfAssets = signal<Record<PdfSlot, PdfAsset | null>>({ logo: null, footer: null });
+  /** The PDF slot that a file is dragged over. */
+  protected readonly pdfDrop = signal<PdfSlot | null>(null);
   protected readonly freetexts = FREETEXTS;
   protected readonly submittedKinds: readonly SubmittedKind[] = ['internal', 'external'];
 
@@ -167,6 +183,14 @@ export class BrandingEditorComponent {
 
   constructor() {
     this.loadConfig();
+    if (this.section === 'branding') {
+      this.pdfSlots.forEach((slot) =>
+        this.api.getPdfAsset(slot).subscribe({
+          next: (asset) => this.setPdfAsset(slot, asset),
+          error: () => this.setPdfAsset(slot, null),
+        }),
+      );
+    }
     inject(DestroyRef).onDestroy(() => this.brand.previewAccent(undefined));
   }
 
@@ -358,6 +382,66 @@ export class BrandingEditorComponent {
       });
     };
     reader.readAsDataURL(file);
+  }
+
+  private setPdfAsset(slot: PdfSlot, asset: PdfAsset | null): void {
+    this.pdfAssets.update((all) => ({ ...all, [slot]: asset }));
+  }
+
+  protected pdfLabel(slot: PdfSlot): string {
+    return this.i18n.translate(`admin.brand.pdf.${slot}` as TranslationKey);
+  }
+
+  protected pdfNone(slot: PdfSlot): string {
+    return this.i18n.translate(`admin.brand.pdf.none.${slot}` as TranslationKey);
+  }
+
+  protected onPdfAssetSelected(slot: PdfSlot, files: File[]): void {
+    const file = files[0];
+    if (file) this.uploadPdfAsset(slot, file);
+  }
+
+  protected onPdfDragOver(slot: PdfSlot, event: DragEvent): void {
+    event.preventDefault();
+    this.pdfDrop.set(slot);
+  }
+
+  protected onPdfDrop(slot: PdfSlot, event: DragEvent): void {
+    event.preventDefault();
+    this.pdfDrop.set(null);
+    const file = event.dataTransfer?.files?.[0];
+    if (file) this.uploadPdfAsset(slot, file);
+  }
+
+  /** Check the type and the size, then upload the graphic at once. */
+  private uploadPdfAsset(slot: PdfSlot, file: File): void {
+    if (!PDF_ASSET_ACCEPT_MIME.includes(file.type)) {
+      this.toast.error(this.i18n.translate('admin.brand.badType'));
+      return;
+    }
+    if (file.size > LOGO_MAX_SIZE_MB * 1024 * 1024) {
+      this.toast.error(this.i18n.translate('admin.brand.tooLarge', { mb: LOGO_MAX_SIZE_MB }));
+      return;
+    }
+    this.savePdfAsset(slot, this.api.uploadPdfAsset(slot, file));
+  }
+
+  protected resetPdfAsset(slot: PdfSlot): void {
+    this.savePdfAsset(slot, this.api.resetPdfAsset(slot));
+  }
+
+  protected removePdfAsset(slot: PdfSlot): void {
+    this.savePdfAsset(slot, this.api.deletePdfAsset(slot).pipe(map(() => null)));
+  }
+
+  private savePdfAsset(slot: PdfSlot, request: Observable<PdfAsset | null>): void {
+    request.subscribe({
+      next: (asset) => {
+        this.setPdfAsset(slot, asset);
+        this.toast.success(this.i18n.translate('admin.common.saved'));
+      },
+      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+    });
   }
 
   protected removeLogo(slot: LogoSlot): void {

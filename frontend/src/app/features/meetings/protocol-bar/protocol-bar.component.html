@@ -10,6 +10,9 @@
         {{ (pub === 'public' ? 'meetings.protocolBar.public' : 'meetings.protocolBar.withheld') | t }}
       </span>
     }
+    @if (approvedText()) {
+      <span class="pb__hint pb__pub pb__pub--on">{{ approvedText() }}</span>
+    }
     @if (needsRight()) {
       <span class="pb__hint">{{ 'meetings.protocolBar.needsRight' | t }}</span>
     }
@@ -21,11 +24,46 @@
         {{ 'meetings.protocol.finalize' | t }}
       </app-button>
     }
+    @if (canSendDraft()) {
+      <app-button variant="text" size="sm" [loading]="draftSending()" (click)="confirmDraft.set(true)">
+        <app-icon name="mail" />
+        {{ 'meetings.protocolBar.sendDraft' | t }}
+      </app-button>
+    }
+    @if (canApprove()) {
+      @if (p.approvedAt) {
+        <app-button variant="text" size="sm" [loading]="approvalSaving()" (click)="confirmUnapprove.set(true)">
+          <app-icon name="x" />
+          {{ 'meetings.protocolBar.unapprove' | t }}
+        </app-button>
+      } @else {
+        <app-button variant="text" size="sm" (click)="approvalOpen.set(true)">
+          <app-icon name="check" />
+          {{ 'meetings.protocolBar.approve' | t }}
+        </app-button>
+      }
+    }
+    @if (canReopen()) {
+      <app-button variant="text" size="sm" [loading]="reopenSaving()" (click)="confirmReopen.set(true)">
+        <app-icon name="edit" />
+        {{ 'meetings.protocolBar.reopen' | t }}
+      </app-button>
+    }
     @if (canPublish()) {
       <app-button variant="text" size="sm" [loading]="publicationSaving()" (click)="togglePublication()">
         <app-icon [name]="publication() === 'withheld' ? 'globe' : 'eyeslash'" />
         {{ (publication() === 'withheld' ? 'meetings.protocolBar.publish' : 'meetings.protocolBar.withhold') | t }}
       </app-button>
+    }
+    @if (draftPdf(); as draft) {
+      <a class="pb__pdf" [href]="draft.internal" target="_blank" rel="noopener">
+        <app-icon name="download" [size]="15" />
+        {{ 'meetings.protocolBar.pdfInternal' | t }}
+      </a>
+      <a class="pb__pdf" [href]="draft.public" target="_blank" rel="noopener">
+        <app-icon name="download" [size]="15" />
+        {{ 'meetings.protocolBar.pdfPublic' | t }}
+      </a>
     }
     @if (p.isFinal) {
       @if (p.pdfUrl) {
@@ -43,3 +81,41 @@
     }
   </div>
 </div>
+
+<app-confirm-dialog
+  [open]="confirmDraft()"
+  [title]="'meetings.draftMail.title' | t"
+  [body]="draftBody()"
+  [confirmLabel]="'meetings.draftMail.confirm' | t"
+  [danger]="false"
+  (confirm)="sendDraft()"
+  (cancel)="confirmDraft.set(false)"
+/>
+
+<app-confirm-dialog
+  [open]="confirmUnapprove()"
+  [title]="'meetings.approval.removeTitle' | t"
+  [confirmLabel]="'action.remove' | t"
+  (confirm)="unapprove()"
+  (cancel)="confirmUnapprove.set(false)"
+/>
+
+<app-confirm-dialog
+  [open]="confirmReopen()"
+  [title]="'meetings.reopen.title' | t"
+  [body]="'meetings.reopen.body' | t"
+  [confirmLabel]="'meetings.reopen.confirm' | t"
+  [danger]="false"
+  (confirm)="reopen()"
+  (cancel)="confirmReopen.set(false)"
+/>
+
+@if (approvalOpen()) {
+  <app-protocol-approval-dialog
+    [open]="true"
+    [meeting]="meeting()"
+    [saving]="approvalSaving()"
+    (closed)="approvalOpen.set(false)"
+    (picked)="approve($event)"
+  />
+}

@@ -4,7 +4,8 @@
 ``due_at`` is over (`ExternalCalendarService.due`), at most `BATCH` per run, one after
 the other and each in its own transaction, so one slow or broken feed does not undo the
 others. A fetch goes through the SSRF guard and stops at 2 MB or 10 seconds
-(`HttpFeedFetcher`). A failed fetch keeps the entries of the last good one. An error of
+(`HttpFeedFetcher`). The read of the bytes runs in a process of its own and stops
+after 10 seconds (`read_feed`). A failed fetch keeps the entries of the last good one. An error of
 the run itself logs and does not stop the run.
 """
 
@@ -20,6 +21,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.db import get_sessionmaker
 from app.modules.calendar.external import ExternalCalendarService
 from app.modules.calendar.external_fetch import FeedFetcher, HttpFeedFetcher
+from app.modules.calendar.external_read import FeedReader, read_feed
+from app.modules.site_config.features import Feature
+from worker.features import job_feature_on
 
 logger = logging.getLogger("worker.calendars")
 
@@ -36,16 +40,25 @@ def _fetcher(ctx: dict[str, Any]) -> FeedFetcher:
     return fetcher if fetcher is not None else HttpFeedFetcher()
 
 
+def _reader(ctx: dict[str, Any]) -> FeedReader:
+    """Return the feed reader (tests inject one via ``ctx['calendars_reader']``)."""
+    reader = ctx.get("calendars_reader")
+    return reader if reader is not None else read_feed
+
+
 async def _fetch_one(
     maker: async_sessionmaker[AsyncSession],
     fetcher: FeedFetcher,
+    reader: FeedReader,
     calendar_id: UUID,
     moment: datetime,
 ) -> bool:
     """Fetch one calendar in its own transaction; return whether the fetch was good."""
     try:
         async with maker() as session:
-            good = await ExternalCalendarService(session).refresh(calendar_id, fetcher, moment)
+            good = await ExternalCalendarService(session).refresh(
+                calendar_id, fetcher, moment, reader
+            )
             await session.commit()
             return good
     except Exception:
@@ -57,11 +70,16 @@ async def fetch_external_calendars(ctx: dict[str, Any], now: datetime | None = N
     """Fetch every due external calendar.
 
     Returns:
-        The number of good fetches.
+        The number of good fetches. None while `Kalender` is off.
     """
     moment = now or datetime.now(UTC)
     maker = _sessionmaker(ctx)
+    if not await job_feature_on(maker, Feature.CALENDAR):
+        return 0
     fetcher = _fetcher(ctx)
+    reader = _reader(ctx)
     async with maker() as session:
         due = await ExternalCalendarService(session).due(moment)
-    return sum([await _fetch_one(maker, fetcher, calendar_id, moment) for calendar_id in due])
+    return sum(
+        [await _fetch_one(maker, fetcher, reader, calendar_id, moment) for calendar_id in due]
+    )
