@@ -23,7 +23,7 @@ from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import (
@@ -52,7 +52,7 @@ from app.modules.protocol.service import ProtocolService
 from app.settings import Settings
 from app.shared.antiabuse import rate_limit_pdf_render
 from app.shared.errors import ProblemDetail
-from app.shared.filenames import content_disposition
+from app.shared.preview import file_response
 
 router = APIRouter(tags=["protocol"])
 logger = logging.getLogger("app.protocol")
@@ -334,6 +334,7 @@ async def get_protocol_draft_pdf(
     service: ServiceDep,
     principal: PrincipalDep,
     variant: Literal["internal", "public"] = "internal",
+    inline: Annotated[bool, Query()] = False,
 ) -> Response:
     """Stream the PDF of a draft, with the watermark "Entwurf" on each page.
 
@@ -345,13 +346,13 @@ async def get_protocol_draft_pdf(
     """
     await service.authorize_read(protocol_id, principal)
     data, name = await DraftMailer(service).preview(protocol_id, public=variant == "public")
-    return Response(
-        content=data,
-        media_type="application/pdf",
-        headers={
-            "Content-Disposition": content_disposition("inline", name),
-            "Cache-Control": "no-store",
-        },
+    return file_response(
+        data,
+        name=name,
+        mime="application/pdf",
+        inline=inline,
+        disposition="inline",
+        extra={"Cache-Control": "no-store"},
     )
 
 
@@ -422,7 +423,10 @@ async def unapprove_protocol(
     response_class=Response,
 )
 async def get_protocol_pdf(
-    protocol_id: UUID, service: ServiceDep, principal: PrincipalDep
+    protocol_id: UUID,
+    service: ServiceDep,
+    principal: PrincipalDep,
+    inline: Annotated[bool, Query()] = False,
 ) -> Response:
     """Stream the protocol PDF inline, because MinIO has no browser access.
 
@@ -436,10 +440,8 @@ async def get_protocol_pdf(
     await service.authorize_read(protocol_id, principal)
     data = await service.get_pdf_bytes(protocol_id)
     name = await service.pdf_filename(protocol_id)
-    return Response(
-        content=data,
-        media_type="application/pdf",
-        headers={"Content-Disposition": content_disposition("inline", name)},
+    return file_response(
+        data, name=name, mime="application/pdf", inline=inline, disposition="inline"
     )
 
 
@@ -449,7 +451,10 @@ async def get_protocol_pdf(
     response_class=Response,
 )
 async def get_protocol_public_pdf(
-    protocol_id: UUID, service: ServiceDep, principal: PrincipalDep
+    protocol_id: UUID,
+    service: ServiceDep,
+    principal: PrincipalDep,
+    inline: Annotated[bool, Query()] = False,
 ) -> Response:
     """Stream the redacted public variant of the protocol.
 
@@ -460,8 +465,6 @@ async def get_protocol_public_pdf(
     await service.authorize_read(protocol_id, principal)
     data = await service.get_public_pdf_bytes(protocol_id)
     name = await service.pdf_filename(protocol_id, public=True)
-    return Response(
-        content=data,
-        media_type="application/pdf",
-        headers={"Content-Disposition": content_disposition("inline", name)},
+    return file_response(
+        data, name=name, mime="application/pdf", inline=inline, disposition="inline"
     )

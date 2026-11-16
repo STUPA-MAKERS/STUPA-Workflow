@@ -166,6 +166,11 @@ export class BudgetPlanApi {
     return this.http.get<BudgetPlan>(`${this.versionUrl(versionId)}/plan`, { context: skipLoading() });
   }
 
+  /** The route of a version as a file, for the file viewer (spec 001080). */
+  exportUrl(versionId: Uuid, format: PlanExportFormat): string {
+    return `${this.versionUrl(versionId)}/export.${format}`;
+  }
+
   /** A version as a file. Each reader of the plan can load it, a draft too. */
   exportVersion(versionId: Uuid, format: PlanExportFormat): Observable<PlanFile> {
     return this.http

@@ -12,6 +12,8 @@ import {
 } from './translations';
 
 const STORAGE_KEY = 'ap.locale';
+/** The built-in short name of the platform; it matches DEFAULT_APP_SHORT_NAME of the backend. */
+const DEFAULT_SHORT_NAME = 'STUPA';
 
 /**
  * The `Intl` locale tag behind each UI locale.
@@ -208,6 +210,20 @@ export class I18nService {
     return this._languages().find((l) => l.code === code)?.name ?? code.toUpperCase();
   }
 
+  /**
+   * The placeholders that every text may hold without a param: `{shortName}`, the short
+   * name of the branding (spec 001096). BrandingService sets them after the config load;
+   * until then the built-in short name stands in.
+   */
+  private readonly _brandParams = signal<Readonly<Record<string, string>>>({
+    shortName: DEFAULT_SHORT_NAME,
+  });
+
+  /** Set the branding placeholders (BrandingService, after each config load or save). */
+  setBrandParams(params: Readonly<Record<string, string>>): void {
+    this._brandParams.set({ shortName: DEFAULT_SHORT_NAME, ...params });
+  }
+
   /** Translate a key. Fallback chain: see {@link fallbackChain}, then the key itself. */
   translate(key: TranslationKey, params?: Record<string, string | number>): string {
     const overrides = this._overrides();
@@ -216,7 +232,8 @@ export class I18nService {
       .map((loc) => overrides[loc]?.[key] ?? catalogs[loc]?.[key])
       .find((text) => text !== undefined);
     const raw = found ?? key;
-    return params ? this.interpolate(raw, params) : raw;
+    if (!raw.includes('{')) return raw;
+    return this.interpolate(raw, { ...this._brandParams(), ...params });
   }
 
   private interpolate(text: string, params: Record<string, string | number>): string {

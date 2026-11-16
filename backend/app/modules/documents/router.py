@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 
 from app.deps import DbSession, SettingsDep
 from app.modules.applications.access import Access, require_app_view
@@ -22,7 +22,8 @@ from app.modules.files.storage import ObjectStorage
 from app.modules.pdf.typst_client import build_typst_client
 from app.shared.antiabuse import rate_limit_pdf_render
 from app.shared.errors import ProblemDetail
-from app.shared.filenames import content_disposition, title_token
+from app.shared.filenames import title_token
+from app.shared.preview import file_response
 
 router = APIRouter(tags=["applications"])
 
@@ -66,6 +67,7 @@ async def get_application_pdf(
     session: DbSession,
     service: Annotated[ApplicationPdfService, Depends(get_pdf_service)],
     access: Annotated[Access, Depends(require_app_view)],
+    inline: Annotated[bool, Query()] = False,
 ) -> Response:
     """Download the current version of an Antrag as PDF.
 
@@ -76,8 +78,4 @@ async def get_application_pdf(
     doc = await service.reader_doc(ApplicationsService(session), access)
     pdf = await service.render(doc)
     name = application_pdf_filename(doc.title, doc.received_on)
-    return Response(
-        content=pdf,
-        media_type="application/pdf",
-        headers={"Content-Disposition": content_disposition("attachment", name)},
-    )
+    return file_response(pdf, name=name, mime="application/pdf", inline=inline)

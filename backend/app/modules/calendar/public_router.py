@@ -31,8 +31,10 @@ from app.modules.calendar.public import (
     RedisFeedCache,
 )
 from app.modules.calendar.schemas import EntriesOut
+from app.modules.site_config.names import active_short_name, name_slug
 from app.shared.antiabuse import _redis_client, rate_limit_public_protocols
 from app.shared.errors import ProblemDetail, ValidationProblem
+from app.shared.filenames import content_disposition
 
 router = APIRouter(prefix="/public", tags=["public-calendar"])
 
@@ -161,7 +163,9 @@ async def public_calendar_feed(
         content=body,
         media_type=_ICS_MEDIA_TYPE,
         headers={
-            "Content-Disposition": 'inline; filename="stupa-kalender.ics"',
+            "Content-Disposition": content_disposition(
+                "inline", f"{name_slug(await active_short_name(service.session))}-kalender.ics"
+            ),
             "Cache-Control": f"public, max-age={FEED_TTL_SECONDS}",
         },
     )
@@ -169,9 +173,10 @@ async def public_calendar_feed(
 
 async def _build_feed(service: PublicCalendarService, base_url: str) -> bytes:
     meetings, appointments = await service.feed()
+    short_name = await active_short_name(service.session)
     return build_calendar(
         meetings,
         domain=urlsplit(base_url).hostname or "stupa.local",
         appointments=appointments,
-        calendar_name="STUPA — Öffentlicher Kalender",
+        calendar_name=f"{short_name} — Öffentlicher Kalender",
     )

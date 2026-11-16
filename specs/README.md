@@ -66,6 +66,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/accounts/000586](requirements/functional/administration/accounts/000586_email-login-confirms.md) | The e-mail login confirms the open guest Anträge of the address | approved |
 | [F/administration/accounts/000587](requirements/functional/administration/accounts/000587_email-login-account-owner.md) | A confirmed guest Antrag of an account address belongs to the account | approved |
 | [F/administration/accounts/000630](requirements/functional/administration/accounts/000630_link-terms.md) | A magic link opens one Antrag, a login link opens an address | approved |
+| [F/administration/accounts/001095](requirements/functional/administration/accounts/001095_account-name.md) | The account on the login names the short name | approved |
 | [F/administration/accounts/001120](requirements/functional/administration/accounts/001120_profile-page.md) | The account area has a profile page with the SSO claims | draft |
 | [F/administration/accounts/001121](requirements/functional/administration/accounts/001121_profile-token-claims.md) | The profile page hides the claims of the token itself | draft |
 | [F/administration/accounts/001122](requirements/functional/administration/accounts/001122_profile-gravatar-link.md) | The profile picture links to Gravatar | draft |
@@ -96,6 +97,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/000942](requirements/functional/administration/admin/000942_periods-fixed-at-start.md) | A changed period does not reach a started case | approved |
 | [F/administration/admin/000980](requirements/functional/administration/admin/000980_embedded-pdfs-follow-sitzungen.md) | The embedded PDFs belong to the feature Sitzungen | approved |
 | [F/administration/admin/001005](requirements/functional/administration/admin/001005_pdf-default-preview.md) | The branding page shows the built-in PDF graphics | approved |
+| [F/administration/admin/001090](requirements/functional/administration/admin/001090_page-head-branding.md) | The page head follows the branding before any script runs | approved |
+| [F/administration/admin/001091](requirements/functional/administration/admin/001091_link-preview-image.md) | The link preview shows the Bildmarke | approved |
+| [F/administration/admin/001092](requirements/functional/administration/admin/001092_app-icons-from-bildmarke.md) | The app icons follow the Bildmarke | approved |
+| [F/administration/admin/001093](requirements/functional/administration/admin/001093_branding-description.md) | The branding holds the description of the platform | approved |
 | [F/administration/audit/000291](requirements/functional/administration/audit/000291_record-in-tx.md) | An audit entry is written in the same transaction | approved |
 | [F/administration/audit/000292](requirements/functional/administration/audit/000292_chain-check.md) | The audit chain is checked every night | approved |
 | [F/administration/audit/000293](requirements/functional/administration/audit/000293_three-permissions.md) | Read, check and revert are separate permissions | approved |
@@ -113,6 +118,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/files/000341](requirements/functional/administration/files/000341_file-access.md) | File access follows the access to the Antrag | approved |
 | [F/administration/files/000342](requirements/functional/administration/files/000342_drafts.md) | Wizard uploads are drafts | approved |
 | [F/administration/files/000464](requirements/functional/administration/files/000464_draft-caps.md) | Wizard drafts are capped and expire | approved |
+| [F/administration/files/001080](requirements/functional/administration/files/001080_download-opens-viewer.md) | A download of a viewable file opens the file viewer | approved |
 | [F/administration/privacy/000457](requirements/functional/administration/privacy/000457_erasure-request.md) | An applicant can request the erasure of an Antrag | approved |
 | [F/administration/privacy/000458](requirements/functional/administration/privacy/000458_data-export.md) | The data export is an audited XLSX | approved |
 | [F/administration/translations/000136](requirements/functional/administration/translations/000136_all-languages-editable.md) | Every i18n text is editable in English too | approved |
@@ -225,6 +231,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/tickets/000315](requirements/functional/collaboration/tickets/000315_sender-block.md) | A sender can be blocked | approved |
 | [F/collaboration/tickets/000316](requirements/functional/collaboration/tickets/000316_ticket-retention.md) | Closed tickets are anonymized after the retention time | approved |
 | [F/collaboration/tickets/000317](requirements/functional/collaboration/tickets/000317_context-url.md) | A ticket context keeps only platform pages | approved |
+| [F/collaboration/tickets/001096](requirements/functional/collaboration/tickets/001096_system-entry-name.md) | A system entry names the short name | approved |
 | [F/collaboration/todos/000147](requirements/functional/collaboration/todos/000147_board-kinds.md) | Boards per Gremium, per person and per team | approved |
 | [F/collaboration/todos/000148](requirements/functional/collaboration/todos/000148_move-sheet.md) | One move sheet | approved |
 | [F/collaboration/todos/000149](requirements/functional/collaboration/todos/000149_no-status-sync.md) | No status sync between ticket and card | approved |
@@ -449,6 +456,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/calendar/000746](requirements/functional/meetings/calendar/000746_week-whole-day.md) | The week view shows the whole day from 00:00 to 24:00 | approved |
 | [F/meetings/calendar/000973](requirements/functional/meetings/calendar/000973_rule-with-day-times.md) | A recurrence rule with times of the day gives only the first date | approved |
 | [F/meetings/calendar/000974](requirements/functional/meetings/calendar/000974_feed-read-time-limit.md) | The read of an external feed has a time limit | approved |
+| [F/meetings/calendar/001094](requirements/functional/meetings/calendar/001094_feed-name.md) | A calendar feed is named by the short name | approved |
 | [F/meetings/delegations/000110](requirements/functional/meetings/delegations/000110_per-gremium.md) | Vote delegation is a Gremium setting | approved |
 | [F/meetings/delegations/000111](requirements/functional/meetings/delegations/000111_delegation-blocks-presence.md) | A member with an active delegation is not present | approved |
 | [F/meetings/delegations/000112](requirements/functional/meetings/delegations/000112_one-pool.md) | The substitute pool is the only substitute rule | approved |
@@ -732,6 +740,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/security/files/000469](requirements/non-functional/security/files/000469_invoice-xml-no-entities.md) | The ZUGFeRD XML parser resolves no entities | approved |
 | [NF/security/files/000869](requirements/non-functional/security/files/000869_pdf-upload.md) | An embedded PDF is checked on upload | approved |
 | [NF/security/files/000979](requirements/non-functional/security/files/000979_embedded-pdf-read-right.md) | An embedded PDF needs the read right of its Sitzung | approved |
+| [NF/security/files/001083](requirements/non-functional/security/files/001083_framable-pdf-preview.md) | A file that the viewer shows has a sandboxed inline preview | approved |
 | [NF/security/integrity/000183](requirements/non-functional/security/integrity/000183_audit-chain.md) | The audit log is append-only | approved |
 | [NF/security/integrity/000184](requirements/non-functional/security/integrity/000184_sandboxed-mail.md) | Mail templates run sandboxed | approved |
 | [NF/security/integrity/000295](requirements/non-functional/security/integrity/000295_canonical-hash.md) | The hash input is canonical | approved |
@@ -801,6 +810,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/000702](requirements/non-functional/usability/controls/000702_date-shortcut-month-end.md) | A month or year shortcut stops at the end of the month | approved |
 | [NF/usability/controls/000741](requirements/non-functional/usability/controls/000741_load-more-button.md) | A button that loads more rows of a list is centred with a chevron | approved |
 | [NF/usability/controls/000931](requirements/non-functional/usability/controls/000931_back-closes-budget-dialogs.md) | Back closes the dialogs of the Haushalt | approved |
+| [NF/usability/controls/001082](requirements/non-functional/usability/controls/001082_open-label.md) | A button that opens a file says Öffnen | approved |
 | [NF/usability/layout/000192](requirements/non-functional/usability/layout/000192_one-geometry.md) | All list and detail pages share one geometry | approved |
 | [NF/usability/layout/000193](requirements/non-functional/usability/layout/000193_scroll-edges.md) | A scroll edge fades, or cuts at a line | approved |
 | [NF/usability/layout/000194](requirements/non-functional/usability/layout/000194_phone-breakpoint.md) | The phone layout starts below 768 px | approved |
@@ -847,6 +857,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/000743](requirements/non-functional/usability/layout/000743_week-day-lines-on-pull.md) | The day lines of the week grid stay when the hours are pulled | approved |
 | [NF/usability/layout/000745](requirements/non-functional/usability/layout/000745_week-blocks-overlap.md) | A later entry lies on an earlier one in the week view | approved |
 | [NF/usability/layout/001016](requirements/non-functional/usability/layout/001016_no-sticky-bar-in-tab-pager.md) | A search bar in a paged tab does not stick | approved |
+| [NF/usability/layout/001079](requirements/non-functional/usability/layout/001079_file-viewer-above-everything.md) | The file viewer lies above everything | approved |
+| [NF/usability/layout/001081](requirements/non-functional/usability/layout/001081_phone-pdf-system-viewer.md) | A PDF on a phone opens in the system viewer | approved |
+| [NF/usability/layout/001084](requirements/non-functional/usability/layout/001084_file-viewer-glass-bar.md) | The file viewer is dark frosted glass | approved |
 | [P/integrations/webhooks/000963](protocols/integrations/webhooks/000963_webhook-delivery.md) | A webhook delivery is a signed JSON POST | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |

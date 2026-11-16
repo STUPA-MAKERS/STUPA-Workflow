@@ -31,7 +31,7 @@ from app.modules.protocol.public import (
 from app.modules.protocol.public_decisions import PublicDecisionPage, list_public_decisions
 from app.shared.antiabuse import rate_limit_public_protocol_pdf, rate_limit_public_protocols
 from app.shared.errors import ProblemDetail
-from app.shared.filenames import content_disposition
+from app.shared.preview import file_response
 
 router = APIRouter(prefix="/public", tags=["public-protocols"])
 
@@ -181,15 +181,15 @@ async def get_public_protocol(protocol_id: UUID, service: ServiceDep) -> PublicP
     dependencies=[_PDF_LIMIT],
     responses=_errors(404, 422, 429, 503),
 )
-async def get_public_protocol_pdf(protocol_id: UUID, service: ServiceDep) -> Response:
+async def get_public_protocol_pdf(
+    protocol_id: UUID,
+    service: ServiceDep,
+    inline: Annotated[bool, Query()] = False,
+) -> Response:
     """Stream the public PDF of one protocol through the API.
 
     The bytes come from the object storage server-side, never from a presigned
     bucket URL. The internal PDF is never served here.
     """
     data, name = await service.get_pdf(protocol_id)
-    return Response(
-        content=data,
-        media_type="application/pdf",
-        headers={"Content-Disposition": content_disposition("attachment", name)},
-    )
+    return file_response(data, name=name, mime="application/pdf", inline=inline)

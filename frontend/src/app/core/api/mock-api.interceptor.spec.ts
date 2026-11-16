@@ -315,7 +315,7 @@ describe('mockApiInterceptor', () => {
 
     it('GET the attachments of the magic-link demo application', async () => {
       const list = await get<unknown[]>('/api/applications/33333333-3333-3333-3333-333333333333/attachments');
-      expect(list).toHaveLength(2);
+      expect(list).toHaveLength(3);
     });
 
     it('GET …/versions → version history', async () => {

@@ -56,6 +56,17 @@ describe('I18nService', () => {
     expect(i18n.translate('nav.dashboard', { x: 1 })).toBe('Dashboard');
   });
 
+  /** Spec 001096: `{shortName}` is the short name of the branding, without a param. */
+  it('fills the short name of the branding into every text', () => {
+    const i18n = service();
+    expect(i18n.translate('login.accountName')).toBe('STUPA-Konto');
+    expect(i18n.translate('todos.event.system')).toBe('STUPA');
+    i18n.setBrandParams({ shortName: 'AStA' });
+    expect(i18n.translate('login.accountName')).toBe('AStA-Konto');
+    expect(i18n.translate('tickets.event.system')).toBe('AStA');
+    expect(i18n.translate('login.sso.title', { account: 'X' })).toBe('Mit X');
+  });
+
   it('ignores unsupported locales', () => {
     const i18n = service();
     i18n.setLocale('fr' as never);

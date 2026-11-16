@@ -1,7 +1,8 @@
 import { computed, inject, signal } from '@angular/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
-import { downloadBlob, liveSearch, type SelectOption, ToastService } from '@stupa-makers/ui-kit';
+import { FileOpenService } from '@shared/viewer/file-open.service';
+import { liveSearch, type SelectOption, ToastService } from '@stupa-makers/ui-kit';
 import type { Uuid } from '@core/api/models';
 import {
   BudgetTreeApi,
@@ -41,6 +42,7 @@ export function currentFiscalYear(
  */
 export class ExpenseDialogsState {
   private readonly api = inject(BudgetTreeApi);
+  private readonly files = inject(FileOpenService);
   private readonly apps = inject(ApiClient);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
@@ -455,12 +457,9 @@ export class ExpenseDialogsState {
       });
   }
 
-  /** MinIO is internal only, so the API streams the PDF as a blob. */
+  /** The receipt opens in the file viewer (spec 001080), streamed through the API. */
   openInvoiceFile(inv: Invoice): void {
-    this.api.invoiceFileBlob(inv.id).subscribe({
-      next: (blob) => downloadBlob(blob, inv.fileName || 'beleg.pdf'),
-      error: (err) => this.toast.error(this.failureText(err)),
-    });
+    this.files.open({ name: inv.fileName || 'Beleg.pdf', url: this.api.invoiceFileUrl(inv.id), kind: 'pdf' });
   }
 
   openEdit(e: Expense): void {

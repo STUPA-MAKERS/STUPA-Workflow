@@ -743,6 +743,11 @@ export class BudgetTreeApi {
     form.append('file', file);
     return this.http.post<InvoiceFileResult>(`${this.base}/invoices/file`, form);
   }
+  /** The route of the original document, for the file viewer (spec 001080). */
+  invoiceFileUrl(id: Uuid): string {
+    return `${this.base}/invoices/${id}/file`;
+  }
+
   /** Load the original document as a blob. The API streams the PDF because MinIO is
    *  reachable only internally, so a presigned URL would carry an internal host. */
   invoiceFileBlob(id: Uuid): Observable<Blob> {

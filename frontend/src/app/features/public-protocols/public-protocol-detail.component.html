@@ -38,8 +38,8 @@
       </div>
       @if (p.hasPdf) {
         <div class="pd__pdf">
-          <a class="pd__btn pd__btn--fill" [href]="pdfUrl(p)" download>
-            <app-icon name="download" [size]="17" />
+          <a class="pd__btn pd__btn--fill" [href]="pdfUrl(p)" download (click)="openPdf($event, p)">
+            <app-icon name="file" [size]="17" />
             {{ 'publicProtocols.pdf' | t }}
           </a>
           @if (pdfSize(p)) {

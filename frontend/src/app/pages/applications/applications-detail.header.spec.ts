@@ -9,7 +9,6 @@ jest.mock('@stupa-makers/ui-kit', () => ({
   __esModule: true,
   ...jest.requireActual('@stupa-makers/ui-kit'),
 }));
-import * as kit from '@stupa-makers/ui-kit';
 import { signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import {
@@ -17,6 +16,7 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
+import { TestBed } from '@angular/core/testing';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { BehaviorSubject } from 'rxjs';
@@ -32,6 +32,7 @@ import type {
 } from '@core/api/models';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { RailStatusService } from '../../layout/rail-status.service';
+import { FileOpenService } from '@shared/viewer/file-open.service';
 import { ApplicationsDetailComponent } from './applications-detail.component';
 import { ApplicationsPageService, type ApplicationChange } from './applications-page.service';
 import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
@@ -341,7 +342,7 @@ describe('ApplicationsDetailComponent — header', () => {
       const { detectChanges } = await setup();
       await openMenu(detectChanges);
       const items = screen.getAllByRole('menuitem').map((el) => el.textContent?.trim());
-      expect(items).toEqual(['Status setzen', 'Beobachter:innen', 'Versionen vergleichen', 'Als PDF herunterladen', 'Löschen']);
+      expect(items).toEqual(['Status setzen', 'Beobachter:innen', 'Versionen vergleichen', 'Als PDF öffnen', 'Löschen']);
       expect(screen.getByRole('menuitem', { name: 'Löschen' })).toHaveClass('rm__item--danger');
     });
 
@@ -351,7 +352,7 @@ describe('ApplicationsDetailComponent — header', () => {
       expect(screen.getAllByRole('menuitem').map((el) => el.textContent?.trim())).toEqual([
         'Beobachter:innen',
         'Versionen vergleichen',
-        'Als PDF herunterladen',
+        'Als PDF öffnen',
         'Anonymisierung beantragen',
       ]);
       await userEvent.click(screen.getByRole('menuitem', { name: 'Anonymisierung beantragen' }));
@@ -429,42 +430,15 @@ describe('ApplicationsDetailComponent — header', () => {
       expect(cmp.menuSections().flatMap((s) => s.items.map((i) => i.id))).toEqual(['pdf']);
     });
 
-    it('downloads the PDF under the name of the server, once at a time', async () => {
-      const dl = jest.spyOn(kit, 'downloadBlob').mockImplementation(() => undefined);
-      const { cmp, http } = await setup();
+    it('opens the PDF in the file viewer (001080)', async () => {
+      const { cmp } = await setup();
+      const files = TestBed.inject(FileOpenService);
+      const open = jest.spyOn(files, 'open').mockImplementation(() => undefined);
       cmp.onMenu({ id: 'pdf', label: '' });
-      cmp.onMenu({ id: 'pdf', label: '' });
-      const req = http.expectOne((r) => r.url === '/api/applications/app-1/pdf');
-      expect(req.request.responseType).toBe('blob');
-      req.flush(new Blob(['%PDF']), {
-        headers: {
-          'Content-Disposition':
-            "attachment; filename=\"Antrag_Plakate_2026-11-10.pdf\"; filename*=UTF-8''Antrag_Pl%C3%A4kate_2026-11-10.pdf",
-        },
-      });
-      expect(dl).toHaveBeenCalledWith(expect.any(Blob), 'Antrag_Pläkate_2026-11-10.pdf');
-      expect(cmp.pdfBusy()).toBe(false);
-      dl.mockRestore();
-    });
-
-    it('tells a failed PDF in a toast', async () => {
-      const { cmp, http, toast } = await setup();
-      const error = jest.spyOn(toast, 'error');
-      cmp.downloadPdf('app-1');
-      http
-        .expectOne((r) => r.url === '/api/applications/app-1/pdf')
-        .flush(new Blob(['x']), { status: 503, statusText: 'Unavailable' });
-      expect(error).toHaveBeenCalledWith('Das PDF konnte nicht erstellt werden.');
-      expect(cmp.pdfBusy()).toBe(false);
-    });
-
-    it('saves nothing for an empty PDF response', async () => {
-      const dl = jest.spyOn(kit, 'downloadBlob').mockImplementation(() => undefined);
-      const { cmp, http } = await setup();
-      cmp.downloadPdf('app-1');
-      http.expectOne((r) => r.url === '/api/applications/app-1/pdf').flush(null);
-      expect(dl).not.toHaveBeenCalled();
-      dl.mockRestore();
+      expect(open).toHaveBeenCalledWith(
+        expect.objectContaining({ url: '/api/applications/app-1/pdf', kind: 'pdf' }),
+      );
+      expect(open.mock.calls[0][0].name).toMatch(/\.pdf$/);
     });
 
     /** The edit form needs structuredClone, which jsdom lacks. */

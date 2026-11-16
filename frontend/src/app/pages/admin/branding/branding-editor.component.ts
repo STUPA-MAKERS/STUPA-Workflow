@@ -200,8 +200,13 @@ export class BrandingEditorComponent {
     this.loadFailed.set(false);
     this.api.getSiteConfig().subscribe({
       next: (cfg) => {
-        this.draft.set(cfg.branding);
-        this.keepSaved(cfg.branding);
+        // A config from before the description (spec 001093) has none; the field edits a map.
+        const branding = cfg.branding && {
+          ...cfg.branding,
+          description: cfg.branding.description ?? {},
+        };
+        this.draft.set(branding);
+        this.keepSaved(branding);
         this.markSaved(this.editRev());
         this.brand.applyBranding(cfg.branding);
         this.brand.previewAccent(undefined);
@@ -259,6 +264,16 @@ export class BrandingEditorComponent {
   /** The built-in copyright line in the picked language: the placeholder of the field. */
   protected copyrightDefault(): string {
     return this.builtIn('footer.coBranding');
+  }
+
+  /** The built-in description in the picked language: the placeholder of its field. */
+  protected descriptionDefault(): string {
+    return this.builtIn('app.description');
+  }
+
+  /** The description map; the load gives every draft one. */
+  protected descriptionMap(d: Branding): I18nMap {
+    return d.description ?? {};
   }
 
   /** The built-in app name: the placeholder of the name field. */
