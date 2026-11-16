@@ -68,6 +68,7 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
         "VotingService.assert_can_manage_group (manages_votes_in_gremium)"
     ),
     ("GET", "/api/auth/me"): _SELF,
+    ("GET", "/api/auth/me/profile"): _SELF,
     ("GET", "/api/budget-plan-versions/{version_id}/plan"): _BUDGET_NODE,
     ("GET", "/api/budget-plan-versions/{version_id}/readable"): _BUDGET_NODE,
     ("GET", "/api/budget-plan-versions/{version_id}/export.xlsx"): _BUDGET_NODE,

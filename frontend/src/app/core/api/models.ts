@@ -129,6 +129,21 @@ export interface GremiumRef {
   readonly slug: string;
 }
 
+/** One SSO claim about the person: the claim name and its JSON value. */
+export interface ProfileClaim {
+  readonly key: string;
+  readonly value: unknown;
+}
+
+/** GET /auth/me/profile: the stored facts of the principal and the SSO claims. */
+export interface Profile {
+  readonly sub: string;
+  readonly email: string | null;
+  readonly displayName: string | null;
+  readonly lastLogin: string | null;
+  readonly claims: readonly ProfileClaim[];
+}
+
 export interface Principal {
   readonly sub: Uuid;
   readonly email?: string | null;

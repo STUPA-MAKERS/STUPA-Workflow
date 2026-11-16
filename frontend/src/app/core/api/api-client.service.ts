@@ -40,6 +40,7 @@ import type {
   ConsentRequest,
   McpSetup,
   NotificationPreference,
+  Profile,
   OAuthGrant,
   PersonRef,
   Application,
@@ -1382,6 +1383,11 @@ export class ApiClient {
     return this.http
       .post<ProtocolOutWire>(`${this.base}/protocols/${protocolId}/finalize`, body)
       .pipe(map(mapProtocol));
+  }
+
+  /** GET /auth/me/profile — the SSO claims of the signed-in person (spec 001120). */
+  getMyProfile(): Observable<Profile> {
+    return this.http.get<Profile>(`${this.base}/auth/me/profile`, { context: skipLoading() });
   }
 
   /** GET /notifications/preferences — own toggles (full catalog). */

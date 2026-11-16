@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Literal
+from datetime import datetime
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import EmailStr, Field
 
 from app.shared.altcha import AltchaSolutionStr
-from app.shared.schemas import FrozenModel
+from app.shared.schemas import FrozenCamelModel, FrozenModel
 
 
 class MagicLinkRequest(FrozenModel, frozen=True):
@@ -66,6 +67,23 @@ class GremiumRef(FrozenModel, frozen=True):
     id: UUID
     name: str
     slug: str
+
+
+class ProfileClaim(FrozenModel, frozen=True):
+    """One claim of the SSO about the person: the claim name and its JSON value."""
+
+    key: str
+    value: Any
+
+
+class ProfileOut(FrozenCamelModel, frozen=True):
+    """The profile page: the stored facts of the principal and the SSO claims."""
+
+    sub: str
+    email: str | None = None
+    display_name: str | None = Field(default=None, alias="displayName")
+    last_login: datetime | None = Field(default=None, alias="lastLogin")
+    claims: tuple[ProfileClaim, ...] = ()
 
 
 class MeOut(FrozenModel, frozen=True):

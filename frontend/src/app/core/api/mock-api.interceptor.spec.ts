@@ -274,6 +274,11 @@ describe('mockApiInterceptor', () => {
       expect(me.permissions).toContain('budget.book');
     });
 
+    it('GET /auth/me/profile → mock profile with claims', async () => {
+      const profile = await get<{ claims: { key: string }[] }>('/api/auth/me/profile');
+      expect(profile.claims.map((c) => c.key)).toContain('groups');
+    });
+
     it('GET /altcha/challenge → 404 error', async () => {
       await expect(get('/api/altcha/challenge')).rejects.toMatchObject({ status: 404 });
     });

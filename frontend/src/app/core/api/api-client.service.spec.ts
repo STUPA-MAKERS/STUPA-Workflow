@@ -1252,6 +1252,16 @@ describe('ApiClient', () => {
     });
   });
 
+  it('reads the own profile', (done) => {
+    api.getMyProfile().subscribe((p) => {
+      expect(p.sub).toBe('u-1');
+      done();
+    });
+    const req = http.expectOne('/api/auth/me/profile');
+    expect(req.request.method).toBe('GET');
+    req.flush({ sub: 'u-1', email: null, displayName: null, lastLogin: null, claims: [] });
+  });
+
   it('lists notification preferences', (done) => {
     api.listNotificationPreferences().subscribe((prefs) => {
       expect(prefs).toEqual([]);
