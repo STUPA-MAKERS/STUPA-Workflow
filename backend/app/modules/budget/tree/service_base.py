@@ -364,10 +364,16 @@ class BudgetTreeServiceBase:
             .join(BudgetPlanVersion, BudgetPlanVersion.plan_id == BudgetPlan.id)
             .join(BudgetPlanLine, BudgetPlanLine.version_id == BudgetPlanVersion.id)
             .join(Budget, Budget.id == BudgetPlanLine.budget_id)
-            .where(BudgetPlanVersion.state == "in_force", BudgetPlanLine.side == "income")
+            .where(
+                BudgetPlanVersion.state == "in_force",
+                BudgetPlanLine.side == "income",
+                *_applied(
+                    BudgetPlan.fiscal_year_id.in_(fiscal_year_ids)
+                    if fiscal_year_ids is not None
+                    else None
+                ),
+            )
         )
-        if fiscal_year_ids is not None:
-            stmt = stmt.where(BudgetPlan.fiscal_year_id.in_(fiscal_year_ids))
         return [(fy, path) for fy, path in (await self.session.execute(stmt)).all()]
 
     async def is_income(self, node: Budget, fiscal_year_id: UUID) -> bool:
@@ -375,13 +381,17 @@ class BudgetTreeServiceBase:
         paths = [path for _fy, path in await self.income_titel_paths([fiscal_year_id])]
         return plan_rules.is_below_path(node.tree_path, paths)
 
-    async def _refuse_income(self, node: Budget, fiscal_year_id: UUID) -> None:
+    async def _refuse_income(self, node: Budget | None, fiscal_year_id: UUID | None) -> None:
         """Refuse an Antrag on a Kostenstelle that is income in the year (001030).
+
+        A cleared assignment has no node and no year, and passes.
 
         Raises:
             ValidationProblem: `cost_centre_income` (422).
         """
-        if await self.is_income(node, fiscal_year_id):
+        if node is not None and fiscal_year_id is not None and await self.is_income(
+            node, fiscal_year_id
+        ):
             raise ValidationProblem(
                 "An Antrag takes only a Kostenstelle on the expense side.",
                 code="cost_centre_income",

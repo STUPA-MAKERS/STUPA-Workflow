@@ -134,10 +134,12 @@ class AssignmentOps(BudgetTreeServiceBase):
             await self._require_open_fiscal_year(app.fiscal_year_id)
         node = await self._get_node(payload.budget_id) if payload.budget_id is not None else None
         budget_id = node.id if node is not None else None
-        fy_id = None
-        if node is not None:
-            fy_id = await self._resolve_fiscal_year(node, payload.fiscal_year_id)
-            await self._refuse_income(node, fy_id)
+        fy_id = (
+            await self._resolve_fiscal_year(node, payload.fiscal_year_id)
+            if node is not None
+            else None
+        )
+        await self._refuse_income(node, fy_id)
         app.budget_id = budget_id
         app.fiscal_year_id = fy_id
         await self._audit(
