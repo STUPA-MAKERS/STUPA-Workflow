@@ -550,6 +550,7 @@ async def test_a_past_open_year_takes_a_booking_with_a_date_in_the_year(
     g = await _gremium(session)
     top = await svc.create_node(BudgetNodeCreate(key=f"LB{_suffix()}", name="Top", gremiumId=g.id))
     other = await svc.create_node(BudgetNodeCreate(key="01", name="Child", parentId=top.id))
+    sibling = await svc.create_node(BudgetNodeCreate(key="02", name="Sibling", parentId=top.id))
     this = date.today().year
     past = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this - 1))
     now = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=this))
@@ -561,7 +562,7 @@ async def test_a_past_open_year_takes_a_booking_with_a_date_in_the_year(
 
     def booking(on: date | None) -> ExpenseCreate:
         return ExpenseCreate(
-            budgetId=top.id,
+            budgetId=other.id,
             fiscalYearId=past.id,
             amount=Decimal("5"),
             description="x",
@@ -576,8 +577,8 @@ async def test_a_past_open_year_takes_a_booking_with_a_date_in_the_year(
 
     def transfer(on: date | None) -> TransferCreate:
         return TransferCreate(
-            fromBudgetId=top.id,
-            toBudgetId=other.id,
+            fromBudgetId=other.id,
+            toBudgetId=sibling.id,
             fiscalYearId=past.id,
             amount=Decimal("1"),
             description="t",
@@ -648,9 +649,9 @@ async def test_the_close_names_open_antraege_and_they_move_to_an_open_year(
     moved = await svc.move_fiscal_year(first.id, MoveFiscalYearRequest(fiscalYearId=now.id))
     assert moved.fiscal_year_id == now.id
     assigned = await svc.assign_budget(
-        second.id, AssignBudgetRequest(budgetId=top.id, fiscalYearId=now.id)
+        second.id, AssignBudgetRequest(budgetId=leaf.id, fiscalYearId=now.id)
     )
-    assert (assigned.budget_id, assigned.fiscal_year_id) == (top.id, now.id)
+    assert (assigned.budget_id, assigned.fiscal_year_id) == (leaf.id, now.id)
     with pytest.raises(ConflictError) as kept:
         await svc.assign_budget(finished.id, AssignBudgetRequest(budgetId=None))
     assert kept.value.code == "fiscal_year_closed"

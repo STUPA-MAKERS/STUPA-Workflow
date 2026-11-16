@@ -113,17 +113,22 @@ interface Opts {
   read?: Subject<TodoCardDetail>;
   /** The meetings of the Gremium of the board (`GET /meetings`). */
   meetings?: readonly Partial<Meeting>[];
+  /** The meetings per Gremium; wins over `meetings`. */
+  meetingsOf?: (gremiumId: string) => Observable<readonly Partial<Meeting>[]>;
+  /** The board list of the person (`GET /todos/boards`). */
+  boards?: Observable<unknown>;
 }
 
 async function setup(opts: Opts = {}) {
   const card = opts.card ?? detail({ comments: [COMMENT] });
   const api = makeApi(card);
   if (opts.read) api.card.mockReturnValue(opts.read);
+  if (opts.boards) api.boards.mockReturnValue(opts.boards as never);
   const toast = { success: jest.fn(), error: jest.fn() };
   const files = {
     deleteDraftAttachment: jest.fn(() => of(undefined)),
     uploadDraftAttachment: jest.fn(),
-    listMeetings: jest.fn(() => of(opts.meetings ?? [])),
+    listMeetings: jest.fn((gid: string) => opts.meetingsOf?.(gid) ?? of(opts.meetings ?? [])),
     addAgendaTodo: jest.fn(() => of([])),
   };
   const out = { closed: jest.fn(), changed: jest.fn(), commentsChanged: jest.fn(), archived: jest.fn() };
@@ -1613,6 +1618,30 @@ describe('TodoCardDetailComponent board work (specs 000553-000555)', () => {
       meetings: [planned({ id: 'm-n', date: null }), planned({ id: 'm-1', date: '2026-10-22' })],
     });
     expect(cmp.agendaMeetings().map((m) => m.id)).toEqual(['m-1', 'm-n']);
+  });
+
+  /** § 001069: a free board offers the meetings of every Gremium with access, by Gremium. */
+  it('offers the meetings of every Gremium of a free board and skips a Gremium that fails', async () => {
+    jest.useFakeTimers({ now: new Date('2026-10-16T10:00:00') });
+    const free = { ...BOARDS[1], id: 'b-1', kind: 'free', gremiumId: null, agendaGremiumIds: ['g-2', 'g-1', 'g-9'] };
+    const { cmp, files } = await setup({
+      card: detail({ boardKind: 'free' }),
+      boards: of([free]),
+      meetingsOf: (gid) =>
+        gid === 'g-9'
+          ? throwError(() => new Error('x'))
+          : of([
+              planned({ id: `${gid}-b`, gremiumId: gid, gremiumName: gid === 'g-1' ? 'AStA' : 'Fachschaft', date: '2026-11-20' }),
+              planned({ id: `${gid}-a`, gremiumId: gid, gremiumName: undefined, date: null }),
+            ]),
+    });
+    expect(files.listMeetings).toHaveBeenCalledTimes(3);
+    expect(cmp.agendaMeetings().map((m) => m.id)).toEqual(['g-2-a', 'g-1-a', 'g-1-b', 'g-2-b']);
+  });
+
+  it('offers no meeting when the boards do not read or the board has no Gremium', async () => {
+    const failed = await setup({ meetings, boards: throwError(() => new Error('x')) });
+    expect(failed.cmp.agendaMeetings()).toEqual([]);
   });
 
   it('reads no meetings when the board of the card is not among the boards', async () => {

@@ -83,7 +83,7 @@
             [removeLabel]="'calendar.dialog.remove' | t: { name: g.name }"
             (remove)="removeGremium(g.id)"
           >
-            <app-icon name="landmark" [size]="14" /><span>{{ g.name }}</span>
+            <app-gremium-logo size="xs" [name]="g.name" [logoUrl]="logoOf(g.id)" /><span>{{ g.name }}</span>
           </app-chip>
         }
         @for (p of persons(); track p.id) {
@@ -93,43 +93,17 @@
             [removeLabel]="'calendar.dialog.remove' | t: { name: p.name }"
             (remove)="removePerson(p.id)"
           >
-            <app-avatar size="xs" [name]="p.name" [decorative]="true" /><span>{{ p.name }}</span>
+            <app-avatar size="xs" [name]="p.name" [principalId]="p.id" [decorative]="true" /><span>{{ p.name }}</span>
           </app-chip>
         }
-        @if (gremiumOptions().length) {
-          <app-filter-select
-            icon="plus"
-            [chevron]="false"
-            [label]="'calendar.dialog.addGremium' | t"
-            [text]="'calendar.dialog.addGremium' | t"
-            [options]="gremiumOptions()"
-            value=""
-            (valueChange)="addGremium($event)"
-          />
-        }
       </div>
-      <app-search-pill
-        class="apd__search"
-        size="md"
-        [clearable]="true"
-        [placeholder]="'calendar.dialog.addPerson' | t"
-        [busy]="personSearch.pending()"
-        [value]="personQuery()"
-        (valueChange)="onPersonQuery($event)"
-        (commit)="personSearch.flush()"
+      <app-gremium-person-picker
+        [placeholder]="'calendar.dialog.invite' | t"
+        [gremien]="known()"
+        [persons]="findPeople"
+        [taken]="taken()"
+        (picked)="addHit($event)"
       />
-      @if (personHits().length) {
-        <ul class="rowgroup apd__hits" [attr.aria-label]="'calendar.dialog.personHits' | t">
-          @for (p of personHits(); track p.id) {
-            <li>
-              <app-list-item [title]="p.name" (activate)="addPerson(p)">
-                <app-avatar lead size="sm" [name]="p.name" [principalId]="p.id" [decorative]="true" />
-                <app-icon trail name="plus" [size]="18" />
-              </app-list-item>
-            </li>
-          }
-        </ul>
-      }
     </div>
     @if (canPublish()) {
       <app-switch [id]="'apd-forall'" [checked]="form().forAll" (checkedChange)="patch({ forAll: $event })">

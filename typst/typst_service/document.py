@@ -410,13 +410,21 @@ def _texts(value: object, what: str) -> list[str]:
 
 
 def _plan_row(row: object, cols: int) -> dict[str, object]:
-    """Check one row of the plan table: its kind, its depth and one cell per column."""
+    """Check one row of the plan table: its kind, its depth, its leaf flag and one cell per column.
+
+    A row without `leaf` is a leaf, so a request from before spec 000968 prints in black.
+    """
     item = cast("dict[str, object]", row) if isinstance(row, dict) else {}
-    kind, depth = item.get("kind"), item.get("depth", 0)
+    kind, depth, leaf = item.get("kind"), item.get("depth", 0), item.get("leaf", True)
     cells = _texts(item.get("cells"), "row cells")
-    if kind not in _PLAN_ROW_KINDS or not isinstance(depth, int) or len(cells) != cols:
+    if (
+        kind not in _PLAN_ROW_KINDS
+        or not isinstance(depth, int)
+        or not isinstance(leaf, bool)
+        or len(cells) != cols
+    ):
         raise ConversionError("plan row needs a known kind, a depth and one cell per column")
-    return {"kind": kind, "depth": max(0, min(depth, 12)), "cells": cells}
+    return {"kind": kind, "depth": max(0, min(depth, 12)), "leaf": leaf, "cells": cells}
 
 
 def _plan(options: Mapping[str, object]) -> dict[str, object]:

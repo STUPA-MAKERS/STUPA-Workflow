@@ -838,6 +838,18 @@ class TodoLinkIn(WireModel, frozen=True):
     )
 
 
+TodoEntryRole = Literal["read", "edit", "manage"]
+
+
+class TodoBoardEntryIn(WireModel, frozen=True):
+    gremiumId: str | None = Field(default=None, description="A gremium; or set principalId")
+    principalId: str | None = Field(default=None, description="A person; or set gremiumId")
+    role: TodoEntryRole = Field(
+        default="edit",
+        description="read reads, edit works on the cards, manage also changes the board",
+    )
+
+
 class TodoCardCreate(WireModel, frozen=True):
     boardId: str
     columnId: str | None = Field(default=None, description="Default: the first column")

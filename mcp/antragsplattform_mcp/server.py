@@ -85,6 +85,11 @@ TYPICAL FLOWS:
   `applications:write`) → `scanned` is false until the
   virus scan is clean. `download_attachment(attachment_id, target_path)` writes the file
   to disk (409 while the scan runs); `delete_attachment` removes it.
+- To-do boards: `todo_board_create(name, entries)` makes a free board (admin or
+  `todo.create_board`); `todo_board_entries`, `todo_board_entry_add/_update/_remove` manage
+  the gremien and persons of a gremium or free board with the roles read, edit, manage
+  (409 `last_manager`); `todo_board_archive`/`_restore`, `todo_board_delete` (admins, only
+  an archived free board).
 - To-dos: `todo_boards` → `todo_board(board_id)` (columns, cards; the `isDone` column is
   done) → `todo_card_get` → `todo_card_update(card_id, {version, ...})` with the card's
   current `version` (409 `card_version_conflict`: read again), `todo_card_move` into a

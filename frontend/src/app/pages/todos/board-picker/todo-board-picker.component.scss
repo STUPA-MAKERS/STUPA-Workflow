@@ -117,3 +117,9 @@
   color: var(--color-text-muted);
   font-size: var(--fs-small);
 }
+/* The line between the boards and the actions "Neues Board" and "Archivierte Boards". */
+.bp__sep {
+  height: 1px;
+  margin: var(--space-2) var(--space-3);
+  background: var(--color-border);
+}

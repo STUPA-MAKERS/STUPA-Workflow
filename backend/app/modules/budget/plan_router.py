@@ -21,6 +21,7 @@ from app.modules.budget import plan_export
 from app.modules.budget.plan_export import PlanExport
 from app.modules.budget.plan_schemas import (
     PlanCreate,
+    PlanLinePredecessorSet,
     PlanLineRename,
     PlanLineSet,
     PlanNodeCreate,
@@ -288,6 +289,21 @@ async def rename_plan_line(
 ) -> PlanOut:
     """Give the cost center of a draft line a new name, a new key or both."""
     out = await service.rename_line(version_id, budget_id, payload)
+    await service.session.commit()
+    return out
+
+
+@router.put(
+    "/budget-plan-versions/{version_id}/lines/{budget_id}/predecessor",
+    response_model=PlanOut,
+    dependencies=_STRUCTURE,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def set_plan_line_predecessor(
+    version_id: UUID, budget_id: UUID, payload: PlanLinePredecessorSet, service: ServiceDep
+) -> PlanOut:
+    """Name the Vorgänger of a draft line in the year before, or clear it (spec 001040)."""
+    out = await service.set_predecessor(version_id, budget_id, payload)
     await service.session.commit()
     return out
 

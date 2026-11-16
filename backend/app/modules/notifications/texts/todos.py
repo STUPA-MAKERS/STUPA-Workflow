@@ -9,6 +9,7 @@ from __future__ import annotations
 TODO_ASSIGNED_KEY = "todo_assigned"
 TODO_MENTIONED_KEY = "todo_mentioned"
 TODO_DUE_KEY = "todo_due"
+TODO_BOARD_ADDED_KEY = "todo_board_added"
 
 TODO_ASSIGNED_SUBJECT: dict[str, str] = {
     "de": "Neues To-Do für Sie: {{ cardTitle }}",
@@ -60,4 +61,27 @@ TODO_DUE_PLACEHOLDERS: dict[str, str] = {
     "cardTitle": "Titel des To-Dos",
     "boardName": "Name des Boards",
     "dueDate": "Fälligkeitsdatum (JJJJ-MM-TT)",
+}
+
+TODO_BOARD_ADDED_SUBJECT: dict[str, str] = {
+    "de": "Neues Board für Sie: {{ boardName }}",
+    "en": "New board for you: {{ boardName }}",
+}
+TODO_BOARD_ADDED_BODY: dict[str, str] = {
+    "de": "Hallo,\n\n{{ actor }} hat Sie zum Board „{{ boardName }}“ hinzugefügt. "
+    "Ihre Rolle: {{ role.de }}.\n",
+    "en": 'Hello,\n\n{{ actor }} added you to the board "{{ boardName }}". '
+    "Your role: {{ role.en }}.\n",
+}
+TODO_BOARD_ADDED_PLACEHOLDERS: dict[str, str] = {
+    "link": "Link zum Board (ohne den Platzhalter hängt die Mail ihn an)",
+    "boardName": "Name des Boards",
+    "actor": "Name der Person, die hinzugefügt hat",
+    "role": "Rolle auf dem Board: role.de (Lesen, Bearbeiten, Verwalten) oder role.en",
+}
+#: The name of each role in the mail, per language.
+TODO_BOARD_ROLES: dict[str, dict[str, str]] = {
+    "read": {"de": "Lesen", "en": "Read"},
+    "edit": {"de": "Bearbeiten", "en": "Edit"},
+    "manage": {"de": "Verwalten", "en": "Manage"},
 }

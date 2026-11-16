@@ -225,7 +225,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/todos/000147](requirements/functional/collaboration/todos/000147_board-kinds.md) | Boards per Gremium, per person and per team | approved |
 | [F/collaboration/todos/000148](requirements/functional/collaboration/todos/000148_move-sheet.md) | One move sheet | approved |
 | [F/collaboration/todos/000149](requirements/functional/collaboration/todos/000149_no-status-sync.md) | No status sync between ticket and card | approved |
-| [F/collaboration/todos/000318](requirements/functional/collaboration/todos/000318_board-rights.md) | Board rights depend on the board kind | approved |
+| [F/collaboration/todos/000318](requirements/functional/collaboration/todos/000318_board-rights.md) | Board rights depend on the board kind | replaced |
 | [F/collaboration/todos/000319](requirements/functional/collaboration/todos/000319_unreadable-404.md) | An unreadable board is not found | approved |
 | [F/collaboration/todos/000320](requirements/functional/collaboration/todos/000320_members-only.md) | Only members are assigned or mentioned | approved |
 | [F/collaboration/todos/000321](requirements/functional/collaboration/todos/000321_no-transfer-to-personal.md) | A shared card does not move to a personal board | approved |
@@ -261,6 +261,25 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/todos/000573](requirements/functional/collaboration/todos/000573_card-links-both-ways.md) | A link between two cards shows on both cards | approved |
 | [F/collaboration/todos/000735](requirements/functional/collaboration/todos/000735_termin-link.md) | A card can link a Termin | approved |
 | [F/collaboration/todos/000736](requirements/functional/collaboration/todos/000736_event-times.md) | The start and the end of an Event can have a time | approved |
+| [F/collaboration/todos/001060](requirements/functional/collaboration/todos/001060_free-boards.md) | A free board belongs to no single Gremium | approved |
+| [F/collaboration/todos/001061](requirements/functional/collaboration/todos/001061_free-board-create.md) | Admins and holders of todo.create_board create a free board | approved |
+| [F/collaboration/todos/001062](requirements/functional/collaboration/todos/001062_free-board-roles.md) | Each member entry of a free board has a role | approved |
+| [F/collaboration/todos/001063](requirements/functional/collaboration/todos/001063_gremium-entry-live.md) | A Gremium entry stands for the members of the Gremium at the time of the read | approved |
+| [F/collaboration/todos/001064](requirements/functional/collaboration/todos/001064_free-board-manage.md) | Members with Verwalten and admins manage a free board | approved |
+| [F/collaboration/todos/001065](requirements/functional/collaboration/todos/001065_free-board-assignees.md) | Assignees of a free board are its members who edit | approved |
+| [F/collaboration/todos/001066](requirements/functional/collaboration/todos/001066_free-board-global-keys.md) | todo.all and todo.read_all reach free boards | approved |
+| [F/collaboration/todos/001067](requirements/functional/collaboration/todos/001067_free-boards-in-picker.md) | Free boards show in the board picker after the boards of the Gremien | approved |
+| [F/collaboration/todos/001068](requirements/functional/collaboration/todos/001068_free-board-archive.md) | A manager archives a free board and only an admin deletes it | approved |
+| [F/collaboration/todos/001069](requirements/functional/collaboration/todos/001069_free-board-agenda.md) | A card of a free board goes on the agenda of each of its Gremien | approved |
+| [F/collaboration/todos/001070](requirements/functional/collaboration/todos/001070_gremium-tab-own-board.md) | The To-Dos tab of a Gremium shows only the board of the Gremium | approved |
+| [F/collaboration/todos/001071](requirements/functional/collaboration/todos/001071_free-board-added-mail.md) | A person added to a free board by name gets a mail | approved |
+| [F/collaboration/todos/001072](requirements/functional/collaboration/todos/001072_gremium-boards-stay.md) | The board of a Gremium stays its own kind | approved |
+| [F/collaboration/todos/001073](requirements/functional/collaboration/todos/001073_team-board-stays.md) | The team board Plattform stays a team board | approved |
+| [F/collaboration/todos/001074](requirements/functional/collaboration/todos/001074_gremium-person-picker.md) | One search field picks Gremien and persons | approved |
+| [F/collaboration/todos/001075](requirements/functional/collaboration/todos/001075_free-board-transfer.md) | A card moves between a free board and other shared boards | approved |
+| [F/collaboration/todos/001076](requirements/functional/collaboration/todos/001076_free-board-api.md) | Free boards are created and managed through the API and MCP | approved |
+| [F/collaboration/todos/001077](requirements/functional/collaboration/todos/001077_gremium-board-entries.md) | A board of a Gremium takes more Gremien and persons | approved |
+| [F/collaboration/todos/001078](requirements/functional/collaboration/todos/001078_board-rights.md) | Board rights depend on the board kind and its entries | approved |
 | [F/finance/budget/000138](requirements/functional/finance/budget/000138_cost-centre-picker.md) | The cost centre pickers are fixed | approved |
 | [F/finance/budget/000139](requirements/functional/finance/budget/000139_close-fiscal-year.md) | A fiscal year closes and reopens | approved |
 | [F/finance/budget/000140](requirements/functional/finance/budget/000140_default-fiscal-year.md) | The default fiscal year holds today | approved |
@@ -361,12 +380,16 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000929](requirements/functional/finance/budget/000929_plan-line-with-bookings-stays.md) | The line of a Kostenstelle with bookings is not removed | approved |
 | [F/finance/budget/000930](requirements/functional/finance/budget/000930_fiscal-year-audit.md) | The create and the change of a fiscal year are in the audit log | approved |
 | [F/finance/budget/000964](requirements/functional/finance/budget/000964_plan-pdf-head-line.md) | The head line of the plan PDF sits tight between the title and the table | approved |
-| [F/finance/budget/000968](requirements/functional/finance/budget/000968_plan-pdf-parent-amounts-in-brackets.md) | The plan PDF shows the amounts of a line with lines below it in brackets | approved |
+| [F/finance/budget/000968](requirements/functional/finance/budget/000968_plan-pdf-parent-lines-grey.md) | The plan PDF prints a line with lines below it in grey | approved |
 | [F/finance/budget/000990](requirements/functional/finance/budget/000990_late-booking-in-past-year.md) | A past fiscal year that is not closed takes a booking with a date in the year | approved |
 | [F/finance/budget/000991](requirements/functional/finance/budget/000991_close-names-open-antraege.md) | The close of a fiscal year names what stays open, and an Antrag can leave a closed year | approved |
 | [F/finance/budget/000992](requirements/functional/finance/budget/000992_stichtag-keeps-closed-years.md) | A new Stichtag moves only the fiscal years that are not closed | approved |
 | [F/finance/budget/001020](requirements/functional/finance/budget/001020_plan-table-amounts-one-edge.md) | The amounts of a plan table end on one edge | approved |
 | [F/finance/budget/001021](requirements/functional/finance/budget/001021_plan-change-needs-comparison.md) | A plan shows the Änderung only against an Ansatz | approved |
+| [F/finance/budget/001030](requirements/functional/finance/budget/001030_antrag-takes-expense-cost-centre.md) | An Antrag takes only a Kostenstelle on the expense side | approved |
+| [F/finance/budget/001031](requirements/functional/finance/budget/001031_antrag-takes-leaf-cost-centre.md) | An Antrag takes only a Kostenstelle without a Kostenstelle below it | approved |
+| [F/finance/budget/001032](requirements/functional/finance/budget/001032_booking-takes-leaf-cost-centre.md) | A booking takes only a Kostenstelle without a Kostenstelle below it | approved |
+| [F/finance/budget/001040](requirements/functional/finance/budget/001040_plan-line-predecessor.md) | A plan line can name its predecessor in the year before | approved |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
 | [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | approved |
 | [F/finance/invoices/000262](requirements/functional/finance/invoices/000262_invoice-segments.md) | The invoice list has four segments | replaced |
@@ -416,7 +439,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/calendar/000737](requirements/functional/meetings/calendar/000737_event-as-termin.md) | The Kalender shows an Event like a Termin | approved |
 | [F/meetings/calendar/000738](requirements/functional/meetings/calendar/000738_termin-invite-person-search.md) | The invitation search finds each active account by name | approved |
 | [F/meetings/calendar/000740](requirements/functional/meetings/calendar/000740_termin-open-answers.md) | The answer list of a Termin names the invited persons without an answer | approved |
-| [F/meetings/calendar/000742](requirements/functional/meetings/calendar/000742_termin-invite-search-rows.md) | The invitation search of a Termin shows its hits as rows with an avatar | approved |
+| [F/meetings/calendar/000742](requirements/functional/meetings/calendar/000742_termin-invite-search-rows.md) | The invitation search of a Termin shows its hits as rows with an avatar | replaced |
 | [F/meetings/calendar/000744](requirements/functional/meetings/calendar/000744_week-span-blocks.md) | A timed entry over several days is a block on each of its days in the week view | approved |
 | [F/meetings/calendar/000746](requirements/functional/meetings/calendar/000746_week-whole-day.md) | The week view shows the whole day from 00:00 to 24:00 | approved |
 | [F/meetings/calendar/000973](requirements/functional/meetings/calendar/000973_rule-with-day-times.md) | A recurrence rule with times of the day gives only the first date | approved |

@@ -16,7 +16,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { catchError, map, of, switchMap, type Observable, type Subscription } from 'rxjs';
+import { catchError, forkJoin, map, of, switchMap, type Observable, type Subscription } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { Meeting, Uuid } from '@core/api/models';
@@ -333,15 +333,18 @@ export class TodoCardDetailComponent {
   }
 
   /**
-   * The board whose Gremium can take the card as a TOP (spec 000553): a Gremium board, a
-   * card the person writes, not archived and not on an agenda yet.
+   * The board whose Gremien can take the card as a TOP (spec 000553, 001069): a Gremium
+   * board or a free board, a card the person writes, not archived and not on an agenda yet.
    */
   private readonly agendaBoard = computed(() => {
     const c = this.card();
-    if (!c || c.boardKind !== 'gremium' || !c.canWrite || c.archivedAt) return null;
+    if (!c || (c.boardKind !== 'gremium' && c.boardKind !== 'free') || !c.canWrite || c.archivedAt) return null;
     return c.links.some((l) => l.kind === 'agenda_item') ? null : c.boardId;
   });
-  /** The planned meetings of the Gremium whose agenda the person edits, the next first. */
+  /**
+   * The planned meetings whose agenda the person edits: of the Gremium of the board, or of
+   * each Gremium with an entry on a free board, by Gremium and the next first.
+   */
   readonly agendaMeetings = signal<readonly Meeting[]>([]);
   readonly agendaOpen = signal(false);
   /** "Duplizieren": the dialog with the copy of the card (spec 000554). */
@@ -366,12 +369,24 @@ export class TodoCardDetailComponent {
     return this.api
       .boards()
       .pipe(
-        map((boards) => boards.find((b) => b.id === boardId)?.gremiumId ?? null),
-        switchMap((gid) => (gid ? this.files.listMeetings(gid) : of([] as Meeting[]))),
-        map((list) =>
-          list
+        map((boards) => {
+          const board = boards.find((b) => b.id === boardId);
+          return board?.agendaGremiumIds ?? (board?.gremiumId ? [board.gremiumId] : []);
+        }),
+        switchMap((ids) =>
+          ids.length
+            ? forkJoin(ids.map((gid) => this.files.listMeetings(gid).pipe(catchError(() => of([] as Meeting[])))))
+            : of([] as Meeting[][]),
+        ),
+        map((lists) =>
+          lists
+            .flat()
             .filter((m) => m.status === 'planned' && m.canWrite && (!m.date || m.date >= today))
-            .sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999')),
+            .sort(
+              (a, b) =>
+                (a.gremiumName ?? '').localeCompare(b.gremiumName ?? '') ||
+                (a.date ?? '9999').localeCompare(b.date ?? '9999'),
+            ),
         ),
         catchError(() => of([] as Meeting[])),
       )

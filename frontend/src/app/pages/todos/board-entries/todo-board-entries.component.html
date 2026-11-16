@@ -1,0 +1,41 @@
+<ul class="be rowgroup" [attr.aria-label]="'todos.entries.title' | t">
+  @for (entry of entries(); track key(entry)) {
+    <li class="be__row">
+      @if (entry.kind === 'gremium') {
+        <app-gremium-logo size="sm" [name]="entry.name" [logoUrl]="entry.logoUrl ?? null" />
+      } @else {
+        <app-avatar size="sm" [name]="entry.name" [principalId]="entry.targetId" [decorative]="true" />
+      }
+      <span class="be__name">{{ entry.name }}</span>
+      @if (entry.fixed) {
+        <span class="be__fixed">{{ roleName(entry.role) }}</span>
+      } @else {
+        <app-filter-select
+          [label]="'todos.entries.roleOf' | t: { name: entry.name }"
+          [text]="roleName(entry.role)"
+          [options]="roleOptions()"
+          [value]="entry.role"
+          (valueChange)="setRole(entry, $event)"
+        />
+        <button
+          type="button"
+          class="be__remove"
+          [disabled]="busy()"
+          [attr.aria-label]="'todos.entries.remove' | t: { name: entry.name }"
+          [title]="'todos.entries.remove' | t: { name: entry.name }"
+          (click)="removed.emit(entry)"
+        >
+          <app-icon name="x" [size]="16" />
+        </button>
+      }
+    </li>
+  }
+</ul>
+<app-gremium-person-picker
+  class="be__picker"
+  [placeholder]="'todos.entries.add' | t"
+  [gremien]="gremien()"
+  [persons]="findPeople"
+  [taken]="taken()"
+  (picked)="add($event)"
+/>

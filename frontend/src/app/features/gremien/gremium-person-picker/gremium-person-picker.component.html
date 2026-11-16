@@ -1,0 +1,54 @@
+<app-search-pill
+  class="gpp__field"
+  size="md"
+  [clearable]="true"
+  [placeholder]="placeholder()"
+  [busy]="search.pending()"
+  [value]="query()"
+  (valueChange)="onQuery($event)"
+  (commit)="onCommit()"
+  (keydown)="onFieldKey($event)"
+/>
+@if (open()) {
+  <div
+    #menu
+    class="gpp__menu"
+    animate.enter="om--entering"
+    animate.leave="om--leaving"
+    popover="manual"
+    tabindex="-1"
+    [style.top.px]="spot()?.top"
+    [style.left.px]="spot()?.left"
+    [style.width.px]="spot()?.width"
+    [style.max-height.px]="spot()?.maxHeight"
+    (keydown)="onMenuKey($event)"
+  >
+    @if (none()) {
+      <p class="gpp__none">{{ 'picker.none' | t }}</p>
+    } @else {
+      <ul class="gpp__list" role="listbox" [id]="listId" [attr.aria-label]="'picker.hits' | t">
+        @for (hit of hits(); track hit.kind + hit.id; let i = $index) {
+          <li role="presentation">
+            <button
+              type="button"
+              role="option"
+              class="gpp__option"
+              tabindex="-1"
+              aria-selected="false"
+              [id]="optionId(i)"
+              (click)="pick(hit)"
+            >
+              @if (hit.kind === 'gremium') {
+                <app-gremium-logo size="sm" [name]="hit.name" [logoUrl]="hit.logoUrl" />
+              } @else {
+                <app-avatar size="sm" [name]="hit.name" [principalId]="hit.id" [decorative]="true" />
+              }
+              <span class="gpp__name">{{ hit.name }}</span>
+              <span class="sr-only">{{ (hit.kind === 'gremium' ? 'picker.kind.gremium' : 'picker.kind.person') | t }}</span>
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+}

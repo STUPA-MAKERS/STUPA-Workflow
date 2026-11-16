@@ -41,6 +41,17 @@ describe('TodoAgendaDialogComponent (spec 000553)', () => {
     expect(cmp.pick()).toBe('m-1');
   });
 
+  /** § 001069: meetings of several Gremien name their Gremium. */
+  it('names the Gremium when the meetings come from several Gremien', async () => {
+    const mixed = [
+      { id: 'm-1', title: '34. Sitzung', gremiumId: 'g-1', gremiumName: 'AStA', date: '2026-11-12', startTime: null },
+      { id: 'm-4', title: '5. Sitzung', gremiumId: 'g-2', gremiumName: 'Fachschaft', date: null, startTime: null },
+    ] as unknown as Meeting[];
+    const { cmp } = await setup(undefined, mixed);
+    expect(cmp.rows()[0].sub).toContain('AStA');
+    expect(cmp.rows()[1].sub).toBe('Fachschaft');
+  });
+
   it('puts the card on the next meeting and closes', async () => {
     const { cmp, api, toast } = await setup();
     const added = jest.fn();

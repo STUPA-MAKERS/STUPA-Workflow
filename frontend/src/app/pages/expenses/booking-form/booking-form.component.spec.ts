@@ -50,6 +50,22 @@ const TREE: BudgetTreeNode[] = [
         byFiscalYear: [],
         children: [],
       },
+      {
+        id: 'et',
+        parentId: 'top',
+        gremiumId: null,
+        key: '230',
+        pathKey: 'VS-230',
+        name: 'Elektrotechnik',
+        currency: 'EUR',
+        active: true,
+        color: null,
+        viewGremiumId: null,
+        fiscalStartMonth: 1,
+        fiscalStartDay: 1,
+        byFiscalYear: [],
+        children: [],
+      },
     ],
   },
 ];
@@ -358,13 +374,16 @@ describe('BookingFormComponent', () => {
     await tick();
     view.fixture.detectChanges();
     http.expectOne((r) => r.url.endsWith('/budgets/top/fiscal-years')).flush([]);
+    expect(screen.getByRole('option', { name: /Gesamthaushalt/ }).getAttribute('aria-disabled')).toBe('true');
     await user.click(screen.getByRole('option', { name: /Gesamthaushalt/ }));
-    expect(dialogs.editBudgetId()).toBe('top');
+    expect(dialogs.editBudgetId()).not.toBe('top');
+    await user.click(screen.getByRole('option', { name: /Elektrotechnik/ }));
+    expect(dialogs.editBudgetId()).toBe('et');
     await user.click(screen.getByRole('radio', { name: 'Karte' }));
     expect(dialogs.editPaymentMethod()).toBe('karte');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (form as any).pickCostCentre('');
-    expect(dialogs.editBudgetId()).toBe('top');
+    expect(dialogs.editBudgetId()).toBe('et');
     const save = jest.spyOn(dialogs, 'saveEdit').mockImplementation(() => undefined);
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(save).toHaveBeenCalledTimes(1);

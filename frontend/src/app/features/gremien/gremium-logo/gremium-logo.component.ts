@@ -1,8 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, effect, input, signal } from '@angular/core';
 import { variantInitials } from '../../../pages/admin/cd-variants/cd-variants.util';
 
-/** The edge of the square: 40px in a row, 48px in the header, 40px in the phone header. */
-export type GremiumLogoSize = 'md' | 'lg';
+/**
+ * The edge of the square: 40px in a row, 48px in the header, 40px in the phone header, 32px
+ * in a hit of the picker (as the avatar `sm`), 22px in a chip (as the avatar `xs`).
+ */
+export type GremiumLogoSize = 'xs' | 'sm' | 'md' | 'lg';
 
 /**
  * The square logo of a gremium: the square logo of its CD variant
@@ -19,6 +22,8 @@ export type GremiumLogoSize = 'md' | 'lg';
   host: {
     'aria-hidden': 'true',
     '[class.glo--lg]': "size() === 'lg'",
+    '[class.glo--sm]': "size() === 'sm'",
+    '[class.glo--xs]': "size() === 'xs'",
     '[class.glo--img]': 'showImage()',
   },
   templateUrl: './gremium-logo.component.html',

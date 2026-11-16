@@ -40,6 +40,34 @@ describe('TodoBoardPickerComponent', () => {
     expect(BOARD_ICON.team).toBe('ticket');
   });
 
+  /** § 001067, 001061, 001068: the free boards after the Gremien, the actions with their rights. */
+  it('lists the free boards after the Gremium boards and offers "Neues Board" with the right', async () => {
+    const free = { ...BOARDS[1], id: 'b-free', name: 'Ersti-Woche', kind: 'free' as const, gremiumId: null };
+    const { cmp, flush, fixture } = await setup({ boards: [...BOARDS, free] });
+    const create = jest.fn();
+    const archived = jest.fn();
+    cmp.create.subscribe(create);
+    cmp.showArchived.subscribe(archived);
+    fireEvent.click(screen.getByRole('button', { name: /Board:/ }));
+    await flush();
+    const caps = Array.from(document.querySelectorAll('.bp__cap')).map((c) => c.textContent?.trim());
+    expect(caps.indexOf('Weitere Boards')).toBe(caps.indexOf('Gremien') + 1);
+    expect(screen.getByRole('button', { name: /Ersti-Woche/ })).toBeInTheDocument();
+    expect(screen.queryByTestId('bp-create')).toBeNull();
+    expect(screen.queryByTestId('bp-archived')).toBeNull();
+    fixture.componentRef.setInput('canCreate', true);
+    fixture.componentRef.setInput('hasArchived', true);
+    await flush();
+    fireEvent.click(screen.getByTestId('bp-create'));
+    expect(create).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /Board:/ }));
+    await flush();
+    expect(screen.getByTestId('bp-archived').textContent).toContain('Archivierte Boards');
+    fireEvent.click(screen.getByTestId('bp-archived'));
+    expect(archived).toHaveBeenCalled();
+    expect(BOARD_ICON.free).toBe('kanban');
+  });
+
   it('lists the meta-board "Alle" directly under "Meine To-Dos" and picks it', async () => {
     const { picked, flush } = await setup({ allId: 'alle' });
     fireEvent.click(screen.getByRole('button', { name: /Board:/ }));

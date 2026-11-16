@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import type { Observable } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { ApiClient } from '@core/api/api-client.service';
 import {
@@ -19,17 +20,18 @@ import {
   ChipComponent,
   DatepickerComponent,
   DialogComponent,
-  FilterSelectComponent,
-  IconComponent,
   InputComponent,
-  ListItemComponent,
-  SearchPillComponent,
   SwitchComponent,
   TextareaComponent,
   TimeInputComponent,
   ToastService,
-  liveSearch,
 } from '@stupa-makers/ui-kit';
+import { GremiumLogoComponent } from '../../gremien/gremium-logo/gremium-logo.component';
+import {
+  GremiumPersonPickerComponent,
+  type PickerGremium,
+  type PickerHit,
+} from '../../gremien/gremium-person-picker/gremium-person-picker.component';
 import { type AppointmentForm, emptyForm, formError, toInput } from '../calendar.util';
 
 /** The form of an existing Termin. */
@@ -55,11 +57,12 @@ const SAVE_ERRORS: Readonly<Record<string, TranslationKey>> = {
 };
 
 /**
- * The dialog "Termin anlegen" and "Termin bearbeiten" (§ 000715-000718, 000738).
+ * The dialog "Termin anlegen" and "Termin bearbeiten" (§ 000715-000718, 001074).
  *
  * A Termin has a title, a start and an end, all-day or with times, and can have a place
  * and a description. It invites Gremien (the Gremien whose meetings the person reads)
- * and persons (a search over the names of the active accounts). The switch "Für alle
+ * and persons (a search over the names of the active accounts), both in the one search
+ * field of the shared picker, with the hits in a popover. The switch "Für alle
  * sichtbar" shows only with the permission `calendar.publish`. The server checks every
  * rule again.
  */
@@ -74,11 +77,9 @@ const SAVE_ERRORS: Readonly<Record<string, TranslationKey>> = {
     ChipComponent,
     DatepickerComponent,
     DialogComponent,
-    FilterSelectComponent,
-    IconComponent,
+    GremiumLogoComponent,
+    GremiumPersonPickerComponent,
     InputComponent,
-    ListItemComponent,
-    SearchPillComponent,
     SwitchComponent,
     TextareaComponent,
     TimeInputComponent,
@@ -109,29 +110,15 @@ export class AppointmentDialogComponent {
   readonly saving = signal(false);
 
   /** The Gremien that the person can invite: those with a meeting that the person reads. */
-  private readonly known = signal<readonly CalendarGremium[]>([]);
-  readonly gremiumOptions = computed(() => {
-    const invited = new Set(this.gremien().map((g) => g.id));
-    return this.known()
-      .filter((g) => !invited.has(g.id))
-      .map((g) => ({ value: g.id, label: g.name }));
-  });
+  readonly known = signal<readonly PickerGremium[]>([]);
+  /** The invited Gremien and persons: they leave the hits of the picker. */
+  readonly taken = computed(() => [...this.gremien().map((g) => g.id), ...this.persons().map((p) => p.id)]);
+  /** The search of the persons of the picker: the names of the active accounts. */
+  readonly findPeople = (q: string): Observable<readonly CalendarPerson[]> => this.api.people(q);
 
   readonly canPublish = computed(() => this.auth.can('calendar.publish'));
   readonly editing = computed(() => this.appointment() !== null);
   readonly valid = computed(() => formError(this.form()) === null);
-
-  readonly personQuery = signal('');
-  readonly personHits = signal<readonly CalendarPerson[]>([]);
-  readonly personSearch = liveSearch<readonly CalendarPerson[]>({
-    run: (q) => this.api.people(q),
-    result: (hits) => {
-      const invited = new Set(this.persons().map((p) => p.id));
-      this.personHits.set(hits.filter((p) => !invited.has(p.id)));
-    },
-    reset: () => this.personHits.set([]),
-    error: () => this.personHits.set([]),
-  });
 
   /** Each opening starts from the Termin, or from an empty form on the picked day. */
   constructor() {
@@ -143,7 +130,6 @@ export class AppointmentDialogComponent {
         this.form.set(current ? formOf(current) : emptyForm(day));
         this.gremien.set(current?.gremien ?? []);
         this.persons.set(current?.persons ?? []);
-        this.clearPersonSearch();
         this.loadGremien();
       });
     });
@@ -158,23 +144,19 @@ export class AppointmentDialogComponent {
     this.form.update((form) => ({ ...form, startsOn: day, endsOn: form.endsOn < day ? day : form.endsOn }));
   }
 
-  addGremium(id: string): void {
-    const hit = this.known().find((g) => g.id === id);
-    if (hit) this.gremien.update((list) => [...list, hit]);
+  /** A pick of the picker: a Gremium or a person joins the invited. */
+  addHit(hit: PickerHit): void {
+    if (hit.kind === 'gremium') this.gremien.update((list) => [...list, { id: hit.id, name: hit.name }]);
+    else this.persons.update((list) => [...list, { id: hit.id, name: hit.name }]);
+  }
+
+  /** The logo of an invited Gremium, when the list of the picker knows it. */
+  logoOf(id: string): string | null {
+    return this.known().find((g) => g.id === id)?.logoUrl ?? null;
   }
 
   removeGremium(id: string): void {
     this.gremien.update((list) => list.filter((g) => g.id !== id));
-  }
-
-  onPersonQuery(text: string): void {
-    this.personQuery.set(text);
-    this.personSearch.set(text);
-  }
-
-  addPerson(person: CalendarPerson): void {
-    this.persons.update((list) => [...list, person]);
-    this.clearPersonSearch();
   }
 
   removePerson(id: string): void {
@@ -201,12 +183,6 @@ export class AppointmentDialogComponent {
         this.toast.error(this.i18n.translate(SAVE_ERRORS[problemCode(err)] ?? 'calendar.toast.saveFailed'));
       },
     });
-  }
-
-  private clearPersonSearch(): void {
-    this.personQuery.set('');
-    this.personHits.set([]);
-    this.personSearch.sync('');
   }
 
   private loadGremien(): void {

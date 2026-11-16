@@ -40,6 +40,7 @@ LinkTarget = Literal[
     "privacy",
     "ticket",
     "todo",
+    "board",
     "poll",
     "circular",
     "appointment",
@@ -53,6 +54,7 @@ _LABELS: dict[str, dict[str, str]] = {
     "privacy": {"de": "Löschanträge öffnen", "en": "Open the erasure requests"},
     "ticket": {"de": "Ticket öffnen", "en": "Open the ticket"},
     "todo": {"de": "To-Do öffnen", "en": "Open the to-do"},
+    "board": {"de": "Board öffnen", "en": "Open the board"},
     "poll": {"de": "Umfrage öffnen", "en": "Open the poll"},
     "circular": {"de": "Umlaufverfahren öffnen", "en": "Open the circular vote"},
     "appointment": {"de": "Termin öffnen", "en": "Open the appointment"},
@@ -139,6 +141,11 @@ def todo_link(settings: Settings, card_id: UUID | str) -> MailLink:
     card moves to another board.
     """
     return MailLink(f"{_base(settings)}/todos?card={card_id}", "todo")
+
+
+def todo_board_link(settings: Settings, board_id: UUID | str) -> MailLink:
+    """Return the link to a to-do board (``/todos/<id>``)."""
+    return MailLink(f"{_base(settings)}/todos/{board_id}", "board")
 
 
 def appointment_link(settings: Settings, appointment_id: UUID | str) -> MailLink:

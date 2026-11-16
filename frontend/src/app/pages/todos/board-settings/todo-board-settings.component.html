@@ -11,6 +11,18 @@
       />
     </app-section>
 
+    @if (hasEntries() && open()) {
+      <app-section class="bs__sec" [heading]="'todos.entries.title' | t">
+        <app-todo-board-entries
+          [entries]="entries()"
+          [busy]="busy()"
+          (added)="addEntry($event)"
+          (roleChanged)="setEntryRole($event)"
+          (removed)="removeEntry($event)"
+        />
+      </app-section>
+    }
+
     <app-section class="bs__sec" [heading]="'todos.settings.columns' | t">
       <app-button sectionAction variant="text" size="sm" [ariaLabel]="'todos.settings.addColumn' | t" (click)="newColumn.set('')">
         <app-icon name="plus" />
@@ -176,6 +188,15 @@
         }
       </div>
     </app-section>
+
+    @if (isFree()) {
+      <app-section class="bs__sec" [heading]="'todos.boardArchive.section' | t">
+        <app-button class="bs__archiveBoard" variant="outlined" (click)="confirmArchive.set(true)">
+          <app-icon name="archive" />
+          {{ 'todos.boardArchive.action' | t }}
+        </app-button>
+      </app-section>
+    }
   </div>
   <app-button dialog-footer variant="fill" (click)="open.set(false)">{{ 'todos.settings.done' | t }}</app-button>
 </app-dialog>
@@ -187,4 +208,15 @@
   [busy]="busy()"
   (confirm)="deleteEmptyColumn()"
   (cancel)="confirmEmpty.set(null)"
+/>
+
+<app-confirm-dialog
+  [open]="confirmArchive()"
+  [title]="'todos.boardArchive.title' | t"
+  [body]="'todos.boardArchive.body' | t: { name: board().name }"
+  [confirmLabel]="'todos.boardArchive.confirm' | t"
+  [danger]="false"
+  [busy]="busy()"
+  (confirm)="archiveBoard()"
+  (cancel)="confirmArchive.set(false)"
 />

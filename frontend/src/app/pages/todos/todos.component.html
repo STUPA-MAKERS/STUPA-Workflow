@@ -59,7 +59,11 @@
         [current]="boardId()"
         [compact]="phone()"
         [allId]="allId"
+        [canCreate]="canCreateBoard()"
+        [hasArchived]="hasArchivedBoards()"
         (picked)="pickBoard($event)"
+        (create)="newBoardOpen.set(true)"
+        (showArchived)="archivedBoardsOpen.set(true)"
       />
       @if (phone() && !board() && loading()) {
         <span class="skel-box td__skelChip td__skelChip--filter skel-in" aria-hidden="true"></span>
@@ -337,7 +341,20 @@
 @if (board(); as b) {
   <app-todo-new-dialog [(open)]="newOpen" [boardId]="b.id" [columnId]="newColumn()" (created)="onCreated($event)" />
   @if (b.canConfigure) {
-    <app-todo-board-settings [(open)]="settingsOpen" [board]="b" (changed)="onSettingsChanged($event)" />
+    <app-todo-board-settings
+      [(open)]="settingsOpen"
+      [board]="b"
+      (changed)="onSettingsChanged($event)"
+      (archived)="onBoardArchived()"
+    />
   }
   <app-todo-archive-sheet [(open)]="archiveOpen" [boardId]="b.id" (openCard)="openCard($event)" (restored)="onRestored($event)" />
 }
+@if (canCreateBoard()) {
+  <app-todo-new-board-dialog [(open)]="newBoardOpen" (created)="onBoardCreated($event)" />
+}
+<app-todo-archived-boards
+  [(open)]="archivedBoardsOpen"
+  (restored)="onBoardRestored()"
+  (emptied)="hasArchivedBoards.set(false)"
+/>

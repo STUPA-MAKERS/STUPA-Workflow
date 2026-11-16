@@ -599,33 +599,20 @@
   low
 }
 
-// Cut nodes at a number of lines: nodes that would take `lines` lines or more
-// show `lines - 1` lines and a line "…". The cut drops the rest of the nodes, so
-// the PDF holds no hidden text. `render` draws a list of nodes; with `inline-mode`
-// the nodes are inline nodes, else blocks, of which the last kept paragraph is cut
-// by words.
-#let clamp(nodes, lines, render, inline-mode: false) = layout(region => {
+// Cut inline nodes at a number of lines: nodes that would take `lines` lines or
+// more show `lines - 1` lines and a line "…". The cut drops the rest of the words,
+// so the PDF holds no hidden text. `render` draws a list of inline nodes. Only a
+// cell of a nested table is cut; a field value is never cut (000881).
+#let clamp(nodes, lines, render) = layout(region => {
   let keep = measure(block(width: region.width, range(lines - 1).map(_ => [x]).join(linebreak()))).height
   let fits(body) = measure(block(width: region.width, body)).height <= keep + 0.5pt
   if fits(render(nodes)) {
     render(nodes)
-  } else if inline-mode {
+  } else {
     let k = largest(inline-size(nodes), k => fits(render(inline-take(nodes, k))))
     render(inline-take(nodes, k))
     linebreak()
     […]
-  } else {
-    let m = largest(nodes.len(), m => fits(render(nodes.slice(0, m))))
-    let kept = nodes.slice(0, m)
-    let next = nodes.at(m)
-    if next.t == "par" {
-      let part(k) = kept + ((t: "par", c: inline-take(next.c, k)),)
-      let k = largest(inline-size(next.c), k => fits(render(part(k))))
-      if k > 0 { kept = part(k) }
-    }
-    render(kept)
-    v(3pt)
-    block(par[…])
   }
 })
 
@@ -660,7 +647,7 @@
         let wide = k == last and last < cols - 1
         grid.cell(colspan: if wide { cols - last } else { 1 }, {
           set par(justify: false)
-          clamp(cell, if wide { 6 } else { 3 }, inline, inline-mode: true)
+          clamp(cell, if wide { 6 } else { 3 }, inline)
         })
       })
     } else {
@@ -687,7 +674,9 @@
   }
   // booktabs at \arraystretch 1.5: \toprule .08em, \midrule .05em,
   // \bottomrule .08em, 20.33pt from row to row.
-  pad(right: if nested { -field-inset } else { 0pt }, block(width: 100%, breakable: false, {
+  // A nested table breaks between its rows, so a long Kostenaufstellung goes on
+  // to the next page (000881).
+  pad(right: if nested { -field-inset } else { 0pt }, block(width: 100%, breakable: nested, {
     if not nested {
       rule(0.876pt)
       v(6.45pt)
@@ -847,7 +836,8 @@
       // the tables of one document line up; a longer label wraps. The table breaks
       // between rows. It is a grid, as the Markdown tables: PDF/UA-1 asks a tagged
       // table for a header row, and a field table has none, so a screen reader reads
-      // label, then value. A value is cut at 30 lines (000881).
+      // label, then value. A value is never cut: a long value goes on to the next
+      // page (000881).
       {
         set par(justify: false)
         let title = n.at("title", default: none)
@@ -868,7 +858,7 @@
           ..n.rows.enumerate().map(((i, r)) => (
             ..if i > 0 { (grid.hline(stroke: (paint: palette.gray, thickness: 0.4pt, dash: "dashed")),) },
             strong(text(hyphenate: false, inline(r.label))),
-            if r.at("sign", default: none) != none { sign-area(r.sign) } else { clamp(r.c, 30, nodes => blocks(nodes, in-field: true)) },
+            if r.at("sign", default: none) != none { sign-area(r.sign) } else { blocks(r.c, in-field: true) },
           )).flatten(),
           grid.hline(stroke: 0.876pt),
         )

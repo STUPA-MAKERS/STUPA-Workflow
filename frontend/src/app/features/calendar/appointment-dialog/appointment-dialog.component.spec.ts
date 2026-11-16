@@ -93,62 +93,82 @@ describe('AppointmentDialogComponent', () => {
     view.http.expectNone('/api/calendar/appointments');
   });
 
-  /** § 000717: the creator invites the Gremien whose meetings the creator reads. */
-  it('invites Gremien from the meeting Gremien of the person', async () => {
+  /** § 000717, 001074: one field finds the Gremien whose meetings the creator reads. */
+  it('invites Gremien from the meeting Gremien of the person in the one field', async () => {
     const view = await setup();
-    expect(view.cmp.gremiumOptions().map((o) => o.label)).toEqual(['Haushaltsausschuss', 'Studierendenparlament']);
-    view.cmp.addGremium('g-2');
-    view.cmp.addGremium('unknown');
-    view.fixture.detectChanges();
-    expect(view.cmp.gremiumOptions().map((o) => o.value)).toEqual(['g-1']);
     const dialog = screen.getByRole('dialog', { name: 'Termin anlegen' });
+    expect(within(dialog).queryByRole('button', { name: /^Gremium$/ })).toBeNull();
+    const field = within(dialog).getByLabelText('Gremium oder Person einladen');
+    fireEvent.pointerDown(field);
+    view.fixture.detectChanges();
+    const all = screen.getByRole('listbox', { name: 'Treffer' });
+    expect(all.closest('[popover]')).not.toBeNull();
+    expect(within(all).getAllByRole('option').map((o) => o.querySelector('.gpp__name')?.textContent)).toEqual([
+      'Haushaltsausschuss',
+      'Studierendenparlament',
+    ]);
+    fireEvent.click(within(all).getByRole('option', { name: /Studierendenparlament/ }));
+    view.fixture.detectChanges();
+    expect(view.cmp.gremien()).toEqual([{ id: 'g-2', name: 'Studierendenparlament' }]);
+    expect(screen.queryByRole('listbox', { name: 'Treffer' })).toBeNull();
+    fireEvent.pointerDown(field);
+    view.fixture.detectChanges();
+    expect(within(screen.getByRole('listbox', { name: 'Treffer' })).getAllByRole('option')).toHaveLength(1);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Studierendenparlament entfernen' }));
     expect(view.cmp.gremien()).toEqual([]);
-    view.cmp.addGremium('g-1');
-    view.cmp.addGremium('g-2');
-    view.fixture.detectChanges();
-    expect(view.container.querySelector('app-filter-select')).toBeNull();
   });
 
   it('offers no Gremium when the read of the Gremien fails', async () => {
     const view = await setup({ gremien: null });
-    expect(view.cmp.gremiumOptions()).toEqual([]);
-    expect(view.container.querySelector('app-filter-select')).toBeNull();
+    expect(view.cmp.known()).toEqual([]);
   });
 
-  /** § 000738: the search finds accounts by name, from two characters on. */
-  it('finds persons by name and invites them once', async () => {
+  /** § 000738, 001074: Gremien and persons in one popover, from two characters on for persons. */
+  it('finds a Gremium and a person in one popover and invites both once', async () => {
     jest.useFakeTimers();
     try {
       const view = await setup({ appointment: appointment() });
       const dialog = screen.getByRole('dialog', { name: 'Termin bearbeiten' });
-      const field = within(dialog).getByLabelText('Person einladen');
+      const field = within(dialog).getByLabelText('Gremium oder Person einladen');
       fireEvent.input(field, { target: { value: 'j' } });
       jest.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS);
       view.http.expectNone((r) => r.url === '/api/calendar/people');
-      fireEvent.input(field, { target: { value: 'le' } });
+      fireEvent.input(field, { target: { value: 'st' } });
       jest.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS);
       const req = view.http.expectOne((r) => r.url === '/api/calendar/people');
-      expect(req.request.params.get('q')).toBe('le');
+      expect(req.request.params.get('q')).toBe('st');
       req.flush([
         { id: 'p-2', name: 'Jonas Weber' },
-        { id: 'p-3', name: 'Lea Schmid' },
+        { id: 'p-3', name: 'Stefan Schmid' },
       ]);
-      expect(view.cmp.personHits()).toEqual([{ id: 'p-3', name: 'Lea Schmid' }]);
       view.fixture.detectChanges();
-      const hits = within(dialog).getByRole('list', { name: 'Treffer' });
-      fireEvent.click(within(hits).getByRole('button', { name: /Lea Schmid/ }));
+      const hits = screen.getByRole('listbox', { name: 'Treffer' });
+      expect(hits.closest('[popover]')).not.toBeNull();
+      expect(within(hits).getAllByRole('option').map((o) => o.querySelector('.gpp__name')?.textContent)).toEqual([
+        'Studierendenparlament',
+        'Stefan Schmid',
+      ]);
+      fireEvent.click(within(hits).getByRole('option', { name: /Stefan Schmid/ }));
       view.fixture.detectChanges();
-      expect(view.cmp.personQuery()).toBe('');
-      expect(view.cmp.personHits()).toEqual([]);
-      expect(view.cmp.persons().map((p) => p.name)).toEqual(['Jonas Weber', 'Lea Schmid']);
+      expect((field as HTMLInputElement).value).toBe('');
+      fireEvent.input(field, { target: { value: 'stu' } });
+      view.fixture.detectChanges();
+      fireEvent.click(within(screen.getByRole('listbox', { name: 'Treffer' })).getByRole('option', { name: /Studierendenparlament/ }));
+      view.fixture.detectChanges();
+      expect(view.cmp.persons().map((p) => p.name)).toEqual(['Jonas Weber', 'Stefan Schmid']);
+      expect(view.cmp.gremien().map((g) => g.name)).toEqual(['Haushaltsausschuss', 'Studierendenparlament']);
+      expect(within(dialog).getByRole('button', { name: 'Stefan Schmid entfernen' })).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: 'Studierendenparlament entfernen' })).toBeInTheDocument();
       fireEvent.click(within(dialog).getByRole('button', { name: 'Jonas Weber entfernen' }));
       expect(view.cmp.persons().map((p) => p.id)).toEqual(['p-3']);
+      jest.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS);
+      view.http.match((r) => r.url === '/api/calendar/people').forEach((r) => r.flush([]));
 
       fireEvent.input(field, { target: { value: 'xy' } });
       jest.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS);
       view.http.expectOne((r) => r.url === '/api/calendar/people').flush(null, { status: 500, statusText: 'Error' });
-      expect(view.cmp.personHits()).toEqual([]);
+      view.fixture.detectChanges();
+      expect(screen.getByText('Keine Treffer')).toBeInTheDocument();
     } finally {
       jest.useRealTimers();
     }

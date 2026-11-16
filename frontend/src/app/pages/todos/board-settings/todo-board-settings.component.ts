@@ -15,10 +15,13 @@ import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import type { Uuid } from '@core/api/models';
+import { switchMap } from 'rxjs';
 import {
   TodosApiService,
   type TodoBoard,
+  type TodoBoardEntry,
   type TodoColumn,
+  type TodoEntryRole,
   type TodoLabel,
   type TodoLabelColor,
 } from '@core/api/todos.service';
@@ -41,6 +44,8 @@ import {
   SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { LABEL_COLORS, LABEL_COLOR_NAME, sortedColumns } from '../../../features/todos/todos.util';
+import type { PickerHit } from '../../../features/gremien/gremium-person-picker/gremium-person-picker.component';
+import { TodoBoardEntriesComponent } from '../board-entries/todo-board-entries.component';
 
 /** The default archive age when the switch turns on. */
 const DEFAULT_ARCHIVE_DAYS = 30;
@@ -50,13 +55,19 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
   column_not_empty: 'todos.settings.error.notEmpty',
   done_column_required: 'todos.settings.error.doneColumn',
   label_exists: 'todos.settings.error.labelExists',
+  last_manager: 'todos.entries.error.lastManager',
+  entry_exists: 'todos.entries.error.exists',
+  own_gremium_entry: 'todos.entries.error.ownGremium',
+  board_archived: 'todos.error.archived',
 };
 
 /**
  * "Board-Einstellungen" (`todo.configure`): the name, the columns (rename,
  * order by drag or by the menu, the done column, add, delete), the labels (name and
- * colour from the fixed palette) and the archive of done cards. Every change saves at
- * once; `changed` gives the board to the page.
+ * colour from the fixed palette), the archive of done cards, and on a Gremium board or a
+ * free board the section "Mitglieder" (spec 001064, 001077). A free board also has
+ * "Board archivieren" (spec 001068). Every change saves at once; `changed` gives the board
+ * to the page, `archived` tells it that the board went to the archive.
  */
 @Component({
   selector: 'app-todo-board-settings',
@@ -77,6 +88,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     RowMenuComponent,
     SelectFieldComponent,
     SwitchComponent,
+    TodoBoardEntriesComponent,
   ],
   templateUrl: './todo-board-settings.component.html',
   styleUrl: './todo-board-settings.component.scss',
@@ -89,6 +101,7 @@ export class TodoBoardSettingsComponent {
   readonly open = model(false);
   readonly board = input.required<TodoBoard>();
   readonly changed = output<TodoBoard>();
+  readonly archived = output<void>();
 
   readonly colors = LABEL_COLORS;
   readonly name = signal('');
@@ -106,6 +119,13 @@ export class TodoBoardSettingsComponent {
   readonly moveTo = signal<Uuid>('');
   /** An empty column that "Spalte löschen?" asks about. */
   readonly confirmEmpty = signal<TodoColumn | null>(null);
+  /** The member entries of a Gremium board or a free board. */
+  readonly entries = signal<readonly TodoBoardEntry[]>([]);
+  /** "Board archivieren?" asks. */
+  readonly confirmArchive = signal(false);
+
+  readonly hasEntries = computed(() => this.board().kind === 'gremium' || this.board().kind === 'free');
+  readonly isFree = computed(() => this.board().kind === 'free');
 
   readonly columns = computed(() => sortedColumns(this.board().columns));
   readonly archiveOn = computed(() => this.board().archiveAfterDays !== null);
@@ -127,7 +147,70 @@ export class TodoBoardSettingsComponent {
         this.labelEdit.set(null);
         this.deleting.set(null);
         this.confirmEmpty.set(null);
+        this.confirmArchive.set(false);
+        this.entries.set([]);
+        if (b.kind === 'gremium' || b.kind === 'free') this.loadEntries(b.id);
       });
+    });
+  }
+
+  private loadEntries(boardId: Uuid): void {
+    this.api.entries(boardId).subscribe({
+      next: (list) => this.entries.set(list),
+      error: (err: unknown) => this.fail(err),
+    });
+  }
+
+  /**
+   * Save a change of the entries, then read the board again: the change can move the own
+   * role, the assignees and the agenda Gremien.
+   */
+  private runEntries(req: Observable<TodoBoardEntry[]>): void {
+    this.busy.set(true);
+    req
+      .pipe(
+        switchMap((list) => {
+          this.entries.set(list);
+          return this.api.board(this.board().id);
+        }),
+      )
+      .subscribe({
+        next: (board) => {
+          this.busy.set(false);
+          this.changed.emit(board);
+        },
+        error: (err: unknown) => this.fail(err),
+      });
+  }
+
+  addEntry(event: { readonly hit: PickerHit; readonly role: TodoEntryRole }): void {
+    const { hit, role } = event;
+    const body = hit.kind === 'gremium' ? { gremiumId: hit.id, role } : { principalId: hit.id, role };
+    this.runEntries(this.api.addEntry(this.board().id, body));
+  }
+
+  setEntryRole(event: { readonly entry: TodoBoardEntry; readonly role: TodoEntryRole }): void {
+    if (event.entry.id) this.runEntries(this.api.patchEntry(this.board().id, event.entry.id, event.role));
+  }
+
+  removeEntry(entry: TodoBoardEntry): void {
+    if (entry.id) this.runEntries(this.api.removeEntry(this.board().id, entry.id));
+  }
+
+  /** "Archivieren" in "Board archivieren?": the board leaves the picker (spec 001068). */
+  archiveBoard(): void {
+    this.busy.set(true);
+    this.api.archiveBoard(this.board().id).subscribe({
+      next: () => {
+        this.busy.set(false);
+        this.confirmArchive.set(false);
+        this.open.set(false);
+        this.archived.emit();
+      },
+      error: (err: unknown) => {
+        this.confirmArchive.set(false);
+        this.fail(err);
+      },
     });
   }
 

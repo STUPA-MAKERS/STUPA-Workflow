@@ -222,7 +222,8 @@ class ExpenseOps(BudgetTreeServiceBase):
         Raises:
             ValidationProblem: `budgetId` is missing, no fiscal year resolves, or the
                 year is past and neither the payment date nor the invoice date lies
-                in it (422).
+                in it (422). `cost_centre_not_leaf` (422) for a node with
+                Kostenstellen below it (001032).
         """
         if payload.budget_id is None:
             raise ValidationProblem(
@@ -236,6 +237,7 @@ class ExpenseOps(BudgetTreeServiceBase):
             late=True,
             on=payload.payment_date or payload.invoice_date,
         )
+        await self._refuse_not_leaf(node)
         return node, year, None
 
     async def _require_invoice(self, invoice_id: UUID) -> None:
@@ -312,6 +314,7 @@ class ExpenseOps(BudgetTreeServiceBase):
         )
         if target is not None:
             await self._resolve_fiscal_year(target, expense.fiscal_year_id, kept=True)
+            await self._refuse_not_leaf(target)
         for name, value in _expense_changes(payload, target).items():
             setattr(expense, name, value)
         if "invoice_id" in fields and payload.invoice_id is not None:

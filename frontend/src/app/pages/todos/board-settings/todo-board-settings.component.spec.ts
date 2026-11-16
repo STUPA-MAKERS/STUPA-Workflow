@@ -1,11 +1,17 @@
+import { TestBed } from '@angular/core/testing';
 import type { CdkDragDrop } from '@angular/cdk/drag-drop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import { of, throwError } from 'rxjs';
-import { TodosApiService, type TodoBoard } from '@core/api/todos.service';
+import { TodosApiService, type TodoBoard, type TodoBoardEntry } from '@core/api/todos.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { board, tile } from '../../../../testing/todo-fixtures';
 import { TodoBoardSettingsComponent } from './todo-board-settings.component';
+
+const ENTRIES: TodoBoardEntry[] = [
+  { id: null, kind: 'gremium', targetId: 'g-1', name: 'Studierendenparlament', role: 'edit', fixed: true, logoUrl: null },
+  { id: 'e-1', kind: 'person', targetId: 'p-5', name: 'Lea Schmid', role: 'read', fixed: false, logoUrl: null },
+];
 
 const refuse = (code?: string) =>
   throwError(() => new HttpErrorResponse({ status: 422, error: code ? { code } : null }));
@@ -21,12 +27,20 @@ async function setup(b: TodoBoard = board()) {
     addLabel: jest.fn(() => of({ id: 'l-9', name: 'Aaa', color: 'red' as const })),
     patchLabel: jest.fn(() => of({ id: 'l-1', name: 'Zzz', color: 'gray' as const })),
     deleteLabel: jest.fn(() => of(undefined)),
+    entries: jest.fn(() => of(ENTRIES)),
+    entryOptions: jest.fn(() => of({ gremien: [{ id: 'g-7', name: 'AStA', logoUrl: null }], persons: [] })),
+    addEntry: jest.fn(() => of(ENTRIES)),
+    patchEntry: jest.fn(() => of(ENTRIES)),
+    removeEntry: jest.fn(() => of(ENTRIES.slice(0, 1))),
+    board: jest.fn(() => of(b)),
+    archiveBoard: jest.fn(() => of(b)),
   };
   const toast = { success: jest.fn(), error: jest.fn() };
   const changed = jest.fn();
+  const archived = jest.fn();
   const view = await render(TodoBoardSettingsComponent, {
     inputs: { open: false, board: b },
-    on: { changed },
+    on: { changed, archived },
     providers: [
       { provide: TodosApiService, useValue: api },
       { provide: ToastService, useValue: toast },
@@ -35,7 +49,7 @@ async function setup(b: TodoBoard = board()) {
   const cmp = view.fixture.componentInstance;
   cmp.open.set(true);
   view.fixture.detectChanges();
-  return { ...view, api, toast, changed, cmp, detect: () => view.fixture.detectChanges() };
+  return { ...view, api, toast, changed, archived, cmp, detect: () => view.fixture.detectChanges() };
 }
 
 describe('TodoBoardSettingsComponent', () => {
@@ -54,12 +68,77 @@ describe('TodoBoardSettingsComponent', () => {
     expect(cmp.open()).toBe(false);
   });
 
-  it('groups the dialog into four sections and says so when there is no label', async () => {
+  it('groups the dialog into its sections and says so when there is no label', async () => {
     await setup(board({ labels: [] }));
-    for (const name of ['Allgemein', 'Spalten', 'Labels', 'Archiv']) {
+    for (const name of ['Allgemein', 'Mitglieder', 'Spalten', 'Labels', 'Archiv']) {
       expect(screen.getByRole('heading', { level: 3, name })).toBeInTheDocument();
     }
     expect(screen.getByText('Keine Labels')).toBeInTheDocument();
+  });
+
+  /** § 001077: the own Gremium is fixed, the other entries change and go. */
+  it('lists the members of a Gremium board and changes the other entries', async () => {
+    const { api, cmp, changed, detect } = await setup();
+    const members = screen.getByRole('list', { name: 'Mitglieder' });
+    expect(within(members).getByText('Studierendenparlament')).toBeInTheDocument();
+    expect(within(members).queryByRole('button', { name: 'Studierendenparlament entfernen' })).toBeNull();
+    expect(within(members).getByRole('button', { name: 'Rolle von Lea Schmid: Lesen' })).toBeInTheDocument();
+    cmp.setEntryRole({ entry: ENTRIES[1], role: 'manage' });
+    expect(api.patchEntry).toHaveBeenCalledWith('b-1', 'e-1', 'manage');
+    expect(api.board).toHaveBeenCalledWith('b-1');
+    expect(changed).toHaveBeenCalled();
+    fireEvent.click(within(members).getByRole('button', { name: 'Lea Schmid entfernen' }));
+    detect();
+    expect(api.removeEntry).toHaveBeenCalledWith('b-1', 'e-1');
+    expect(cmp.entries()).toHaveLength(1);
+    cmp.addEntry({ hit: { kind: 'gremium', id: 'g-7', name: 'AStA', logoUrl: null }, role: 'edit' });
+    expect(api.addEntry).toHaveBeenCalledWith('b-1', { gremiumId: 'g-7', role: 'edit' });
+    expect(screen.queryByRole('button', { name: 'Board archivieren' })).toBeNull();
+  });
+
+  /** § 001064, 001068: the last manager stays; a free board goes to the archive. */
+  it('says why the last manager stays and archives a free board', async () => {
+    const { api, cmp, toast, archived, detect } = await setup(board({ kind: 'free', gremiumId: null }));
+    api.patchEntry.mockReturnValueOnce(refuse('last_manager'));
+    cmp.setEntryRole({ entry: ENTRIES[1], role: 'read' });
+    expect(toast.error).toHaveBeenCalledWith('Das Board braucht mindestens einen Eintrag mit „Verwalten“.');
+    fireEvent.click(screen.getByRole('button', { name: 'Board archivieren' }));
+    detect();
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Board archivieren?' })).getByRole('button', { name: 'Archivieren' }));
+    expect(api.archiveBoard).toHaveBeenCalledWith('b-1');
+    expect(archived).toHaveBeenCalled();
+    expect(cmp.open()).toBe(false);
+  });
+
+  it('says so when the members do not load or the archive fails', async () => {
+    const free = board({ kind: 'free', gremiumId: null });
+    const { api, cmp, toast, archived } = await setup(free);
+    api.entries.mockReturnValueOnce(refuse(undefined) as never);
+    cmp.open.set(false);
+    cmp.open.set(true);
+    TestBed.flushEffects();
+    expect(toast.error).toHaveBeenLastCalledWith('Die Einstellung konnte nicht gespeichert werden.');
+    api.archiveBoard.mockReturnValueOnce(refuse('board_archived') as never);
+    cmp.archiveBoard();
+    expect(toast.error).toHaveBeenCalledTimes(2);
+    expect(archived).not.toHaveBeenCalled();
+    expect(cmp.open()).toBe(true);
+  });
+
+  it('adds a person and skips the rows without an id', async () => {
+    const { api, cmp } = await setup(board({ kind: 'free', gremiumId: null }));
+    cmp.addEntry({ hit: { kind: 'person', id: 'p-9', name: 'Bert' }, role: 'edit' });
+    expect(api.addEntry).toHaveBeenCalledWith('b-1', { principalId: 'p-9', role: 'edit' });
+    const fixed = { ...ENTRIES[0], id: null };
+    cmp.setEntryRole({ entry: fixed, role: 'read' });
+    cmp.removeEntry(fixed);
+    expect(api.patchEntry).not.toHaveBeenCalled();
+    expect(api.removeEntry).not.toHaveBeenCalled();
+  });
+
+  it('reads no members of a personal board', async () => {
+    const { api } = await setup(board({ kind: 'personal', gremiumId: null }));
+    expect(api.entries).not.toHaveBeenCalled();
   });
 
   it('saves a new name, keeps the old one for an empty or the same name', async () => {

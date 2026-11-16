@@ -838,8 +838,8 @@ export class ApiClient {
    * list loads its own rows, and without it the page showed its own placeholder and the global
    * overlay at the same time.
    */
-  listMeetingFilterGremien(): Observable<{ id: Uuid; name: string }[]> {
-    return this.http.get<{ id: Uuid; name: string }[]>(`${this.base}/meetings/committees`, {
+  listMeetingFilterGremien(): Observable<{ id: Uuid; name: string; logoUrl?: string | null }[]> {
+    return this.http.get<{ id: Uuid; name: string; logoUrl?: string | null }[]>(`${this.base}/meetings/committees`, {
       context: skipLoading(),
     });
   }

@@ -29,6 +29,7 @@ from app.modules.budget.plan_rules import PlanState, PlanTarget, Side
 from app.modules.budget.plan_schemas import (
     PlanCreate,
     PlanLineOut,
+    PlanLinePredecessorSet,
     PlanLineRename,
     PlanLineSet,
     PlanMeetingOut,
@@ -88,6 +89,7 @@ def _line_out(
         transferable=bool(line.transferable),
         coverable=bool(line.coverable),
         blocked=(line.blocked if line.blocked is not None else _ZERO).quantize(_CENT),
+        predecessorId=line.predecessor_id,
     )
 
 
@@ -461,6 +463,30 @@ class PlanOps(NodeOps, AllocationOps):
         return cleared
 
     @staticmethod
+    def _clear_predecessors(
+        lines: Sequence[BudgetPlanLine], nodes: Sequence[Budget], top_id: UUID, titel_id: UUID
+    ) -> list[dict[str, str]]:
+        """Take the Vorgänger off the lines of a Titel that changes its side (spec 001040).
+
+        A Vorgänger is on the side of its line, so a new side makes it wrong. The return
+        value names each line and its Vorgänger, for the audit entry.
+        """
+        parent_of = {n.id: n.parent_id for n in nodes}
+        named = [
+            line
+            for line in lines
+            if line.predecessor_id is not None
+            and plan_rules.titel_of(parent_of, top_id, line.budget_id) == titel_id
+        ]
+        cleared = [
+            {"budgetId": str(line.budget_id), "predecessorId": str(line.predecessor_id)}
+            for line in named
+        ]
+        for line in named:
+            line.predecessor_id = None
+        return cleared
+
+    @staticmethod
     def _default_marks(
         lines: Sequence[BudgetPlanLine], nodes: Sequence[Budget], top_id: UUID, titel_id: UUID
     ) -> list[str]:
@@ -715,13 +741,21 @@ class PlanOps(NodeOps, AllocationOps):
         return await self._lines(in_force.id)
 
     async def _new_version(
-        self, plan: BudgetPlan, number: int, source: list[BudgetPlanLine], top: Budget
+        self,
+        plan: BudgetPlan,
+        number: int,
+        source: list[BudgetPlanLine],
+        top: Budget,
+        *,
+        same_year: bool = False,
     ) -> BudgetPlanVersion:
         """Add a draft version to `plan` with a copy of the `source` lines.
 
         The copy drops the name and the path key of a decided line, because a draft
         shows the current ones. Each parent of the copy holds the sum of its children,
-        because the tree can differ from the tree of the source.
+        because the tree can differ from the tree of the source. Only a copy of the
+        same year (`same_year`, a Nachtrag) keeps the Vorgänger, because a copy of
+        another year has a different year before (spec 001040).
         """
         version = BudgetPlanVersion(
             id=uuid.uuid4(),
@@ -742,6 +776,7 @@ class PlanOps(NodeOps, AllocationOps):
                 transferable=line.transferable,
                 coverable=line.coverable,
                 blocked=line.blocked,
+                predecessor_id=line.predecessor_id if same_year else None,
             )
             for line in source
         ]
@@ -800,7 +835,11 @@ class PlanOps(NodeOps, AllocationOps):
         if in_force is None:
             raise ConflictError("The plan has no version in force.", code="plan_not_in_force")
         version = await self._new_version(
-            plan, max(v.number for v in versions) + 1, await self._lines(in_force.id), top
+            plan,
+            max(v.number for v in versions) + 1,
+            await self._lines(in_force.id),
+            top,
+            same_year=True,
         )
         await self._audit_version(plan, version)
         return await self._plan_out(plan, top.id)
@@ -861,6 +900,11 @@ class PlanOps(NodeOps, AllocationOps):
         cleared = (
             self._clear_marks(list(lines.values()), nodes, top.id, node.id) if to_income else []
         )
+        unnamed = (
+            self._clear_predecessors(list({**lines, node.id: own}.values()), nodes, top.id, node.id)
+            if titel and side_before is not None and own.side != side_before
+            else []
+        )
         sides = self._sides(top, nodes, [*lines.values(), own])
         to_expense = titel and asked.side == "expense" and side_before != "expense"
         starts = plan_rules.starts_coverable(
@@ -915,6 +959,7 @@ class PlanOps(NodeOps, AllocationOps):
                 "side": wanted.side,
                 "previousSide": side_before,
                 "clearedMarks": cleared,
+                "clearedPredecessors": unnamed,
                 "defaultedMarks": defaulted,
                 "note": wanted.note,
                 "transferable": wanted.transferable,
@@ -1101,6 +1146,117 @@ class PlanOps(NodeOps, AllocationOps):
             },
         )
         return await self._plan_out(plan, top.id)
+
+    async def _year_before(self, fy: FiscalYear) -> FiscalYear | None:
+        """Return the fiscal year before `fy` of the same budget, else none."""
+        return (
+            await self.session.scalars(
+                select(FiscalYear).where(
+                    FiscalYear.budget_id == fy.budget_id, FiscalYear.year == fy.year - 1
+                )
+            )
+        ).one_or_none()
+
+    async def _plan_in(self, fy: FiscalYear | None) -> PlanOut | None:
+        """Return the Haushaltsplan of a fiscal year, else none."""
+        plan = await self._plan_of(fy.id) if fy is not None else None
+        return await self._plan_out(plan, fy.budget_id) if plan is not None and fy else None
+
+    async def set_predecessor(
+        self, version_id: UUID, budget_id: UUID, payload: PlanLinePredecessorSet
+    ) -> PlanOut:
+        """Name the Vorgänger of a draft line, or clear it (spec 001040).
+
+        The Vorgänger is the cost center of a line of the version in force of the year
+        before, on the side of the line. The line then compares with it instead of
+        with its own cost center.
+
+        Raises:
+            NotFoundError: The version does not exist (404).
+            ConflictError: `fiscal_year_closed` (409), `plan_version_locked` (409) for
+                a version that is not a draft, `plan_predecessor_taken` (409) for a
+                Vorgänger that another line of the version names.
+            ValidationProblem: `plan_line_missing` (422) for a cost center without a
+                line in the version, `plan_predecessor_invalid` (422) for a Vorgänger
+                that is no line of the plan in force of the year before, or one on
+                another side, or a line without a side.
+        """
+        version, plan, fy, top = await self._version_context(version_id)
+        if version.state != "draft":
+            raise ConflictError("Only a draft version can be edited.", code="plan_version_locked")
+        nodes = await self._subtree(top)
+        lines = await self._lines(version.id)
+        node = next((n for n in nodes if n.id == budget_id), None)
+        line = next((ln for ln in lines if ln.budget_id == budget_id), None)
+        if node is None or line is None:
+            raise ValidationProblem(
+                "The cost centre has no line in this version.",
+                code="plan_line_missing",
+                errors=[{"field": "budgetId", "msg": "no line in the version"}],
+            )
+        wanted = payload.predecessor_id
+        if wanted is not None:
+            await self._check_predecessor(fy, top, nodes, lines, line, wanted)
+        before = self._name_predecessor(line, wanted)
+        await self._audit(
+            AuditAction.BUDGET_PLAN_LINE_SET,
+            target_type="budget_plan",
+            target_id=str(plan.id),
+            data={
+                "versionId": str(version.id),
+                "number": version.number,
+                "budgetId": str(node.id),
+                "pathKey": node.path_key,
+                "name": node.name,
+                "predecessor": {
+                    "before": str(before) if before else None,
+                    "after": str(wanted) if wanted else None,
+                },
+            },
+        )
+        return await self._plan_out(plan, top.id)
+
+    @staticmethod
+    def _name_predecessor(line: BudgetPlanLine, wanted: UUID | None) -> UUID | None:
+        """Give a line its Vorgänger and return the one it had."""
+        before = line.predecessor_id
+        line.predecessor_id = wanted
+        return before
+
+    async def _check_predecessor(
+        self,
+        fy: FiscalYear,
+        top: Budget,
+        nodes: Sequence[Budget],
+        lines: Sequence[BudgetPlanLine],
+        line: BudgetPlanLine,
+        wanted: UUID,
+    ) -> None:
+        """Check a Vorgänger against the year before and the other lines of the version.
+
+        Raises:
+            ConflictError: `plan_predecessor_taken` (409).
+            ValidationProblem: `plan_predecessor_invalid` (422).
+        """
+        before = await self._plan_in(await self._year_before(fy))
+        in_force = next(
+            (v for v in (before.versions if before else ()) if v.state == "in_force"), None
+        )
+        target = next(
+            (ln for ln in (in_force.lines if in_force else ()) if ln.budget_id == wanted), None
+        )
+        side = self._sides(top, nodes, lines).get(line.budget_id)
+        if target is None or side is None or target.side != side:
+            raise ValidationProblem(
+                "The Vorgänger is no line of the plan in force of the year before on this side.",
+                code="plan_predecessor_invalid",
+                errors=[{"field": "predecessorId", "msg": "no line of the year before here"}],
+            )
+        if any(ln.predecessor_id == wanted and ln.id != line.id for ln in lines):
+            raise ConflictError(
+                "Another line of this version names this Vorgänger.",
+                code="plan_predecessor_taken",
+            )
 
     async def delete_line(self, version_id: UUID, budget_id: UUID) -> PlanOut:
         """Remove the line of one cost center from a draft version.
