@@ -95,6 +95,7 @@ export const AXE_ROUTES: readonly AxeRoute[] = [
   fixed('admin/notifications'),
   { path: 'oauth/consent', url: () => '/oauth/consent?client_id=missing' },
   fixed('account'),
+  fixed('account/profile'),
   fixed('account/notifications'),
   fixed('account/grants'),
   fixed('forbidden'),
