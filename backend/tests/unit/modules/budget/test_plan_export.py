@@ -130,6 +130,23 @@ def test_a_predecessor_takes_the_figures_of_the_year_before() -> None:
     assert rows["VS-8"].prev is None
 
 
+def test_a_predecessor_outside_the_tree_has_no_ist() -> None:
+    """A Vorgänger that is no node of the tree shows an Ist of zero.
+
+    Rule: §F/finance/budget/001040.
+    """
+    gone = uuid.uuid4()
+    export = build_export(
+        _head(),
+        _TOP,
+        (_Line(_OPEN.id, D("40"), side="expense", predecessor_id=gone),),
+        prev=(_Line(gone, D("25"), side="expense"),),
+        prev_fiscal_year_id=_PREV,
+    )
+    row = next(r for g in export.groups for r in g.rows if r.key == "VS-9")
+    assert (row.prev, row.actual) == (D("25"), D("0.00"))
+
+
 def test_a_plan_without_lines_has_no_group_and_a_balance_of_zero() -> None:
     """A group without a line is left out."""
     export = build_export(_head(), _TOP, ())
