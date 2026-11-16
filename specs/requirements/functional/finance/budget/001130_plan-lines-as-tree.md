@@ -2,7 +2,7 @@
 id: "001130"
 title: The lines of a plan show as a tree
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:
