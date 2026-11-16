@@ -2,7 +2,7 @@
 id: "001041"
 title: A row without its own figure of the year before sums the rows below it
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:
