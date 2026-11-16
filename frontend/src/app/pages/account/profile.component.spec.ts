@@ -56,6 +56,46 @@ describe('AccountProfileComponent', () => {
     expect(screen.getByText('ada@x.de')).toBeTruthy();
   });
 
+  it('formats every kind of claim value and falls back to the e-mail as name', async () => {
+    const { container } = await setup(
+      of({
+        sub: 'u-2',
+        email: 'bo@x.de',
+        display_name: null,
+        last_login: null,
+        claims: [
+          { key: 'sub', value: 'u-2' },
+          { key: 'email_verified', value: false },
+          { key: 'groups', value: [] },
+          { key: 'name', value: 'Bo' },
+          { key: 'roles', value: [{ id: 1 }, 'x'] },
+          { key: 'level', value: 3 },
+        ],
+      }),
+    );
+    const rows = [...container.querySelectorAll('.pf__row')].map((r) => [
+      r.querySelector('.pf__label')?.textContent?.trim(),
+      r.querySelector('.pf__value')?.textContent?.trim(),
+    ]);
+    expect(rows).toEqual([
+      ['Name', 'Bo'],
+      ['E-Mail bestätigt', 'Nein'],
+      ['Gruppen', '—'],
+      ['level', '3'],
+      ['roles', '{"id":1}, x'],
+      ['Kennung', 'u-2'],
+    ]);
+    expect(container.querySelector('.pf__name')?.textContent?.trim()).toBe('bo@x.de');
+    expect(container.querySelector('.pf__mail')).toBeNull();
+  });
+
+  it('shows a dash as name without a name and an e-mail address', async () => {
+    const { container } = await setup(
+      of({ sub: 'u-3', email: null, display_name: null, last_login: null, claims: [] }),
+    );
+    expect(container.querySelector('.pf__name')?.textContent?.trim()).toBe('—');
+  });
+
   it('links the avatar to the Gravatar profile in a new tab', async () => {
     const { container } = await setup();
     const link = container.querySelector<HTMLAnchorElement>('a.pf__avatar');
