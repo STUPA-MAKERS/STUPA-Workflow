@@ -490,10 +490,26 @@ async def test_assign_budget_sets_fiscal_year() -> None:
     node = top
     fy = _fy(budget_id=top.id, active=True)
     app = _app()
-    sess = fake_session(result(app), result(node), result(top), result(fy))
+    sess = fake_session(result(app), result(True), result(node), result(top), result(fy))
     svc = BudgetTreeService(sess)
     out = await svc.assign_budget(app.id, AssignBudgetRequest(budgetId=node.id))
     assert out.budget_id == node.id and out.fiscal_year_id == fy.id
+
+
+async def test_assign_budget_refuses_an_antrag_without_money() -> None:
+    """A type without `has_budget` takes no Kostenstelle (422).
+
+    Rule: §F/finance/budget/001033. The fake session serves the application and the flag
+    of its type.
+    """
+    app = _app()
+    sess = fake_session(result(app), result(False))
+    with pytest.raises(ValidationProblem) as exc:
+        await BudgetTreeService(sess).assign_budget(
+            app.id, AssignBudgetRequest(budgetId=uuid.uuid4())
+        )
+    assert exc.value.code == "application_without_budget"
+    assert app.budget_id is None
 
 
 async def test_assign_budget_app_not_found() -> None:
@@ -512,7 +528,7 @@ async def test_assign_budget_explicit_fiscal_year() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS-800", key="800")
     fy = _fy(id=uuid.uuid4(), budget_id=top.id, active=True)
     app = _app()
-    sess = fake_session(result(app), result(node), result(top), result(fy))
+    sess = fake_session(result(app), result(True), result(node), result(top), result(fy))
     svc = BudgetTreeService(sess)
     out = await svc.assign_budget(
         app.id, AssignBudgetRequest(budgetId=node.id, fiscalYearId=fy.id)
@@ -531,7 +547,7 @@ async def test_assign_budget_ambiguous_requires_fiscal_year() -> None:
     fy1 = _fy(id=uuid.uuid4(), budget_id=top.id)
     fy2 = _fy(id=uuid.uuid4(), budget_id=top.id)
     app = _app()
-    sess = fake_session(result(app), result(node), result(top), result(fy1, fy2))
+    sess = fake_session(result(app), result(True), result(node), result(top), result(fy1, fy2))
     svc = BudgetTreeService(sess)
     with pytest.raises(ValidationProblem):
         await svc.assign_budget(app.id, AssignBudgetRequest(budgetId=node.id))
@@ -542,7 +558,7 @@ async def test_move_fiscal_year_ok() -> None:
     node = top
     fy = _fy(budget_id=top.id)
     app = _app(budget_id=node.id, fiscal_year_id=uuid.uuid4())
-    sess = fake_session(result(app), result(node), result(top), result(fy))
+    sess = fake_session(result(app), result(True), result(node), result(top), result(fy))
     svc = BudgetTreeService(sess)
     out = await svc.move_fiscal_year(app.id, MoveFiscalYearRequest(fiscalYearId=fy.id))
     assert out.fiscal_year_id == fy.id
@@ -561,7 +577,7 @@ async def test_move_fiscal_year_wrong_top() -> None:
     node = top
     fy = _fy(budget_id=uuid.uuid4())
     app = _app(budget_id=node.id)
-    sess = fake_session(result(app), result(node), result(top), result(fy))
+    sess = fake_session(result(app), result(True), result(node), result(top), result(fy))
     svc = BudgetTreeService(sess)
     with pytest.raises(ValidationProblem):
         await svc.move_fiscal_year(app.id, MoveFiscalYearRequest(fiscalYearId=fy.id))

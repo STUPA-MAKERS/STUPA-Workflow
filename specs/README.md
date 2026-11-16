@@ -399,6 +399,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/001030](requirements/functional/finance/budget/001030_antrag-takes-expense-cost-centre.md) | An Antrag takes only a Kostenstelle on the expense side | approved |
 | [F/finance/budget/001031](requirements/functional/finance/budget/001031_antrag-takes-leaf-cost-centre.md) | An Antrag takes only a Kostenstelle without a Kostenstelle below it | approved |
 | [F/finance/budget/001032](requirements/functional/finance/budget/001032_booking-takes-leaf-cost-centre.md) | A booking takes only a Kostenstelle without a Kostenstelle below it | approved |
+| [F/finance/budget/001033](requirements/functional/finance/budget/001033_antrag-without-money-takes-no-cost-centre.md) | An Antrag of a type without money takes no Kostenstelle | draft |
 | [F/finance/budget/001040](requirements/functional/finance/budget/001040_plan-line-predecessor.md) | A plan line can name its predecessor in the year before | approved |
 | [F/finance/budget/001041](requirements/functional/finance/budget/001041_plan-row-sums-rows-below.md) | A row without its own figure of the year before sums the rows below it | approved |
 | [F/finance/budget/001042](requirements/functional/finance/budget/001042_plan-line-year-before-by-hand.md) | A plan line can set the Ansatz and the Ist of the year before by hand | approved |

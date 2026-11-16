@@ -101,6 +101,8 @@ interface Opts {
   page?: boolean;
   phone?: boolean;
   tree?: unknown[];
+  /** `hasBudget` of the type, from the effective form; default true (001033). */
+  hasBudget?: boolean;
   /** The bar of the list/detail layout, one view at a time. */
   nav?: ListDetailNav;
 }
@@ -162,7 +164,7 @@ async function setup(opts: Opts = {}) {
   }
   http
     .expectOne((r) => r.url === '/api/applications/app-1/form')
-    .flush({ applicationTypeId: 't1', formVersionId: 'fv', hasBudget: false, sections: FORM_SECTIONS });
+    .flush({ applicationTypeId: 't1', formVersionId: 'fv', hasBudget: opts.hasBudget ?? true, sections: FORM_SECTIONS });
   view.detectChanges();
   if (opts.tree) {
     for (const req of http.match((r) => r.url === '/api/budgets')) req.flush(opts.tree);
@@ -630,6 +632,30 @@ describe('ApplicationsDetailComponent — header', () => {
       expect(screen.getByRole('button', { name: 'Kostenstelle' })).toHaveTextContent('Zuordnen');
       expect(screen.getAllByText('Keine').length).toBeGreaterThan(0);
       http.verify();
+    });
+
+    /** An Antrag of a type without money takes no Kostenstelle (spec 001033). */
+    it('shows no Kostenstelle row for an Antrag of a type without money', async () => {
+      const { http } = await setup({ app: { budgetId: null, fiscalYearId: null }, tree: TREE, hasBudget: false });
+      expect(screen.queryByRole('button', { name: 'Kostenstelle' })).not.toBeInTheDocument();
+      http.verify();
+    });
+
+    /** An old Kostenstelle of such an Antrag stays visible and can only go away (spec 001033). */
+    it('offers only to remove the old Kostenstelle of an Antrag without money', async () => {
+      const { http, detectChanges } = await setup({
+        app: { budgetId: 'b2', fiscalYearId: 'fy1' },
+        tree: TREE,
+        hasBudget: false,
+      });
+      http.expectOne(YEARS_URL).flush(YEARS);
+      detectChanges();
+      expect(screen.getByText('Kostenstelle · HHJ 2026')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Kostenstelle ändern' })).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Kostenstelle entfernen' }));
+      const post = http.expectOne((r) => r.url === '/api/applications/app-1/assign-budget');
+      expect(post.request.body).toEqual({ budgetId: null, fiscalYearId: null });
+      for (const req of http.match(() => true)) req.flush([]);
     });
 
     it('drops the years of an application it no longer shows', async () => {

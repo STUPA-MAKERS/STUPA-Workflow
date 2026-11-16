@@ -3277,10 +3277,20 @@ async def test_a_haushalt_with_a_plan_takes_a_booking_only_on_a_plan_in_force(
 
 
 async def _antrag(
-    session: AsyncSession, budget_id: uuid.UUID | None = None, fy_id: uuid.UUID | None = None
+    session: AsyncSession,
+    budget_id: uuid.UUID | None = None,
+    fy_id: uuid.UUID | None = None,
+    *,
+    has_budget: bool = True,
 ) -> uuid.UUID:
-    """Store an Antrag in a running state, with a cost center and a year or without."""
-    app_type = ApplicationType(key=f"t-{uuid.uuid4().hex[:8]}", name_i18n={})
+    """Store an Antrag in a running state, with a cost center and a year or without.
+
+    `has_budget` is the flag of its type: an Antrag of a type without it asks for no
+    money (001033).
+    """
+    app_type = ApplicationType(
+        key=f"t-{uuid.uuid4().hex[:8]}", name_i18n={}, has_budget=has_budget
+    )
     session.add(app_type)
     await session.flush()
     fv = FormVersion(application_type_id=app_type.id, version=1)
@@ -3324,6 +3334,24 @@ async def test_an_antrag_is_not_assigned_to_an_income_cost_centre(
         app_id, AssignBudgetRequest(budgetId=t.exp_a.id, fiscalYearId=t.fy.id)
     )
     assert done.budget_id == t.exp_a.id
+
+
+async def test_an_antrag_without_money_takes_no_cost_centre(session: AsyncSession) -> None:
+    """An Antrag of a type without money takes no Kostenstelle; an old one can go away.
+
+    Rule: §F/finance/budget/001033.
+    """
+    t = await _tree(session)
+    fresh = await _antrag(session, has_budget=False)
+    with pytest.raises(ValidationProblem) as exc:
+        await t.svc.assign_budget(
+            fresh, AssignBudgetRequest(budgetId=t.exp_a.id, fiscalYearId=t.fy.id)
+        )
+    assert _code(exc) == "application_without_budget"
+    await session.rollback()
+    old = await _antrag(session, t.exp_a.id, t.fy.id, has_budget=False)
+    cleared = await t.svc.assign_budget(old, AssignBudgetRequest(budgetId=None))
+    assert (cleared.budget_id, cleared.fiscal_year_id) == (None, None)
 
 
 async def test_an_antrag_does_not_move_into_a_year_where_its_cost_centre_is_income(

@@ -36,6 +36,10 @@ class _Years:
         """Say the node is a leaf unless the fake session names it in `parents`."""
         return node.id not in getattr(self._session, "parents", ())
 
+    async def takes_cost_centre(self, app: Any) -> bool:
+        """Say the Antrag asks for money unless the fake session names it in `no_money`."""
+        return app.id not in getattr(self._session, "no_money", ())
+
     async def is_income(self, node: Any, _fiscal_year_id: Any) -> bool:
         """Say the node is income when the fake session names it in `income`."""
         return node.id in getattr(self._session, "income", ())

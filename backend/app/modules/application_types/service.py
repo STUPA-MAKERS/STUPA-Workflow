@@ -65,3 +65,15 @@ class ApplicationTypesService:
             key=row.key if admin else None,
             gremiumId=row.gremium_id if admin else None,
         )
+
+
+async def type_has_budget(session: AsyncSession, type_id: UUID) -> bool:
+    """Tell if an Antrag of this type asks for money (`has_budget`, spec 001033).
+
+    A missing type counts as a type without money, so a Kostenstelle stays off (fail
+    closed).
+    """
+    flag = await session.scalar(
+        select(ApplicationType.has_budget).where(ApplicationType.id == type_id)
+    )
+    return bool(flag)

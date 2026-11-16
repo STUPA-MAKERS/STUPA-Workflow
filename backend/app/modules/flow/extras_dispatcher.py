@@ -11,8 +11,9 @@ contains today. `assignBudgetFromField` does the
 same with the cost center id that a form field holds. `assignBudgetFromApplicantGremium`
 takes the single cost center whose own deciding Gremium is a Gremium of the applicant.
 `assignBudgetFromMap` maps the value of a form field to a cost center. No cost-center
-action changes the cost center while the application sits in a vote state whose
-Gremium comes from the cost center.
+action assigns a cost center to an application of a type without money (`has_budget`
+false, spec 001033), and no cost-center action changes the cost center while the
+application sits in a vote state whose Gremium comes from the cost center.
 The dispatcher logs an error of a single action and never propagates it. A failed action
 must not roll back the committed state change.
 """
@@ -332,10 +333,11 @@ class FlowExtrasActionDispatcher:
 
         Returns:
             `True` after the assignment. The caller commits. `False` when the node is
-            missing, the application sits in a closed fiscal year, the budget has no
-            current fiscal year that a booking can take, the cost center has cost
-            centers below it (001031) or is income in that year (001030), or the
-            application already has this cost center.
+            missing, the application is of a type without money (001033), the
+            application sits in a closed fiscal year, the budget has no current fiscal
+            year that a booking can take, the cost center has cost centers below it
+            (001031) or is income in that year (001030), or the application already has
+            this cost center.
             Nothing changed in that case.
         """
         node = await session.get(Budget, budget_id)
@@ -368,6 +370,12 @@ class FlowExtrasActionDispatcher:
         top = await self._top_level(session, node)
         today = datetime.now(ZoneInfo(get_settings().local_timezone)).date()
         tree = BudgetTreeService(session)
+        if not await tree.takes_cost_centre(app):
+            logger.info(
+                "assignBudget: application %s is of a type without money — skipped",
+                app.id,
+            )
+            return False
         current = [
             f.id for f in await tree.choosable_years(top) if f.start_date <= today <= f.end_date
         ]
