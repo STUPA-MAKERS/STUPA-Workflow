@@ -73,6 +73,8 @@ describe('minutes field', () => {
     expect(parseMinutes(480)).toBe(480);
     expect(parseMinutes('')).toBeNull();
     expect(parseMinutes(null)).toBeNull();
+    expect(parseMinutes(undefined)).toBeNull();
+    expect(minutesInvalid(undefined)).toBe(false);
     expect(minutesInvalid('')).toBe(false);
     expect(minutesInvalid(null)).toBe(false);
     for (const bad of [0, 481, '2.5', 'abc', -3]) {

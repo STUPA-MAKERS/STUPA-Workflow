@@ -98,22 +98,23 @@ export function agendaPlan(
   if (!meeting.startTime || total === null) {
     return { rows: durations.map((minutes) => ({ start: null, actual: false, minutes })), end: null, total, overrun: false };
   }
-  const live = meeting.status === 'live';
-  const current = live ? items.findIndex((i) => i.id === meeting.currentAgendaItemId) : -1;
+  const startTime = meeting.startTime;
+  const current = meeting.status === 'live' ? items.findIndex((i) => i.id === meeting.currentAgendaItemId) : -1;
+  const next = current < 0 ? -1 : current + 1;
   const today = berlin(now);
-  const nowMinutes = meeting.date && today.date === meeting.date ? today.minutes : null;
-  const rows = items.reduce<readonly AgendaPlanRow[]>((acc, item, index) => {
-    const before = acc[index - 1];
-    const cursor = before ? (before.start ?? 0) + (before.minutes ?? 0) : wallMinutes(meeting.startTime ?? '00:00');
-    const minutes = durations[index];
-    const reached = meeting.status !== 'planned' && item.startedAt ? berlin(new Date(item.startedAt)).minutes : null;
-    const catchUp = live && current >= 0 && index === current + 1 && nowMinutes !== null && reached === null;
-    const start = reached ?? (catchUp ? Math.max(cursor, nowMinutes) : cursor);
-    return [...acc, { start, actual: reached !== null, minutes }];
-  }, []);
-  const last = rows[rows.length - 1];
-  const cursor = last ? (last.start ?? 0) + (last.minutes ?? 0) : wallMinutes(meeting.startTime);
-  const end = cursor;
+  const nowMinutes = today.date === meeting.date ? today.minutes : null;
+  const plan = items.reduce<{ readonly rows: readonly AgendaPlanRow[]; readonly cursor: number }>(
+    (acc, item, index) => {
+      const minutes = durations[index];
+      const reached = meeting.status !== 'planned' && item.startedAt ? berlin(new Date(item.startedAt)).minutes : null;
+      const catchUp = index === next && nowMinutes !== null;
+      const start = reached ?? (catchUp ? Math.max(acc.cursor, nowMinutes) : acc.cursor);
+      return { rows: [...acc.rows, { start, actual: reached !== null, minutes }], cursor: start + (minutes ?? 0) };
+    },
+    { rows: [], cursor: wallMinutes(startTime) },
+  );
+  const rows = plan.rows;
+  const end = plan.cursor;
   const overrun = !!meeting.endTime && end > wallMinutes(meeting.endTime);
   return { rows, end, total, overrun };
 }
