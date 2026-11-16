@@ -119,12 +119,13 @@
         [id]="'ap-minutes'"
         [label]="'meetings.agenda.duration' | t"
         [suffix]="'meetings.agenda.durationUnit' | t"
+        [error]="durationInvalid() ? ('meetings.agenda.durationRange' | t) : null"
         [ngModel]="durationDraft()"
         (ngModelChange)="durationDraft.set($event)"
       />
       <button type="submit" hidden></button>
     </form>
     <app-button dialog-footer variant="text" (click)="durationItem.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button dialog-footer variant="fill" (click)="saveDuration()">{{ 'action.save' | t }}</app-button>
+    <app-button dialog-footer variant="fill" [disabled]="durationInvalid()" (click)="saveDuration()">{{ 'action.save' | t }}</app-button>
   </app-dialog>
 }

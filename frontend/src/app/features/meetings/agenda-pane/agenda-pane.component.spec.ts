@@ -16,7 +16,7 @@ import { AgendaPaneComponent } from './agenda-pane.component';
 
 const OUTPUTS = [
   'pick', 'add', 'startRename', 'cancelRename', 'renameTop', 'setNonPublic', 'move',
-  'remove', 'setDone',
+  'remove', 'setDone', 'setDuration',
 ] as const;
 
 /** Whether each row may be lifted, in agenda order. */
@@ -366,6 +366,82 @@ describe('AgendaPaneComponent', () => {
     expect(draggable(fixture)).toEqual([false, false, false]);
     drop(fixture, 0, 1);
     expect(on.move).not.toHaveBeenCalled();
+  });
+
+  describe('time plan', () => {
+    const TIMED = [
+      item({ id: 't-1', title: 'Begrüßung', estimatedMinutes: 5 }),
+      item({ id: 't-2', title: 'Bericht', position: 1, estimatedMinutes: 30 }),
+      item({ id: 't-3', title: 'Verschiedenes', position: 2 }),
+    ];
+
+    it('planRows: shows the planned start and the duration in the sub line and the end below (§ 001141, § 001144)', async () => {
+      const { container } = await setup({ meeting: meeting({ status: 'planned', startTime: '18:00' }), agenda: TIMED });
+      expect(screen.getByText('ca. 18:00 · 5 Min.')).toBeInTheDocument();
+      expect(screen.getByText('ca. 18:05 · 30 Min.')).toBeInTheDocument();
+      expect(screen.getByText('ca. 18:35')).toBeInTheDocument();
+      const end = container.querySelector('.ap__plan-end');
+      expect(end).toHaveTextContent('Ende ca. 18:35');
+      expect(end).not.toHaveClass('ap__plan-end--over');
+    });
+
+    it('planRowsOverrun: marks an end after the end time of the meeting with the warning class only (§ 001144)', async () => {
+      const { container } = await setup({
+        meeting: meeting({ status: 'planned', startTime: '18:00', endTime: '18:30' }),
+        agenda: TIMED,
+      });
+      const end = container.querySelector('.ap__plan-end');
+      expect(end).toHaveClass('ap__plan-end--over');
+      expect(end).toHaveTextContent(/^Ende ca\. 18:35$/);
+    });
+
+    it('planRowsNoStart: shows only the durations and the sum without a start time (§ 001142)', async () => {
+      const { container } = await setup({ meeting: meeting({ status: 'planned', startTime: null }), agenda: TIMED });
+      expect(screen.getByText('5 Min.')).toBeInTheDocument();
+      expect(screen.queryByText(/ca\. \d\d:\d\d/)).toBeNull();
+      expect(container.querySelector('.ap__plan-end')).toHaveTextContent('Dauer ca. 35 Min.');
+    });
+
+    it('planRowsNone: shows no plan without any duration (§ 001141)', async () => {
+      const { container } = await setup({ meeting: meeting({ status: 'planned' }) });
+      expect(container.querySelector('.ap__plan-end')).toBeNull();
+      expect(screen.queryByText(/ca\. \d\d:\d\d/)).toBeNull();
+    });
+
+    it('durationMenu: changes and clears the duration from the row menu (§ 001140)', async () => {
+      const { on, fixture } = await setup({ meeting: meeting({ status: 'planned' }), agenda: TIMED });
+      let menu = await openMenu(1);
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'Dauer ändern' }));
+      fixture.detectChanges();
+      let dialog = screen.getByRole('dialog', { name: 'Dauer ändern' });
+      const field = within(dialog).getByLabelText(/Dauer/);
+      expect(field).toHaveValue(30);
+      await userEvent.clear(field);
+      await userEvent.type(field, '45');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+      expect(on.setDuration).toHaveBeenCalledWith({ item: TIMED[1], minutes: 45 });
+
+      menu = await openMenu(0);
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'Dauer ändern' }));
+      fixture.detectChanges();
+      dialog = screen.getByRole('dialog', { name: 'Dauer ändern' });
+      await userEvent.clear(within(dialog).getByLabelText(/Dauer/));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+      expect(on.setDuration).toHaveBeenCalledWith({ item: TIMED[0], minutes: null });
+    });
+
+    it('durationMenuRange: keeps the save off for a duration outside 1 to 480 (§ 001140)', async () => {
+      const { on, fixture } = await setup({ meeting: meeting({ status: 'planned' }), agenda: TIMED });
+      const menu = await openMenu(1);
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'Dauer ändern' }));
+      fixture.detectChanges();
+      const dialog = screen.getByRole('dialog', { name: 'Dauer ändern' });
+      const field = within(dialog).getByLabelText(/Dauer/);
+      await userEvent.clear(field);
+      await userEvent.type(field, '500');
+      expect(within(dialog).getByRole('button', { name: 'Speichern' })).toBeDisabled();
+      expect(on.setDuration).not.toHaveBeenCalled();
+    });
   });
 
   it('names a to-do item in the sub line', async () => {

@@ -903,7 +903,7 @@ const MOCK_TRANSITIONS: readonly TransitionOutWire[] = [
 
 const LOGOUT_OUT = { logout_url: null };
 
-/** Mockup T-0019: `localStorage.mockNoStart = '1'` drops the start time of the planned meeting. */
+/** `localStorage.mockNoStart = '1'` drops the start time of the planned meeting (time plan without a start, § 001142). */
 function mockNoStart(): boolean {
   try {
     return globalThis.localStorage?.getItem('mockNoStart') === '1';
@@ -2019,6 +2019,12 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       MOCK_AGENDA = ids.map((id, i) => ({ ...(byId.get(id) as MockAgendaItem), position: i }));
       return ok([...MOCK_AGENDA]);
     }
+    const duration = /\/meetings\/[^/]+\/agenda\/([^/]+)\/duration$/.exec(p);
+    if (duration) {
+      const minutes = (req.body as { minutes?: number | null } | null)?.minutes ?? null;
+      MOCK_AGENDA = MOCK_AGENDA.map((a) => (a.id === duration[1] ? { ...a, estimatedMinutes: minutes } : a));
+      return ok([...MOCK_AGENDA]);
+    }
     const done = /\/meetings\/[^/]+\/agenda\/([^/]+)\/done$/.exec(p);
     if (done) {
       mockSetDone(done[1], (req.body as { done?: boolean } | null)?.done === true);
@@ -2136,20 +2142,21 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       return ok(MOCK_MEETING);
     }
     if (/\/meetings\/[^/]+\/agenda$/.test(p)) {
-      const body = req.body as { applicationId?: string; title?: string; nonPublic?: boolean } | null;
+      const body = req.body as { applicationId?: string; title?: string; nonPublic?: boolean; estimatedMinutes?: number } | null;
       const appId = body?.applicationId;
       const freetext = body?.title;
       const nonPublic = body?.nonPublic === true;
+      const estimatedMinutes = body?.estimatedMinutes ?? null;
       if (freetext) {
         MOCK_AGENDA = [
           ...MOCK_AGENDA,
-          { id: `ag-${++MOCK_AGENDA_SEQ}`, applicationId: null, title: freetext, position: MOCK_AGENDA.length, nonPublic },
+          { id: `ag-${++MOCK_AGENDA_SEQ}`, applicationId: null, title: freetext, position: MOCK_AGENDA.length, nonPublic, estimatedMinutes },
         ];
       } else if (appId && !MOCK_AGENDA.some((a) => a.applicationId === appId)) {
         const src = MOCK_ASSIGNABLE.find((a) => a.applicationId === appId);
         MOCK_AGENDA = [
           ...MOCK_AGENDA,
-          { id: `ag-${++MOCK_AGENDA_SEQ}`, applicationId: appId, title: src?.title ?? null, position: MOCK_AGENDA.length, stateLabel: src?.stateLabel ?? null, nonPublic },
+          { id: `ag-${++MOCK_AGENDA_SEQ}`, applicationId: appId, title: src?.title ?? null, position: MOCK_AGENDA.length, stateLabel: src?.stateLabel ?? null, nonPublic, estimatedMinutes },
         ];
       }
       return ok([...MOCK_AGENDA]);

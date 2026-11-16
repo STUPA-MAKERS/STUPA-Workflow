@@ -2,11 +2,13 @@
 id: "001145"
 title: The time plan stays internal
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:
-implementation: null
+  - "backend/tests/unit/modules/livevote/test_agenda_duration_unit.py:test_the_public_shapes_carry_no_duration"
+implementation:
+  - frontend/src/app/features/meetings/agenda-pane/agenda-pane.component.ts
 scope:
   - backend/app/modules/meetings
   - backend/app/modules/livevote

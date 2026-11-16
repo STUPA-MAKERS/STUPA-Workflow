@@ -42,6 +42,7 @@ from app.modules.livevote.schemas import (
     AgendaAddBody,
     AgendaBodyBody,
     AgendaDoneBody,
+    AgendaDurationBody,
     AgendaReorderBody,
     AttendanceSelfBody,
     AttendanceSetBody,
@@ -986,6 +987,7 @@ async def add_agenda_item(
             title=card.title,
             non_public=payload.non_public,
             actor=principal.sub,
+            estimated_minutes=payload.estimated_minutes,
         )
         await todos.link_agenda_item(card, item.id, principal)
         await agenda.session.commit()
@@ -1004,6 +1006,7 @@ async def add_agenda_item(
             title=plan.title,
             non_public=payload.non_public,
             actor=principal.sub,
+            estimated_minutes=payload.estimated_minutes,
         )
         await agenda.session.commit()
         return await agenda.list(meeting_id)
@@ -1014,6 +1017,7 @@ async def add_agenda_item(
         non_public=payload.non_public,
         actor=principal.sub,
         description=payload.description,
+        estimated_minutes=payload.estimated_minutes,
     )
 
 
@@ -1118,6 +1122,33 @@ async def set_agenda_body(
         await service.broadcast_agenda(meeting_id, item_id)
     else:
         await service.broadcast_state(meeting_id, principal)
+    return items
+
+
+@router.put(
+    "/meetings/{meeting_id}/agenda/{item_id}/duration",
+    response_model=list[AgendaItemOut],
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def set_agenda_duration(
+    meeting_id: UUID,
+    item_id: UUID,
+    payload: AgendaDurationBody,
+    agenda: AgendaDep,
+    service: ServiceDep,
+    principal: ReaderDep,
+) -> list[AgendaItemOut]:
+    """Set or clear the estimated duration of an agenda item (spec 001140).
+
+    Only the meeting lead or an admin may edit the agenda (``canWrite``). A closed
+    meeting answers 409 ``meeting_closed``, as an add or a move does. The time plan of
+    the agenda reads the durations (spec 001141). Sends ``agenda_changed``.
+    """
+    meeting = await service.get(meeting_id, principal)
+    if not meeting.can_write:
+        raise ForbiddenError("not allowed to edit the agenda")
+    items = await agenda.set_duration(meeting_id, item_id, payload.minutes, actor=principal.sub)
+    await service.broadcast_agenda(meeting_id, item_id)
     return items
 
 

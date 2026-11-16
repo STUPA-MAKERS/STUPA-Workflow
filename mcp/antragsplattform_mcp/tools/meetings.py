@@ -288,7 +288,7 @@ async def get_agenda(meeting_id: str) -> list[dict]:
     """Read the agenda of a meeting: its items in their order.
 
     Each item has `id`, `title`, `position`, `body` (markdown), `nonPublic`, `doneAt`,
-    and for an application item `applicationId`, `stateLabel` and `amount` (a to-do
+    `startedAt`, `estimatedMinutes`, and for an application item `applicationId`, `stateLabel` and `amount` (a to-do
     item has `todoId`). Needs read access to the meeting. Read the agenda here before
     you change it, and after a failed write before you repeat it.
     """
@@ -302,6 +302,7 @@ async def add_agenda_item(
     title: str | None = None,
     description: str | None = None,
     plan_version_id: str | None = None,
+    estimated_minutes: int | None = None,
 ) -> dict:
     """Add an agenda item to a meeting.
 
@@ -313,7 +314,9 @@ async def add_agenda_item(
     starts with it as a Markdown block quote, so it goes into the protocol. Requires
     write access to the meeting: session.manage or protocol.write in its gremium, the
     assigned minute-taker, or admin. Only a planned or live meeting takes a new item;
-    a closed meeting gives 409 `meeting_closed`. Returns the whole agenda after the add.
+    a closed meeting gives 409 `meeting_closed`. `estimated_minutes` (1 to 480) is the
+    estimated duration of the item; the agenda computes a time plan from it. Returns the
+    whole agenda after the add.
 
     A second free-text item with the same title is a second item. If the call fails
     without an answer from the platform, read the agenda with `get_agenda` before you
@@ -326,7 +329,22 @@ async def add_agenda_item(
             planVersionId=plan_version_id,
             title=title,
             description=description,
+            estimatedMinutes=estimated_minutes,
         ),
+    )
+
+
+@group.tool
+async def set_agenda_item_duration(meeting_id: str, item_id: str, minutes: int | None) -> dict:
+    """Set or clear the estimated duration of an agenda item.
+
+    `minutes` is a whole number from 1 to 480; `None` clears the estimate. The agenda
+    computes a time plan from the durations and the start time of the meeting. Requires
+    write access to the meeting. Only a planned or live meeting takes the change (409
+    `meeting_closed` otherwise). Returns the whole agenda.
+    """
+    return await api().put(
+        f"/meetings/{meeting_id}/agenda/{item_id}/duration", json={"minutes": minutes}
     )
 
 

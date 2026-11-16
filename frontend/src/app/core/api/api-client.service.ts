@@ -154,6 +154,11 @@ function readContext(opts: {
  * resolves the i18n labels for the current `lang`. Components see only the
  * view models.
  */
+/** The body part of the estimated duration of a new agenda item (spec 001140). */
+function minutesBody(estimatedMinutes?: number): { readonly estimatedMinutes?: number } {
+  return estimatedMinutes ? { estimatedMinutes } : {};
+}
+
 @Injectable({ providedIn: 'root' })
 export class ApiClient {
   private readonly http = inject(HttpClient);
@@ -964,10 +969,16 @@ export class ApiClient {
   }
 
   /** POST /meetings/{id}/agenda — put a waiting version of a Haushaltsplan on the agenda. */
-  addAgendaPlan(meetingId: Uuid, planVersionId: Uuid, nonPublic = false): Observable<AgendaItem[]> {
+  addAgendaPlan(
+    meetingId: Uuid,
+    planVersionId: Uuid,
+    nonPublic = false,
+    estimatedMinutes?: number,
+  ): Observable<AgendaItem[]> {
     return this.http.post<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
       planVersionId,
       nonPublic,
+      ...minutesBody(estimatedMinutes),
     });
   }
 
@@ -975,10 +986,16 @@ export class ApiClient {
    * POST /meetings/{id}/agenda — put an application on the agenda (meeting lead).
    * `nonPublic` marks the new item as non-public (NÖ) at once.
    */
-  addAgendaItem(meetingId: Uuid, applicationId: Uuid, nonPublic = false): Observable<AgendaItem[]> {
+  addAgendaItem(
+    meetingId: Uuid,
+    applicationId: Uuid,
+    nonPublic = false,
+    estimatedMinutes?: number,
+  ): Observable<AgendaItem[]> {
     return this.http.post<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
       applicationId,
       nonPublic,
+      ...minutesBody(estimatedMinutes),
     });
   }
 
@@ -992,11 +1009,13 @@ export class ApiClient {
     title: string,
     nonPublic = false,
     description?: string,
+    estimatedMinutes?: number,
   ): Observable<AgendaItem[]> {
     return this.http.post<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
       title,
       nonPublic,
       ...(description ? { description } : {}),
+      ...minutesBody(estimatedMinutes),
     });
   }
 
@@ -1004,10 +1023,26 @@ export class ApiClient {
    * POST /meetings/{id}/agenda — put a to-do of the gremium board on the agenda. The item
    * takes the card title, and the server links the card to the item.
    */
-  addAgendaTodo(meetingId: Uuid, todoId: Uuid, nonPublic = false): Observable<AgendaItem[]> {
+  addAgendaTodo(
+    meetingId: Uuid,
+    todoId: Uuid,
+    nonPublic = false,
+    estimatedMinutes?: number,
+  ): Observable<AgendaItem[]> {
     return this.http.post<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
       todoId,
       nonPublic,
+      ...minutesBody(estimatedMinutes),
+    });
+  }
+
+  /**
+   * PUT /meetings/{id}/agenda/{itemId}/duration — set or clear the estimated duration of an
+   * item in minutes, 1 to 480 (spec 001140). `null` clears it.
+   */
+  setAgendaDuration(meetingId: Uuid, itemId: Uuid, minutes: number | null): Observable<AgendaItem[]> {
+    return this.http.put<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda/${itemId}/duration`, {
+      minutes,
     });
   }
 

@@ -2,11 +2,15 @@
 id: "001142"
 title: Without a start time the agenda shows only durations and the sum
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:
-implementation: null
+  - "frontend/src/app/features/meetings/agenda-plan.util.spec.ts:planNoStart"
+  - "frontend/src/app/features/meetings/agenda-pane/agenda-pane.component.spec.ts:planRowsNoStart"
+implementation:
+  - frontend/src/app/features/meetings/agenda-plan.util.ts
+  - frontend/src/app/features/meetings/agenda-pane/agenda-pane.component.ts
 scope:
   - backend/app/modules/meetings
   - backend/app/modules/livevote

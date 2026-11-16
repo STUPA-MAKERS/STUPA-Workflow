@@ -4117,6 +4117,7 @@
   "meetings.agenda.duration": "Duration",
   "meetings.agenda.durationUnit": "min",
   "meetings.agenda.durationEdit": "Change duration",
+  "meetings.agenda.durationRange": "Whole minutes from 1 to 480",
   "meetings.agenda.kindFreetext": "Free text",
   "meetings.agenda.searchTodo": "Search to-dos",
   "meetings.agenda.openTodosLabel": "Open to-dos",

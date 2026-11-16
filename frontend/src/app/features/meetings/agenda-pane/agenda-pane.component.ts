@@ -41,7 +41,7 @@ import { BodyPortalDirective } from '@shared/ui/body-portal/body-portal.directiv
 import { TodoLinkCardDialogComponent } from '../../todos/link-card-dialog/todo-link-card-dialog.component';
 import { TodoLinkedRefresh } from '../../todos/linked-list/todo-linked-refresh';
 import { TopBadgeComponent } from '../top-badge/top-badge.component';
-import { agendaPlan, planClock } from '../agenda-plan.util';
+import { agendaPlan, minutesInvalid, parseMinutes, planClock } from '../agenda-plan.util';
 
 /** The ids of the row menu items of an agenda item. */
 type AgendaAction = 'done' | 'rename' | 'duration' | 'up' | 'down' | 'nonPublic' | 'remove' | 'todo' | 'link';
@@ -178,6 +178,8 @@ export class AgendaPaneComponent {
   readonly renameTop = output<AgendaItem>();
   readonly setNonPublic = output<{ item: AgendaItem; nonPublic: boolean }>();
   readonly setDone = output<{ item: AgendaItem; done: boolean }>();
+  /** "Dauer ändern": the new estimate of an item, `null` clears it (§ 001140). */
+  readonly setDuration = output<{ item: AgendaItem; minutes: number | null }>();
   readonly move = output<AgendaMove>();
   readonly remove = output<Uuid>();
 
@@ -223,36 +225,31 @@ export class AgendaPaneComponent {
     return id;
   })();
   /** The time plan of the agenda (§ 001141 – § 001144). */
-  protected readonly plan = computed(() => {
-    const own = this.durations();
-    const items = this.agenda().map((i) => (own.has(i.id) ? { ...i, estimatedMinutes: own.get(i.id) } : i));
-    return agendaPlan(items, this.meeting(), this.clock());
-  });
-  /** "Dauer ändern": the item, the draft, and the saved values of this mockup. */
+  protected readonly plan = computed(() => agendaPlan(this.agenda(), this.meeting(), this.clock()));
+  /** "Dauer ändern": the item of the open dialog and the value of its field (§ 001140). */
   protected readonly durationItem = signal<AgendaItem | null>(null);
-  protected readonly durationDraft = signal<number | null>(null);
-  private readonly durations = signal<ReadonlyMap<Uuid, number | null>>(new Map());
+  protected readonly durationDraft = signal<number | string | null>(null);
+  protected readonly durationInvalid = computed(() => minutesInvalid(this.durationDraft()));
   protected saveDuration(): void {
     const item = this.durationItem();
-    if (!item) return;
-    const raw = this.durationDraft();
-    const value = raw === null || (raw as unknown) === '' ? null : Number(raw);
-    this.durations.update((m) => new Map(m).set(item.id, value));
+    if (!item || this.durationInvalid()) return;
+    this.setDuration.emit({ item, minutes: parseMinutes(this.durationDraft()) });
     this.durationItem.set(null);
   }
   /** The plan part of the row subline: `ca. 18:10 · 10 Min.`, or `18:04` for a reached item. */
   protected planText(index: number): string | null {
     const row = this.plan().rows[index];
     if (!row) return null;
-    const parts: string[] = [];
-    if (row.start !== null) {
-      parts.push(
-        row.actual
-          ? this.i18n.translate('meetings.agenda.planActual', { time: planClock(row.start) })
-          : this.i18n.translate('meetings.agenda.planStart', { time: planClock(row.start) }),
-      );
-    }
-    if (row.minutes !== null) parts.push(this.i18n.translate('meetings.agenda.planMinutes', { n: row.minutes }));
+    const clock =
+      row.start === null
+        ? []
+        : [
+            this.i18n.translate(row.actual ? 'meetings.agenda.planActual' : 'meetings.agenda.planStart', {
+              time: planClock(row.start),
+            }),
+          ];
+    const minutes = row.minutes === null ? [] : [this.i18n.translate('meetings.agenda.planMinutes', { n: row.minutes })];
+    const parts = [...clock, ...minutes];
     return parts.length ? parts.join(' · ') : null;
   }
   /** The line below the last row: the planned end (§ 001144) or the sum (§ 001142). */
@@ -404,7 +401,7 @@ export class AgendaPaneComponent {
         break;
       case 'duration':
         this.durationItem.set(item);
-        this.durationDraft.set(this.durations().get(item.id) ?? item.estimatedMinutes ?? null);
+        this.durationDraft.set(item.estimatedMinutes ?? null);
         break;
       case 'rename':
         this.renamingHere.set(item.id);

@@ -2,11 +2,15 @@
 id: "001144"
 title: The agenda shows the planned end and marks an overrun
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:
-implementation: null
+  - "frontend/src/app/features/meetings/agenda-plan.util.spec.ts:planOverrun"
+  - "frontend/src/app/features/meetings/agenda-pane/agenda-pane.component.spec.ts:planRowsOverrun"
+implementation:
+  - frontend/src/app/features/meetings/agenda-pane/agenda-pane.component.ts
+  - frontend/src/app/features/meetings/agenda-pane/agenda-pane.component.scss
 scope:
   - backend/app/modules/meetings
   - backend/app/modules/livevote

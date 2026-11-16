@@ -357,6 +357,13 @@ export class MeetingsComponent {
     this.session.setCurrentTop(id, from);
   }
 
+  /** Set or clear the estimated duration of a TOP (§ 001140). */
+  setDuration(item: AgendaItem, minutes: number | null): void {
+    const m = this.meeting();
+    if (!m) return;
+    this.agendaSvc.setDuration(m.id, item.id, minutes);
+  }
+
   /** Set or remove the done mark of a TOP ("TOP abhaken"). */
   setDone(item: AgendaItem, done: boolean): void {
     const m = this.meeting();

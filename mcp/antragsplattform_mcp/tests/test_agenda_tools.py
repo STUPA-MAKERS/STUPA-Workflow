@@ -61,6 +61,37 @@ def test_add_agenda_item_sends_the_description(monkeypatch: pytest.MonkeyPatch) 
     ]
 
 
+def test_add_agenda_item_sends_the_duration(monkeypatch: pytest.MonkeyPatch) -> None:
+    """§001140: a new item takes an estimated duration."""
+    fake = _PostApi()
+    monkeypatch.setattr(_common, "_client", fake)
+    asyncio.run(meetings.add_agenda_item("m1", title="Bericht", estimated_minutes=15))
+    assert fake.calls == [("/meetings/m1/agenda", {"title": "Bericht", "estimatedMinutes": 15})]
+
+
+class _PutApi:
+    """Record each PUT and answer with an empty agenda."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, Any]] = []
+
+    async def put(self, path: str, **kw: Any) -> list[dict[str, Any]]:
+        self.calls.append((path, kw.get("json")))
+        return []
+
+
+def test_set_agenda_item_duration_puts_the_minutes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """§001140: the duration of an item changes and clears."""
+    fake = _PutApi()
+    monkeypatch.setattr(_common, "_client", fake)
+    asyncio.run(meetings.set_agenda_item_duration("m1", "i1", 20))
+    asyncio.run(meetings.set_agenda_item_duration("m1", "i1", None))
+    assert fake.calls == [
+        ("/meetings/m1/agenda/i1/duration", {"minutes": 20}),
+        ("/meetings/m1/agenda/i1/duration", {"minutes": None}),
+    ]
+
+
 def _client(handler: Any, monkeypatch: pytest.MonkeyPatch) -> ApiClient:
     monkeypatch.setattr(
         client_mod.auth, "ensure_access_token", lambda *_a, **_k: "token"

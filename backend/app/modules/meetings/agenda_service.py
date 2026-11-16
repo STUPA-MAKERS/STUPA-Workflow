@@ -16,6 +16,8 @@ State rules:
   `vote_delete` audit entry. To delete these votes the caller needs the
   `canManageVotes` right, else 403.
 * Add and remove lock the meeting row, as the meeting close and the vote open do.
+* The estimated duration of an item (spec 001140) follows the add and the move: it
+  needs a `planned` or `live` meeting.
 * The title, the Markdown body and the `nonPublic` flag are open from the planning
   until the protocol leaves the draft (409 `protocol_final`). The minute-taker can
   thus write the minutes of an item before the meeting starts.
@@ -108,9 +110,16 @@ def _item_out(
         position=row.position,
         nonPublic=row.non_public,
         doneAt=row.done_at,
+        startedAt=row.started_at,
+        estimatedMinutes=row.estimated_minutes,
         stateLabel=state.label_i18n if state is not None else None,
         amount=app.amount if app is not None else None,
     )
+
+
+def _store_minutes(row: MeetingAgendaItem, minutes: int | None) -> None:
+    """Write the estimated duration on the ORM row (spec 001140)."""
+    row.estimated_minutes = minutes
 
 
 class AgendaService:
@@ -350,6 +359,32 @@ class AgendaService:
         await self.session.commit()
         return await self.list(meeting_id)
 
+    async def set_duration(
+        self, meeting_id: UUID, item_id: UUID, minutes: int | None, *, actor: str | None = None
+    ) -> list[AgendaItemOut]:
+        """Set or clear the estimated duration of an agenda item, then commit.
+
+        The duration is part of the agenda structure, so it needs a `planned` or `live`
+        meeting, as an add or a move does (spec 001140). `None` clears the estimate. A
+        change writes `agenda_item_update` with the field `estimatedMinutes`; a value that
+        does not change writes nothing.
+
+        Raises:
+            NotFoundError: The meeting has no agenda item with this id.
+            ConflictError: The meeting is closed (``meeting_closed``).
+        """
+        meeting = await self._meeting(meeting_id)
+        self._assert_agenda_open(meeting)
+        row = await self.item(meeting_id, item_id)
+        if row.estimated_minutes != minutes:
+            _store_minutes(row, minutes)
+            await self._audit(
+                AuditAction.AGENDA_ITEM_UPDATE, actor=actor, item=row, fields=["estimatedMinutes"]
+            )
+            await self.session.flush()
+            await self.session.commit()
+        return await self.list(meeting_id)
+
     async def _own_title(self, row: MeetingAgendaItem, title: str) -> str | None:
         """Return the title to store for a rename of `row` to `title`.
 
@@ -513,6 +548,7 @@ class AgendaService:
         *,
         actor: str | None = None,
         description: str | None = None,
+        estimated_minutes: int | None = None,
     ) -> list[AgendaItemOut]:
         """Add an agenda item for an application or for free text, then commit.
 
@@ -531,6 +567,7 @@ class AgendaService:
             non_public=non_public,
             actor=actor,
             description=description,
+            estimated_minutes=estimated_minutes,
         ):
             await self.session.commit()
         return await self.list(meeting_id)
@@ -544,6 +581,7 @@ class AgendaService:
         *,
         actor: str | None = None,
         description: str | None = None,
+        estimated_minutes: int | None = None,
     ) -> bool:
         """Add an agenda item in the transaction of the caller. It does not commit.
 
@@ -555,6 +593,7 @@ class AgendaService:
         application changes nothing. The flow engine calls this method before its
         own commit, so the state change and the new item stay atomic. A new item
         writes `agenda_item_add`. A missing `actor` marks a system add.
+        `estimated_minutes` is the estimate of the new item (spec 001140).
 
         The read uses `populate_existing`, because the flow engine moved the state with a
         bulk UPDATE in this transaction. The current state must come from the database.
@@ -571,7 +610,9 @@ class AgendaService:
         meeting = await self._meeting(meeting_id, for_update=True)
         self._assert_agenda_open(meeting)
         if title is not None:
-            await self._add_freetext(meeting_id, title.strip(), non_public, actor, description)
+            await self._add_freetext(
+                meeting_id, title.strip(), non_public, actor, description, estimated_minutes
+            )
             return True
 
         app = await self.session.get(Application, application_id, populate_existing=True)
@@ -597,6 +638,7 @@ class AgendaService:
             application_id=application_id,
             position=await self._next_position(meeting_id),
             non_public=non_public,
+            estimated_minutes=estimated_minutes,
         )
         self.session.add(item)
         await self.session.flush()
@@ -610,6 +652,7 @@ class AgendaService:
         non_public: bool,
         actor: str | None,
         description: str | None = None,
+        estimated_minutes: int | None = None,
     ) -> None:
         """Add a free-text item with its own title and write ``agenda_item_add``.
 
@@ -622,6 +665,7 @@ class AgendaService:
             body=block_quote(description) if description and description.strip() else None,
             position=await self._next_position(meeting_id),
             non_public=non_public,
+            estimated_minutes=estimated_minutes,
         )
         self.session.add(item)
         await self.session.flush()
@@ -635,6 +679,7 @@ class AgendaService:
         title: str,
         non_public: bool = False,
         actor: str | None = None,
+        estimated_minutes: int | None = None,
     ) -> MeetingAgendaItem:
         """Add an agenda item for a to-do card in the transaction of the caller.
 
@@ -667,6 +712,7 @@ class AgendaService:
             title=title.strip() or title,
             position=await self._next_position(meeting_id),
             non_public=non_public,
+            estimated_minutes=estimated_minutes,
         )
         self.session.add(item)
         await self.session.flush()
@@ -687,6 +733,7 @@ class AgendaService:
         title: str,
         non_public: bool = False,
         actor: str | None = None,
+        estimated_minutes: int | None = None,
     ) -> MeetingAgendaItem:
         """Add an agenda item for a version of a Haushaltsplan, without a commit.
 
@@ -719,6 +766,7 @@ class AgendaService:
             title=title,
             position=await self._next_position(meeting_id),
             non_public=non_public,
+            estimated_minutes=estimated_minutes,
         )
         self.session.add(item)
         await self.session.flush()

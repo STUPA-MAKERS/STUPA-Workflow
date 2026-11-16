@@ -2,11 +2,14 @@
 id: "001143"
 title: A live Sitzung computes the plan of the open TOPs again
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 tests:
-implementation: null
+  - "frontend/src/app/features/meetings/agenda-plan.util.spec.ts:planLive"
+implementation:
+  - frontend/src/app/features/meetings/agenda-plan.util.ts
+  - backend/app/modules/meetings/schemas.py
 scope:
   - backend/app/modules/meetings
   - backend/app/modules/livevote
