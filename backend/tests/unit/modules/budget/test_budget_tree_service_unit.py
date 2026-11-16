@@ -558,7 +558,7 @@ async def test_move_fiscal_year_ok() -> None:
     node = top
     fy = _fy(budget_id=top.id)
     app = _app(budget_id=node.id, fiscal_year_id=uuid.uuid4())
-    sess = fake_session(result(app), result(True), result(node), result(top), result(fy))
+    sess = fake_session(result(app), result(node), result(top), result(fy))
     svc = BudgetTreeService(sess)
     out = await svc.move_fiscal_year(app.id, MoveFiscalYearRequest(fiscalYearId=fy.id))
     assert out.fiscal_year_id == fy.id
@@ -577,7 +577,7 @@ async def test_move_fiscal_year_wrong_top() -> None:
     node = top
     fy = _fy(budget_id=uuid.uuid4())
     app = _app(budget_id=node.id)
-    sess = fake_session(result(app), result(True), result(node), result(top), result(fy))
+    sess = fake_session(result(app), result(node), result(top), result(fy))
     svc = BudgetTreeService(sess)
     with pytest.raises(ValidationProblem):
         await svc.move_fiscal_year(app.id, MoveFiscalYearRequest(fiscalYearId=fy.id))
