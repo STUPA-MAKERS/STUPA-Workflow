@@ -230,6 +230,16 @@ export class ApplicationsDetailComponent {
   private readonly features = inject(FeatureService);
   /** The row "Kostenstelle" shows only while `Budget` is on (spec 000758). */
   protected readonly budgetOn = computed(() => this.features.isOn('budget'));
+  /**
+   * Show the Kostenstelle row: the type asks for money (`hasBudget`), or an old
+   * assignment is still there and can go away (001033). An Antrag of a type without
+   * money takes no Kostenstelle.
+   */
+  protected readonly budgetRow = computed(() => {
+    const app = this.app();
+    if (!this.budgetOn() || app === null) return false;
+    return !!app.budgetId || (!this.formLoading() && this.hasBudget());
+  });
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
@@ -1224,6 +1234,13 @@ export class ApplicationsDetailComponent {
         if (seq === this.loadSeq) this.budgetTree.set([]);
       },
     });
+  }
+
+  /** Take the old Kostenstelle off an Antrag of a type without money (001033). */
+  clearBudget(): void {
+    this.budgetChoice.set('');
+    this.fiscalChoice.set('');
+    this.assignBudget();
   }
 
   /** Assign or unassign the cost centre with POST /assign-budget, then reload. */

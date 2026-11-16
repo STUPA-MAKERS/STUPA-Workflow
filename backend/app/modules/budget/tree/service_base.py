@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import ColumnElement, Select, or_, select
 
+from app.modules.application_types.service import type_has_budget
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.budget import plan_rules, tree_rules
@@ -30,6 +31,7 @@ from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from app.modules.applications.models import Application
     from app.modules.files.storage import ObjectStorage
 
 _ZERO = Decimal(0)
@@ -396,6 +398,27 @@ class BudgetTreeServiceBase:
                 "An Antrag takes only a Kostenstelle on the expense side.",
                 code="cost_centre_income",
                 errors=[{"field": "budgetId", "msg": "income Kostenstelle in this year"}],
+            )
+
+    async def takes_cost_centre(self, app: Application) -> bool:
+        """Tell if the Antrag takes a Kostenstelle: its type has `has_budget` (001033)."""
+        return await type_has_budget(self.session, app.type_id)
+
+    async def _refuse_without_amount(self, app: Application) -> None:
+        """Refuse a Kostenstelle on an Antrag of a type without money (001033).
+
+        A type without `has_budget` asks for no amount, so it has nothing to spend from a
+        Kostenstelle. The caller skips a cleared assignment, so an old assignment can go
+        away.
+
+        Raises:
+            ValidationProblem: `application_without_budget` (422).
+        """
+        if not await self.takes_cost_centre(app):
+            raise ValidationProblem(
+                "An Antrag of a type without money takes no Kostenstelle.",
+                code="application_without_budget",
+                errors=[{"field": "budgetId", "msg": "type without money"}],
             )
 
     async def is_leaf(self, node: Budget) -> bool:

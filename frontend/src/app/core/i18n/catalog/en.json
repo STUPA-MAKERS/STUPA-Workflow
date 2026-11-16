@@ -803,6 +803,7 @@
   "applications.budget.save": "Assign",
   "applications.budget.assign": "Cost centre",
   "applications.budget.change": "Change cost centre",
+  "applications.budget.remove": "Remove cost centre",
   "applications.budget.invalid": "Assignment not allowed – check cost centre / fiscal year.",
   "applications.budget.fiscalYear": "Fiscal year",
   "applications.budget.fiscalAuto": "Automatic (current fiscal year)",

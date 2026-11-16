@@ -803,6 +803,7 @@
   "applications.budget.save": "Zuordnen",
   "applications.budget.assign": "Kostenstelle",
   "applications.budget.change": "Kostenstelle ändern",
+  "applications.budget.remove": "Kostenstelle entfernen",
   "applications.budget.invalid": "Zuordnung nicht möglich — Kostenstelle/Haushaltsjahr prüfen.",
   "applications.budget.fiscalYear": "Haushaltsjahr",
   "applications.budget.fiscalAuto": "Automatisch (aktuelles HHJ)",

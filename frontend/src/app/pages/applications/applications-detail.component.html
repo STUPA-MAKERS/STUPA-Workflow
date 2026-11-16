@@ -306,7 +306,7 @@
           }
         </div>
       }
-      @if (budgetOn()) {
+      @if (budgetRow()) {
       <app-field-row
         [label]="application.fiscalYearId && fiscalLabel(application.fiscalYearId)
           ? ('applications.detail.budgetWithYear' | t: { year: fiscalLabel(application.fiscalYearId) })
@@ -320,7 +320,7 @@
             <span class="ad__bound">{{ 'decision.bound' | t: { amount: approved } }}</span>
           }
         }
-        @if (canManage()) {
+        @if (canManage() && hasBudget()) {
           <app-button
             trail
             variant="text"
@@ -329,6 +329,17 @@
             (click)="openBudgetDialog()"
           >
             {{ (application.budgetId ? 'applications.detail.budgetChange' : 'applications.detail.budgetAssign') | t }}
+          </app-button>
+        } @else if (canManage() && !formLoading()) {
+          <app-button
+            trail
+            variant="text"
+            size="sm"
+            [ariaLabel]="'applications.budget.remove' | t"
+            [loading]="assigningBudget()"
+            (click)="clearBudget()"
+          >
+            {{ 'action.remove' | t }}
           </app-button>
         }
       </app-field-row>
