@@ -67,9 +67,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/accounts/000587](requirements/functional/administration/accounts/000587_email-login-account-owner.md) | A confirmed guest Antrag of an account address belongs to the account | approved |
 | [F/administration/accounts/000630](requirements/functional/administration/accounts/000630_link-terms.md) | A magic link opens one Antrag, a login link opens an address | approved |
 | [F/administration/accounts/001095](requirements/functional/administration/accounts/001095_account-name.md) | The account on the login names the short name | approved |
-| [F/administration/accounts/001120](requirements/functional/administration/accounts/001120_profile-page.md) | The account area has a profile page with the SSO claims | draft |
-| [F/administration/accounts/001121](requirements/functional/administration/accounts/001121_profile-token-claims.md) | The profile page hides the claims of the token itself | draft |
-| [F/administration/accounts/001122](requirements/functional/administration/accounts/001122_profile-gravatar-link.md) | The profile picture links to Gravatar | draft |
+| [F/administration/accounts/001120](requirements/functional/administration/accounts/001120_profile-page.md) | The account area has a profile page with the SSO claims | approved |
+| [F/administration/accounts/001121](requirements/functional/administration/accounts/001121_profile-token-claims.md) | The profile page hides the claims of the token itself | approved |
+| [F/administration/accounts/001122](requirements/functional/administration/accounts/001122_profile-gravatar-link.md) | The profile picture links to Gravatar | approved |
 | [F/administration/admin/000161](requirements/functional/administration/admin/000161_crud-complete.md) | Every entity has create, read, update and delete | approved |
 | [F/administration/admin/000162](requirements/functional/administration/admin/000162_cd-variant-delete.md) | A CD variant in use is not deleted | approved |
 | [F/administration/admin/000163](requirements/functional/administration/admin/000163_audit-revert.md) | The audit revert reverses effects, never entries | approved |
