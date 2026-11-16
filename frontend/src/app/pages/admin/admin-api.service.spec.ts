@@ -554,6 +554,17 @@ describe('AdminApiService — real mode (contract)', () => {
     del.flush(null);
   });
 
+  it('maps the group and the position of a type, and the defaults of a group', () => {
+    s.listApplicationTypesFull().subscribe((list) =>
+      expect(list[0]).toMatchObject({ groupId: 'g1', position: 3 }),
+    );
+    http.expectOne('/api/admin/application-types').flush([{ id: 't1', groupId: 'g1', position: 3 }]);
+    s.listApplicationTypeGroups().subscribe((list) =>
+      expect(list).toEqual([{ id: 'g9', name: {}, text: { de: 'T' }, position: 0 }]),
+    );
+    http.expectOne('/api/admin/application-type-groups').flush([{ id: 'g9', textI18n: { de: 'T' } }]);
+  });
+
   /** An empty body sets no keys. */
   it('PATCHes only the supplied application-type fields and DELETEs', () => {
     let done = false;
@@ -1085,6 +1096,10 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(up.map((g) => g.id)).toEqual(['atg-projekte', created.id, 'atg-spezial']);
     const edge = await firstValueFrom(s.moveApplicationTypeGroup('atg-projekte', -1));
     expect(edge[0].id).toBe('atg-projekte');
+    const last = await firstValueFrom(s.moveApplicationTypeGroup('atg-spezial', 1));
+    expect(last[last.length - 1].id).toBe('atg-spezial');
+    const loose = await firstValueFrom(s.moveApplicationType('f-anschaffung', -1));
+    expect(loose.find((t) => t.id === 'f-anschaffung')!.position).toBe(0);
     await firstValueFrom(s.moveApplicationTypeGroup('ghost', 1));
 
     const moved = await firstValueFrom(s.moveApplicationType('f-foerderung', 1));

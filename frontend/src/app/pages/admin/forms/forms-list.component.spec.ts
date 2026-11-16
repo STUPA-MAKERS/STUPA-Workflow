@@ -139,6 +139,12 @@ describe('FormsListComponent', () => {
       expect(c.saving()).toBe(false);
     });
 
+    it('fills the dialog with the English name and text of a group', async () => {
+      const { c } = await setupGroups();
+      c.groupAction({ ...GROUPS[1], name: { de: 'S', en: 'Special' }, text: { en: 'Text' } }, { id: 'edit', label: '' });
+      expect(c.groupForm()).toEqual({ nameDe: 'S', nameEn: 'Special', textDe: '', textEn: 'Text' });
+    });
+
     it('saves no group without a German name', async () => {
       const createApplicationTypeGroup = jest.fn();
       const { c } = await setupGroups({ createApplicationTypeGroup });
