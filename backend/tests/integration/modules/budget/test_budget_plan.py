@@ -3342,14 +3342,13 @@ async def test_an_antrag_without_money_takes_no_cost_centre(session: AsyncSessio
     Rule: §F/finance/budget/001033.
     """
     t = await _tree(session)
-    fresh = await _antrag(session, has_budget=False)
+    old = await _antrag(session, t.exp_a.id, t.fy.id, has_budget=False)
     with pytest.raises(ValidationProblem) as exc:
         await t.svc.assign_budget(
-            fresh, AssignBudgetRequest(budgetId=t.exp_a.id, fiscalYearId=t.fy.id)
+            old, AssignBudgetRequest(budgetId=t.exp_b.id, fiscalYearId=t.fy.id)
         )
     assert _code(exc) == "application_without_budget"
     await session.rollback()
-    old = await _antrag(session, t.exp_a.id, t.fy.id, has_budget=False)
     cleared = await t.svc.assign_budget(old, AssignBudgetRequest(budgetId=None))
     assert (cleared.budget_id, cleared.fiscal_year_id) == (None, None)
 
