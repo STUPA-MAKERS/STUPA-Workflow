@@ -202,6 +202,9 @@ class BudgetTreeNodeOut(FrozenCamelModel, frozen=True):
     #: node the years with a version in force, for a node below it the years whose
     #: version in force has a line for it.
     planned_in: tuple[UUID, ...] = Field(default=(), alias="plannedIn")
+    #: The fiscal years whose version in force puts the node on the income side. An
+    #: Antrag must not take the node in these years (001030).
+    income_in: tuple[UUID, ...] = Field(default=(), alias="incomeIn")
     by_fiscal_year: tuple[AllocationView, ...] = Field(default_factory=tuple, alias="byFiscalYear")
     #: Read-only `Sequence`, because a caller builds a node with a list of children.
     children: Sequence[BudgetTreeNodeOut] = Field(default_factory=tuple)

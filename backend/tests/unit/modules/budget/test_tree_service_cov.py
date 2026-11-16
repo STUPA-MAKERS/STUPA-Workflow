@@ -477,6 +477,7 @@ async def test_book_expense_standalone_with_actor() -> None:
         result(node),
         result(top),
         result(fy),
+        result(),
         result(sub_ref("u-1", "Alice", "a@x")),
     )
     svc = BudgetTreeService(sess)
@@ -715,6 +716,7 @@ async def test_update_expense_rebooks_within_same_top_level() -> None:
         result(new),
         result(top),
         result(fy),
+        result(),
         result(new),
         result(),
         gets=[expense],
@@ -1509,10 +1511,14 @@ async def test_get_tree_denied_excluded() -> None:
 
 
 async def test_get_tree_with_gremium_scope() -> None:
-    """Reach scope_forest with visible_gremium_ids set."""
+    """Reach scope_forest with visible_gremium_ids set.
+
+    The fake session serves the top, five empty reads, no income Titel (001030) and
+    the scoped ids.
+    """
     g = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS", view_gremium_id=g)
-    empty = (result(), result(), result(), result(), result())
+    empty = (result(), result(), result(), result(), result(), result())
     sess = fake_session(result(top), *empty, result(top.id))
     svc = BudgetTreeService(sess)
     tree = await svc.get_tree(visible_gremium_ids={g})
