@@ -565,6 +565,17 @@ describe('AdminApiService — real mode (contract)', () => {
     http.expectOne('/api/admin/application-type-groups').flush([{ id: 'g9', textI18n: { de: 'T' } }]);
   });
 
+  it('sends the group of a type on create and on update', () => {
+    s.createApplicationType({ key: 'k', name: { de: 'N' }, groupId: 'g1' }).subscribe();
+    const create = http.expectOne('/api/admin/application-types');
+    expect(create.request.body.groupId).toBe('g1');
+    create.flush({ id: 't9' });
+    s.updateApplicationType('t9', { groupId: null }).subscribe();
+    const patch = http.expectOne('/api/admin/application-types/t9');
+    expect(patch.request.body).toEqual({ groupId: null });
+    patch.flush({ id: 't9' });
+  });
+
   /** An empty body sets no keys. */
   it('PATCHes only the supplied application-type fields and DELETEs', () => {
     let done = false;
@@ -1107,6 +1118,9 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(inGroup).toEqual(['f-veranstaltung', 'f-foerderung']);
     await firstValueFrom(s.moveApplicationType('ghost', 1));
 
+    const store = (s as unknown as { store: { appTypes: { id: string; position?: number }[] } }).store;
+    store.appTypes = store.appTypes.map(({ position: _p, ...t }) => (t.id === 'f-anschaffung' ? t : { ...t, position: _p }));
+    expect((await firstValueFrom(s.listApplicationTypesFull())).map((t) => t.id)).toContain('f-anschaffung');
     await firstValueFrom(s.updateApplicationType('f-anschaffung', { groupId: created.id }));
     await firstValueFrom(s.updateApplicationType('f-anschaffung', { groupId: created.id }));
     const regrouped = await firstValueFrom(s.listApplicationTypesFull());
