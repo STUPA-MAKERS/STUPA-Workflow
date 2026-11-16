@@ -235,6 +235,38 @@ def _amount_of(lines: Mapping[UUID, _Line], node_id: UUID) -> Decimal | None:
     return None if line is None else line.amount
 
 
+def _sum_of(values: Sequence[Decimal | None]) -> Decimal | None:
+    """Sum the figures that are there; ``None`` when none is."""
+    present = [v for v in values if v is not None]
+    return sum(present, _ZERO) if present else None
+
+
+def _year_before_of(
+    node: _Node,
+    line: _Line,
+    before: _YearBefore,
+    below: Sequence[tuple[Side | None, ExportRow]],
+    depth: int,
+) -> tuple[Decimal | None, Decimal | None]:
+    """Return the Ansatz and the Ist of the year before of a row (001040, 001041).
+
+    A row compares with its Vorgänger or its own cost center. A row with rows below
+    whose match has no line in the plan of the year before sums the rows directly
+    below it instead, so a Titel and the sums of a side follow the Vorgänger. A row
+    without such a match and without rows below shows no figure, not 0,00.
+    """
+    against = before.against.get(node.id)
+    if against is not None and against in before.lines:
+        return (
+            _amount_of(before.lines, against),
+            _actual(before.nodes.get(against), line.side, before.fiscal_year_id),
+        )
+    children = [row for _, row in below if row.depth == depth + 1]
+    if children:
+        return (_sum_of([r.prev for r in children]), _sum_of([r.actual for r in children]))
+    return None, None
+
+
 def _rows(
     node: _Node,
     depth: int,
@@ -249,17 +281,15 @@ def _rows(
     below = tuple(
         pair for child in node.children for pair in _rows(child, depth + 1, lines, base, before)
     )
-    against = before.against.get(node.id)
+    prev, actual = _year_before_of(node, line, before, below, depth)
     row = ExportRow(
         key=line.path_key or node.path_key,
         name=line.name or node.name,
         depth=depth,
         amount=line.amount,
         base=_amount_of(base, node.id),
-        prev=None if against is None else _amount_of(before.lines, against),
-        actual=None
-        if against is None
-        else _actual(before.nodes.get(against), line.side, before.fiscal_year_id),
+        prev=prev,
+        actual=actual,
         transferable=line.transferable,
         coverable=line.coverable,
         blocked=line.blocked,

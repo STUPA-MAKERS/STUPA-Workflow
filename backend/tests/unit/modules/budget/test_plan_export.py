@@ -95,7 +95,10 @@ def _export(number: int = 0, state: PlanState = "draft", prev: str | None = "202
 
 
 def test_the_rows_follow_the_tree_and_the_sides() -> None:
-    """Rule: §F/finance/budget/000875. A cost center without a line is not in the file."""
+    """Rule: §F/finance/budget/000875. A cost center without a line is not in the file.
+
+    A line without a line of the year before shows no Ist (001041).
+    """
     export = _export()
     assert [g.group for g in export.groups] == ["income", "expense", "none"]
     income, expense, none = export.groups
@@ -104,10 +107,10 @@ def test_the_rows_follow_the_tree_and_the_sides() -> None:
         ("VS-8-9", "Büro alt", 1),
     ]
     assert (income.amount, expense.amount, export.balance) == (D("100"), D("60"), D("40"))
-    assert (income.rows[0].prev, income.rows[0].actual) == (None, D("95.50"))
+    assert (income.rows[0].prev, income.rows[0].actual) == (None, None)
     assert (expense.rows[0].prev, expense.rows[0].actual) == (D("50"), D("0.00"))
-    assert expense.rows[1].actual == D("30")
-    assert (expense.prev, expense.actual, income.actual) == (D("50"), D("0.00"), D("95.50"))
+    assert expense.rows[1].actual is None
+    assert (expense.prev, expense.actual, income.actual) == (D("50"), D("0.00"), D("0.00"))
     assert none.rows[0].actual is None
     assert [r.marks for r in expense.rows] == ["übertragbar, deckungsfähig", "deckungsfähig"]
     assert none.label == "Ohne Seite"
@@ -151,6 +154,42 @@ def test_a_predecessor_outside_the_tree_has_no_ist() -> None:
     )
     row = next(r for g in export.groups for r in g.rows if r.key == "VS-9")
     assert (row.prev, row.actual) == (D("25"), D("0.00"))
+
+
+
+def test_a_row_without_its_own_match_sums_the_rows_below() -> None:
+    """A new Titel takes the Ansatz and the Ist of the year before of its rows below.
+
+    Rule: §F/finance/budget/001041.
+    """
+    old_a = _Node("Alt A", "VS-7-1", by_fiscal_year=(_Figures(_PREV, expended=D("3")),))
+    old_b = _Node("Alt B", "VS-7-2", by_fiscal_year=(_Figures(_PREV, expended=D("4")),))
+    old = _Node("Alt", "VS-7", children=(old_a, old_b))
+    new_a, new_b = _Node("Neu A", "VS-5-1"), _Node("Neu B", "VS-5-2")
+    mid = _Node("Mitte", "VS-5-9")
+    titel = _Node("Neu", "VS-5", children=(new_a, new_b, mid))
+    top = _Node("VS-Mittel", "VS", children=(old, titel))
+    export = build_export(
+        _head(),
+        top,
+        (
+            _Line(titel.id, D("30"), side="expense", predecessor_id=None),
+            _Line(new_a.id, D("20"), side="expense", predecessor_id=old_a.id),
+            _Line(new_b.id, D("10"), side="expense", predecessor_id=old_b.id),
+            _Line(mid.id, D("0"), side="expense"),
+        ),
+        prev=(
+            _Line(old.id, D("15"), side="expense"),
+            _Line(old_a.id, D("10"), side="expense"),
+            _Line(old_b.id, D("5"), side="expense"),
+        ),
+        prev_fiscal_year_id=_PREV,
+    )
+    expense = next(g for g in export.groups if g.group == "expense")
+    rows = {r.key: r for r in expense.rows}
+    assert (rows["VS-5"].prev, rows["VS-5"].actual) == (D("15"), D("7"))
+    assert (rows["VS-5-9"].prev, rows["VS-5-9"].actual) == (None, None)
+    assert (expense.prev, expense.actual) == (D("15"), D("7"))
 
 
 def test_a_plan_without_lines_has_no_group_and_a_balance_of_zero() -> None:
@@ -216,7 +255,7 @@ def test_the_table_of_a_first_plan_with_a_year_before() -> None:
         "Büro alt",
         D("60"),
         None,
-        D("30"),
+        None,
         "deckungsfähig",
         D("5"),
         "IT",
@@ -306,7 +345,7 @@ def test_the_pdf_request_holds_the_table_as_text() -> None:
         "kind": "line",
         "depth": 1,
         "leaf": True,
-        "cells": ["VS-8-9", "Büro alt", "60,00", "", "30,00", "deckungsfähig", "5,00", "IT"],
+        "cells": ["VS-8-9", "Büro alt", "60,00", "", "", "deckungsfähig", "5,00", "IT"],
     }
     assert plan_export.pdf_source(export) == '---\ntitle: "Haushaltsplan VS-Mittel 2026"\n---\n'
 

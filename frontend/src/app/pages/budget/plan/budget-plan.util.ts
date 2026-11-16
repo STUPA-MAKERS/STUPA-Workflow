@@ -71,6 +71,41 @@ export function comparedWith(lines: readonly Pick<PlanLine, 'budgetId' | 'predec
 const allNodes = (node: BudgetTreeNode): readonly BudgetTreeNode[] => [node, ...node.children.flatMap(allNodes)];
 const nodesById = (node: BudgetTreeNode): ReadonlyMap<Uuid, BudgetTreeNode> => new Map(allNodes(node).map((n) => [n.id, n] as const));
 
+/** What a row needs to find its figures of the year before. */
+interface YearBefore {
+  readonly prev: ReadonlyMap<Uuid, PlanLine>;
+  readonly against: ReadonlyMap<Uuid, Uuid | null>;
+  readonly nodes: ReadonlyMap<Uuid, BudgetTreeNode>;
+  readonly fiscalYearId: Uuid | null;
+}
+
+/** The sum of the figures that are there; `null` when none is. */
+function sumOf(values: readonly (number | null)[]): number | null {
+  const present = values.filter((v): v is number => v !== null);
+  return present.length ? present.reduce((sum, v) => sum + v, 0) : null;
+}
+
+/**
+ * The Ansatz and the Ist of the year before of a row (001040, 001041). A row compares with
+ * its Vorgänger or its own Kostenstelle. A row with rows below whose match has no line in the
+ * plan of the year before sums the rows directly below it, so a Titel and the side sums follow
+ * the Vorgänger. A row without such a match and without rows below shows no figure, not 0,00.
+ */
+function yearBeforeOf(
+  node: BudgetTreeNode,
+  line: PlanLine,
+  below: readonly PlanRow[],
+  depth: number,
+  before: YearBefore,
+): readonly [number | null, number | null] {
+  const other = before.against.get(node.id) ?? null;
+  const own = other ? before.prev.get(other) : undefined;
+  if (other && own) return [Number(own.amount), actualOf(before.nodes.get(other), line.side, before.fiscalYearId)];
+  const children = below.filter((r) => r.depth === depth + 1);
+  if (children.length) return [sumOf(children.map((r) => r.prev)), sumOf(children.map((r) => r.actual))];
+  return [null, null];
+}
+
 /** The rows of a version in tree order. A Kostenstelle without a line is not in the plan. */
 export function planRows(source: PlanRowSource): readonly PlanRow[] {
   const lines = lineMap(source.version);
@@ -82,7 +117,7 @@ export function planRows(source: PlanRowSource): readonly PlanRow[] {
     const line = lines.get(node.id);
     if (!line) return [];
     const below = node.children.flatMap((c) => rowsOf(c, depth + 1));
-    const other = against.get(node.id) ?? null;
+    const [prevOf, actual] = yearBeforeOf(node, line, below, depth, { prev, against, nodes, fiscalYearId: source.prevFiscalYearId });
     const row: PlanRow = {
       id: node.id,
       parentId: depth === 0 ? null : node.parentId,
@@ -93,8 +128,8 @@ export function planRows(source: PlanRowSource): readonly PlanRow[] {
       depth,
       amount: Number(line.amount),
       base: base.has(node.id) ? Number(base.get(node.id)?.amount) : null,
-      prev: other && prev.has(other) ? Number(prev.get(other)?.amount) : null,
-      actual: other ? actualOf(nodes.get(other), line.side, source.prevFiscalYearId) : null,
+      prev: prevOf,
+      actual,
       predecessorId: line.predecessorId ?? null,
       note: line.note ?? '',
       transferable: line.transferable,

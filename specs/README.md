@@ -390,6 +390,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/001031](requirements/functional/finance/budget/001031_antrag-takes-leaf-cost-centre.md) | An Antrag takes only a Kostenstelle without a Kostenstelle below it | approved |
 | [F/finance/budget/001032](requirements/functional/finance/budget/001032_booking-takes-leaf-cost-centre.md) | A booking takes only a Kostenstelle without a Kostenstelle below it | approved |
 | [F/finance/budget/001040](requirements/functional/finance/budget/001040_plan-line-predecessor.md) | A plan line can name its predecessor in the year before | approved |
+| [F/finance/budget/001041](requirements/functional/finance/budget/001041_plan-row-sums-rows-below.md) | A row without its own figure of the year before sums the rows below it | draft |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
 | [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | approved |
 | [F/finance/invoices/000262](requirements/functional/finance/invoices/000262_invoice-segments.md) | The invoice list has four segments | replaced |

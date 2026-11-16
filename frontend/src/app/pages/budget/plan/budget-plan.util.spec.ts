@@ -47,8 +47,22 @@ describe('BudgetPlanUtil', () => {
       prevFiscalYearId: 'fy-25',
     });
     expect(rows[0]).toMatchObject({ base: 80, prev: 95, actual: 90, transferable: true, coverable: true, blocked: 5 });
-    expect(rows[2]).toMatchObject({ id: 'wages', actual: 55, base: null, prev: null });
-    expect(rows[3]).toMatchObject({ id: 'grants', actual: 0 });
+    expect(rows[2]).toMatchObject({ id: 'wages', actual: null, base: null, prev: null });
+    expect(rows[3]).toMatchObject({ id: 'grants', actual: null });
+  });
+
+  it('§F/finance/budget/001041: a row without its own match sums the rows below, and a row without any shows nothing', () => {
+    const rows = planRows({
+      top: TOP,
+      version: version({ lines: [line('fees', '100'), line('staff', '70'), line('wages', '60', { predecessorId: 'grants' }), line('grants', '30')] }),
+      base: null,
+      prev: version({ lines: [line('fees', '95'), line('grants', '50')] }),
+      prevFiscalYearId: 'fy-25',
+    });
+    const byId = new Map(rows.map((r) => [r.id, r] as const));
+    expect(byId.get('wages')).toMatchObject({ prev: 50 });
+    expect(byId.get('staff')).toMatchObject({ prev: 50, actual: byId.get('wages')?.actual });
+    expect(byId.get('grants')).toMatchObject({ prev: null, actual: null });
   });
 
   it('§F/finance/budget/001040: a line compares with its Vorgänger, and the Vorgänger with that line only', () => {
