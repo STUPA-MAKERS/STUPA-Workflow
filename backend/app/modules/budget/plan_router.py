@@ -24,6 +24,7 @@ from app.modules.budget.plan_schemas import (
     PlanLinePredecessorSet,
     PlanLineRename,
     PlanLineSet,
+    PlanLineYearBeforeSet,
     PlanNodeCreate,
     PlanOut,
     PlanReadableOut,
@@ -304,6 +305,21 @@ async def set_plan_line_predecessor(
 ) -> PlanOut:
     """Name the Vorgänger of a draft line in the year before, or clear it (spec 001040)."""
     out = await service.set_predecessor(version_id, budget_id, payload)
+    await service.session.commit()
+    return out
+
+
+@router.put(
+    "/budget-plan-versions/{version_id}/lines/{budget_id}/year-before",
+    response_model=PlanOut,
+    dependencies=_STRUCTURE,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def set_plan_line_year_before(
+    version_id: UUID, budget_id: UUID, payload: PlanLineYearBeforeSet, service: ServiceDep
+) -> PlanOut:
+    """Set the Ansatz and the Ist of the year before of a draft line by hand (spec 001042)."""
+    out = await service.set_year_before(version_id, budget_id, payload)
     await service.session.commit()
     return out
 

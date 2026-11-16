@@ -4463,6 +4463,8 @@
   "budget.plan.line.amount": "Planned amount",
   "budget.plan.line.predecessor": "Predecessor",
   "budget.plan.line.predecessorNone": "No predecessor",
+  "budget.plan.line.prevAmount": "Budget {year} by hand",
+  "budget.plan.line.prevActual": "Actual {year} by hand",
   "budget.plan.action.deleteDraft": "Delete draft",
   "budget.plan.step.title": "Complete step?",
   "budget.plan.step.body": "The step “{name}” then counts as completed.",

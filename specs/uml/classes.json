@@ -2700,6 +2700,18 @@
           "type": "CHAR(32)"
         },
         {
+          "name": "prev_amount",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "prev_actual",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
           "name": "id",
           "nullable": false,
           "primaryKey": true,

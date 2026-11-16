@@ -4463,6 +4463,8 @@
   "budget.plan.line.amount": "Ansatz",
   "budget.plan.line.predecessor": "Vorgänger",
   "budget.plan.line.predecessorNone": "Kein Vorgänger",
+  "budget.plan.line.prevAmount": "Ansatz {year} von Hand",
+  "budget.plan.line.prevActual": "Ist {year} von Hand",
   "budget.plan.action.deleteDraft": "Entwurf löschen",
   "budget.plan.step.title": "Schritt abschließen?",
   "budget.plan.step.body": "Der Schritt „{name}“ gilt danach als abgeschlossen.",
