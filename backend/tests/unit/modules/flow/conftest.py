@@ -32,7 +32,7 @@ class _Years:
         ]
         return list(getattr(self._session, "active_fy", fallback))
 
-    async def is_leaf(self, node: Any) -> bool:
+    async def is_leaf(self, node: Any, fiscal_year_id: Any = None) -> bool:
         """Say the node is a leaf unless the fake session names it in `parents`."""
         return node.id not in getattr(self._session, "parents", ())
 

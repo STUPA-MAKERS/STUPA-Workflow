@@ -8,6 +8,7 @@ from mcp.server.fastmcp import FastMCP
 
 from ._chat_files import post_message
 from ._common import ToolGroup, api, params
+from .meetings import download_to
 
 group = ToolGroup()
 
@@ -22,6 +23,7 @@ async def list_applications(
     order: Literal["asc", "desc"] | None = None,
     limit: int | None = None,
     offset: int | None = None,
+    archived: Literal["false", "true", "all"] | None = None,
 ) -> dict:
     """List applications, one page at a time.
 
@@ -33,13 +35,15 @@ async def list_applications(
         gremium: Filter by the id of a Gremium.
         type: Filter by the id of an application type.
         q: Full-text search term.
+        archived: `false` (default) lists the working list, `true` the archived
+            applications, `all` both.
     """
     states = [state] if isinstance(state, str) else state
     return await api().get(
         "/applications",
         params=params(
             state=states or None, gremium=gremium, type=type, q=q,
-            sort=sort, order=order, limit=limit, offset=offset,
+            sort=sort, order=order, limit=limit, offset=offset, archived=archived,
         ),
     )
 
@@ -287,6 +291,188 @@ async def fire_transition(
             nonPublic=non_public,
             decision=decision,
         ),
+    )
+
+
+@group.tool
+async def edit_application_comment(
+    application_id: str, comment_id: str, body: str, mentions: list[str] | None = None
+) -> dict:
+    """Replace the text of a comment on an application.
+
+    Only the author or a holder of `application.manage` may do this; the audit log
+    records the change. `mentions` None keeps the stored mentions, a list replaces them
+    (the persons of `list_application_mentionable`).
+    """
+    return await api().patch(
+        f"/applications/{application_id}/comments/{comment_id}",
+        json=params(body=body, mentions=mentions),
+    )
+
+
+@group.tool
+async def delete_application_comment(application_id: str, comment_id: str) -> dict:
+    """Delete a comment on an application and its files, for good.
+
+    Only the author or a holder of `application.manage` may do this; the audit log
+    records it. Ask the user before you call this.
+    """
+    await api().delete(f"/applications/{application_id}/comments/{comment_id}")
+    return {"deleted": True}
+
+
+@group.tool
+async def list_application_mentionable(application_id: str) -> list:
+    """List the persons whom a comment on this application may mention."""
+    return await api().get(f"/applications/{application_id}/mentionable")
+
+
+@group.tool
+async def archive_application(application_id: str) -> dict:
+    """Move an application out of the working list (reversible, nothing is deleted).
+
+    This is not the privacy erasure. `unarchive_application` brings it back.
+    """
+    return await api().post(f"/applications/{application_id}/archive")
+
+
+@group.tool
+async def unarchive_application(application_id: str) -> dict:
+    """Bring an archived application back into the working list."""
+    return await api().delete(f"/applications/{application_id}/archive")
+
+
+@group.tool
+async def list_application_flow_states(application_id: str) -> list:
+    """List all states of the flow of an application: the targets of `force_application_status`."""
+    return await api().get(f"/applications/{application_id}/flow-states")
+
+
+@group.tool
+async def force_application_status(application_id: str, state_id: str, note: str) -> dict:
+    """Put an application directly into a state, past the transitions and their guards.
+
+    Requires the right to force a status. `note` (required) says why; the audit log
+    records it. 409 when the application has no current state, already sits in the
+    target state, or a concurrent change moved it first. Prefer `fire_transition`, and
+    ask the user before you force a status.
+    """
+    return await api().post(
+        f"/applications/{application_id}/force-status",
+        json={"stateId": state_id, "note": note},
+    )
+
+
+@group.tool
+async def request_application_erasure(application_id: str) -> dict:
+    """File a privacy erasure request (Art. 17 GDPR) for an application.
+
+    The request goes into the queue of `/admin/privacy` and the privacy officers get a
+    mail. Nothing is erased until a privacy officer runs the request in the app.
+    """
+    return await api().post(f"/applications/{application_id}/erasure-request")
+
+
+@group.tool
+async def list_application_observers(application_id: str) -> list:
+    """List the observers of an application (e-mail addresses), the oldest first."""
+    return await api().get(f"/applications/{application_id}/observers")
+
+
+@group.tool
+async def add_application_observer(application_id: str, email: str) -> dict:
+    """Add an observer by e-mail address; the address gets one mail with a read link.
+
+    At most five observers (422 `observer_limit`), ten adds in an hour (429). The
+    applicant address gives 422 `observer_is_applicant`, an address that observes
+    already 409 `observer_exists`.
+    """
+    return await api().post(
+        f"/applications/{application_id}/observers", json={"email": email}
+    )
+
+
+@group.tool
+async def remove_application_observer(application_id: str, observer_id: str) -> dict:
+    """Remove an observer; the next request of the observer gets 403."""
+    await api().delete(f"/applications/{application_id}/observers/{observer_id}")
+    return {"removed": True}
+
+
+@group.tool
+async def get_application_links(application_id: str) -> dict:
+    """Read the Vorgänger, the Folgeanträge and the link history of an application."""
+    return await api().get(f"/applications/{application_id}/links")
+
+
+@group.tool
+async def set_application_predecessor(
+    application_id: str, predecessor_id: str | None
+) -> dict:
+    """Set, change or remove (`None`) the Vorgänger of an application.
+
+    The caller needs the edit right on the application and on the Vorgänger. The
+    Vorgänger must have the same application type and must not lead back to the
+    application. Answers and versions stay as they are.
+    """
+    path = f"/applications/{application_id}/predecessor"
+    if predecessor_id is None:
+        await api().delete(path)
+        return await api().get(f"/applications/{application_id}/links")
+    return await api().put(path, json={"predecessorId": predecessor_id})
+
+
+@group.tool
+async def get_application_prefill(application_id: str) -> dict:
+    """Return the answers of an application as the start of a Folgeantrag of the same type.
+
+    The answers fit the current form of the type; pass them as `data` to
+    `create_application` together with the predecessor.
+    """
+    return await api().get(f"/applications/{application_id}/prefill")
+
+
+@group.tool
+async def download_application_pdf(
+    application_id: str, target_path: str, overwrite: bool = False
+) -> dict:
+    """Download the current version of an Antrag as PDF to a local file.
+
+    The PDF holds the head data, the answers by section, the Kostenaufstellung, the
+    names of the files and the valid decision. A field that the reader may not read
+    prints as `(nicht sichtbar)`.
+    """
+    return await download_to(
+        "GET",
+        f"/applications/{application_id}/pdf",
+        target_path,
+        overwrite=overwrite,
+        fallback=f"antrag-{application_id}.pdf",
+    )
+
+
+@group.tool
+async def export_applications_xlsx(
+    target_path: str,
+    state: list[str] | str | None = None,
+    gremium: str | None = None,
+    type: str | None = None,
+    q: str | None = None,
+    archived: Literal["false", "true", "all"] | None = None,
+    overwrite: bool = False,
+) -> dict:
+    """Export the application list as `.xlsx` to a local file.
+
+    The filters work as in `list_applications`. The workbook holds no form answers.
+    """
+    states = [state] if isinstance(state, str) else state
+    return await download_to(
+        "GET",
+        "/applications/export.xlsx",
+        target_path,
+        overwrite=overwrite,
+        fallback="antraege.xlsx",
+        query=params(state=states or None, gremium=gremium, type=type, q=q, archived=archived),
     )
 
 

@@ -144,7 +144,7 @@ class AssignmentOps(BudgetTreeServiceBase):
             else None
         )
         await self._refuse_income(node, fy_id)
-        await self._refuse_not_leaf(node)
+        await self._refuse_not_leaf(node, fy_id)
         app.budget_id = budget_id
         app.fiscal_year_id = fy_id
         await self._audit(

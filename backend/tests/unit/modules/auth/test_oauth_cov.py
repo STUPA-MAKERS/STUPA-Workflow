@@ -939,7 +939,7 @@ def test_mcp_config_success() -> None:
     assert body["clientId"] == CLIENT_ID
     assert body["baseUrl"] == "https://antrag.example"
     assert body["scopesSupported"] == sorted(oauth.SCOPES.keys())
-    assert body["mcpServers"]["antragsplattform"]["command"] == "antragsplattform-mcp"
+    assert body["mcpServers"]["workflow"]["command"] == "antragsplattform-mcp"
 
 
 def test_mcp_package_not_available_404(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -964,14 +964,14 @@ def test_mcp_package_streams_tarball(
     resp = client.get("/api/mcp/package")
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/gzip"
-    assert "antragsplattform-mcp.tar.gz" in resp.headers["content-disposition"]
+    assert "workflow-mcp.tar.gz" in resp.headers["content-disposition"]
 
     import io
 
     with tarfile.open(fileobj=io.BytesIO(resp.content), mode="r:gz") as tar:
         names = tar.getnames()
     assert not any("__pycache__" in n for n in names)
-    assert "antragsplattform-mcp/antragsplattform_mcp/_baked.py" in names
+    assert "workflow-mcp/antragsplattform_mcp/_baked.py" in names
 
 
 def test_mcp_package_bakes_url_json_safe(
@@ -1002,7 +1002,7 @@ def test_mcp_package_bakes_url_json_safe(
 
     with tarfile.open(fileobj=io.BytesIO(resp.content), mode="r:gz") as tar:
         member = tar.extractfile(
-            "antragsplattform-mcp/antragsplattform_mcp/_baked.py"
+            "workflow-mcp/antragsplattform_mcp/_baked.py"
         )
         assert member is not None
         source = member.read().decode("utf-8")

@@ -107,7 +107,7 @@ describe('BrandingEditorComponent', () => {
     const { container } = await setup('texts');
     expect(screen.getByRole('heading', { level: 1, name: 'Texte' })).toBeInTheDocument();
     expect(metaLine(container)).toBe('');
-    expect(screen.getByRole('textbox', { name: 'Willkommenstext (DE)' })).toHaveValue('Willkommen auf der Antragsplattform.');
+    expect(screen.getByRole('textbox', { name: 'Willkommenstext (DE)' })).toHaveValue('Willkommen bei STUPA Workflow.');
     expect(screen.queryByRole('textbox', { name: 'Voller Name (Browser-Tab)' })).toBeNull();
     expect(screen.queryByText('Vorschau', { selector: 'summary *' })).toBeNull();
     expect(container.querySelector('details')).toBeNull();

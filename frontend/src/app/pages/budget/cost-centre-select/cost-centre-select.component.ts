@@ -236,13 +236,17 @@ export class CostCentreSelectComponent {
     return pickable(nodes, (top) => [this.fiscalYearId(), this.fiscalYears().get(top.id) ?? '']);
   });
 
-  /** The nodes with an active Kostenstelle below them, in the tree as given. */
+  /**
+   * The nodes with a Kostenstelle below them in the list as offered: for a fiscal year with
+   * a plan in force a Kostenstelle that only the plan of another year holds does not count
+   * (spec 001031).
+   */
   private readonly parents = computed(
     () =>
       new Set(
-        this.nodes()
+        this.offered()
           .flatMap(withDescendants)
-          .filter((n) => (n.children ?? []).some((c) => c.active))
+          .filter((n) => (n.children ?? []).length > 0)
           .map((n) => n.id),
       ),
   );

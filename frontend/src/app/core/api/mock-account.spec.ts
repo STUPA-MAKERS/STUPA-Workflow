@@ -71,7 +71,7 @@ describe('mockAccount (demo data)', () => {
 
   it('serves the MCP setup and the package', () => {
     const setup = mockAccount('GET', '/api/mcp/config', null)!.body as McpSetup;
-    expect(setup.mcpServers).toEqual({ antragsplattform: { command: 'antragsplattform-mcp' } });
+    expect(setup.mcpServers).toEqual({ workflow: { command: 'antragsplattform-mcp' } });
     expect(mockAccount('GET', '/api/mcp/package', null)!.body).toBeInstanceOf(Blob);
   });
 

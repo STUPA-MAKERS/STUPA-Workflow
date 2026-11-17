@@ -220,6 +220,32 @@ describe('CostCentreSelectComponent', () => {
     expect(host.picks).toEqual(['t9']);
   });
 
+  it('§F/finance/budget/001031: a Kostenstelle that only another year plans leaves its Titel choosable', async () => {
+    const tree = [
+      NODE('vsm', null, 'VSM', 'VSM', 'VS-Mittel', {
+        plannedIn: ['fy-v'],
+        children: [
+          NODE('t3', 'vsm', '3', 'VSM-3', 'Einnahmen', {
+            plannedIn: ['fy-v'],
+            children: [NODE('g359', 't3', '59', 'VSM-359', 'Entnahmen', { plannedIn: ['fy-next'] })],
+          }),
+        ],
+      }),
+    ];
+    const option = (name: string) => screen.getByRole('option', { name: new RegExp(name) });
+    const { field, tick, user, host } = await setup((h) => {
+      h.nodes.set(tree);
+      h.leaves.set(true);
+      h.fy.set('fy-v');
+    });
+    await user.click(field());
+    await tick();
+    expect(screen.queryByRole('option', { name: /Entnahmen/ })).toBeNull();
+    expect(option('Einnahmen').getAttribute('aria-disabled')).toBeNull();
+    await user.click(option('Einnahmen'));
+    expect(host.picks).toEqual(['t3']);
+  });
+
   /** An id that the tree does not hold shows the placeholder. */
   it('shows the placeholder, then the pick with its swatch and path key', async () => {
     const { field, view, host } = await setup();

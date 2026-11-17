@@ -36,7 +36,7 @@ const GRANTS: OAuthGrant[] = [
 ];
 
 const SETUP: McpSetup = {
-  mcpServers: { antragsplattform: { command: 'antragsplattform-mcp' } },
+  mcpServers: { workflow: { command: 'antragsplattform-mcp' } },
   baseUrl: 'https://antraege.example.org',
   clientId: 'antragsplattform-mcp',
   scopesSupported: ['read'],
@@ -228,7 +228,7 @@ describe('AccountGrantsComponent', () => {
     const { api } = await setup({ canMcp: true });
     await userEvent.click(screen.getByRole('button', { name: /MCP-Paket herunterladen/ }));
     expect(api.downloadMcpPackage).toHaveBeenCalled();
-    expect(dl).toHaveBeenCalledWith(expect.any(Blob), 'antragsplattform-mcp.tar.gz');
+    expect(dl).toHaveBeenCalledWith(expect.any(Blob), 'workflow-mcp.tar.gz');
     dl.mockRestore();
   });
 

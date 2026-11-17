@@ -2303,3 +2303,43 @@ def test_two_cost_centres_with_one_path_key_stop_the_upgrade(
             conn.execute(text("DELETE FROM budget WHERE path_key LIKE 'MIGQ-80%-%'"))
             conn.execute(text("DELETE FROM budget WHERE path_key LIKE 'MIGQ%'"))
         command.upgrade(alembic_cfg, "head")
+
+
+def test_the_seeded_magic_link_subject_names_the_platform_by_the_branding(
+    alembic_cfg: Config, engine: Engine
+) -> None:
+    """Migration 81852f245ccb: the seed subject becomes the builtin branded subject.
+
+    A subject that an admin changed stays as it is. The way back restores the seed text.
+    Rule: §F/administration/admin/001231.
+    """
+    seed = {
+        "de": "Ihr Zugangslink zur Antragsplattform",
+        "en": "Your access link for the application platform",
+    }
+    command.downgrade(alembic_cfg, "b7e2c4a91f03")
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO mail_template (key, subject_i18n) VALUES ('magic_link', "
+                "CAST(:s AS jsonb)) ON CONFLICT (key) DO UPDATE SET subject_i18n = "
+                "EXCLUDED.subject_i18n"
+            ),
+            {"s": json.dumps({"de": seed["de"], "en": "Own subject"})},
+        )
+
+    command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+        subject = conn.execute(
+            text("SELECT subject_i18n FROM mail_template WHERE key = 'magic_link'")
+        ).scalar_one()
+        assert subject == {"de": "Ihr Zugangslink für {{ platformName }}", "en": "Own subject"}
+
+    command.downgrade(alembic_cfg, "b7e2c4a91f03")
+    with engine.begin() as conn:
+        subject = conn.execute(
+            text("SELECT subject_i18n FROM mail_template WHERE key = 'magic_link'")
+        ).scalar_one()
+        assert subject == {"de": seed["de"], "en": "Own subject"}
+        conn.execute(text("DELETE FROM mail_template WHERE key = 'magic_link'"))
+    command.upgrade(alembic_cfg, "head")

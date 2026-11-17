@@ -15,6 +15,7 @@ import codecs
 import os
 import re
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Literal
 from urllib.parse import unquote
@@ -843,6 +844,81 @@ def _disposition_filename(header: str) -> str:
     return "" if name in {".", ".."} else _fit_name_max(name)
 
 
+_DOCUMENT_MAX = 20 * 1024 * 1024
+_IMAGE_MAX = 10 * 1024 * 1024
+_IMAGE_TYPES = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+}
+
+
+def _local_file(file_path: str, cap: int, suffixes: set[str]) -> tuple[str, bytes, str]:
+    """Read a local file for an upload, after the checks of its type and size."""
+    path = Path(file_path).expanduser()
+    if not path.is_file():
+        raise ApiError(400, f"file not found: {file_path!r}")
+    suffix = path.suffix.lower()
+    if suffix not in suffixes:
+        raise ApiError(400, f"file type not allowed: {suffix or '(none)'!r}")
+    if path.stat().st_size > cap:
+        raise ApiError(413, f"file larger than {cap // (1024 * 1024)} MB: {file_path!r}")
+    mime = _IMAGE_TYPES.get(suffix, "application/pdf")
+    return path.name, path.read_bytes(), mime
+
+
+async def download_to(
+    method: str,
+    path: str,
+    target_path: str,
+    *,
+    overwrite: bool = False,
+    fallback: str,
+    query: Mapping[str, object] | None = None,
+) -> dict:
+    """Stream a binary answer of the API into a local file; the bytes never enter the chat.
+
+    `target_path` is a file path or an existing directory; for a directory the file name
+    comes from the `Content-Disposition` header, else from `fallback`. An existing file
+    is kept unless `overwrite` is true. The tool writes a temp file and renames it.
+
+    Returns:
+        `path` (absolute), `filename`, `mime` and `size` in bytes.
+    """
+    target = Path(target_path).expanduser()
+    if not target.is_dir():
+        if not target.parent.is_dir():
+            raise ApiError(400, f"directory not found: {str(target.parent)!r}")
+        if target.exists() and not overwrite:
+            raise ApiError(400, f"file exists (pass overwrite=true): {target_path!r}")
+    kwargs: dict[str, object] = {"params": query} if query else {}
+    async with api().stream(method, path, **kwargs) as resp:
+        named = _disposition_filename(resp.headers.get("content-disposition", ""))
+        stored = named if named and "\x00" not in named else fallback
+        final = target / stored if target.is_dir() else target
+        if final.exists() and not overwrite:
+            raise ApiError(400, f"file exists (pass overwrite=true): {str(final)!r}")
+        fd, tmp = tempfile.mkstemp(dir=final.parent, prefix=".download-")
+        try:
+            with os.fdopen(fd, "wb") as out:
+                async for chunk in resp.aiter_bytes(_DOWNLOAD_CHUNK):
+                    out.write(chunk)
+                size = out.tell()
+            os.replace(tmp, final)
+        except BaseException:
+            Path(tmp).unlink(missing_ok=True)
+            raise
+        mime = resp.headers.get("content-type", "application/octet-stream")
+    return {
+        "path": str(final.resolve()),
+        "filename": stored,
+        "mime": mime.split(";")[0].strip(),
+        "size": size,
+    }
+
+
 def _attachment_part(
     file_path: str, filename: str | None
 ) -> tuple[str, bytes, str]:
@@ -948,35 +1024,19 @@ async def download_attachment(
     Returns:
         `path` (absolute), `filename`, `mime` and `size` in bytes.
     """
-    target = Path(target_path).expanduser()
-    if not target.is_dir():
-        if not target.parent.is_dir():
-            raise ApiError(400, f"directory not found: {str(target.parent)!r}")
-        if target.exists() and not overwrite:
-            raise ApiError(400, f"file exists (pass overwrite=true): {target_path!r}")
-    async with api().stream("GET", f"/attachments/{attachment_id}/download") as resp:
-        named = _disposition_filename(resp.headers.get("content-disposition", ""))
-        stored = named if named and "\x00" not in named else f"attachment-{attachment_id}"
-        final = target / stored if target.is_dir() else target
-        if final.exists() and not overwrite:
-            raise ApiError(400, f"file exists (pass overwrite=true): {str(final)!r}")
-        fd, tmp = tempfile.mkstemp(dir=final.parent, prefix=".download-")
-        try:
-            with os.fdopen(fd, "wb") as out:
-                async for chunk in resp.aiter_bytes(_DOWNLOAD_CHUNK):
-                    out.write(chunk)
-                size = out.tell()
-            os.replace(tmp, final)
-        except BaseException:
-            Path(tmp).unlink(missing_ok=True)
-            raise
-        mime = resp.headers.get("content-type", "application/octet-stream")
-    return {
-        "path": str(final.resolve()),
-        "filename": stored,
-        "mime": mime.split(";")[0].strip(),
-        "size": size,
-    }
+    return await download_to(
+        "GET",
+        f"/attachments/{attachment_id}/download",
+        target_path,
+        overwrite=overwrite,
+        fallback=f"attachment-{attachment_id}",
+    )
+
+
+@group.tool
+async def get_attachment(attachment_id: str) -> dict:
+    """Return the download link of an attachment; use `download_attachment` for the file."""
+    return await api().get(f"/attachments/{attachment_id}")
 
 
 @group.tool
@@ -987,6 +1047,222 @@ async def delete_attachment(attachment_id: str) -> dict:
     may delete only while the state of the application allows edits (409 otherwise).
     """
     return await api().delete(f"/attachments/{attachment_id}")
+
+
+@group.tool
+async def set_agenda_item_done(meeting_id: str, item_id: str, done: bool) -> list:
+    """Set or remove the done mark of an agenda item ("TOP abhaken").
+
+    The gate is the gate of the item text; in a live meeting with a protokollant only
+    the protokollant (403 `not_protokollant`). A closed meeting with a final protocol
+    gives 409 `protocol_final`. Returns the agenda.
+    """
+    return await api().put(
+        f"/meetings/{meeting_id}/agenda/{item_id}/done", json={"done": done}
+    )
+
+
+@group.tool
+async def set_own_attendance(
+    meeting_id: str, status: Literal["present", "excused"], note: str | None = None
+) -> list:
+    """Report the own attendance for a planned or live meeting (Gremium members only).
+
+    `note` (the reason) only with `excused`. 409 `attendance_set_by_lead` when the
+    meeting lead set the record, 409 `delegation_active` for `present` while the caller
+    has a delegation for the meeting.
+    """
+    return await api().put(
+        f"/meetings/{meeting_id}/attendance/me", json=params(status=status, note=note)
+    )
+
+
+@group.tool
+async def update_meeting_vote(
+    meeting_id: str, vote_id: str, vote: S.MeetingVoteOpenBody
+) -> dict:
+    """Change a prepared (draft) vote: question, rules, candidates or options.
+
+    The body is the body of `create_meeting_vote` without `draft`; it replaces the whole
+    vote. `agendaItemId` must name the item of the vote (422 `agenda_item_mismatch`).
+    """
+    body = {k: v for k, v in dump_create(vote).items() if k != "draft"}
+    return await api().put(f"/meetings/{meeting_id}/votes/{vote_id}", json=body)
+
+
+@group.tool
+async def list_meeting_timeline(
+    direction: Literal["past", "upcoming"] = "upcoming",
+    cursor: str | None = None,
+    limit: int | None = None,
+    gremium_id: str | None = None,
+    q: str | None = None,
+) -> dict:
+    """List meetings around now, page by page (the meetings page).
+
+    `upcoming` goes forward, `past` backward; pass `nextCursor` as `cursor`. With `q`
+    the result is one list sorted by relevance.
+    """
+    return await api().get(
+        "/meetings/timeline",
+        params=params(
+            direction=direction, cursor=cursor, limit=limit, gremiumId=gremium_id, q=q
+        ),
+    )
+
+
+@group.tool
+async def list_meeting_gremien() -> list:
+    """List the Gremien in which the caller can read at least one meeting."""
+    return await api().get("/meetings/committees")
+
+
+@group.tool
+async def resolve_meeting_join_code(code: str) -> dict:
+    """Return the meeting of a join code (the QR code of a public meeting)."""
+    return await api().get(f"/meetings/join/{code}")
+
+
+@group.tool
+async def get_protocol(meeting_id: str) -> dict:
+    """Read the protocol of a meeting without creating one (404 when none exists)."""
+    return await api().get(f"/meetings/{meeting_id}/protocol")
+
+
+@group.tool
+async def delete_protocol(protocol_id: str) -> dict:
+    """Delete a protocol while it is still a draft (409 for a final one).
+
+    Ask the user before you call this.
+    """
+    await api().delete(f"/protocols/{protocol_id}")
+    return {"deleted": True}
+
+
+@group.tool
+async def list_protocol_known_names(meeting_id: str) -> list:
+    """List the known names of a meeting for the blackout of a protocol text.
+
+    Only a person who can write a protocol text of the meeting reads the list.
+    """
+    return await api().get(f"/meetings/{meeting_id}/known-names")
+
+
+@group.tool
+async def upload_meeting_document(meeting_id: str, file_path: str) -> dict:
+    """Upload a local PDF for a protocol text of a meeting (Sitzungsunterlage).
+
+    PDF only, unencrypted, at most 20 MiB and 100 pages. The answer names the
+    canonical path: write `[<name>](<url>)` into the protocol text.
+    """
+    name, data, _ = _local_file(file_path, _DOCUMENT_MAX, {".pdf"})
+    return await api().post(
+        f"/meetings/{meeting_id}/documents",
+        files={"file": (name, data, "application/pdf")},
+    )
+
+
+@group.tool
+async def get_meeting_document_info(document_id: str) -> dict:
+    """Return the file name, size and page count of a PDF in a protocol text."""
+    return await api().get(f"/media/documents/{document_id}/info")
+
+
+@group.tool
+async def download_meeting_document(
+    document_id: str, target_path: str, overwrite: bool = False
+) -> dict:
+    """Download a PDF of a protocol text (Sitzungsunterlage) to a local file."""
+    return await download_to(
+        "GET",
+        f"/media/documents/{document_id}",
+        target_path,
+        overwrite=overwrite,
+        fallback=f"dokument-{document_id}.pdf",
+    )
+
+
+@group.tool
+async def upload_markdown_image(file_path: str) -> dict:
+    """Upload a local image for a Markdown text (protocol, to-do card, comment).
+
+    PNG, JPEG, GIF and WEBP only, at most 10 MB. The platform strips the metadata and
+    scales the longest side down to 2400 px. Write `![alt](<url>)` into the text.
+    """
+    name, data, mime = _local_file(file_path, _IMAGE_MAX, set(_IMAGE_TYPES))
+    return await api().post("/media/images", files={"file": (name, data, mime)})
+
+
+@group.tool
+async def download_markdown_image(
+    image_id: str, target_path: str, overwrite: bool = False
+) -> dict:
+    """Download an image of a Markdown text to a local file."""
+    return await download_to(
+        "GET",
+        f"/media/images/{image_id}",
+        target_path,
+        overwrite=overwrite,
+        fallback=f"bild-{image_id}",
+    )
+
+
+@group.tool
+async def download_protocol_pdf(
+    protocol_id: str,
+    target_path: str,
+    variant: Literal["internal", "public", "draft", "draft_public"] = "internal",
+    overwrite: bool = False,
+) -> dict:
+    """Download the PDF of a protocol to a local file.
+
+    `internal` and `public` read a final protocol (the public variant exists only with a
+    non-public agenda item, else 404). `draft` and `draft_public` render a draft with the
+    watermark "Entwurf" and store nothing (409 `protocol_not_draft`, `meeting_live`).
+    """
+    draft = variant in ("draft", "draft_public")
+    path = (
+        f"/protocols/{protocol_id}/draft-pdf"
+        if draft
+        else f"/protocols/{protocol_id}/pdf/public"
+        if variant == "public"
+        else f"/protocols/{protocol_id}/pdf"
+    )
+    query = {"variant": "public" if variant == "draft_public" else "internal"} if draft else None
+    return await download_to(
+        "GET",
+        path,
+        target_path,
+        overwrite=overwrite,
+        fallback=f"protokoll-{protocol_id}.pdf",
+        query=query,
+    )
+
+
+@group.tool
+async def get_delegation_context(meeting_id: str) -> dict:
+    """Return the delegation data of a meeting: gates, deadline, recipients and status."""
+    return await api().get(f"/delegations/meetings/{meeting_id}/context")
+
+
+@group.tool
+async def search_delegation_recipients(
+    meeting_id: str, q: str = "", delegator_id: str | None = None
+) -> list:
+    """Find the persons who can take a delegation for a meeting.
+
+    With `delegator_id` the meeting lead gets the pool substitutes of that member.
+    """
+    return await api().get(
+        f"/delegations/meetings/{meeting_id}/recipients",
+        params=params(q=q, delegatorId=delegator_id),
+    )
+
+
+@group.tool
+async def get_vote_delegation_status(vote_id: str) -> dict:
+    """Return the delegation status of the caller for a vote."""
+    return await api().get(f"/delegations/votes/{vote_id}/status")
 
 
 def register(mcp: FastMCP) -> None:

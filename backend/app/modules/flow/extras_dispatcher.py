@@ -386,7 +386,7 @@ class FlowExtrasActionDispatcher:
                 node.id,
             )
             return False
-        if not await tree.is_leaf(node):
+        if not await tree.is_leaf(node, current[0]):
             logger.warning(
                 "assignBudget: budget %s has cost centers below it — skipped",
                 node.id,
