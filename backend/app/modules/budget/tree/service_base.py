@@ -18,12 +18,13 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import ColumnElement, Select, or_, select
 
 from app.modules.application_types.service import type_has_budget
+from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.budget import plan_rules, tree_rules
 from app.modules.budget.access import viewed_by
 from app.modules.budget.plan_models import BudgetPlan, BudgetPlanLine, BudgetPlanVersion
-from app.modules.budget.tree_models import Budget, FiscalYear
+from app.modules.budget.tree_models import Budget, BudgetExpense, FiscalYear
 from app.modules.budget.tree_rules import _SEP
 from app.settings import Settings, get_settings
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
@@ -31,7 +32,6 @@ from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from app.modules.applications.models import Application
     from app.modules.files.storage import ObjectStorage
 
 _ZERO = Decimal(0)
@@ -421,24 +421,53 @@ class BudgetTreeServiceBase:
                 errors=[{"field": "budgetId", "msg": "type without money"}],
             )
 
-    async def is_leaf(self, node: Budget) -> bool:
-        """Tell if a Kostenstelle has no active Kostenstelle below it (001031)."""
-        child = await self.session.scalar(
-            select(Budget.id)
-            .where(Budget.parent_id == node.id, Budget.active.is_(True))
-            .limit(1)
-        )
-        return child is None
+    async def is_leaf(self, node: Budget, fiscal_year_id: UUID | None = None) -> bool:
+        """Tell if a Kostenstelle has no active Kostenstelle below it in the year (001031).
 
-    async def _refuse_not_leaf(self, node: Budget | None) -> None:
-        """Refuse an Antrag or a booking on a node with Kostenstellen below it.
+        In a fiscal year whose plan is in force, only a Kostenstelle below the node that
+        the plan holds, or that has a booking or an Antrag in the year, counts. The
+        plan of another year can hang Kostenstellen below a Titel that is a leaf in
+        this year. Without a year, or in a year without a plan in force, each active
+        Kostenstelle below the node counts.
+        """
+        below = select(Budget.id).where(Budget.parent_id == node.id, Budget.active.is_(True))
+        if fiscal_year_id is None:
+            return await self.session.scalar(below.limit(1)) is None
+        in_force = (
+            select(BudgetPlanVersion.id)
+            .join(BudgetPlan, BudgetPlan.id == BudgetPlanVersion.plan_id)
+            .where(
+                BudgetPlan.fiscal_year_id == fiscal_year_id,
+                BudgetPlanVersion.state == "in_force",
+            )
+        )
+        planned = in_force.join(
+            BudgetPlanLine, BudgetPlanLine.version_id == BudgetPlanVersion.id
+        ).where(BudgetPlanLine.budget_id == Budget.id)
+        booked = select(BudgetExpense.id).where(
+            BudgetExpense.budget_id == Budget.id,
+            BudgetExpense.fiscal_year_id == fiscal_year_id,
+        )
+        requested = select(Application.id).where(
+            Application.budget_id == Budget.id,
+            Application.fiscal_year_id == fiscal_year_id,
+        )
+        counted = below.where(
+            or_(~in_force.exists(), planned.exists(), booked.exists(), requested.exists())
+        )
+        return await self.session.scalar(counted.limit(1)) is None
+
+    async def _refuse_not_leaf(
+        self, node: Budget | None, fiscal_year_id: UUID | None = None
+    ) -> None:
+        """Refuse an Antrag or a booking on a node with Kostenstellen below it in the year.
 
         An Antrag (001031) and a booking (001032) take only a leaf. No node passes.
 
         Raises:
             ValidationProblem: `cost_centre_not_leaf` (422).
         """
-        if node is not None and not await self.is_leaf(node):
+        if node is not None and not await self.is_leaf(node, fiscal_year_id):
             raise ValidationProblem(
                 "Choose a Kostenstelle without a Kostenstelle below it.",
                 code="cost_centre_not_leaf",
