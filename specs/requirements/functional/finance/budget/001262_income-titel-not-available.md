@@ -6,6 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-17
 tests:
+  - "frontend/src/app/pages/budget/plan/budget-plan.util.spec.ts:BudgetPlanUtil"
   - "backend/tests/integration/modules/budget/test_budget_plan.py:test_the_tree_gives_an_income_titel_its_ansatz_and_ist"
   - "backend/tests/unit/modules/budget/test_budget_tree_rules.py:test_build_forest_income_actual_and_planned"
   - "frontend/src/app/pages/budget/budget-dashboard.component.spec.ts:BudgetDashboardComponent"

@@ -1538,6 +1538,9 @@ describe('BudgetDashboardComponent income Titel', () => {
     expect(view.c.incomeRows().map((r: { node: { id: string } }) => r.node.id)).toEqual(['b-11']);
   });
 
+});
+
+describe('utilisation', () => {
   it('reads the reached part and the label of the deviation', () => {
     const base = { allocated: 0, requested: 0, bound: 0, expended: 0, income: 0, committed: 0, available: 0 };
     expect(reached({ ...base, incomeActual: 50, planned: 200 })).toBe(25);
@@ -1546,9 +1549,6 @@ describe('BudgetDashboardComponent income Titel', () => {
     expect(deviationKey(-1)).toBe('budget.dash.fig.shortfall');
     expect(deviationKey(0)).toBe('budget.dash.fig.deviation');
   });
-});
-
-describe('utilisation', () => {
   it('is committed over the total of allocation and income, or null without a total', () => {
     const f = { allocated: 100, requested: 0, bound: 20, expended: 30, income: 0, committed: 50, available: 50, incomeActual: 0, planned: null };
     expect(utilisation(f)).toBe(50);
