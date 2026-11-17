@@ -85,11 +85,13 @@ describe('BudgetItemListComponent', () => {
         bookingItem(itemBooking({ id: 'e-1' })),
         bookingItem(itemBooking({ id: 'e-2', fiscalYearId: 'fy-2' })),
         bookingItem(itemBooking({ id: 'e-3', kind: 'income' })),
+        bookingItem(itemBooking({ id: 'e-4', budgetId: 'b-unknown' })),
       ],
       names,
     );
     expect(rows[0].querySelector('app-status-text')?.textContent).toContain('Rückzahlung');
     expect(rows[1].querySelector('app-status-text')?.textContent).toContain('Ausgabe');
     expect(rows[2].querySelector('app-status-text')?.textContent).toContain('Einnahme');
+    expect(rows[3].querySelector('app-status-text')?.textContent).toContain('Ausgabe');
   });
 });

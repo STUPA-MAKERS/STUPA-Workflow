@@ -11,7 +11,7 @@ import { axe } from 'jest-axe';
 import { AuthService } from '@core/auth/auth.service';
 import { AdminApiService } from '../admin/admin-api.service';
 import { ToastService } from '@stupa-makers/ui-kit';
-import { BudgetDashboardComponent, deviationKey, reached, utilisation } from './budget-dashboard.component';
+import { BudgetDashboardComponent, deviationKey, isIncome, reached, utilisation } from './budget-dashboard.component';
 import { BudgetTreeApi } from './budget-tree.api';
 import { By } from '@angular/platform-browser';
 import { CostCentreSettingsComponent } from './cost-centre/cost-centre-settings.component';
@@ -1451,6 +1451,15 @@ describe('BudgetDashboardComponent income Titel', () => {
               incomeIn: ['fy-1'],
               byFiscalYear: [alloc({ fiscalYearId: 'fy-1', planned: '100', incomeActual: '65' })],
             }),
+            node({
+              id: 'b-12',
+              parentId: 'b-1',
+              key: '2',
+              pathKey: 'VS-1-2',
+              name: 'Ohne Ansatz',
+              incomeIn: ['fy-1'],
+              byFiscalYear: [alloc({ fiscalYearId: 'fy-1' })],
+            }),
           ],
         }),
         node({
@@ -1535,7 +1544,22 @@ describe('BudgetDashboardComponent income Titel', () => {
     expect(view.c.selectedIsIncome()).toBe(true);
     expect(view.container.querySelector('app-budget-pie')).toBeNull();
     expect(view.container.querySelectorAll('.bd__usage')).toHaveLength(1);
-    expect(view.c.incomeRows().map((r: { node: { id: string } }) => r.node.id)).toEqual(['b-11']);
+    const rows = view.c.incomeRows();
+    expect(rows.map((r: { node: { id: string } }) => r.node.id)).toEqual(['b-11', 'b-12']);
+    expect(rows[1]).toMatchObject({ percent: null, total: null });
+    expect(view.c.usageLabel(rows[1])).toMatch(/^Ist: 0,00\s€ von 0,00\s€ \(0 % erreicht\)$/);
+    const tree = view.c.treeRows().find((r: { node: { id: string } }) => r.node.id === 'b-12');
+    expect(tree).toMatchObject({ allocated: 0, total: null, percent: null });
+  });
+
+  it('§F/finance/budget/001260: an income node without a line shows the Ansatz 0 and the Abweichung', async () => {
+    const view = await incomeSetup('b-12');
+    const tiles = view.c.figureList().map((f: { label: string; value: number }) => [f.label, f.value]);
+    expect(tiles).toEqual([
+      ['Ansatz', 0],
+      ['Ist', 0],
+      ['Abweichung', 0],
+    ]);
   });
 
 });
@@ -1548,6 +1572,8 @@ describe('utilisation', () => {
     expect(deviationKey(1)).toBe('budget.dash.fig.surplus');
     expect(deviationKey(-1)).toBe('budget.dash.fig.shortfall');
     expect(deviationKey(0)).toBe('budget.dash.fig.deviation');
+    expect(isIncome(node({ id: 'x', incomeIn: ['fy-1'] }), '')).toBe(false);
+    expect(isIncome(node({ id: 'x', incomeIn: ['fy-1'] }), 'fy-1')).toBe(true);
   });
   it('is committed over the total of allocation and income, or null without a total', () => {
     const f = { allocated: 100, requested: 0, bound: 20, expended: 30, income: 0, committed: 50, available: 50, incomeActual: 0, planned: null };
