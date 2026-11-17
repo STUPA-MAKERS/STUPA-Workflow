@@ -237,7 +237,7 @@ class ExpenseOps(BudgetTreeServiceBase):
             late=True,
             on=payload.payment_date or payload.invoice_date,
         )
-        await self._refuse_not_leaf(node)
+        await self._refuse_not_leaf(node, year)
         return node, year, None
 
     async def _require_invoice(self, invoice_id: UUID) -> None:
@@ -314,7 +314,7 @@ class ExpenseOps(BudgetTreeServiceBase):
         )
         if target is not None:
             await self._resolve_fiscal_year(target, expense.fiscal_year_id, kept=True)
-            await self._refuse_not_leaf(target)
+            await self._refuse_not_leaf(target, expense.fiscal_year_id)
         for name, value in _expense_changes(payload, target).items():
             setattr(expense, name, value)
         if "invoice_id" in fields and payload.invoice_id is not None:

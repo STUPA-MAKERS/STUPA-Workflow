@@ -65,8 +65,8 @@ class TransferOps(ExpenseOps):
                 "Both cost centres must share the fiscal year.",
                 errors=[{"field": "fiscalYearId", "msg": "must match for both"}],
             )
-        await self._refuse_not_leaf(src)
-        await self._refuse_not_leaf(dst)
+        await self._refuse_not_leaf(src, fy_src)
+        await self._refuse_not_leaf(dst, fy_src)
         transfer_id = uuid.uuid4()
         out_row = BudgetExpense(
             id=uuid.uuid4(),

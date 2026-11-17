@@ -3458,6 +3458,39 @@ async def test_a_booking_is_not_made_on_a_cost_centre_with_children(
     assert income.budget_id == t.inc.id
 
 
+async def test_a_cost_centre_of_another_year_does_not_make_a_titel_a_node(
+    session: AsyncSession,
+) -> None:
+    """A Kostenstelle that only another year plans leaves the Titel a leaf in this year.
+
+    Rule: §F/finance/budget/001032.
+    """
+    t = await _tree(session)
+    await _in_force(t)
+    later = await t.svc.create_node(
+        BudgetNodeCreate(key="9", name="Gebühren", parentId=t.inc.id)
+    )
+    await session.commit()
+
+    def booking(budget_id: uuid.UUID) -> ExpenseCreate:
+        return ExpenseCreate.model_validate(
+            {
+                "budgetId": str(budget_id),
+                "fiscalYearId": str(t.fy.id),
+                "amount": "5",
+                "description": "x",
+                "kind": "income",
+            }
+        )
+
+    income = await t.svc.book_expense(booking(t.inc.id), actor="tester")
+    assert income.budget_id == t.inc.id
+    await t.svc.book_expense(booking(later.id), actor="tester")
+    with pytest.raises(ValidationProblem) as exc:
+        await t.svc.book_expense(booking(t.inc.id), actor="tester")
+    assert _code(exc) == "cost_centre_not_leaf"
+
+
 async def test_a_transfer_is_not_made_on_a_cost_centre_with_children(
     session: AsyncSession,
 ) -> None:
