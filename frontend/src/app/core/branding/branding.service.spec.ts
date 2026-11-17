@@ -182,9 +182,11 @@ describe('BrandingService', () => {
     expect(svc.appName()).toBe(i18n.translate('app.title'));
   });
 
-  /** The EN and DE titles differ, so a change proves that the computed value ran again. */
+  /** The built-in titles are the same in EN and DE, so an EN override makes them differ:
+   * a change proves that the computed value ran again. */
   it('reacts to a locale switch via the i18n fallback', () => {
     const de = svc.appName();
+    i18n.applyOverrides('en', { 'app.title': 'EN title' });
     i18n.setLocale('en');
     const en = svc.appName();
     expect(en).toBe(i18n.translate('app.title'));

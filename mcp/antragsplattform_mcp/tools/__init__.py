@@ -13,10 +13,12 @@ from . import (
     applications,
     budget,
     budget_plan,
+    committees,
     finance,
     flow_forms,
     meetings,
     session,
+    settings,
     tickets,
     todos,
 )
@@ -26,12 +28,14 @@ _GROUPS = (
     applications,
     flow_forms,
     meetings,
+    committees,
     todos,
     tickets,
     budget,
     budget_plan,
     finance,
     admin,
+    settings,
 )
 
 

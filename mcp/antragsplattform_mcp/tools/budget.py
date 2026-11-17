@@ -13,6 +13,7 @@ from mcp.server.fastmcp import FastMCP
 from .. import schemas as S
 from ..schemas import dump_create, dump_patch
 from ._common import ToolGroup, api, params
+from .meetings import download_to
 
 group = ToolGroup()
 
@@ -248,6 +249,163 @@ async def move_application_fiscal_year(application_id: str, fiscal_year_id: str)
     return await api().post(
         f"/applications/{application_id}/move-fiscal-year",
         json={"fiscalYearId": fiscal_year_id},
+    )
+
+
+@group.tool
+async def book_application_expense(
+    application_id: str,
+    amount: str,
+    description: str,
+    kind: Literal["expense", "income"] = "expense",
+    invoice_date: str | None = None,
+    payment_date: str | None = None,
+    correspondent: str | None = None,
+    note: str | None = None,
+    reference_number: str | None = None,
+    payment_method: Literal["ueberweisung", "bar", "lastschrift", "karte", "paypal"] | None = None,
+    category: str | None = None,
+    invoice_id: str | None = None,
+) -> dict:
+    """Book an expense or an income on an application.
+
+    The booking takes the cost center and the fiscal year of the application. Requires
+    budget.book.
+    """
+    return await api().post(
+        "/expenses",
+        json=params(
+            applicationId=application_id, amount=amount, description=description, kind=kind,
+            invoiceDate=invoice_date, paymentDate=payment_date, correspondent=correspondent,
+            note=note, referenceNumber=reference_number, paymentMethod=payment_method,
+            category=category, invoiceId=invoice_id,
+        ),
+    )
+
+
+@group.tool
+async def create_sub_booking(
+    expense_id: str,
+    amount: str,
+    description: str,
+    invoice_date: str | None = None,
+    payment_date: str | None = None,
+    correspondent: str | None = None,
+    note: str | None = None,
+    reference_number: str | None = None,
+    payment_method: Literal["ueberweisung", "bar", "lastschrift", "karte", "paypal"] | None = None,
+    category: str | None = None,
+) -> dict:
+    """Create a sub-booking of a booking by hand; it takes the cost center, the year and
+    the kind of the parent. Requires budget.book.
+    """
+    return await api().post(
+        f"/budget-expenses/{expense_id}/sub-bookings",
+        json=params(
+            amount=amount, description=description, invoiceDate=invoice_date,
+            paymentDate=payment_date, correspondent=correspondent, note=note,
+            referenceNumber=reference_number, paymentMethod=payment_method, category=category,
+        ),
+    )
+
+
+@group.tool
+async def list_budget_transfers(
+    transfer_id: str | None = None,
+    budget: str | None = None,
+    fiscal_year: str | None = None,
+    q: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> dict:
+    """List the transfers (Umbuchungen) as single rows, page by page.
+
+    Args:
+        transfer_id: One transfer only.
+        budget: A cost center; it matches either side and includes the subtree.
+        fiscal_year: A fiscal year id.
+        q: Search in the description and the note.
+    """
+    return await api().get(
+        "/budget-transfers",
+        params=params(
+            id=transfer_id, budget=budget, fiscalYear=fiscal_year, q=q, limit=limit,
+            offset=offset,
+        ),
+    )
+
+
+@group.tool
+async def update_budget_transfer(
+    transfer_id: str,
+    amount: str | None = None,
+    description: str | None = None,
+    note: str | None = None,
+    invoice_date: str | None = None,
+    payment_date: str | None = None,
+) -> dict:
+    """Change both legs of a transfer at once; the two cost centers stay. Requires budget.book."""
+    return await api().patch(
+        f"/budget-transfers/{transfer_id}",
+        json=params(
+            amount=amount, description=description, note=note, invoiceDate=invoice_date,
+            paymentDate=payment_date,
+        ),
+    )
+
+
+@group.tool
+async def delete_budget_transfer(transfer_id: str) -> dict:
+    """Delete a transfer, that is both of its bookings. Requires budget.book."""
+    await api().delete(f"/budget-transfers/{transfer_id}")
+    return {"deleted": True}
+
+
+@group.tool
+async def fiscal_year_close_check(budget_id: str, fiscal_year_id: str) -> dict:
+    """Say what the close of a fiscal year leaves open: Anträge not in an end state and a
+    Nachtrag of the plan in draft. Call it before `close_fiscal_year`.
+    """
+    return await api().get(f"/budgets/{budget_id}/fiscal-years/{fiscal_year_id}/close-check")
+
+
+@group.tool
+async def export_budget_xlsx(
+    target_path: str,
+    gremium: str | None = None,
+    node: str | None = None,
+    fiscal_year: str | None = None,
+    overwrite: bool = False,
+) -> dict:
+    """Export the budget tree as `.xlsx` to a local file, filtered like the dashboard."""
+    return await download_to(
+        "GET",
+        "/budget/export.xlsx",
+        target_path,
+        overwrite=overwrite,
+        fallback="haushalt.xlsx",
+        query=params(gremium=gremium, node=node, fiscalYear=fiscal_year),
+    )
+
+
+@group.tool
+async def export_expenses_xlsx(
+    target_path: str,
+    budget: str | None = None,
+    fiscal_year: str | None = None,
+    kind: Literal["expense", "income"] | None = None,
+    q: str | None = None,
+    ids: list[str] | None = None,
+    overwrite: bool = False,
+) -> dict:
+    """Export the bookings as `.xlsx` to a local file, with the filters of `list_expenses`."""
+    return await download_to(
+        "GET",
+        "/expenses/export.xlsx",
+        target_path,
+        overwrite=overwrite,
+        fallback="buchungen.xlsx",
+        query=params(budget=budget, fiscalYear=fiscal_year, kind=kind, q=q, ids=ids),
     )
 
 

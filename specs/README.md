@@ -101,6 +101,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/001091](requirements/functional/administration/admin/001091_link-preview-image.md) | The link preview shows the Bildmarke | approved |
 | [F/administration/admin/001092](requirements/functional/administration/admin/001092_app-icons-from-bildmarke.md) | The app icons follow the Bildmarke | approved |
 | [F/administration/admin/001093](requirements/functional/administration/admin/001093_branding-description.md) | The branding holds the description of the platform | approved |
+| [F/administration/admin/001230](requirements/functional/administration/admin/001230_platform-name-from-branding.md) | Every visible name of the platform comes from the branding | approved |
+| [F/administration/admin/001231](requirements/functional/administration/admin/001231_seeded-mail-subject-branding.md) | The seeded subject of the access link mail names the branding | approved |
 | [F/administration/audit/000291](requirements/functional/administration/audit/000291_record-in-tx.md) | An audit entry is written in the same transaction | approved |
 | [F/administration/audit/000292](requirements/functional/administration/audit/000292_chain-check.md) | The audit chain is checked every night | approved |
 | [F/administration/audit/000293](requirements/functional/administration/audit/000293_three-permissions.md) | Read, check and revert are separate permissions | approved |
@@ -428,6 +430,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/mcp/000386](requirements/functional/integrations/mcp/000386_no-ballot-tool.md) | The MCP has no ballot tool | approved |
 | [F/integrations/mcp/000387](requirements/functional/integrations/mcp/000387_idp-roles-read-only.md) | Memberships and roles are read-only in the MCP | replaced |
 | [F/integrations/mcp/000462](requirements/functional/integrations/mcp/000462_forbidden-permissions.md) | No agent token gets a human-only permission | approved |
+| [F/integrations/mcp/001200](requirements/functional/integrations/mcp/001200_mcp-parity.md) | The MCP server has a tool for every app function | approved |
+| [F/integrations/mcp/001201](requirements/functional/integrations/mcp/001201_mcp-exclusions.md) | The MCP leaves out a closed list of functions | approved |
+| [F/integrations/mcp/001232](requirements/functional/integrations/mcp/001232_mcp-name.md) | The MCP server presents itself as workflow | approved |
 | [F/integrations/webhooks/000298](requirements/functional/integrations/webhooks/000298_retry.md) | A failed delivery is retried with backoff | approved |
 | [F/integrations/webhooks/000299](requirements/functional/integrations/webhooks/000299_idempotent-delivery.md) | A delivery runs once per key | approved |
 | [F/integrations/webhooks/000402](requirements/functional/integrations/webhooks/000402_flow-action-only.md) | A webhook fires only through a flow action | approved |
@@ -982,6 +987,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/shared/testing/000476](style/shared/testing/000476_fake-principal.md) | Test doubles of Principal model the admin bypass | approved |
 | [S/shared/testing/000641](style/shared/testing/000641_query-test-on-postgres.md) | A test of a database query runs on Postgres | approved |
 | [S/shared/testing/000642](style/shared/testing/000642_session-fake-ratchet.md) | A CI ratchet lowers the fake sessions in tests | approved |
+| [S/shared/testing/001240](style/shared/testing/001240_changed-parts.md) | CI runs only the jobs of the changed parts | approved |
+| [S/shared/testing/001241](style/shared/testing/001241_green-base.md) | The base of a change is the newest green CI run before it | approved |
+| [S/shared/testing/001242](style/shared/testing/001242_full-runs.md) | Main, a manual run and a change of the CI run every job | approved |
+| [S/shared/testing/001243](style/shared/testing/001243_part-table.md) | A part also runs for a change of a file that it reads | approved |
+| [S/shared/testing/001244](style/shared/testing/001244_gate-job.md) | One gate job sums up the CI run | approved |
 | [S/shared/tooling/000067](style/shared/tooling/000067_nix-dev-shell.md) | Commands run in the Nix dev shell | approved |
 | [S/shared/writing/000034](style/shared/writing/000034_ste-english.md) | Repository texts are written in STE English | approved |
 | [S/shared/writing/000035](style/shared/writing/000035_stupa-in-capitals.md) | STUPA is written in capitals | approved |

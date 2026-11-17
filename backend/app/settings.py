@@ -224,7 +224,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    app_name: str = "Antragsplattform API"
+    app_name: str = "STUPA Workflow API"
     app_version: str = "0.0.2"
     environment: str = "development"
     log_level: str = "INFO"
@@ -314,7 +314,7 @@ class Settings(BaseSettings):
     smtp_ssl: bool = False
     smtp_timeout_seconds: int = 30
     mail_from: str = "noreply@antragsplattform.local"
-    mail_from_name: str = "Antragsplattform"
+    mail_from_name: str = "STUPA Workflow"
     mail_default_lang: str = "de"
     mail_max_tries: int = 5
     mail_retry_backoff_seconds: int = 30

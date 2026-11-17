@@ -1,1 +1,1 @@
-"""Antragsplattform API: the FastAPI app, its modules and shared utilities."""
+"""STUPA Workflow API: the FastAPI app, its modules and shared utilities."""

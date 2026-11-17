@@ -7,7 +7,7 @@ the audit log.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from mcp.server.fastmcp import FastMCP
 
@@ -379,6 +379,74 @@ async def update_application_type(type_id: str, patch: S.ApplicationTypeUpdate) 
     return await api().patch(
         f"/admin/application-types/{type_id}", json=dump_patch(patch)
     )
+
+
+@group.tool
+async def delete_application_type(type_id: str) -> dict:
+    """Delete an application type. Requires admin.types_delete.
+
+    409 while applications of this type exist. Ask the user before you call this.
+    """
+    await api().delete(f"/admin/application-types/{type_id}")
+    return {"deleted": True}
+
+
+@group.tool
+async def move_application_type(type_id: str, by: Literal[-1, 1]) -> list:
+    """Move an application type one place up (-1) or down (1) inside its group."""
+    return await api().post(f"/admin/application-types/{type_id}/move", json={"by": by})
+
+
+@group.tool
+async def list_application_type_groups() -> list:
+    """List the groups of Antragsarten in their order (admin view)."""
+    return await api().get("/admin/application-type-groups")
+
+
+@group.tool
+async def create_application_type_group(group_in: S.ApplicationTypeGroupCreate) -> dict:
+    """Create a group of Antragsarten at the end of the order. Requires admin.types.
+
+    Put a type into the group with `update_application_type` and `groupId`.
+    """
+    return await api().post("/admin/application-type-groups", json=dump_create(group_in))
+
+
+@group.tool
+async def update_application_type_group(
+    group_id: str, patch: S.ApplicationTypeGroupUpdate
+) -> dict:
+    """Change the name or the text of a group of Antragsarten. Requires admin.types."""
+    return await api().patch(
+        f"/admin/application-type-groups/{group_id}", json=dump_patch(patch)
+    )
+
+
+@group.tool
+async def delete_application_type_group(group_id: str) -> dict:
+    """Delete a group of Antragsarten; its types stay without a group. Requires admin.types."""
+    await api().delete(f"/admin/application-type-groups/{group_id}")
+    return {"deleted": True}
+
+
+@group.tool
+async def move_application_type_group(group_id: str, by: Literal[-1, 1]) -> list:
+    """Move a group of Antragsarten one place up (-1) or down (1)."""
+    return await api().post(
+        f"/admin/application-type-groups/{group_id}/move", json={"by": by}
+    )
+
+
+@group.tool
+async def list_submittable_application_types(lang: str | None = None) -> dict:
+    """List the application types as the apply wizard shows them, with their group."""
+    return await api().get("/application-types", params=params(lang=lang, limit=100))
+
+
+@group.tool
+async def list_apply_type_groups(lang: str | None = None) -> list:
+    """List the groups of Antragsarten of step 1 of the apply wizard, with their types."""
+    return await api().get("/application-type-groups", params=params(lang=lang))
 
 
 @group.tool

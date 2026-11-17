@@ -181,7 +181,7 @@ export class AccountGrantsComponent {
     this.api.downloadMcpPackage().subscribe({
       next: (blob) => {
         this.downloading.set(false);
-        downloadBlob(blob, 'antragsplattform-mcp.tar.gz');
+        downloadBlob(blob, 'workflow-mcp.tar.gz');
       },
       error: () => {
         this.downloading.set(false);
