@@ -12,6 +12,7 @@ import {
   EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
+  ScrollFadeDirective,
   SearchPillComponent,
   SkeletonComponent,
 } from '@stupa-makers/ui-kit';
@@ -52,6 +53,7 @@ interface PageRequest {
     FilterSelectComponent,
     LoadMoreComponent,
     LoadErrorComponent,
+    ScrollFadeDirective,
     SearchPillComponent,
     SkeletonComponent,
     TranslatePipe,
