@@ -2,9 +2,9 @@
 id: "001232"
 title: The MCP server presents itself as workflow
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-16
+updated: 2026-11-17
 tests:
   - "backend/tests/unit/modules/auth/test_oauth_cov.py:test_mcp_config_success"
   - "backend/tests/unit/modules/auth/test_oauth_cov.py:test_mcp_package_streams_tarball"

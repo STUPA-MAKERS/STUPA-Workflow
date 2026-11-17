@@ -2,9 +2,9 @@
 id: "001230"
 title: Every visible name of the platform comes from the branding
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-16
+updated: 2026-11-17
 tests:
   - "backend/tests/unit/test_platform_name.py:test_no_visible_text_names_the_old_product_name"
   - "backend/tests/unit/modules/admin/test_page_head.py:test_an_empty_branding_gives_the_built_in_names_and_description"

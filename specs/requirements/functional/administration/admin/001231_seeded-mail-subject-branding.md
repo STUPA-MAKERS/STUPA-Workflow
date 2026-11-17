@@ -2,9 +2,9 @@
 id: "001231"
 title: The seeded subject of the access link mail names the branding
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-16
+updated: 2026-11-17
 tests:
   - "backend/tests/integration/test_migrations.py:test_the_seeded_magic_link_subject_names_the_platform_by_the_branding"
 implementation:
