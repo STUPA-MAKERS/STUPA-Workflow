@@ -23,6 +23,11 @@ export interface BudgetAllocationView {
   /** Requested amount of in-flight applications that are neither accepted nor denied. */
   readonly requested: string;
   readonly available: string;
+  /** Ist of the income side: income minus Rückzahlungen below an income Titel of the plan
+   *  in force (001261). It never counts in `available` (001262). */
+  readonly incomeActual?: string;
+  /** Ansatz of the line in the plan version in force, `null` without a line (001260). */
+  readonly planned?: string | null;
 }
 
 /** Booking kind of an actual movement. */

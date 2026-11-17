@@ -38,6 +38,23 @@ describe('BudgetPlanUtil', () => {
     expect(planRows({ ...source, version: decided })[0]).toMatchObject({ name: 'Alt', pathKey: 'OLD-1', note: 'n' });
   });
 
+  it('§F/finance/budget/001262: the Ist of the year before of an income line adds incomeActual', () => {
+    const fees = TOP.children.find((n) => n.id === 'fees')!;
+    const withActual = {
+      ...fees,
+      byFiscalYear: fees.byFiscalYear.map((f) => ({ ...f, incomeActual: '10' })),
+    };
+    const top = { ...TOP, children: TOP.children.map((n) => (n.id === 'fees' ? withActual : n)) };
+    const rows = planRows({
+      top,
+      version: version({ lines: [line('fees', '100')] }),
+      base: null,
+      prev: version({ lines: [line('fees', '95')] }),
+      prevFiscalYearId: 'fy-25',
+    });
+    expect(rows[0]).toMatchObject({ id: 'fees', actual: 100 });
+  });
+
   it('adds the version in force, the year before and the marks', () => {
     const rows = planRows({
       top: TOP,

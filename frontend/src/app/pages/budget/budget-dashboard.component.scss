@@ -339,6 +339,13 @@
 .bd__cols--single {
   grid-template-columns: minmax(0, 1fr);
 }
+/* "Auslastung" and "Einnahmen" share the second column (001264). */
+.bd__usageStack {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  min-width: 0;
+}
 .bd__sec {
   --section-gap: var(--space-4);
 }
@@ -464,6 +471,9 @@
   }
   .bd__cols {
     grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-5);
+  }
+  .bd__usageStack {
     gap: var(--space-5);
   }
   .bd__sec {
