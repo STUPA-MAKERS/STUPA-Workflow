@@ -3425,7 +3425,8 @@ async def test_the_tree_gives_an_income_titel_its_ansatz_and_ist(session: AsyncS
     await session.commit()
     tree = await t.svc.get_tree()
     top = next(n for n in tree if n.id == t.top.id)
-    nodes = {n.id: n for n in (top, *top.children)}
+    exp = next(n for n in top.children if n.id == t.exp.id)
+    nodes = {n.id: n for n in (top, *top.children, *exp.children)}
 
     def view(node_id: uuid.UUID) -> AllocationView:
         return next(v for v in nodes[node_id].by_fiscal_year if v.fiscal_year_id == t.fy.id)
