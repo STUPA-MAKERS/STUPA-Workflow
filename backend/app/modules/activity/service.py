@@ -367,7 +367,7 @@ class ActivityService:
         """Store the time up to which the reader has seen the page (spec 001275).
 
         The mark never moves back and never past now, so a late or a forged request
-        cannot hide events that have not happened yet.
+        cannot hide events that have not happened yet. The caller commits (000474).
         """
         me = await self._me(principal)
         if me.id is None:
@@ -379,7 +379,6 @@ class ActivityService:
                 set_={"seen_at": func.greatest(ActivityVisit.seen_at, insert_row.excluded.seen_at)},
             )
         )
-        await self.session.commit()
 
     # ------------------------------------------------------------------ the merge
 

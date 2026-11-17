@@ -69,3 +69,4 @@ async def activity_status(session: DbSession, principal: Reader) -> ActivityStat
 async def mark_activity_seen(session: DbSession, principal: Reader, body: ActivitySeen) -> None:
     """Store the ``readAt`` of a step as the last visit (spec 001275)."""
     await ActivityService(session).mark_seen(principal, body.at)
+    await session.commit()
