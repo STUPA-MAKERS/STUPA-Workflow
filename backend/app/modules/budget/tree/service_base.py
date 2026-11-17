@@ -428,11 +428,10 @@ class BudgetTreeServiceBase:
         the plan holds, or that has a booking or an Antrag in the year, counts. The
         plan of another year can hang Kostenstellen below a Titel that is a leaf in
         this year. Without a year, or in a year without a plan in force, each active
-        Kostenstelle below the node counts.
+        Kostenstelle below the node counts: no plan in force matches the year, so the
+        first condition of the query holds for each of them.
         """
         below = select(Budget.id).where(Budget.parent_id == node.id, Budget.active.is_(True))
-        if fiscal_year_id is None:
-            return await self.session.scalar(below.limit(1)) is None
         in_force = (
             select(BudgetPlanVersion.id)
             .join(BudgetPlan, BudgetPlan.id == BudgetPlanVersion.plan_id)
