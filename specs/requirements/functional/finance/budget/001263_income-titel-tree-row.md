@@ -2,7 +2,7 @@
 id: "001263"
 title: The tree row of an income Titel shows its Ansatz and the reached part
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-17
 tests:

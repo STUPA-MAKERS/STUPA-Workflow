@@ -2,7 +2,7 @@
 id: "001260"
 title: An income Titel shows Ansatz, Ist and the deviation
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-17
 tests:

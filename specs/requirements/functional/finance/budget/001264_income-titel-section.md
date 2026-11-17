@@ -2,7 +2,7 @@
 id: "001264"
 title: Income nodes are listed under "Einnahmen"
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-17
 tests:

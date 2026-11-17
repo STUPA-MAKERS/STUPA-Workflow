@@ -2,7 +2,7 @@
 id: "001261"
 title: An expense booking on an income Titel is a Rückzahlung
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-17
 tests:

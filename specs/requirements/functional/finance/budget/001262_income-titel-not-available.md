@@ -2,7 +2,7 @@
 id: "001262"
 title: The Ist of an income Titel does not raise the Verfügbar of the Haushalt
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-17
 tests:
