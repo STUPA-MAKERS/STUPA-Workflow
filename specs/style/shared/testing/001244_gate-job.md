@@ -2,9 +2,9 @@
 id: "001244"
 title: One gate job sums up the CI run
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-16
+updated: 2026-11-17
 implementation:
   - .github/workflows/ci.yml
 scope:

@@ -2,9 +2,9 @@
 id: "000628"
 title: The branches development and main require the CI checks
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-16
+updated: 2026-11-17
 implementation: null
 scope:
   - .github/workflows/ci.yml

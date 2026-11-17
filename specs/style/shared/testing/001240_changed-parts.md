@@ -2,9 +2,9 @@
 id: "001240"
 title: CI runs only the jobs of the changed parts
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-16
+updated: 2026-11-17
 tests:
   - "backend/tests/unit/scripts/test_ci_scope.py:test_spec_change_runs_no_part"
   - "backend/tests/unit/scripts/test_ci_scope.py:test_frontend_change_runs_frontend_and_stack"

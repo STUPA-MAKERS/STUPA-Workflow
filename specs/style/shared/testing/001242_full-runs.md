@@ -2,9 +2,9 @@
 id: "001242"
 title: Main, a manual run and a change of the CI run every job
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-16
+updated: 2026-11-17
 tests:
   - "backend/tests/unit/scripts/test_ci_scope.py:test_main_and_dispatch_run_every_part"
   - "backend/tests/unit/scripts/test_ci_scope.py:test_global_file_runs_every_part"

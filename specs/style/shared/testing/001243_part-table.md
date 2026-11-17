@@ -2,9 +2,9 @@
 id: "001243"
 title: A part also runs for a change of a file that it reads
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-16
+updated: 2026-11-17
 tests:
   - "backend/tests/unit/scripts/test_ci_scope.py:test_backend_change_runs_mcp_too"
   - "backend/tests/unit/scripts/test_ci_scope.py:test_backend_test_change_does_not_run_mcp"

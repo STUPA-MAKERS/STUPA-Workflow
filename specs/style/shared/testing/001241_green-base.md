@@ -2,9 +2,9 @@
 id: "001241"
 title: The base of a change is the newest green CI run before it
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-16
+updated: 2026-11-17
 tests:
   - "backend/tests/unit/scripts/test_ci_scope.py:test_base_is_the_green_run_with_the_smallest_diff"
   - "backend/tests/unit/scripts/test_ci_scope.py:test_no_ancestor_runs_every_part"
