@@ -926,7 +926,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/backend/python/000651](style/backend/python/000651_no-import-exception.md) | The import contract has no exception | approved |
 | [S/backend/python/000652](style/backend/python/000652_meeting-core-module.md) | The meeting core is in the module meetings | approved |
 | [S/frontend/angular/000073](style/frontend/angular/000073_i18n-parity.md) | Every UI text is in both catalogs | approved |
-| [S/frontend/angular/000074](style/frontend/angular/000074_production-build.md) | Run the production build after style changes | approved |
+| [S/frontend/angular/000074](style/frontend/angular/000074_production-build.md) | Run the production build after style changes | draft |
 | [S/frontend/angular/000075](style/frontend/angular/000075_narrow-with-as.md) | A template narrows a signal with as | approved |
 | [S/frontend/angular/000076](style/frontend/angular/000076_tailwind-borders.md) | A Tailwind border has a style | approved |
 | [S/frontend/angular/000077](style/frontend/angular/000077_load-bar.md) | Only foreground reads show the load bar | replaced |
