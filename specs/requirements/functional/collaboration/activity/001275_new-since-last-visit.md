@@ -2,10 +2,12 @@
 id: "001275"
 title: New events since the last visit are marked
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-17
-implementation: null
+implementation:
+  - backend/app/modules/activity
+  - frontend/src/app/pages/activity
 scope:
   - backend/app/modules/activity
   - frontend/src/app/pages/activity

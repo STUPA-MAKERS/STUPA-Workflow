@@ -2,10 +2,12 @@
 id: "001272"
 title: The activity page reuses the read gate of each module
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-17
-implementation: null
+implementation:
+  - backend/app/modules/activity
+  - frontend/src/app/pages/activity
 scope:
   - backend/app/modules/activity
   - frontend/src/app/pages/activity

@@ -79,7 +79,7 @@ from app.modules.site_config.features import Feature, active_features
 from app.modules.tickets.access import TICKET_MANAGE
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote
 from app.modules.tickets.service import format_number
-from app.modules.todos.access import BoardAccess, token_reads
+from app.modules.todos.access import BoardAccess, member_gremium_ids, token_reads
 from app.modules.todos.links import card_url
 from app.modules.todos.models import TodoAssignee, TodoBoard, TodoCard, TodoComment, TodoEvent
 from app.shared.errors import ForbiddenError, NotFoundError, ValidationProblem
@@ -176,15 +176,17 @@ def _bad_cursor() -> ValidationProblem:
 
 @dataclass(frozen=True, slots=True)
 class Me:
-    """The reader: the principal, its row id, its e-mail and the language of the texts.
+    """The reader: the principal, its row id, its e-mail, the language and its Gremien.
 
     ``lang`` is the language of the texts that the server resolves (a state label).
+    ``gremien`` holds the Gremien where the reader is an active member (spec 001271).
     """
 
     principal: Principal
     id: uuid.UUID | None
     email: str | None
     lang: str = "de"
+    gremien: frozenset[uuid.UUID] = frozenset()
 
     @property
     def sub(self) -> str:
@@ -494,7 +496,7 @@ class ActivityService:
     # ------------------------------------------------------------------ the reader
 
     async def _me(self, principal: Principal, lang: str = "de") -> Me:
-        """Load the row id and the e-mail of the reader."""
+        """Load the row id, the e-mail and the Gremien of the reader."""
         row = (
             await self.session.execute(
                 select(PrincipalRow.id, PrincipalRow.email).where(PrincipalRow.sub == principal.sub)
@@ -502,7 +504,8 @@ class ActivityService:
         ).first()
         if row is None:
             return Me(principal, None, principal.email, lang)
-        return Me(principal, row.id, row.email or principal.email, lang)
+        gremien = await member_gremium_ids(self.session, principal)
+        return Me(principal, row.id, row.email or principal.email, lang, gremien)
 
     async def _seen_at(self, me: Me) -> datetime | None:
         """The last visit of the reader, or ``None``."""
@@ -888,7 +891,11 @@ class ActivityService:
     # ------------------------------------------------------------------ meetings
 
     def _my_meetings(self, me: Me) -> Select[str]:
-        """The meetings of the reader as text ids (spec 001271): created, minutes, attended."""
+        """The meetings of the reader as text ids (spec 001271).
+
+        A meeting of a Gremium of the reader, or one the reader created, keeps the minutes
+        of or attended.
+        """
         held = (
             (
                 Meeting.protokollant_id == me.id,
@@ -901,7 +908,10 @@ class ActivityService:
             if me.id is not None
             else ()
         )
-        return select(sql_cast(Meeting.id, Text)).where(or_(Meeting.created_by == me.sub, *held))
+        of_gremien = (Meeting.gremium_id.in_(me.gremien),) if me.gremien else ()
+        return select(sql_cast(Meeting.id, Text)).where(
+            or_(Meeting.created_by == me.sub, *held, *of_gremien)
+        )
 
     async def _meeting_updates(
         self, me: Me, cursor: Cursor | None, limit: int, own: bool

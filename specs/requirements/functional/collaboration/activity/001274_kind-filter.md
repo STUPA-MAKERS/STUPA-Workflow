@@ -2,10 +2,12 @@
 id: "001274"
 title: The activity page filters by the kind of item
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-17
-implementation: null
+implementation:
+  - backend/app/modules/activity
+  - frontend/src/app/pages/activity
 scope:
   - backend/app/modules/activity
   - frontend/src/app/pages/activity

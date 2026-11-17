@@ -212,14 +212,14 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/forms/000288](requirements/functional/applications/forms/000288_finite-numbers.md) | Numbers are finite decimals | approved |
 | [F/applications/forms/000289](requirements/functional/applications/forms/000289_form-revision.md) | A form change is versioned and audited | approved |
 | [F/applications/forms/000471](requirements/functional/applications/forms/000471_type-retention.md) | Antrag types can keep their own retention | approved |
-| [F/collaboration/activity/001270](requirements/functional/collaboration/activity/001270_activity-page.md) | The activity page lists the events of the items of a person | draft |
-| [F/collaboration/activity/001271](requirements/functional/collaboration/activity/001271_items-of-a-person.md) | An item belongs to a person when they made, hold or touched it | draft |
-| [F/collaboration/activity/001272](requirements/functional/collaboration/activity/001272_reuse-gates.md) | The activity page reuses the read gate of each module | draft |
-| [F/collaboration/activity/001273](requirements/functional/collaboration/activity/001273_hide-own-actions.md) | The activity page hides the own actions by default | draft |
-| [F/collaboration/activity/001274](requirements/functional/collaboration/activity/001274_kind-filter.md) | The activity page filters by the kind of item | draft |
-| [F/collaboration/activity/001275](requirements/functional/collaboration/activity/001275_new-since-last-visit.md) | New events since the last visit are marked | draft |
-| [F/collaboration/activity/001276](requirements/functional/collaboration/activity/001276_paging.md) | The activity page loads 50 events per step without a time limit | draft |
-| [F/collaboration/activity/001277](requirements/functional/collaboration/activity/001277_activity-row.md) | An activity row names the item, the actor, the change and the time | draft |
+| [F/collaboration/activity/001270](requirements/functional/collaboration/activity/001270_activity-page.md) | The activity page lists the events of the items of a person | approved |
+| [F/collaboration/activity/001271](requirements/functional/collaboration/activity/001271_items-of-a-person.md) | An item belongs to a person when they made, hold or touched it | approved |
+| [F/collaboration/activity/001272](requirements/functional/collaboration/activity/001272_reuse-gates.md) | The activity page reuses the read gate of each module | approved |
+| [F/collaboration/activity/001273](requirements/functional/collaboration/activity/001273_hide-own-actions.md) | The activity page hides the own actions by default | approved |
+| [F/collaboration/activity/001274](requirements/functional/collaboration/activity/001274_kind-filter.md) | The activity page filters by the kind of item | approved |
+| [F/collaboration/activity/001275](requirements/functional/collaboration/activity/001275_new-since-last-visit.md) | New events since the last visit are marked | approved |
+| [F/collaboration/activity/001276](requirements/functional/collaboration/activity/001276_paging.md) | The activity page loads 50 events per step without a time limit | approved |
+| [F/collaboration/activity/001277](requirements/functional/collaboration/activity/001277_activity-row.md) | An activity row names the item, the actor, the change and the time | approved |
 | [F/collaboration/committees/001010](requirements/functional/collaboration/committees/001010_info-tab.md) | A Gremium has an Info tab | approved |
 | [F/collaboration/committees/001011](requirements/functional/collaboration/committees/001011_info-edit-permission.md) | Only info.write edits the Info of a Gremium | approved |
 | [F/collaboration/committees/001012](requirements/functional/collaboration/committees/001012_info-links.md) | An Info link has a label and a web address | approved |
@@ -926,7 +926,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/backend/python/000651](style/backend/python/000651_no-import-exception.md) | The import contract has no exception | approved |
 | [S/backend/python/000652](style/backend/python/000652_meeting-core-module.md) | The meeting core is in the module meetings | approved |
 | [S/frontend/angular/000073](style/frontend/angular/000073_i18n-parity.md) | Every UI text is in both catalogs | approved |
-| [S/frontend/angular/000074](style/frontend/angular/000074_production-build.md) | Run the production build after style changes | draft |
+| [S/frontend/angular/000074](style/frontend/angular/000074_production-build.md) | Run the production build after style changes | approved |
 | [S/frontend/angular/000075](style/frontend/angular/000075_narrow-with-as.md) | A template narrows a signal with as | approved |
 | [S/frontend/angular/000076](style/frontend/angular/000076_tailwind-borders.md) | A Tailwind border has a style | approved |
 | [S/frontend/angular/000077](style/frontend/angular/000077_load-bar.md) | Only foreground reads show the load bar | replaced |

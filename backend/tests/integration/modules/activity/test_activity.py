@@ -253,15 +253,17 @@ async def test_the_applicant_view_hides_internal_rows_and_names(
 
 
 async def test_a_meeting_shows_its_audit_entries(maker: async_sessionmaker[AsyncSession]) -> None:
-    """Spec 001270/001271: a meeting on the attendance list shows status and protocol."""
+    """Spec 001270/001271: the meetings of my Gremien show up, not those of another."""
     alice, alice_id = await add_person(maker, "Alice")
     async with maker() as session:
         gremium = Gremium(name="StuPa", slug=f"todo-{uuid.uuid4().hex[:8]}")
-        session.add(gremium)
+        foreign = Gremium(name="AStA", slug=f"todo-{uuid.uuid4().hex[:8]}")
+        session.add_all([gremium, foreign])
         await session.flush()
         meeting = Meeting(gremium_id=gremium.id, title="Sitzung 1")
-        other = Meeting(gremium_id=gremium.id, title="Sitzung 2")
-        session.add_all([meeting, other])
+        other = Meeting(gremium_id=foreign.id, title="Sitzung 2")
+        mine = Meeting(gremium_id=gremium.id, title="Sitzung 3")
+        session.add_all([meeting, other, mine])
         await session.flush()
         session.add(
             MeetingAttendance(
@@ -300,18 +302,26 @@ async def test_a_meeting_shows_its_audit_entries(maker: async_sessionmaker[Async
             target_id=str(other.id),
             data={"changes": {"status": {"from": "planned", "to": "live"}}},
         )
+        await audit_record(
+            session,
+            actor="lead",
+            action=AuditAction.MEETING_UPDATE,
+            target_type="meeting",
+            target_id=str(mine.id),
+            data={"changes": {"status": {"from": "planned", "to": "closed"}}},
+        )
         await session.commit()
         gremium_id = gremium.id
     await add_member(maker, gremium_id, alice_id)
 
     async with maker() as session:
         page = await ActivityService(session).page(alice, kinds=["meeting"])
-        assert [(e.change, e.status) for e in page.entries] == [
-            ("protocol.finalized", None),
-            ("meeting.updated", None),
-            ("meeting.status", "live"),
+        assert [(e.item_title, e.change, e.status) for e in page.entries] == [
+            ("Sitzung 3", "meeting.status", "closed"),
+            ("Sitzung 1", "protocol.finalized", None),
+            ("Sitzung 1", "meeting.updated", None),
+            ("Sitzung 1", "meeting.status", "live"),
         ]
-        assert {e.item_title for e in page.entries} == {"Sitzung 1"}
 
 
 async def test_the_cursor_pages_and_the_mark_counts(
