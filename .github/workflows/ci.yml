@@ -40,19 +40,34 @@ env:
   PIP_PREFER_BINARY: "1"
 
 jobs:
+  # The parts of the repository that this change needs (specs 001240-001244). The job
+  # compares HEAD with the newest green CI run whose commit is an ancestor of HEAD and
+  # sets one flag per part. A job of a part that did not change is skipped, and a
+  # skipped job counts as green. Without a green base every part runs.
   detect:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Reads the earlier runs of this workflow.
+      actions: read
     outputs:
-      frontend: ${{ steps.check.outputs.frontend }}
+      backend: ${{ steps.scope.outputs.backend }}
+      frontend: ${{ steps.scope.outputs.frontend }}
+      stack: ${{ steps.scope.outputs.stack }}
+      mcp: ${{ steps.scope.outputs.mcp }}
+      typst: ${{ steps.scope.outputs.typst }}
+      admin_cli: ${{ steps.scope.outputs.admin_cli }}
+      compose: ${{ steps.scope.outputs.compose }}
+      functional: ${{ steps.scope.outputs.functional }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - id: check
-        run: |
-          if [ -f frontend/package.json ]; then
-            echo "frontend=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "frontend=false" >> "$GITHUB_OUTPUT"
-          fi
+        with:
+          # The base is an older commit, so the job needs the history.
+          fetch-depth: 0
+      - id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci_scope.py
 
   specs:
     runs-on: ubuntu-latest
@@ -80,6 +95,8 @@ jobs:
   # frontend part with the ESLint report.
   functional:
     runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.functional == 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
@@ -94,6 +111,8 @@ jobs:
 
   be-lint:
     runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.backend == 'true'
     defaults:
       run:
         working-directory: backend
@@ -116,6 +135,8 @@ jobs:
 
   be-typecheck:
     runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.backend == 'true'
     defaults:
       run:
         working-directory: backend
@@ -132,6 +153,8 @@ jobs:
 
   be-unit:
     runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.backend == 'true'
     defaults:
       run:
         working-directory: backend
@@ -161,6 +184,8 @@ jobs:
   # The integration suite starts Postgres and Redis through testcontainers.
   be-integration:
     runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.backend == 'true'
     defaults:
       run:
         working-directory: backend
@@ -192,6 +217,8 @@ jobs:
   # dependencies can differ from the dependencies of this commit.
   be-migrations:
     runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.backend == 'true'
     services:
       postgres:
         image: postgres:16-alpine@sha256:81e77a4833487b8132fe4b00bedd39dc3f74b8641e387f19312a48f7de218c2e
@@ -241,6 +268,8 @@ jobs:
 
   be-contract:
     runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.backend == 'true'
     defaults:
       run:
         working-directory: backend
@@ -354,7 +383,9 @@ jobs:
     #   - per PR:    set the label `run-e2e`
     #   - permanent: repo variable RUN_E2E=true
     if: >-
-      needs.detect.outputs.frontend == 'true'
+      !cancelled()
+      && needs.detect.outputs.stack == 'true'
+      && !contains(needs.*.result, 'failure')
       && (
         github.event_name == 'workflow_dispatch'
         || contains(github.event.pull_request.labels.*.name, 'run-e2e')
@@ -402,7 +433,11 @@ jobs:
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     needs: [detect, fe-unit]
-    if: needs.detect.outputs.frontend == 'true'
+    # A backend change runs axe without fe-unit, so a skipped fe-unit does not stop it.
+    if: >-
+      !cancelled()
+      && needs.detect.outputs.stack == 'true'
+      && contains(fromJSON('["success", "skipped"]'), needs.fe-unit.result)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -510,6 +545,8 @@ jobs:
 
   typst:
     runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.typst == 'true'
     defaults:
       run:
         working-directory: typst
@@ -555,6 +592,8 @@ jobs:
   # result blocks a pull request only when the branch protection lists the job.
   mcp:
     runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.mcp == 'true'
     defaults:
       run:
         working-directory: mcp
@@ -577,6 +616,8 @@ jobs:
   # check as the other Python packages, so the CLI keeps one configuration with them.
   admin-cli:
     runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.admin_cli == 'true'
     defaults:
       run:
         working-directory: admin-cli
@@ -595,6 +636,8 @@ jobs:
 
   compose:
     runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.compose == 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Validate docker-compose
@@ -669,3 +712,44 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Real-Stack-Smoke (compose up -> HTTP/WS-Kernflüsse)
         run: scripts/smoke-real-stack.sh
+
+  # One check that sums up the run (spec 001244). It needs every job, runs always and
+  # fails when a job failed or was cancelled. A skipped job counts as green. The branch
+  # protection must require this check (spec 000628): when `detect` fails, every other
+  # job is skipped, and only this job turns red.
+  ci-ok:
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - detect
+      - specs
+      - functional
+      - be-lint
+      - be-typecheck
+      - be-unit
+      - be-integration
+      - be-migrations
+      - be-contract
+      - fe-unit
+      - e2e
+      - axe
+      - coverage-gate
+      - image-build-smoke
+      - typst
+      - mcp
+      - admin-cli
+      - compose
+      - restore-smoke
+      - real-stack-smoke
+    steps:
+      - name: Every job is green or skipped
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          test "$(echo "$NEEDS" | jq -r '.detect.result')" = success
+          bad="$(echo "$NEEDS" | jq -r '[to_entries[] | select(.value.result != "success" and .value.result != "skipped") | .key] | join(", ")')"
+          if [ -n "$bad" ]; then
+            echo "Not green: $bad"
+            exit 1
+          fi
