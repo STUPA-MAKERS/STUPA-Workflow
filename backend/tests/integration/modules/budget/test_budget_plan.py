@@ -53,6 +53,7 @@ from app.modules.budget.tree_schemas import (
     BudgetNodeUpdate,
     BudgetTreeNodeOut,
     ExpenseCreate,
+    ExpenseKind,
     ExpenseUpdate,
     FiscalYearCreate,
     FiscalYearOut,
@@ -3413,7 +3414,7 @@ async def test_the_tree_gives_an_income_titel_its_ansatz_and_ist(session: AsyncS
     t = await _tree(session)
     await _in_force(t)
 
-    def book(budget_id: uuid.UUID, amount: int, kind: str) -> ExpenseCreate:
+    def book(budget_id: uuid.UUID, amount: int, kind: ExpenseKind) -> ExpenseCreate:
         return ExpenseCreate(
             budgetId=budget_id, fiscalYearId=t.fy.id, amount=D(amount), description="x", kind=kind
         )

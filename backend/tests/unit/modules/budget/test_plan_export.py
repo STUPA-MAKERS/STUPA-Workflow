@@ -24,6 +24,7 @@ class _Figures:
     fiscal_year_id: uuid.UUID
     expended: Decimal = D(0)
     income: Decimal = D(0)
+    income_actual: Decimal = D(0)
 
 
 @dataclass(frozen=True, slots=True)
