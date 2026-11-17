@@ -101,6 +101,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/001091](requirements/functional/administration/admin/001091_link-preview-image.md) | The link preview shows the Bildmarke | approved |
 | [F/administration/admin/001092](requirements/functional/administration/admin/001092_app-icons-from-bildmarke.md) | The app icons follow the Bildmarke | approved |
 | [F/administration/admin/001093](requirements/functional/administration/admin/001093_branding-description.md) | The branding holds the description of the platform | approved |
+| [F/administration/admin/001230](requirements/functional/administration/admin/001230_platform-name-from-branding.md) | Every visible name of the platform comes from the branding | approved |
+| [F/administration/admin/001231](requirements/functional/administration/admin/001231_seeded-mail-subject-branding.md) | The seeded subject of the access link mail names the branding | approved |
 | [F/administration/audit/000291](requirements/functional/administration/audit/000291_record-in-tx.md) | An audit entry is written in the same transaction | approved |
 | [F/administration/audit/000292](requirements/functional/administration/audit/000292_chain-check.md) | The audit chain is checked every night | approved |
 | [F/administration/audit/000293](requirements/functional/administration/audit/000293_three-permissions.md) | Read, check and revert are separate permissions | approved |
@@ -430,6 +432,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/mcp/000462](requirements/functional/integrations/mcp/000462_forbidden-permissions.md) | No agent token gets a human-only permission | approved |
 | [F/integrations/mcp/001200](requirements/functional/integrations/mcp/001200_mcp-parity.md) | The MCP server has a tool for every app function | approved |
 | [F/integrations/mcp/001201](requirements/functional/integrations/mcp/001201_mcp-exclusions.md) | The MCP leaves out a closed list of functions | approved |
+| [F/integrations/mcp/001232](requirements/functional/integrations/mcp/001232_mcp-name.md) | The MCP server presents itself as workflow | approved |
 | [F/integrations/webhooks/000298](requirements/functional/integrations/webhooks/000298_retry.md) | A failed delivery is retried with backoff | approved |
 | [F/integrations/webhooks/000299](requirements/functional/integrations/webhooks/000299_idempotent-delivery.md) | A delivery runs once per key | approved |
 | [F/integrations/webhooks/000402](requirements/functional/integrations/webhooks/000402_flow-action-only.md) | A webhook fires only through a flow action | approved |

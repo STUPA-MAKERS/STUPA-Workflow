@@ -16,7 +16,7 @@ from app.modules.site_config.reads import active_branding
 
 #: Fallback app names for the case where the branding leaves them empty. They match the
 #: built-in tags of ``frontend/src/index.html`` and ``frontend/public/manifest.webmanifest``.
-DEFAULT_APP_NAME = "STUPA Antragsplattform"
+DEFAULT_APP_NAME = "STUPA Workflow"
 DEFAULT_APP_SHORT_NAME = "STUPA"
 
 _NOT_SLUG = re.compile(r"[^a-z0-9]+")

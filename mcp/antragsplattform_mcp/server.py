@@ -19,7 +19,7 @@ from .tools import register_all
 from .tools._common import cfg
 
 _INSTRUCTIONS = """\
-antragsplattform — act on a student-government application/budget/meeting platform via its API.
+STUPA Workflow — act on a student-government application/budget/meeting platform via its API.
 
 AUTH: the first tool call opens a browser login (OAuth2 + PKCE) and caches a token; it
 refreshes automatically. If a call returns an auth error, call `login` to re-authenticate.
@@ -142,7 +142,7 @@ Money amounts are decimal strings ("1500.00"). Ids are UUID strings. Prefer read
 (get/list) before writing, and echo back what you changed.
 """
 
-mcp = FastMCP("antragsplattform", instructions=_INSTRUCTIONS)
+mcp = FastMCP("workflow", instructions=_INSTRUCTIONS)
 register_all(mcp)
 
 

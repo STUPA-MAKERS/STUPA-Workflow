@@ -64,7 +64,7 @@ function initialGrants(): readonly OAuthGrant[] {
 let grants: readonly OAuthGrant[] = initialGrants();
 
 const SETUP: McpSetup = {
-  mcpServers: { antragsplattform: { command: 'antragsplattform-mcp' } },
+  mcpServers: { workflow: { command: 'antragsplattform-mcp' } },
   baseUrl: 'https://stupa.example',
   clientId: 'antragsplattform-mcp',
   scopesSupported: [

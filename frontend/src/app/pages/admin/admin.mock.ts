@@ -466,7 +466,7 @@ export const MOCK_MAIL_TEMPLATES: readonly MailTemplate[] = [
   {
     id: null,
     key: 'magic_link',
-    subjectI18n: { de: 'Dein Link zur Antragsplattform', en: 'Your link to the application platform' },
+    subjectI18n: { de: 'Dein Link zu {{ platformName }}', en: 'Your link to {{ platformName }}' },
     bodyI18n: { de: 'Hallo,\n\nmit diesem Link öffnest du deinen Antrag:\n{{ link }}', en: 'Hello,\n\nopen your application with this link:\n{{ link }}' },
     bodyHtmlI18n: {},
     placeholders: { link: 'https://antraege.example.org/status#t=…' },
@@ -532,7 +532,7 @@ export const MOCK_BRANDING: Branding = {
   ],
   freetexts: {
     loginHint: { de: 'Mit Hochschul-Account anmelden.', en: 'Sign in with your university account.' },
-    welcome: { de: 'Willkommen auf der Antragsplattform.', en: 'Welcome to the application platform.' },
+    welcome: { de: 'Willkommen bei STUPA Workflow.', en: 'Welcome to STUPA Workflow.' },
     support: { de: 'Bei Fragen: support@example.org', en: 'Questions? support@example.org' },
     emailFooter: { de: 'Automatische Nachricht – nicht antworten.', en: 'Automated message – do not reply.' },
     submittedInternal: {},
