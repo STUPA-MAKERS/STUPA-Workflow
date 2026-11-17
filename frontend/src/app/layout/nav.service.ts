@@ -50,6 +50,7 @@ export type NavKey =
   | 'start'
   | 'applications'
   | 'tasks'
+  | 'activity'
   | 'todos'
   | 'calendar'
   | 'meetings'
@@ -97,6 +98,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   /** Every session has at least the personal board. */
   { key: 'todos', path: '/todos', labelKey: 'nav.todos', icon: 'circleok', permissions: [], feature: 'todos', place: 'main' },
   { key: 'calendar', path: '/calendar', labelKey: 'nav.calendar', icon: 'cal', permissions: [], feature: 'calendar', place: 'main' },
+  /** The events of the own items (spec 001270); every session has the page. */
+  { key: 'activity', path: '/activity', labelKey: 'nav.activity', icon: 'history', permissions: [], place: 'main' },
   {
     key: 'meetings',
     path: '/meetings',

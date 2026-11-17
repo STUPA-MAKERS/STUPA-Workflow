@@ -388,6 +388,13 @@ export const routes: Routes = [
         ],
       },
       {
+        path: 'activity',
+        data: { title: 'nav.activity', wide: true },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/activity/activity.component').then((m) => m.ActivityComponent),
+      },
+      {
         path: 'calendar',
         canMatch: [featureMatch('calendar')],
         data: { title: 'nav.calendar', wide: true },

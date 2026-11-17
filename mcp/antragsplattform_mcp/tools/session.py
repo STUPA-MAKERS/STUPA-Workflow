@@ -70,6 +70,45 @@ async def search(q: str, lang: str | None = None) -> dict:
 
 
 @group.tool
+async def list_activity(
+    kinds: list[str] | None = None,
+    own: bool = False,
+    cursor: str | None = None,
+    lang: str | None = None,
+) -> dict:
+    """List the activity page: the events of the Anträge, To-dos, Tickets and Sitzungen
+    that the caller made, holds or touched, newest first, 50 per step.
+
+    Args:
+        kinds: Limit to ``application``, ``todo``, ``ticket`` and/or ``meeting``.
+        own: Show the own actions too; without it they are hidden.
+        cursor: The ``nextCursor`` of the step before.
+        lang: The language of the state labels (``de`` or ``en``).
+
+    Each source shows only what the detail page of the item shows to the caller.
+    """
+    return await api().get(
+        "/activity", params=params(kind=kinds, own=own or None, cursor=cursor, lang=lang)
+    )
+
+
+@group.tool
+async def get_activity_status() -> dict:
+    """Tell whether an event of another person waits after the last visit (``hasNew``)."""
+    return await api().get("/activity/status")
+
+
+@group.tool
+async def mark_activity_seen(at: str) -> dict:
+    """Mark the activity page as seen up to ``at`` (the ``readAt`` of a step).
+
+    The mark never moves back and never past now.
+    """
+    await api().post("/activity/seen", json={"at": at})
+    return {"seen": at}
+
+
+@group.tool
 async def list_my_agent_grants() -> list:
     """List the own agent tokens (OAuth grants) that are not revoked."""
     return await api().get("/oauth/grants")

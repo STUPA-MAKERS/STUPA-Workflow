@@ -273,6 +273,7 @@ EXCLUDED_COLUMNS: dict[str, str] = {
     "erasure_request.principal_id": "the proof of the request; an open one blocks",
     "gremium_membership.principal_id": "derived from OIDC; the sync deletes the rows",
     "todo_board.owner_id": "one personal board per person; `_todos` moves or folds it",
+    "activity_visit.principal_id": "a read mark of the activity page; the target keeps its own",
 }
 
 

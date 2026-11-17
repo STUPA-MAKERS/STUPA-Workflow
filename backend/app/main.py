@@ -32,6 +32,7 @@ from app.middleware import (
     SecurityHeadersMiddleware,
 )
 from app.modules.account.router import router as account_router
+from app.modules.activity.router import router as activity_router
 from app.modules.admin.forms_router import router as form_versions_router
 from app.modules.admin.router import authed_router as gremien_authed_router
 from app.modules.admin.router import public_router as site_config_public_router
@@ -152,6 +153,7 @@ api_router.include_router(privacy_router)
 api_router.include_router(erasure_request_router)
 api_router.include_router(backup_router)
 api_router.include_router(search_router)
+api_router.include_router(activity_router)
 api_router.include_router(tickets_router)
 api_router.include_router(todos_router)
 api_router.include_router(todos_ws_router)

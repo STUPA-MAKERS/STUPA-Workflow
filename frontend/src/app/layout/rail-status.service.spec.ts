@@ -3,7 +3,8 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
-import { Subject } from 'rxjs';
+import { type Observable, Subject, of, throwError } from 'rxjs';
+import { ActivityApiService } from '@core/api/activity.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import type { Principal } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
@@ -44,6 +45,9 @@ const meeting = (status: string) => ({
   votes: [],
 });
 
+/** The answer of `GET /activity/status`; each test may set its own. */
+let activityStatus: () => Observable<{ hasNew: boolean }> = () => of({ hasNew: false });
+
 function setup() {
   const states = new Subject<MeetingStateMsg>();
   TestBed.configureTestingModule({
@@ -54,6 +58,7 @@ function setup() {
       { provide: USE_MOCK_API, useValue: false },
       provideLocationMock(createLocationMock()),
       { provide: WsService, useValue: { meetingStates$: states.asObservable() } },
+      { provide: ActivityApiService, useValue: { status: () => activityStatus() } },
     ],
   });
   const http = TestBed.inject(HttpTestingController);
@@ -315,5 +320,31 @@ describe('RailStatusService', () => {
     expect(env.svc.taskCount()).toBe(1);
     expect(env.svc.ticketCount()).toBeNull();
     expect(env.svc.live()).toBe(false);
+  });
+
+  /** Spec 001275: a dot for a waiting event; a failed read and a seen page show none. */
+  it('shows the activity dot, clears it when the page is seen, and hides it on a failed read', () => {
+    activityStatus = () => of({ hasNew: true });
+    const env = setup();
+    signIn(env);
+    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    answer(env, 0);
+    expect(env.svc.activityNew()).toBe(true);
+
+    env.svc.activitySeen();
+    expect(env.svc.activityNew()).toBe(false);
+
+    activityStatus = () => of({ hasNew: true });
+    env.svc.refresh();
+    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    answer(env, 0);
+    expect(env.svc.activityNew()).toBe(true);
+
+    activityStatus = () => throwError(() => new Error('down'));
+    env.svc.refresh();
+    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    answer(env, 0);
+    expect(env.svc.activityNew()).toBe(false);
+    activityStatus = () => of({ hasNew: false });
   });
 });
