@@ -45,8 +45,14 @@ const ROUTES: Routes = [
 ];
 
 /** The marks of the rail, set by the test instead of HTTP. */
-function railStatusStub(tasks: number | null = 4, live = true, tickets: number | null = null) {
-  return { taskCount: signal(tasks), ticketCount: signal<number | null>(tickets), live: signal(live), refresh: () => undefined };
+function railStatusStub(tasks: number | null = 4, live = true, tickets: number | null = null, activity = false) {
+  return {
+    taskCount: signal(tasks),
+    ticketCount: signal<number | null>(tickets),
+    live: signal(live),
+    activityNew: signal(activity),
+    refresh: () => undefined,
+  };
 }
 
 /** The avatars read these. The config is not loaded, so they show the initials. */
@@ -284,6 +290,7 @@ describe('ShellComponent', () => {
         'Aufgaben',
         'Boards',
         'Kalender',
+        'Aktivität',
         'Sitzungen',
         'Gremien',
         'Abstimmungen',
@@ -490,6 +497,14 @@ describe('ShellComponent', () => {
     it('counts the new tickets on the Tickets entry', async () => {
       await setup({ ...MEMBER, roles: ['admin'] }, { status: railStatusStub(0, false, 3) });
       expect(screen.getByRole('link', { name: 'Tickets 3 neu' })).toHaveAttribute('href', '/tickets');
+    });
+
+    /** Spec 001275: a dot without a number on the Aktivität entry. */
+    it('marks the Aktivität entry with a dot while a new event waits', async () => {
+      await setup(MEMBER, { status: railStatusStub(0, false, null, true) });
+      const link = within(mainNav() as HTMLElement).getByRole('link', { name: /^Aktivität/ });
+      expect(link).toHaveAccessibleName('Aktivität neue Aktivität');
+      expect(link.querySelector('.mark__live')).not.toBeNull();
     });
   });
 

@@ -1,6 +1,13 @@
 {
   "edges": [
     {
+      "column": "principal_id",
+      "from": "ActivityVisit",
+      "multiplicity": "1",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
       "column": "appointment_id",
       "from": "Answer",
       "multiplicity": "*",
@@ -1262,6 +1269,27 @@
     }
   ],
   "elements": [
+    {
+      "attributes": [
+        {
+          "name": "principal_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "seen_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "ActivityVisit",
+      "module": "activity",
+      "name": "ActivityVisit",
+      "path": "backend/app/modules/activity/models.py",
+      "table": "activity_visit"
+    },
     {
       "attributes": [
         {
