@@ -11,7 +11,7 @@ import { axe } from 'jest-axe';
 import { AuthService } from '@core/auth/auth.service';
 import { AdminApiService } from '../admin/admin-api.service';
 import { ToastService } from '@stupa-makers/ui-kit';
-import { BudgetDashboardComponent, utilisation } from './budget-dashboard.component';
+import { BudgetDashboardComponent, deviationKey, reached, utilisation } from './budget-dashboard.component';
 import { BudgetTreeApi } from './budget-tree.api';
 import { By } from '@angular/platform-browser';
 import { CostCentreSettingsComponent } from './cost-centre/cost-centre-settings.component';
@@ -42,6 +42,8 @@ function alloc(over: Partial<BudgetAllocationView> & { fiscalYearId: string }): 
     committed: over.committed ?? '0',
     requested: over.requested ?? '0',
     available: over.available ?? '0',
+    ...(over.incomeActual === undefined ? {} : { incomeActual: over.incomeActual }),
+    ...(over.planned === undefined ? {} : { planned: over.planned }),
   };
 }
 
@@ -61,6 +63,7 @@ function node(over: Partial<BudgetTreeNode> & { id: string }): BudgetTreeNode {
     fiscalStartDay: over.fiscalStartDay ?? 1,
     byFiscalYear: over.byFiscalYear ?? [],
     children: over.children ?? [],
+    ...(over.incomeIn ? { incomeIn: over.incomeIn } : {}),
   };
 }
 
@@ -1404,9 +1407,150 @@ describe('BudgetDashboardComponent', () => {
   });
 });
 
+describe('BudgetDashboardComponent income Titel', () => {
+  const realMatchMedia = window.matchMedia;
+  beforeEach(() => {
+    localStorage.setItem('ap.locale', 'de');
+    jest.useFakeTimers({ now: new Date('2026-11-12T10:00:00Z'), doNotFake: [...NOT_FAKED] });
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+    const http = TestBed.inject(HttpTestingController);
+    http.match((r) => r.url.endsWith('/plan')).forEach((r) => r.flush(null));
+    flushApps(http);
+    http.verify();
+    window.matchMedia = realMatchMedia;
+  });
+
+  /** VS (expense Ansatz 100) with the income Titel 1 (Ansatz 100, Ist 65 = 70 − 5) and its
+   *  Kostenstelle 1-1, and the expense Titel 8. */
+  const INCOME_TREE: BudgetTreeNode[] = [
+    node({
+      id: 'b-vs',
+      key: 'VS',
+      pathKey: 'VS',
+      name: 'VS-Mittel',
+      planEnabled: true,
+      byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '100', income: '3', available: '103', incomeActual: '65' })],
+      children: [
+        node({
+          id: 'b-1',
+          parentId: 'b-vs',
+          key: '1',
+          pathKey: 'VS-1',
+          name: 'Beiträge',
+          incomeIn: ['fy-1'],
+          byFiscalYear: [alloc({ fiscalYearId: 'fy-1', planned: '100', incomeActual: '65' })],
+          children: [
+            node({
+              id: 'b-11',
+              parentId: 'b-1',
+              key: '1',
+              pathKey: 'VS-1-1',
+              name: 'Semesterbeitrag',
+              incomeIn: ['fy-1'],
+              byFiscalYear: [alloc({ fiscalYearId: 'fy-1', planned: '100', incomeActual: '65' })],
+            }),
+          ],
+        }),
+        node({
+          id: 'b-8',
+          parentId: 'b-vs',
+          key: '8',
+          pathKey: 'VS-8',
+          name: 'Zuschüsse',
+          byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '100', income: '3', available: '103', planned: '100' })],
+        }),
+      ],
+    }),
+  ];
+
+  /** Render the tree and answer the plan of the year, so the sheet shows its figures. */
+  async function incomeSetup(costCentre?: string) {
+    const view = await setup({ tree: INCOME_TREE, queryParams: costCentre ? { costCentre } : {} });
+    view.http.match((r) => r.url.endsWith('/plan')).forEach((r) => r.flush(null));
+    view.fixture.detectChanges();
+    await view.fixture.whenStable();
+    flushApps(view.http);
+    view.fixture.detectChanges();
+    return view;
+  }
+
+  it('§F/finance/budget/001260: shows Ansatz, Ist and Mindereinnahmen for an income Titel', async () => {
+    const view = await incomeSetup('b-1');
+    const figs = within(view.container.querySelector('.bd__figs') as HTMLElement);
+    expect(figs.getByText('Ansatz')).toBeTruthy();
+    expect(figs.getByText('Ist')).toBeTruthy();
+    expect(figs.getByText('Mindereinnahmen')).toBeTruthy();
+    for (const gone of ['Beantragt', 'Gebunden', 'Ausgegeben', 'Verfügbar']) {
+      expect(figs.queryByText(gone)).toBeNull();
+    }
+    expect(figs.getByText(/^-35,00\s€$/).classList).toContain('bd__neg');
+    expect(view.container.querySelector('.bd__fig--main')?.textContent).toMatch(/Ist\s*65,00\s€/);
+  });
+
+  it('§F/finance/budget/001262: adds the Ist of the income Titel to the tiles of the Haushalt', async () => {
+    const view = await incomeSetup();
+    const tiles = view.c.figureList().map((f: { key: string; value: number }) => [f.key, f.value]);
+    expect(tiles).toEqual([
+      ['allocated', 100],
+      ['requested', 0],
+      ['bound', 0],
+      ['expended', 0],
+      ['income', 3],
+      ['incomeActual', 65],
+      ['available', 103],
+    ]);
+    expect(within(view.container.querySelector('.bd__figs') as HTMLElement).getByText('Einnahmen (Ist)')).toBeTruthy();
+  });
+
+  it('§F/finance/budget/001263: the tree row of an income Titel shows its Ansatz and the reached part', async () => {
+    const view = await incomeSetup();
+    const row = view.c.treeRows().find((r: { node: { id: string } }) => r.node.id === 'b-1');
+    expect(row).toMatchObject({ allocated: 100, total: 100, percent: 65, income: true });
+    expect(row.segments).toEqual([{ value: 65, tone: 'filled' }]);
+    const tn = Array.from(view.container.querySelectorAll('.bd__tree .tn')).find((el) => el.textContent?.includes('Beiträge'));
+    const bar = tn?.querySelector('app-seg-bar');
+    expect(bar?.getAttribute('aria-label')).toBe('65 % erreicht');
+  });
+
+  it('§F/finance/budget/001264: the Haushalt lists its income Titel under "Einnahmen", not "Auslastung"', async () => {
+    const view = await incomeSetup();
+    expect(view.c.expenseRows().map((r: { node: { id: string } }) => r.node.id)).toEqual(['b-8']);
+    expect(view.c.incomeRows().map((r: { node: { id: string } }) => r.node.id)).toEqual(['b-1']);
+    const lists = view.container.querySelectorAll('.bd__usage');
+    expect(lists).toHaveLength(2);
+    const income = within(lists[1] as HTMLElement);
+    expect(income.getByText('65 %')).toBeTruthy();
+    expect(income.getAllByText(/^100\s€$/).length).toBeGreaterThan(0);
+    expect(income.getByText(/^65\s€$/)).toBeTruthy();
+    expect(lists[1].querySelector('.bd__urow')?.getAttribute('title')).toMatch(
+      /^Ist: 65,00\s€ von 100,00\s€ \(65 % erreicht\)$/,
+    );
+    expect(screen.getByRole('heading', { name: 'Einnahmen' })).toBeTruthy();
+  });
+
+  it('§F/finance/budget/001264: an income Titel with Kostenstellen shows no Verteilung', async () => {
+    const view = await incomeSetup('b-1');
+    expect(view.c.selectedIsIncome()).toBe(true);
+    expect(view.container.querySelector('app-budget-pie')).toBeNull();
+    expect(view.container.querySelectorAll('.bd__usage')).toHaveLength(1);
+    expect(view.c.incomeRows().map((r: { node: { id: string } }) => r.node.id)).toEqual(['b-11']);
+  });
+
+  it('reads the reached part and the label of the deviation', () => {
+    const base = { allocated: 0, requested: 0, bound: 0, expended: 0, income: 0, committed: 0, available: 0 };
+    expect(reached({ ...base, incomeActual: 50, planned: 200 })).toBe(25);
+    expect(reached({ ...base, incomeActual: 50, planned: null })).toBeNull();
+    expect(deviationKey(1)).toBe('budget.dash.fig.surplus');
+    expect(deviationKey(-1)).toBe('budget.dash.fig.shortfall');
+    expect(deviationKey(0)).toBe('budget.dash.fig.deviation');
+  });
+});
+
 describe('utilisation', () => {
   it('is committed over the total of allocation and income, or null without a total', () => {
-    const f = { allocated: 100, requested: 0, bound: 20, expended: 30, income: 0, committed: 50, available: 50 };
+    const f = { allocated: 100, requested: 0, bound: 20, expended: 30, income: 0, committed: 50, available: 50, incomeActual: 0, planned: null };
     expect(utilisation(f)).toBe(50);
     expect(utilisation({ ...f, committed: 0, available: 0 })).toBeNull();
   });

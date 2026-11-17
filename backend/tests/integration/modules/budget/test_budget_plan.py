@@ -46,6 +46,7 @@ from app.modules.budget.tree.service_base import lock_tree
 from app.modules.budget.tree_models import Budget, BudgetAllocation, FiscalYear
 from app.modules.budget.tree_schemas import (
     AllocationSet,
+    AllocationView,
     AssignBudgetRequest,
     BudgetNodeCreate,
     BudgetNodeOut,
@@ -3399,6 +3400,42 @@ async def test_the_tree_names_the_years_where_a_node_is_income(session: AsyncSes
     assert income[t.inc.id] == (t.fy.id,)
     assert income[t.exp.id] == ()
     assert income[t.top.id] == ()
+
+
+async def test_the_tree_gives_an_income_titel_its_ansatz_and_ist(session: AsyncSession) -> None:
+    """An income Titel shows the Ansatz of its line and its Ist net of Rückzahlungen.
+
+    The Ist stays out of the Verfügbar of the Haushalt; income on an expense node still
+    counts there.
+
+    Rule: §F/finance/budget/001260, §F/finance/budget/001261, §F/finance/budget/001262.
+    """
+    t = await _tree(session)
+    await _in_force(t)
+
+    def book(budget_id: uuid.UUID, amount: int, kind: str) -> ExpenseCreate:
+        return ExpenseCreate(
+            budgetId=budget_id, fiscalYearId=t.fy.id, amount=D(amount), description="x", kind=kind
+        )
+
+    await t.svc.book_expense(book(t.inc.id, 70, "income"), actor="tester")
+    await t.svc.book_expense(book(t.inc.id, 5, "expense"), actor="tester")
+    await t.svc.book_expense(book(t.exp_a.id, 3, "income"), actor="tester")
+    await session.commit()
+    tree = await t.svc.get_tree()
+    top = next(n for n in tree if n.id == t.top.id)
+    nodes = {n.id: n for n in (top, *top.children)}
+
+    def view(node_id: uuid.UUID) -> AllocationView:
+        return next(v for v in nodes[node_id].by_fiscal_year if v.fiscal_year_id == t.fy.id)
+
+    inc = view(t.inc.id)
+    assert (inc.planned, inc.income_actual) == (D(100), D(65))
+    assert (inc.allocated, inc.expended, inc.income, inc.available) == (D(0), D(0), D(0), D(0))
+    head = view(t.top.id)
+    assert head.income_actual == D(65)
+    assert (head.allocated, head.income, head.available) == (D(100), D(3), D(103))
+    assert view(t.exp_a.id).planned == D(60)
 
 
 async def test_an_antrag_is_not_assigned_to_a_cost_centre_with_children(

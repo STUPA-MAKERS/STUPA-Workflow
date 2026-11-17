@@ -65,7 +65,7 @@ export function activeOnly(forest: readonly BudgetTreeNode[]): readonly BudgetTr
 /** The Kostenstelle has a booking or an Antrag in the fiscal year. */
 export function usedIn(node: BudgetTreeNode, fiscalYearId: string): boolean {
   const view = node.byFiscalYear.find((a) => a.fiscalYearId === fiscalYearId);
-  return !!view && [view.bound, view.requested, view.expended, view.income].some((v) => Number(v) !== 0);
+  return !!view && [view.bound, view.requested, view.expended, view.income, view.incomeActual ?? 0].some((v) => Number(v) !== 0);
 }
 
 /**

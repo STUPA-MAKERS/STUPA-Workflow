@@ -138,6 +138,22 @@ class TreeViewOps(BudgetTreeServiceBase):
             for node in dict.fromkeys(node for node, _year in pairs)
         }
 
+    async def _planned_amounts(self) -> Mapping[tuple[object, object], Decimal]:
+        """Return the Ansatz of each line of a version in force by `(node, fiscal year)`.
+
+        An income line keeps its allocation at 0 (000797), so the Ansatz of an income
+        Kostenstelle is only on its line (001260).
+        """
+        rows = (
+            await self.session.execute(
+                select(BudgetPlanLine.budget_id, BudgetPlan.fiscal_year_id, BudgetPlanLine.amount)
+                .join(BudgetPlanVersion, BudgetPlanVersion.id == BudgetPlanLine.version_id)
+                .join(BudgetPlan, BudgetPlan.id == BudgetPlanVersion.plan_id)
+                .where(BudgetPlanVersion.state == "in_force")
+            )
+        ).all()
+        return {(node, fy): amount for node, fy, amount in rows}
+
     async def get_tree(
         self,
         *,
@@ -209,11 +225,28 @@ class TreeViewOps(BudgetTreeServiceBase):
         bound_rows = _positive_rows(shares, "bound")
         requested_rows = _positive_rows(shares, "requested")
 
+        titel = await self.income_titel_paths()
+
+        def income_side(fy: object, path: str) -> bool:
+            return any(
+                fy == t_fy and plan_rules.is_below_path(path, (t_path,)) for t_fy, t_path in titel
+            )
+
+        sides = [(row, income_side(row[1], row[0])) for row in expense_rows]
         expended_rows = [
-            (fy, path, amount) for path, fy, amount, kind, _app in expense_rows if kind == "expense"
+            (fy, path, amount)
+            for (path, fy, amount, kind, _app), on_income in sides
+            if kind == "expense" and not on_income
         ]
         income_rows = [
-            (fy, path, amount) for path, fy, amount, kind, _app in expense_rows if kind == "income"
+            (fy, path, amount)
+            for (path, fy, amount, kind, _app), on_income in sides
+            if kind == "income" and not on_income
+        ]
+        income_actual_rows = [
+            (fy, path, amount if kind == "income" else -amount)
+            for (path, fy, amount, kind, _app), on_income in sides
+            if on_income
         ]
 
         node_tuples = [
@@ -243,6 +276,8 @@ class TreeViewOps(BudgetTreeServiceBase):
             expended_rows,
             income_rows,
             gremium_id=gremium_id,
+            income_actual_rows=income_actual_rows,
+            planned=await self._planned_amounts(),
         )
         forest = plan_rules.with_plan_fields(
             plain,

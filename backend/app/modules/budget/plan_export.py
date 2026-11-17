@@ -51,6 +51,8 @@ class _Figures(Protocol):
     def expended(self) -> Decimal: ...
     @property
     def income(self) -> Decimal: ...
+    @property
+    def income_actual(self) -> Decimal: ...
 
 
 class _Node(Protocol):
@@ -223,7 +225,11 @@ def _all_nodes(node: _Node) -> dict[UUID, _Node]:
 def _actual(
     node: _Node | None, side: Side | None, prev_fiscal_year_id: UUID | None
 ) -> Decimal | None:
-    """Return the booked amount of the year before: the income for the income side."""
+    """Return the booked amount of the year before: the income for the income side.
+
+    Below an income Titel of a plan in force the income is `income_actual` (001261),
+    elsewhere it is `income`, so the sum of both is the Ist of either case.
+    """
     if prev_fiscal_year_id is None or side is None:
         return None
     if node is None:
@@ -231,7 +237,7 @@ def _actual(
     view = next((v for v in node.by_fiscal_year if v.fiscal_year_id == prev_fiscal_year_id), None)
     if view is None:
         return _ZERO
-    return view.income if side == "income" else view.expended
+    return view.income + view.income_actual if side == "income" else view.expended
 
 
 def _amount_of(lines: Mapping[UUID, _Line], node_id: UUID) -> Decimal | None:

@@ -355,6 +355,8 @@ def _views_for_node(
     requested_by_node: dict[tuple[object, object], Decimal],
     expended_by_node: dict[tuple[object, object], Decimal],
     income_by_node: dict[tuple[object, object], Decimal],
+    actual_by_node: Mapping[tuple[object, object], Decimal] | None = None,
+    planned_by_node: Mapping[tuple[object, object], Decimal] | None = None,
 ) -> list[dict[str, Any]]:
     """Build the `AllocationView` dicts of a node, one per relevant fiscal year.
 
@@ -362,8 +364,16 @@ def _views_for_node(
     backward compatibility.
     """
     tables = (alloc_by_node, bound_by_node, requested_by_node, expended_by_node, income_by_node)
-    fys = {fy for table in tables for (nid, fy) in table if nid == node_id}
-    return [_view(node_id, fy, *tables) for fy in sorted(fys, key=str)]
+    extra = (actual_by_node or {}, planned_by_node or {})
+    fys = {fy for table in (*tables, *extra) for (nid, fy) in table if nid == node_id}
+    return [
+        {
+            **_view(node_id, fy, *tables),
+            "income_actual": extra[0].get((node_id, fy), _ZERO),
+            "planned": extra[1].get((node_id, fy)),
+        }
+        for fy in sorted(fys, key=str)
+    ]
 
 
 def _view(
@@ -418,12 +428,20 @@ def build_forest(
     income_rows: Sequence[tuple[object, str, Decimal | None]] = (),
     *,
     gremium_id: object | None = None,
+    income_actual_rows: Sequence[tuple[object, str, Decimal | None]] = (),
+    planned: Mapping[tuple[object, object], Decimal] | None = None,
 ) -> list[dict[str, Any]]:
     """Build the tree for `GET /budgets` as DTO-ready snake_case dicts.
 
     Consumption (bound plus expended) rolls up. The allocation stays at its own
     node. Income raises the available sum. The result reports each figure per
     fiscal year.
+
+    `income_actual_rows` holds the net bookings of the income side, `+amount` for an
+    income and `-amount` for a Rückzahlung (001261). They roll up into
+    `income_actual` and never into `available` (001262). `planned` maps
+    `(budget_id, fiscal_year_id)` to the Ansatz of the line in the version in force
+    (001260).
 
     `allocations` holds `(budget_id, fiscal_year_id, allocated)` rows, top-down.
     `bound_rows` holds `(fiscal_year_id, leaf_tree_path, amount)` per bound
@@ -436,6 +454,7 @@ def build_forest(
     requested_by_node = _rollup_by_fy(node_paths, requested_rows)
     expended_by_node = _rollup_by_fy(node_paths, expended_rows)
     income_by_node = _rollup_by_fy(node_paths, income_rows)
+    actual_by_node = _rollup_by_fy(node_paths, income_actual_rows)
 
     alloc_by_node: dict[tuple[object, object], Decimal] = {
         (bid, fy): as_amount(value) for bid, fy, value in allocations
@@ -486,6 +505,8 @@ def build_forest(
                 requested_by_node,
                 expended_by_node,
                 income_by_node,
+                actual_by_node,
+                planned,
             ),
             "children": [to_dict(c) for c in children_of.get(nid, [])],
         }

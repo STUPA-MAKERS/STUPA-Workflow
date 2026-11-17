@@ -290,3 +290,27 @@ def test_a_past_year_takes_a_late_booking_with_a_date_in_the_year() -> None:
     assert not r.late_booking_date_fits(start, end, today, None)
     assert not r.late_booking_date_fits(start, end, today, date(2027, 1, 2))
     assert r.late_booking_date_fits(start, end, date(2026, 6, 1), None)
+
+
+def test_build_forest_income_actual_and_planned() -> None:
+    """The net Ist of the income side rolls up beside `available`, the Ansatz stays put.
+
+    Rule: §F/finance/budget/001260, §F/finance/budget/001262.
+    """
+    fy = uuid.uuid4()
+    nodes = [_node("top", None, None, "VS", "VS"), _node("inc", "top", None, "1", "VS-1")]
+    forest = r.build_forest(
+        nodes,
+        [("top", fy, Decimal("50"))],
+        [],
+        income_actual_rows=[(fy, "VS-1", Decimal("30")), (fy, "VS-1", Decimal("-4"))],
+        planned={("inc", fy): Decimal("40")},
+    )
+    top = forest[0]["by_fiscal_year"][0]
+    assert (top["income_actual"], top["available"], top["planned"]) == (
+        Decimal("26"), Decimal("50"), None,
+    )
+    inc = forest[0]["children"][0]["by_fiscal_year"][0]
+    assert (inc["income_actual"], inc["planned"], inc["available"]) == (
+        Decimal("26"), Decimal("40"), Decimal("0"),
+    )

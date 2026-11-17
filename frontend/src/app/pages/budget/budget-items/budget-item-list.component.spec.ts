@@ -77,4 +77,19 @@ describe('BudgetItemListComponent', () => {
     expect(inc.textContent).toContain('02.03.2025');
     expect(inc.textContent).not.toContain('Werkstatt');
   });
+
+  it('§F/finance/budget/001261: names an expense on an income cost centre of its year a Rückzahlung', async () => {
+    const names = new Map([['b-800', { name: 'Werkstatt', incomeIn: ['fy-1'] }]]);
+    const { rows } = await setup(
+      [
+        bookingItem(itemBooking({ id: 'e-1' })),
+        bookingItem(itemBooking({ id: 'e-2', fiscalYearId: 'fy-2' })),
+        bookingItem(itemBooking({ id: 'e-3', kind: 'income' })),
+      ],
+      names,
+    );
+    expect(rows[0].querySelector('app-status-text')?.textContent).toContain('Rückzahlung');
+    expect(rows[1].querySelector('app-status-text')?.textContent).toContain('Ausgabe');
+    expect(rows[2].querySelector('app-status-text')?.textContent).toContain('Einnahme');
+  });
 });

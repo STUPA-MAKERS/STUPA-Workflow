@@ -312,8 +312,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000145](requirements/functional/finance/budget/000145_revert-keeps-invoice.md) | A reverted booking keeps the invoice status | replaced |
 | [F/finance/budget/000146](requirements/functional/finance/budget/000146_legend.md) | The budget legend matches the drawing | approved |
 | [F/finance/budget/000246](requirements/functional/finance/budget/000246_path-key.md) | A cost centre has a stable path key | approved |
-| [F/finance/budget/000247](requirements/functional/finance/budget/000247_roll-up.md) | Allocation flows down, consumption flows up | approved |
-| [F/finance/budget/000248](requirements/functional/finance/budget/000248_available-formula.md) | The available amount can be negative | approved |
+| [F/finance/budget/000247](requirements/functional/finance/budget/000247_roll-up.md) | Allocation flows down, consumption flows up | draft |
+| [F/finance/budget/000248](requirements/functional/finance/budget/000248_available-formula.md) | The available amount can be negative | draft |
 | [F/finance/budget/000249](requirements/functional/finance/budget/000249_state-classes.md) | Flow states classify the amount of an Antrag | replaced |
 | [F/finance/budget/000250](requirements/functional/finance/budget/000250_decision-gremium.md) | The deciding Gremium is inherited | approved |
 | [F/finance/budget/000251](requirements/functional/finance/budget/000251_fiscal-year-bounds.md) | A fiscal year starts on a day from 1 to 28 | approved |
@@ -416,6 +416,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/001041](requirements/functional/finance/budget/001041_plan-row-sums-rows-below.md) | A row without its own figure of the year before sums the rows below it | approved |
 | [F/finance/budget/001042](requirements/functional/finance/budget/001042_plan-line-year-before-by-hand.md) | A plan line can set the Ansatz and the Ist of the year before by hand | approved |
 | [F/finance/budget/001130](requirements/functional/finance/budget/001130_plan-lines-as-tree.md) | The lines of a plan show as a tree | approved |
+| [F/finance/budget/001260](requirements/functional/finance/budget/001260_income-titel-figures.md) | An income Titel shows Ansatz, Ist and the deviation | draft |
+| [F/finance/budget/001261](requirements/functional/finance/budget/001261_income-titel-refund.md) | An expense booking on an income Titel is a Rückzahlung | draft |
+| [F/finance/budget/001262](requirements/functional/finance/budget/001262_income-titel-not-available.md) | The Ist of an income Titel does not raise the Verfügbar of the Haushalt | draft |
+| [F/finance/budget/001263](requirements/functional/finance/budget/001263_income-titel-tree-row.md) | The tree row of an income Titel shows its Ansatz and the reached part | draft |
+| [F/finance/budget/001264](requirements/functional/finance/budget/001264_income-titel-section.md) | Income nodes are listed under "Einnahmen" | draft |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
 | [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | approved |
 | [F/finance/invoices/000262](requirements/functional/finance/invoices/000262_invoice-segments.md) | The invoice list has four segments | replaced |

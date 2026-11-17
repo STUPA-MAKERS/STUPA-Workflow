@@ -56,11 +56,14 @@ const OPEN_STATES: readonly PlanState[] = ['draft', 'in_progress'];
 const lineMap = (version: PlanVersion | null): ReadonlyMap<Uuid, PlanLine> =>
   new Map((version?.lines ?? []).map((l) => [l.budgetId, l] as const));
 
-/** The booked amount of a Kostenstelle in a fiscal year: income for the income side. */
+/** The booked amount of a Kostenstelle in a fiscal year: income for the income side. Below an
+ *  income Titel of a plan in force the Ist is `incomeActual` (001261), elsewhere `income`. */
 function actualOf(node: BudgetTreeNode | undefined, side: Side | null, fiscalYearId: Uuid | null): number | null {
   const view = node?.byFiscalYear.find((a) => a.fiscalYearId === fiscalYearId);
   if (!fiscalYearId || !side) return null;
-  return Number(side === 'income' ? (view?.income ?? 0) : (view?.expended ?? 0));
+  return side === 'income'
+    ? Number(view?.income ?? 0) + Number(view?.incomeActual ?? 0)
+    : Number(view?.expended ?? 0);
 }
 
 /**

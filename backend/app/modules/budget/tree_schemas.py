@@ -169,6 +169,11 @@ class AllocationView(FrozenCamelModel, frozen=True):
     committed: Decimal
     requested: Decimal = Decimal(0)
     available: Decimal
+    #: Ist of the income side: income minus Rückzahlungen below an income Titel of
+    #: the plan in force (001261). It never counts in `available` (001262).
+    income_actual: Decimal = Field(default=Decimal(0), alias="incomeActual")
+    #: Ansatz of the line in the plan version in force, `None` without a line (001260).
+    planned: Decimal | None = None
 
 
 class BudgetTreeNodeOut(FrozenCamelModel, frozen=True):
