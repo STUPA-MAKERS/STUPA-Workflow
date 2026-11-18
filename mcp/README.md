@@ -112,6 +112,7 @@ Gremien and Kalender: `gremien_overview`, `gremium_members`, `gremium_decisions`
 `gremium_attendance`, `get_gremium_info`, `set_gremium_info`, `calendar_entries`,
 `create_appointment`, `answer_appointment`.
 Search and profile: `search`, `get_profile`.
+Activity: `list_activity`, `get_activity_status`, `mark_activity_seen`.
 Tickets: `tickets_list`, `tickets_get`, `tickets_note`, `tickets_update`,
 `tickets_block_sender`, `tickets_unblock_sender`, `tickets_blocked_senders`,
 `tickets_delete_blocked_sender` (need `ticket.manage`); as a reporter `tickets_report`,

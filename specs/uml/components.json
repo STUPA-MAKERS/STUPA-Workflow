@@ -26,6 +26,51 @@
       "to": "tickets"
     },
     {
+      "count": 2,
+      "from": "activity",
+      "to": "applications"
+    },
+    {
+      "count": 2,
+      "from": "activity",
+      "to": "audit"
+    },
+    {
+      "count": 3,
+      "from": "activity",
+      "to": "auth"
+    },
+    {
+      "count": 1,
+      "from": "activity",
+      "to": "flow"
+    },
+    {
+      "count": 2,
+      "from": "activity",
+      "to": "meetings"
+    },
+    {
+      "count": 5,
+      "from": "activity",
+      "to": "shared"
+    },
+    {
+      "count": 1,
+      "from": "activity",
+      "to": "site_config"
+    },
+    {
+      "count": 3,
+      "from": "activity",
+      "to": "tickets"
+    },
+    {
+      "count": 3,
+      "from": "activity",
+      "to": "todos"
+    },
+    {
       "count": 3,
       "from": "admin",
       "to": "application_types"
@@ -1332,6 +1377,12 @@
       "layer": 1,
       "name": "account",
       "path": "backend/app/modules/account"
+    },
+    {
+      "id": "activity",
+      "layer": 1,
+      "name": "activity",
+      "path": "backend/app/modules/activity"
     },
     {
       "id": "admin",

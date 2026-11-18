@@ -24,6 +24,7 @@ describe('CostCentreUtil', () => {
     expect(usedIn(node({ id: 'a', byFiscalYear: [figures] }), 'fy')).toBe(false);
     expect(usedIn(node({ id: 'a', byFiscalYear: [{ ...figures, requested: '1' }] }), 'fy')).toBe(true);
     expect(usedIn(node({ id: 'a', byFiscalYear: [{ ...figures, bound: '1' }] }), 'other')).toBe(false);
+    expect(usedIn(node({ id: 'a', byFiscalYear: [{ ...figures, incomeActual: '4' }] }), 'fy')).toBe(true);
   });
 
   it('§F/finance/budget/000822 §F/finance/budget/000834: a picker offers no inactive Kostenstelle and, in a planned year, only those of the plan or in use', () => {

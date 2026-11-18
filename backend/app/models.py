@@ -7,6 +7,7 @@ metadata is the single source for Alembic and for the tests.
 from __future__ import annotations
 
 from app.db import Base
+from app.modules.activity.models import ActivityVisit
 from app.modules.application_types.models import ApplicationType, ApplicationTypeGroup
 from app.modules.applications.models import (
     Applicant,
@@ -92,6 +93,7 @@ from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.modules.webhooks.models import Webhook, WebhookDelivery
 
 __all__ = [
+    "ActivityVisit",
     "Applicant",
     "Application",
     "ApplicationDecision",

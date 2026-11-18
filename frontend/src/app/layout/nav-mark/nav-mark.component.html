@@ -1,7 +1,7 @@
 @if (part() === 'visual') {
   @if (count() > 0) {
     <span class="mark__count" aria-hidden="true">{{ countLabel() }}</span>
-  } @else if (live()) {
+  } @else if (live() || activityNew()) {
     <span class="mark__live" aria-hidden="true"></span>
   }
 } @else if (part() === 'count') {
@@ -13,5 +13,7 @@
     <span class="sr-only">{{ countText() | t: { count: count() } }}</span>
   } @else if (live()) {
     <span class="sr-only">{{ 'shell.nav.live' | t }}</span>
+  } @else if (activityNew()) {
+    <span class="sr-only">{{ 'shell.nav.activityNew' | t }}</span>
   }
 }

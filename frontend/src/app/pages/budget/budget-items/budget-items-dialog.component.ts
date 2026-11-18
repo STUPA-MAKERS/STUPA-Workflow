@@ -12,6 +12,7 @@ import {
   EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
+  ScrollFadeDirective,
   SearchPillComponent,
   SkeletonComponent,
 } from '@stupa-makers/ui-kit';
@@ -52,6 +53,7 @@ interface PageRequest {
     FilterSelectComponent,
     LoadMoreComponent,
     LoadErrorComponent,
+    ScrollFadeDirective,
     SearchPillComponent,
     SkeletonComponent,
     TranslatePipe,
@@ -73,7 +75,7 @@ export class BudgetItemsDialogComponent {
   readonly apps = input<readonly BudgetApplication[]>([]);
   /** The reader may read the bookings. Without it the list holds only applications. */
   readonly withBookings = input(false);
-  readonly names = input<ReadonlyMap<string, { name: string }>>(new Map());
+  readonly names = input<ReadonlyMap<string, { name: string; incomeIn?: readonly string[] }>>(new Map());
 
   readonly type = signal<BudgetItemType>('');
   /** The text in the search field, and the text the list is filtered by (debounced). */

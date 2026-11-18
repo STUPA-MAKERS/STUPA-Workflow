@@ -57,8 +57,9 @@ export class BudgetItemListComponent {
   private readonly i18n = inject(I18nService);
 
   readonly items = input.required<readonly BudgetItem[]>();
-  /** The names of the cost centres by id, for the cost centre of each row. */
-  readonly names = input<ReadonlyMap<string, { name: string }>>(new Map());
+  /** The names of the cost centres by id, for the cost centre of each row. `incomeIn` names
+   *  the years in which a cost centre is on the income side (001030). */
+  readonly names = input<ReadonlyMap<string, { name: string; incomeIn?: readonly string[] }>>(new Map());
 
   protected readonly rows = computed<ItemRow[]>(() => {
     const names = this.names();
@@ -86,6 +87,7 @@ export class BudgetItemListComponent {
       }
       const b = item.booking;
       const income = b.kind === 'income';
+      const refund = !income && !!names.get(b.budgetId)?.incomeIn?.includes(b.fiscalYearId);
       return {
         key,
         icon: 'swap',
@@ -93,7 +95,9 @@ export class BudgetItemListComponent {
         title: b.description,
         link: ['/expenses'],
         queryParams: { id: b.id },
-        statusLabel: this.i18n.translate(income ? 'expenses.kind.income' : 'expenses.kind.expense'),
+        statusLabel: this.i18n.translate(
+          income ? 'expenses.kind.income' : refund ? 'expenses.kind.refund' : 'expenses.kind.expense',
+        ),
         statusKind: income ? 'accent' : 'muted',
         pathKey: null,
         costCentre: names.get(b.budgetId)?.name ?? null,

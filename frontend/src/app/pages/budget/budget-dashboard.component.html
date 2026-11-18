@@ -209,7 +209,7 @@
 
         <dl class="bd__figs">
           @for (f of figureList(); track f.key) {
-            <div class="bd__fig" [class.bd__fig--main]="f.key === 'available'">
+            <div class="bd__fig" [class.bd__fig--main]="f.main">
               <dt class="bd__figLabel">{{ f.label }}</dt>
               <dd class="bd__figValue mono" [class.bd__neg]="f.value < 0">{{ money(f.value, current()?.currency) }}</dd>
             </div>
@@ -236,8 +236,8 @@
           }
         }
 
-        <div class="bd__cols" [class.bd__cols--single]="!hasChildren()">
-          @if (hasChildren()) {
+        <div class="bd__cols" [class.bd__cols--single]="!hasChildren() || selectedIsIncome()">
+          @if (hasChildren() && !selectedIsIncome()) {
             <app-section class="bd__sec" size="lg" [heading]="'budget.dash.distribution' | t">
               <app-filter-select
                 sectionAction
@@ -257,6 +257,8 @@
             </app-section>
           }
 
+          <div class="bd__usageStack">
+          @if (expenseRows().length) {
           <app-section class="bd__sec" size="lg" [heading]="'budget.usage.headingNode' | t">
             <div class="bd__usageCols" aria-hidden="true">
               <span class="bd__grow"></span>
@@ -265,7 +267,7 @@
               <span class="bd__c3">{{ 'budget.dash.fig.available' | t }}</span>
             </div>
             <ul class="bd__usage">
-              @for (row of usageRows(); track row.node.id) {
+              @for (row of expenseRows(); track row.node.id) {
                 <li class="bd__urow" [style.--color-accent]="row.color" [title]="usageLabel(row)">
                   <div class="bd__uline">
                     <div class="bd__ucell">
@@ -299,6 +301,52 @@
               }
             </ul>
           </app-section>
+          }
+          @if (incomeRows().length) {
+          <app-section class="bd__sec" size="lg" [heading]="'budget.usage.headingIncome' | t">
+            <div class="bd__usageCols" aria-hidden="true">
+              <span class="bd__grow"></span>
+              <span class="bd__c1">{{ 'budget.dash.fig.planned' | t }}</span>
+              <span class="bd__c2">{{ 'budget.usage.reached' | t }}</span>
+              <span class="bd__c3">{{ 'budget.dash.fig.actual' | t }}</span>
+            </div>
+            <ul class="bd__usage">
+              @for (row of incomeRows(); track row.node.id) {
+                <li class="bd__urow" [style.--color-accent]="row.color" [title]="usageLabel(row)">
+                  <div class="bd__uline">
+                    <div class="bd__ucell">
+                      <button
+                        type="button"
+                        class="bd__uname ell"
+                        [title]="row.node.name"
+                        [disabled]="row.node.id === selectedKsId()"
+                        (click)="drillInto(row.node)"
+                      >{{ row.node.name }}</button>
+                      <span class="bd__ureq">
+                        {{ 'budget.dash.fig.planned' | t }}:
+                        <span class="mono">{{ moneyShort(row.figures.planned ?? 0, row.node.currency) }}</span>
+                      </span>
+                    </div>
+                    <span class="bd__c1 mono">
+                      <span class="sr-only">{{ 'budget.dash.fig.planned' | t }}:</span>
+                      {{ moneyShort(row.figures.planned ?? 0, row.node.currency) }}
+                    </span>
+                    <span class="bd__c2 mono">
+                      <span class="sr-only">{{ 'budget.usage.reached' | t }}:</span>
+                      {{ row.percent === null ? '—' : row.percent + ' %' }}
+                    </span>
+                    <span class="bd__c3 mono" [class.bd__neg]="row.figures.incomeActual < 0">
+                      <span class="sr-only">{{ 'budget.dash.fig.actual' | t }}:</span>
+                      {{ moneyShort(row.figures.incomeActual, row.node.currency) }}
+                    </span>
+                  </div>
+                  <app-seg-bar [segments]="row.segments" [total]="row.total" [label]="usageLabel(row)" />
+                </li>
+              }
+            </ul>
+          </app-section>
+          }
+          </div>
         </div>
 
         <app-section class="bd__sec bd__sec--apps" size="lg" headingId="bd-apps" [heading]="itemsTitle()">
@@ -393,7 +441,7 @@
                 size="thin"
                 [segments]="row.segments"
                 [total]="row.total"
-                [label]="'budget.dash.treeBar' | t: { percent: row.percent ?? 0 }"
+                [label]="(row.income ? 'budget.dash.treeBarIncome' : 'budget.dash.treeBar') | t: { percent: row.percent ?? 0 }"
               />
             </button>
           </div>

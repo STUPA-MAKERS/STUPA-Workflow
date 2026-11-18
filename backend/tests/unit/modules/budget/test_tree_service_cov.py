@@ -1513,12 +1513,13 @@ async def test_get_tree_denied_excluded() -> None:
 async def test_get_tree_with_gremium_scope() -> None:
     """Reach scope_forest with visible_gremium_ids set.
 
-    The fake session serves the top, five empty reads, no income Titel (001030) and
-    the scoped ids.
+    The fake session serves the top, three empty reads, no income Titel for the
+    bookings (001262), no plan line (001260), two empty plan reads, no income Titel
+    (001030) and the scoped ids.
     """
     g = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS", view_gremium_id=g)
-    empty = (result(), result(), result(), result(), result(), result())
+    empty = tuple(result() for _ in range(8))
     sess = fake_session(result(top), *empty, result(top.id))
     svc = BudgetTreeService(sess)
     tree = await svc.get_tree(visible_gremium_ids={g})

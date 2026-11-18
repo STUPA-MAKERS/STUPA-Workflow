@@ -8,8 +8,9 @@ const MAX_COUNT = 99;
 
 /**
  * The mark on a navigation icon: the number of open tasks on "Aufgaben", the number of
- * new tickets on "Tickets" and a dot on "Sitzungen" while a meeting runs. Other entries
- * carry no mark.
+ * new tickets on "Tickets", a dot on "Sitzungen" while a meeting runs and a dot on
+ * "Aktivität" while an event of another person waits (spec 001275, no number). Other
+ * entries carry no mark.
  *
  * Use it twice per entry: `part="visual"` on the icon and `part="text"` after the label.
  */
@@ -58,4 +59,7 @@ export class NavMarkComponent {
   });
 
   readonly live = computed(() => this.key() === 'meetings' && this.status.live());
+
+  /** A new event waits on the activity page. */
+  readonly activityNew = computed(() => this.key() === 'activity' && this.status.activityNew());
 }

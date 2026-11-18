@@ -81,10 +81,22 @@ export interface Figures {
   /** bound + expended. */
   readonly committed: number;
   readonly available: number;
+  /** Ist of the income side: income minus Rückzahlungen (001261). */
+  readonly incomeActual: number;
+  /** Ansatz of the line in the plan in force, `null` without a line (001260). */
+  readonly planned: number | null;
 }
 
 /** A figure the sheet names. `committed` is only a sum for the bars. */
-export type FigureKey = Exclude<keyof Figures, 'committed'>;
+export type FigureKey = Exclude<keyof Figures, 'committed' | 'incomeActual' | 'planned'>;
+
+/** One tile of the sheet. `main` is the tile in the accent colour. */
+export interface FigureTile {
+  readonly key: string;
+  readonly label: string;
+  readonly value: number;
+  readonly main: boolean;
+}
 
 /** A figure that the "Verteilung" chart can show. */
 export type DistributionMetric = 'allocated' | 'requested' | 'bound' | 'expended' | 'available';
@@ -103,11 +115,15 @@ interface TreeRow {
   readonly segments: readonly Seg[];
   readonly total: number | null;
   readonly percent: number | null;
+  /** The node is on the income side: the bar shows the reached part (001263). */
+  readonly income: boolean;
 }
 
-/** One row of "Auslastung". */
+/** One row of "Auslastung" or of "Einnahmen". */
 interface UsageRow {
   readonly node: BudgetTreeNode;
+  /** The node is on the income side in the year (001264). */
+  readonly income: boolean;
   readonly color: string;
   readonly figures: Figures;
   readonly percent: number | null;
@@ -124,6 +140,8 @@ const ZERO: Figures = {
   income: 0,
   committed: 0,
   available: 0,
+  incomeActual: 0,
+  planned: null,
 };
 
 /** How many applications the sheet lists before "Alle ansehen". */
@@ -423,8 +441,25 @@ export class BudgetDashboardComponent {
     );
     const rowOf = (n: BudgetTreeNode, depth: number, fyId: string, expanded: boolean): TreeRow => {
       const f = this.figuresOf(n, fyId);
+      if (isIncome(n, fyId)) {
+        const planned = f.planned ?? 0;
+        return {
+          node: n,
+          depth,
+          hasChildren: n.children.length > 0,
+          expanded,
+          color: colors.get(n.id) ?? '',
+          swatch: set.get(n.id) != null,
+          allocated: planned,
+          segments: [{ value: Math.max(0, Math.min(f.incomeActual, planned)), tone: 'filled' }],
+          total: planned > 0 ? planned : null,
+          percent: reached(f),
+          income: true,
+        };
+      }
       const total = f.available + f.committed;
       return {
+        income: false,
         node: n,
         depth,
         hasChildren: n.children.length > 0,
@@ -465,17 +500,39 @@ export class BudgetDashboardComponent {
     return ks ? this.figuresOf(ks) : ZERO;
   });
 
-  readonly figureList = computed(() => {
+  /** The selected cost centre is on the income side in the selected year (001260). */
+  readonly selectedIsIncome = computed(() => {
+    const ks = this.selectedKs();
+    return !!ks && isIncome(ks, this.selectedFyId());
+  });
+
+  /**
+   * The tiles of the sheet. An income node shows Ansatz, Ist and the Mehr- or
+   * Mindereinnahmen (001260). Another node shows the six figures, and a node above an
+   * income Titel adds its Ist as "Einnahmen (Ist)" (001262).
+   */
+  readonly figureList = computed<readonly FigureTile[]>(() => {
     const f = this.figures();
-    const keys: FigureKey[] = [
-      'allocated',
-      'requested',
-      'bound',
-      'expended',
-      'income',
-      'available',
-    ];
-    return keys.map((k) => ({ key: k, label: this.figureLabel(k), value: f[k] }));
+    const t = (key: TranslationKey): string => this.i18n.translate(key);
+    if (this.selectedIsIncome()) {
+      const diff = f.incomeActual - (f.planned ?? 0);
+      return [
+        { key: 'planned', label: t('budget.dash.fig.planned'), value: f.planned ?? 0, main: false },
+        { key: 'incomeActual', label: t('budget.dash.fig.actual'), value: f.incomeActual, main: true },
+        { key: 'deviation', label: t(deviationKey(diff)), value: diff, main: false },
+      ];
+    }
+    const keys: FigureKey[] = ['allocated', 'requested', 'bound', 'expended', 'income', 'available'];
+    const tiles = keys.map((k) => ({ key: k, label: this.figureLabel(k), value: f[k], main: k === 'available' }));
+    const ks = this.selectedKs();
+    const aboveIncome = !!ks && hasIncomeBelow(ks, this.selectedFyId());
+    return aboveIncome
+      ? [
+          ...tiles.slice(0, 5),
+          { key: 'incomeActual', label: t('budget.dash.fig.incomeActual'), value: f.incomeActual, main: false },
+          tiles[5]!,
+        ]
+      : tiles;
   });
 
   /** The amount of a year is the Ansatz when the Haushalt has a Haushaltsplan, else the Zuteilung. */
@@ -536,11 +593,25 @@ export class BudgetDashboardComponent {
     if (!ks) return [];
     const nodes = ks.children.length ? ks.children : [ks];
     const colors = this.colors();
+    const fy = this.selectedFyId();
     return nodes.map((node) => {
       const f = this.figuresOf(node);
+      if (isIncome(node, fy)) {
+        const planned = f.planned ?? 0;
+        return {
+          node,
+          income: true,
+          color: colors.get(node.id) ?? '',
+          figures: f,
+          percent: reached(f),
+          segments: [{ value: Math.max(0, Math.min(f.incomeActual, planned)), tone: 'filled' }],
+          total: planned > 0 ? planned : null,
+        };
+      }
       const total = f.available + f.committed;
       return {
         node,
+        income: false,
         color: colors.get(node.id) ?? '',
         figures: f,
         percent: utilisation(f),
@@ -553,9 +624,21 @@ export class BudgetDashboardComponent {
     });
   });
 
-  /** The screen-reader text of a utilisation bar. */
+  /** The rows of "Auslastung": the nodes on the expense side. */
+  readonly expenseRows = computed(() => this.usageRows().filter((r) => !r.income));
+  /** The rows of "Einnahmen": the nodes on the income side (001264). */
+  readonly incomeRows = computed(() => this.usageRows().filter((r) => r.income));
+
+  /** The screen-reader text of a utilisation bar, or of the reached part of an income. */
   usageLabel(row: UsageRow): string {
     const f = row.figures;
+    if (row.income) {
+      return this.i18n.translate('budget.dash.reachedLabel', {
+        percent: row.percent ?? 0,
+        actual: this.money(f.incomeActual, row.node.currency),
+        planned: this.money(f.planned ?? 0, row.node.currency),
+      });
+    }
     return this.i18n.translate('budget.dash.usageLabel', {
       percent: row.percent ?? 0,
       expended: this.money(f.expended, row.node.currency),
@@ -582,7 +665,7 @@ export class BudgetDashboardComponent {
     mergeBudgetItems(this.apps() ?? [], this.previewBookings(), true).slice(0, APPS_SHOWN),
   );
   /** The names of the cost centres, for the rows of the list. */
-  readonly nodeNames = computed<ReadonlyMap<string, { name: string }>>(() => this.nodeById());
+  readonly nodeNames = computed<ReadonlyMap<string, { name: string; incomeIn?: readonly string[] }>>(() => this.nodeById());
   readonly itemsOpen = signal(false);
 
   readonly overviewOpen = signal(false);
@@ -1117,7 +1200,33 @@ function toFigures(a: BudgetAllocationView): Figures {
     income: Number(a.income),
     committed: Number(a.committed),
     available: Number(a.available),
+    incomeActual: Number(a.incomeActual ?? 0),
+    planned: a.planned == null ? null : Number(a.planned),
   };
+}
+
+/** The node is on the income side in the fiscal year: its Titel is income in the plan in
+ *  force (000853, 001030). */
+export function isIncome(node: BudgetTreeNode, fiscalYearId: string): boolean {
+  return !!fiscalYearId && !!node.incomeIn?.includes(fiscalYearId);
+}
+
+/** A node below the given one is on the income side in the fiscal year. */
+function hasIncomeBelow(node: BudgetTreeNode, fiscalYearId: string): boolean {
+  return node.children.some((c) => isIncome(c, fiscalYearId) || hasIncomeBelow(c, fiscalYearId));
+}
+
+/** The reached part of an income Ansatz in percent, `null` without an Ansatz (001263). */
+export function reached(f: Figures): number | null {
+  const planned = f.planned ?? 0;
+  return planned > 0 ? Math.round((f.incomeActual / planned) * 100) : null;
+}
+
+/** The label of the deviation of an income: Mehr- or Mindereinnahmen by its sign. */
+export function deviationKey(diff: number): TranslationKey {
+  if (diff > 0.005) return 'budget.dash.fig.surplus';
+  if (diff < -0.005) return 'budget.dash.fig.shortfall';
+  return 'budget.dash.fig.deviation';
 }
 
 /** Utilisation in percent: committed / (allocated + income), where allocated + income =
