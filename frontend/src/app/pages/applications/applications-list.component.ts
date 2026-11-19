@@ -32,6 +32,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   CheckboxComponent,
   ConfirmDialogComponent,
   CurrencyInputComponent,
@@ -199,6 +200,7 @@ type FilterSheet = 'more' | null;
     DecisionDialogComponent,
     ApplicationCaptureComponent,
     BulkDialogComponent,
+    ButtonGroupComponent,
     CheckboxComponent,
     SelectionBarComponent,
   ],

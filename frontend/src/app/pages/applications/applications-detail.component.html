@@ -112,6 +112,7 @@
                 : ('applications.comments.open' | t: { n: comments().length })
             "
             [count]="commentsLoading() ? null : comments().length"
+            [ariaExpanded]="commentsOpen()"
             data-testid="ad-comments-open"
             (click)="commentsOpen.set(true)"
           >
@@ -179,7 +180,7 @@
         }
 
         @if (offersNewVersion() || (canTransition() && !application.observer && transitions().length)) {
-          <div class="ad__transitions" role="group" [attr.aria-label]="'applications.transitions.title' | t">
+          <app-button-group class="ad__transitionGroup" [label]="'applications.transitions.title' | t">
             @for (t of canTransition() && !application.observer ? transitions() : []; track t.id) {
               <app-button
                 [variant]="looks().get(t.id) ?? 'tonal'"
@@ -195,13 +196,13 @@
             }
             @if (offersNewVersion()) {
               <app-button
-                variant="outlined"
+                variant="tonal"
                 data-testid="new-version"
                 [loading]="creatingVersion()"
                 (click)="createNewVersion()"
               ><app-icon name="copy" />{{ 'status.newVersion.action' | t }}</app-button>
             }
-          </div>
+          </app-button-group>
         } @else if (canTransition() && !application.observer && transitionsLoading()) {
           <ng-container *ngTemplateOutlet="transitionsSkel" />
         }

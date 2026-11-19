@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { Subject } from 'rxjs';
+import { PageResumeService } from '../browser/page-resume.service';
 import { LiveVoteService } from './live-vote.service';
 import { LIVE_VOTE_SOURCE, type LiveVoteSource } from './live-vote.source';
 import type { MeetingChannel } from './ws.service';
@@ -33,13 +34,55 @@ class FakeSource implements LiveVoteSource {
 describe('LiveVoteService', () => {
   let svc: LiveVoteService;
   let source: FakeSource;
+  let resume: Subject<void>;
 
   beforeEach(() => {
     source = new FakeSource();
+    resume = new Subject<void>();
     TestBed.configureTestingModule({
-      providers: [{ provide: LIVE_VOTE_SOURCE, useValue: source }],
+      providers: [
+        { provide: LIVE_VOTE_SOURCE, useValue: source },
+        { provide: PageResumeService, useValue: { resume$: resume.asObservable() } },
+      ],
     });
     svc = TestBed.inject(LiveVoteService);
+  });
+
+  /**
+   * A return of the page drops the old socket (dead or not) and opens a new one, whose
+   * `subscribe` replays the state (§F/meetings/meetings/001441).
+   */
+  it('opens a new socket on a return of the page and ignores the old one', () => {
+    const s = svc.open('m-1');
+    resume.next();
+    expect(source.channels).toHaveLength(2);
+    expect(source.channels[0].closed).toBe(true);
+    expect(source.channels[1].sent[0]).toEqual({ type: 'subscribe' });
+    source.channels[0].subject.next({ type: 'error', code: 'stale' });
+    source.channels[0].subject.complete();
+    expect(s.errorCode()).toBeNull();
+    expect(s.connection()).toBe('open');
+    expect(source.channels).toHaveLength(2);
+  });
+
+  it('starts again after it gave up, and not after a close of the page', () => {
+    jest.useFakeTimers();
+    const s = svc.open('m-1', { reconnectMs: 10 });
+    for (let i = 0; i < 5; i += 1) {
+      source.channels[source.channels.length - 1].subject.complete();
+      jest.runOnlyPendingTimers();
+    }
+    expect(s.connection()).toBe('closed');
+    expect(s.errorCode()).toBe('connection_failed');
+    const before = source.channels.length;
+    resume.next();
+    expect(source.channels).toHaveLength(before + 1);
+    expect(s.connection()).toBe('open');
+    expect(s.errorCode()).toBeNull();
+    s.close();
+    resume.next();
+    expect(source.channels).toHaveLength(before + 1);
+    jest.useRealTimers();
   });
 
   it('sends a subscribe frame on connect to resync state', () => {

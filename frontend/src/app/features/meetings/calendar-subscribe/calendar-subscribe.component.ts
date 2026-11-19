@@ -15,6 +15,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   CopyButtonComponent,
   EmptyStateComponent,
   FocusDialogDirective,
@@ -73,6 +74,7 @@ let nextId = 0;
     NgTemplateOutlet,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     CopyButtonComponent,
     IconComponent,
     SideSheetComponent,

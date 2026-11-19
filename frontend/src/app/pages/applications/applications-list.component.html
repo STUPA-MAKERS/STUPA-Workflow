@@ -144,6 +144,7 @@
             (selectAll)="toggleSelectAll($event)"
             (cleared)="stopSelecting()"
           >
+            <app-button-group>
             <app-button
               variant="text"
               [iconOnly]="phone()"
@@ -160,6 +161,7 @@
               [disabled]="!selectedCount() || overMax()"
               (click)="openBulk('message')"
             ><app-icon name="mail" />@if (!phone()) { {{ 'applications.bulk.message' | t }} }</app-button>
+            </app-button-group>
           </app-selection-bar>
         }
         @if (reloading()) {

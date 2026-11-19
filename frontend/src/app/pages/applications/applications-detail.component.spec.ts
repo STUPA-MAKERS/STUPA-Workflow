@@ -485,7 +485,7 @@ describe('ApplicationsDetailComponent', () => {
     const busy = view.container.querySelector('article.ad--busy')!;
     expect(busy).not.toHaveClass('ad--split');
     expect(busy.querySelector('app-tabs')).not.toBeNull();
-    expect(busy.querySelector('.ad__transitions')).toBeNull();
+    expect(busy.querySelector('.ad__transitions, .ad__transitionGroup')).toBeNull();
     const http = view.fixture.debugElement.injector.get(HttpTestingController);
     for (const req of http.match(() => true)) req.flush(null, { status: 404, statusText: 'x' });
   });
@@ -567,7 +567,7 @@ describe('ApplicationsDetailComponent', () => {
     detectChanges();
     expect(cmp.transitionsLoading()).toBe(false);
     // Only "Neue Fassung" (001720) stays: the state allows edits and is not the start.
-    expect(container.querySelectorAll('.ad__head .ad__transitions app-button')).toHaveLength(1);
+    expect(container.querySelectorAll('.ad__head .ad__transitionGroup app-button')).toHaveLength(1);
     expect(container.querySelector('[data-testid="new-version"]')).not.toBeNull();
     flushAttachments(http);
     http.verify();
