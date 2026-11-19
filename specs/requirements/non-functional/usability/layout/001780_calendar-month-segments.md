@@ -2,7 +2,7 @@
 id: "001780"
 title: Each day of the month grid is a segment of its own
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
