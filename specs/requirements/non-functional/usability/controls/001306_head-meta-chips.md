@@ -2,7 +2,7 @@
 id: "001306"
 title: The meta line in the head of a detail is a list of chips
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:

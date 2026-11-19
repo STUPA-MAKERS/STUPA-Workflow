@@ -2,7 +2,7 @@
 id: "001305"
 title: The status in the head of a page is a chip
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:

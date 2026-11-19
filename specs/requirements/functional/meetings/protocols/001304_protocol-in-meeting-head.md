@@ -2,7 +2,7 @@
 id: "001304"
 title: The protocol state and its actions sit in the meeting head
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:
