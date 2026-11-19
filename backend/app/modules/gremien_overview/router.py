@@ -188,15 +188,17 @@ async def gremium_member_attendance(
     db: DbSession,
     service: ServiceDep,
     month: Annotated[str, Query(pattern=_MONTH)],
+    pool: Annotated[bool, Query()] = False,
 ) -> MemberAttendanceOut:
     """Give the closed meetings of one month with the state of one member.
 
     The state is present, excused, absent or delegated (with the delegate). The excuse
-    text is never in the answer.
+    text is never in the answer. With ``pool`` the person is read as a pool substitute:
+    the state is seat (with the represented member) or no_seat.
     """
     await require_gremium(db, principal, gremium_id)
     return await service.member_attendance(
-        gremium_id, principal_id, month, requester_sub=principal.sub
+        gremium_id, principal_id, month, requester_sub=principal.sub, pool=pool
     )
 
 

@@ -98,10 +98,17 @@ async def gremium_attendance(
 
 
 @group.tool
-async def gremium_member_attendance(gremium_id: str, principal_id: str, month: str) -> dict:
-    """Give the closed meetings of one month (YYYY-MM) with the state of one member."""
+async def gremium_member_attendance(
+    gremium_id: str, principal_id: str, month: str, pool: bool = False
+) -> dict:
+    """Give the closed meetings of one month (YYYY-MM) with the state of one member.
+
+    With `pool` the person is read as a pool substitute: the state is `seat` (with the
+    represented member) or `no_seat`.
+    """
     return await api().get(
-        f"/committees/{gremium_id}/attendance/{principal_id}", params={"month": month}
+        f"/committees/{gremium_id}/attendance/{principal_id}",
+        params={"month": month, **({"pool": "true"} if pool else {})},
     )
 
 
@@ -161,9 +168,7 @@ async def gremium_meeting_members(gremium_id: str) -> list:
 
 
 @group.tool
-async def download_gremium_logo(
-    gremium_id: str, target_path: str, overwrite: bool = False
-) -> dict:
+async def download_gremium_logo(gremium_id: str, target_path: str, overwrite: bool = False) -> dict:
     """Download the square logo of the CD variant of a Gremium to a local file."""
     return await download_to(
         "GET",
