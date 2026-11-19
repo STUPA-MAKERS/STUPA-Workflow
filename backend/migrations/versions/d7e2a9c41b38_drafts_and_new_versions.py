@@ -12,7 +12,7 @@ A fresh database already gets them from the ``create_all`` baseline (0001), beca
 models sit in ``app.models``. The downgrade drops the three columns.
 
 Revision ID: d7e2a9c41b38
-Revises: a4c71e2b9d05
+Revises: c4d1e2f3a5b6
 Create Date: 2026-11-19 23:00:00
 """
 
@@ -23,7 +23,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "d7e2a9c41b38"
-down_revision: str | None = "a4c71e2b9d05"
+down_revision: str | None = "c4d1e2f3a5b6"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
