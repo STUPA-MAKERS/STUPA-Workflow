@@ -221,7 +221,8 @@ export class MeetingSessionService implements OnDestroy {
    * must not start with an item that a click during the preparation set.
    *
    * "Nächster TOP" names the item that the room leaves (`completeItemId`): the server
-   * ticks it in the same request. A click on an item ticks nothing.
+   * ticks it in the same request. The agenda shows the tick at once, before the answer,
+   * and a refused request takes it back. A click on an item ticks nothing.
    */
   setCurrentTop(itemId: Uuid, completeItemId: Uuid | null = null): void {
     const m = this.meeting();
@@ -229,12 +230,19 @@ export class MeetingSessionService implements OnDestroy {
     const body: MeetingPatchBody = completeItemId
       ? { currentAgendaItemId: itemId, completeAgendaItemId: completeItemId }
       : { currentAgendaItemId: itemId };
+    if (completeItemId) this.agendaSvc.markDoneNow(completeItemId);
     this.api.patchMeeting(m.id, body).subscribe({
       next: (updated) => {
         this.meeting.set(updated);
-        if (completeItemId) this.agendaSvc.load(m.id, updated.currentAgendaItemId);
+        if (completeItemId) {
+          this.agendaSvc.settleDone(completeItemId, true);
+          this.agendaSvc.load(m.id, updated.currentAgendaItemId);
+        }
       },
-      error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
+      error: () => {
+        if (completeItemId) this.agendaSvc.settleDone(completeItemId, false);
+        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+      },
     });
   }
 
