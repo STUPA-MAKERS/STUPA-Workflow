@@ -108,7 +108,8 @@ describe('touch styles', () => {
     const items = read('../../vendor/ui-kit/src/styles/_nav-items.scss');
     const body = items.slice(items.indexOf(`@mixin ${mixin}(`));
     expect(body).toContain('.#{$b}__item {\n    @include press.host;');
-    expect(body).toMatch(/\.#\{\$b\}__item:active \.#\{\$b\}__ind::after,[^{]*\{[^}]*@include press\.paint;/);
+    const pressed = body.slice(body.indexOf('.#{$b}__item:active .#{$b}__ind::after,'));
+    expect(pressed).toMatch(/^[\s\S]*?--ripple-r: 32px;\s*@include press\.paint;/);
   });
 
   /**
