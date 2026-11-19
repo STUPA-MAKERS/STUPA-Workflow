@@ -151,7 +151,7 @@
         } @else if (!rows().length) {
           <app-empty-state [heading]="'applications.list.empty' | t">
             @if (activeFilterCount() > 0) {
-              <app-button variant="tonal" size="sm" (click)="reset()"><app-icon name="reset" />
+              <app-button variant="text" size="sm" (click)="reset()">
                 {{ 'applications.list.filter.reset' | t }}
               </app-button>
             }
