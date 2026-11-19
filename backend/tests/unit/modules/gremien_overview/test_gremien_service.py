@@ -268,6 +268,8 @@ async def test_attendance_matrix_rows() -> None:
         result(4),
         result(("2026-05", 2)),
         result((me_id, "2026-05", 2, 0, 0), (guest_id, "2026-05", 1, 1, 1)),
+        result(),
+        result(),
         result((me_id, "vorstand", {"de": "Vorstand"})),
         result((guest_id, 2)),
         result((me_id, "Me", "me"), (guest_id, "Gast", "g")),
@@ -312,6 +314,8 @@ async def test_attendance_of_a_past_term_counts_this_term_only() -> None:
         result(),
         result(),
         result(),
+        result(),
+        result(),
         result((pid, 2)),
         result((pid, "Anna", "anna")),
         result(date(2024, 5, 2), date(2024, 6, 6), date(2025, 1, 9), date(2025, 4, 3)),
@@ -340,11 +344,86 @@ async def test_attendance_of_a_past_term_counts_this_term_only() -> None:
 async def test_attendance_unknown_principal_row() -> None:
     pid = uuid.uuid4()
     out = await _svc(
-        result(), result(), result((pid, "2026-05", 1, 0, 0)), result(), result()
-    ).attendance(
-        G1, ME, from_month="2026-05", to_month="2026-05"
-    )
+        result(),
+        result(),
+        result((pid, "2026-05", 1, 0, 0)),
+        result(),
+        result(),
+        result(),
+        result(),
+    ).attendance(G1, ME, from_month="2026-05", to_month="2026-05")
     assert out.rows[0].display_name is None and not out.rows[0].is_self
+
+
+async def test_attendance_pool_rows() -> None:
+    """§F/meetings/meetings/001310: the pool substitutes follow as own rows.
+
+    Sub took one seat in May and has a present record that is no member attendance,
+    so Sub has a pool row only. Pia has a pool entry and no seat. Mo is a member and in
+    the pool, so Mo has both rows.
+    """
+    mo, sub, pia = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    service = _svc(
+        result(4),
+        result(("2026-05", 2)),
+        result((mo, "2026-05", 2, 0, 0), (sub, "2026-05", 0, 0, 0)),
+        result((sub, "2026-05", 1)),
+        result(pia, mo),
+        result((mo, "member", {"de": "Mitglied"})),
+        result(),
+        result((mo, "Mo", "mo"), (sub, "Sub", "sub"), (pia, "Pia", "me")),
+        gets=(SimpleNamespace(absence_limit=3),),
+    )
+    out = await service.attendance(G1, ME, from_month="2026-05", to_month="2026-06")
+    assert [(r.display_name, r.pool) for r in out.rows] == [
+        ("Mo", False),
+        ("Mo", True),
+        ("Pia", True),
+        ("Sub", True),
+    ]
+    mo_pool, pia_row, sub_row = out.rows[1:]
+    assert [(c.member, c.present, c.excused, c.delegated) for c in sub_row.cells] == [
+        (True, 1, 0, 0),
+        (True, 0, 0, 0),
+    ]
+    assert [c.present for c in mo_pool.cells] == [0, 0]
+    assert pia_row.is_self and pia_row.role_key is None and pia_row.unexcused == 0
+
+
+async def test_member_attendance_pool_states() -> None:
+    """§F/meetings/meetings/001310: a pool row reads seats with the represented member."""
+    pid = uuid.uuid4()
+    m = [uuid.uuid4() for _ in range(2)]
+    day = date(2026, 5, 1)
+    service = _svc(
+        result(pid),
+        result(*((mid, f"S{n}", day, time(18, 0), None, None) for n, mid in enumerate(m))),
+        result((m[1], "Alice")),
+        gets=(SimpleNamespace(display_name="Sub", sub="sub"),),
+    )
+    out = await service.member_attendance(G1, pid, "2026-05", pool=True)
+    assert [(r.status, r.delegate_name) for r in out.meetings] == [
+        ("no_seat", None),
+        ("seat", "Alice"),
+    ]
+
+
+async def test_member_attendance_pool_seat_without_entry() -> None:
+    """A former pool substitute with a seat in the gremium still reads its pool row."""
+    out = await _svc(
+        result(),
+        result(True),
+        result(),
+        gets=(SimpleNamespace(display_name="Sub", sub="sub"),),
+    ).member_attendance(G1, uuid.uuid4(), "2026-05", pool=True)
+    assert out.meetings == []
+
+
+async def test_member_attendance_pool_unrelated() -> None:
+    with pytest.raises(NotFoundError):
+        await _svc(
+            result(), result(None), gets=(SimpleNamespace(display_name="X", sub="x"),)
+        ).member_attendance(G1, uuid.uuid4(), "2026-05", pool=True)
 
 
 async def test_member_attendance_unknown_principal() -> None:

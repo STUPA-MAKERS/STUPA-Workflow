@@ -390,7 +390,8 @@ async def test_attendance_matrix(maker: async_sessionmaker[AsyncSession], app_fo
     """Build the attendance matrix.
 
     The excuse of m1 is a vote transfer, so it counts as delegated only. The pool
-    substitute is no member, so the present record does not count.
+    substitute is no member, so the present record does not count, and the pool seat
+    shows in an own pool row (§F/meetings/meetings/001310).
     """
     w = await _world(maker)
     resp = _client(app_for, w.me).get(
@@ -404,8 +405,11 @@ async def test_attendance_matrix(maker: async_sessionmaker[AsyncSession], app_fo
         {"month": "2026-06", "meetings": 1},
         {"month": "2026-07", "meetings": 0},
     ]
-    rows = {r["displayName"]: r for r in body["rows"]}
-    assert set(rows) == {"Me", "Alice", "Bob", "Sub"}
+    rows = {r["displayName"]: r for r in body["rows"] if not r["pool"]}
+    pool = {r["displayName"]: r for r in body["rows"] if r["pool"]}
+    assert set(rows) == {"Me", "Alice", "Bob"}
+    assert set(pool) == {"Sub"}
+    assert [r["pool"] for r in body["rows"]][-1] is True
     may = lambda name: rows[name]["cells"][0]  # noqa: E731
     assert may("Me") == {
         "month": "2026-05",
@@ -421,13 +425,12 @@ async def test_attendance_matrix(maker: async_sessionmaker[AsyncSession], app_fo
         "excused": 0,
         "delegated": 1,
     }
-    assert may("Sub") == {
-        "month": "2026-05",
-        "member": False,
-        "present": 0,
-        "excused": 0,
-        "delegated": 0,
-    }
+    assert [(c["member"], c["present"]) for c in pool["Sub"]["cells"]] == [
+        (True, 1),
+        (True, 0),
+        (True, 0),
+    ]
+    assert pool["Sub"]["roleKey"] is None and pool["Sub"]["unexcused"] == 0
     assert rows["Bob"]["cells"][1]["member"] is True
     assert rows["Me"]["cells"][1]["excused"] == 1
     assert rows["Me"]["isSelf"] is True
@@ -470,6 +473,23 @@ async def test_member_attendance_detail(
     )
     assert outsider.status_code == 404
     assert outsider.json()["code"] == "member_not_found"
+
+
+async def test_pool_attendance_detail(
+    maker: async_sessionmaker[AsyncSession], app_for: FastAPI
+) -> None:
+    """§F/meetings/meetings/001310: a pool cell lists the seats with the member."""
+    w = await _world(maker)
+    client = _client(app_for, w.me)
+    url = f"/api/committees/{w.gremium_id}/attendance/{w.ids['sub']}"
+    body = client.get(url, params={"month": "2026-05", "pool": "true"}).json()
+    states = [(m["title"], m["status"], m["delegateName"]) for m in body["meetings"]]
+    assert states == [("Sitzung m1", "seat", "Alice"), ("Sitzung m2", "no_seat", None)]
+    alice = client.get(
+        f"/api/committees/{w.gremium_id}/attendance/{w.ids['alice']}",
+        params={"month": "2026-05", "pool": "true"},
+    )
+    assert alice.status_code == 404
 
 
 async def test_decisions(maker: async_sessionmaker[AsyncSession], app_for: FastAPI) -> None:

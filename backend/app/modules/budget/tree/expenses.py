@@ -16,6 +16,7 @@ from app.modules.budget.tree.service_base import (
     BudgetTreeServiceBase,
     _applied,
     _json_safe,
+    _set_invoice_status,
     _subtree_ids,
 )
 from app.modules.budget.tree_models import (
@@ -169,6 +170,9 @@ class ExpenseOps(BudgetTreeServiceBase):
             invoice_id=payload.invoice_id,
         )
         self.session.add(expense)
+        paid_invoice = (
+            await self._pay_invoice(payload.invoice_id) if payload.invoice_id is not None else False
+        )
         await self._audit(
             AuditAction.BUDGET_EXPENSE_CREATE,
             target_type="budget_expense",
@@ -179,10 +183,13 @@ class ExpenseOps(BudgetTreeServiceBase):
                 "kind": payload.kind,
                 "amount": str(payload.amount),
                 "applicationId": (str(payload.application_id) if payload.application_id else None),
+                **(
+                    {"invoiceId": str(payload.invoice_id), "invoicePaid": True}
+                    if paid_invoice
+                    else {}
+                ),
             },
         )
-        if payload.invoice_id is not None:
-            await self._require_invoice(payload.invoice_id)
         if commit:
             await self.session.commit()
         names = await self._actor_names({expense.actor} if expense.actor else set())
@@ -240,12 +247,32 @@ class ExpenseOps(BudgetTreeServiceBase):
         await self._refuse_not_leaf(node, year)
         return node, year, None
 
-    async def _require_invoice(self, invoice_id: UUID) -> None:
-        """Make sure that the invoice of a booking exists.
+    async def _pay_invoice(self, invoice_id: UUID) -> bool:
+        """Set the invoice of a new booking to `paid` (spec 001290).
 
-        A booking does not change the status of its invoice. The invoice stays
-        `open` ("Verbucht" in the list) until a user marks it `paid` with an
-        invoice update. A part booking thus does not close the invoice.
+        A booking that is created with an invoice pays that invoice. The return value
+        tells if this booking changed the status, so the audit entry can record it and
+        a revert of the booking can set the invoice back to `open`. An invoice that is
+        already `paid` stays as it is, and the return value is False.
+
+        Raises:
+            NotFoundError: The invoice does not exist. The check happens here so
+                the request fails with 404 instead of on the foreign key at
+                commit time.
+        """
+        inv = await self.session.get(Invoice, invoice_id)
+        if inv is None:
+            raise NotFoundError(f"invoice {invoice_id} not found")
+        if inv.status == "paid":
+            return False
+        _set_invoice_status(inv, "paid")
+        return True
+
+    async def _require_invoice(self, invoice_id: UUID) -> None:
+        """Make sure that the invoice of an edited booking exists.
+
+        The edit of a booking does not change the status of its invoice. Only the
+        create of a booking pays its invoice (spec 001290).
 
         Raises:
             NotFoundError: The invoice does not exist. The check happens here so
