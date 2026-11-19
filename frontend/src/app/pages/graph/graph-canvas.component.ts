@@ -337,7 +337,16 @@ export class GraphCanvasComponent {
 
   private run(): void {
     if (this.frame !== null) return;
-    this.frame = requestAnimationFrame(() => this.tick());
+    this.frame = this.nextFrame(() => this.tick());
+  }
+
+  /** The frame of the layout. Angular asks for frames of its own, so the layout has its own door. */
+  protected nextFrame(step: FrameRequestCallback): number {
+    return requestAnimationFrame(step);
+  }
+
+  protected dropFrame(frame: number): void {
+    cancelAnimationFrame(frame);
   }
 
   private tick(): void {
@@ -349,7 +358,7 @@ export class GraphCanvasComponent {
   }
 
   private stop(): void {
-    if (this.frame !== null) cancelAnimationFrame(this.frame);
+    if (this.frame !== null) this.dropFrame(this.frame);
     this.frame = null;
     this.alpha = 0;
   }

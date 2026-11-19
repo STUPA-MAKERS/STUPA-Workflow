@@ -29,8 +29,12 @@ const LINES = [line('a', 'b'), line('b', 'c', 'builtin'), line('a', 'gone')];
 /** The frames that the component asked for; `run` plays them until none is left. */
 function frames() {
   const queue: FrameRequestCallback[] = [];
-  const request = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => queue.push(cb));
-  const cancel = jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+  const door = GraphCanvasComponent.prototype as unknown as {
+    nextFrame: (cb: FrameRequestCallback) => number;
+    dropFrame: (frame: number) => void;
+  };
+  const request = jest.spyOn(door, 'nextFrame').mockImplementation((cb) => queue.push(cb));
+  const cancel = jest.spyOn(door, 'dropFrame').mockImplementation(() => undefined);
   const run = (): number => {
     let played = 0;
     while (queue.length > 0) {
