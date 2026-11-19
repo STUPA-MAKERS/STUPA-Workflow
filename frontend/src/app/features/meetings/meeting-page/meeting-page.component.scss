@@ -359,3 +359,16 @@
     color: var(--field-bg);
   }
 }
+
+/* Very high contrast (spec 000605): the vote card in the place of the text and the dock have
+   the white edge of every surface; the page behind them is black like they are. */
+@include d.host-on(veryHigh) {
+  .mp__inPlace {
+    border: var(--vh-edge);
+    border-radius: var(--radius-xl);
+  }
+  // The floating dock is a surface too, so it has the same edge.
+  .mp__dock:not(.mp__dock--quiet) {
+    border: var(--vh-edge);
+  }
+}
