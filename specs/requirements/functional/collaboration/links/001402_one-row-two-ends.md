@@ -2,12 +2,12 @@
 id: "001402"
 title: A link is one row with two typed ends
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
-  - backend/app/modules/todos
-  - backend/migrations/versions
+  - backend/app/modules/todos/models.py
+  - backend/migrations/versions/c4d1e2f3a5b6_link_any_to_any.py
 scope:
   - backend/app/modules/todos
 ---

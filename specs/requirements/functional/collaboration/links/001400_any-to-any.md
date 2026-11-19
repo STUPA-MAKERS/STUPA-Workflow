@@ -2,11 +2,12 @@
 id: "001400"
 title: Any two elements can link to each other
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
-  - backend/app/modules/todos
+  - backend/app/modules/todos/link_service.py
+  - backend/app/modules/todos/models.py
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos

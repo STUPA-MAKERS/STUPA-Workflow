@@ -2,7 +2,7 @@
 id: "001406"
 title: The Vorgänger stays its own relation
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:

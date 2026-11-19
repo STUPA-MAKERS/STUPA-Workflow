@@ -2,12 +2,12 @@
 id: "001409"
 title: The links have their own API
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
-  - backend/app/modules/todos
-  - mcp/antragsplattform_mcp/tools/todos.py
+  - backend/app/modules/todos/links_router.py
+  - mcp/antragsplattform_mcp/tools/links.py
 scope:
   - backend/app/modules/todos
   - mcp/

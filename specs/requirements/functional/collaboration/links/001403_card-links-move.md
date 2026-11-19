@@ -2,11 +2,12 @@
 id: "001403"
 title: The card links move to the new table
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
-  - backend/migrations/versions
+  - backend/migrations/versions/c4d1e2f3a5b6_link_any_to_any.py
+  - backend/app/modules/todos/link_store.py
 scope:
   - backend/app/modules/todos
 ---

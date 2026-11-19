@@ -2,11 +2,11 @@
 id: "001404"
 title: A person links what the person reads and writes on one end
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
-  - backend/app/modules/todos
+  - backend/app/modules/todos/link_rights.py
 scope:
   - backend/app/modules/todos
 ---
@@ -20,11 +20,11 @@ change at least one of them. The change right of each kind must be:
 | --- | --- |
 | Antrag | the edit right of the Antrag |
 | meeting, TOP | `session.manage` in the Gremium of the meeting |
-| vote | `vote.manage` in the Gremium of the vote |
+| vote | `vote.manage` or `session.manage` in the Gremium of the vote |
 | Termin | the creator, or `calendar.manage` |
 | Gremium | `admin.gremien` |
-| invoice, Buchung | `budget.book` on the cost centre |
-| cost centre | `budget.structure` on the cost centre |
+| invoice, Buchung | `budget.book` |
+| cost centre | `budget.structure` |
 | ticket | `ticket.manage` |
 | card | `todo.write` on the board of the card |
 

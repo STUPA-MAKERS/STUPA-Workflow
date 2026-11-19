@@ -2,11 +2,12 @@
 id: "001405"
 title: Only a card gives read access to its links
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
-  - backend/app/modules/todos
+  - backend/app/modules/todos/link_service.py
+  - backend/app/modules/todos/links.py
 scope:
   - backend/app/modules/todos
 ---
