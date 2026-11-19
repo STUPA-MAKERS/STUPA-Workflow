@@ -22,6 +22,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.principal import Principal
@@ -141,12 +142,33 @@ class LinkService:
     async def _cards(
         self, ends: Sequence[LinkEnd], principal: Principal
     ) -> list[tuple[LinkEnd, TodoCard, TodoBoard]]:
-        """The card ends with their boards, locked for the change."""
+        """The card ends with their boards, locked for the change.
+
+        The boards lock in the order of their ids, so two changes of the same two cards
+        wait for each other and never deadlock, and the second sees the first link.
+        """
+        boards: list[tuple[str, LinkEnd]] = []
+        for end in ends:
+            if end[0] != "todo":
+                continue
+            card = await self.session.get(TodoCard, end[1])
+            boards.append((str(card.board_id) if card is not None else "", end))
         return [
             (end, *(await self.todos.card_end(end[1], principal, write=False)))
-            for end in ends
-            if end[0] == "todo"
+            for _board, end in sorted(boards, key=lambda pair: pair[0])
         ]
+
+    async def _commit_new(self) -> None:
+        """Commit a new link; a parallel equal link is ``link_exists``.
+
+        Raises:
+            ConflictError: ``link_exists`` (HTTP 409).
+        """
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise ConflictError("The elements are linked.", code="link_exists") from exc
 
     async def add(self, one: LinkEnd, other: LinkEnd, principal: Principal) -> LinksOut:
         """Link two elements and return the links of ``one``.
@@ -164,16 +186,16 @@ class LinkService:
         ):
             raise _invalid("The element was not found.", "link_target_not_found", "b")
         await self._check_change(one, other, principal)
+        cards = await self._cards((one, other), principal)
         if await link_store.link_between(self.session, one, other) is not None:
             raise ConflictError("The elements are linked.", code="link_exists")
         actor = await self.todos.actor_of(principal)
-        cards = await self._cards((one, other), principal)
         for end, card, _board in cards:
             await self.todos.check_new_link(card, other if end == one else one)
         self.session.add(Link.between(one, other, actor))
         for end, card, board in cards:
             self.todos.note_link(card, board, other if end == one else one, actor, added=True)
-        await self.session.commit()
+        await self._commit_new()
         return await self.of(one[0], one[1], principal)
 
     async def remove(self, link_id: uuid.UUID, principal: Principal) -> None:

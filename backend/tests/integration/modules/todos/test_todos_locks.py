@@ -24,6 +24,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.auth.principal import Principal
+from app.modules.todos.link_service import LinkService
+from app.modules.todos.models import Link
 from app.modules.todos.schemas import CardCreate, CardMove, CardPatch, CardTransfer, LabelCreate
 from app.modules.todos.service import TodoService
 from app.shared.errors import ConflictError
@@ -128,13 +130,8 @@ async def test_the_agenda_path_locks_the_board_before_the_meeting(
         agenda = asyncio.create_task(add_to_agenda())
         await asyncio.sleep(0.3)
         assert not agenda.done()
-        await creator.execute(
-            text(
-                "INSERT INTO todo_link (id, card_id, meeting_id, created_by) "
-                "VALUES (:i, :c, :m, :p)"
-            ),
-            {"i": uuid.uuid4(), "c": card_id, "m": meeting.id, "p": admin_id},
-        )
+        creator.add(Link.between(("todo", card_id), ("meeting", meeting.id), admin_id))
+        await creator.flush()
         await creator.execute(
             text("UPDATE todo_board SET updated_at = now() WHERE id = :b"), {"b": bid}
         )
@@ -152,7 +149,6 @@ async def test_two_ticket_closes_lock_the_boards_in_one_order(
     """
     from app.modules.tickets.models import Ticket
     from app.modules.todos.hooks import TicketTodoBridge
-    from app.modules.todos.models import TodoLink
 
     admin, admin_id = await add_person(maker, "Admin")
     lead = Principal(sub=admin.sub, roles=["admin"])
@@ -171,7 +167,7 @@ async def test_two_ticket_closes_lock_the_boards_in_one_order(
             for board_id in boards:
                 payload = CardCreate.model_validate({"boardId": str(board_id), "title": "K"})
                 created = await TodoService(session).create(payload, lead)
-                session.add(TodoLink(card_id=created.id, ticket_id=ticket_id, created_by=admin_id))
+                session.add(Link.between(("todo", created.id), ("ticket", ticket_id), admin_id))
                 await session.commit()
 
     async def close(ticket_id: uuid.UUID) -> None:
@@ -258,7 +254,7 @@ async def test_two_identical_links_and_labels_give_one_409(
 
     async def link() -> Any:
         async with maker() as session:
-            return await TodoService(session).add_link(ids[0], "todo", ids[1], me)
+            return await LinkService(session).add(("todo", ids[0]), ("todo", ids[1]), me)
 
     async def label() -> Any:
         async with maker() as session:
@@ -320,9 +316,9 @@ async def test_two_cards_on_two_boards_link_each_other_at_once(
 ) -> None:
     """Let two cards on two boards link each other at the same time.
 
-    The link a1 -> b1 holds a1 the way ``add_link`` does. The link b1 -> a1 must not wait
-    for it, because its foreign key check needs only KEY SHARE on a1. Then a1 shows the
-    link of b1 and refuses the second link back (spec 000573, ``link_exists``).
+    A link change locks the boards of its card ends in the order of their ids, so the
+    link a1 - b1 and the link b1 - a1 wait for each other instead of deadlocking. The
+    second sees the first and answers ``link_exists`` (spec 001400).
     """
     admin, _admin_id = await add_person(maker, "Admin")
     lead = Principal(sub=admin.sub, roles=["admin"])
@@ -338,19 +334,25 @@ async def test_two_cards_on_two_boards_link_each_other_at_once(
             for bid in (board_a, board_b)
         ]
 
-    async def link_b_to_a() -> int:
+    async def link(one: uuid.UUID, other: uuid.UUID) -> int:
         async with maker() as session:
-            return len((await TodoService(session).add_link(b1, "todo", a1, lead)).links)
+            out = await LinkService(session).add(("todo", one), ("todo", other), lead)
+            return len(out.links)
 
     async with maker() as holder:
-        service = TodoService(holder)
-        await service._card(a1, lead, lock=True)
-        linked = await asyncio.wait_for(asyncio.create_task(link_b_to_a()), 5)
-        assert linked == 1
-        assert len((await service.card(a1, lead)).links) == 1
-        with pytest.raises(ConflictError) as exc:
-            await service.add_link(a1, "todo", b1, lead)
-        assert exc.value.code == "link_exists"
+        low = min(board_a, board_b, key=str)
+        await holder.execute(text("SELECT id FROM todo_board WHERE id = :b FOR UPDATE"), {"b": low})
+        tasks = [asyncio.create_task(link(a1, b1)), asyncio.create_task(link(b1, a1))]
+        await asyncio.sleep(0.3)
+        assert not any(task.done() for task in tasks)
+        await holder.commit()
+    results = await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), 10)
+    errors = [r for r in results if isinstance(r, BaseException)]
+    assert [r for r in results if not isinstance(r, BaseException)] == [1]
+    assert len(errors) == 1
+    assert isinstance(errors[0], ConflictError) and errors[0].code == "link_exists"
+    async with maker() as session:
+        assert len((await TodoService(session).card(a1, lead)).links) == 1
 
 
 @pytest.mark.parametrize("write", ["move", "patch", "archive", "checklist"])

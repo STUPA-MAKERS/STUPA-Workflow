@@ -7,15 +7,14 @@ id and gets the other end of each link. ``Edge`` is a link as one end sees it.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Collection, Sequence
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import ColumnElement, CompoundSelect, Select, and_, literal, or_, select, union_all
+from sqlalchemy import ColumnElement, CompoundSelect, Select, and_, literal, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.todos.grouping import grouped
 from app.modules.todos.models import Link, LinkEnd, ordered_ends
 
 
@@ -114,34 +113,6 @@ def pair_condition(one: LinkEnd, other: LinkEnd) -> ColumnElement[bool]:
     return and_(Link.a_kind == a_kind, Link.a_id == a_id, Link.b_kind == b_kind, Link.b_id == b_id)
 
 
-def any_end(end: LinkEnd) -> ColumnElement[bool]:
-    """The condition of every link with the end ``end``."""
-    kind, target_id = end
-    return or_(
-        and_(Link.a_kind == kind, Link.a_id == target_id),
-        and_(Link.b_kind == kind, Link.b_id == target_id),
-    )
-
-
 async def link_between(session: AsyncSession, one: LinkEnd, other: LinkEnd) -> Link | None:
     """The link between two ends, if any."""
     return await session.scalar(select(Link).where(pair_condition(one, other)))
-
-
-def edge_of(link: Link, own: LinkEnd) -> Edge:
-    """The link as the end ``own`` sees it."""
-    kind, target_id = link.other(own)
-    return Edge(
-        id=link.id,
-        own_kind=own[0],
-        own_id=own[1],
-        kind=kind,
-        target_id=target_id,
-        created_by=link.created_by,
-        created_at=link.created_at,
-    )
-
-
-def ends_by_kind(found: Sequence[Edge]) -> dict[str, set[uuid.UUID]]:
-    """The other ends of the edges, grouped by kind."""
-    return {kind: set(ids) for kind, ids in grouped(e.target for e in found).items()}

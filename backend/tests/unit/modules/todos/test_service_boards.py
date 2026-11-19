@@ -26,6 +26,7 @@ from tests.unit.modules.todos.fakes import (
     card,
     column,
     label,
+    link,
 )
 
 OUT = object()
@@ -214,7 +215,10 @@ async def test_patch_column_renames_and_moves_the_done_flag() -> None:
     new_done = card(b, first)
     kept = card(b, first, completed_at=svc_mod._now())
     ticket = uuid.uuid4()
-    session = ScriptedSession(scalars=[[first, done], [old_done], [new_done, kept], [ticket]])
+    session = ScriptedSession(
+        scalars=[[first, done], [old_done], [new_done, kept]],
+        execute=[[link(new_done.id, ticket_id=ticket)]],
+    )
     session.put(b, first, done)
     service = _svc(session)
     _stub(service)
@@ -245,7 +249,10 @@ async def test_patch_column_does_not_tell_tickets_of_archived_cards() -> None:
     archived = card(b, waiting, archived_at=svc_mod._now())
     live = card(b, waiting)
     ticket = uuid.uuid4()
-    session = ScriptedSession(scalars=[[waiting, done], [], [archived, live], [ticket]])
+    session = ScriptedSession(
+        scalars=[[waiting, done], [], [archived, live]],
+        execute=[[link(live.id, ticket_id=ticket)]],
+    )
     session.put(b, waiting, done)
     service = _svc(session)
     _stub(service)

@@ -175,7 +175,7 @@ async def test_a_switch_keeps_the_records_and_the_search_follows_it(
             return [hit["kind"] for hit in found["hits"]]
 
         def link_targets() -> list[str]:
-            found = client.get("/api/todos/link-targets", params={"q": "Schalterprobe"})
+            found = client.get("/api/links/targets", params={"q": "Schalterprobe"})
             assert found.status_code == 200, found.text
             return [target["kind"] for target in found.json()]
 

@@ -128,21 +128,22 @@ async def test_the_personal_board_flow(api: Api, maker: async_sessionmaker[Async
             json={"body": "x", "mentions": [str(uuid.uuid4())]},
         )
         assert stranger.status_code == 422
-        detail = _ok(
-            client.post(
-                f"/api/todos/cards/{a['id']}/links", json={"kind": "todo", "targetId": c["id"]}
-            )
-        )
-        assert detail["links"][0]["accessible"] is True and detail["links"][0]["title"] == "Cee"
-        again = client.post(
-            f"/api/todos/cards/{a['id']}/links", json={"kind": "todo", "targetId": c["id"]}
-        )
-        assert again.status_code == 409
-        hits = _ok(client.get("/api/todos/link-targets?q=Cee&kind=todo"))
+        pair = {"a": {"kind": "todo", "id": a["id"]}, "b": {"kind": "todo", "id": c["id"]}}
+        added = _ok(client.post("/api/links", json=pair), 201)
+        assert added["links"][0]["accessible"] is True and added["links"][0]["title"] == "Cee"
+        detail = _ok(client.get(f"/api/todos/cards/{a['id']}"))
+        assert detail["links"][0]["title"] == "Cee"
+        back = {"a": pair["b"], "b": pair["a"]}
+        assert client.post("/api/links", json=back).status_code == 409
+        hits = _ok(client.get("/api/links/targets?q=Cee&kind=todo"))
         assert c["id"] in {h["targetId"] for h in hits}
-        newest = _ok(client.get("/api/todos/link-targets?kind=todo"))
+        newest = _ok(client.get("/api/links/targets?kind=todo"))
         assert c["id"] in {h["targetId"] for h in newest}
-        assert _ok(client.get("/api/todos/link-targets?q=C&kind=meeting")) == []
+        mine_hits = _ok(
+            client.get(f"/api/links/targets?q=Cee&kind=todo&excludeKind=todo&excludeId={a['id']}")
+        )
+        assert c["id"] not in {h["targetId"] for h in mine_hits}
+        assert _ok(client.get("/api/links/targets?q=C&kind=meeting")) == []
         mine = _ok(client.get("/api/todos/mine"))
         assert [i["title"] for i in mine["items"]] == ["A2"] and mine["dueSoonCount"] == 1
         assert client.delete(f"/api/todos/cards/{c['id']}").status_code == 204
@@ -269,8 +270,9 @@ async def test_ticket_coupling_and_back_references(
         tid = next(t["id"] for t in tickets if t["number"] == number)
         card = _card(client, str(bid), "Fix", links=[{"kind": "ticket", "targetId": tid}])
         assert card["primaryLink"]["detail"]["number"] == number
-        linked = _ok(client.get(f"/api/todos/linked?kind=ticket&targetId={tid}"))
-        assert [c["id"] for c in linked] == [card["id"]]
+        linked = _ok(client.get(f"/api/links?kind=ticket&id={tid}"))
+        assert [row["targetId"] for row in linked["links"]] == [card["id"]]
+        assert linked["links"][0]["card"]["title"] == "Fix" and linked["canLink"] is True
         assert _ok(client.get(f"/api/tickets/{tid}"))["openTodoCount"] == 1
         done = _ok(
             client.patch(f"/api/tickets/{tid}", json={"status": "done", "completeTodos": True})
@@ -316,8 +318,8 @@ async def test_a_card_becomes_an_agenda_item(
         detail = _ok(client.get(f"/api/todos/cards/{card['id']}"))
         assert detail["links"][0]["kind"] == "agenda_item"
         assert detail["links"][0]["detail"]["position"] == 1
-        linked = _ok(client.get(f"/api/todos/linked?kind=meeting&targetId={meeting.id}"))
-        assert linked == []
+        linked = _ok(client.get(f"/api/links?kind=meeting&id={meeting.id}"))
+        assert linked["links"] == []
         personal = next(b for b in _ok(client.get("/api/todos/boards")) if b["kind"] == "personal")
         mine = _card(client, personal["id"], "Privat")
         wrong = client.post(f"/api/meetings/{meeting.id}/agenda", json={"todoId": mine["id"]})
@@ -392,20 +394,18 @@ async def test_votes_gremien_invoices_and_bookings_as_link_targets(
         assert by_kind["invoice"]["detail"]["amount"] == "119.00"
         assert by_kind["expense"]["detail"]["costCentre"] == node.path_key
         assert by_kind["expense"]["url"] == f"/expenses?id={ids['expense']}"
-        for kind, target in ids.items():
-            linked = _ok(client.get(f"/api/todos/linked?kind={kind}&targetId={target}"))
-            assert [c["id"] for c in linked] == [card["id"]]
-        found = _ok(client.get("/api/todos/link-targets?q=Plakate"))
+        for kind in ("invoice", "expense"):
+            linked = _ok(client.get(f"/api/links?kind={kind}&id={ids[kind]}"))
+            assert [row["targetId"] for row in linked["links"]] == [card["id"]]
+        found = _ok(client.get("/api/links/targets?q=Plakate"))
         assert {(h["kind"], h["targetId"]) for h in found} >= {
             ("vote", str(ids["vote"])),
             ("expense", str(ids["expense"])),
         }
-        assert {h["kind"] for h in _ok(client.get("/api/todos/link-targets?q=RE-77"))} >= {
-            "invoice"
-        }
+        assert {h["kind"] for h in _ok(client.get("/api/links/targets?q=RE-77"))} >= {"invoice"}
         assert ("gremium", str(gid)) in {
             (h["kind"], h["targetId"])
-            for h in _ok(client.get("/api/todos/link-targets?q=Finanzer&kind=gremium"))
+            for h in _ok(client.get("/api/links/targets?q=Finanzer&kind=gremium"))
         }
 
         api.login(lead)
@@ -417,10 +417,13 @@ async def test_votes_gremien_invoices_and_bookings_as_link_targets(
         assert by_kind["invoice"]["url"] is None
         assert by_kind["expense"]["granted"] is True and by_kind["expense"]["url"] is None
         assert by_kind["vote"]["accessible"] is True and by_kind["gremium"]["accessible"] is True
-        assert _ok(client.get("/api/todos/link-targets?q=RE-77&kind=invoice")) == []
+        assert _ok(client.get("/api/links/targets?q=RE-77&kind=invoice")) == []
         bad = client.post(
-            f"/api/todos/cards/{card['id']}/links",
-            json={"kind": "invoice", "targetId": str(uuid.uuid4())},
+            "/api/links",
+            json={
+                "a": {"kind": "todo", "id": card["id"]},
+                "b": {"kind": "invoice", "id": str(uuid.uuid4())},
+            },
         )
         assert bad.status_code == 422
 
