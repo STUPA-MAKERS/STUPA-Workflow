@@ -18,7 +18,7 @@ specs/
     functional/
       administration/  accounts, admin, audit, backups, files, privacy, translations
       applications/    applications, dashboard, flow, forms
-      collaboration/   activity, committees, notifications, search, tickets, todos
+      collaboration/   activity, committees, links, notifications, search, tickets, todos
       finance/         budget, invoices
       integrations/    external, mcp, webhooks
       meetings/        calendar, delegations, meetings, protocols, voting
@@ -229,6 +229,16 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/committees/001013](requirements/functional/collaboration/committees/001013_info-markdown.md) | The Info text is sanitized Markdown | approved |
 | [F/collaboration/committees/001014](requirements/functional/collaboration/committees/001014_info-save.md) | An Info save is versioned and audited | approved |
 | [F/collaboration/committees/001015](requirements/functional/collaboration/committees/001015_info-empty.md) | An empty Info tab shows only to its editors | approved |
+| [F/collaboration/links/001400](requirements/functional/collaboration/links/001400_any-to-any.md) | Any two elements can link to each other | draft |
+| [F/collaboration/links/001401](requirements/functional/collaboration/links/001401_no-direction.md) | A link has no direction | draft |
+| [F/collaboration/links/001402](requirements/functional/collaboration/links/001402_one-row-two-ends.md) | A link is one row with two typed ends | draft |
+| [F/collaboration/links/001403](requirements/functional/collaboration/links/001403_card-links-move.md) | The card links move to the new table | draft |
+| [F/collaboration/links/001404](requirements/functional/collaboration/links/001404_link-rights.md) | A person links what the person reads and writes on one end | draft |
+| [F/collaboration/links/001405](requirements/functional/collaboration/links/001405_only-card-grants.md) | Only a card gives read access to its links | draft |
+| [F/collaboration/links/001406](requirements/functional/collaboration/links/001406_predecessor-stays.md) | The Vorgänger stays its own relation | draft |
+| [F/collaboration/links/001407](requirements/functional/collaboration/links/001407_one-linked-section.md) | Each element shows all its links in Verknüpft | draft |
+| [F/collaboration/links/001408](requirements/functional/collaboration/links/001408_one-picker.md) | Verknüpfen searches every kind | draft |
+| [F/collaboration/links/001409](requirements/functional/collaboration/links/001409_links-api.md) | The links have their own API | draft |
 | [F/collaboration/notifications/000151](requirements/functional/collaboration/notifications/000151_task-mail-recipients.md) | Task mails go only to who can act | approved |
 | [F/collaboration/notifications/000152](requirements/functional/collaboration/notifications/000152_team-mails-opt-in.md) | Team mails about Anträge are off by default | approved |
 | [F/collaboration/notifications/000153](requirements/functional/collaboration/notifications/000153_sandboxed-templates.md) | Mail placeholders use camelCase | approved |
