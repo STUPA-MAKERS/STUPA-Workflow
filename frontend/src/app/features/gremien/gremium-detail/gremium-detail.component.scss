@@ -64,6 +64,11 @@
 .gd__head .gd__titleRow {
   padding-block: 6px;
 }
+// The logo is the top of the head, so its top edge, not the capitals of the title, is as far
+// from the top of the sheet as from the side (6px of the 60px line are above the logo).
+.gd__bar {
+  --sheet-bar-cap: 6px;
+}
 .gd__title {
   min-width: 0;
 }

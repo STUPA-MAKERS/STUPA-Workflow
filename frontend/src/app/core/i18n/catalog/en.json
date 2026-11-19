@@ -4119,8 +4119,6 @@
   "meetings.agenda.planStart": "approx. {time}",
   "meetings.agenda.planActual": "{time}",
   "meetings.agenda.planMinutes": "{n} min",
-  "meetings.agenda.planEnd": "End approx. {time}",
-  "meetings.agenda.planTotal": "Duration approx. {n} min",
   "meetings.agenda.duration": "Duration",
   "meetings.agenda.durationUnit": "min",
   "meetings.agenda.durationEdit": "Change duration",

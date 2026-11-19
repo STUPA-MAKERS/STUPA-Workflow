@@ -46,8 +46,8 @@ describe('rounded sheet styles', () => {
   });
 
   /**
-   * Below wide the body is the one scroll area: its edges are the card edges, with their radius and
-   * the shared fade (the rule is nested in the below-wide media query). The side column shares its
+   * Below wide the body is the one scroll area: its edges are the card edges, with their radius,
+   * and the content cuts at them without a fade (the rule is nested in the below-wide media query). The side column shares its
    * scroll rule with the agenda; the radius is a rule of its own.
    */
   it('makes the session page and the participant view pane pages with round card columns', () => {
@@ -58,8 +58,9 @@ describe('rounded sheet styles', () => {
     // The vote cards are a side sheet, not a column (spec 001460).
     expect(meetingPage).not.toMatch(/\.mp__body--wide \.mp__votes/);
     expect(meetingPage).toMatch(
-      /\.mp__body:not\(\.mp__body--wide\) \{[^}]*margin-inline: var\(--space-3\);[^}]*padding-inline: 0;[^}]*border-radius: var\(--radius-xl\);[^}]*@include fade\.fade-y/,
+      /\.mp__body:not\(\.mp__body--wide\) \{[^}]*margin-inline: var\(--space-3\);[^}]*padding-inline: 0;[^}]*border-radius: var\(--radius-xl\);/,
     );
+    expect(meetingPage).not.toContain('fade.fade-y');
     expect(followView).toMatch(
       /\n\.fv__body--wide \.fv__side \{[^}]*border-radius: var\(--radius-xl\);/,
     );

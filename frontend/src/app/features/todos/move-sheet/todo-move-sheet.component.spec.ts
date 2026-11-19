@@ -32,6 +32,10 @@ describe('TodoMoveSheetComponent', () => {
     expect(screen.queryByRole('button', { name: 'In anderes Board verschieben' })).toBeNull();
     expect(screen.getByRole('radio', { name: /In Arbeit/ })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: 'Offen' })).toHaveTextContent(/^\s*Offen\s*$/);
+    // Spec 001380: the rows of the select sheet, the check mark after the chosen name only.
+    expect(screen.getByRole('radiogroup', { name: 'Spalte' })).toHaveClass('rowgroup', 'rowgroup--bg3');
+    expect(screen.getByRole('radio', { name: /In Arbeit/ }).querySelector('.ms__check')).not.toBeNull();
+    expect(screen.getByRole('radio', { name: 'Offen' }).querySelector('.ms__check')).toBeNull();
     fireEvent.click(screen.getByRole('radio', { name: 'Erledigt' }));
     fixture.componentInstance.setPosition('bottom');
     fixture.detectChanges();
@@ -66,7 +70,9 @@ describe('TodoMoveSheetComponent', () => {
   it('offers the other board: the row closes the sheet and emits transfer', async () => {
     const { moved, transfer, dismissed, openSheet, fixture } = await setup('c-2', true);
     openSheet();
-    fireEvent.click(screen.getByRole('button', { name: 'In anderes Board verschieben' }));
+    const row = screen.getByRole('button', { name: 'In anderes Board verschieben' });
+    expect(row.parentElement).toHaveClass('rowgroup', 'rowgroup--bg3');
+    fireEvent.click(row);
     expect(transfer).toHaveBeenCalledTimes(1);
     expect(moved).not.toHaveBeenCalled();
     expect(dismissed).not.toHaveBeenCalled();

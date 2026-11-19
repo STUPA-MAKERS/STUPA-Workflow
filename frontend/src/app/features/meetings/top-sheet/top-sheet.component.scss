@@ -24,7 +24,9 @@
   flex: none;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-5) 28px var(--space-2);
+  // The capitals of the kicker sit 28px below the top edge, as far as the text from the side:
+  // 5px of its 18px line are above the capitals.
+  padding: 23px 28px var(--space-2);
 }
 .ts__done {
   flex: none;
@@ -278,15 +280,6 @@
 }
 .ts__keepers app-icon {
   flex: none;
-}
-
-// The text scrolls inside the sheet on a wider screen: its top end fades below the title
-// while lines lie above it. The foot ends at the round edge of the sheet.
-@include bp.not-phone {
-  .ts__editor.is-fade-start {
-    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--space-5));
-    mask-image: linear-gradient(to bottom, transparent, #000 var(--space-5));
-  }
 }
 
 @include bp.phone {

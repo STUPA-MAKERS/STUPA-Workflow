@@ -1,6 +1,5 @@
 @use 'field' as f;
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use '../../shared/ui/surface-card' as sc;
 
 :host {
@@ -48,9 +47,6 @@
 }
 .ff--sheet .ff__body {
   padding: var(--space-2) 0 var(--ff-fab-room);
-}
-.ff__body {
-  @include fade.fade-y(var(--ff-fade));
 }
 
 .ff__cols {

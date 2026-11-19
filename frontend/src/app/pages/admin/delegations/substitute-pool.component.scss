@@ -1,4 +1,3 @@
-@use 'scroll-fade' as fade;
 
 :host {
   display: block;
@@ -92,6 +91,8 @@
   color: var(--color-text-muted);
 }
 
+// The list cuts hard at its own rounded frame, and its rows run to the sides of the frame
+// (000193).
 .sp__hits {
-  @include fade.fade-y(var(--space-5));
+  border-radius: var(--radius-lg);
 }

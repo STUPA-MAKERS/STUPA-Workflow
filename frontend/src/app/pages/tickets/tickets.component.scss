@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use 'list-pane' as lp;
 
 // The same two panes as applications-list.component.scss and voting.component.scss.
@@ -45,9 +44,6 @@
 }
 .tk--split .tk__scroll > * {
   flex: none;
-}
-.tk__scroll {
-  @include fade.fade-y(var(--tk-fade));
 }
 
 .tk__rows {

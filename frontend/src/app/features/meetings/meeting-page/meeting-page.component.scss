@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use 'frosted' as *;
 @use 'display' as d;
 
@@ -11,6 +10,12 @@
   margin-block: calc(var(--app-top-safe-area, 0px) - var(--main-pad-top, var(--space-8)))
     calc(-1 * var(--main-pad-bottom, var(--space-8)));
   margin-inline: calc(-1 * var(--layout-gutter));
+}
+// The content keeps 12px of space to the navigation rail (001440).
+@include bp.not-phone {
+  :host {
+    padding-inline-start: var(--space-3);
+  }
 }
 
 .mp__muted {
@@ -137,8 +142,14 @@
 }
 .mp__body--wide .mp__agenda {
   grid-area: agenda;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
-  overflow-y: auto;
+}
+// The agenda pane is a split head over its list, and only the list scrolls (001440).
+.mp__body--wide .mp__agenda > * {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .mp__body--wide .mp__main {
   grid-area: main;
@@ -155,7 +166,6 @@
     padding-inline: 0;
     border-radius: var(--radius-xl);
     overscroll-behavior: contain;
-    @include fade.fade-y(var(--space-6));
   }
 }
 
@@ -237,9 +247,6 @@
   }
 }
 
-.mp__agenda {
-  @include fade.fade-y(var(--space-5));
-}
 
 // The format tools in the phone dock (`#formatTpl`), like the tools of the sheet bar.
 .mp__tool {
