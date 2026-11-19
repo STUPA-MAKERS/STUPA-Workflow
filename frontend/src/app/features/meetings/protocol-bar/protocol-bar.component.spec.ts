@@ -6,6 +6,7 @@ import type { Meeting, Protocol } from '@core/api/models';
 import { meeting, protocol } from '../../../../testing/meeting-fixtures';
 import { signal } from '@angular/core';
 import { MeetingSessionService } from '../meeting-session.service';
+import { FileOpenService } from '@shared/viewer/file-open.service';
 import { ProtocolBarComponent } from './protocol-bar.component';
 
 const closed = (over: Partial<Meeting> = {}) => meeting({ status: 'closed', ...over });
@@ -29,12 +30,14 @@ async function setup(m: Meeting, p: Protocol, opts: { session?: boolean; compact
   const finalize = jest.fn();
   const session = fakeSession();
   const api = { listMeetings: jest.fn(() => of(opts.meetings ?? [])) };
+  const files = { open: jest.fn(), click: jest.fn() };
   const view = await render(ProtocolBarComponent, {
     inputs: { meeting: m, protocol: p, compact: opts.compact ?? false },
     on: { finalize },
     providers: [
       ...(opts.session === false ? [] : [{ provide: MeetingSessionService, useValue: session }]),
       { provide: ApiClient, useValue: api },
+      { provide: FileOpenService, useValue: files },
     ],
   });
   const labels = () => view.fixture.componentInstance.menuItems().map((i) => i.label);
@@ -46,7 +49,7 @@ async function setup(m: Meeting, p: Protocol, opts: { session?: boolean; compact
     await view.fixture.whenStable();
     view.fixture.detectChanges();
   };
-  return { ...view, finalize, session, api, labels, select };
+  return { ...view, finalize, session, api, files, labels, select };
 }
 
 /** § 001304: the protocol part of the meeting head. */
@@ -246,6 +249,44 @@ describe('ProtocolBarComponent', () => {
     it('offers no switch outside the meeting page (no session)', async () => {
       const { labels } = await setup(closed(), pub(), { session: false });
       expect(labels()).not.toContain('Nicht veröffentlichen');
+    });
+  });
+
+  /** § 001304: the PDF items of the menu open the file viewer, with the title of the meeting. */
+  describe('PDF items', () => {
+    const opened = (files: { open: jest.Mock }) => files.open.mock.calls.map(([f]) => (f as { url: string }).url);
+
+    it('opens the final PDF and the public one', async () => {
+      const { fixture, files } = await setup(closed(), final({ pdfUrl: '/p.pdf', publicPdfUrl: '/pub.pdf' }), { compact: true });
+      const bar = fixture.componentInstance;
+      expect(bar.select('protocol.pdf')).toBe(true);
+      expect(bar.select('protocol.pdfPublic')).toBe(true);
+      expect(opened(files)).toEqual(['/p.pdf', '/pub.pdf']);
+      expect(files.open.mock.calls[0][0]).toEqual(expect.objectContaining({ kind: 'pdf', name: expect.stringContaining('PDF intern') }));
+    });
+
+    it('opens both variants of the draft PDF', async () => {
+      const { fixture, files } = await setup(closed(), protocol());
+      const bar = fixture.componentInstance;
+      expect(bar.select('protocol.draftPdf')).toBe(true);
+      expect(bar.select('protocol.draftPdfPublic')).toBe(true);
+      expect(opened(files)).toEqual([expect.stringMatching(/draft-pdf$/), expect.stringMatching(/draft-pdf\?variant=public$/)]);
+    });
+
+    it('opens nothing for a PDF the protocol does not have, and leaves other ids to the page', async () => {
+      const { fixture, files } = await setup(meeting(), protocol());
+      const bar = fixture.componentInstance;
+      for (const id of ['protocol.pdf', 'protocol.pdfPublic', 'protocol.draftPdf', 'protocol.draftPdfPublic']) {
+        expect(bar.select(id)).toBe(true);
+      }
+      expect(files.open).not.toHaveBeenCalled();
+      expect(bar.select('meeting.edit')).toBe(false);
+    });
+
+    it('opens the head link in the file viewer', async () => {
+      const { files } = await setup(closed(), final({ pdfUrl: '/p.pdf' }));
+      await userEvent.click(screen.getByRole('link', { name: 'PDF' }));
+      expect(files.click).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ url: '/p.pdf' }));
     });
   });
 });
