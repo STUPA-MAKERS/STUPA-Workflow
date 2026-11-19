@@ -5,7 +5,7 @@ import { USE_MOCK_API } from '@core/api/api.config';
 import type { Principal } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { createLocationMock, provideLocationMock } from '../../testing/location-mock';
-import { ADMIN_PAGES } from '../pages/admin/admin-frame/admin-pages';
+import { ADMIN_PAGES } from '../pages/admin/admin-list/admin-pages';
 import { ADMIN_AREA_PERMISSIONS, BOTTOM_BAR_KEYS, NAV_ITEMS, NavService } from './nav.service';
 import { routes } from '../app.routes';
 

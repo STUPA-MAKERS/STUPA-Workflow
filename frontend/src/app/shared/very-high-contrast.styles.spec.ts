@@ -121,11 +121,6 @@ describe('rowsAndFills (§000619, §000621)', () => {
     expect(RULES).toMatch(/\.cal__num:not\(\.cal__num--today\) \{\s*color: var\(--vh-hi\) !important;/);
   });
 
-  it('fills the open page and the chosen tile of the admin frame', () => {
-    const fill = selectorsOf('  .af__item--on,', 'fill');
-    expect(fill).toContain('.ah__tile--on');
-  });
-
   it('turns the text of the chosen budget node black', () => {
     expect(RULES).toMatch(/\.tn--on \{\s*@include vh\.ink\(var\(--vh-bg\), var\(--vh-bg\)\);/);
   });

@@ -3,8 +3,8 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { DetailNoneComponent } from '@stupa-makers/ui-kit';
 
 /**
- * The sheet of `/account` before an account page is open. Only the wide frame shows it,
- * beside the account navigation; below wide the navigation is the whole page.
+ * The detail pane of `/account` before an account page is open (spec 000665). Only the
+ * side-by-side layout shows it; one pane at a time, the list of Konto fills the screen.
  */
 @Component({
   selector: 'app-account-none',

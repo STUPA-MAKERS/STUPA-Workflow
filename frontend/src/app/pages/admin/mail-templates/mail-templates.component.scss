@@ -27,30 +27,30 @@
   gap: 2px;
 }
 
-:host-context(.af--split) {
+:host-context(.adl--split) {
   display: flex;
   flex: 1 1 0;
   flex-direction: column;
   min-height: 0;
 }
-:host-context(.af--split) .mt {
+:host-context(.adl--split) .mt {
   flex: 1 1 0;
   min-height: 0;
 }
-:host-context(.af--split) .mt__layout {
+:host-context(.adl--split) .mt__layout {
   flex: 1 1 0;
   grid-template-rows: minmax(0, 1fr);
   align-items: stretch;
   min-height: 0;
 }
-:host-context(.af--split) .mt__list,
-:host-context(.af--split) .mt__editor {
+:host-context(.adl--split) .mt__list,
+:host-context(.adl--split) .mt__editor {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 // The editor cuts at a round frame, like the list of a dialog (spec 000193).
-:host-context(.af--split) .mt__editor {
+:host-context(.adl--split) .mt__editor {
   border-radius: var(--radius-field);
 }
 .mt__list {

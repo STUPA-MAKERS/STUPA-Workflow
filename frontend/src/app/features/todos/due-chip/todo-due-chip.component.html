@@ -9,7 +9,7 @@
          hold the visible text (WCAG 2.5.3). -->
     <span class="sr-only">{{ (text() ? 'todos.due.change' : 'todos.due.set') | t: { date: '' } }}</span>
     <app-icon name="cal" [size]="15" />
-    <span>{{ text() ?? ('todos.due.none' | t) }}</span>
+    <span class="chip__text">{{ text() ?? ('todos.due.none' | t) }}</span>
     @if (!disabled()) {
       <app-icon class="dc__chev" name="down" [size]="15" />
     }

@@ -119,9 +119,6 @@
   .hm__item {
     @include vh.text;
   }
-  .af__item:not(.af__item--on) .af__icon {
-    color: var(--vh-hi) !important;
-  }
 
   // A choice card (000618): a vote option, a vote option for a person that the voter
   // stands in for, and a card of the Antrag type.
@@ -174,12 +171,7 @@
     color: var(--vh-hi) !important;
   }
 
-  // The open page of the admin frame, its chosen tile and the chosen node of the budget
-  // tree are yellow fills (000619, 000621).
-  .af__item--on,
-  .ah__tile--on {
-    @include vh.fill;
-  }
+  // The chosen node of the budget tree has black text on its fill (000621).
   .tn--on {
     @include vh.ink(var(--vh-bg), var(--vh-bg));
   }
