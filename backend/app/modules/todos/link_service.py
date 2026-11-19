@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -58,14 +59,25 @@ def _order(row: LinkRow) -> tuple[bool, int, float]:
     )
 
 
+@dataclass(frozen=True, slots=True)
 class LinkService:
-    """The links of the elements, as one principal sees and changes them."""
+    """The links of the elements, as one principal sees and changes them.
 
-    def __init__(self, session: AsyncSession, todos: TodoService | None = None) -> None:
-        """Bind the service to a session; the to-do service gives the cards and the rules."""
-        self.session = session
-        self.todos = todos or TodoService(session)
-        self.rights = LinkRights(session, self.todos.access)
+    Attributes:
+        session: The database session.
+        todos: The to-do service; it gives the cards and the read rules.
+        rights: The check whether the principal changes an element.
+    """
+
+    session: AsyncSession
+    todos: TodoService
+    rights: LinkRights
+
+    @classmethod
+    def on(cls, session: AsyncSession, todos: TodoService | None = None) -> LinkService:
+        """Build the service on a session, with the given to-do service or a new one."""
+        cards = todos or TodoService(session)
+        return cls(session, cards, LinkRights(session, cards.access))
 
     async def _reads(self, end: LinkEnd, principal: Principal) -> bool:
         """Tell if the principal reads the element by the rule of its kind."""
@@ -141,15 +153,24 @@ class LinkService:
     async def _cards(
         self, ends: Sequence[LinkEnd], principal: Principal
     ) -> list[tuple[LinkEnd, TodoCard, TodoBoard]]:
-        """The card ends with their boards, locked for the change."""
+        """The card ends with their boards, locked for the change.
+
+        The boards lock in the order of their ids, so two changes of the same two cards
+        wait for each other and never deadlock, and the second sees the first link.
+        """
+        boards = [(await self._board_of(end[1]), end) for end in ends if end[0] == GRANTING_KIND]
         return [
             (end, *(await self.todos.card_end(end[1], principal, write=False)))
-            for end in ends
-            if end[0] == "todo"
+            for _board, end in sorted(boards, key=lambda pair: pair[0])
         ]
 
-    async def add(self, one: LinkEnd, other: LinkEnd, principal: Principal) -> LinksOut:
-        """Link two elements and return the links of ``one``.
+    async def _board_of(self, card_id: uuid.UUID) -> str:
+        """The board id of a card as text, empty for a card that does not exist."""
+        card = await self.session.get(TodoCard, card_id)
+        return str(card.board_id) if card is not None else ""
+
+    async def add(self, one: LinkEnd, other: LinkEnd, principal: Principal) -> None:
+        """Link two elements; the caller commits, and a parallel equal link then fails.
 
         Raises:
             ValidationProblem: ``link_self`` or ``link_target_not_found`` (HTTP 422).
@@ -164,20 +185,18 @@ class LinkService:
         ):
             raise _invalid("The element was not found.", "link_target_not_found", "b")
         await self._check_change(one, other, principal)
+        cards = await self._cards((one, other), principal)
         if await link_store.link_between(self.session, one, other) is not None:
             raise ConflictError("The elements are linked.", code="link_exists")
         actor = await self.todos.actor_of(principal)
-        cards = await self._cards((one, other), principal)
         for end, card, _board in cards:
             await self.todos.check_new_link(card, other if end == one else one)
         self.session.add(Link.between(one, other, actor))
         for end, card, board in cards:
             self.todos.note_link(card, board, other if end == one else one, actor, added=True)
-        await self.session.commit()
-        return await self.of(one[0], one[1], principal)
 
     async def remove(self, link_id: uuid.UUID, principal: Principal) -> None:
-        """Remove a link from both ends (spec 001401).
+        """Remove a link from both ends (spec 001401); the caller commits.
 
         Raises:
             NotFoundError: The link does not exist (HTTP 404).
@@ -195,7 +214,6 @@ class LinkService:
         await self.session.delete(link)
         for end, card, board in cards:
             self.todos.note_link(card, board, link.other(end), actor, added=False)
-        await self.session.commit()
 
     async def view(self, link_id: uuid.UUID, principal: Principal) -> TodoLinkView:
         """The read sheet of the other end of a card that the principal reads (000487).

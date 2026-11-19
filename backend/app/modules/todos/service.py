@@ -2170,7 +2170,7 @@ class TodoService:
             NotFoundError: The card is not readable (HTTP 404).
             ForbiddenError: ``write`` and the caller does not write the card (HTTP 403).
         """
-        return await self._card(card_id, principal, lock=write, write=write)
+        return await self._card(card_id, principal, lock=True, write=write)
 
     async def check_new_link(self, card: TodoCard, other: tuple[str, uuid.UUID]) -> None:
         """Refuse a link that would give the Antrag, Buchung or invoice a second Event.

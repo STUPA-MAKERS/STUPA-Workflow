@@ -20,7 +20,8 @@ baseline (0001), because the model sits in ``app.models``; it gets the triggers 
 
 The downgrade creates ``todo_link`` again with the links that have a card end, drops the
 triggers, the function and ``link``. A link without a card end is lost, because
-``todo_link`` has no place for it.
+``todo_link`` has no place for it. A link between two cards becomes one row, with the
+``a`` end as the card, because ``todo_link`` showed one row from both cards.
 
 Revision ID: c4d1e2f3a5b6
 Revises: a4c71e2b9d05
@@ -173,7 +174,8 @@ def downgrade() -> None:
         """
     )
     for kind, _table, column in KINDS:
-        for own, other in (("a", "b"), ("b", "a")):
+        sides = (("a", "b"),) if kind == "todo" else (("a", "b"), ("b", "a"))
+        for own, other in sides:
             op.execute(
                 f"""
                 INSERT INTO todo_link (id, card_id, {column}, created_by, created_at)

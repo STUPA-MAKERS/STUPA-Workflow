@@ -10,7 +10,7 @@ import pytest
 
 from app.modules.auth.principal import Principal
 from app.modules.todos import service as svc_mod
-from app.modules.todos.models import TodoLink
+from app.modules.todos.models import Link
 from app.modules.todos.service import TodoService, berlin_today
 from app.shared.errors import ForbiddenError, NotFoundError, ValidationProblem
 from tests.unit.modules.todos.fakes import (
@@ -186,24 +186,23 @@ async def test_all_boards_lists_every_board_with_all_live_cards(
     assert "todo_assignee" not in cards_sql
 
 
-async def test_linked_sorts_open_first_then_by_due_date() -> None:
-    assert await _svc(ScriptedSession()).linked("ticket", uuid.uuid4(), TOKEN) == []
-    assert await _svc(ScriptedSession(execute=[[]])).linked("ticket", uuid.uuid4(), USER) == []
+async def test_linked_cards_read_the_live_readable_cards() -> None:
+    assert await _svc(ScriptedSession()).linked_cards([uuid.uuid4()], TOKEN) == {}
+    assert await _svc(ScriptedSession()).linked_cards([], USER) == {}
+    assert await _svc(ScriptedSession(execute=[[]])).linked_cards([uuid.uuid4()], USER) == {}
     b = board()
     open_col, done = column(b.id), column(b.id, "Erledigt", 1, is_done=True)
     today = berlin_today()
     a = card(b, open_col, title="b", due_date=today)
-    z = card(b, open_col, title="a")
     finished = card(b, done, title="c", due_date=today)
-    earlier = card(b, open_col, title="d", due_date=today - timedelta(days=1))
     session = ScriptedSession(
-        execute=[[(finished, b, done), (z, b, open_col), (a, b, open_col), (earlier, b, open_col)]],
+        execute=[[(finished, b, done), (a, b, open_col)]],
         scalars=[[]],
     )
-    out = await _svc(session).linked("meeting", uuid.uuid4(), USER)
-    assert [c.title for c in out] == ["d", "b", "a", "c"]
-    assert out[-1].is_done is True
-    assert "todo_link.meeting_id" in str(session.statements[0])
+    out = await _svc(session).linked_cards([a.id, finished.id], USER)
+    assert set(out) == {a.id, finished.id}
+    assert out[finished.id].is_done is True and out[a.id].column_name == open_col.name
+    assert "todo_card.archived_at IS NULL" in str(session.statements[0])
 
 
 async def test_search_is_scoped() -> None:
@@ -254,8 +253,9 @@ async def test_link_agenda_item_once() -> None:
     await service.link_agenda_item(c, ITEM, USER)
     assert session.added == []
     await service.link_agenda_item(c, ITEM, USER)
-    (new,) = [o for o in session.added if isinstance(o, TodoLink)]
-    assert new.agenda_item_id == ITEM and b.updated_at != stamp
+    (new,) = [o for o in session.added if isinstance(o, Link)]
+    assert new.has_end(("agenda_item", ITEM)) and new.has_end(("todo", c.id))
+    assert b.updated_at != stamp
     orphan = card(board(), column(uuid.uuid4()))
     await service.link_agenda_item(orphan, ITEM, USER)
     assert session.committed == 0

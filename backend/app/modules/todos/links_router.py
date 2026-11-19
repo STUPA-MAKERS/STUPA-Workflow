@@ -22,6 +22,7 @@ from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response, status
+from sqlalchemy.exc import IntegrityError
 
 from app.deps import require_principal
 from app.modules.auth.principal import Principal
@@ -35,7 +36,7 @@ from app.modules.todos.schemas import (
     TodoLinkTarget,
     TodoLinkView,
 )
-from app.shared.errors import ProblemDetail
+from app.shared.errors import ConflictError, ProblemDetail
 
 router = APIRouter(prefix="/links", tags=["links"])
 
@@ -51,7 +52,7 @@ Member = Annotated[Principal, Depends(require_principal())]
 
 def get_link_service(service: ServiceDep) -> LinkService:
     """The link service on top of the to-do service, so that the board pings go out."""
-    return LinkService(service.session, todos=service)
+    return LinkService.on(service.session, todos=service)
 
 
 LinkServiceDep = Annotated[LinkService, Depends(get_link_service)]
@@ -75,10 +76,18 @@ async def list_links(
     responses=_errors(401, 403, 404, 409, 422),
 )
 async def add_link(payload: LinkCreate, service: LinkServiceDep, principal: Member) -> LinksOut:
-    """Link two elements; the answer is the links of ``a``."""
-    return await service.add(
-        (payload.a.kind, payload.a.id), (payload.b.kind, payload.b.id), principal
-    )
+    """Link two elements; the answer is the links of ``a``.
+
+    A parallel equal link fails at the commit on ``uq_link_ends``: 409 ``link_exists``.
+    """
+    one = (payload.a.kind, payload.a.id)
+    await service.add(one, (payload.b.kind, payload.b.id), principal)
+    try:
+        await service.session.commit()
+    except IntegrityError as exc:
+        await service.session.rollback()
+        raise ConflictError("The elements are linked.", code="link_exists") from exc
+    return await service.of(*one, principal)
 
 
 @router.get("/targets", response_model=list[TodoLinkTarget], responses=_errors(401, 422))
@@ -110,6 +119,7 @@ async def link_targets(
 async def remove_link(link_id: UUID, service: LinkServiceDep, principal: Member) -> Response:
     """Remove a link from both of its elements (spec 001401)."""
     await service.remove(link_id, principal)
+    await service.session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
