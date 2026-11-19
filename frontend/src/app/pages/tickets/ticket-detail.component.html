@@ -77,14 +77,11 @@
       </app-sheet-bar>
 
       <p class="sheet-line td__line">
-        <app-status-text [kind]="statusKind()">{{ statusLabel() }}</app-status-text>
-        <span class="td__dot" aria-hidden="true">·</span>
-        <span class="mono">{{ ticket.number }}</span>
-        <span class="td__dot" aria-hidden="true">·</span>
-        <span>{{ kindLabel() }}</span>
+        <span class="td__part"><app-status-text chip [kind]="statusKind()">{{ statusLabel() }}</app-status-text></span>
+        <span class="td__part mono">{{ ticket.number }}</span>
+        <span class="td__part">{{ kindLabel() }}</span>
         @if (manager) {
-          <span class="td__dot" aria-hidden="true">·</span>
-          <span>{{ assigneeName() }}</span>
+          <span class="td__part">{{ assigneeName() }}</span>
         }
       </p>
 

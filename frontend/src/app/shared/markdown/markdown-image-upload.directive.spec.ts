@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { fireEvent, render } from '@testing-library/angular';
 import { Subject } from 'rxjs';
@@ -11,6 +11,7 @@ const ID = '0b8f3c3e-4d6a-4f43-9a1e-2f0c1d2e3f40';
 const ID2 = '1b8f3c3e-4d6a-4f43-9a1e-2f0c1d2e3f40';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
   standalone: true,
   imports: [FormsModule, MarkdownImageUploadDirective],
   template: `<textarea

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
@@ -27,13 +27,16 @@ import { ApplicationsPageService } from './applications-page.service';
 import { loadErrorToast } from '../../../testing/load-error';
 
 /** The detail of the outlet. The detail has its own spec; here only the route matters. */
-@Component({ standalone: true, template: '<p>detail</p>' })
+@Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
+  standalone: true, template: '<p>detail</p>'
+})
 class DetailStub {}
 
-@Component({ standalone: true, template: '' })
+@Component({ changeDetection: ChangeDetectionStrategy.Eager, standalone: true, template: '' })
 class NoneStub {}
 
-@Component({ standalone: true, template: '' })
+@Component({ changeDetection: ChangeDetectionStrategy.Eager, standalone: true, template: '' })
 class ApplyStub {}
 
 const SUBMITTED: StateOutWire = {

@@ -62,9 +62,8 @@
   text-decoration: none;
   cursor: pointer;
   transition:
-    background-color var(--motion-fast) var(--ease-standard),
-    scale var(--motion-xs) var(--ease-standard);
-  @include press.press($scale: row);
+    background-color var(--motion-fast) var(--ease-standard);
+  @include press.press;
 }
 @media (hover: hover) {
   .home__choice:hover {

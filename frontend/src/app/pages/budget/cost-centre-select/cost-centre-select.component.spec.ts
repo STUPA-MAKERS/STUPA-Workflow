@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { BudgetAllocationView, BudgetTreeNode } from '../budget-tree.api';
@@ -74,6 +74,7 @@ const TREE: BudgetTreeNode[] = [
 ];
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
   standalone: true,
   imports: [CostCentreSelectComponent],
   template: `
@@ -501,6 +502,7 @@ describe('CostCentreSelectComponent', () => {
 
   it('shows the card of a transfer leg with the projected lines and no chevron', async () => {
     @Component({
+      changeDetection: ChangeDetectionStrategy.Eager,
       standalone: true,
       imports: [CostCentreSelectComponent],
       template: `<app-cost-centre-select variant="card" label="Von" [nodes]="nodes" value="erst"
@@ -524,6 +526,7 @@ describe('CostCentreSelectComponent', () => {
    */
   it('runs as a filter chip with "Alle" on top, and names an unknown id', async () => {
     @Component({
+      changeDetection: ChangeDetectionStrategy.Eager,
       standalone: true,
       imports: [CostCentreSelectComponent],
       template: `<app-cost-centre-select
@@ -572,6 +575,7 @@ describe('CostCentreSelectComponent', () => {
 
   it('names "Alle" in the field while no cost centre is picked', async () => {
     @Component({
+      changeDetection: ChangeDetectionStrategy.Eager,
       standalone: true,
       imports: [CostCentreSelectComponent],
       template: `<app-cost-centre-select label="Kostenstelle" allLabel="Keine" [nodes]="nodes" value="" />`,

@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use 'list-pane' as lp;
 
 // The same two panes as applications-list.component.scss.
@@ -23,9 +22,6 @@
 }
 .tasks--split .tasks__scroll > * {
   flex: none;
-}
-.tasks__scroll {
-  @include fade.fade-y(var(--tasks-fade));
 }
 
 // The to-do section below the month groups.

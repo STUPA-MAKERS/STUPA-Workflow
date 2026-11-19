@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -1617,6 +1617,7 @@ describe('ChatComponent', () => {
      */
     it('keeps the files of the page (ChatDrafts) when a layout switch re-creates the chat', async () => {
       @Component({
+        changeDetection: ChangeDetectionStrategy.Eager,
         standalone: true,
         imports: [ChatComponent],
         providers: [ChatDrafts],

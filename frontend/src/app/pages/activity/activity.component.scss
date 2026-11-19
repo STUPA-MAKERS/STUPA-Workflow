@@ -1,4 +1,3 @@
-@use 'scroll-fade' as fade;
 @use 'list-pane' as lp;
 @use 'press';
 @use 'field' as f;
@@ -23,7 +22,6 @@
 .act__scroll {
   @include lp.scroll(--act-fade);
   padding-bottom: var(--space-6);
-  @include fade.fade-y(var(--act-fade));
 }
 
 .act__groups,
@@ -94,8 +92,7 @@
   white-space: nowrap;
   text-decoration: none;
   transition: filter var(--motion-fast) var(--ease-standard),
-    background-color var(--motion-fast) var(--ease-standard),
-    scale var(--motion-xs) var(--ease-standard);
+    background-color var(--motion-fast) var(--ease-standard);
   @include f.highlight-surface;
   @include press.chrome-text;
   @include press.press;

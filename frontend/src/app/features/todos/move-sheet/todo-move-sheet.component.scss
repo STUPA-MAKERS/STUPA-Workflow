@@ -1,4 +1,5 @@
 @use 'field' as f;
+@use 'option-menu' as om;
 :host {
   display: contents;
 }
@@ -8,45 +9,36 @@
   gap: var(--space-3);
   padding-bottom: var(--space-3);
 }
-.ms__list {
-  display: flex;
-  flex-direction: column;
-  margin-inline: calc(-1 * var(--space-4));
-}
+/* The rows of the select sheet (spec 001380): tiles of a row group on surface 3, the
+   chosen row with the check mark after its name. */
 .ms__row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 48px;
-  padding: 0 var(--space-4);
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  font-weight: var(--fw-medium);
-  text-align: start;
-  cursor: pointer;
+  @include om.option;
+  @include om.option-sheet;
 }
-.ms__row--on {
-  background: var(--color-selected);
-  color: var(--color-on-selected);
-  @include f.highlight-chosen;
-}
-.ms__row--transfer {
-  margin-inline: calc(-1 * var(--space-4));
-  border-top: var(--border-width) solid var(--color-border);
+@media (hover: hover) {
+  .ms__row:hover {
+    @include om.option-hover;
+  }
 }
 .ms__row:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
+  @include om.option-focus;
 }
-.ms__radio {
-  flex: none;
+.ms__row--on .ms__name {
+  font-weight: var(--fw-semibold);
+}
+.ms__row--on {
+  @include f.highlight-chosen;
 }
 .ms__name {
   flex: 1 1 auto;
   min-width: 0;
+}
+.ms__check {
+  @include om.check;
+}
+.ms__go {
+  flex: none;
+  color: var(--color-text-muted);
 }
 .ms__foot {
   display: flex;

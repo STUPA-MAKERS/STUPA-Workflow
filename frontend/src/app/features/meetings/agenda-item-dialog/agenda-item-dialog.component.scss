@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use '../../../shared/ui/dialog-form' as df;
 @use 'field' as f;
 
@@ -68,7 +67,6 @@
   gap: 2px;
   min-height: 0;
   overflow-y: auto;
-  @include fade.fade-y(var(--space-5));
 }
 
 .aid__row {
@@ -143,4 +141,10 @@
   border-radius: var(--radius-lg);
   background: var(--color-surface-3);
   cursor: pointer;
+}
+
+// The list cuts hard at its own rounded frame, and its rows run to the sides of the frame
+// (000193).
+.aid__list {
+  border-radius: var(--radius-lg);
 }

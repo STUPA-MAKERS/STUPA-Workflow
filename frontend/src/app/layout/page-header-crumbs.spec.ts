@@ -1,4 +1,4 @@
-import { Component, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import { ListDetailBarComponent, ListDetailNav, PageHeaderComponent } from '@stupa-makers/ui-kit';
@@ -6,6 +6,7 @@ import { BreadcrumbsComponent } from './breadcrumbs.component';
 
 /** A page header as the pages write it: the breadcrumbs of the app in the `[crumbs]` slot. */
 @Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
   standalone: true,
   imports: [PageHeaderComponent, BreadcrumbsComponent],
   template: `
@@ -20,6 +21,7 @@ class PageComponent {
 
 /** An admin page on a phone: the frame shows the bar, the page has its header. */
 @Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
   standalone: true,
   imports: [ListDetailBarComponent, PageHeaderComponent, BreadcrumbsComponent],
   providers: [ListDetailNav],

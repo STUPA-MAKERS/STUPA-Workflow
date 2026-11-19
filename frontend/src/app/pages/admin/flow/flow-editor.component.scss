@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use 'press';
 @use 'display' as d;
 
@@ -187,8 +186,7 @@
     opacity var(--motion-base, 200ms) var(--ease-standard, ease),
     background var(--motion-fast, 120ms) var(--ease-standard, ease),
     color var(--motion-fast, 120ms) var(--ease-standard, ease),
-    border-color var(--motion-fast, 120ms) var(--ease-standard, ease),
-    scale var(--motion-xs) var(--ease-standard);
+    border-color var(--motion-fast, 120ms) var(--ease-standard, ease);
   @include press.press;
 }
 .fe__tongue--on {
@@ -512,7 +510,6 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: thin;
-    @include fade.fade-y(var(--space-5));
   }
 }
 

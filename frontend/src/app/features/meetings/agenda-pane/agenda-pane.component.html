@@ -79,9 +79,6 @@
       </li>
     }
   </ol>
-  @if (planEnd(); as end) {
-    <p class="ap__plan-end" [class.ap__plan-end--over]="plan().overrun">{{ end }}</p>
-  }
 } @else {
   <app-empty-state shape="agenda" rows="3" [heading]="'meetings.agenda.empty' | t" />
 }
