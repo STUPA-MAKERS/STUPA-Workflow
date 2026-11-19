@@ -20,8 +20,8 @@ On a phone, while a vote of the open item is open, the page must show the card o
 the place of the text of the item.
 
 1. Every person sees the vote card there: the voters, the lead and the minute-taker.
-2. A button "Text" above the card shows the text again. A button "Abstimmung" above the text
-   shows the card again. The choice holds until the vote ends.
+2. A switch "Abstimmung | Text" above the card shows the text instead, and back. The choice
+   holds until the vote ends.
 3. When the vote closes or is cancelled, the text comes back.
 4. The other votes of the item stay in the side sheet (001460).
 

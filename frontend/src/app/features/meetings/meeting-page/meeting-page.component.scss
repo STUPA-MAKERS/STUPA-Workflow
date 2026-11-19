@@ -105,6 +105,21 @@
   flex: 1 1 auto;
   min-height: 24rem;
 }
+// The open vote in the place of the text on a phone (spec 001461): the switch to the text on
+// top, the card below it.
+.mp__swap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.mp__swapSeg {
+  align-self: center;
+}
+// The sheet stays in the page behind the card, so the editor keeps its state.
+.mp__sheet[hidden] {
+  display: none;
+}
 // The application and the to-dos of the item sit above the sheet, so the sheet holds only
 // the protocol.
 .mp__linked {
@@ -120,10 +135,6 @@
   padding: 0 var(--space-3) 0 0;
   overflow: hidden;
 }
-.mp__body--wide.mp__body--votes {
-  grid-template-columns: 320px minmax(0, 1fr) 320px;
-  grid-template-areas: 'agenda main votes';
-}
 .mp__body--wide .mp__agenda {
   grid-area: agenda;
   min-height: 0;
@@ -135,14 +146,6 @@
 }
 .mp__body--wide .mp__sheet {
   min-height: 0;
-}
-.mp__body--wide .mp__votes {
-  grid-area: votes;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  border-radius: var(--radius-xl);
-  scroll-padding-block: var(--space-4);
 }
 
 // The radius of the cards, so a card that scrolls past an end is clipped round, not straight.
@@ -234,8 +237,7 @@
   }
 }
 
-.mp__agenda,
-.mp__votes {
+.mp__agenda {
   @include fade.fade-y(var(--space-5));
 }
 
