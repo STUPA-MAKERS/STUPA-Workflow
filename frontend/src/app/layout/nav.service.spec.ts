@@ -63,7 +63,7 @@ describe('NavService', () => {
 
   /** § F/collaboration/graph/001420 and 001421: the entry "Graph" needs `graph.view`. */
   it('opens the graph with graph.view, after the tickets', () => {
-    expect(keysFor({ ...BASE, permissions: ['graph.view'] })).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', 'graph']);
+    expect(keysFor({ ...BASE, permissions: ['graph.view'] })).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', 'graph', 'protocols', 'decisions', 'publicCalendar']);
     const item = NAV_ITEMS.find((i) => i.key === 'graph');
     expect(item).toMatchObject({ path: '/graph', labelKey: 'nav.graph', permissions: ['graph.view'], place: 'main' });
     expect(NAV_ITEMS.findIndex((i) => i.key === 'graph')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'tickets') + 1);
