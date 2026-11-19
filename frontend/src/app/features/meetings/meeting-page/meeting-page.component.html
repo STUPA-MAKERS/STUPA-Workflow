@@ -253,7 +253,7 @@
     [title]="'meetings.vote.count' | t"
     (click)="votesOpen.set(true)"
   >
-    <app-icon name="chevron-left" [size]="16" />
+    <app-icon name="left" [size]="16" />
     <app-icon name="vote" [size]="20" />
     @if (votes().length) {
       <span class="mp__edgeBadge num" aria-hidden="true">{{ votes().length }}</span>
