@@ -36,6 +36,13 @@
       "to": "Application"
     },
     {
+      "column": "replaces_id",
+      "from": "Application",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Application"
+    },
+    {
       "column": "type_id",
       "from": "Application",
       "multiplicity": "*",
@@ -1449,6 +1456,18 @@
           "nullable": true,
           "primaryKey": false,
           "type": "DATE"
+        },
+        {
+          "name": "replaces_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "draft_reminder_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
         },
         {
           "name": "id",
@@ -5860,6 +5879,12 @@
         },
         {
           "name": "is_denied",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "is_replaced_target",
           "nullable": false,
           "primaryKey": false,
           "type": "BOOLEAN"
