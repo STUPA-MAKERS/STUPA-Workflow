@@ -768,11 +768,11 @@ export interface ApplicationState {
   /** State kind: normal|vote. */
   readonly kind: string;
   /** Set only when true: the initial state, so the Antrag is a draft (001710). */
-  readonly isInitial?: true;
+  readonly isInitial?: boolean;
   /** Set only when true: a terminal state. */
-  readonly isTerminal?: true;
+  readonly isTerminal?: boolean;
   /** Set only when true: a denied state. */
-  readonly isDenied?: true;
+  readonly isDenied?: boolean;
 }
 
 export interface Applicant {
@@ -1007,7 +1007,7 @@ export interface Transition {
    */
   readonly allowsDecision?: boolean;
   /** Set only when true: the target is terminal, so the applicant page asks first (001712). */
-  readonly toTerminal?: true;
+  readonly toTerminal?: boolean;
 }
 
 /** A changed field cell, frontend view. The `key` comes out of the diff map. */
