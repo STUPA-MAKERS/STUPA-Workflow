@@ -12,7 +12,6 @@
   background: var(--tile-bg);
   color: var(--color-text);
   cursor: grab;
-  transition: scale var(--motion-xs) var(--ease-standard);
 }
 :host-context([data-theme='dark']) {
   --tile-bg: var(--color-surface-3);
@@ -24,10 +23,17 @@
     --tile-bg: var(--tile-hover);
   }
 }
-// The press of the kit (`_press.scss`) on the tile.
-:host(:active) {
-  background-image: linear-gradient(var(--press-tint), var(--press-tint));
-  @include press.press-scale(row);
+// The ripple of the kit (`_press.scss`) on the tile. The host is the tile, so the mixin
+// `press` (which presses `&:active`) does not fit `:host`.
+:host {
+  @include press.host;
+}
+:host(:active),
+:host([data-press-key]) {
+  @include press.paint;
+}
+:host([data-press-out]:not(:active)) {
+  @include press.fade;
 }
 :host(.long-press) {
   -webkit-touch-callout: none;

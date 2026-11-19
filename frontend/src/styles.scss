@@ -156,7 +156,6 @@ app-dialog {
   color: var(--color-text);
   font-weight: var(--fw-semibold);
   text-decoration: none;
-  transition: scale var(--motion-xs) var(--ease-standard);
   @include press.press;
   @include press.chrome-text;
 }
