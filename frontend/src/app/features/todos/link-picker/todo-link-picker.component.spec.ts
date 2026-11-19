@@ -171,7 +171,7 @@ describe('TodoLinkPickerComponent', () => {
     expect(linkTargets).toHaveBeenCalledTimes(calls);
     fireEvent.click(screen.getByRole('button', { name: 'TOPs' }));
     expect(screen.getByRole('button', { name: 'TOPs' })).toHaveAttribute('aria-pressed', 'true');
-    expect(linkTargets).toHaveBeenLastCalledWith('Haushalt', 'agenda_item', 'k-1');
+    expect(linkTargets).toHaveBeenLastCalledWith('Haushalt', 'agenda_item', { kind: 'todo', id: 'k-1' });
   });
 
   it('shows the shared empty state when nothing matches', async () => {
