@@ -152,7 +152,7 @@
           <span class="ad__parts">
             @if (application.state) {
               <span class="ad__part">
-                <app-status-text [kind]="stateKind()">{{ application.state.label }}</app-status-text>
+                <app-status-text badge [kind]="stateKind()">{{ application.state.label }}</app-status-text>
               </span>
             }
             @if (typeName(); as type) {

@@ -19,7 +19,7 @@
     <p class="sheet-line fd__line fd__seps">
       <span class="fd__parts">
         <span class="fd__part">
-          <app-status-text [kind]="e.kind === 'income' ? 'accent' : 'neutral'">{{
+          <app-status-text badge [kind]="e.kind === 'income' ? 'accent' : 'neutral'">{{
             (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t
           }}</app-status-text>
         </span>

@@ -15,7 +15,7 @@ scope:
 
 # The design has one accent and plain status text
 
-The app must have one accent colour. A status must be coloured text, without a dot or a pill. The status beside the title of the
-meeting head is the one exception (001305). A
+The app must have one accent colour. A status must be coloured text, without a dot or a pill. A status in the head of a page is a
+badge (001305). A
 tag is a feature, not a status. Input fields must not have a shadow. Only persons must have
 avatars.
