@@ -4118,8 +4118,6 @@
   "meetings.agenda.planStart": "ca. {time}",
   "meetings.agenda.planActual": "{time}",
   "meetings.agenda.planMinutes": "{n} Min.",
-  "meetings.agenda.planEnd": "Ende ca. {time}",
-  "meetings.agenda.planTotal": "Dauer ca. {n} Min.",
   "meetings.agenda.duration": "Dauer",
   "meetings.agenda.durationUnit": "Min.",
   "meetings.agenda.durationEdit": "Dauer ändern",

@@ -252,15 +252,6 @@ export class AgendaPaneComponent {
     const parts = [...clock, ...minutes];
     return parts.length ? parts.join(' · ') : null;
   }
-  /** The line below the last row: the planned end (§ 001144) or the sum (§ 001142). */
-  protected readonly planEnd = computed(() => {
-    const plan = this.plan();
-    if (plan.end !== null && plan.total !== null) {
-      return this.i18n.translate('meetings.agenda.planEnd', { time: planClock(plan.end) });
-    }
-    if (plan.total !== null) return this.i18n.translate('meetings.agenda.planTotal', { n: plan.total });
-    return null;
-  });
 
   /** A row lifts while the agenda may change, is not saving and the row is not in rename. */
   protected canDrag(item: AgendaItem): boolean {

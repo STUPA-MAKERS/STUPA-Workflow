@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use 'dot-parts' as dots;
 @use 'swatch';
 @use 'display' as d;
@@ -117,10 +116,6 @@
 .bd__sheetBody {
   --bd-fade: var(--space-6);
 }
-.bd__tree,
-.bd__sheetBody {
-  @include fade.fade-y(var(--bd-fade));
-}
 
 .bd__tree {
   display: flex;
@@ -132,6 +127,15 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scroll-padding-block: var(--bd-fade);
+}
+// Beside the sheet the tree runs to the bottom edge of the screen and cuts there, without a
+// surface of its own. In a sheet it cuts at its own rounded frame (000193).
+.bd--wide .bd__tree {
+  margin-bottom: calc(-1 * var(--space-4));
+  padding-bottom: var(--space-4);
+}
+.bd__paneBody--side .bd__tree {
+  border-radius: var(--radius-lg);
 }
 .bd__tree > * {
   flex: none;

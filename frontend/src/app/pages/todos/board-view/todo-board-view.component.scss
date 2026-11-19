@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use '../../../shared/ui/drag-preview' as dp;
 @use 'display' as d;
 @use 'field' as f;
@@ -46,9 +45,6 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-}
-.bv__scroll {
-  @include fade.fade-y(var(--space-5));
 }
 .bv__head {
   display: flex;

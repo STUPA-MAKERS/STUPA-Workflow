@@ -1,4 +1,3 @@
-@use 'scroll-fade' as fade;
 @use 'list-pane' as lp;
 @use 'press';
 @use 'field' as f;
@@ -23,7 +22,6 @@
 .act__scroll {
   @include lp.scroll(--act-fade);
   padding-bottom: var(--space-6);
-  @include fade.fade-y(var(--act-fade));
 }
 
 .act__groups,
