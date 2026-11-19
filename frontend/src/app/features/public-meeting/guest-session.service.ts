@@ -5,6 +5,7 @@ import { USE_MOCK_API } from '@core/api/api.config';
 import { problemCode } from '@core/api/problem';
 import type { GuestMe, PublicMeetingHead } from '@core/api/models';
 import { WsService, type MeetingChannel } from '@core/ws/ws.service';
+import { PageResumeService } from '@core/browser/page-resume.service';
 import type { ServerMessage } from '@core/ws/ws-messages';
 import { AltchaService } from '../apply/altcha.service';
 
@@ -47,6 +48,7 @@ export class GuestSessionService implements OnDestroy {
   private readonly ws = inject(WsService);
   private readonly altcha = inject(AltchaService);
   private readonly useMock = inject(USE_MOCK_API);
+  private readonly resumeSub = inject(PageResumeService).resume$.subscribe(() => this.onResume());
 
   readonly code = signal('');
   readonly head = signal<PublicMeetingHead | null>(null);
@@ -297,6 +299,18 @@ export class GuestSessionService implements OnDestroy {
     }, RECONNECT_MS * this.attempts);
   }
 
+  /**
+   * The page is back from the background (§F/meetings/meetings/001441): drop the socket, which
+   * may be dead without a `close` event, and read the own state again. The read opens a new
+   * socket while the request or the participation still runs.
+   */
+  private onResume(): void {
+    if (this.closed || this.useMock || !this.me()) return;
+    this.attempts = 0;
+    this.disconnect();
+    this.refresh();
+  }
+
   private disconnect(): void {
     if (this.reconnectTimer !== null) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
@@ -307,6 +321,7 @@ export class GuestSessionService implements OnDestroy {
 
   ngOnDestroy(): void {
     this.closed = true;
+    this.resumeSub.unsubscribe();
     if (this.refreshTimer !== null) clearTimeout(this.refreshTimer);
     this.disconnect();
   }

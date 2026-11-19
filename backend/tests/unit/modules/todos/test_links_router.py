@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 
 from app.db import get_session
 from app.deps import get_current_principal
@@ -31,17 +32,34 @@ NOW = datetime(2026, 11, 19, tzinfo=UTC)
 ROW = LinkRow(id=LID, kind="invoice", target_id=BID, accessible=True, title="R-1", created_at=NOW)
 
 
+class _Tx:
+    """The commit of the route; ``clash`` lets it meet a parallel equal link."""
+
+    def __init__(self) -> None:
+        self.clash = False
+        self.commits = 0
+        self.rollbacks = 0
+
+    async def commit(self) -> None:
+        if self.clash:
+            raise IntegrityError("INSERT", {}, Exception("uq_link_ends"))
+        self.commits += 1
+
+    async def rollback(self) -> None:
+        self.rollbacks += 1
+
+
 class _FakeLinks:
     def __init__(self) -> None:
         self.calls: list[tuple[str, tuple[Any, ...], dict[str, Any]]] = []
+        self.session = _Tx()
 
     async def of(self, *args: Any) -> LinksOut:
         self.calls.append(("of", args, {}))
         return LinksOut(can_link=True, links=[ROW])
 
-    async def add(self, *args: Any) -> LinksOut:
+    async def add(self, *args: Any) -> None:
         self.calls.append(("add", args, {}))
-        return LinksOut(can_link=True, links=[ROW])
 
     async def remove(self, *args: Any) -> None:
         self.calls.append(("remove", args, {}))
@@ -84,14 +102,26 @@ def test_list_add_remove_and_view(fake: tuple[TestClient, _FakeLinks]) -> None:
     assert links.calls[-1] == ("of", ("application", AID, USER), {})
     body = {"a": {"kind": "application", "id": str(AID)}, "b": {"kind": "invoice", "id": str(BID)}}
     added = client.post("/api/links", json=body)
-    assert added.status_code == 201
-    assert links.calls[-1][1][:2] == (("application", AID), ("invoice", BID))
+    assert added.status_code == 201 and added.json()["links"][0]["id"] == str(LID)
+    assert links.calls[-2][1][:2] == (("application", AID), ("invoice", BID))
+    assert links.calls[-1] == ("of", ("application", AID, USER), {})
     bad = {**body, "b": {"kind": "cost_centre", "id": str(BID)}}
     assert client.post("/api/links", json=bad).status_code == 422
     assert client.delete(f"/api/links/{LID}").status_code == 204
     assert links.calls[-1] == ("remove", (LID, USER), {})
+    assert links.session.commits == 2
     assert client.get(f"/api/links/{LID}/view").json()["title"] == "Abstimmung"
     assert client.get(f"/api/links?kind=nope&id={AID}").status_code == 422
+
+
+def test_a_parallel_equal_link_is_link_exists(fake: tuple[TestClient, _FakeLinks]) -> None:
+    """§F/collaboration/links/001400: at most one link per pair, also under a race."""
+    client, links = fake
+    links.session.clash = True
+    body = {"a": {"kind": "application", "id": str(AID)}, "b": {"kind": "invoice", "id": str(BID)}}
+    answer = client.post("/api/links", json=body)
+    assert answer.status_code == 409 and answer.json()["code"] == "link_exists"
+    assert links.session.rollbacks == 1
 
 
 def test_targets_pass_the_excluded_element(fake: tuple[TestClient, _FakeLinks]) -> None:

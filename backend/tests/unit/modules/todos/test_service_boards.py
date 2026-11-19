@@ -217,7 +217,7 @@ async def test_patch_column_renames_and_moves_the_done_flag() -> None:
     ticket = uuid.uuid4()
     session = ScriptedSession(
         scalars=[[first, done], [old_done], [new_done, kept]],
-        execute=[[link(new_done.id, ticket_id=ticket)]],
+        execute=[[], [link(new_done.id, ticket_id=ticket)]],
     )
     session.put(b, first, done)
     service = _svc(session)
@@ -251,7 +251,7 @@ async def test_patch_column_does_not_tell_tickets_of_archived_cards() -> None:
     ticket = uuid.uuid4()
     session = ScriptedSession(
         scalars=[[waiting, done], [], [archived, live]],
-        execute=[[link(live.id, ticket_id=ticket)]],
+        execute=[[], [link(live.id, ticket_id=ticket)]],
     )
     session.put(b, waiting, done)
     service = _svc(session)
@@ -312,7 +312,10 @@ async def test_delete_column_moves_the_cards_and_renumbers() -> None:
     moving = [card(b, col, rank="a"), card(b, col, rank="b", completed_at=svc_mod._now())]
     present = card(b, done, rank="m")
     ticket = uuid.uuid4()
-    session = ScriptedSession(execute=[[]], scalars=[moving, [present], [ticket], [first, done]])
+    session = ScriptedSession(
+        execute=[[], [link(moving[0].id, ticket_id=ticket)]],
+        scalars=[moving, [present], [first, done]],
+    )
     session.put(b, first, col, done)
     service = _svc(session)
     _stub(service)

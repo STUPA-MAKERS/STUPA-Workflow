@@ -1,4 +1,3 @@
-@use 'scroll-fade' as fade;
 @use 'list-pane' as lp;
 
 // The same two panes as voting.component.scss.
@@ -44,9 +43,6 @@
 }
 .grl--split .grl__scroll > * {
   flex: none;
-}
-.grl__scroll {
-  @include fade.fade-y(var(--grl-fade));
 }
 
 .grl__rows {

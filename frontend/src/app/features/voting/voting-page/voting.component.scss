@@ -1,6 +1,5 @@
 @use 'breakpoints' as bp;
 @use 'dot-parts' as dots;
-@use 'scroll-fade' as fade;
 @use 'list-pane' as lp;
 
 // The same two panes as applications-list.component.scss.
@@ -46,9 +45,6 @@
 }
 .vl--split .vl__scroll > * {
   flex: none;
-}
-.vl__scroll {
-  @include fade.fade-y(var(--vl-fade));
 }
 
 .vl__rows {

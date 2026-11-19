@@ -180,13 +180,13 @@ async def test_set_event_makes_a_todo_an_event_after_the_one_event_check() -> No
         seriesId=SERIES,
     )
     session.scalar_q[:] = [c, uuid.uuid4()]
-    session.execute_q.append([link(c.id, application_id=APP)])
+    session.execute_q.extend([[], [link(c.id, application_id=APP)]])
     with pytest.raises(ConflictError) as exc:
         await service.set_event(c.id, payload, USER)
     assert exc.value.code == "event_link_taken"
     assert session.event_rows == {}
     session.scalar_q[:] = [c, None]
-    session.execute_q.append([link(c.id, application_id=APP)])
+    session.execute_q.extend([[], [link(c.id, application_id=APP)]])
     assert await service.set_event(c.id, payload, USER) is OUT
     row = session.event_rows[c.id]
     assert (row.starts_on, row.ends_on, row.place, row.participants, row.series_id) == (
