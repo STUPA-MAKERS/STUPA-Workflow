@@ -35,6 +35,10 @@ class AttachmentOut(FrozenModel, frozen=True):
     mime: str
     size: int
     scanned: bool
+    #: The form field of the file, or ``None`` for a general attachment.
+    fieldKey: str | None = None
+    #: The position of a ``positions`` field that the file belongs to (spec 001730).
+    positionId: str | None = None
 
 
 class DraftAttachmentOut(AttachmentOut, frozen=True):

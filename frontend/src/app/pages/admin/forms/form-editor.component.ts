@@ -16,7 +16,14 @@ import { switchMap } from 'rxjs';
 import { I18nService, fallbackChain } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import type { FieldType, FormFieldDef, I18nMap, Uuid } from '@core/api/models';
+import type {
+  FieldType,
+  FormFieldDef,
+  FormRule,
+  I18nMap,
+  RuleSeverity,
+  Uuid,
+} from '@core/api/models';
 import { langFieldLabel, resolveI18n, sameI18n, setI18n } from '@shared/forms/i18n-text';
 import {
   ButtonComponent,
@@ -56,7 +63,9 @@ import {
   groupsToFields,
   moveQuestionTo,
   normalizeFormField,
+  participantsProblem,
   validateFormField,
+  validateJsonLogic,
 } from '../form-field.util';
 import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 import { ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
@@ -169,6 +178,16 @@ export class FormEditorComponent {
   protected readonly hasBudget = signal(false);
   /** The Antrag PDF of this type ends with the signature section (spec 000888). */
   protected readonly pdfSignatures = signal(false);
+  /** "Anhang Pflicht": an Antrag of this type needs a file (spec 001732). */
+  protected readonly attachmentRequired = signal(false);
+  /** The rules across fields (spec 001670); the logic stays text while it is typed. */
+  protected readonly rules = signal<readonly RuleDraft[]>([]);
+  protected readonly severityOptions: SelectOption[] = (['block', 'warn'] as const).map((v) => ({
+    value: v,
+    label: this.i18n.translate(`admin.forms.rules.${v}`),
+  }));
+  /** The problem of each rule as a translation key, or null. */
+  protected readonly ruleErrors = computed(() => this.rules().map(ruleProblem));
   /** Comparison-offers rule: required + minimum count. */
   protected readonly cmpRequired = signal(false);
   protected readonly cmpMinCount = signal(2);
@@ -255,6 +274,7 @@ export class FormEditorComponent {
     title: { de: '', en: '' } as I18nMap,
     hasBudget: false,
     pdfSignatures: false,
+    attachmentRequired: false,
     cmpRequired: false,
     cmpMinCount: 2,
   });
@@ -262,7 +282,7 @@ export class FormEditorComponent {
   private readonly savedForm = signal<string | null>(null);
   /** The questions and the description as the editor has them (JSON). */
   private readonly formSnapshot = computed(() =>
-    JSON.stringify({ groups: this.groups(), description: this.description() }),
+    JSON.stringify({ groups: this.groups(), description: this.description(), rules: this.rules() }),
   );
   /** The type differs from the server: a save patches it before the new form version. */
   private readonly typeChanged = computed(() => {
@@ -271,6 +291,7 @@ export class FormEditorComponent {
       !sameI18n(this.title(), o.title) ||
       this.hasBudget() !== o.hasBudget ||
       this.pdfSignatures() !== o.pdfSignatures ||
+      this.attachmentRequired() !== o.attachmentRequired ||
       this.cmpRequired() !== o.cmpRequired ||
       this.cmpMinCount() !== o.cmpMinCount
     );
@@ -298,7 +319,9 @@ export class FormEditorComponent {
 
   protected readonly duplicates = computed(() => duplicateKeys(this.flatQuestions()));
   /** The form-level problem of the requested funding field, or null. */
-  protected readonly fundingIssue = computed(() => fundingProblem(this.flatQuestions()));
+  protected readonly fundingIssue = computed(
+    () => fundingProblem(this.flatQuestions()) ?? participantsProblem(this.flatQuestions()),
+  );
   /** Validation errors per question, indexed by "gi:qi". */
   protected readonly fieldErrors = computed(
     (): Readonly<Record<string, readonly string[]>> =>
@@ -313,6 +336,7 @@ export class FormEditorComponent {
       this.flatQuestions().length > 0 &&
       this.duplicates().length === 0 &&
       this.fundingIssue() === null &&
+      this.ruleErrors().every((e) => e === null) &&
       Object.values(this.fieldErrors()).every((e) => e.length === 0),
   );
 
@@ -333,6 +357,7 @@ export class FormEditorComponent {
           this.title.set({ de: '', en: '', ...t.name });
           this.hasBudget.set(t.hasBudget);
           this.pdfSignatures.set(t.pdfSignatures ?? false);
+          this.attachmentRequired.set(t.attachmentRequired ?? false);
           const co = t.comparisonOffers;
           this.cmpRequired.set(co?.required ?? false);
           this.cmpMinCount.set(co?.minCount ?? 2);
@@ -352,6 +377,7 @@ export class FormEditorComponent {
         this.selected.set(this.groups()[0]?.fields.length ? { gi: 0, qi: 0 } : null);
         const d = draft.description ?? {};
         this.description.set({ de: '', en: '', ...d });
+        this.rules.set((draft.rules ?? []).map(toDraft));
         this.active.set(draft.active ?? false);
         this.hasVersion.set(!!draft.formVersionId);
         this.formVersion.set(draft.version ?? null);
@@ -938,12 +964,55 @@ export class FormEditorComponent {
     return current ? JSON.stringify(current) : '';
   }
 
+  /** The field is a number field, and another number field already holds the participants. */
+  protected participantsTaken(field: FormFieldDef): boolean {
+    return this.flatQuestions().some(
+      (f) => f !== field && f.type === 'number' && f.validation?.participants === true,
+    );
+  }
+
+  /** The switch "Teilnehmerzahl" of a number field (spec 001631). */
+  protected setParticipants(pos: QPos, on: boolean): void {
+    this.patchQuestion(pos, (f) => {
+      const current = f.validation ?? {};
+      const validation = on ? { ...current, participants: true } : withoutKey(current, 'participants');
+      return { ...f, validation: validation as FormFieldDef['validation'] };
+    });
+  }
+
+  /** The root "Wurzel" of a cost-centre picker, a path key such as QSM (spec 001680). */
+  protected setRootPath(pos: QPos, value: string): void {
+    this.patchQuestion(pos, (f) => {
+      const current = f.validation ?? {};
+      const validation = value.trim() ? { ...current, rootPath: value } : withoutKey(current, 'rootPath');
+      return { ...f, validation: validation as FormFieldDef['validation'] };
+    });
+  }
+
+  protected addRule(): void {
+    this.rules.update((list) => [...list, { logic: '', message: { de: '', en: '' }, severity: 'block' }]);
+  }
+
+  protected removeRule(index: number): void {
+    this.rules.update((list) => list.filter((_, i) => i !== index));
+  }
+
+  protected moveRule(index: number, dir: -1 | 1): void {
+    const to = index + dir;
+    this.rules.update((list) => (to < 0 || to >= list.length ? list : movedTo(list, index, to)));
+  }
+
+  protected setRule(index: number, patch: Partial<RuleDraft>): void {
+    this.rules.update((list) => list.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  }
+
   /** The type fields of the editor are now the state of the server. */
   private keepTypeAsSaved(): void {
     this.originalType.set({
       title: { ...this.title() },
       hasBudget: this.hasBudget(),
       pdfSignatures: this.pdfSignatures(),
+      attachmentRequired: this.attachmentRequired(),
       cmpRequired: this.cmpRequired(),
       cmpMinCount: this.cmpMinCount(),
     });
@@ -958,6 +1027,7 @@ export class FormEditorComponent {
     const flat = groupsToFields(this.groups());
     const normalized = flat.map(normalizeFormField);
     const description: I18nMap = { ...this.description() };
+    const rules = this.rules().map(toRule);
     const snapshot = this.formSnapshot();
     this.saving.set(true);
 
@@ -967,6 +1037,7 @@ export class FormEditorComponent {
             name: { ...this.title() },
             hasBudget: this.hasBudget(),
             pdfSignatures: this.pdfSignatures(),
+            attachmentRequired: this.attachmentRequired(),
             comparisonOffers: {
               required: this.cmpRequired(),
               minCount: this.cmpMinCount(),
@@ -974,8 +1045,8 @@ export class FormEditorComponent {
               as: this.cmpAs,
             },
           })
-          .pipe(switchMap(() => this.api.createFormVersion(id, normalized, description)))
-      : this.api.createFormVersion(id, normalized, description);
+          .pipe(switchMap(() => this.api.createFormVersion(id, normalized, description, rules)))
+      : this.api.createFormVersion(id, normalized, description, rules);
 
     save$.subscribe({
       next: () => {
@@ -993,6 +1064,50 @@ export class FormEditorComponent {
       },
     });
   }
+}
+
+/** A rule as the editor holds it: the logic as the text the admin types (spec 001670). */
+interface RuleDraft {
+  readonly logic: string;
+  readonly message: I18nMap;
+  readonly severity: RuleSeverity;
+}
+
+/** The logic of a rule as an object, or null when the text is no allowed JsonLogic. */
+function parseLogic(text: string): Record<string, unknown> | null {
+  try {
+    const value: unknown = JSON.parse(text);
+    const record = typeof value === 'object' && value !== null && !Array.isArray(value);
+    return record && validateJsonLogic(value) ? (value as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The problem of a rule as a translation key, or null. The server checks the same. */
+function ruleProblem(rule: RuleDraft): TranslationKey | null {
+  if (parseLogic(rule.logic) === null) return 'admin.forms.rules.logicInvalid';
+  if (!rule.message['de']?.trim() || !rule.message['en']?.trim()) {
+    return 'admin.forms.rules.messageMissing';
+  }
+  return null;
+}
+
+function toDraft(rule: FormRule): RuleDraft {
+  return {
+    logic: JSON.stringify(rule.logic),
+    message: { de: '', en: '', ...rule.message },
+    severity: rule.severity,
+  };
+}
+
+/** A valid draft as the rule the server stores. */
+function toRule(rule: RuleDraft): FormRule {
+  return {
+    logic: parseLogic(rule.logic) ?? {},
+    message: { de: rule.message['de'] ?? '', en: rule.message['en'] ?? '' },
+    severity: rule.severity,
+  };
 }
 
 /** The index the arrow, Home or End key moves the type menu focus to, or null for another key. */

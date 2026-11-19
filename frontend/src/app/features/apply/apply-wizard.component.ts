@@ -38,6 +38,8 @@ import { AnswerViewComponent } from '@shared/forms/answer-view/answer-view.compo
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { toFormlyFields, toFormlySections } from '@shared/forms/formly-mapper';
 import { applyServerErrors, clearServerErrors } from '@shared/forms/server-errors';
+import { brokenRules } from '@shared/forms/form-rules';
+import { POSITION_FILES, type PositionFiles } from '@shared/forms/position-files';
 import { renderMarkdown } from '../meetings/meetings.util';
 import {
   ButtonComponent,
@@ -51,6 +53,7 @@ import {
   ListDetailBarComponent,
   ListDetailNavDirective,
   MEDIA,
+  NoteComponent,
   mediaQuery,
   SectionComponent,
   SkeletonComponent,
@@ -152,6 +155,7 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgTemplateOutlet,
+    NoteComponent,
     SectionComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
@@ -172,7 +176,20 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
     ListDetailNavDirective,
     TranslatePipe,
   ],
-  providers: [DraftAttachmentsService, provideFormly()],
+  providers: [
+    DraftAttachmentsService,
+    provideFormly(),
+    {
+      provide: POSITION_FILES,
+      useFactory: (): PositionFiles => {
+        const drafts = inject(DraftAttachmentsService);
+        return {
+          component: DraftFilesComponent,
+          removed: (fieldKey, positionId) => void drafts.dropPosition(fieldKey, positionId),
+        };
+      },
+    },
+  ],
   templateUrl: './apply-wizard.component.html',
   styleUrl: './apply-wizard.component.scss',
 })
@@ -295,6 +312,36 @@ export class ApplyWizardComponent {
       ),
   );
 
+  /** The `positions` fields: their files belong to a position (spec 001730). */
+  private readonly positionKeys = computed<ReadonlySet<string>>(
+    () => new Set(this.allFields().filter((f) => f.type === 'positions').map((f) => f.key)),
+  );
+  /** Every field of the form, in form order. */
+  private readonly allFields = computed<readonly FormFieldDef[]>(() =>
+    (this.effForm()?.sections ?? []).flatMap((s) => s.fields),
+  );
+
+  /**
+   * The messages of the rules that the answers break (specs 001670, 001671), in the UI
+   * language: a `block` rule stops the submit, a `warn` rule only shows.
+   */
+  readonly ruleMessages = computed(() => {
+    const rules = this.effForm()?.rules ?? [];
+    const lang = this.i18n.uiLocale();
+    const broken = brokenRules(rules, this.allFields(), this.modelSignal()).map((i) => rules[i]);
+    const text = (severity: 'block' | 'warn') =>
+      broken.filter((r) => r.severity === severity).map((r) => resolveI18n(r.message, lang));
+    return { block: text('block'), warn: text('warn') };
+  });
+
+  /** The Antragsart needs a file, and the draft has none (spec 001732). */
+  readonly fileMissing = computed(
+    () => !!this.effForm()?.attachmentRequired && this.drafts.count() === 0,
+  );
+
+  /** The warning before a submit without a file is open (spec 001731). */
+  readonly confirmNoFile = signal(false);
+
   /** The steps in order. */
   readonly stepKeys = computed<StepKey[]>(() => {
     const contact = !this.loggedIn() || this.piiDefs().length > 0;
@@ -380,7 +427,9 @@ export class ApplyWizardComponent {
       this.detailsForm.valid &&
       this.piiForm.valid &&
       !this.drafts.busy() &&
-      !this.drafts.hasFailed()
+      !this.drafts.hasFailed() &&
+      this.ruleMessages().block.length === 0 &&
+      !this.fileMissing()
     );
   });
 
@@ -560,7 +609,7 @@ export class ApplyWizardComponent {
    */
   private syncFileFields(): void {
     const keys = this.fileKeys();
-    void this.drafts.scopeToFields(keys);
+    void this.drafts.scopeToFields(new Set([...keys, ...this.positionKeys()]));
     for (const key of keys) {
       const ids = this.drafts
         .filesOf(key)
@@ -696,10 +745,15 @@ export class ApplyWizardComponent {
    * A signed-in applicant sends no identity and no ALTCHA solution, because the backend derives
    * them from the account. A solution is good for one request, so the next submit needs a new one.
    */
-  submit(): void {
+  submit(withoutFile = false): void {
     if (!this.canSubmit() || this.submitting()) return;
     const typeId = this.typeId();
     if (!typeId) return;
+    if (!withoutFile && this.positionKeys().size > 0 && this.drafts.count() === 0) {
+      this.confirmNoFile.set(true);
+      return;
+    }
+    this.confirmNoFile.set(false);
     const altcha = this.altchaSolution();
     const ids = this.drafts.attachmentIds();
     const token = this.drafts.token();
@@ -756,6 +810,15 @@ export class ApplyWizardComponent {
    * opens the first step with one.
    */
   private onInvalid(problem: ProblemDetail | null): void {
+    if (problem?.code === 'form_rule_failed') {
+      this.toast.error(this.serverRuleText(problem));
+      return;
+    }
+    if (problem?.code === 'attachment_required') {
+      this.toast.error(this.i18n.translate('apply.files.requiredByType'));
+      this.goTo(this.stepKeys().indexOf('details'));
+      return;
+    }
     const lost = this.drafts.markFailed(problem);
     if (lost.length) {
       this.dropFileRefs(new Set(lost));
@@ -774,6 +837,20 @@ export class ApplyWizardComponent {
       return;
     }
     this.toast.error(problem?.detail ?? this.i18n.translate('apply.error.submit'));
+  }
+
+  /**
+   * The messages of the rules that the server names (`rules[<i>]`), in the UI language.
+   * A rule the form does not know shows the text of the server.
+   */
+  private serverRuleText(problem: ProblemDetail): string {
+    const rules = this.effForm()?.rules ?? [];
+    const lang = this.i18n.uiLocale();
+    const texts = (problem.errors ?? []).map((e) => {
+      const rule = rules[Number(/^rules\[(\d+)\]$/.exec(e.field)?.[1] ?? -1)];
+      return rule ? resolveI18n(rule.message, lang) : e.msg;
+    });
+    return texts.join(' ') || (problem.detail ?? this.i18n.translate('apply.error.submit'));
   }
 
   /** Take lost files out of the values of the file fields. */

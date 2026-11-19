@@ -131,6 +131,12 @@
                   </button>
                 }
               </div>
+              @if (offerWarning(p, oi); as warn) {
+                <p class="pos__warn">
+                  <app-icon class="pos__warnIcon" name="alert" [size]="16" />
+                  <span>{{ warn }}</span>
+                </p>
+              }
             }
           </div>
 
@@ -151,12 +157,19 @@
               ></textarea>
             </label>
           }
+          @if (positionFiles && p.id) {
+            <ng-container *ngComponentOutlet="positionFiles.component; inputs: filesInputs(p)" />
+          }
           @if (cardError(p, pi); as msg) {
             <p class="pos__error" role="alert">{{ msg }}</p>
           }
         </div>
       }
     </div>
+  }
+
+  @if (costLine(); as line) {
+    <p class="pos__line" aria-live="polite">{{ costLineText(line) }}</p>
   }
 
   <app-button class="pos__add" variant="tonal" (click)="addPosition()">

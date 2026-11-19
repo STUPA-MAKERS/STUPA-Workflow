@@ -16,6 +16,14 @@ import {
   type CostPosition,
   type PositionOffer,
 } from '../positions';
+import type { CostLine } from '../form-rules';
+
+/** A file of a position as the view lists it. */
+export interface PositionFile {
+  readonly id: string;
+  readonly filename: string;
+  readonly positionId?: string | null;
+}
 
 /** One offer as the view draws it. */
 interface OfferRow extends PositionOffer {
@@ -31,6 +39,8 @@ interface PositionRow extends CostPosition {
   readonly count: string;
   /** The supplier of the preferred offer, or '' when none is preferred. */
   readonly preferred: string;
+  /** The files of the position (spec 001730). */
+  readonly files: readonly PositionFile[];
 }
 
 let nextId = 0;
@@ -47,7 +57,9 @@ let nextId = 0;
  * Names, suppliers and offer texts are never cut: they wrap. An offer text that is an
  * http(s) URL is a link in the open position (a link cannot sit in the row button).
  *
- * Comparison offers stay tagged attachments: the offers here have no file.
+ * The files of a position (spec 001730) are listed in the open position by name; the
+ * block "Anhänge" opens them. Below the total, `costLine` gives the line "Gesamtkosten X
+ * €, davon beantragt Y €" with the amount per person, as the form showed it (spec 001632).
  */
 @Component({
   selector: 'app-positions-view',
@@ -68,6 +80,10 @@ export class PositionsViewComponent {
   readonly surface = input<1 | 2 | 3>(2);
   /** Open every position at the start, for example in the review step of the wizard. */
   readonly expanded = input(false);
+  /** The figures of the cost line, or null when this field does not show it. */
+  readonly costLine = input<CostLine | null>(null);
+  /** The files of the application; the view lists those of each position. */
+  readonly files = input<readonly PositionFile[]>([]);
 
   protected readonly id = `pv-${nextId++}`;
 
@@ -85,7 +101,21 @@ export class PositionsViewComponent {
         { count: p.offers.length },
       ),
       preferred: preferredOffer(p)?.label.trim() ?? '',
+      files: p.id ? this.files().filter((f) => f.positionId === p.id) : [],
     }));
+  });
+
+  /** "Gesamtkosten 1.200,00 €, davon beantragt 800,00 €, 40,00 € pro Person", or ''. */
+  protected readonly lineText = computed(() => {
+    const line = this.costLine();
+    if (!line) return '';
+    const head = this.i18n.translate('forms.costLine.total', {
+      total: this.money(line.total),
+      requested: this.money(line.requested),
+    });
+    return line.perPerson === null
+      ? head
+      : `${head}, ${this.i18n.translate('forms.costLine.perPerson', { amount: this.money(line.perPerson) })}`;
   });
 
   protected readonly total = computed(() => this.money(positionsTotal(this.rows())));

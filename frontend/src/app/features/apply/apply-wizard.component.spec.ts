@@ -1068,4 +1068,149 @@ describe('ApplyWizardComponent', () => {
     s.comp.activeIndex.set(1);
     expect(s.comp.stepLine()).toBe('Schritt 2 von 3');
   });
+  describe('form rules and files (specs 001641, 001671, 001731, 001732)', () => {
+    /** A form with a cost position, a sum and two rules over the sum. */
+    const RULES: EffectiveForm = {
+      applicationTypeId: 't1',
+      formVersionId: 'v1',
+      hasBudget: false,
+      sections: [
+        {
+          key: 'main',
+          label: { de: 'Antrag' },
+          fields: [
+            { key: 'title', type: 'text', label: { de: 'Titel' }, required: true },
+            { key: 'summe', type: 'number', label: { de: 'Summe' } },
+          ],
+        },
+      ],
+      rules: [
+        {
+          logic: { '>=': [{ var: 'summe' }, 500] },
+          message: { de: 'Ab 500 €.', en: 'From 500 €.' },
+          severity: 'block',
+        },
+        {
+          logic: { '>=': [{ var: 'summe' }, 1000] },
+          message: { de: 'Besser ab 1000 €.', en: 'Better from 1000 €.' },
+          severity: 'warn',
+        },
+      ],
+    };
+
+    /** A form with a `positions` field that takes one offer. */
+    const COSTS: EffectiveForm = {
+      ...PLAIN,
+      sections: [
+        {
+          key: 'main',
+          label: { de: 'Antrag' },
+          fields: [
+            { key: 'title', type: 'text', label: { de: 'Titel' }, required: true },
+            { key: 'kosten', type: 'positions', label: { de: 'Kosten' }, validation: { minOffers: 1 } },
+          ],
+        },
+      ],
+    };
+
+    async function toReviewSignedIn(s: Setup, fill: () => Promise<void>) {
+      await waitFor(() => expect(s.comp['loggedIn']()).toBe(true));
+      await pickType(s);
+      s.comp.next();
+      s.fixture.detectChanges();
+      await userEvent.type(field(/Titel/), 'Fahrt');
+      await fill();
+      s.comp.next();
+      s.fixture.detectChanges();
+      expect(s.comp.currentStep()).toBe('review');
+    }
+
+    it('blocks the submit while a block rule is broken and only shows a warn rule', async () => {
+      const s = await setup({ form: RULES, loggedIn: true });
+      await toReviewSignedIn(s, () => userEvent.type(field(/Summe/), '100'));
+      expect(s.comp.ruleMessages()).toEqual({ block: ['Ab 500 €.'], warn: ['Besser ab 1000 €.'] });
+      expect(screen.getByText('Ab 500 €.')).toBeInTheDocument();
+      expect(s.comp.canSubmit()).toBe(false);
+      s.comp.submit();
+      expect(s.create).not.toHaveBeenCalled();
+
+      s.comp.prev();
+      s.fixture.detectChanges();
+      await userEvent.clear(field(/Summe/));
+      await userEvent.type(field(/Summe/), '600');
+      expect(s.comp.ruleMessages()).toEqual({ block: [], warn: ['Besser ab 1000 €.'] });
+      expect(s.comp.canSubmit()).toBe(true);
+      s.comp.submit();
+      expect(s.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the messages of the rules that the server refuses', async () => {
+      const create = jest.fn(() =>
+        throwError(() => ({
+          status: 422,
+          error: {
+            code: 'form_rule_failed',
+            errors: [
+              { field: 'rules[0]', msg: 'From 500 €.' },
+              { field: 'rules[7]', msg: 'Unknown rule.' },
+            ],
+          },
+        })),
+      );
+      const s = await setup({ form: RULES, loggedIn: true, create });
+      await toReviewSignedIn(s, () => userEvent.type(field(/Summe/), '600'));
+      s.comp.submit();
+      expect(s.toast.error).toHaveBeenCalledWith('Ab 500 €. Unknown rule.');
+    });
+
+    it('needs a file for a type with "Anhang Pflicht"', async () => {
+      const drafts = fakeDrafts();
+      const s = await setup({ form: { ...PLAIN, attachmentRequired: true }, loggedIn: true, drafts });
+      await toReviewSignedIn(s, async () => undefined);
+      expect(s.comp.fileMissing()).toBe(true);
+      expect(s.comp.canSubmit()).toBe(false);
+      expect(screen.getByText('Diese Antragsart braucht mindestens einen Anhang.')).toBeInTheDocument();
+      drafts.files.set([draft('f1')]);
+      expect(s.comp.canSubmit()).toBe(true);
+    });
+
+    it('sends the applicant back to the files when the server needs one', async () => {
+      const create = jest.fn(() =>
+        throwError(() => ({ status: 422, error: { code: 'attachment_required' } })),
+      );
+      const s = await setup({ form: PLAIN, loggedIn: true, create });
+      await toReviewSignedIn(s, async () => undefined);
+      s.comp.submit();
+      expect(s.toast.error).toHaveBeenCalledWith('Diese Antragsart braucht mindestens einen Anhang.');
+      expect(s.comp.currentStep()).toBe('details');
+    });
+
+    it('asks before a submit without a file and submits a placeholder offer after the yes', async () => {
+      const s = await setup({ form: COSTS, loggedIn: true });
+      await toReviewSignedIn(s, async () => {
+        await userEvent.click(screen.getByRole('button', { name: /Position hinzufügen/ }));
+        s.fixture.detectChanges();
+        await userEvent.type(screen.getByLabelText('Position'), 'Bus');
+        await userEvent.type(screen.getByLabelText('Anbieter'), 'x');
+        await userEvent.type(screen.getByLabelText('Betrag'), '1');
+        s.fixture.detectChanges();
+        expect(screen.getByText(/sieht nach einem Platzhalter aus/)).toBeInTheDocument();
+      });
+      s.comp.submit();
+      s.fixture.detectChanges();
+      expect(s.create).not.toHaveBeenCalled();
+      expect(s.comp.confirmNoFile()).toBe(true);
+      expect(await screen.findByText(/Dein Antrag hat keinen Anhang/)).toBeInTheDocument();
+      s.comp.submit(true);
+      expect(s.comp.confirmNoFile()).toBe(false);
+      expect(s.create).toHaveBeenCalledTimes(1);
+      const sent = s.create.mock.calls[0][0] as { data: { kosten: { label: string }[] } };
+      expect(sent.data.kosten[0].label).toBe('Bus');
+
+      s.drafts.files.set([draft('f1')]);
+      s.comp.submit();
+      expect(s.comp.confirmNoFile()).toBe(false);
+      expect(s.create).toHaveBeenCalledTimes(2);
+    });
+  });
 });

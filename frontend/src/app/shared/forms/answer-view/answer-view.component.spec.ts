@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/angular';
+import { fireEvent, render, screen, within } from '@testing-library/angular';
 import type { FormFieldDef, FormSection } from '@core/api/models';
 import { runAxe } from '../../../../testing/a11y';
 import { AnswerViewComponent } from './answer-view.component';
@@ -192,6 +192,34 @@ describe('AnswerViewComponent', () => {
     expect(valueOf('Gespeichert · berechnet')).toBe('7');
     expect(screen.queryByText(/Kaputt/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Ohne Regel/)).not.toBeInTheDocument();
+  });
+
+  it('shows the cost line and the files of each position (specs 001632, 001730)', async () => {
+    const { container } = await view(
+      one([
+        { key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung' } },
+        { key: 'foerderung', type: 'funding', label: { de: 'Förderung' } },
+        { key: 'n', type: 'number', label: { de: 'Personen' }, validation: { participants: true } },
+      ]),
+      {
+        kosten: [
+          { id: 'p-1', label: 'Bus', offers: [{ label: 'Reisen AG', value: 1000, preferred: true }] },
+        ],
+        foerderung: 600,
+        n: 4,
+      },
+      {
+        files: [
+          { id: 'a1', filename: 'angebot.pdf', positionId: 'p-1' },
+          { id: 'a2', filename: 'sonst.pdf', positionId: null },
+        ],
+      },
+    );
+    const line = container.querySelector('.pv__line')?.textContent?.replace(/\s+/g, ' ').trim();
+    expect(line).toBe('Gesamtkosten 1.000,00 €, davon beantragt 600,00 €, 150,00 € pro Person');
+    fireEvent.click(screen.getByRole('button', { name: /Bus/ }));
+    await screen.findByText('angebot.pdf');
+    expect(screen.queryByText('sonst.pdf')).toBeNull();
   });
 
   it('renders the cost positions in their own block between the field groups', async () => {

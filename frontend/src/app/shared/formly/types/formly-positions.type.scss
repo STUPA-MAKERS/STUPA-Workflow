@@ -235,6 +235,31 @@
   align-self: flex-start;
 }
 
+/* A placeholder warning of an offer (spec 001640): the icon in the warning colour, the
+   text in the muted text colour, so it reads in every contrast mode. */
+.pos__warn {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  margin: calc(var(--space-1) * -1) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.pos__warnIcon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-warning);
+}
+
+/* The cost line below the positions (specs 001630, 001631). */
+.pos__line {
+  margin: 0;
+  padding: 0 var(--space-1);
+  color: var(--color-text);
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+}
+
 .pf {
   @include f.box;
   @include f.box-labelled;

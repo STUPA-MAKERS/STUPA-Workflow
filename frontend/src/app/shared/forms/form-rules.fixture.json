@@ -1,0 +1,111 @@
+{
+  "comment": "Spec 001671: the backend (tests/unit/modules/forms/test_form_rules.py) and the frontend (form-rules.spec.ts) run these cases and must give the same broken rules.",
+  "fields": [
+    {
+      "key": "art",
+      "type": "select",
+      "label": { "de": "Art" },
+      "options": [
+        { "value": "qsm", "label": { "de": "QSM" } },
+        { "value": "exk", "label": { "de": "Exkursion" } }
+      ]
+    },
+    { "key": "kosten", "type": "positions", "label": { "de": "Kosten" } },
+    { "key": "foerderung", "type": "funding", "label": { "de": "Förderung" } },
+    {
+      "key": "teilnehmer",
+      "type": "number",
+      "label": { "de": "Teilnehmer" },
+      "validation": { "participants": true }
+    }
+  ],
+  "rules": [
+    {
+      "logic": { "or": [{ "!=": [{ "var": "art" }, "qsm"] }, { ">=": [{ "var": "amount" }, 500] }] },
+      "message": { "de": "QSM fördert ab 500 €.", "en": "QSM funds from 500 €." },
+      "severity": "block"
+    },
+    {
+      "logic": {
+        "or": [
+          { "!=": [{ "var": "art" }, "exk"] },
+          { "<=": [{ "/": [{ "var": "amount" }, { "var": "teilnehmer" }] }, 200] }
+        ]
+      },
+      "message": {
+        "de": "Eine Exkursion fördert höchstens 200 € pro Person.",
+        "en": "An excursion funds at most 200 € per person."
+      },
+      "severity": "warn"
+    },
+    {
+      "logic": { ">=": [{ "var": "costTotal" }, 100] },
+      "message": { "de": "Die Kosten liegen unter 100 €.", "en": "The cost is below 100 €." },
+      "severity": "warn"
+    }
+  ],
+  "cases": [
+    {
+      "name": "QSM with 600 € cost and no funding meets every rule",
+      "data": {
+        "art": "qsm",
+        "kosten": [{ "label": "Raum", "offers": [{ "label": "A", "value": 600, "preferred": true }] }]
+      },
+      "broken": []
+    },
+    {
+      "name": "QSM with a funding of 400 € breaks the minimum",
+      "data": {
+        "art": "qsm",
+        "kosten": [{ "label": "Raum", "offers": [{ "label": "A", "value": 600, "preferred": true }] }],
+        "foerderung": 400
+      },
+      "broken": [0]
+    },
+    {
+      "name": "An excursion with 300 € per person breaks the limit per person",
+      "data": {
+        "art": "exk",
+        "kosten": [{ "label": "Bus", "offers": [{ "label": "B", "value": 1000, "preferred": true }] }],
+        "foerderung": 900,
+        "teilnehmer": 3
+      },
+      "broken": [1]
+    },
+    {
+      "name": "An excursion with 200 € per person meets the limit",
+      "data": {
+        "art": "exk",
+        "kosten": [{ "label": "Bus", "offers": [{ "label": "B", "value": 1000, "preferred": true }] }],
+        "foerderung": 600,
+        "teilnehmer": 3
+      },
+      "broken": []
+    },
+    {
+      "name": "A division by zero participants cannot be evaluated and counts as met",
+      "data": {
+        "art": "exk",
+        "kosten": [{ "label": "Bus", "offers": [{ "label": "B", "value": 1000, "preferred": true }] }],
+        "teilnehmer": 0
+      },
+      "broken": []
+    },
+    {
+      "name": "A cost of 50 € breaks the warning on the cost total",
+      "data": {
+        "art": "exk",
+        "kosten": [
+          { "label": "Snacks", "offers": [{ "label": "C", "value": 20, "preferred": true }] },
+          { "label": "Getränke", "offers": [{ "label": "D", "value": 30, "preferred": true }, { "label": "E", "value": 90, "preferred": false }] }
+        ]
+      },
+      "broken": [2]
+    },
+    {
+      "name": "Without positions the amount is empty and no rule can be evaluated",
+      "data": { "art": "qsm" },
+      "broken": []
+    }
+  ]
+}

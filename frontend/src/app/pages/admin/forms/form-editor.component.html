@@ -325,6 +325,24 @@
                   </fieldset>
                 }
 
+                @if (field.type === 'number') {
+                  <app-checkbox
+                    [ngModel]="field.validation?.participants === true"
+                    [disabled]="field.validation?.participants !== true && participantsTaken(field)"
+                    (ngModelChange)="setParticipants(pos, $event)"
+                  >{{ 'admin.form.participants' | t }}</app-checkbox>
+                }
+
+                @if (field.type === 'budget_select') {
+                  <app-input
+                    class="fe__mono"
+                    [label]="'admin.form.rootPath' | t"
+                    placeholder="QSM"
+                    [ngModel]="field.validation?.rootPath ?? ''"
+                    (ngModelChange)="setRootPath(pos, $event)"
+                  />
+                }
+
                 @if (field.type === 'computed') {
                   <label class="fe__code">
                     <span class="fe__codeLabel">{{ 'admin.form.compute' | t }}</span>
@@ -428,6 +446,10 @@
             (ngModelChange)="pdfSignatures.set($event)"
           >{{ 'admin.forms.pdfSignatures' | t }}</app-checkbox>
           <app-checkbox
+            [ngModel]="attachmentRequired()"
+            (ngModelChange)="attachmentRequired.set($event)"
+          >{{ 'admin.forms.attachmentRequired' | t }}</app-checkbox>
+          <app-checkbox
             [ngModel]="cmpRequired()"
             (ngModelChange)="cmpRequired.set($event)"
           >{{ 'admin.forms.cmpRequired' | t }}</app-checkbox>
@@ -440,6 +462,58 @@
               (ngModelChange)="cmpMinCount.set(+$event)"
             />
           }
+        </section>
+
+        <section class="fe__card fe__meta fe__rules" [attr.aria-labelledby]="'fe-rules-h'">
+          <h2 id="fe-rules-h" class="cap fe__cap">{{ 'admin.forms.rules.title' | t }}</h2>
+          @for (rule of rules(); track $index; let ri = $index) {
+            <div class="fe__rule" [attr.aria-label]="'admin.forms.rules.ruleN' | t: { n: ri + 1 }" role="group">
+              <div class="fe__ruleHead">
+                <span class="fe__ruleTitle">{{ 'admin.forms.rules.ruleN' | t: { n: ri + 1 } }}</span>
+                <app-move-buttons
+                  [upDisabled]="ri === 0"
+                  [downDisabled]="ri === rules().length - 1"
+                  (move)="moveRule(ri, $event)"
+                />
+                <app-button
+                  variant="text"
+                  size="sm"
+                  [iconOnly]="true"
+                  [ariaLabel]="'admin.forms.rules.remove' | t"
+                  [title]="'admin.forms.rules.remove' | t"
+                  (click)="removeRule(ri)"
+                ><app-icon name="trash" /></app-button>
+              </div>
+              <label class="fe__code">
+                <span class="fe__codeLabel">{{ 'admin.forms.rules.logic' | t }}</span>
+                <textarea
+                  class="mono"
+                  rows="3"
+                  [ngModel]="rule.logic"
+                  (ngModelChange)="setRule(ri, { logic: $event })"
+                  [attr.aria-invalid]="ruleErrors()[ri] === 'admin.forms.rules.logicInvalid' ? 'true' : null"
+                  placeholder='{">=":[{"var":"amount"},500]}'
+                ></textarea>
+              </label>
+              <app-i18n-input
+                [label]="'admin.forms.rules.message' | t"
+                [value]="rule.message"
+                (valueChange)="setRule(ri, { message: $event })"
+              />
+              <app-select
+                [label]="'admin.forms.rules.severity' | t"
+                [options]="severityOptions"
+                [ngModel]="rule.severity"
+                (ngModelChange)="setRule(ri, { severity: $event })"
+              />
+              @if (ruleErrors()[ri]; as problem) {
+                <p class="fe__alert" role="alert">{{ problem | t }}</p>
+              }
+            </div>
+          }
+          <app-button class="fe__inlineAdd" variant="text" size="sm" (click)="addRule()">
+            <app-icon name="plus" /> {{ 'admin.forms.rules.add' | t }}
+          </app-button>
         </section>
 
         @if (typeId()) {

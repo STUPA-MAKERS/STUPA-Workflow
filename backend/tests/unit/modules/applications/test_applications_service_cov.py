@@ -28,6 +28,7 @@ import pytest
 
 from app.modules.applications.service import ApplicationsService
 from app.modules.applications.service import create as create_mod
+from app.modules.applications.service import edits as edits_mod
 from app.modules.applications.service import listing as listing_mod
 from app.modules.applications.service import reads as reads_mod
 from app.modules.applications.service.service_base import (
@@ -453,7 +454,7 @@ def _payload(**over: Any) -> SimpleNamespace:
 
 def _effective(fields: list[FormFieldDef], fv_id: UUID) -> Any:
     section = SimpleNamespace(fields=fields)
-    return SimpleNamespace(sections=[section], form_version_id=fv_id)
+    return SimpleNamespace(sections=[section], form_version_id=fv_id, rules=())
 
 
 class _FakeForms:
@@ -497,6 +498,20 @@ def _reset_flow() -> None:
     _FakeForms.effective = None
 
 
+class _FakeEditForms(_FakeForms):
+    """Stand-in for FormsService in the edit: a form without rules and without a root."""
+
+    async def get_effective_form(
+        self, _type_id: Any, _pot_id: Any = None, *, form_version_id: Any = None
+    ) -> Any:
+        return SimpleNamespace(sections=[], rules=())
+
+
+@pytest.fixture(autouse=True)
+def _patch_edit_forms(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(edits_mod, "FormsService", _FakeEditForms)
+
+
 @pytest.fixture
 def _patch_forms(monkeypatch: pytest.MonkeyPatch) -> type[_FakeForms]:
     monkeypatch.setattr(create_mod, "FormsService", _FakeForms)
@@ -519,7 +534,7 @@ async def test_create_unknown_type_404() -> None:
 
 async def test_create_no_active_flow_404(_patch_forms: type[_FakeForms]) -> None:
     """Answer 404 when no flow is active."""
-    app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4())
+    app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4(), attachment_required=False)
     session = _Session(get_results=[app_type], execute_results=[[]])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     with pytest.raises(NotFoundError, match="no active global flow"):
@@ -528,7 +543,7 @@ async def test_create_no_active_flow_404(_patch_forms: type[_FakeForms]) -> None
 
 async def test_create_validation_error_422(_patch_forms: type[_FakeForms]) -> None:
     """Answer 422 when the required field `title` is missing."""
-    app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4())
+    app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4(), attachment_required=False)
     fv_id = uuid4()
     _FakeForms.effective = _effective(
         [_ff("title", required=True)], fv_id
@@ -546,7 +561,7 @@ async def test_create_no_initial_state_404(
     _patch_forms: type[_FakeForms],
 ) -> None:
     """Answer 404 when the flow has no initial state."""
-    app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4())
+    app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4(), attachment_required=False)
     fv_id = uuid4()
     _FakeForms.effective = _effective([_ff("title", required=True)], fv_id)
     session = _Session(
@@ -558,6 +573,21 @@ async def test_create_no_initial_state_404(
         await svc.create(_payload(data={"title": "T"}))  # type: ignore[arg-type]
 
 
+async def test_create_of_a_type_with_a_required_file_needs_a_file(
+    _patch_forms: type[_FakeForms],
+) -> None:
+    """Answer 422 attachment_required when the type needs a file and none came (001732)."""
+    app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4(), attachment_required=True)
+    fv_id = uuid4()
+    _FakeForms.effective = _effective([_ff("title", required=True)], fv_id)
+    session = _Session(get_results=[app_type], execute_results=[[fv_id]])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    with pytest.raises(ValidationProblem) as exc:
+        await svc.create(_payload(data={"title": "T"}))  # type: ignore[arg-type]
+    assert exc.value.code == "attachment_required"
+    assert session.added == []
+
+
 async def test_create_anonymous_ok(
     _patch_forms: type[_FakeForms], _patch_flow: type[_FakeFlow]
 ) -> None:
@@ -566,7 +596,7 @@ async def test_create_anonymous_ok(
     A guest application rests in the flow until the magic-link verify, so the create starts
     nothing.
     """
-    app_type = _Obj(id=uuid4(), has_budget=True, gremium_id=uuid4())
+    app_type = _Obj(id=uuid4(), has_budget=True, gremium_id=uuid4(), attachment_required=False)
     fv_id = uuid4()
     initial = _state(is_initial=True)
     _FakeForms.effective = _effective(
@@ -600,7 +630,7 @@ async def test_create_logged_in_actor_confirms_immediately(
     _patch_forms: type[_FakeForms], _patch_flow: type[_FakeFlow]
 ) -> None:
     """Confirm a logged-in application and start its flow with the route dispatcher."""
-    app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4())
+    app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4(), attachment_required=False)
     fv_id = uuid4()
     initial = _state(is_initial=True)
     _FakeForms.effective = _effective([_ff("title", required=True)], fv_id)

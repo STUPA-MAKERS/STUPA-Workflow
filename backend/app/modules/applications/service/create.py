@@ -18,6 +18,7 @@ from app.modules.applications.models import (
     SubmissionVersion,
 )
 from app.modules.applications.schemas import ApplicationCreate
+from app.modules.applications.service.form_checks import check_form_rules
 from app.modules.applications.service.links import check_predecessor, write_link
 from app.modules.applications.service.service_base import (
     ApplicationsServiceBase,
@@ -28,6 +29,7 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.budget.form_options import budget_field_options
 from app.modules.files.drafts import DRAFT_ATTACHMENTS_MISSING, bind_drafts, check_drafts
+from app.modules.files.service import ATTACHMENT_REQUIRED
 from app.modules.flow.models import FlowVersion, State
 from app.modules.flow.vote_gremium import resolve_vote_gremium
 from app.modules.forms.service import FormsService
@@ -77,6 +79,9 @@ class CreateOps(ApplicationsServiceBase):
 
         1. Load the effective form.
         2. Run ``validate_answers``. A bad answer raises 422 before any DB write.
+           Then the checks across fields (`check_form_rules`): a ``block`` rule and the
+           root of a cost-center field. An Antragsart with "Anhang Pflicht" needs at
+           least one draft upload (422 ``attachment_required``, spec 001732).
            Check and lock the draft uploads of the wizard (``_check_drafts``).
            A missing, expired, foreign or infected draft raises 422 too.
         3. Write the application, the PII row, version 1, the initial state and
@@ -151,6 +156,14 @@ class CreateOps(ApplicationsServiceBase):
                 "Invalid application data.",
                 errors=[{"field": e.field, "msg": e.msg} for e in exc.errors],
             ) from exc
+
+        check_form_rules(effective, payload.data)
+        if app_type.attachment_required and not payload.attachment_ids:
+            raise ValidationProblem(
+                "This Antragsart needs a file.",
+                code=ATTACHMENT_REQUIRED,
+                errors=[{"field": "attachmentIds", "msg": "a file is required"}],
+            )
 
         confirmed = actor != "applicant" if email_confirmed is None else email_confirmed
         initial = await self._initial_state(flow_version_id)

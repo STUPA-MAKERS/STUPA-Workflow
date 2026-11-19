@@ -12,7 +12,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from app.shared.config_schemas import FormFieldDef
+from app.shared.config_schemas import FormFieldDef, FormRule
 from app.shared.i18n import I18nMap
 from app.shared.schemas import FrozenCamelModel
 
@@ -32,6 +32,8 @@ class FormVersionCreate(FrozenCamelModel, frozen=True):
     activate: bool = True
     #: Multilingual Markdown description of the form.
     description: I18nMap | None = None
+    #: The rules across fields, in their order (spec 001670).
+    rules: Sequence[FormRule] = Field(default=(), max_length=50)
 
 
 class FormActiveSet(FrozenCamelModel, frozen=True):
@@ -53,6 +55,7 @@ class FormVersionOut(FrozenCamelModel, frozen=True):
     active: bool
     fields: Sequence[FormFieldDef]
     description: I18nMap | None = None
+    rules: Sequence[FormRule] = ()
 
 
 class FormDraftOut(FrozenCamelModel, frozen=True):
@@ -69,6 +72,7 @@ class FormDraftOut(FrozenCamelModel, frozen=True):
     active: bool = False
     description: I18nMap | None = None
     fields: Sequence[FormFieldDef]
+    rules: Sequence[FormRule] = ()
 
 
 class FormSectionOut(FrozenCamelModel, frozen=True):
@@ -92,3 +96,7 @@ class EffectiveFormOut(FrozenCamelModel, frozen=True):
     form_version_id: UUID = Field(alias="formVersionId")
     has_budget: bool = Field(default=False, alias="hasBudget")
     sections: Sequence[FormSectionOut]
+    #: The rules across fields (spec 001670); the form checks them while the applicant types.
+    rules: Sequence[FormRule] = ()
+    #: The Antragsart needs a file before the submit (spec 001732).
+    attachment_required: bool = Field(default=False, alias="attachmentRequired")

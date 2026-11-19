@@ -66,6 +66,16 @@
                 <span>{{ p.noOffersReason || '—' }}</span>
               </p>
             }
+            @if (p.files.length) {
+              <ul class="pv__files" [attr.aria-label]="'forms.positions.files' | t">
+                @for (f of p.files; track f.id) {
+                  <li class="pv__file">
+                    <app-icon class="pv__fileIcon" name="clip" [size]="16" />
+                    <span class="pv__fileName">{{ f.filename }}</span>
+                  </li>
+                }
+              </ul>
+            }
           </div>
         }
       </div>
@@ -76,4 +86,7 @@
     <span>{{ 'forms.positions.total' | t }}</span>
     <span class="mono">{{ total() }}</span>
   </div>
+  @if (lineText(); as line) {
+    <p class="pv__line">{{ line }}</p>
+  }
 </div>

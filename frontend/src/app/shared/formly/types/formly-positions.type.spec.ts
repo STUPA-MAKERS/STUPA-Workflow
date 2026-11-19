@@ -1,6 +1,9 @@
 import { FormControl } from '@angular/forms';
 import { render } from '@testing-library/angular';
+import { Component, input } from '@angular/core';
+import type { Provider } from '@angular/core';
 import { I18nService } from '@core/i18n/i18n.service';
+import { POSITION_FILES } from '@shared/forms/position-files';
 import { FormlyPositionsType } from './formly-positions.type';
 
 interface Offer {
@@ -23,23 +26,39 @@ async function setup(opts: {
   value?: unknown;
   props?: Record<string, unknown>;
   showError?: boolean;
-} = {}): Promise<{ cmp: FormlyPositionsType; control: FormControl; detect: () => void }> {
+  model?: Record<string, unknown>;
+  key?: string;
+  providers?: Provider[];
+} = {}): Promise<{
+  cmp: FormlyPositionsType;
+  control: FormControl;
+  detect: () => void;
+  host: HTMLElement;
+}> {
   localStorage.setItem('ap.locale', 'de');
   const control = new FormControl(opts.value ?? null);
   const field = {
     formControl: control,
     props: opts.props ?? {},
     options: { showError: () => false },
+    ...(opts.model ? { model: opts.model } : {}),
+    ...(opts.key ? { key: opts.key } : {}),
   };
   const { fixture } = await render(FormlyPositionsType, {
     componentInputs: { field: field as never },
+    providers: opts.providers ?? [],
   });
   const cmp = fixture.componentInstance;
   if (opts.showError) {
     control.setErrors({ positions: true });
     control.markAsTouched();
   }
-  return { cmp, control, detect: () => fixture.detectChanges() };
+  return {
+    cmp,
+    control,
+    detect: () => fixture.detectChanges(),
+    host: fixture.nativeElement as HTMLElement,
+  };
 }
 
 /** Cast to any to reach protected helpers under test. */
@@ -782,5 +801,134 @@ describe('FormlyPositionsType — comparison-offer opt-out (noOffers)', () => {
       'Bitte begründe, warum keine Vergleichsangebote möglich sind.',
     );
     expect(prot(cmp).reasonInvalid({ ...p, noOffersReason: 'Grund' })).toBe(false);
+  });
+});
+
+/** A files block that only shows its inputs. */
+@Component({
+  selector: 'app-files-stub',
+  standalone: true,
+  template: `<span class="stub">{{ fieldKey() }}/{{ positionId() }}/{{ heading() }}</span>`,
+})
+class FilesStubComponent {
+  readonly fieldKey = input('');
+  readonly positionId = input('');
+  readonly heading = input('');
+}
+
+/** The text of the cost line, with plain spaces. */
+function lineOf(host: HTMLElement): string | undefined {
+  return host.querySelector('.pos__line')?.textContent?.replace(/\s+/g, ' ').trim();
+}
+
+describe('FormlyPositionsType — cost line (specs 001630, 001631)', () => {
+  const fields = [
+    { key: 'kosten', type: 'positions', label: { de: 'K' } },
+    { key: 'foerderung', type: 'funding', label: { de: 'F' } },
+    { key: 'n', type: 'number', label: { de: 'N' }, validation: { participants: true } },
+  ];
+  const kosten = [{ label: 'Bus', offers: [{ label: 'Reisen AG', value: 1200, preferred: true }] }];
+
+  it('shows the total as the requested amount without a funding', async () => {
+    const model: Record<string, unknown> = { kosten };
+    const { host } = await setup({
+      key: 'kosten',
+      value: kosten,
+      model,
+      props: { costLine: true, costFields: fields },
+    });
+    expect(lineOf(host)).toBe(
+      'Gesamtkosten 1.200,00 €, davon beantragt 1.200,00 €',
+    );
+  });
+
+  it('shows the funding and the amount per person, and follows the form', async () => {
+    const model: Record<string, unknown> = { kosten, foerderung: 800, n: 3 };
+    const { host, control, detect } = await setup({
+      key: 'kosten',
+      value: kosten,
+      model,
+      props: { costLine: true, costFields: fields },
+    });
+    expect(lineOf(host)).toBe(
+      'Gesamtkosten 1.200,00 €, davon beantragt 800,00 €, 266,67 € pro Person',
+    );
+    model['n'] = 0;
+    control.setValue(kosten);
+    detect();
+    expect(lineOf(host)).toBe(
+      'Gesamtkosten 1.200,00 €, davon beantragt 800,00 €',
+    );
+  });
+
+  it('shows no line on a field without costLine', async () => {
+    const { host } = await setup({ key: 'kosten', value: kosten, props: { costFields: fields } });
+    expect(host.querySelector('.pos__line')).toBeNull();
+  });
+});
+
+describe('FormlyPositionsType — placeholder warnings (specs 001640, 001641)', () => {
+  const offers = [
+    { label: 'x', value: 1, preferred: true },
+    { label: 'Thomann', value: 50, preferred: false },
+    { label: ' thomann', value: 60, preferred: false },
+  ];
+
+  it('names each reason and the switch for no comparison offers', async () => {
+    const { cmp, control } = await setup({ value: [{ label: 'P', offers }] });
+    const p = (control.value as Position[])[0];
+    expect(prot(cmp).offerWarning(p, 0)).toBe(
+      'Ein Angebot über 0 € oder 1 € sieht nach einem Platzhalter aus. ' +
+        'Der Anbieter hat weniger als 3 Zeichen. ' +
+        'Gibt es keine Vergleichsangebote, schalte „Für diese Position sind keine Vergleichsangebote möglich“ ein.',
+    );
+    expect(prot(cmp).offerWarning(p, 1)).toContain('denselben Anbieter');
+    expect(prot(cmp).offerWarning({ ...p, offers: [offers[1]] }, 0)).toBe('');
+  });
+
+  it('does not name the switch when the field does not offer it', async () => {
+    const { cmp, control } = await setup({
+      value: [{ label: 'P', offers }],
+      props: { allowNoOffers: false },
+    });
+    const p = (control.value as Position[])[0];
+    expect(prot(cmp).offerWarning(p, 0)).not.toContain('Vergleichsangebote');
+    expect(prot(cmp).offerWarning({ ...p, noOffers: true }, 0)).not.toContain('schalte');
+  });
+
+  it('keeps a complete position with a warning valid', async () => {
+    const { control } = await setup({
+      value: [{ label: 'P', offers }],
+      props: { minOffers: 3 },
+    });
+    await Promise.resolve();
+    expect(control.errors).toBeNull();
+  });
+});
+
+describe('FormlyPositionsType — files per position (spec 001730)', () => {
+  it('gives a new position an id', async () => {
+    const { cmp, control } = await setup({ props: { minOffers: 1 } });
+    cmp.addPosition();
+    expect((control.value as { id?: string }[])[0].id).toMatch(/^p-/);
+  });
+
+  it('shows the files block of the page and reports a removed position', async () => {
+    const removed = jest.fn();
+    const { cmp, control, host } = await setup({
+      key: 'kosten',
+      value: [{ label: '', offers: [] }],
+      providers: [{ provide: POSITION_FILES, useValue: { component: FilesStubComponent, removed } }],
+    });
+    const id = (control.value as { id?: string }[])[0].id;
+    expect(id).toMatch(/^p-/);
+    expect(host.querySelector('.stub')?.textContent).toBe(`kosten/${id}/Dateien zur Position`);
+    cmp.removePosition(0);
+    expect(removed).toHaveBeenCalledWith('kosten', id);
+  });
+
+  it('has no files block without the page token', async () => {
+    const { host } = await setup({ value: [{ id: 'p-1', label: '', offers: [] }] });
+    expect(host.querySelector('.stub')).toBeNull();
   });
 });

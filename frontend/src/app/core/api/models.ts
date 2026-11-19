@@ -667,6 +667,10 @@ export interface AttachmentOutWire {
   readonly mime: string;
   readonly size: number;
   readonly scanned: boolean;
+  /** The form field of the file; absent or null for a general attachment. */
+  readonly fieldKey?: string | null;
+  /** The position of a `positions` field that the file belongs to (spec 001730). */
+  readonly positionId?: string | null;
 }
 
 /**
@@ -1018,6 +1022,10 @@ export interface Attachment {
   readonly size: number;
   readonly scanned: boolean;
   readonly scanState: ScanState;
+  /** The form field of the file, when it has one. */
+  readonly fieldKey?: string | null;
+  /** The position of a `positions` field that the file belongs to (spec 001730). */
+  readonly positionId?: string | null;
 }
 
 /** Signed download URL, frontend view. */
@@ -1105,6 +1113,8 @@ export interface FieldOption {
   readonly key?: string | null;
   /** The own display colour of the cost centre, or null. */
   readonly color?: string | null;
+  /** The path key of the cost centre (`VS-80004`). */
+  readonly pathKey?: string | null;
 }
 
 export interface FieldValidation {
@@ -1124,6 +1134,26 @@ export interface FieldValidation {
    *  user ticks a checkbox and must give a reason. Then one offer is enough. If
    *  unset, the opt-out is allowed. */
   readonly allowNoOffers?: boolean;
+  /** `number`. The field holds the number of participants (spec 001631); at most one
+   *  field of a form. The cost line then shows the amount per person. */
+  readonly participants?: boolean;
+  /** `budget_select`. The path key of the Kostenstelle whose subtree the picker offers
+   *  (spec 001680). The server sends only the options below it. */
+  readonly rootPath?: string;
+}
+
+/** How a form rule acts when the answers break it (spec 001671). */
+export type RuleSeverity = 'block' | 'warn';
+
+/**
+ * A rule of a form across fields (spec 001670). `logic` is a JsonLogic expression over
+ * the answers by key, `amount` and `costTotal`; the answers meet the rule when it gives
+ * `true`. `message` is shown when they do not.
+ */
+export interface FormRule {
+  readonly logic: Readonly<Record<string, unknown>>;
+  readonly message: I18nMap;
+  readonly severity: RuleSeverity;
 }
 
 /** A field definition of the effective form. It is camelCase like the OpenAPI by_alias. */
@@ -1155,6 +1185,10 @@ export interface EffectiveForm {
   /** Drives `visibleIf: has_budget`. Comes from the type, as the server's own check does. */
   readonly hasBudget: boolean;
   readonly sections: readonly FormSection[];
+  /** The rules across fields (spec 001670); absent from an older server. */
+  readonly rules?: readonly FormRule[];
+  /** The Antragsart needs a file before the submit (spec 001732). */
+  readonly attachmentRequired?: boolean;
 }
 
 /**

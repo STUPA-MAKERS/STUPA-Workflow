@@ -51,7 +51,7 @@ from functools import reduce
 from typing import Any
 from uuid import UUID
 
-from app.shared.config_schemas import FieldValidation, FormFieldDef
+from app.shared.config_schemas import FieldValidation, FormFieldDef, FormRule
 from app.shared.jsonlogic import JsonLogicError, eval_jsonlogic, validate_jsonlogic
 
 #: Field types with a numeric value, used by the promoted extraction and by min and max.
@@ -159,7 +159,8 @@ def validate_definition(fields: Sequence[FormFieldDef]) -> None:
     ``pattern`` must compile as a regex, because a broken pattern fails at answer runtime
     with a 500. A form has at most one ``funding`` field, and only beside a ``positions``
     field, because the funding is checked against the cost total and replaces it as the
-    amount.
+    amount. ``participants`` belongs to one ``number`` field at most (spec 001631) and
+    ``rootPath`` to a ``budget_select`` field only (spec 001680).
 
     Raises:
         FormDefinitionError: The definition breaks one of these rules.
@@ -176,6 +177,8 @@ def validate_definition(fields: Sequence[FormFieldDef]) -> None:
         raise FormDefinitionError(
             f"funding field {funding[0]!r} needs a positions field in the same form"
         )
+
+    _check_field_settings(fields)
 
     for f in fields:
         if f.is_promoted and f.type not in _NUMERIC_TYPES:
@@ -197,6 +200,34 @@ def validate_definition(fields: Sequence[FormFieldDef]) -> None:
                 raise FormDefinitionError(
                     f"field {f.key!r} has an invalid validation pattern: {exc}"
                 ) from exc
+
+
+def _check_field_settings(fields: Sequence[FormFieldDef]) -> None:
+    """Check the settings that belong to one field type only.
+
+    Raises:
+        FormDefinitionError: ``participants`` is on a field that is no ``number`` field,
+            on more than one field, or ``rootPath`` is on a field that is no
+            ``budget_select`` field.
+    """
+    participants = [f for f in fields if f.validation is not None and f.validation.participants]
+    wrong_participants = [f.key for f in participants if f.type != "number"]
+    if wrong_participants:
+        raise FormDefinitionError(
+            f"only a number field holds the number of participants, got {wrong_participants}"
+        )
+    if len(participants) > 1:
+        raise FormDefinitionError(
+            "a form has at most one field for the number of participants, got "
+            f"{[f.key for f in participants]}"
+        )
+    wrong_root = [
+        f.key
+        for f in fields
+        if f.validation is not None and f.validation.root_path and f.type != "budget_select"
+    ]
+    if wrong_root:
+        raise FormDefinitionError(f"only a budget_select field has a root, got {wrong_root}")
 
 
 def effective_form(type_fields: Sequence[FormFieldDef]) -> list[FormSection]:
@@ -937,3 +968,71 @@ def _finite_decimal(value: object) -> Decimal | None:
     except (InvalidOperation, ValueError):
         return None
     return num if num.is_finite() else None
+
+
+def cost_total(fields: Sequence[FormFieldDef], data: Mapping[str, Any]) -> Decimal | None:
+    """Sum the preferred offers of every ``positions`` field, or ``None`` without one."""
+    totals = tuple(
+        total
+        for f in fields
+        if f.type == "positions" and (total := positions_total(data.get(f.key))) is not None
+    )
+    return sum(totals, Decimal(0)) if totals else None
+
+
+def rule_context(fields: Sequence[FormFieldDef], data: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the values that a form rule reads (spec 001670).
+
+    The answers by field key, plus ``amount`` (the amount of the Antrag, as
+    `extract_promoted` makes it) and ``costTotal`` (the sum of the preferred offers). Both
+    are ``float`` or ``None``, because the JsonLogic evaluator compares plain numbers.
+    """
+    amount = _finite_decimal(extract_promoted(fields, data).get("amount"))
+    total = cost_total(fields, data)
+    return {
+        **data,
+        "amount": float(amount) if amount is not None else None,
+        "costTotal": float(total) if total is not None else None,
+    }
+
+
+def rule_met(rule: FormRule, ctx: Mapping[str, Any]) -> bool:
+    """Tell whether the answers meet one form rule.
+
+    The answers meet the rule when its expression gives exactly ``true``. An expression
+    that cannot be evaluated, for example because a field is still empty, counts as met:
+    the required check of the field reports the empty value, and a second message for the
+    same gap only confuses. The frontend (`shared/forms/form-rules.ts`) uses the same rule.
+    """
+    try:
+        return eval_jsonlogic(rule.logic, dict(ctx)) is True
+    except JsonLogicError:
+        return True
+
+
+def broken_rules(
+    rules: Sequence[FormRule], fields: Sequence[FormFieldDef], data: Mapping[str, Any]
+) -> tuple[tuple[int, FormRule], ...]:
+    """Return the rules that the answers do not meet, with their index (spec 001671)."""
+    ctx = rule_context(fields, data)
+    return tuple((i, rule) for i, rule in enumerate(rules) if not rule_met(rule, ctx))
+
+
+def outside_subtree(
+    fields: Sequence[FormFieldDef], data: Mapping[str, Any]
+) -> tuple[FieldError, ...]:
+    """Report a Kostenstelle outside the root of its ``budget_select`` field (spec 001681).
+
+    The fields carry the options that the server injected (`FormsService`), and a field
+    with a root holds only the Kostenstellen below it. An empty answer passes, because the
+    required check reports it.
+    """
+    return tuple(
+        FieldError(field=f.key, msg="the cost centre is outside the root of the field")
+        for f in fields
+        if f.type == "budget_select"
+        and f.validation is not None
+        and f.validation.root_path
+        and _is_present(data.get(f.key))
+        and str(data.get(f.key)) not in {o.value for o in (f.options or [])}
+    )
