@@ -100,7 +100,10 @@ export class TypeChangeDialogComponent {
     });
   }
 
+  /** Close the dialog and drop the answer of a preview that is still loading. */
   close(): void {
+    this.seq = this.seq + 1;
+    this.loading.set(false);
     this.open.set(false);
   }
 

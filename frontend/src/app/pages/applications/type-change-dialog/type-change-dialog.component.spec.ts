@@ -115,12 +115,12 @@ async function setup() {
   const cmp = view.fixture.debugElement.children[0].componentInstance as TypeChangeDialogComponent;
   const openIt = () => {
     host.open.set(true);
-    view.detectChanges();
+    detectChanges();
   };
   const pick = (typeId: string, preview: TypeChangePreview) => {
     cmp.pickType(typeId);
     http.expectOne(PREVIEW_URL(typeId)).flush(preview);
-    view.detectChanges();
+    detectChanges();
   };
   return { ...view, http, toast, host, cmp, openIt, pick };
 }
@@ -236,7 +236,7 @@ describe('TypeChangeDialogComponent', () => {
   });
 
   it('drops the answer of an earlier pick', async () => {
-    const { http, cmp, toast, openIt } = await setup();
+    const { http, cmp, toast, openIt, detectChanges } = await setup();
     const error = jest.spyOn(toast, 'error');
     openIt();
     cmp.pickType('t2');
@@ -248,16 +248,40 @@ describe('TypeChangeDialogComponent', () => {
     cmp.pickType('t2');
     const third = http.expectOne(PREVIEW_URL('t2'));
     cmp.close();
+    detectChanges();
     openIt();
     third.flush({}, { status: 500, statusText: 'x' });
     expect(error).toHaveBeenCalledTimes(1);
+    expect(cmp.loading()).toBe(false);
+  });
+
+  it('has no lists and no transitions before a preview', async () => {
+    const { cmp, openIt } = await setup();
+    openIt();
+    expect(cmp.transitionOptions()).toEqual([]);
+    expect(cmp.missing()).toEqual([]);
+    expect(cmp.dropped()).toEqual([]);
+    expect(cmp.carried()).toEqual([]);
+    expect(cmp.canSubmit()).toBe(false);
+  });
+
+  it('drops the answer of a successful preview after the dialog closed', async () => {
+    const { http, cmp, openIt } = await setup();
+    openIt();
+    cmp.pickType('t2');
+    const req = http.expectOne(PREVIEW_URL('t2'));
+    cmp.close();
+    req.flush(SEND_BACK);
+    expect(cmp.preview()).toBeNull();
+    expect(cmp.loading()).toBe(false);
   });
 
   it('loads nothing without a type or without an application', async () => {
-    const { http, host, cmp, openIt } = await setup();
+    const { http, host, cmp, detectChanges, openIt } = await setup();
     openIt();
     cmp.pickType('');
     host.id.set(null);
+    detectChanges();
     cmp.pickType('t2');
     cmp.submit();
     http.verify();
