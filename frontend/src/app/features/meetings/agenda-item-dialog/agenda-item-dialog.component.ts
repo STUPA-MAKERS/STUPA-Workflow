@@ -380,13 +380,6 @@ export class AgendaItemDialogComponent {
     this.nonPublic.update((on) => !on);
   }
 
-  /** "Filter zurücksetzen": clears the search of the current kind. */
-  clearSearch(): void {
-    if (this.kind() === 'todo') this.todoQuery.set('');
-    else this.query.set('');
-    this.focusAfterRender('.aid__area input');
-  }
-
   /**
    * "Als Freitext anlegen": switches to a free-text item. A search text becomes the
    * title, so nothing that was typed is lost.

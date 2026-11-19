@@ -75,20 +75,16 @@ def test_card_create_carries_the_checklist(fake_api: _FakeApi) -> None:
 
 
 def test_card_field_tools(fake_api: _FakeApi) -> None:
-    """§ 001200: assignees, labels and links change after the create."""
+    """§ 001200: assignees and labels change after the create."""
     asyncio.run(todos.todo_card_assignee_add("c1", "p1"))
     asyncio.run(todos.todo_card_assignee_remove("c1", "p1"))
     asyncio.run(todos.todo_card_label_add("c1", "l1"))
     asyncio.run(todos.todo_card_label_remove("c1", "l1"))
-    asyncio.run(todos.todo_card_link_add("c1", S.TodoLinkIn(kind="ticket", targetId="t1")))
-    asyncio.run(todos.todo_card_link_remove("c1", "k1"))
     assert fake_api.calls == [
         ("POST", "/todos/cards/c1/assignees", {"principalId": "p1"}),
         ("DELETE", "/todos/cards/c1/assignees/p1", None),
         ("POST", "/todos/cards/c1/labels", {"labelId": "l1"}),
         ("DELETE", "/todos/cards/c1/labels/l1", None),
-        ("POST", "/todos/cards/c1/links", {"kind": "ticket", "targetId": "t1"}),
-        ("DELETE", "/todos/cards/c1/links/k1", None),
     ]
 
 

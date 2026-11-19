@@ -16,6 +16,7 @@ from tests.unit.modules.todos.fakes import (
     board,
     card,
     column,
+    link,
 )
 
 TICKET = uuid.UUID(int=61)
@@ -57,7 +58,9 @@ async def test_complete_moves_the_cards_and_commits() -> None:
     b = board()
     col, done = column(b.id), column(b.id, "Erledigt", 1, is_done=True)
     c = card(b, col)
-    session = ScriptedSession(execute=[[(c, b)]], scalars=[[col, done], [], [TICKET]])
+    session = ScriptedSession(
+        execute=[[(c, b)], [link(c.id, ticket_id=TICKET)]], scalars=[[col, done], []]
+    )
     await _bridge(session, {b.id}).complete(TICKET, USER)
     assert c.column_id == done.id and session.committed == 1
 
@@ -115,7 +118,9 @@ async def test_complete_pings_the_board_after_the_commit() -> None:
     b = board()
     col, done = column(b.id), column(b.id, "Erledigt", 1, is_done=True)
     c = card(b, col)
-    session = ScriptedSession(execute=[[(c, b)]], scalars=[[col, done], [], [TICKET]])
+    session = ScriptedSession(
+        execute=[[(c, b)], [link(c.id, ticket_id=TICKET)]], scalars=[[col, done], []]
+    )
     bridge = _bridge(session, {b.id})
     sent: list[tuple[str, dict[str, object]]] = []
 

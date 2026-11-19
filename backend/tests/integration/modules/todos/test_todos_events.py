@@ -237,17 +237,19 @@ async def test_totals_decisions_and_one_event_per_element(
 
         other = _card(client, board, "Sommerfest", event=EVENT)
         taken = client.post(
-            f"/api/todos/cards/{other['id']}/links",
-            json={"kind": "expense", "targetId": str(ids["parent"])},
+            "/api/links",
+            json={
+                "a": {"kind": "todo", "id": other["id"]},
+                "b": {"kind": "expense", "id": str(ids["parent"])},
+            },
         )
         assert _code(taken, 409) == "event_link_taken"
         plain = _card(client, board, "Plakate", links=[links[3]])
         converted = client.put(f"/api/todos/cards/{plain['id']}/event", json=EVENT)
         assert _code(converted, 409) == "event_link_taken"
 
-        back = _ok(
-            client.get("/api/todos/linked", params={"kind": "expense", "targetId": ids["parent"]})
-        )
+        rows = _ok(client.get("/api/links", params={"kind": "expense", "id": ids["parent"]}))
+        back = [row["card"] for row in rows["links"]]
         assert [c["title"] for c in back] == ["Erstiparty", "Plakate"]
         assert back[0]["event"]["place"] == "Mensa" and back[0]["balance"] == "-225.00"
         assert back[1]["event"] is None

@@ -2,14 +2,10 @@
 id: "000613"
 title: One ghost row holds the message and shows no bars
 kind: non-functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-10
-tests:
-  - "frontend/vendor/ui-kit/src/lib/empty-state/empty-state.component.spec.ts:EmptyStateComponent"
-implementation:
-  - frontend/vendor/ui-kit/src/lib/empty-state/empty-state.component.html
-  - frontend/vendor/ui-kit/src/lib/empty-state/empty-state.component.scss
+updated: 2026-11-19
+replaced_by: NF/usability/controls/001360
 scope:
   - frontend/vendor/ui-kit/src/lib/empty-state
 ---

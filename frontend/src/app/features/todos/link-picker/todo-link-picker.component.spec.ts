@@ -16,7 +16,7 @@ async function setup(opts: { fail?: boolean; linked?: string[] } = {}) {
   const linkTargets = jest.fn(() => (opts.fail ? throwError(() => new Error('x')) : of(HITS)));
   const picked = jest.fn();
   const view = await render(TodoLinkPickerComponent, {
-    inputs: { open: false, excludeCardId: 'k-1', linked: new Set(opts.linked ?? []) },
+    inputs: { open: false, exclude: { kind: 'todo', id: 'k-1' }, linked: new Set(opts.linked ?? []) },
     on: { picked },
     providers: [{ provide: TodosApiService, useValue: { linkTargets } }],
   });
@@ -58,7 +58,7 @@ describe('TodoLinkPickerComponent', () => {
   it('opens on the first render when open is true from the start', async () => {
     const linkTargets = jest.fn(() => of(HITS));
     await render(TodoLinkPickerComponent, {
-      inputs: { open: true, excludeCardId: 'k-1', linked: new Set<string>() },
+      inputs: { open: true, exclude: { kind: 'todo', id: 'k-1' }, linked: new Set<string>() },
       providers: [{ provide: TodosApiService, useValue: { linkTargets } }],
     });
     expect(screen.getByRole('dialog', { name: 'Verknüpfen' }).closest('.lp-layer')?.parentElement).toBe(document.body);
@@ -113,7 +113,7 @@ describe('TodoLinkPickerComponent', () => {
     const { open, type, linkTargets, picked } = await setup({ linked: ['application:a-1'] });
     await open();
     type('Haushalt');
-    expect(linkTargets).toHaveBeenLastCalledWith('Haushalt', 'all', 'k-1');
+    expect(linkTargets).toHaveBeenLastCalledWith('Haushalt', 'all', { kind: 'todo', id: 'k-1' });
     expect(screen.getByText('Anträge', { selector: '.lp__group' })).toBeInTheDocument();
     expect(screen.getByText('Sitzungen und TOPs')).toBeInTheDocument();
     expect(screen.getByText('To-Dos', { selector: '.lp__group' })).toBeInTheDocument();
@@ -158,7 +158,7 @@ describe('TodoLinkPickerComponent', () => {
       ['Buchungen', 'expense'],
     ] as const) {
       fireEvent.click(screen.getByRole('button', { name: label }));
-      expect(linkTargets).toHaveBeenLastCalledWith('Pla', kind, 'k-1');
+      expect(linkTargets).toHaveBeenLastCalledWith('Pla', kind, { kind: 'todo', id: 'k-1' });
     }
   });
 
@@ -171,7 +171,7 @@ describe('TodoLinkPickerComponent', () => {
     expect(linkTargets).toHaveBeenCalledTimes(calls);
     fireEvent.click(screen.getByRole('button', { name: 'TOPs' }));
     expect(screen.getByRole('button', { name: 'TOPs' })).toHaveAttribute('aria-pressed', 'true');
-    expect(linkTargets).toHaveBeenLastCalledWith('Haushalt', 'agenda_item', 'k-1');
+    expect(linkTargets).toHaveBeenLastCalledWith('Haushalt', 'agenda_item', { kind: 'todo', id: 'k-1' });
   });
 
   it('shows the shared empty state when nothing matches', async () => {

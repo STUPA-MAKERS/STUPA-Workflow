@@ -36,7 +36,7 @@ def _ok(resp: Any, status: int = 200) -> Any:
 
 
 def _targets(client: TestClient, q: str) -> list[dict[str, Any]]:
-    return _ok(client.get("/api/todos/link-targets", params={"q": q, "kind": "appointment"}))
+    return _ok(client.get("/api/links/targets", params={"q": q, "kind": "appointment"}))
 
 
 async def test_card_links_a_termin(
@@ -76,12 +76,8 @@ async def test_card_links_a_termin(
         own = card["links"][0]
         assert own["accessible"] and not own["granted"]
         assert own["url"] == f"/calendar?appointment={termin['id']}"
-        back = _ok(
-            client.get(
-                "/api/todos/linked", params={"kind": "appointment", "targetId": termin["id"]}
-            )
-        )
-        assert [c["title"] for c in back] == ["Raum buchen"]
+        back = _ok(client.get("/api/links", params={"kind": "appointment", "id": termin["id"]}))
+        assert [row["card"]["title"] for row in back["links"]] == ["Raum buchen"]
 
     api.login(bert)
     with TestClient(api.app) as client:
@@ -98,7 +94,7 @@ async def test_card_links_a_termin(
             "endTime": "16:00:00",
             "place": "Raum 1",
         }
-        view = _ok(client.get(f"/api/todos/cards/{card['id']}/links/{link['id']}/view"))
+        view = _ok(client.get(f"/api/links/{link['id']}/view"))
         assert {fact["key"]: fact["value"] for fact in view["facts"]} == {
             "date": "2031-05-05",
             "endDate": "2031-05-06",
@@ -111,8 +107,11 @@ async def test_card_links_a_termin(
             client.post("/api/todos/cards", json={"boardId": str(board), "title": "Plakate"}), 201
         )
         refused = client.post(
-            f"/api/todos/cards/{other['id']}/links",
-            json={"kind": "appointment", "targetId": termin["id"]},
+            "/api/links",
+            json={
+                "a": {"kind": "todo", "id": other["id"]},
+                "b": {"kind": "appointment", "id": termin["id"]},
+            },
         )
         assert _ok(refused, 422)["code"] == "link_target_not_found"
 

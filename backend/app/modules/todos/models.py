@@ -20,9 +20,14 @@ sorts inside its column by ``rank``, a lexorank string with the collation ``C``,
 a move writes one row only (``lexorank.py``). ``version`` guards the content edits
 (title, description, due date) against a lost update.
 
-``todo_link`` points a card at exactly one target: an application, a meeting, an
-agenda item, a vote, a Termin (``calendar_appointment``), a gremium, an invoice, a
-booking (``budget_expense``), a cost centre (``budget``), a ticket or another card.
+``link`` connects two elements of any two kinds (specs 001400-001402): an application,
+a meeting, an agenda item, a vote, a Termin (``calendar_appointment``), a gremium, an
+invoice, a booking (``budget_expense``), a cost centre (``budget``), a ticket or a card.
+A link has no direction. Its two ends are stored in a fixed order, ``(a_kind, a_id)``
+before ``(b_kind, b_id)`` by byte order (``Link.between``), so the unique index holds one
+row per pair. An end has no foreign key, because it points into one of eleven tables:
+an ``AFTER DELETE`` trigger on each of them (``link_drop_ends``, migration
+``c4d1e2f3a5b6``) deletes the links of a deleted element.
 ``todo_event`` is the timeline of a card; there is no audit entry for to-dos.
 
 ``due_reminded_on`` is the due date that the ``todo_due`` reminder went out for. A
@@ -93,19 +98,19 @@ LINK_KINDS: tuple[str, ...] = (
     "ticket",
     "todo",
 )
-#: The target column of each link kind.
-LINK_COLUMNS: dict[str, str] = {
-    "application": "application_id",
-    "meeting": "meeting_id",
-    "agenda_item": "agenda_item_id",
-    "vote": "vote_id",
-    "appointment": "appointment_id",
-    "gremium": "gremium_id",
-    "invoice": "invoice_id",
-    "expense": "expense_id",
-    "budget": "budget_id",
-    "ticket": "ticket_id",
-    "todo": "todo_id",
+#: The table of each link kind; a trigger on it deletes the links of a deleted row.
+LINK_TABLES: dict[str, str] = {
+    "application": "application",
+    "meeting": "meeting",
+    "agenda_item": "meeting_agenda_item",
+    "vote": "vote",
+    "appointment": "calendar_appointment",
+    "gremium": "gremium",
+    "invoice": "invoice",
+    "expense": "budget_expense",
+    "budget": "budget",
+    "ticket": "ticket",
+    "todo": "todo_card",
 }
 #: The columns of a new board, by position; the last one is the done column.
 DEFAULT_COLUMNS: tuple[str, ...] = ("Offen", "In Arbeit", "Wartet", "Erledigt")
@@ -400,80 +405,64 @@ class TodoEvent(UUIDPkMixin, Base):
     )
 
 
-class TodoLink(UUIDPkMixin, Base):
-    """A link from a card to exactly one target."""
+LinkEnd = tuple[str, uuid.UUID]
 
-    __tablename__ = "todo_link"
 
-    card_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("todo_card.id", ondelete="CASCADE"))
-    application_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("application.id", ondelete="CASCADE"), nullable=True
-    )
-    meeting_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("meeting.id", ondelete="CASCADE"), nullable=True
-    )
-    agenda_item_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("meeting_agenda_item.id", ondelete="CASCADE"), nullable=True
-    )
-    vote_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("vote.id", ondelete="CASCADE"), nullable=True
-    )
-    appointment_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("calendar_appointment.id", ondelete="CASCADE"), nullable=True
-    )
-    gremium_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("gremium.id", ondelete="CASCADE"), nullable=True
-    )
-    invoice_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("invoice.id", ondelete="CASCADE"), nullable=True
-    )
-    expense_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("budget_expense.id", ondelete="CASCADE"), nullable=True
-    )
-    budget_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("budget.id", ondelete="CASCADE"), nullable=True
-    )
-    ticket_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("ticket.id", ondelete="CASCADE"), nullable=True
-    )
-    todo_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("todo_card.id", ondelete="CASCADE"), nullable=True
-    )
+def _order_key(end: LinkEnd) -> tuple[bytes, bytes]:
+    return (end[0].encode(), end[1].bytes)
+
+
+def ordered_ends(one: LinkEnd, other: LinkEnd) -> tuple[LinkEnd, LinkEnd]:
+    """The two ends in the stored order: by kind (byte order), then by id.
+
+    The byte order is the order of Postgres with ``COLLATE "C"`` and of ``uuid``, so the
+    migration orders the rows of ``todo_link`` the same way.
+    """
+    return (one, other) if _order_key(one) <= _order_key(other) else (other, one)
+
+
+class Link(UUIDPkMixin, Base):
+    """A link between two elements, without direction (spec 001401)."""
+
+    __tablename__ = "link"
+
+    a_kind: Mapped[str] = mapped_column(Text)
+    a_id: Mapped[uuid.UUID] = mapped_column()
+    b_kind: Mapped[str] = mapped_column(Text)
+    b_id: Mapped[uuid.UUID] = mapped_column()
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("principal.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
-        CheckConstraint(
-            f"num_nonnulls({', '.join(LINK_COLUMNS.values())}) = 1",
-            name="one_target",
-        ),
-        Index("ix_todo_link_card_id", "card_id"),
-        *(
-            Index(
-                f"uq_todo_link_{column}",
-                "card_id",
-                column,
-                unique=True,
-                postgresql_where=text(f"{column} IS NOT NULL"),
-            )
-            for column in LINK_COLUMNS.values()
-        ),
-        *(
-            Index(f"ix_todo_link_{column}", column, postgresql_where=text(f"{column} IS NOT NULL"))
-            for column in LINK_COLUMNS.values()
-        ),
+        CheckConstraint(f"a_kind IN ({_in(LINK_KINDS)})", name="a_kind"),
+        CheckConstraint(f"b_kind IN ({_in(LINK_KINDS)})", name="b_kind"),
+        CheckConstraint("NOT (a_kind = b_kind AND a_id = b_id)", name="not_self"),
+        Index("uq_link_ends", "a_kind", "a_id", "b_kind", "b_id", unique=True),
+        Index("ix_link_b", "b_kind", "b_id"),
     )
 
-    @property
-    def kind(self) -> str:
-        """The kind of the target (the one set target column)."""
-        for kind, column in LINK_COLUMNS.items():
-            if getattr(self, column) is not None:
-                return kind
-        raise ValueError("todo_link without a target")  # pragma: no cover - check constraint
+    @classmethod
+    def between(
+        cls, one: LinkEnd, other: LinkEnd, actor: uuid.UUID, at: datetime | None = None
+    ) -> Link:
+        """A new link between two ends, in the stored order."""
+        (a_kind, a_id), (b_kind, b_id) = ordered_ends(one, other)
+        return cls(
+            id=uuid.uuid4(),
+            a_kind=a_kind,
+            a_id=a_id,
+            b_kind=b_kind,
+            b_id=b_id,
+            created_by=actor,
+            **({"created_at": at} if at is not None else {}),
+        )
 
-    @property
-    def target_id(self) -> uuid.UUID:
-        """The id of the target."""
-        value: uuid.UUID = getattr(self, LINK_COLUMNS[self.kind])
-        return value
+    def other(self, end: LinkEnd) -> LinkEnd:
+        """The end that is not ``end``."""
+        if (self.a_kind, self.a_id) == end:
+            return (self.b_kind, self.b_id)
+        return (self.a_kind, self.a_id)
+
+    def has_end(self, end: LinkEnd) -> bool:
+        """Tell if ``end`` is one of the two ends."""
+        return end in ((self.a_kind, self.a_id), (self.b_kind, self.b_id))
