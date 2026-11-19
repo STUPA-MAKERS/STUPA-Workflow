@@ -131,14 +131,14 @@ describe('touch styles', () => {
         return /:active\b/.test(text) && !text.includes('@include press.press-scale');
       })
       .map((file) => relative(SRC, file));
-    expect(own).toEqual(['app/pages/admin/flow/flow-editor.component.scss', 'app/pages/dashboard/dashboard.component.scss']);
+    expect(own).toEqual(['app/pages/admin/flow/flow-editor.component.scss']);
   });
 
   it('gives the app cards and the page header actions the press and the chrome text', () => {
     expect(read('pages/home.component.scss')).toContain('@include press.press($scale: row);');
-    const dash = read('pages/dashboard/dashboard.component.scss');
-    expect(dash).toContain('@include press.press;');
-    expect(dash).toContain('@include press.chrome-text;');
+    const start = read('pages/activity/activity.component.scss');
+    expect(start).toContain('@include press.press;');
+    expect(start).toContain('@include press.chrome-text;');
     expect(read('features/todos/card-tile/todo-card-tile.component.scss')).toMatch(
       /:host\(:active\) \{\s*background-image: linear-gradient\(var\(--press-tint\), var\(--press-tint\)\);\s*@include press\.press-scale\(row\);/,
     );

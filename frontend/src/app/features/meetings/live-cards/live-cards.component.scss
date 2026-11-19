@@ -1,0 +1,139 @@
+@use 'press';
+@use 'field' as f;
+@use 'display' as d;
+
+// The live card of the old start page (spec 001302), unchanged in look.
+
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+:host:empty {
+  display: none;
+}
+
+.lc {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+}
+.lc__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.lc__text {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.lc__title {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.lc__name {
+  display: -webkit-box;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: var(--fs-h3);
+  line-height: 1.25rem;
+  font-weight: var(--fw-semibold);
+}
+.lc__title app-status-text {
+  flex: none;
+}
+.lc__sub {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.1875rem;
+}
+
+.lc__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-3);
+}
+.lc__progressLine {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.lc__progressLabel {
+  flex: 1 1 auto;
+  font-weight: var(--fw-medium);
+}
+.lc__progressCount {
+  flex: none;
+  font-size: 0.8125rem;
+  word-spacing: -0.15em;
+}
+.lc__voteLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin: 0;
+  padding-inline: 2px;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.1875rem;
+}
+.lc__dot {
+  margin-inline: 6px;
+  color: var(--color-text-subtle);
+}
+
+.lc__join {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  height: var(--control-height);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: filter var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    scale var(--motion-xs) var(--ease-standard);
+  @include f.highlight-surface;
+  @include press.chrome-text;
+  @include press.press;
+}
+.lc__join:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  .lc__join:hover {
+    filter: brightness(1.08);
+  }
+}
+
+// Very high contrast (spec 000605): the live card has the white edge of every surface.
+@include d.host-on(veryHigh) {
+  .lc {
+    border: var(--vh-edge) !important;
+    outline: none !important;
+  }
+}

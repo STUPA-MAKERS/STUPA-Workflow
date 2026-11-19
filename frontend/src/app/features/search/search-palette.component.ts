@@ -37,7 +37,7 @@ const KIND_ICON: Record<SearchKind, IconName> = {
  * the navigation. Admin pages keep the gear, because there it is true.
  */
 const SECTION_ICON: Record<string, IconName> = {
-  dashboard: 'home',
+  activity: 'history',
   applications: 'file',
   apply: 'fileplus',
   tasks: 'tasks',

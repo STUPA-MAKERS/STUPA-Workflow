@@ -1,4 +1,7 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
+import { USE_MOCK_API } from '@core/api/api.config';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { Subject, of, throwError, type Observable } from 'rxjs';
@@ -54,6 +57,9 @@ async function setup(answers: Array<() => Observable<ActivityPage>>) {
   const r = await render(ActivityComponent, {
     providers: [
       provideRouter([]),
+      provideHttpClient(),
+      provideHttpClientTesting(),
+      { provide: USE_MOCK_API, useValue: false },
       { provide: ActivityApiService, useValue: api },
       { provide: RailStatusService, useValue: rail },
     ],
@@ -63,6 +69,38 @@ async function setup(answers: Array<() => Observable<ActivityPage>>) {
 
 describe('ActivityComponent', () => {
   afterEach(() => localStorage.clear());
+
+  /** § F/collaboration/activity/001301 and 001302: the start page parts above the list. */
+  it('shows "Antrag stellen" in the header and the live cards above the list', async () => {
+    const { container } = await setup([() => of(page([entry()]))]);
+    const apply = screen.getByRole('link', { name: /Antrag stellen/ });
+    expect(apply).toHaveAttribute('href', '/apply');
+    expect(apply.closest('app-page-header')).not.toBeNull();
+    expect(container.querySelector('app-fab')).toBeNull();
+    const live = container.querySelector('app-live-cards');
+    expect(live?.closest('.act__scroll')).not.toBeNull();
+  });
+
+  it('shows "Antrag stellen" as the floating button on a phone', async () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query === '(max-width: 767.98px)',
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+    try {
+      const { container } = await setup([() => of(page([entry()]))]);
+      expect(container.querySelector('app-page-header a[href="/apply"]')).toBeNull();
+      expect(container.querySelector('app-fab')).not.toBeNull();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
 
   it('groups the rows by day and links each row to its item', async () => {
     const { api, rail } = await setup([

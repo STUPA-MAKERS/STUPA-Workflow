@@ -36,17 +36,16 @@ describe('NavService', () => {
   });
 
   it('shows a plain member only the personal areas', () => {
-    expect(keysFor(BASE)).toEqual(['start', 'applications', 'tasks', 'todos', 'calendar', 'activity']);
+    expect(keysFor(BASE)).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar']);
   });
 
   it('opens the budget areas with a global budget right', () => {
     expect(keysFor({ ...BASE, permissions: ['budget.book'] })).toEqual([
-      'start',
+      'activity',
       'applications',
       'tasks',
       'todos',
       'calendar',
-      'activity',
       'budget',
       'expenses',
       'invoices',
@@ -54,12 +53,12 @@ describe('NavService', () => {
   });
 
   it('opens the tickets with ticket.manage, after the invoices', () => {
-    expect(keysFor({ ...BASE, permissions: ['ticket.manage'] })).toEqual(['start', 'applications', 'tasks', 'todos', 'calendar', 'activity', 'tickets', 'admin']);
+    expect(keysFor({ ...BASE, permissions: ['ticket.manage'] })).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', 'tickets', 'admin']);
     expect(NAV_ITEMS.findIndex((i) => i.key === 'tickets')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'invoices') + 1);
   });
 
   it('opens the tickets to a reporter without ticket.manage', () => {
-    expect(keysFor({ ...BASE, has_reported_tickets: true })).toEqual(['start', 'applications', 'tasks', 'todos', 'calendar', 'activity', 'tickets']);
+    expect(keysFor({ ...BASE, has_reported_tickets: true })).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', 'tickets']);
   });
 
   it('shows the To-Dos to every session, after the tasks', () => {
@@ -76,11 +75,11 @@ describe('NavService', () => {
     expect(keysFor(BASE)).toContain('calendar');
   });
 
-  /** Spec 001270: every session has the activity page, after the Kalender. */
-  it('shows the Aktivität to every session, after the Kalender', () => {
+  /** Specs 001270, 001300: every session has the activity page, as the first entry. */
+  it('shows the Aktivität to every session, as the first entry', () => {
     const activity = NAV_ITEMS.find((i) => i.key === 'activity');
     expect(activity).toMatchObject({ path: '/activity', labelKey: 'nav.activity', icon: 'history', permissions: [] });
-    expect(NAV_ITEMS.findIndex((i) => i.key === 'activity')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'calendar') + 1);
+    expect(NAV_ITEMS.findIndex((i) => i.key === 'activity')).toBe(0);
   });
 
   it('opens the administration with any area-admin right', () => {

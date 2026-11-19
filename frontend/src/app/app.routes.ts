@@ -154,11 +154,10 @@ export const routes: Routes = [
           ),
       },
       {
+        /** The old start page; the activity is the start page now (spec 001300). */
         path: 'dashboard',
-        data: { title: 'nav.dashboard', wide: true, fab: true },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/dashboard/dashboard.component').then((m) => m.DashboardComponent),
+        pathMatch: 'full',
+        redirectTo: 'activity',
       },
       {
         path: 'applications',
@@ -389,7 +388,7 @@ export const routes: Routes = [
       },
       {
         path: 'activity',
-        data: { title: 'nav.activity', wide: true },
+        data: { title: 'nav.activity', wide: true, fab: true },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/activity/activity.component').then((m) => m.ActivityComponent),

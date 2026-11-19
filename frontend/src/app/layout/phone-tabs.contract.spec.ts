@@ -15,7 +15,6 @@ const PAGES: [base: string, paged: string, handler: string][] = [
   ['pages/applications/applications-detail.component', 'phone()', 'selectTab'],
   ['pages/tickets/ticket-detail.component', 'phone()', 'selectTab'],
   ['features/gremien/gremium-detail/gremium-detail.component', 'phone()', 'selectTab'],
-  ['pages/dashboard/dashboard.component', 'true', 'setTab'],
   ['pages/todos/board-view/todo-board-view.component', 'true', 'selectPhoneColumn'],
 ];
 

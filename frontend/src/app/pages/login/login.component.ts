@@ -69,7 +69,7 @@ export class LoginComponent {
 
   /** Start the OIDC login. It leaves the SPA and comes back to the dashboard. */
   ssoLogin(): void {
-    this.auth.login('/dashboard');
+    this.auth.login('/activity');
   }
 
   onAltchaSolved(solution: string): void {
