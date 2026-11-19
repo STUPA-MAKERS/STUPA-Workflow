@@ -87,21 +87,12 @@
               <span class="gr__mark" [class.gr__mark--muted]="!c.node.accessible">
                 <app-icon [name]="c.icon" [size]="18" />
               </span>
-              <div class="gr__panelText">
-                <h2 id="gr-panel-title" class="gr__panelTitle">{{ c.title }}</h2>
-                <ng-container *ngTemplateOutlet="lines; context: { $implicit: c }" />
-              </div>
-              <app-button
-                variant="text"
-                size="sm"
-                [iconOnly]="true"
-                [ariaLabel]="'graph.panel.close' | t"
-                (click)="choose(null)"
-              >
-                <app-icon name="x" />
-              </app-button>
+              <ng-container *ngTemplateOutlet="action; context: { $implicit: c, close: true }" />
             </header>
-            <ng-container *ngTemplateOutlet="action; context: { $implicit: c }" />
+            <div class="gr__panelText">
+              <h2 id="gr-panel-title" class="gr__panelTitle">{{ c.title }}</h2>
+              <ng-container *ngTemplateOutlet="lines; context: { $implicit: c }" />
+            </div>
           </aside>
         }
       }
@@ -179,15 +170,23 @@
   @if (dateLine(c); as day) {
     <p class="gr__panelSub">{{ day }}</p>
   }
-</ng-template>
-
-<ng-template #action let-c>
-  @if (c.route; as to) {
-    <a class="gr__open" appButton="fill" [routerLink]="to.path" [queryParams]="to.query">
-      {{ 'graph.panel.open' | t }}
-      <app-icon name="arrow" />
-    </a>
-  } @else if (c.node.granted) {
+  @if (!c.route && c.node.granted) {
     <p class="gr__hint">{{ 'graph.panel.granted' | t }}</p>
   }
+</ng-template>
+
+<ng-template #action let-c let-close="close">
+  <app-button-group class="gr__actions" [main]="true">
+    @if (c.route; as to) {
+      <a class="gr__open" appButton="fill" [routerLink]="to.path" [queryParams]="to.query">
+        {{ 'graph.panel.open' | t }}
+        <app-icon name="arrow" />
+      </a>
+    }
+    @if (close) {
+      <app-button [iconOnly]="true" [ariaLabel]="'graph.panel.close' | t" (click)="choose(null)">
+        <app-icon name="x" />
+      </app-button>
+    }
+  </app-button-group>
 </ng-template>
