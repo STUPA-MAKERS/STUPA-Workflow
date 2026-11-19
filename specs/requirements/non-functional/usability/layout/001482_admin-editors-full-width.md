@@ -1,5 +1,5 @@
 ---
-id: "001442"
+id: "001482"
 title: The form editor and the flow editor open without the list
 kind: non-functional
 status: draft

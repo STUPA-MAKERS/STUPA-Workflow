@@ -6,7 +6,7 @@ import { ADMIN_PAGES } from './admin-pages';
 
 /**
  * The paths below `/admin` in `app.routes.ts`: the children of the list page and the two
- * editors beside it (spec 001442).
+ * editors beside it (spec 001482).
  */
 function adminChildPaths(): readonly string[] {
   const shell = routes.find((r) => r.children?.some((c) => c.path === 'admin'));

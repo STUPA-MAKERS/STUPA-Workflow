@@ -1,5 +1,5 @@
 ---
-id: "001440"
+id: "001480"
 title: Verwaltung and Konto are ordinary list/detail pages
 kind: non-functional
 status: draft

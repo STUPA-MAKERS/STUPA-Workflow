@@ -1,6 +1,6 @@
 @use 'list-pane' as lp;
 
-// The same two panes as every list/detail page (spec 001440).
+// The same two panes as every list/detail page (spec 001480).
 @include lp.frame('adl');
 
 .adl__hidden {
@@ -19,20 +19,46 @@
   color: var(--color-text-muted);
 }
 
-// An admin page opens with its page header, not with a sheet bar, so the sheet has the gutter
-// at the top too. A sticky bar sticks below the top padding of its scroll box, so a bar sticks
-// at the top edge instead and the rows do not scroll through the padding strip.
+// Side by side the detail is the sheet, and its body is a round frame as wide as the fields,
+// 24px inside the sheet, which scrolls. A field that scrolls past an end keeps its round
+// corners, so the cut looks intended (spec 000193). The body is the scroll box, so a sticky bar
+// sticks at its top edge.
 .adl--split .adl__detail {
-  padding-top: var(--space-6);
-  --ld-sticky-top: calc(-1 * var(--space-6));
+  padding: 0;
+  overflow: hidden;
 }
-.adl--split .adl__detail:has(app-detail-none) {
+.adl--split .adl__body {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+  margin: var(--space-6);
+  padding: 0 0 var(--space-2);
+  border-radius: var(--radius-field);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  --ld-sticky-top: 0px;
+}
+.adl--split .adl__body > ::ng-deep * {
+  flex-shrink: 0;
+}
+.adl__body:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+// The empty detail (`app-detail-none`) brings its own sheet.
+.adl--split .adl__body:has(app-detail-none) {
+  margin: 0;
   padding: 0;
 }
 
-// The detail ends with room for the floating button of an admin page and 16px above it.
-.adl__detail:has(app-fab) {
+// The page ends with room for the floating button of an admin page and 16px below and above it.
+.adl__body:has(app-fab) {
   padding-bottom: calc(56px + 2 * var(--space-4));
+}
+.adl--split .adl__body:has(app-fab) {
+  padding-bottom: calc(56px + var(--space-4));
 }
 .adl--split {
   --fab-inset: var(--space-6);

@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  type ElementRef,
   computed,
   effect,
   inject,
@@ -62,23 +63,25 @@ function parentOf(root: ActivatedRouteSnapshot): string | null {
 
 /**
  * Verwaltung (`/admin`) and Konto (`/account`): an ordinary list/detail page
- * (`app-list-detail`, spec 001440), the same as the Gremien or the Tickets.
+ * (`app-list-detail`, spec 001480), the same as the Gremien or the Tickets.
  *
  * - The list is the navigation of the area: the title, "Einstellungen durchsuchen" (filters
  *   the entries by title and description, in the browser), the "Zustand" tiles and the
  *   groups of `ADMIN_GROUPS`. An entry shows only with one of its permissions and while its
  *   feature is on, so the list never leads to the 403 page. The guard and the server stay
  *   authoritative.
- * - Each entry is an `app-list-item` with the icon, the title and the description (001441).
+ * - Each entry is an `app-list-item` with the icon, the title and the description (001481).
  * - The detail is the child route. On the home path (`/admin`, `/account`) that is the
  *   empty pane ("Keine Seite geöffnet"); one pane at a time the home path shows the list.
  * - The way back of the bar and of a swipe (both from `app-list-detail`) leads to the
  *   parent of the route (`data.parent`, the same target as the breadcrumb), else to the
  *   home path.
- * - Side by side the breadcrumbs leave out "Verwaltung", because the list shows it.
+ * - Side by side the breadcrumbs leave out "Verwaltung", because the list shows it. The
+ *   open page then scrolls inside a round frame 24px inside the sheet (`.adl__body`, spec
+ *   000193), and a new page starts at its top.
  *
  * The form editor and the flow editor are not children of this page: they take the full
- * width (001442).
+ * width (001482).
  *
  * The area comes from the route data (`frame: 'admin' | 'account'`, `FRAME_MODES`); Konto
  * has no search and no tiles.
@@ -124,6 +127,8 @@ export class AdminListComponent {
   readonly mode = computed(() => FRAME_MODES[this.frame()] ?? FRAME_MODES.admin);
 
   private readonly layout = viewChild(ListDetailLayoutComponent);
+  /** The scroll box of the open page while the panes sit side by side. */
+  private readonly body = viewChild<ElementRef<HTMLElement>>('body');
   /** The list and the open page sit side by side. */
   readonly split = injectListDetailPage(this.layout).split;
 
@@ -167,6 +172,10 @@ export class AdminListComponent {
       .subscribe((e) => {
         this.path.set(pathOf(e.urlAfterRedirects));
         this.parentPath.set(parentOf(this.router.routerState.snapshot.root));
+        // The body scrolls, not the window, so the router scroll does not reach it: a new
+        // page starts at the top.
+        const body = this.body()?.nativeElement;
+        if (body) body.scrollTop = 0;
       });
 
     effect(() =>

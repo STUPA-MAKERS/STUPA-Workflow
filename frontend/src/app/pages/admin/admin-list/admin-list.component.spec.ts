@@ -102,7 +102,7 @@ function links(container: Element): string[] {
   );
 }
 
-describe('AdminListComponent (spec 001440, 001441)', () => {
+describe('AdminListComponent (spec 001480, 001481)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('is an ordinary list/detail page: the list in the list slot, the page in the detail', async () => {

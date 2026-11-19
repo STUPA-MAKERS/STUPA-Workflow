@@ -1,5 +1,5 @@
 ---
-id: "001441"
+id: "001481"
 title: A row of the Verwaltung list is an ordinary list row
 kind: non-functional
 status: draft

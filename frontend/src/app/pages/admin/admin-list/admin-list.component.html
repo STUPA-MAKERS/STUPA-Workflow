@@ -37,7 +37,9 @@
     </nav>
 
     <div detail class="adl__detail">
-      <router-outlet />
+      <div #body class="adl__body" [attr.tabindex]="split() ? 0 : null">
+        <router-outlet />
+      </div>
     </div>
   </app-list-detail>
 </div>
