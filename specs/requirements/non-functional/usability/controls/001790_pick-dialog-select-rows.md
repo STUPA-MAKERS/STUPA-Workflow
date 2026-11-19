@@ -2,7 +2,7 @@
 id: "001790"
 title: A pick dialog lists its choices as the select sheet does
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:
