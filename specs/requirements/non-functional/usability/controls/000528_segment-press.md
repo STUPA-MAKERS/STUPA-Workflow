@@ -2,12 +2,10 @@
 id: "000528"
 title: A pressed segment shrinks its whole control
 kind: non-functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation:
-  - frontend/vendor/ui-kit/src/styles/_press.scss
-  - frontend/vendor/ui-kit/src/lib/segmented/segmented.component.scss
+updated: 2026-11-19
+replaced_by: NF/usability/controls/001315
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

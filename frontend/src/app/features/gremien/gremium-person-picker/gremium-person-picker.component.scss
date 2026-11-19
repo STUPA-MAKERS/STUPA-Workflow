@@ -35,8 +35,7 @@
   font: inherit;
   text-align: start;
   cursor: pointer;
-  transition: scale var(--motion-xs) var(--ease-standard);
-  @include press.press($scale: row);
+  @include press.press;
 }
 @media (hover: hover) {
   .gpp__option:hover {
