@@ -40,7 +40,6 @@ from app.modules.budget.tree_schemas import (
     ExpenseUpdate,
     FiscalYearCreate,
     InvoiceCreate,
-    InvoiceUpdate,
     TransferCreate,
 )
 from app.modules.config_revision.revert import RevertService
@@ -101,15 +100,15 @@ async def _top_with_fy(
     return top_row, fy.id
 
 
-async def test_revert_booking_deletes_expense_and_keeps_invoice_status(
+async def test_revert_booking_deletes_expense_and_reopens_invoice(
     session: AsyncSession,
 ) -> None:
-    """Delete the expense on a booking revert and keep the invoice status.
+    """Delete the expense on a booking revert and set its invoice open again.
 
-    A booking does not pay the invoice, so a user marks it paid. The revert removes the
-    booking and does not change the invoice status. The test cleans up at the end,
-    because nothing empties the DB between integration tests, and a leftover open
-    invoice would corrupt the global invoice counter of another test.
+    The booking pays the invoice (spec 001290), so the revert sets it back to open
+    (001291). The test cleans up at the end, because nothing empties the DB between
+    integration tests, and a leftover invoice would corrupt the global invoice counter
+    of another test.
     """
     svc = BudgetTreeService(session, actor="tester")
     top, fy_id = await _top_with_fy(session, svc)
@@ -128,8 +127,7 @@ async def test_revert_booking_deletes_expense_and_keeps_invoice_status(
         actor="tester",
     )
     inv_row = await session.get(Invoice, inv.id)
-    assert inv_row is not None and inv_row.status == "open"
-    await svc.update_invoice(inv.id, InvoiceUpdate(status="paid"))
+    assert inv_row is not None and inv_row.status == "paid"
 
     audit_id = await _audit_id(
         session, AuditAction.BUDGET_EXPENSE_CREATE, str(booked.id)
@@ -138,7 +136,7 @@ async def test_revert_booking_deletes_expense_and_keeps_invoice_status(
 
     assert await session.get(BudgetExpense, booked.id) is None
     await session.refresh(inv_row)
-    assert inv_row.status == "paid"
+    assert inv_row.status == "open"
 
     await session.delete(inv_row)
     await session.commit()

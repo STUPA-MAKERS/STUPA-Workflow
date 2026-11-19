@@ -4,8 +4,8 @@ title: A reverted booking keeps the invoice status
 kind: functional
 status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-replaced_by: F/finance/invoices/000261
+updated: 2026-11-19
+replaced_by: F/finance/invoices/001291
 scope:
   - backend/app/modules/budget
   - frontend/src/app/pages/budget

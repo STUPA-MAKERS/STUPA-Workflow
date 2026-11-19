@@ -555,10 +555,10 @@ async def test_book_expense_linked_application_not_found() -> None:
         await svc.book_expense(payload, actor="a")
 
 
-async def test_book_expense_keeps_open_invoice_open() -> None:
-    """A booking does not pay its open invoice: it is "Verbucht", not paid.
+async def test_book_expense_pays_open_invoice() -> None:
+    """A booking pays its open invoice (spec 001290).
 
-    ``_require_invoice`` loads the invoice through ``session.get``.
+    ``_pay_invoice`` loads the invoice through ``session.get``.
     """
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     top = node
@@ -574,7 +574,7 @@ async def test_book_expense_keeps_open_invoice_open() -> None:
     )
     out = await svc.book_expense(payload, actor="")
     assert out.amount == Decimal("10.00")
-    assert inv.status == "open"
+    assert inv.status == "paid"
 
 
 async def test_book_expense_paid_invoice_stays_paid() -> None:
@@ -660,6 +660,19 @@ async def test_update_expense_all_fields_with_app() -> None:
     assert out.actor_name == "bob@x"
     assert inv.status == "open"
     assert expense.invoice_id == inv.id
+
+
+async def test_update_expense_unknown_invoice_404() -> None:
+    """An edit that links an unknown invoice gives 404 (§ 001290: the edit pays nothing).
+
+    The gets are the booking, its fiscal year (missing, so open) and the invoice (missing).
+    """
+    expense = _expense()
+    sess = fake_session(gets=[expense, None, None])
+    svc = BudgetTreeService(sess)
+    with pytest.raises(NotFoundError):
+        await svc.update_expense(expense.id, ExpenseUpdate(invoiceId=uuid.uuid4()))
+    assert sess.committed == 0
 
 
 async def test_update_expense_no_app() -> None:
@@ -1582,10 +1595,57 @@ async def test_revert_expense_create_no_invoice_deletes() -> None:
     assert exp in sess.deleted and sess.committed == 1
 
 
-async def test_revert_expense_create_keeps_paid_invoice_paid() -> None:
-    """A user marked the invoice paid. The revert of a booking does not undo that.
+async def test_revert_expense_create_reopens_invoice_it_paid() -> None:
+    """The booking paid its invoice, so the revert sets it back to open (spec 001291).
 
-    The revert does not load the invoice.
+    The gets are the booking, its fiscal year (missing, so open) and the invoice. No
+    other booking links the invoice.
+    """
+    inv = _invoice()
+    inv.status = "paid"
+    exp = _expense(id=uuid.uuid4(), invoice_id=inv.id)
+    sess = fake_session(result(), gets=[exp, None, inv])
+    svc = BudgetTreeService(sess, actor="admin")
+    data = {"invoiceId": str(inv.id), "invoicePaid": True}
+    await svc.revert_audit(_entry(AuditAction.BUDGET_EXPENSE_CREATE, exp.id, data), "admin")
+    assert inv.status == "open"
+    assert exp in sess.deleted and sess.committed == 1
+
+
+async def test_revert_expense_create_keeps_invoice_another_booking_pays() -> None:
+    """Another booking still links the invoice, so the invoice stays paid."""
+    inv = _invoice()
+    inv.status = "paid"
+    exp = _expense(id=uuid.uuid4(), invoice_id=inv.id)
+    sess = fake_session(result((uuid.uuid4(),)), gets=[exp, None, inv])
+    svc = BudgetTreeService(sess, actor="admin")
+    data = {"invoiceId": str(inv.id), "invoicePaid": True}
+    await svc.revert_audit(_entry(AuditAction.BUDGET_EXPENSE_CREATE, exp.id, data), "admin")
+    assert inv.status == "paid"
+
+
+async def test_revert_expense_create_leaves_reopened_or_deleted_invoice() -> None:
+    """A user set the invoice open again, or deleted it: the revert changes nothing."""
+    inv = _invoice()
+    exp = _expense(id=uuid.uuid4(), invoice_id=inv.id)
+    data = {"invoiceId": str(inv.id), "invoicePaid": True}
+    sess = fake_session(gets=[exp, None, inv])
+    await BudgetTreeService(sess, actor="admin").revert_audit(
+        _entry(AuditAction.BUDGET_EXPENSE_CREATE, exp.id, data), "admin"
+    )
+    assert inv.status == "open"
+    gone = _expense(id=uuid.uuid4(), invoice_id=inv.id)
+    sess = fake_session(gets=[gone, None, None])
+    await BudgetTreeService(sess, actor="admin").revert_audit(
+        _entry(AuditAction.BUDGET_EXPENSE_CREATE, gone.id, data), "admin"
+    )
+    assert gone in sess.deleted and sess.committed == 1
+
+
+async def test_revert_expense_create_keeps_paid_invoice_paid() -> None:
+    """A user marked the invoice paid, not the booking. The revert does not undo that.
+
+    The audit entry holds no ``invoicePaid``, so the revert does not load the invoice.
     """
     inv = _invoice()
     inv.status = "paid"

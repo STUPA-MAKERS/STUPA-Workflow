@@ -24,7 +24,7 @@ from app.modules.audit.service import record as audit_record
 from app.modules.budget import plan_rules, tree_rules
 from app.modules.budget.access import viewed_by
 from app.modules.budget.plan_models import BudgetPlan, BudgetPlanLine, BudgetPlanVersion
-from app.modules.budget.tree_models import Budget, BudgetExpense, FiscalYear
+from app.modules.budget.tree_models import Budget, BudgetExpense, FiscalYear, Invoice
 from app.modules.budget.tree_rules import _SEP
 from app.settings import Settings, get_settings
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
@@ -35,6 +35,11 @@ if TYPE_CHECKING:
     from app.modules.files.storage import ObjectStorage
 
 _ZERO = Decimal(0)
+
+
+def _set_invoice_status(inv: Invoice, status: str) -> None:
+    """Write the status of an invoice that a booking pays or a revert reopens (001290, 001291)."""
+    inv.status = status
 
 
 def _json_safe(value: object) -> object:

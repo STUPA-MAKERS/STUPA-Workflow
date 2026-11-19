@@ -433,9 +433,12 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/001263](requirements/functional/finance/budget/001263_income-titel-tree-row.md) | The tree row of an income Titel shows its Ansatz and the reached part | approved |
 | [F/finance/budget/001264](requirements/functional/finance/budget/001264_income-titel-section.md) | Income nodes are listed under "Einnahmen" | approved |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
-| [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | approved |
+| [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | replaced |
 | [F/finance/invoices/000262](requirements/functional/finance/invoices/000262_invoice-segments.md) | The invoice list has four segments | replaced |
 | [F/finance/invoices/000263](requirements/functional/finance/invoices/000263_zugferd-import.md) | A ZUGFeRD invoice fills the form | approved |
+| [F/finance/invoices/001290](requirements/functional/finance/invoices/001290_booking-pays-invoice.md) | A new booking sets its invoice to paid | approved |
+| [F/finance/invoices/001291](requirements/functional/finance/invoices/001291_revert-reopens-invoice.md) | The revert of a booking sets the invoice it paid back to open | approved |
+| [F/finance/invoices/001292](requirements/functional/finance/invoices/001292_invoice-menu-books.md) | The head menu of an invoice has "Buchung anlegen" | approved |
 | [F/integrations/external/000176](requirements/functional/integrations/external/000176_optional.md) | Integrations are optional | approved |
 | [F/integrations/external/000177](requirements/functional/integrations/external/000177_preview-access.md) | A link preview uses the access of the viewer | approved |
 | [F/integrations/mcp/000174](requirements/functional/integrations/mcp/000174_acts-as-user.md) | The MCP server acts as the logged-in user | approved |
@@ -566,6 +569,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/001143](requirements/functional/meetings/meetings/001143_live-plan.md) | A live Sitzung computes the plan of the open TOPs again | approved |
 | [F/meetings/meetings/001144](requirements/functional/meetings/meetings/001144_planned-end-overrun.md) | The agenda shows the planned end and marks an overrun | approved |
 | [F/meetings/meetings/001145](requirements/functional/meetings/meetings/001145_time-plan-internal.md) | The time plan stays internal | approved |
+| [F/meetings/meetings/001310](requirements/functional/meetings/meetings/001310_attendance-pool-rows.md) | The attendance matrix shows the pool substitutes | approved |
+| [F/meetings/meetings/001311](requirements/functional/meetings/meetings/001311_attendance-pool-cell.md) | A pool cell counts the pool seats | approved |
+| [F/meetings/meetings/001312](requirements/functional/meetings/meetings/001312_attendance-average-pool-seats.md) | The attendance average counts the pool seats | approved |
 | [F/meetings/protocols/000115](requirements/functional/meetings/protocols/000115_keeper-permission.md) | The keeper holds protocol.write | approved |
 | [F/meetings/protocols/000116](requirements/functional/meetings/protocols/000116_finalize.md) | Finalize needs a closed meeting and protocol.finalize | approved |
 | [F/meetings/protocols/000117](requirements/functional/meetings/protocols/000117_delete-draft-only.md) | Only a draft protocol is deleted | approved |
@@ -802,7 +808,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/000207](requirements/non-functional/usability/controls/000207_no-title-counters.md) | Titles show no counters | replaced |
 | [NF/usability/controls/000208](requirements/non-functional/usability/controls/000208_separators.md) | A separator stands only between two items | approved |
 | [NF/usability/controls/000209](requirements/non-functional/usability/controls/000209_no-cut-urls.md) | URLs, IBANs and e-mail addresses are never cut | approved |
-| [NF/usability/controls/000210](requirements/non-functional/usability/controls/000210_press-feedback.md) | A press gives feedback | approved |
+| [NF/usability/controls/000210](requirements/non-functional/usability/controls/000210_press-feedback.md) | A press gives feedback | replaced |
 | [NF/usability/controls/000211](requirements/non-functional/usability/controls/000211_swipe-and-select.md) | A swipe never deletes | approved |
 | [NF/usability/controls/000212](requirements/non-functional/usability/controls/000212_tooltips.md) | A tooltip shows only for cut text | approved |
 | [NF/usability/controls/000213](requirements/non-functional/usability/controls/000213_segments.md) | Segments have equal width | approved |
@@ -813,7 +819,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/000410](requirements/non-functional/usability/controls/000410_tap-tint.md) | A tap tints the whole tile | approved |
 | [NF/usability/controls/000412](requirements/non-functional/usability/controls/000412_ghost-rows-for-lists.md) | Ghost rows are only for lists | replaced |
 | [NF/usability/controls/000416](requirements/non-functional/usability/controls/000416_empty-chart.md) | An empty chart is a grey skeleton | approved |
-| [NF/usability/controls/000528](requirements/non-functional/usability/controls/000528_segment-press.md) | A pressed segment shrinks its whole control | approved |
+| [NF/usability/controls/000528](requirements/non-functional/usability/controls/000528_segment-press.md) | A pressed segment shrinks its whole control | replaced |
 | [NF/usability/controls/000529](requirements/non-functional/usability/controls/000529_menu-row-tile.md) | A menu row is an inset rounded tile | approved |
 | [NF/usability/controls/000560](requirements/non-functional/usability/controls/000560_no-counts-in-headings-and-selectors.md) | Headings and selectors show no counts | approved |
 | [NF/usability/controls/000561](requirements/non-functional/usability/controls/000561_segment-pill.md) | A segmented control is a pill track | approved |
@@ -852,6 +858,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/000741](requirements/non-functional/usability/controls/000741_load-more-button.md) | A button that loads more rows of a list is centred with a chevron | approved |
 | [NF/usability/controls/000931](requirements/non-functional/usability/controls/000931_back-closes-budget-dialogs.md) | Back closes the dialogs of the Haushalt | approved |
 | [NF/usability/controls/001082](requirements/non-functional/usability/controls/001082_open-label.md) | A button that opens a file says Öffnen | approved |
+| [NF/usability/controls/001314](requirements/non-functional/usability/controls/001314_press-ripple.md) | A press shows a ripple | approved |
+| [NF/usability/controls/001315](requirements/non-functional/usability/controls/001315_segment-ripple.md) | A pressed segment ripples only inside its segment | approved |
 | [NF/usability/controls/001360](requirements/non-functional/usability/controls/001360_empty-list-face.md) | An empty list shows a face in a ring of dots | draft |
 | [NF/usability/controls/001361](requirements/non-functional/usability/controls/001361_empty-state-face-motion.md) | The face of an empty state moves until motion is reduced | draft |
 | [NF/usability/controls/001362](requirements/non-functional/usability/controls/001362_empty-state-face-very-high-contrast.md) | The face of an empty state is white in very high contrast | draft |
@@ -905,6 +913,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/001079](requirements/non-functional/usability/layout/001079_file-viewer-above-everything.md) | The file viewer lies above everything | approved |
 | [NF/usability/layout/001081](requirements/non-functional/usability/layout/001081_phone-pdf-system-viewer.md) | A PDF on a phone opens in the system viewer | approved |
 | [NF/usability/layout/001084](requirements/non-functional/usability/layout/001084_file-viewer-glass-bar.md) | The file viewer is dark frosted glass | approved |
+| [NF/usability/layout/001313](requirements/non-functional/usability/layout/001313_attendance-pool-row-group.md) | The pool substitutes are an own row group | approved |
 | [P/integrations/webhooks/000963](protocols/integrations/webhooks/000963_webhook-delivery.md) | A webhook delivery is a signed JSON POST | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |

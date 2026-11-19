@@ -110,9 +110,8 @@ export class ExpenseDialogsState {
   readonly invoices = signal<readonly Invoice[]>([]);
   readonly newInvoiceId = signal('');
   readonly editInvoiceId = signal('');
-  /** Open invoices, newest issue date first. A booking keeps its invoice open (part
-   *  bookings), and "Als bezahlt markieren" closes it, so paid invoices drop out of the
-   *  create dropdown. */
+  /** Open invoices, newest issue date first. A new booking pays its invoice (spec
+   *  001290), so paid invoices drop out of the create dropdown. */
   private readonly openInvoices = computed<readonly Invoice[]>(() =>
     this.invoices()
       .filter((i) => i.status === 'open')
