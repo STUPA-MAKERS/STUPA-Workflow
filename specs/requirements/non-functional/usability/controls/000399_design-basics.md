@@ -4,7 +4,7 @@ title: The design has one accent and plain status text
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
+updated: 2026-11-19
 implementation:
   - frontend/vendor/ui-kit/src/styles/tokens.scss
   - frontend/vendor/ui-kit/src/lib/status-text/status-text.component.ts
@@ -15,6 +15,7 @@ scope:
 
 # The design has one accent and plain status text
 
-The app must have one accent colour. A status must be coloured text, without a dot or a pill. A
+The app must have one accent colour. A status must be coloured text, without a dot or a pill. The status beside the title of the
+meeting head is the one exception (001305). A
 tag is a feature, not a status. Input fields must not have a shadow. Only persons must have
 avatars.

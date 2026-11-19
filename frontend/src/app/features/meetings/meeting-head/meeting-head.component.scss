@@ -1,3 +1,5 @@
+@use 'display' as d;
+
 .mh__back {
   flex: none;
 }
@@ -10,7 +12,7 @@
 }
 .mh__titleLine {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
   min-width: 0;
 }
@@ -24,9 +26,17 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* The status beside the title is a badge (spec 001305): a plate tinted in its status colour,
+   centred on the title line. Text on the baseline of the larger title sat low, and in very
+   high contrast its edge box looked moved down. */
 .mh__status {
   flex: none;
-  font-size: var(--mh-status-size, var(--fs-body));
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  font-size: var(--mh-status-size, var(--fs-small));
+  line-height: 1;
   font-weight: var(--fw-semibold);
 }
 .mh__sub {
@@ -59,4 +69,11 @@
   font-size: var(--fs-small);
   line-height: 1.125rem;
   color: var(--color-primary);
+}
+
+/* Very high contrast: no tint, the global white edge of a state marks the badge. */
+@include d.host-on(veryHigh) {
+  .mh__status {
+    background: none;
+  }
 }

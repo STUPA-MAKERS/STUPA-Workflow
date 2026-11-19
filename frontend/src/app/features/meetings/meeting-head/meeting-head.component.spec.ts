@@ -103,6 +103,14 @@ describe('MeetingHeadComponent', () => {
     const scss = readFileSync(join(__dirname, 'meeting-head.component.scss'), 'utf8');
     expect(scss).toContain('font-size: var(--mh-title-size, var(--fs-h1))');
     expect(scss).toContain('line-height: var(--mh-title-line, 1.75rem)');
-    expect(scss).toContain('font-size: var(--mh-status-size, var(--fs-body))');
+    expect(scss).toContain('font-size: var(--mh-status-size, var(--fs-small))');
+  });
+
+  /** § 001305 (statusBadge) */
+  it('draws the status beside the title as a badge centred on the title line', () => {
+    const scss = readFileSync(join(__dirname, 'meeting-head.component.scss'), 'utf8');
+    expect(scss).toMatch(/\.mh__titleLine \{[^}]*align-items: center;/);
+    expect(scss).toMatch(/\.mh__status \{[^}]*border-radius: var\(--radius-pill\);[^}]*background: color-mix/);
+    expect(scss).toMatch(/@include d\.host-on\(veryHigh\) \{\s*\.mh__status \{[^}]*background: none;/);
   });
 });
