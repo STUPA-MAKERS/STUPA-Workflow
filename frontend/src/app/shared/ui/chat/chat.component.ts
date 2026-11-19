@@ -22,6 +22,7 @@ import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   ChipComponent,
   ConfirmDialogComponent,
   copyText,
@@ -191,6 +192,7 @@ function writeStore(key: string, value: string | null): void {
     EmptyStateComponent,
     AvatarComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     ChatBodyPipe,
     FileViewerComponent,
     IconComponent,

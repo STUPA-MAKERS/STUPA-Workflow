@@ -409,51 +409,6 @@ async def todo_checklist_remove(card_id: str, item_id: str) -> dict:
 
 
 @group.tool
-async def todo_link_targets(
-    q: str = "", kind: S.TodoLinkKind | None = None, exclude_card_id: str | None = None
-) -> list:
-    """Find link targets that the caller can read, by text (at most 5 per kind).
-
-    Below two characters, the kind `todo` lists the newest cards.
-
-    Args:
-        q: Search text.
-        kind: One kind only (default: all kinds).
-        exclude_card_id: Leave this card out of the `todo` hits.
-    """
-    return await api().get(
-        "/todos/link-targets",
-        params=params(q=q, kind=kind or "all", excludeCardId=exclude_card_id),
-    )
-
-
-@group.tool
-async def todo_card_link_add(card_id: str, link: S.TodoLinkIn) -> dict:
-    """Link a card to an object that the caller can read (422 `link_target_not_found`)."""
-    return await api().post(
-        f"/todos/cards/{card_id}/links", json=link.model_dump(exclude_none=True)
-    )
-
-
-@group.tool
-async def todo_card_link_remove(card_id: str, link_id: str) -> dict:
-    """Remove a link of a card; `link_id` is the id in `links` of `todo_card_get`."""
-    return await api().delete(f"/todos/cards/{card_id}/links/{link_id}")
-
-
-@group.tool
-async def todo_card_link_view(card_id: str, link_id: str) -> dict:
-    """Read the linked object of a card as a reader of the card sees it."""
-    return await api().get(f"/todos/cards/{card_id}/links/{link_id}/view")
-
-
-@group.tool
-async def todo_linked(kind: S.TodoLinkKind, target_id: str) -> list:
-    """List the cards that link an object (the back-references of the object)."""
-    return await api().get("/todos/linked", params={"kind": kind, "targetId": target_id})
-
-
-@group.tool
 async def todo_card_event_set(card_id: str, event: S.TodoEventIn) -> dict:
     """Set the event data of a card: dates, times, place, participants and the Reihe.
 

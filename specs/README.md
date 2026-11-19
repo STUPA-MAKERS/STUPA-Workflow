@@ -18,7 +18,7 @@ specs/
     functional/
       administration/  accounts, admin, audit, backups, files, privacy, translations
       applications/    applications, dashboard, flow, forms
-      collaboration/   activity, committees, notifications, search, tickets, todos
+      collaboration/   activity, committees, links, notifications, search, tickets, todos
       finance/         budget, invoices
       integrations/    external, mcp, webhooks
       meetings/        calendar, delegations, meetings, protocols, voting
@@ -272,6 +272,16 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/committees/001013](requirements/functional/collaboration/committees/001013_info-markdown.md) | The Info text is sanitized Markdown | approved |
 | [F/collaboration/committees/001014](requirements/functional/collaboration/committees/001014_info-save.md) | An Info save is versioned and audited | approved |
 | [F/collaboration/committees/001015](requirements/functional/collaboration/committees/001015_info-empty.md) | An empty Info tab shows only to its editors | approved |
+| [F/collaboration/links/001400](requirements/functional/collaboration/links/001400_any-to-any.md) | Any two elements can link to each other | approved |
+| [F/collaboration/links/001401](requirements/functional/collaboration/links/001401_no-direction.md) | A link has no direction | approved |
+| [F/collaboration/links/001402](requirements/functional/collaboration/links/001402_one-row-two-ends.md) | A link is one row with two typed ends | approved |
+| [F/collaboration/links/001403](requirements/functional/collaboration/links/001403_card-links-move.md) | The card links move to the new table | approved |
+| [F/collaboration/links/001404](requirements/functional/collaboration/links/001404_link-rights.md) | A person links what the person reads and writes on one end | approved |
+| [F/collaboration/links/001405](requirements/functional/collaboration/links/001405_only-card-grants.md) | Only a card gives read access to its links | approved |
+| [F/collaboration/links/001406](requirements/functional/collaboration/links/001406_predecessor-stays.md) | The Vorgänger stays its own relation | approved |
+| [F/collaboration/links/001407](requirements/functional/collaboration/links/001407_one-linked-section.md) | Each element shows all its links in Verknüpft | approved |
+| [F/collaboration/links/001408](requirements/functional/collaboration/links/001408_one-picker.md) | Verknüpfen searches every kind | approved |
+| [F/collaboration/links/001409](requirements/functional/collaboration/links/001409_links-api.md) | The links have their own API | approved |
 | [F/collaboration/notifications/000151](requirements/functional/collaboration/notifications/000151_task-mail-recipients.md) | Task mails go only to who can act | approved |
 | [F/collaboration/notifications/000152](requirements/functional/collaboration/notifications/000152_team-mails-opt-in.md) | Team mails about Anträge are off by default | approved |
 | [F/collaboration/notifications/000153](requirements/functional/collaboration/notifications/000153_sandboxed-templates.md) | Mail placeholders use camelCase | approved |
@@ -325,16 +335,16 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/todos/000486](requirements/functional/collaboration/todos/000486_event-calendar.md) | An Event with a start is in the calendar | approved |
 | [F/collaboration/todos/000487](requirements/functional/collaboration/todos/000487_card-grants-read.md) | A card gives read access to its links | approved |
 | [F/collaboration/todos/000488](requirements/functional/collaboration/todos/000488_to-do-becomes-event-once.md) | A to-do becomes an Event only once | approved |
-| [F/collaboration/todos/000489](requirements/functional/collaboration/todos/000489_links-are-called-linked.md) | The cards of an element are under Verknüpft | approved |
+| [F/collaboration/todos/000489](requirements/functional/collaboration/todos/000489_links-are-called-linked.md) | The cards of an element are under Verknüpft | replaced |
 | [F/collaboration/todos/000547](requirements/functional/collaboration/todos/000547_create-card-from-element.md) | A card is created from the detail of an element | approved |
-| [F/collaboration/todos/000548](requirements/functional/collaboration/todos/000548_link-card-from-element.md) | An element is linked to a card from its detail | approved |
+| [F/collaboration/todos/000548](requirements/functional/collaboration/todos/000548_link-card-from-element.md) | An element is linked to a card from its detail | replaced |
 | [F/collaboration/todos/000549](requirements/functional/collaboration/todos/000549_due-cards-in-calendar.md) | A due card of a person is in their calendar | approved |
 | [F/collaboration/todos/000551](requirements/functional/collaboration/todos/000551_meeting-gremium-linked.md) | A meeting shows its linked cards and a Gremium its board | approved |
 | [F/collaboration/todos/000552](requirements/functional/collaboration/todos/000552_cost-centre-link.md) | A card can link a cost centre | approved |
 | [F/collaboration/todos/000553](requirements/functional/collaboration/todos/000553_card-to-agenda.md) | A card is put on the agenda from the card | approved |
 | [F/collaboration/todos/000554](requirements/functional/collaboration/todos/000554_duplicate-card.md) | A card can be duplicated | approved |
 | [F/collaboration/todos/000555](requirements/functional/collaboration/todos/000555_item-to-card.md) | A checklist item becomes a card | approved |
-| [F/collaboration/todos/000573](requirements/functional/collaboration/todos/000573_card-links-both-ways.md) | A link between two cards shows on both cards | approved |
+| [F/collaboration/todos/000573](requirements/functional/collaboration/todos/000573_card-links-both-ways.md) | A link between two cards shows on both cards | replaced |
 | [F/collaboration/todos/000735](requirements/functional/collaboration/todos/000735_termin-link.md) | A card can link a Termin | approved |
 | [F/collaboration/todos/000736](requirements/functional/collaboration/todos/000736_event-times.md) | The start and the end of an Event can have a time | approved |
 | [F/collaboration/todos/001060](requirements/functional/collaboration/todos/001060_free-boards.md) | A free board belongs to no single Gremium | approved |
@@ -773,6 +783,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/accessibility/settings/000623](requirements/non-functional/accessibility/settings/000623_scripts-read-motion-setting.md) | A script reads the motion setting, not the system | approved |
 | [NF/accessibility/settings/000647](requirements/non-functional/accessibility/settings/000647_accessibility-menu.md) | Accessibility has its own menu | approved |
 | [NF/accessibility/settings/000739](requirements/non-functional/accessibility/settings/000739_copy-box-yellow-fill.md) | In very high contrast, a box with a text to copy is a yellow fill | approved |
+| [NF/accessibility/settings/001352](requirements/non-functional/accessibility/settings/001352_very-high-contrast-button-group.md) | In very high contrast, a head group is yellow with black gaps | approved |
 | [NF/accessibility/statement/000495](requirements/non-functional/accessibility/statement/000495_statement-page.md) | A public page holds the accessibility statement | approved |
 | [NF/accessibility/statement/000496](requirements/non-functional/accessibility/statement/000496_statement-link.md) | Every page links to the accessibility statement | approved |
 | [NF/accessibility/statement/000497](requirements/non-functional/accessibility/statement/000497_barrier-report.md) | A user can report a barrier as a ticket | approved |
@@ -910,6 +921,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/001314](requirements/non-functional/usability/controls/001314_press-ripple.md) | A press shows a ripple | approved |
 | [NF/usability/controls/001315](requirements/non-functional/usability/controls/001315_segment-ripple.md) | A pressed segment ripples only inside its segment | approved |
 | [NF/usability/controls/001330](requirements/non-functional/usability/controls/001330_search-palette-concentric-corner.md) | The search window has a corner concentric with its search bar | approved |
+| [NF/usability/controls/001350](requirements/non-functional/usability/controls/001350_head-actions-button-group.md) | The buttons of a head form one connected button group | approved |
+| [NF/usability/controls/001351](requirements/non-functional/usability/controls/001351_selected-group-button.md) | A selected button of a group is filled and fully round | approved |
+| [NF/usability/controls/001353](requirements/non-functional/usability/controls/001353_confirm-row-button-group.md) | The buttons of a dialog footer form a button group with a filled main action | approved |
 | [NF/usability/layout/000192](requirements/non-functional/usability/layout/000192_one-geometry.md) | All list and detail pages share one geometry | approved |
 | [NF/usability/layout/000193](requirements/non-functional/usability/layout/000193_scroll-edges.md) | A scroll area cuts at the edge of a surface | approved |
 | [NF/usability/layout/000194](requirements/non-functional/usability/layout/000194_phone-breakpoint.md) | The phone layout starts below 768 px | approved |
@@ -961,6 +975,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/001084](requirements/non-functional/usability/layout/001084_file-viewer-glass-bar.md) | The file viewer is dark frosted glass | approved |
 | [NF/usability/layout/001313](requirements/non-functional/usability/layout/001313_attendance-pool-row-group.md) | The pool substitutes are an own row group | approved |
 | [NF/usability/layout/001340](requirements/non-functional/usability/layout/001340_detail-head-equal-inset.md) | A detail head is as far from the top as from the side | approved |
+| [NF/usability/layout/001341](requirements/non-functional/usability/layout/001341_dialog-head-equal-inset.md) | A dialog or sheet head is as far from the top as from the side | approved |
 | [NF/usability/layout/001440](requirements/non-functional/usability/layout/001440_agenda-pane-split-head.md) | The agenda beside the protocol is a split head over its list | approved |
 | [NF/usability/layout/001441](requirements/non-functional/usability/layout/001441_rail-scroll-surface.md) | The scroll part of the navigation rail is a surface | approved |
 | [NF/usability/layout/001442](requirements/non-functional/usability/layout/001442_board-own-surface.md) | Each board lies on a surface of its own | approved |

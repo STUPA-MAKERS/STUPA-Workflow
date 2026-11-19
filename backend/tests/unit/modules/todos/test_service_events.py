@@ -11,9 +11,7 @@ from typing import Any
 import pytest
 
 from app.modules.auth.principal import Principal
-from app.modules.meetings.models import MeetingAgendaItem
 from app.modules.todos import events as todo_events
-from app.modules.todos.links import Resolved
 from app.modules.todos.models import (
     TodoCard,
     TodoCardEvent,
@@ -96,25 +94,6 @@ def _event_of(card_id: uuid.UUID, **kw: Any) -> TodoCardEvent:
     return TodoCardEvent(card_id=card_id, **kw)
 
 
-async def test_link_view_needs_a_link_of_the_card() -> None:
-    session, _b, _col, c, _ = _setup()
-    item = MeetingAgendaItem(id=uuid.uuid4(), body="Text")
-    session.put(item)
-    mine = link(c.id, agenda_item_id=item.id)
-    foreign = link(uuid.uuid4(), agenda_item_id=item.id)
-    session.put(mine, foreign)
-    links = FakeLinks(resolved={("agenda_item", item.id): Resolved(accessible=True, title="TOP")})
-    session.scalars_q.append([])
-    service = _svc(session, links)
-    with pytest.raises(NotFoundError):
-        await service.link_view(c.id, uuid.uuid4(), USER)
-    with pytest.raises(NotFoundError):
-        await service.link_view(c.id, foreign.id, USER)
-    view = await service.link_view(c.id, mine.id, USER)
-    assert (view.kind, view.title) == ("agenda_item", "TOP")
-    assert [(f.key, f.value) for f in view.facts] == [("body", "Text")]
-
-
 async def test_cards_keep_the_order_and_leave_out_unknown_and_unreadable() -> None:
     session = EventSession()
     readable, hidden = board(), board()
@@ -139,18 +118,17 @@ async def test_tile_of_an_archived_card_is_not_found() -> None:
         await service.tile(c.id, USER)
 
 
-async def test_add_link_on_an_event_refuses_an_element_of_another_event() -> None:
-    session, _b, _col, c, _ = _setup()
+async def test_a_new_link_of_an_event_refuses_an_element_of_another_event() -> None:
+    session, _b, _col, c, service = _setup()
+    await service.check_new_link(c, ("application", APP))
+    assert session.statements == []
     session.event_rows[c.id] = _event_of(c.id)
-    service = _svc(session, FakeLinks(readable=[("application", APP)]))
-    session.scalar_q[:] = [c, None, uuid.uuid4()]
+    session.scalar_q[:] = [uuid.uuid4()]
     with pytest.raises(ConflictError) as exc:
-        await service.add_link(c.id, "application", APP, USER)
+        await service.check_new_link(c, ("application", APP))
     assert exc.value.code == "event_link_taken"
-    assert session.committed == 0
-    session.scalar_q[:] = [c, None, None]
-    assert await service.add_link(c.id, "application", APP, USER) is OUT
-    assert session.committed == 1
+    session.scalar_q[:] = [None]
+    await service.check_new_link(c, ("application", APP))
 
 
 @pytest.mark.parametrize(
@@ -202,13 +180,13 @@ async def test_set_event_makes_a_todo_an_event_after_the_one_event_check() -> No
         seriesId=SERIES,
     )
     session.scalar_q[:] = [c, uuid.uuid4()]
-    session.scalars_q.append([link(c.id, application_id=APP)])
+    session.execute_q.extend([[], [link(c.id, application_id=APP)]])
     with pytest.raises(ConflictError) as exc:
         await service.set_event(c.id, payload, USER)
     assert exc.value.code == "event_link_taken"
     assert session.event_rows == {}
     session.scalar_q[:] = [c, None]
-    session.scalars_q.append([link(c.id, application_id=APP)])
+    session.execute_q.extend([[], [link(c.id, application_id=APP)]])
     assert await service.set_event(c.id, payload, USER) is OUT
     row = session.event_rows[c.id]
     assert (row.starts_on, row.ends_on, row.place, row.participants, row.series_id) == (
@@ -403,13 +381,11 @@ async def test_event_facts_sum_decide_and_list_the_editions() -> None:
         ),
     )
     session.scalar_q.append(3)
-    session.scalars_q[:] = [
-        [link(c.id, application_id=APP)],
-        [link(c.id, application_id=APP)],
-    ]
     session.execute_q[:] = [
         [(other, b, other_row)],
+        [link(c.id, application_id=APP)],
         [(APP, Decimal("100.00"), Decimal("80.00"), True)],
+        [link(c.id, application_id=APP)],
         [(*decided, "StuPa")],
     ]
     facts = SimpleNamespace(events={c.id: _event_of(c.id, series_id=SERIES)})
@@ -435,11 +411,10 @@ async def test_event_facts_sum_decide_and_list_the_editions() -> None:
 
 async def test_event_facts_without_amount() -> None:
     session, _b, _col, c, service = _setup()
-    session.scalars_q[:] = [[], [link(c.id, vote_id=APP)]]
     vote = SimpleNamespace(
         id=APP, question="Frage", application_id=None, closed_at=None, result="passed"
     )
-    session.execute_q[:] = [[(vote, None, None)]]
+    session.execute_q[:] = [[], [link(c.id, vote_id=APP)], [(vote, None, None)]]
     facts = SimpleNamespace(events={c.id: _event_of(c.id)})
     out = (await service._event_facts([c], facts, USER))[c.id]  # type: ignore[arg-type]
     assert [(d.kind, d.amount) for d in out.decisions] == [("vote", None)]

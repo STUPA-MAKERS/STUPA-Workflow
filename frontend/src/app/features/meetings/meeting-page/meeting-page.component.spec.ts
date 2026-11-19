@@ -1,5 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { renderDeferred } from '../../../../testing/defer';
+import { linksOf } from '../../../../testing/todo-fixtures';
 import {
   HttpTestingController,
   provideHttpClientTesting,
@@ -270,8 +271,8 @@ describe('MeetingPageComponent', () => {
       const menu = await openMenu();
       await userEvent.click(within(menu).getByRole('menuitem', { name: 'To-Dos' }));
       fixture.detectChanges();
-      const linked = http.expectOne((r) => r.url.endsWith('/api/todos/linked') && r.params.get('kind') === 'meeting');
-      linked.flush([
+      const linked = http.expectOne((r) => r.url.endsWith('/api/links') && r.params.get('kind') === 'meeting');
+      linked.flush(linksOf([
         {
           id: 'k-1',
           boardId: 'b-1',
@@ -284,12 +285,12 @@ describe('MeetingPageComponent', () => {
           event: null,
           balance: null,
         },
-      ]);
+      ]));
       http.expectOne((r) => r.url.endsWith('/api/todos/boards')).flush([{ id: 'b-1', name: 'StuPa', kind: 'gremium', gremiumId: 'g-1', canWrite: true }]);
       fixture.detectChanges();
       const sheet = await screen.findByRole('dialog', { name: 'To-Dos' });
       expect(within(sheet).getByRole('link', { name: 'Raum für die Sitzung buchen' })).toHaveAttribute('href', '/todos?card=k-1');
-      expect(within(sheet).getByRole('button', { name: 'Mit To-Do verknüpfen' })).toBeInTheDocument();
+      expect(within(sheet).getByRole('button', { name: 'Verknüpfen' })).toBeInTheDocument();
       expect(within(sheet).getByRole('button', { name: 'To-Do anlegen' })).toBeInTheDocument();
       expect(document.querySelector('.mp__agenda app-todo-linked-list[kind="meeting"]')).toBeNull();
     });

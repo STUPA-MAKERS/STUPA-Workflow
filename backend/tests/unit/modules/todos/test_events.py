@@ -44,7 +44,7 @@ async def test_series_names_skip_none_and_map_ids() -> None:
 
 
 async def test_totals_without_cards_or_links() -> None:
-    session: Any = ScriptedSession(scalars=[[]])
+    session: Any = ScriptedSession(execute=[[]])
     assert await events.totals(session, []) == {}
     out = await events.totals(session, [EMPTY])
     assert out[EMPTY] == events.Totals()
@@ -64,8 +64,8 @@ async def test_totals_sum_applications_and_bookings() -> None:
         link(CARD, expense_id=E4),
     ]
     session: Any = ScriptedSession(
-        scalars=[links],
         execute=[
+            links,
             [
                 (A1, Decimal("100.00"), Decimal("80.00"), True),
                 (A2, Decimal("50.00"), None, False),
@@ -90,8 +90,7 @@ async def test_totals_sum_applications_and_bookings() -> None:
 
 async def test_totals_approved_falls_back_to_the_requested_amount() -> None:
     session: Any = ScriptedSession(
-        scalars=[[link(CARD, application_id=A1)]],
-        execute=[[(A1, Decimal("40.00"), None, True)]],
+        execute=[[link(CARD, application_id=A1)], [(A1, Decimal("40.00"), None, True)]],
     )
     got = (await events.totals(session, [CARD]))[CARD]
     assert got.requested == got.approved == Decimal("40.00")
@@ -100,8 +99,10 @@ async def test_totals_approved_falls_back_to_the_requested_amount() -> None:
 async def test_totals_approved_skips_an_antrag_outside_an_approved_state() -> None:
     """A decision alone does not count: the state must carry the approved flag (000572)."""
     session: Any = ScriptedSession(
-        scalars=[[link(CARD, application_id=A1)]],
-        execute=[[(A1, Decimal("40.00"), Decimal("30.00"), False)]],
+        execute=[
+            [link(CARD, application_id=A1)],
+            [(A1, Decimal("40.00"), Decimal("30.00"), False)],
+        ],
     )
     got = (await events.totals(session, [CARD]))[CARD]
     assert got.requested == Decimal("40.00")
@@ -110,8 +111,7 @@ async def test_totals_approved_skips_an_antrag_outside_an_approved_state() -> No
 
 async def test_totals_count_a_sub_booking_alone_when_its_parent_is_not_linked() -> None:
     session: Any = ScriptedSession(
-        scalars=[[link(CARD, expense_id=E2)]],
-        execute=[[(E2, "expense", Decimal("5.00"), E1)]],
+        execute=[[link(CARD, expense_id=E2)], [(E2, "expense", Decimal("5.00"), E1)]],
     )
     assert (await events.totals(session, [CARD]))[CARD].expenses == Decimal("5.00")
 
@@ -153,7 +153,7 @@ def _vote(
 
 
 async def test_decisions_without_links() -> None:
-    session: Any = ScriptedSession(scalars=[[]])
+    session: Any = ScriptedSession(execute=[[]])
     assert await events.decisions(session, CARD) == []
     assert len(session.statements) == 1
 
@@ -167,8 +167,8 @@ async def test_decisions_merge_votes_and_order_newest_first() -> None:
     ]
     v2 = _vote(V2, application_id=A4, closed_at=T3, result="passed")
     session: Any = ScriptedSession(
-        scalars=[links],
         execute=[
+            links,
             [
                 (
                     _app(A1, " Sommerfest ", "100.00"),
@@ -217,8 +217,10 @@ async def test_decisions_merge_votes_and_order_newest_first() -> None:
 
 async def test_decisions_of_votes_only_use_question_and_skip_title_query() -> None:
     session: Any = ScriptedSession(
-        scalars=[[link(CARD, vote_id=V1)]],
-        execute=[[(_vote(V1, question="Budget?", closed_at=T1), None, None)]],
+        execute=[
+            [link(CARD, vote_id=V1)],
+            [(_vote(V1, question="Budget?", closed_at=T1), None, None)],
+        ],
     )
     (only,) = await events.decisions(session, CARD)
     assert (only.kind, only.title, only.target_id) == ("vote", "Budget?", V1)
@@ -227,8 +229,7 @@ async def test_decisions_of_votes_only_use_question_and_skip_title_query() -> No
 
 async def test_decisions_vote_without_any_title() -> None:
     session: Any = ScriptedSession(
-        scalars=[[link(CARD, agenda_item_id=uuid.uuid4())]],
-        execute=[[(_vote(V1), None, None)]],
+        execute=[[link(CARD, agenda_item_id=uuid.uuid4())], [(_vote(V1), None, None)]],
     )
     (only,) = await events.decisions(session, CARD)
     assert only.title == ""

@@ -229,6 +229,7 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
   };
   const todosApi = {
     linked: jest.fn(() => todos),
+    links: jest.fn(() => of({ canLink: false, links: [] })),
     boards: jest.fn(() => of([])),
     board: jest.fn(),
     members: jest.fn(),

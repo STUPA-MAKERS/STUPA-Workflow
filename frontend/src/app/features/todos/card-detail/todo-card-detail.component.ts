@@ -32,6 +32,7 @@ import {
   type TodoEventEdition,
   type TodoEventIn,
   type TodoEventSeries,
+  type LinkEnd,
   type TodoLink,
   type TodoLinkTarget,
   type TodoMember,
@@ -621,6 +622,12 @@ export class TodoCardDetailComponent {
   route(url: string) {
     return splitUrl(url);
   }
+
+  /** The card as a link end: the picker leaves it and its links out (spec 001408). */
+  readonly linkSelf = computed<LinkEnd | null>(() => {
+    const c = this.card();
+    return c ? { kind: 'todo', id: c.id } : null;
+  });
 
   /** The link whose read sheet is open (spec 000487): a link readable only through the card. */
   readonly viewedLink = signal<TodoLink | null>(null);

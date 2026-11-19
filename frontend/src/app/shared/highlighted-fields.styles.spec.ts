@@ -40,7 +40,6 @@ const SURFACES: readonly (readonly [string, string])[] = [
   ['pages/admin/committees/gremium-dialog/gremium-dialog.component.scss', '.gd__mail'],
   ['features/meetings/attendance-sheet/attendance-sheet.component.scss', '.as__note'],
   ['pages/admin/forms/form-editor.component.scss', '.fe__pv-control'],
-  ['pages/activity/activity.component.scss', '.act__new'],
   ['features/meetings/live-cards/live-cards.component.scss', '.lc__join'],
   ['pages/todos/board-picker/todo-board-picker.component.scss', '.bp__chip'],
   ['features/help/help-menu/help-menu.component.scss', '.hm__head'],

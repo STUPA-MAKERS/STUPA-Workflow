@@ -70,7 +70,6 @@ export class TodoLinkViewComponent {
   private readonly t = this.i18n.translate.bind(this.i18n);
 
   readonly open = model(false);
-  readonly cardId = input.required<Uuid>();
   readonly link = input<TodoLink | null>(null);
 
   readonly phone = mediaQuery(MEDIA.phone);
@@ -91,18 +90,17 @@ export class TodoLinkViewComponent {
     effect(() => {
       const link = this.link();
       const open = this.open();
-      const cardId = this.cardId();
       untracked(() => {
-        if (open && link) this.load(cardId, link.id);
+        if (open && link) this.load(link.id);
       });
     });
   }
 
-  private load(cardId: Uuid, linkId: Uuid): void {
+  private load(linkId: Uuid): void {
     this.request?.unsubscribe();
     this.view.set(null);
     this.failed.set(false);
-    this.request = this.api.linkView(cardId, linkId).subscribe({
+    this.request = this.api.linkView(linkId).subscribe({
       next: (view) => this.view.set(view),
       error: () => this.failed.set(true),
     });

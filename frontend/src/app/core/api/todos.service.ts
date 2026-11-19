@@ -8,7 +8,7 @@
  */
 import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { catchError, map, of, throwError, type Observable } from 'rxjs';
+import { catchError, map, of, switchMap, throwError, type Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { I18nMap, IsoDateTime, MessageAttachment, MessageFiles, Page, PersonRef, Uuid } from '@core/api/models';
 import { messageFiles } from '@core/api/mappers';
@@ -452,6 +452,28 @@ export interface TodoLinkedCard {
   readonly balance: string | null;
 }
 
+/** One end of a link: the kind and the id of an element (spec 001402). */
+export interface LinkEnd {
+  readonly kind: TodoLinkKind;
+  readonly id: Uuid;
+}
+
+/** A link of an element as its reader sees it (`GET /links`, spec 001407). */
+export interface LinkRow extends TodoLink {
+  /** The card of a card end that the reader reads; null for any other kind. */
+  readonly card: TodoLinkedCard | null;
+  /** The reader may take the link off (spec 001404). */
+  readonly removable: boolean;
+  readonly createdAt: string;
+}
+
+/** The links of an element: a linked Event first, then by kind, the newest first. */
+export interface LinksOut {
+  /** The reader may change the element, so the reader may link it. */
+  readonly canLink: boolean;
+  readonly links: readonly LinkRow[];
+}
+
 /** An assignable person of a board; also the @-mention list. */
 export interface TodoMember {
   readonly principalId: Uuid;
@@ -662,9 +684,9 @@ export class TodosApiService {
     return this.http.get<TodoCardTile>(`${this.base}/todos/cards/${cardId}/tile`, { context: skipLoading() });
   }
 
-  /** The read sheet of a link of the card (spec 000487). */
-  linkView(cardId: Uuid, linkId: Uuid): Observable<TodoLinkView> {
-    return this.http.get<TodoLinkView>(`${this.base}/todos/cards/${cardId}/links/${linkId}/view`, {
+  /** The read sheet of the other end of a card link (spec 000487). */
+  linkView(linkId: Uuid): Observable<TodoLinkView> {
+    return this.http.get<TodoLinkView>(`${this.base}/links/${linkId}/view`, {
       context: skipLoading(),
     });
   }
@@ -748,18 +770,32 @@ export class TodosApiService {
     });
   }
 
+  /** Link a card to an element, then read the card again. */
   addLink(cardId: Uuid, kind: TodoLinkKind, targetId: Uuid): Observable<TodoCardDetail> {
-    return this.http.post<TodoCardDetail>(
-      `${this.base}/todos/cards/${cardId}/links`,
-      { kind, targetId },
-      { context: skipLoading() },
+    return this.link({ kind: 'todo', id: cardId }, { kind, id: targetId }).pipe(
+      switchMap(() => this.card(cardId)),
     );
   }
 
+  /** Take a link of a card off, then read the card again. */
   removeLink(cardId: Uuid, linkId: Uuid): Observable<TodoCardDetail> {
-    return this.http.delete<TodoCardDetail>(`${this.base}/todos/cards/${cardId}/links/${linkId}`, {
-      context: skipLoading(),
-    });
+    return this.unlink(linkId).pipe(switchMap(() => this.card(cardId)));
+  }
+
+  /** The links of an element that the caller reads (spec 001407). */
+  links(kind: TodoLinkKind, id: Uuid): Observable<LinksOut> {
+    const params = new HttpParams().set('kind', kind).set('id', id);
+    return this.http.get<LinksOut>(`${this.base}/links`, { params, context: detailContext() });
+  }
+
+  /** Link two elements (spec 001400); the answer is the links of `a`. */
+  link(a: LinkEnd, b: LinkEnd): Observable<LinksOut> {
+    return this.http.post<LinksOut>(`${this.base}/links`, { a, b }, { context: skipLoading() });
+  }
+
+  /** Take a link off both of its elements (spec 001401). */
+  unlink(linkId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/links/${linkId}`, { context: skipLoading() });
   }
 
   /** A comment; `files` binds draft uploads of `POST /apply/attachments` (at most 5). */
@@ -829,22 +865,23 @@ export class TodosApiService {
       );
   }
 
-  /** The link picker: what the caller may read, at most five per kind. */
-  linkTargets(q: string, kind: TodoLinkKind | 'all', excludeCardId?: Uuid | null): Observable<TodoLinkTarget[]> {
-    const params = httpParams({ q, kind, excludeCardId: excludeCardId || undefined });
-    return this.http.get<TodoLinkTarget[]>(`${this.base}/todos/link-targets`, {
+  /**
+   * The link picker: what the caller may read, at most five per kind (spec 001408).
+   * `exclude` leaves out an element and the elements that it links already.
+   */
+  linkTargets(q: string, kind: TodoLinkKind | 'all', exclude?: LinkEnd | null): Observable<TodoLinkTarget[]> {
+    const params = httpParams({ q, kind, excludeKind: exclude?.kind, excludeId: exclude?.id });
+    return this.http.get<TodoLinkTarget[]>(`${this.base}/links/targets`, {
       params,
       context: skipLoading(),
     });
   }
 
-  /** The readable, not archived cards that link the target: open first, then by due date. */
-  linked(kind: Exclude<TodoLinkKind, 'todo'>, targetId: Uuid): Observable<TodoLinkedCard[]> {
-    const params = new HttpParams().set('kind', kind).set('targetId', targetId);
-    return this.http.get<TodoLinkedCard[]>(`${this.base}/todos/linked`, {
-      params,
-      context: detailContext(),
-    });
+  /** The readable cards that link the element: a linked Event first, then the newest. */
+  linked(kind: TodoLinkKind, targetId: Uuid): Observable<TodoLinkedCard[]> {
+    return this.links(kind, targetId).pipe(
+      map((out) => out.links.flatMap((row) => (row.card ? [row.card] : []))),
+    );
   }
 
   /** Set the event data; a to-do becomes an Event for good. */
