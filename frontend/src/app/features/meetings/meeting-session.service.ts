@@ -191,9 +191,7 @@ export class MeetingSessionService implements OnDestroy {
     this.destroyed = true;
     this.clearDraft();
     if (this.liveTimer !== null) clearTimeout(this.liveTimer);
-    const ch = this.channel;
-    this.channel = null;
-    ch?.close();
+    this.channel?.close();
     if (this.renderPollTimer !== null) clearTimeout(this.renderPollTimer);
   }
 
