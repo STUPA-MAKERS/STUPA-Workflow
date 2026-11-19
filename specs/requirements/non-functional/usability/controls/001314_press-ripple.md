@@ -2,11 +2,9 @@
 id: "001314"
 title: A press shows a ripple
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-tests:
-  - "frontend/vendor/ui-kit/src/styles/touch.spec.ts:ripple"
 implementation:
   - frontend/vendor/ui-kit/src/styles/_press.scss
 scope:

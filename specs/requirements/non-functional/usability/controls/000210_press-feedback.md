@@ -6,8 +6,6 @@ status: replaced
 owner: frederikbeimgraben
 updated: 2026-11-19
 replaced_by: NF/usability/controls/001314
-implementation:
-  - frontend/vendor/ui-kit/src/styles/_press.scss
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit
