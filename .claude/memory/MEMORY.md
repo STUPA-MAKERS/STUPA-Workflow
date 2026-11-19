@@ -19,7 +19,7 @@ sibling memory here.
 ## UI / frontend conventions
 
 - [mobile-view-decisions](mobile-view-decisions.md) — 768px, additive media queries, phone bottom bar + "Mehr" sheet, bottom inset, footer rule, PWA bar colours
-- [empty-state-convention](empty-state-convention.md) — `app-empty-state` with ghost rows for lists, `plain` for panes, searches and missing records
+- [empty-state-convention](empty-state-convention.md) — `app-empty-state` with the moving face for lists, `plain` for panes and missing records, no reset
 - [no-uuids-in-ui](no-uuids-in-ui.md) — never show raw UUIDs or ids in the UI, resolve to names server-side (`auth/identity.py`)
 - [loading-bar-convention](loading-bar-convention.md) — loading bar counts GETs only; `skipLoading()` / `quietly()` for background reads, mutations never count
 - [tailwind-preflight-off-borders](tailwind-preflight-off-borders.md) — preflight OFF: borders need a style, single-side borders need `border-0` first
