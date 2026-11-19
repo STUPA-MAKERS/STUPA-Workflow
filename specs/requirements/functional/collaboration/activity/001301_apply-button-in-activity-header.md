@@ -2,7 +2,7 @@
 id: "001301"
 title: Antrag stellen stands in the header of the activity page
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:

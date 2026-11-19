@@ -2,7 +2,7 @@
 id: "001303"
 title: The help menu leads a signed-in person to the public pages
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:

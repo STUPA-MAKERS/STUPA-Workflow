@@ -2,7 +2,7 @@
 id: "001302"
 title: The activity page shows a running meeting above the list
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
