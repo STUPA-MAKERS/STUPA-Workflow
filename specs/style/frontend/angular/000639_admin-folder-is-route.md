@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:
-  - "frontend/src/app/pages/admin/admin-frame/admin-pages.spec.ts:ADMIN_PAGES"
+  - "frontend/src/app/pages/admin/admin-list/admin-pages.spec.ts:ADMIN_PAGES"
 implementation:
   - frontend/src/app/app.routes.ts
   - frontend/src/app/pages/admin
@@ -23,6 +23,6 @@ that holds parts for more than one page must have a name that says what the part
 
 Reason: A folder with the name of the route can be found from the URL.
 
-Test: `frontend/src/app/pages/admin/admin-frame/admin-pages.spec.ts`: for each child route
+Test: `frontend/src/app/pages/admin/admin-list/admin-pages.spec.ts`: for each child route
 of `/admin` with a component below `pages/admin`, the import path starts with the folder of
 the route segment.
