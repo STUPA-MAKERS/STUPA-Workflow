@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use 'meta-chips' as chips;
 
 // The geometry of applications-detail.component.scss.
 
@@ -26,13 +27,10 @@
   background: var(--color-surface-1);
 }
 .td__line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
+  @include chips.list;
 }
-.td__dot {
-  margin-inline: 8px;
-  color: var(--color-text-subtle);
+.td__part {
+  @include chips.chip;
 }
 .td__actions {
   display: flex;

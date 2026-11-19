@@ -232,7 +232,7 @@ describe('VotePanelComponent', () => {
     expect(title.closest('app-sheet-bar')).not.toBeNull();
     const meta = fixture.nativeElement.querySelector('.vpn__meta') as HTMLElement;
     expect(meta).toHaveClass('sheet-line');
-    expect(meta.textContent?.replace(/\s+/g, '')).toBe('Offen·34.SitzungdesStudierendenparlaments·TOP3·EinfacheMehrheit');
+    expect(meta.textContent?.replace(/\s+/g, '')).toBe('Offen34.SitzungdesStudierendenparlaments·TOP3EinfacheMehrheit');
     expect(screen.getByRole('heading', { name: 'Deine Stimme' })).toBeInTheDocument();
     const progress = fixture.nativeElement.querySelector('app-vote-progress') as HTMLElement;
     const ballot = fixture.nativeElement.querySelector('app-ballot') as HTMLElement;

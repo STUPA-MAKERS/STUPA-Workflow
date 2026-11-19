@@ -25,7 +25,7 @@
         <app-row-menu [label]="'invoices.detail.menu' | t" [sections]="menu()" (selected)="onMenu($event)" />
       }
     </app-sheet-bar>
-    <p class="sheet-line fd__line fd__seps">
+    <p class="sheet-line fd__line">
       <span class="fd__parts">
         <span class="fd__part">
           <app-status-text chip [kind]="status().kind">{{ status().key | t }}</app-status-text>

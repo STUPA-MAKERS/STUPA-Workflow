@@ -1,5 +1,5 @@
 @use 'breakpoints' as bp;
-@use 'dot-parts' as dots;
+@use 'meta-chips' as chips;
 
 :host {
   display: flex;
@@ -143,19 +143,11 @@
 .ad__progress {
   inset-inline: var(--radius-2xl);
 }
-.ad__line {
-  --ad-sep: 24px;
-}
-// Each part draws its dot in a `--ad-sep` box and starts `--ad-sep` before the clip, so the
-// first dot of each line is hidden. `overflow-x: clip` leaves the line height alone.
-.ad__seps {
-  overflow-x: clip;
-}
 .ad__parts {
-  @include dots.list(var(--ad-sep));
+  @include chips.list;
 }
 .ad__part {
-  @include dots.part(var(--ad-sep));
+  @include chips.chip;
 }
 .ad__bound {
   display: block;
