@@ -151,16 +151,17 @@
 <app-todo-link-picker [(open)]="linkOpen" [exclude]="self()" [linked]="linkedKeys()" (picked)="pick($event)" />
 <ng-template #unlink let-row>
   @if (row.removable) {
-    <app-button
-      class="tl__x"
-      variant="text"
-      size="sm"
-      [iconOnly]="true"
-      [ariaLabel]="'todos.card.unlink' | t: { title: title(row) }"
-      data-testid="tl-unlink"
-      (click)="remove(row)"
-    >
-      <app-icon name="x" />
-    </app-button>
+    <app-button-group class="tl__x">
+      <app-button
+        variant="text"
+        size="sm"
+        [iconOnly]="true"
+        [ariaLabel]="'todos.card.unlink' | t: { title: title(row) }"
+        data-testid="tl-unlink"
+        (click)="remove(row)"
+      >
+        <app-icon name="x" />
+      </app-button>
+    </app-button-group>
   }
 </ng-template>

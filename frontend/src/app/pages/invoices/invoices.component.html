@@ -69,9 +69,11 @@
             (applied)="onGrossRange($event)"
           />
           @if (activeFilterCount() > 0) {
-            <app-button variant="text" size="sm" (click)="resetFilters()">
-              {{ 'invoices.filter.reset' | t }}
-            </app-button>
+            <app-button-group>
+              <app-button variant="text" size="sm" (click)="resetFilters()">
+                {{ 'invoices.filter.reset' | t }}
+              </app-button>
+            </app-button-group>
           }
         </div>
         @if (reloading()) {
