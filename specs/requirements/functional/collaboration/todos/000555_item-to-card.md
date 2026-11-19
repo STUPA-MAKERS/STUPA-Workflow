@@ -19,7 +19,7 @@ scope:
 A checklist item must have the action `Als Karte anlegen` (`Make card`). It must open the create
 dialog on the board of the card with the text of the item as the title, the assignees of the card and a link to the card.
 A created card must remove the item from the checklist. `Verknüpft` (`Linked`) of each card
-shows the other through the one link (000573).
+shows the other through the one link (001401).
 
 Reason: An item can grow into its own work with a person and a due date.
 

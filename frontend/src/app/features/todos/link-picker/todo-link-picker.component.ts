@@ -21,7 +21,7 @@ import {
   viewChild,
 } from '@angular/core';
 import type { Uuid } from '@core/api/models';
-import { TodosApiService, type TodoLinkKind, type TodoLinkTarget } from '@core/api/todos.service';
+import { TodosApiService, type LinkEnd, type TodoLinkKind, type TodoLinkTarget } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate, TranslationKey } from '@core/i18n/translations';
@@ -80,7 +80,7 @@ export function linkKey(kind: TodoLinkKind, id: Uuid): string {
 }
 
 /**
- * "Verknüpfen": search what a card can link. The server lists per kind only
+ * "Verknüpfen" (spec 001408): search what an element can link. The server lists per kind only
  * what the person may read. The chips narrow the kind; the hits come in groups (Anträge,
  * Sitzungen und TOPs, Abstimmungen, Gremien, Rechnungen, Buchungen, Kostenstellen, Tickets, To-Dos), a
  * linked target carries a check mark. A pick of a linked target takes the link off again.
@@ -109,8 +109,8 @@ export class TodoLinkPickerComponent {
   private readonly t: Translate = (key, params) => this.i18n.translate(key, params);
 
   readonly open = model(false);
-  /** The card itself never shows as a to-do hit. */
-  readonly excludeCardId = input<Uuid | null>(null);
+  /** The element that links: it and the elements that it links already never show. */
+  readonly exclude = input<LinkEnd | null>(null);
   /** The targets the card links now (`kind:id`). */
   readonly linked = input<ReadonlySet<string>>(new Set());
   readonly picked = output<TodoLinkTarget>();
@@ -141,7 +141,7 @@ export class TodoLinkPickerComponent {
   readonly search = liveSearch<TodoLinkTarget[]>({
     run: (q) => {
       this.failed.set(false);
-      return this.api.linkTargets(q, this.kind(), this.excludeCardId());
+      return this.api.linkTargets(q, this.kind(), this.exclude());
     },
     result: (hits) => this.hits.set(hits),
     reset: () => this.hits.set([]),

@@ -22,13 +22,13 @@ from app.modules.privacy.service import AuskunftService, PrincipalService
 from app.modules.tickets.models import Ticket, TicketEvent
 from app.modules.todos.boards import ensure_personal_board
 from app.modules.todos.models import (
+    Link,
     TodoAssignee,
     TodoBoard,
     TodoCard,
     TodoColumn,
     TodoComment,
     TodoEvent,
-    TodoLink,
 )
 from app.modules.todos.schemas import CardCreate, ColumnPatch
 from app.modules.todos.service import BERLIN, TodoService
@@ -179,8 +179,8 @@ async def test_a_column_change_into_done_tells_the_linked_ticket(
         await session.flush()
         session.add_all(
             [
-                TodoLink(card_id=flagged, ticket_id=ticket.id, created_by=me_id),
-                TodoLink(card_id=moved, ticket_id=ticket.id, created_by=me_id),
+                Link.between(("todo", flagged), ("ticket", ticket.id), me_id),
+                Link.between(("todo", moved), ("ticket", ticket.id), me_id),
             ]
         )
         await session.commit()

@@ -61,6 +61,12 @@ export class MeetingAgendaService implements OnDestroy {
   private localBody: { itemId: Uuid; body: string } | null = null;
   /** The running body save. It emits once and completes after the response. */
   private runningSave: Observable<void> | null = null;
+  /**
+   * The item that "Nächster TOP" ticks before the server confirms it, with the time of the
+   * tick. A read of the agenda that started before the request would show the item open
+   * again, so {@link setRows} keeps the tick until {@link settleDone}.
+   */
+  private pendingDone: { itemId: Uuid; doneAt: string } | null = null;
 
   readonly selectedTop = computed<AgendaItem | null>(
     () => this.agenda().find((a) => a.id === this.selectedTopId()) ?? null,
@@ -380,12 +386,41 @@ export class MeetingAgendaService implements OnDestroy {
   }
 
   /** Show the rows of the server, with the unconfirmed text of this tab kept. */
+  /**
+   * Show the tick of "Nächster TOP" at once, before the server answers. An item that is
+   * ticked already keeps its time. {@link settleDone} ends the local tick.
+   */
+  markDoneNow(itemId: Uuid): void {
+    const item = this.agenda().find((a) => a.id === itemId);
+    if (!item || item.doneAt) return;
+    const doneAt = new Date().toISOString();
+    this.pendingDone = { itemId, doneAt };
+    this.agenda.update((rows) => rows.map((a) => (a.id === itemId ? { ...a, doneAt } : a)));
+  }
+
+  /**
+   * End the local tick of {@link markDoneNow}. After a refused request (`keep` false) the
+   * item shows open again; after a success the next read of the agenda holds the tick.
+   */
+  settleDone(itemId: Uuid, keep: boolean): void {
+    if (this.pendingDone?.itemId !== itemId) return;
+    this.pendingDone = null;
+    if (!keep) {
+      this.agenda.update((rows) =>
+        rows.map((a) => (a.id === itemId ? { ...a, doneAt: null } : a)),
+      );
+    }
+  }
+
   private setRows(rows: AgendaItem[]): void {
     const local = this.localBody;
+    const done = this.pendingDone;
     this.agenda.set(
-      local
-        ? rows.map((a) => (a.id === local.itemId ? { ...a, body: local.body } : a))
-        : rows,
+      rows.map((a) => ({
+        ...a,
+        ...(local && a.id === local.itemId ? { body: local.body } : {}),
+        ...(done && a.id === done.itemId && !a.doneAt ? { doneAt: done.doneAt } : {}),
+      })),
     );
   }
 }

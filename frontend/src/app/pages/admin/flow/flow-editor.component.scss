@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use 'press';
 @use 'display' as d;
 
@@ -511,7 +510,6 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: thin;
-    @include fade.fade-y(var(--space-5));
   }
 }
 

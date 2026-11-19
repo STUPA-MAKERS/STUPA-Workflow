@@ -10,7 +10,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { BOARDS, MEMBERS, board, detail, link } from '../../../../testing/todo-fixtures';
 import { AGENDA, item, meeting, vote } from '../../../../testing/meeting-fixtures';
 import { TodoLinkedRefresh } from '../../todos/linked-list/todo-linked-refresh';
-import { TodoLinkCardDialogComponent } from '../../todos/link-card-dialog/todo-link-card-dialog.component';
+import { TodoLinkPickerComponent } from '../../todos/link-picker/todo-link-picker.component';
 import { TodoNewDialogComponent } from '../../todos/new-dialog/todo-new-dialog.component';
 import { AgendaPaneComponent } from './agenda-pane.component';
 
@@ -75,6 +75,8 @@ async function setup(over: Partial<Inputs> = {}, canTodo?: boolean) {
                 linkTargets: jest.fn(() => of([])),
                 mine: jest.fn(() => of({ items: [] })),
                 linked: jest.fn(() => of([{ id: 'k-1' }])),
+                links: jest.fn(() => of({ canLink: false, links: [] })),
+                link: jest.fn(() => of({ canLink: true, links: [] })),
               },
             },
           ],
@@ -104,7 +106,7 @@ describe('AgendaPaneComponent', () => {
 
   it('shows the empty agenda hint', async () => {
     await setup({ agenda: [] });
-    expect(screen.getByText('Noch keine Anträge auf der Tagesordnung.')).toBeInTheDocument();
+    expect(screen.getByText('Noch keine Punkte auf der Tagesordnung.')).toBeInTheDocument();
   });
 
   /** An item before "now" without a tick is not done. */
@@ -375,31 +377,30 @@ describe('AgendaPaneComponent', () => {
       item({ id: 't-3', title: 'Verschiedenes', position: 2 }),
     ];
 
-    it('planRows: shows the planned start and the duration in the sub line and the end below (§ 001141, § 001144)', async () => {
+    it('planRows: shows the planned start and the duration in the sub line and no end line (§ 001141, § 001144)', async () => {
       const { container } = await setup({ meeting: meeting({ status: 'planned', startTime: '18:00' }), agenda: TIMED });
       expect(screen.getByText('ca. 18:00 · 5 Min.')).toBeInTheDocument();
       expect(screen.getByText('ca. 18:05 · 30 Min.')).toBeInTheDocument();
       expect(screen.getByText('ca. 18:35')).toBeInTheDocument();
-      const end = container.querySelector('.ap__plan-end');
-      expect(end).toHaveTextContent('Ende ca. 18:35');
-      expect(end).not.toHaveClass('ap__plan-end--over');
+      expect(screen.queryByText(/Ende ca\./)).toBeNull();
+      expect(container.querySelector('.ap__over')).toBeNull();
     });
 
-    it('planRowsOverrun: marks an end after the end time of the meeting with the warning class only (§ 001144)', async () => {
+    it('planRowsOverrun: marks no overrun of the end time of the meeting (§ 001144)', async () => {
       const { container } = await setup({
         meeting: meeting({ status: 'planned', startTime: '18:00', endTime: '18:30' }),
         agenda: TIMED,
       });
-      const end = container.querySelector('.ap__plan-end');
-      expect(end).toHaveClass('ap__plan-end--over');
-      expect(end).toHaveTextContent(/^Ende ca\. 18:35$/);
+      expect(screen.getByText('ca. 18:35')).toBeInTheDocument();
+      expect(container.querySelector('.ap__over')).toBeNull();
+      expect(screen.queryByText(/Ende ca\./)).toBeNull();
     });
 
-    it('planRowsNoStart: shows only the durations and the sum without a start time (§ 001142)', async () => {
-      const { container } = await setup({ meeting: meeting({ status: 'planned', startTime: null }), agenda: TIMED });
+    it('planRowsNoStart: shows only the durations without a start time (§ 001142)', async () => {
+      await setup({ meeting: meeting({ status: 'planned', startTime: null }), agenda: TIMED });
       expect(screen.getByText('5 Min.')).toBeInTheDocument();
       expect(screen.queryByText(/ca\. \d\d:\d\d/)).toBeNull();
-      expect(container.querySelector('.ap__plan-end')).toHaveTextContent('Dauer ca. 35 Min.');
+      expect(screen.queryByText(/Dauer ca\./)).toBeNull();
     });
 
     it('planRowsLive: shows the recorded time of a reached item without "ca." (§ 001143)', async () => {
@@ -417,7 +418,7 @@ describe('AgendaPaneComponent', () => {
 
     it('planRowsNone: shows no plan without any duration (§ 001141)', async () => {
       const { container } = await setup({ meeting: meeting({ status: 'planned' }) });
-      expect(container.querySelector('.ap__plan-end')).toBeNull();
+      expect(container.querySelector('.ap__over')).toBeNull();
       expect(screen.queryByText(/ca\. \d\d:\d\d/)).toBeNull();
     });
 
@@ -495,17 +496,27 @@ describe('AgendaPaneComponent', () => {
       expect(document.querySelectorAll('.tn__chip')).toHaveLength(1);
     });
 
-    it('opens "Karte verknüpfen" for the TOP and leaves out the cards that link it', async () => {
+    it('§F/collaboration/links/001408: opens the one picker for the TOP and links the pick', async () => {
       const view = await setup({ savingAgenda: true }, true);
       const menu = await openMenu(2);
-      await userEvent.click(within(menu).getByRole('menuitem', { name: 'To-Do verknüpfen' }));
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'Verknüpfen' }));
       view.fixture.detectChanges();
-      const dialog = view.fixture.debugElement.query(By.directive(TodoLinkCardDialogComponent));
-      const cmp = dialog.componentInstance as TodoLinkCardDialogComponent;
-      expect(cmp.kind()).toBe('agenda_item');
-      expect(cmp.targetId()).toBe('t-3');
-      expect(cmp.exclude()).toEqual(['k-1']);
-      expect(TestBed.inject(TodosApiService).linked).toHaveBeenCalledWith('agenda_item', 't-3');
+      const picker = view.fixture.debugElement.query(By.directive(TodoLinkPickerComponent));
+      const cmp = picker.componentInstance as TodoLinkPickerComponent;
+      expect(cmp.open()).toBe(true);
+      expect(cmp.exclude()).toEqual({ kind: 'agenda_item', id: 't-3' });
+      const touch = jest.spyOn(TestBed.inject(TodoLinkedRefresh), 'touch');
+      cmp.picked.emit({ kind: 'invoice', targetId: 'i-1', title: 'RE-1', detail: {} });
+      expect(TestBed.inject(TodosApiService).link).toHaveBeenCalledWith(
+        { kind: 'agenda_item', id: 't-3' },
+        { kind: 'invoice', id: 'i-1' },
+      );
+      expect(touch).toHaveBeenCalledWith([
+        { kind: 'agenda_item', targetId: 't-3' },
+        { kind: 'invoice', targetId: 'i-1' },
+      ]);
+      view.fixture.detectChanges();
+      expect(cmp.open()).toBe(false);
     });
 
     it('is not offered without todo.write or without a gremium', async () => {

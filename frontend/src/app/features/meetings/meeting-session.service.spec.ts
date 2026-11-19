@@ -5,7 +5,10 @@ import { USE_MOCK_API } from '@core/api/api.config';
 import type { Meeting, Protocol } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { WsService } from '@core/ws/ws.service';
-import { EMPTY } from 'rxjs';
+import { EMPTY, Subject } from 'rxjs';
+import { PageResumeService } from '@core/browser/page-resume.service';
+import type { MeetingChannel } from '@core/ws/ws.service';
+import type { ServerMessage } from '@core/ws/ws-messages';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { MeetingAgendaService } from './meeting-agenda.service';
 import { MeetingSessionService } from './meeting-session.service';
@@ -536,5 +539,103 @@ describe('MeetingSessionService live body draft', () => {
     session.meeting.set(M({ status: 'live', protokollantId: null, canWrite: true, isProtokollant: false }));
     session['onLive'](draft(2, 'fremd'));
     expect(agenda.agenda()[0].body).toBe('eigen');
+  });
+});
+
+/** A live channel that the test drives: frames in, close out. */
+class FakeChannel implements MeetingChannel {
+  readonly subject = new Subject<ServerMessage>();
+  readonly messages$ = this.subject.asObservable();
+  closed = false;
+  send(): void {}
+  close(): void {
+    this.closed = true;
+  }
+}
+
+/** The real socket path (no mock API), with a fake socket and a return of the page by hand. */
+function liveSetup() {
+  const channels: FakeChannel[] = [];
+  const resume = new Subject<void>();
+  TestBed.configureTestingModule({
+    providers: [
+      provideHttpClient(),
+      provideHttpClientTesting(),
+      MeetingSessionService,
+      MeetingAgendaService,
+      { provide: USE_MOCK_API, useValue: false },
+      { provide: AuthService, useValue: { can: () => false, isAdmin: () => false } },
+      {
+        provide: WsService,
+        useValue: {
+          connectMeeting: () => {
+            const ch = new FakeChannel();
+            channels.push(ch);
+            return ch;
+          },
+        },
+      },
+      { provide: PageResumeService, useValue: { resume$: resume.asObservable() } },
+    ],
+  });
+  const http = TestBed.inject(HttpTestingController);
+  const session = TestBed.inject(MeetingSessionService);
+  session.meeting.set(M({ status: 'live', canWrite: false }));
+  session['connectLive']('m-1');
+  const reads = () => http.match((r) => r.method === 'GET').map((r) => r.request.url);
+  return { channels, resume, http, session, reads };
+}
+
+/** The live channel survives a drop and a return of the page (§F/meetings/meetings/001738, 001739). */
+describe('MeetingSessionService live channel', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('opens a dropped channel again after a wait and reads the state again', () => {
+    const { channels, session, reads } = liveSetup();
+    reads();
+    channels[0].subject.complete();
+    expect(channels).toHaveLength(1);
+    jest.advanceTimersByTime(1000);
+    expect(channels).toHaveLength(2);
+    expect(reads()).toEqual(expect.arrayContaining(['/api/meetings/m-1', '/api/meetings/m-1/agenda']));
+    channels[1].subject.next({ type: 'viewers', viewers: [{ id: 'p-9', name: 'A' }] });
+    expect(session.viewers()).toHaveLength(1);
+  });
+
+  it('stops after the last try and starts again on a return of the page', () => {
+    const { channels, resume, reads } = liveSetup();
+    for (let i = 0; i < 9; i += 1) {
+      channels[channels.length - 1].subject.complete();
+      jest.advanceTimersByTime(15_000);
+    }
+    expect(channels).toHaveLength(9);
+    reads();
+    resume.next();
+    expect(channels).toHaveLength(10);
+    expect(reads()).toEqual(expect.arrayContaining(['/api/meetings/m-1']));
+  });
+
+  it('drops the old socket on a return of the page, opens a new one and reads again', () => {
+    const { channels, resume, session, reads } = liveSetup();
+    reads();
+    resume.next();
+    expect(channels).toHaveLength(2);
+    expect(channels[0].closed).toBe(true);
+    expect(reads()).toEqual(expect.arrayContaining(['/api/meetings/m-1', '/api/meetings/m-1/agenda']));
+    channels[0].subject.next({ type: 'viewers', viewers: [{ id: 'p-9', name: 'A' }] });
+    channels[0].subject.complete();
+    jest.advanceTimersByTime(15_000);
+    expect(session.viewers()).toHaveLength(0);
+    expect(channels).toHaveLength(2);
+  });
+
+  it('does not open a channel after the page is gone', () => {
+    const { channels, resume, session } = liveSetup();
+    session.ngOnDestroy();
+    channels[0].subject.complete();
+    jest.advanceTimersByTime(15_000);
+    resume.next();
+    expect(channels).toHaveLength(1);
   });
 });
