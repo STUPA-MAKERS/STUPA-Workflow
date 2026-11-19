@@ -2,7 +2,7 @@
 id: "001280"
 title: The Gremien list shows its skeleton until the logos have loaded
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:
