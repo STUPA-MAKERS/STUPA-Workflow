@@ -1,14 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import {
-  HttpClient,
-  HttpParams,
-  provideHttpClient,
-  withInterceptors,
-} from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpClient, HttpParams, provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { firstValueFrom } from 'rxjs';
 import { ApiClient } from './api-client.service';
 import { USE_MOCK_API } from './api.config';
@@ -47,7 +39,9 @@ describe('mockApiInterceptor', () => {
       'adrian.becker@example.org',
       'mara@example.org',
     ]);
-    await expect(firstValueFrom(api.addApplicationObserver(app, 'MARA@example.org'))).rejects.toMatchObject({
+    await expect(
+      firstValueFrom(api.addApplicationObserver(app, 'MARA@example.org')),
+    ).rejects.toMatchObject({
       status: 409,
       error: { code: 'observer_exists' },
     });
@@ -55,10 +49,14 @@ describe('mockApiInterceptor', () => {
     expect(await firstValueFrom(api.applicationObservers(app))).toHaveLength(1);
     await expect(firstValueFrom(api.endObservation('o1.sig'))).resolves.toBeNull();
     await expect(firstValueFrom(api.endObservation('cut'))).rejects.toMatchObject({ status: 404 });
-    const observed = await firstValueFrom(api.getApplication('4f8a03b6-0000-4000-8000-000000000002'));
+    const observed = await firstValueFrom(
+      api.getApplication('4f8a03b6-0000-4000-8000-000000000002'),
+    );
     expect([observed.observer, observed.submittedBy]).toEqual([true, 'Luis Meyer']);
     const items = (await firstValueFrom(api.applicantApplications())).items;
-    expect(items.filter((i) => i.observed).map((i) => i.title)).toEqual(['Technik für das Sommerfest']);
+    expect(items.filter((i) => i.observed).map((i) => i.title)).toEqual([
+      'Technik für das Sommerfest',
+    ]);
   });
 
   it('marks the second demo row observed with mockObserver', async () => {
@@ -67,7 +65,9 @@ describe('mockApiInterceptor', () => {
     try {
       const page = await firstValueFrom(api.listApplications({}));
       expect(page.items.filter((i) => i.observed).length).toBe(1);
-      const detail = await firstValueFrom(api.getApplication('a1000000-0000-0000-0000-000000000002'));
+      const detail = await firstValueFrom(
+        api.getApplication('a1000000-0000-0000-0000-000000000002'),
+      );
       expect([detail.observer, detail.applicant, detail.canEdit]).toEqual([true, null, false]);
     } finally {
       localStorage.removeItem('mockObserver');
@@ -159,12 +159,16 @@ describe('mockApiInterceptor', () => {
   it('answers a draft upload without a form body with a default file', async () => {
     const { http } = setup(true);
     const client = TestBed.inject(HttpClient);
-    const res = await firstValueFrom(client.post<Record<string, unknown>>('/api/apply/attachments', {}));
+    const res = await firstValueFrom(
+      client.post<Record<string, unknown>>('/api/apply/attachments', {}),
+    );
     expect(res).toMatchObject({ mime: 'application/pdf', size: 1024 });
     expect(String(res['filename'])).toMatch(/^datei-\d+\.pdf$/);
     const form = new FormData();
     form.append('file', new File(['x'], 'ohne-typ'));
-    const typeless = await firstValueFrom(client.post<Record<string, unknown>>('/api/apply/attachments', form));
+    const typeless = await firstValueFrom(
+      client.post<Record<string, unknown>>('/api/apply/attachments', form),
+    );
     expect(typeless['mime']).toBe('application/pdf');
     http.verify();
   });
@@ -174,14 +178,20 @@ describe('mockApiInterceptor', () => {
     const client = TestBed.inject(HttpClient);
     const form = new FormData();
     form.append('file', new File(['xy'], 'a.webp', { type: 'image/webp' }));
-    const res = await firstValueFrom(client.post<Record<string, unknown>>('/api/media/images', form));
+    const res = await firstValueFrom(
+      client.post<Record<string, unknown>>('/api/media/images', form),
+    );
     expect(res).toMatchObject({ mime: 'image/webp', size: 2 });
     expect(String(res['url'])).toMatch(/^\/api\/media\/images\/[0-9a-f-]{36}$/);
-    const bare = await firstValueFrom(client.post<Record<string, unknown>>('/api/media/images', {}));
+    const bare = await firstValueFrom(
+      client.post<Record<string, unknown>>('/api/media/images', {}),
+    );
     expect(bare).toMatchObject({ mime: 'image/png', size: 1024 });
     const typeless = new FormData();
     typeless.append('file', new File(['x'], 'ohne'));
-    const t = await firstValueFrom(client.post<Record<string, unknown>>('/api/media/images', typeless));
+    const t = await firstValueFrom(
+      client.post<Record<string, unknown>>('/api/media/images', typeless),
+    );
     expect(t['mime']).toBe('image/png');
     http.verify();
   });
@@ -294,7 +304,9 @@ describe('mockApiInterceptor', () => {
     });
 
     it('GET /committees/{id}/meeting-defaults → a quorum for the StuPa, a guest ballot elsewhere', async () => {
-      expect(await get('/api/committees/g0000000-0000-0000-0000-000000000001/meeting-defaults')).toEqual({
+      expect(
+        await get('/api/committees/g0000000-0000-0000-0000-000000000001/meeting-defaults'),
+      ).toEqual({
         guestsVoteAllowed: false,
         quorumPercent: 50,
         inviteDaysOrdinary: 7,
@@ -314,12 +326,16 @@ describe('mockApiInterceptor', () => {
     });
 
     it('GET /site-config → the platform defaults; the admin config is not this route', async () => {
-      const cfg = await get<{ linkTtlDays: number | null; confirmTtlHours: number }>('/api/site-config');
+      const cfg = await get<{ linkTtlDays: number | null; confirmTtlHours: number }>(
+        '/api/site-config',
+      );
       expect(cfg).toMatchObject({ linkTtlDays: null, confirmTtlHours: 12 });
     });
 
     it('GET the attachments of the magic-link demo application', async () => {
-      const list = await get<unknown[]>('/api/applications/33333333-3333-3333-3333-333333333333/attachments');
+      const list = await get<unknown[]>(
+        '/api/applications/33333333-3333-3333-3333-333333333333/attachments',
+      );
       expect(list).toHaveLength(3);
     });
 
@@ -360,7 +376,10 @@ describe('mockApiInterceptor', () => {
       expect(sub.items.length).toBeGreaterThan(0);
       expect(sub.items.every((e) => /0000000000(2\d)$/.test(e.budgetId))).toBe(true);
 
-      const searched = await get<{ items: E[] }>('/api/expenses', new HttpParams().set('q', 'turnier'));
+      const searched = await get<{ items: E[] }>(
+        '/api/expenses',
+        new HttpParams().set('q', 'turnier'),
+      );
       expect(searched.items.length).toBe(2);
 
       const paged = await get<{ items: E[]; offset: number }>(
@@ -390,7 +409,10 @@ describe('mockApiInterceptor', () => {
       const all = await get<{ items: I[] }>('/api/invoices');
       expect(all.items.some((i) => i.linkedBookings.length > 1)).toBe(true);
       expect(all.items.some((i) => i.linkedBookings.length === 0)).toBe(true);
-      const open = await get<{ items: I[] }>('/api/invoices', new HttpParams().set('status', 'open'));
+      const open = await get<{ items: I[] }>(
+        '/api/invoices',
+        new HttpParams().set('status', 'open'),
+      );
       expect(open.items.every((i) => i.status === 'open')).toBe(true);
       const byId = await get<{ items: I[] }>(
         '/api/invoices',
@@ -416,7 +438,9 @@ describe('mockApiInterceptor', () => {
         new HttpParams().set('status', 'open').set('booked', 'false'),
       );
       expect(inbox.items).toHaveLength(c.inbox);
-      expect(inbox.items.every((i) => i.status === 'open' && i.linkedBookings.length === 0)).toBe(true);
+      expect(inbox.items.every((i) => i.status === 'open' && i.linkedBookings.length === 0)).toBe(
+        true,
+      );
       const booked = await get<P>(
         '/api/invoices',
         new HttpParams().set('status', 'open').set('booked', 'true'),
@@ -444,14 +468,21 @@ describe('mockApiInterceptor', () => {
      * One node inherits its colour: it has none of its own under a coloured parent.
      */
     it('GET /budgets → the demo tree with consistent rollups', async () => {
-      type N = { id: string; pathKey: string; color: string | null; children: N[];
-        byFiscalYear: { allocated: string; committed: string; income: string; available: string }[] };
+      type N = {
+        id: string;
+        pathKey: string;
+        color: string | null;
+        children: N[];
+        byFiscalYear: { allocated: string; committed: string; income: string; available: string }[];
+      };
       const tree = await get<N[]>('/api/budgets');
       expect(tree).toHaveLength(1);
       const root = tree[0];
       expect(root.children[1].children[0].pathKey).toBe('HH-200210');
       const a = root.byFiscalYear[0];
-      expect(Number(a.available)).toBe(Number(a.allocated) - Number(a.committed) + Number(a.income));
+      expect(Number(a.available)).toBe(
+        Number(a.allocated) - Number(a.committed) + Number(a.income),
+      );
       const gestaltung = root.children[1].children[2];
       expect(gestaltung.color).toMatch(/^#/);
       expect(gestaltung.children[0].color).toBeNull();
@@ -487,7 +518,13 @@ describe('mockApiInterceptor', () => {
     });
 
     describe('demo applications (mock-applications.ts)', () => {
-      type Row = { id: string; title: string; amount: string | null; archivedAt: string | null; state: { id: string; key: string } };
+      type Row = {
+        id: string;
+        title: string;
+        amount: string | null;
+        archivedAt: string | null;
+        state: { id: string; key: string };
+      };
       const first = 'a1000000-0000-0000-0000-000000000001';
       const second = 'a1000000-0000-0000-0000-000000000002';
 
@@ -509,7 +546,9 @@ describe('mockApiInterceptor', () => {
         expect(page.items.every((r) => [review, agenda].includes(r.state.id))).toBe(true);
         expect(page.items.length).toBe(7);
 
-        params = new HttpParams().set('type', '22222222-2222-2222-2222-222222222222').set('q', 'zur');
+        params = new HttpParams()
+          .set('type', '22222222-2222-2222-2222-222222222222')
+          .set('q', 'zur');
         page = await get<{ items: Row[] }>('/api/applications', params);
         expect(page.items.map((r) => r.title)).toEqual([
           'Anreise zur Bundeskonferenz der Studierendenschaften',
@@ -518,7 +557,9 @@ describe('mockApiInterceptor', () => {
 
         params = new HttpParams().set('amountMin', '1000').set('amountMax', '2000');
         page = await get<{ items: Row[] }>('/api/applications', params);
-        expect(page.items.every((r) => Number(r.amount) >= 1000 && Number(r.amount) <= 2000)).toBe(true);
+        expect(page.items.every((r) => Number(r.amount) >= 1000 && Number(r.amount) <= 2000)).toBe(
+          true,
+        );
 
         params = new HttpParams().set('createdFrom', '2026-08-01').set('createdTo', '2026-08-31');
         page = await get<{ items: Row[] }>('/api/applications', params);
@@ -534,10 +575,15 @@ describe('mockApiInterceptor', () => {
       /** An own submission carries no capture; the demo row 2 was captured per PDF. */
       it('Searches the accounts and captures a new row on top', async () => {
         let params = new HttpParams().set('q', 'AN');
-        const hits = await get<{ displayName: string }[]>('/api/applications/on-behalf/applicants', params);
+        const hits = await get<{ displayName: string }[]>(
+          '/api/applications/on-behalf/applicants',
+          params,
+        );
         expect(hits.map((h) => h.displayName)).toEqual(['Anna Antrag', 'Anton Albers']);
         params = new HttpParams();
-        expect(await get<unknown[]>('/api/applications/on-behalf/applicants', params)).toHaveLength(3);
+        expect(await get<unknown[]>('/api/applications/on-behalf/applicants', params)).toHaveLength(
+          3,
+        );
 
         const created = await firstValueFrom(
           http.post<{ applicationId: string }>('/api/applications/on-behalf', {
@@ -570,9 +616,10 @@ describe('mockApiInterceptor', () => {
         );
         expect(plain.capture).toMatchObject({ receivedOn: null, intake: null });
         expect((await get<{ capture: unknown }>(`/api/applications/${first}`)).capture).toBeNull();
-        expect((await get<{ capture: { intake: string } }>(`/api/applications/${second}`)).capture.intake).toBe(
-          'per PDF',
-        );
+        expect(
+          (await get<{ capture: { intake: string } }>(`/api/applications/${second}`)).capture
+            .intake,
+        ).toBe('per PDF');
       });
 
       it('sorts by amount and by date in both directions and pages', async () => {
@@ -583,15 +630,20 @@ describe('mockApiInterceptor', () => {
         page = await get<{ items: Row[] }>('/api/applications', params);
         expect(page.items[0].amount).toBeNull();
         params = new HttpParams().set('order', 'asc').set('limit', '5').set('offset', '5');
-        const paged = await get<{ items: Row[]; offset: number; limit: number }>('/api/applications', params);
+        const paged = await get<{ items: Row[]; offset: number; limit: number }>(
+          '/api/applications',
+          params,
+        );
         expect(paged.items).toHaveLength(5);
         expect(paged.offset).toBe(5);
       });
 
       it('GET the detail, its transitions, attachments and flow states', async () => {
-        const app = await get<{ id: string; data: Record<string, unknown>; applicant: { name: string } }>(
-          `/api/applications/${first}`,
-        );
+        const app = await get<{
+          id: string;
+          data: Record<string, unknown>;
+          applicant: { name: string };
+        }>(`/api/applications/${first}`);
         expect(app.id).toBe(first);
         expect(app.applicant.name).toBeTruthy();
         expect(await get<unknown[]>(`/api/applications/${first}/transitions`)).toEqual([]);
@@ -607,7 +659,9 @@ describe('mockApiInterceptor', () => {
       /** An approved row without a decision has none. */
       it('Serves the decision of a decided row in the detail and the timeline', async () => {
         const decided = 'a1000000-0000-0000-0000-000000000016';
-        const app = await get<{ decision: Record<string, unknown> }>(`/api/applications/${decided}`);
+        const app = await get<{ decision: Record<string, unknown> }>(
+          `/api/applications/${decided}`,
+        );
         expect(app.decision).toEqual({
           requestedAmount: '820.00',
           approvedAmount: '700.00',
@@ -622,14 +676,18 @@ describe('mockApiInterceptor', () => {
           meetingTitle: '34. Sitzung',
           agendaPosition: 6,
         });
-        const timeline = await get<{ decision: unknown }[]>(`/api/applications/${decided}/timeline`);
+        const timeline = await get<{ decision: unknown }[]>(
+          `/api/applications/${decided}/timeline`,
+        );
         expect(timeline[timeline.length - 1].decision).toEqual({
           requestedAmount: '820.00',
           approvedAmount: '700.00',
           amountDeviates: true,
           conditionCount: 2,
         });
-        const plain = await get<{ decision: unknown }>('/api/applications/a1000000-0000-0000-0000-000000000013');
+        const plain = await get<{ decision: unknown }>(
+          '/api/applications/a1000000-0000-0000-0000-000000000013',
+        );
         expect(plain.decision).toBeNull();
       });
 
@@ -642,7 +700,9 @@ describe('mockApiInterceptor', () => {
         type Detail = { state: { key: string }; decision: Record<string, unknown> | null };
         type Event = { note: string | null; decision: Record<string, unknown> | null };
         const asked = 'a1000000-0000-0000-0000-000000000004';
-        const transitions = await get<{ id: string; allowsDecision: boolean }[]>(`/api/applications/${asked}/transitions`);
+        const transitions = await get<{ id: string; allowsDecision: boolean }[]>(
+          `/api/applications/${asked}/transitions`,
+        );
         expect(transitions.filter((t) => t.allowsDecision).map((t) => t.id)).toEqual([approve]);
         await firstValueFrom(
           http.post(`/api/applications/${asked}/transition`, {
@@ -669,8 +729,12 @@ describe('mockApiInterceptor', () => {
         });
 
         const noAmount = 'a1000000-0000-0000-0000-000000000015';
-        const toReview = (await get<{ id: string }[]>(`/api/applications/${noAmount}/transitions`))[0];
-        await firstValueFrom(http.post(`/api/applications/${noAmount}/transition`, { transitionId: toReview.id }));
+        const toReview = (
+          await get<{ id: string }[]>(`/api/applications/${noAmount}/transitions`)
+        )[0];
+        await firstValueFrom(
+          http.post(`/api/applications/${noAmount}/transition`, { transitionId: toReview.id }),
+        );
         await firstValueFrom(
           http.post(`/api/applications/${noAmount}/transition`, {
             transitionId: approve,
@@ -684,7 +748,9 @@ describe('mockApiInterceptor', () => {
         });
 
         const without = 'a1000000-0000-0000-0000-000000000014';
-        await firstValueFrom(http.post(`/api/applications/${without}/transition`, { transitionId: approve }));
+        await firstValueFrom(
+          http.post(`/api/applications/${without}/transition`, { transitionId: approve }),
+        );
         expect((await get<Detail>(`/api/applications/${without}`)).decision).toBeNull();
         const last = (await get<Event[]>(`/api/applications/${without}/timeline`)).pop();
         expect(last?.decision).toBeNull();
@@ -693,7 +759,9 @@ describe('mockApiInterceptor', () => {
       });
 
       it('answers 404 for an unknown demo id', async () => {
-        await expect(get('/api/applications/a1000000-0000-0000-0000-000000009999')).rejects.toMatchObject({
+        await expect(
+          get('/api/applications/a1000000-0000-0000-0000-000000009999'),
+        ).rejects.toMatchObject({
           status: 404,
         });
       });
@@ -704,36 +772,52 @@ describe('mockApiInterceptor', () => {
        */
       it('fires a transition, archives, forces a state, edits and deletes a demo row', async () => {
         const start = (await get<{ id: string }[]>(`/api/applications/${second}/transitions`))[0];
-        await firstValueFrom(http.post(`/api/applications/${second}/transition`, { transitionId: start.id }));
+        await firstValueFrom(
+          http.post(`/api/applications/${second}/transition`, { transitionId: start.id }),
+        );
         expect((await get<Row>(`/api/applications/${second}`)).state.key).toBe('review');
-        await firstValueFrom(http.post(`/api/applications/${second}/transition`, { transitionId: 'x' }));
+        await firstValueFrom(
+          http.post(`/api/applications/${second}/transition`, { transitionId: 'x' }),
+        );
         expect((await get<Row>(`/api/applications/${second}`)).state.key).toBe('review');
 
-        const archived = await firstValueFrom(http.post<Row>(`/api/applications/${second}/archive`, {}));
+        const archived = await firstValueFrom(
+          http.post<Row>(`/api/applications/${second}/archive`, {}),
+        );
         expect(archived.archivedAt).toBeTruthy();
         const back = await firstValueFrom(http.delete<Row>(`/api/applications/${second}/archive`));
         expect(back.archivedAt).toBeNull();
 
         await firstValueFrom(
-          http.post(`/api/applications/${second}/force-status`, { stateId: '66666666-6666-6666-6666-666666666666' }),
+          http.post(`/api/applications/${second}/force-status`, {
+            stateId: '66666666-6666-6666-6666-666666666666',
+          }),
         );
         expect((await get<Row>(`/api/applications/${second}`)).state.key).toBe('approved');
-        await firstValueFrom(http.post(`/api/applications/${second}/force-status`, { stateId: 'nope' }));
+        await firstValueFrom(
+          http.post(`/api/applications/${second}/force-status`, { stateId: 'nope' }),
+        );
         expect((await get<Row>(`/api/applications/${second}`)).state.key).toBe('approved');
 
         const edited = await firstValueFrom(
-          http.patch<{ title: string; version: number; data: { title: string } }>(`/api/applications/${second}`, {
-            data: { title: ' Neuer Titel ' },
-          }),
+          http.patch<{ title: string; version: number; data: { title: string } }>(
+            `/api/applications/${second}`,
+            {
+              data: { title: ' Neuer Titel ' },
+            },
+          ),
         );
         expect(edited.data.title).toBe(' Neuer Titel ');
         expect(edited.version).toBe(3);
         await firstValueFrom(http.patch(`/api/applications/${second}`, { data: { title: '  ' } }));
-        const list = await get<{ items: Row[] }>('/api/applications', new HttpParams().set('archived', 'all'));
-        expect(list.items.find((r) => r.id === second)?.title).toBe('Neuer Titel');
-        const versions = await get<{ version: number; diff: { changed: Record<string, unknown> } }[]>(
-          `/api/applications/${second}/versions`,
+        const list = await get<{ items: Row[] }>(
+          '/api/applications',
+          new HttpParams().set('archived', 'all'),
         );
+        expect(list.items.find((r) => r.id === second)?.title).toBe('Neuer Titel');
+        const versions = await get<
+          { version: number; diff: { changed: Record<string, unknown> } }[]
+        >(`/api/applications/${second}/versions`);
         expect(versions.map((v) => v.version)).toEqual([1, 2, 3, 4]);
         expect(Object.keys(versions[2].diff.changed)).toContain('title');
 
@@ -746,6 +830,60 @@ describe('mockApiInterceptor', () => {
        * only, and an approved row went through "Bewilligen". A row without an amount has no cost
        * positions.
        */
+      /** § 001660-001663: the demo preview and the change of the Antragsart. */
+      it('previews and changes the Antragsart of a demo row', async () => {
+        type Field = { key: string };
+        type Preview = {
+          missing: Field[];
+          carried: Field[];
+          transitions: { id: string }[];
+          possible: boolean;
+        };
+        type Version = { typeChange?: { fromType: unknown; toType: unknown } | null };
+        const qsm = '22222222-2222-2222-2222-222222222223';
+        const noAmount = 'a1000000-0000-0000-0000-000000000015';
+        const preview = (id: string, typeId?: string) =>
+          get<Preview>(
+            `/api/applications/${id}/type-change`,
+            typeId ? new HttpParams({ fromObject: { typeId } }) : undefined,
+          );
+
+        const back = await preview(first, qsm);
+        expect(back.missing.map((f) => f.key)).toEqual(['funding', 'period']);
+        expect(back.transitions).toHaveLength(1);
+        expect(back.possible).toBe(true);
+        expect((await preview(second, qsm)).possible).toBe(false);
+        const plain = await preview(noAmount, '11111111-1111-1111-1111-111111111111');
+        expect(plain.missing).toEqual([]);
+        expect(plain.carried.map((f) => f.key)).not.toContain('costs');
+        expect((await preview(first)).transitions).toEqual([]);
+
+        await firstValueFrom(
+          http.post(`/api/applications/${first}/type-change`, {
+            typeId: qsm,
+            transitionId: back.transitions[0].id,
+            note: 'Bitte ergänzen.',
+          }),
+        );
+        expect((await get<Row>(`/api/applications/${first}`)).state.key).toBe('submitted');
+        const versions = await get<Version[]>(`/api/applications/${first}/versions`);
+        expect(versions[versions.length - 1].typeChange?.toType).toEqual({
+          de: 'Projektantrag: QSM',
+          en: 'Project application: QSM',
+        });
+
+        await firstValueFrom(http.post(`/api/applications/${noAmount}/type-change`, null));
+        const kept = await get<Version[]>(`/api/applications/${noAmount}/versions`);
+        expect(kept[kept.length - 1].typeChange?.fromType).toEqual(
+          kept[kept.length - 1].typeChange?.toType,
+        );
+        await firstValueFrom(
+          http.post(`/api/applications/${second}/type-change`, { typeId: 'unknown' }),
+        );
+        const unknown = await get<Version[]>(`/api/applications/${second}/versions`);
+        expect(unknown[unknown.length - 1].typeChange?.toType).toBeNull();
+      });
+
       it('serves the form, the history and the versions of a demo row', async () => {
         const form = await get<{ sections: { key: string }[] }>(`/api/applications/${first}/form`);
         expect(form.sections.map((s) => s.key)).toEqual(['plan', 'costs_section', 'contact']);
@@ -760,7 +898,9 @@ describe('mockApiInterceptor', () => {
         expect(timeline.map((e) => e.toState.key)).toEqual(['submitted', 'review', 'agenda']);
         expect(timeline[0].transitionLabel).toBeNull();
         expect(await get<unknown[]>(`/api/applications/${first}/versions`)).toHaveLength(2);
-        expect(await get<unknown[]>('/api/applications/a1000000-0000-0000-0000-000000000003/versions')).toHaveLength(1);
+        expect(
+          await get<unknown[]>('/api/applications/a1000000-0000-0000-0000-000000000003/versions'),
+        ).toHaveLength(1);
         const approved = await get<{ transitionLabel: { de: string } | null }[]>(
           '/api/applications/a1000000-0000-0000-0000-000000000010/timeline',
         );
@@ -772,8 +912,13 @@ describe('mockApiInterceptor', () => {
       });
 
       it('answers 422 for a cost position without any offer', async () => {
-        const data = { title: 'x', costs: [{ label: 'A', noOffers: true, noOffersReason: 'r', offers: [] }, { label: 'B' }] };
-        await expect(firstValueFrom(http.patch(`/api/applications/${second}`, { data }))).rejects.toMatchObject({
+        const data = {
+          title: 'x',
+          costs: [{ label: 'A', noOffers: true, noOffersReason: 'r', offers: [] }, { label: 'B' }],
+        };
+        await expect(
+          firstValueFrom(http.patch(`/api/applications/${second}`, { data })),
+        ).rejects.toMatchObject({
           status: 422,
           error: { errors: [{ field: 'costs[0]' }] },
         });
@@ -790,7 +935,12 @@ describe('mockApiInterceptor', () => {
         expect(meetings.every((m) => m.status === 'planned')).toBe(true);
         const [agenda] = await get<{ id: string }[]>(`/api/applications/${review}/transitions`);
         await expect(
-          firstValueFrom(http.post(`/api/applications/${review}/transition`, { transitionId: agenda.id, meetingId: 'gone' })),
+          firstValueFrom(
+            http.post(`/api/applications/${review}/transition`, {
+              transitionId: agenda.id,
+              meetingId: 'gone',
+            }),
+          ),
         ).rejects.toMatchObject({ status: 422, error: { code: 'agenda_meeting_invalid' } });
         await firstValueFrom(
           http.post(`/api/applications/${review}/transition`, {
@@ -807,8 +957,13 @@ describe('mockApiInterceptor', () => {
         expect(timeline.at(-1)?.note).toBe(`${meetings[0].title} · Bitte vorziehen`);
         const second2 = 'a1000000-0000-0000-0000-000000000002';
         const [start] = await get<{ id: string }[]>(`/api/applications/${second2}/transitions`);
-        await firstValueFrom(http.post(`/api/applications/${second2}/transition`, { transitionId: start.id }));
-        expect((await get<{ note: string | null }[]>(`/api/applications/${second2}/timeline`)).at(-1)?.note).toBeNull();
+        await firstValueFrom(
+          http.post(`/api/applications/${second2}/transition`, { transitionId: start.id }),
+        );
+        expect(
+          (await get<{ note: string | null }[]>(`/api/applications/${second2}/timeline`)).at(-1)
+            ?.note,
+        ).toBeNull();
       });
 
       it('answers 404 for a write it does not know', async () => {
@@ -827,9 +982,12 @@ describe('mockApiInterceptor', () => {
     });
 
     it('GET /votes/{id} of a closed demo meeting → its closed result', async () => {
-      const v = await get<{ status: string; result: string; meetingId: string; agendaItemId: string }>(
-        '/api/votes/a0000000-0000-0000-0000-000000000101',
-      );
+      const v = await get<{
+        status: string;
+        result: string;
+        meetingId: string;
+        agendaItemId: string;
+      }>('/api/votes/a0000000-0000-0000-0000-000000000101');
       expect(v).toMatchObject({
         status: 'closed',
         result: 'passed',
@@ -849,45 +1007,72 @@ describe('mockApiInterceptor', () => {
     /** §F/meetings/voting/000932: the own cast counts for the represented member too. */
     it('POST /votes/{id}/ballot keeps the ballots and refuses a second one', async () => {
       const cast = (body: unknown, id = 'vote-ballots') =>
-        firstValueFrom(http.post<{ status: string; ballots: number }>(`/api/votes/${id}/ballot`, body));
+        firstValueFrom(
+          http.post<{ status: string; ballots: number }>(`/api/votes/${id}/ballot`, body),
+        );
       expect(await cast({ choice: 'no' })).toEqual({ status: 'cast', ballots: 2 });
       await expect(cast({ choice: 'yes' })).rejects.toMatchObject({
         status: 409,
         error: { code: 'already_voted' },
       });
       await expect(cast({ asDelegation: true })).rejects.toMatchObject({ status: 409 });
-      const v = await get<{ myBallot: { cast: boolean; choice: string }; representedCast: boolean; tally: { voted: number } }>(
-        '/api/votes/vote-ballots',
-      );
+      const v = await get<{
+        myBallot: { cast: boolean; choice: string };
+        representedCast: boolean;
+        tally: { voted: number };
+      }>('/api/votes/vote-ballots');
       expect(v.myBallot).toEqual({ cast: true, choice: 'no' });
       expect(v.representedCast).toBe(true);
       expect(v.tally.voted).toBe(10);
-      expect(await cast({ asDelegation: true }, 'vote-proxy-first')).toEqual({ status: 'cast', ballots: 1 });
-      expect(await cast({ choice: 'yes' }, 'vote-proxy-first')).toEqual({ status: 'cast', ballots: 1 });
+      expect(await cast({ asDelegation: true }, 'vote-proxy-first')).toEqual({
+        status: 'cast',
+        ballots: 1,
+      });
+      expect(await cast({ choice: 'yes' }, 'vote-proxy-first')).toEqual({
+        status: 'cast',
+        ballots: 1,
+      });
     });
 
     it('POST /votes/{id}/ballot without a body still counts', async () => {
-      const res = await firstValueFrom(http.post<{ status: string }>('/api/votes/vote-empty/ballot', null));
+      const res = await firstValueFrom(
+        http.post<{ status: string }>('/api/votes/vote-empty/ballot', null),
+      );
       expect(res.status).toBe('cast');
     });
 
     describe('vote list (mock-votes.ts)', () => {
-      type Row = { id: string; status: string; myBallot: { cast: boolean; choice: string | null }; meetingTitle: string | null };
+      type Row = {
+        id: string;
+        status: string;
+        myBallot: { cast: boolean; choice: string | null };
+        meetingTitle: string | null;
+      };
       type VotePage = { items: Row[]; total: number; limit: number; offset: number };
       const list = (params = new HttpParams()) => get<VotePage>('/api/votes', params);
 
       /** The ended votes follow by the time they ended, the newest first. */
       it('GET /votes → the open votes first, without the drafts', async () => {
         const page = await list();
-        expect(page.items.map((r) => r.status)).toEqual(['open', 'open', 'closed', 'cancelled', 'closed']);
-        expect(page.items.find((r) => r.id === 'vote-demo')?.meetingTitle).toBe('STUPA-Sitzung 12.06.');
+        expect(page.items.map((r) => r.status)).toEqual([
+          'open',
+          'open',
+          'closed',
+          'cancelled',
+          'closed',
+        ]);
+        expect(page.items.find((r) => r.id === 'vote-demo')?.meetingTitle).toBe(
+          'STUPA-Sitzung 12.06.',
+        );
         expect(page.total).toBe(5);
       });
 
       it('filters by status, gremium and search, and pages', async () => {
         const drafts = await list(new HttpParams().append('status', 'draft'));
         expect(drafts.items.map((r) => r.id)).toEqual(['b0000000-0000-0000-0000-000000000002']);
-        const hha = await list(new HttpParams().set('gremiumId', 'g0000000-0000-0000-0000-000000000002'));
+        const hha = await list(
+          new HttpParams().set('gremiumId', 'g0000000-0000-0000-0000-000000000002'),
+        );
         expect(hha.total).toBe(2);
         const found = await list(new HttpParams().set('q', 'campuszeitung'));
         expect(found.items.map((r) => r.status)).toEqual(['cancelled']);
@@ -900,11 +1085,14 @@ describe('mockApiInterceptor', () => {
 
       it('shows the ballots of this mock session in the rows and the detail', async () => {
         const id = 'b0000000-0000-0000-0000-000000000001';
-        expect((await get<{ myBallot: { cast: boolean } }>(`/api/votes/${id}`)).myBallot.cast).toBe(false);
-        await firstValueFrom(http.post(`/api/votes/${id}/ballot`, { choice: 'no' }));
-        const detail = await get<{ myBallot: { cast: boolean; choice: string }; tally: { voted: number } }>(
-          `/api/votes/${id}`,
+        expect((await get<{ myBallot: { cast: boolean } }>(`/api/votes/${id}`)).myBallot.cast).toBe(
+          false,
         );
+        await firstValueFrom(http.post(`/api/votes/${id}/ballot`, { choice: 'no' }));
+        const detail = await get<{
+          myBallot: { cast: boolean; choice: string };
+          tally: { voted: number };
+        }>(`/api/votes/${id}`);
         expect(detail.myBallot).toEqual({ cast: true, choice: 'no' });
         expect(detail.tally.voted).toBe(5);
         const row = (await list()).items.find((r) => r.id === id);
@@ -915,16 +1103,18 @@ describe('mockApiInterceptor', () => {
       it('keeps the choice of a secret vote out of the row', async () => {
         const id = 'b0000000-0000-0000-0000-000000000003';
         await firstValueFrom(http.post(`/api/votes/${id}/ballot`, { choice: 'yes' }));
-        const row = (await list(new HttpParams().append('status', 'closed'))).items.find((r) => r.id === id);
+        const row = (await list(new HttpParams().append('status', 'closed'))).items.find(
+          (r) => r.id === id,
+        );
         expect(row?.myBallot).toEqual({ cast: true, choice: null });
         const detail = await get<{ tally: { voted: number } }>(`/api/votes/${id}`);
         expect(detail.tally.voted).toBe(4);
       });
 
       it('answers 404 for an unknown demo vote', async () => {
-        await expect(
-          get('/api/votes/b0000000-0000-0000-0000-000000000099'),
-        ).rejects.toMatchObject({ status: 404 });
+        await expect(get('/api/votes/b0000000-0000-0000-0000-000000000099')).rejects.toMatchObject({
+          status: 404,
+        });
       });
     });
 
@@ -1027,10 +1217,9 @@ describe('mockApiInterceptor', () => {
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
       };
       const range = new HttpParams().set('dateFrom', day(-10)).set('dateTo', day(15));
-      const rows = await get<{ title: string; status: string; date: string; agendaItemCount?: number }[]>(
-        '/api/meetings',
-        range,
-      );
+      const rows = await get<
+        { title: string; status: string; date: string; agendaItemCount?: number }[]
+      >('/api/meetings', range);
       expect(rows.map((m) => m.title).sort()).toEqual([
         '12. Sitzung des Haushaltsausschusses',
         '33. Sitzung des Studierendenparlaments',
@@ -1062,11 +1251,15 @@ describe('mockApiInterceptor', () => {
       const stupa = new HttpParams().set('gremiumId', 'g0000000-0000-0000-0000-000000000001');
       const before = await get<Row[]>('/api/delegations/substitutes', stupa);
       expect(before.map((r) => r.substituteId)).toEqual(['p-12', 'p-3']);
-      expect(await get<Row[]>('/api/delegations/substitutes', new HttpParams().set('gremiumId', 'g-x'))).toEqual([]);
+      expect(
+        await get<Row[]>('/api/delegations/substitutes', new HttpParams().set('gremiumId', 'g-x')),
+      ).toEqual([]);
       const body = { gremiumId: 'g0000000-0000-0000-0000-000000000001', substituteId: 'p-5' };
       const added = await firstValueFrom(http.post<Row>('/api/delegations/substitutes', body));
       expect(added).toMatchObject({ memberId: null, substituteId: 'p-5' });
-      await expect(firstValueFrom(http.post('/api/delegations/substitutes', body))).rejects.toMatchObject({
+      await expect(
+        firstValueFrom(http.post('/api/delegations/substitutes', body)),
+      ).rejects.toMatchObject({
         status: 409,
       });
       const forOne = await firstValueFrom(
@@ -1160,7 +1353,9 @@ describe('mockApiInterceptor', () => {
         http.put<Row[]>(`/api/meetings/m1/agenda/${last.id}/duration`, {}),
       );
       expect(cleared.find((r) => r.id === last.id)?.estimatedMinutes).toBeNull();
-      const plain = await firstValueFrom(http.post<Row[]>('/api/meetings/m1/agenda', { title: 'TOP ohne' }));
+      const plain = await firstValueFrom(
+        http.post<Row[]>('/api/meetings/m1/agenda', { title: 'TOP ohne' }),
+      );
       expect(plain[plain.length - 1].estimatedMinutes).toBeNull();
     });
 
@@ -1176,16 +1371,17 @@ describe('mockApiInterceptor', () => {
       expect((await put(true)).find((a) => a.id === id)?.doneAt).toBe(first);
       expect((await put(false)).find((a) => a.id === id)?.doneAt).toBeNull();
       await firstValueFrom(
-        http.patch('/api/meetings/m1', { currentAgendaItemId: agenda[0].id, completeAgendaItemId: id }),
+        http.patch('/api/meetings/m1', {
+          currentAgendaItemId: agenda[0].id,
+          completeAgendaItemId: id,
+        }),
       );
       const after = await firstValueFrom(http.get<Row[]>('/api/meetings/m1/agenda'));
       expect(after.find((a) => a.id === id)?.doneAt).toBeTruthy();
     });
 
     it('PUT …/agenda/order with no itemIds yields an empty agenda', async () => {
-      const res = await firstValueFrom(
-        http.put<unknown[]>('/api/meetings/m1/agenda/order', {}),
-      );
+      const res = await firstValueFrom(http.put<unknown[]>('/api/meetings/m1/agenda/order', {}));
       expect(res).toEqual([]);
     });
 
@@ -1346,9 +1542,7 @@ describe('mockApiInterceptor', () => {
 
     it('POST …/agenda with no body adds nothing', async () => {
       const before = await get<unknown[]>('/api/meetings/m1/agenda');
-      const after = await firstValueFrom(
-        http.post<unknown[]>('/api/meetings/m1/agenda', {}),
-      );
+      const after = await firstValueFrom(http.post<unknown[]>('/api/meetings/m1/agenda', {}));
       expect(after.length).toBe(before.length);
     });
 
@@ -1438,20 +1632,27 @@ describe('mockApiInterceptor', () => {
     });
 
     it('POST /votes/{id}/open → 204', async () => {
-      const res = await firstValueFrom(http.post('/api/votes/a0000000-0000-0000-0000-0000000000a1/open', {}));
+      const res = await firstValueFrom(
+        http.post('/api/votes/a0000000-0000-0000-0000-0000000000a1/open', {}),
+      );
       expect(res).toBeNull();
     });
 
     it('DELETE /meetings/{id}/votes/{voteId} → the meeting without the vote', async () => {
       const m = await firstValueFrom(
-        http.delete<{ votes: { id: string }[] }>('/api/meetings/m1/votes/a0000000-0000-0000-0000-0000000000e1'),
+        http.delete<{ votes: { id: string }[] }>(
+          '/api/meetings/m1/votes/a0000000-0000-0000-0000-0000000000e1',
+        ),
       );
       expect(m.votes.some((v) => v.id === 'a0000000-0000-0000-0000-0000000000e1')).toBe(false);
     });
 
     it('POST /votes/{id}/close → the closed vote (sets a result)', async () => {
       const res = await firstValueFrom(
-        http.post<{ id: string; branchFired: boolean }>('/api/votes/a0000000-0000-0000-0000-0000000000a1/close', {}),
+        http.post<{ id: string; branchFired: boolean }>(
+          '/api/votes/a0000000-0000-0000-0000-0000000000a1/close',
+          {},
+        ),
       );
       expect(res).toMatchObject({ id: 'a0000000-0000-0000-0000-0000000000a1', branchFired: true });
       const m = await get<{ votes: { id: string; result: string | null }[] }>('/api/meetings/m1');
@@ -1469,7 +1670,9 @@ describe('mockApiInterceptor', () => {
 
     /** The open branch keeps `v.result` because the new status is not 'closed'. */
     it('POST /votes/{id}/open on a vote keeps its existing result (status branch)', async () => {
-      const res = await firstValueFrom(http.post('/api/votes/a0000000-0000-0000-0000-0000000000a2/open', {}));
+      const res = await firstValueFrom(
+        http.post('/api/votes/a0000000-0000-0000-0000-0000000000a2/open', {}),
+      );
       expect(res).toBeNull();
     });
 
@@ -1517,8 +1720,12 @@ describe('mockApiInterceptor', () => {
     it('GET /applicant/applications and POST /auth/email-login(/verify) → the e-mail session', async () => {
       const res = await get<{ items: unknown[] }>('/api/applicant/applications');
       expect(res.items.length).toBe(3);
-      await expect(firstValueFrom(http.post('/api/auth/email-login', { email: 'a@b.de' }))).resolves.toBeNull();
-      await expect(firstValueFrom(http.post('/api/auth/email-login/verify', { token: 't' }))).resolves.toBeNull();
+      await expect(
+        firstValueFrom(http.post('/api/auth/email-login', { email: 'a@b.de' })),
+      ).resolves.toBeNull();
+      await expect(
+        firstValueFrom(http.post('/api/auth/email-login/verify', { token: 't' })),
+      ).resolves.toBeNull();
     });
 
     it('POST /auth/magic-link/verify → scope edit', async () => {
@@ -1594,9 +1801,7 @@ describe('mockApiInterceptor', () => {
     });
 
     it('PATCH /meetings/{id} with a null body falls back to {} (nullish branch)', async () => {
-      const m = await firstValueFrom(
-        http.patch<{ status: string }>('/api/meetings/m1', null),
-      );
+      const m = await firstValueFrom(http.patch<{ status: string }>('/api/meetings/m1', null));
       expect(m.status).toBeTruthy();
     });
 
@@ -1643,9 +1848,7 @@ describe('mockApiInterceptor', () => {
     });
 
     it('PATCH /protocols/{id} with no markdown keeps the existing markdown', async () => {
-      const p = await firstValueFrom(
-        http.patch<{ markdown: string }>('/api/protocols/p1', {}),
-      );
+      const p = await firstValueFrom(http.patch<{ markdown: string }>('/api/protocols/p1', {}));
       expect(p.markdown).toBeTruthy();
     });
 
@@ -1673,17 +1876,27 @@ describe('mockApiInterceptor', () => {
 
       /** The status follows the live demo meeting, which other tests may have closed. */
       it('serves the live meeting as a plain member sees it', async () => {
-        const m = await get<{ id: string; canWrite: boolean; canVote: boolean; protokollantName: string }>(
-          `/api/meetings/${MEMBER_LIVE}`,
-        );
-        expect(m).toMatchObject({ id: MEMBER_LIVE, canWrite: false, canVote: true, protokollantName: 'Max Mustermann' });
+        const m = await get<{
+          id: string;
+          canWrite: boolean;
+          canVote: boolean;
+          protokollantName: string;
+        }>(`/api/meetings/${MEMBER_LIVE}`);
+        expect(m).toMatchObject({
+          id: MEMBER_LIVE,
+          canWrite: false,
+          canVote: true,
+          protokollantName: 'Max Mustermann',
+        });
         const ctx = await get<Ctx>(`/api/delegations/meetings/${MEMBER_LIVE}/context`);
         expect(ctx.meetingStarted).toBe(true);
         expect(ctx.incoming.map((d) => d.delegatorName)).toEqual(['Erika Beispiel']);
       });
 
       it('serves a planned meeting with its agenda and the delegation setup', async () => {
-        const m = await get<{ status: string; canManage: boolean }>(`/api/meetings/${MEMBER_PLANNED}`);
+        const m = await get<{ status: string; canManage: boolean }>(
+          `/api/meetings/${MEMBER_PLANNED}`,
+        );
         expect(m).toMatchObject({ status: 'planned', canManage: false });
         const agenda = await get<unknown[]>(`/api/meetings/${MEMBER_PLANNED}/agenda`);
         expect(agenda).toHaveLength(5);
@@ -1703,13 +1916,20 @@ describe('mockApiInterceptor', () => {
       /** The planned demo meeting of the lead has not started either. */
       it('creates an own delegation, which the context then names', async () => {
         const made = await firstValueFrom(
-          http.post<{ delegateName: string; viaPool: boolean; direction: string }>('/api/delegations', {
-            meetingId: MEMBER_PLANNED,
-            delegateId: 'p-10',
-            delegateVoting: true,
-          }),
+          http.post<{ delegateName: string; viaPool: boolean; direction: string }>(
+            '/api/delegations',
+            {
+              meetingId: MEMBER_PLANNED,
+              delegateId: 'p-10',
+              delegateVoting: true,
+            },
+          ),
         );
-        expect(made).toMatchObject({ delegateName: 'Emma Vogel', viaPool: true, direction: 'outgoing' });
+        expect(made).toMatchObject({
+          delegateName: 'Emma Vogel',
+          viaPool: true,
+          direction: 'outgoing',
+        });
         const member = await firstValueFrom(
           http.post<{ delegateName: string; viaPool: boolean }>('/api/delegations', {
             meetingId: 'd0000000-0000-0000-0000-000000000002',
@@ -1717,11 +1937,15 @@ describe('mockApiInterceptor', () => {
           }),
         );
         expect(member).toMatchObject({ delegateName: 'Max Mustermann', viaPool: false });
-        const nobody = await firstValueFrom(http.post<{ delegateName: string | null }>('/api/delegations', null));
+        const nobody = await firstValueFrom(
+          http.post<{ delegateName: string | null }>('/api/delegations', null),
+        );
         expect(nobody.delegateName).toBeNull();
         const ctx = await get<Ctx>(`/api/delegations/meetings/${MEMBER_PLANNED}/context`);
         expect(ctx.myDelegation).toMatchObject({ delegateId: 'p-10' });
-        const lead = await get<Ctx>('/api/delegations/meetings/d0000000-0000-0000-0000-000000000002/context');
+        const lead = await get<Ctx>(
+          '/api/delegations/meetings/d0000000-0000-0000-0000-000000000002/context',
+        );
         expect(lead.meetingStarted).toBe(false);
       });
 
@@ -1729,23 +1953,49 @@ describe('mockApiInterceptor', () => {
       it('Lists the pool of a missing member and enters the substitute', async () => {
         const LIVE = 'd0000000-0000-0000-0000-000000000001';
         const recipients = `/api/delegations/meetings/${LIVE}/recipients`;
-        const fritz = await get<{ displayName: string }[]>(recipients, new HttpParams().set('delegatorId', 'p-8'));
-        expect(fritz.map((r) => r.displayName)).toEqual(['Emma Vogel', 'Paula Persönlich', 'Sven Stellvertreter']);
-        const other = await get<{ displayName: string }[]>(recipients, new HttpParams().set('delegatorId', 'p-2'));
+        const fritz = await get<{ displayName: string }[]>(
+          recipients,
+          new HttpParams().set('delegatorId', 'p-8'),
+        );
+        expect(fritz.map((r) => r.displayName)).toEqual([
+          'Emma Vogel',
+          'Paula Persönlich',
+          'Sven Stellvertreter',
+        ]);
+        const other = await get<{ displayName: string }[]>(
+          recipients,
+          new HttpParams().set('delegatorId', 'p-2'),
+        );
         expect(other.map((r) => r.displayName)).toEqual(['Emma Vogel', 'Sven Stellvertreter']);
         const made = await firstValueFrom(
-          http.post<{ id: string; delegatorName: string; delegateName: string; viaPool: boolean; direction: null }>(
-            '/api/delegations',
-            { meetingId: LIVE, delegatorId: 'p-8', delegateId: 'p-11', delegateVoting: true },
-          ),
+          http.post<{
+            id: string;
+            delegatorName: string;
+            delegateName: string;
+            viaPool: boolean;
+            direction: null;
+          }>('/api/delegations', {
+            meetingId: LIVE,
+            delegatorId: 'p-8',
+            delegateId: 'p-11',
+            delegateVoting: true,
+          }),
         );
         expect(made).toMatchObject({
-          delegatorName: 'Fritz Fehlend', delegateName: 'Paula Persönlich', viaPool: true, direction: null,
+          delegatorName: 'Fritz Fehlend',
+          delegateName: 'Paula Persönlich',
+          viaPool: true,
+          direction: null,
         });
         const unknown = await firstValueFrom(
-          http.post<{ id: string; delegatorName: string | null; delegateName: string | null }>('/api/delegations', {
-            meetingId: LIVE, delegatorId: 'p-99', delegateId: 'p-98',
-          }),
+          http.post<{ id: string; delegatorName: string | null; delegateName: string | null }>(
+            '/api/delegations',
+            {
+              meetingId: LIVE,
+              delegatorId: 'p-99',
+              delegateId: 'p-98',
+            },
+          ),
         );
         expect(unknown).toMatchObject({ delegatorName: null, delegateName: null });
         await firstValueFrom(http.delete(`/api/delegations/${made.id}`));
@@ -1762,7 +2012,9 @@ describe('mockApiInterceptor', () => {
         keeperPeriods: { principalId: string; toAt: string | null; toPosition: number | null }[];
       };
       const handover = (principalId: string, mode: string) =>
-        firstValueFrom(http.post<M>(`/api/meetings/${LIVE}/minute-taker-handover`, { principalId, mode }));
+        firstValueFrom(
+          http.post<M>(`/api/meetings/${LIVE}/minute-taker-handover`, { principalId, mode }),
+        );
 
       /**
        * Other tests change the shared mock meeting, so each test starts from the demo keeper on TOP
@@ -1770,7 +2022,10 @@ describe('mockApiInterceptor', () => {
        */
       beforeEach(async () => {
         await firstValueFrom(
-          http.patch(`/api/meetings/${LIVE}`, { protokollantId: DEMO, currentAgendaItemId: 'ag-s3' }),
+          http.patch(`/api/meetings/${LIVE}`, {
+            protokollantId: DEMO,
+            currentAgendaItemId: 'ag-s3',
+          }),
         );
       });
 
@@ -1792,7 +2047,9 @@ describe('mockApiInterceptor', () => {
       it('plans a handover, discards it, and starts a planned one on a forward move', async () => {
         const agenda = await get<{ id: string }[]>(`/api/meetings/${LIVE}/agenda`);
         expect(agenda.length).toBeGreaterThan(1);
-        await firstValueFrom(http.patch(`/api/meetings/${LIVE}`, { currentAgendaItemId: agenda[0].id }));
+        await firstValueFrom(
+          http.patch(`/api/meetings/${LIVE}`, { currentAgendaItemId: agenda[0].id }),
+        );
         const planned = await handover('p-4', 'next_item');
         expect(planned.plannedHandover).toMatchObject({ principalId: 'p-4', fromPosition: 2 });
         const discarded = await firstValueFrom(
@@ -1810,7 +2067,9 @@ describe('mockApiInterceptor', () => {
         expect(moved.plannedHandover).toBeNull();
         expect(moved.keeperPeriods.at(-1)?.principalId).toBe('p-4');
         await firstValueFrom(
-          http.patch(`/api/meetings/${LIVE}`, { currentAgendaItemId: agenda[agenda.length - 1].id }),
+          http.patch(`/api/meetings/${LIVE}`, {
+            currentAgendaItemId: agenda[agenda.length - 1].id,
+          }),
         );
         await expect(handover(DEMO, 'next_item')).rejects.toMatchObject({
           status: 409,
@@ -1834,7 +2093,10 @@ describe('mockApiInterceptor', () => {
         expect(listed.map((d) => d.delegatorId)).toEqual(['p-6']);
         await firstValueFrom(http.delete(`/api/delegations/${listed[0].id}`));
         const rows = await firstValueFrom(
-          http.put<{ principalId: string; status: string }[]>(`/api/meetings/${LIVE}/attendance/p-6`, { status: 'present' }),
+          http.put<{ principalId: string; status: string }[]>(
+            `/api/meetings/${LIVE}/attendance/p-6`,
+            { status: 'present' },
+          ),
         );
         expect(rows.find((r) => r.principalId === 'p-6')?.status).toBe('present');
       });
@@ -1845,21 +2107,33 @@ describe('mockApiInterceptor', () => {
        */
       it('serves the closed meetings: draft, edit of the text, finalize, and a final one', async () => {
         const draft = 'd0000000-0000-0000-0000-000000000101';
-        const m = await get<{ status: string; keeperPeriods: unknown[]; votes: { status: string }[] }>(`/api/meetings/${draft}`);
+        const m = await get<{
+          status: string;
+          keeperPeriods: unknown[];
+          votes: { status: string }[];
+        }>(`/api/meetings/${draft}`);
         expect(m.status).toBe('closed');
         expect(m.keeperPeriods).toHaveLength(2);
         expect(m.votes[0].status).toBe('closed');
         const agenda = await get<{ id: string; body: string }[]>(`/api/meetings/${draft}/agenda`);
         expect(agenda[2].body).toContain('> [!abstimmung]');
         const edited = await firstValueFrom(
-          http.patch<{ id: string; body: string }[]>(`/api/meetings/${draft}/agenda/${agenda[0].id}`, { body: 'Neu.' }),
+          http.patch<{ id: string; body: string }[]>(
+            `/api/meetings/${draft}/agenda/${agenda[0].id}`,
+            { body: 'Neu.' },
+          ),
         );
         expect(edited[0].body).toBe('Neu.');
-        const protocol = await get<{ id: string; status: string }>(`/api/meetings/${draft}/protocol`);
+        const protocol = await get<{ id: string; status: string }>(
+          `/api/meetings/${draft}/protocol`,
+        );
         expect(protocol.status).toBe('draft');
         await firstValueFrom(http.patch(`/api/protocols/${protocol.id}`, { markdown: '# A' }));
         const final = await firstValueFrom(
-          http.post<{ status: string; publicPdfUrl: string | null }>(`/api/protocols/${protocol.id}/finalize`, null),
+          http.post<{ status: string; publicPdfUrl: string | null }>(
+            `/api/protocols/${protocol.id}/finalize`,
+            null,
+          ),
         );
         expect(final.status).toBe('final');
         expect(final.publicPdfUrl).toBeTruthy();
@@ -1893,10 +2167,14 @@ describe('mockApiInterceptor', () => {
 
     const [current] = await firstValueFrom(api.listMeetings());
     const meeting = await firstValueFrom(api.search(current.title));
-    expect(meeting.hits).toContainEqual(expect.objectContaining({ kind: 'meeting', title: current.title }));
+    expect(meeting.hits).toContainEqual(
+      expect.objectContaining({ kind: 'meeting', title: current.title }),
+    );
 
     const person = await firstValueFrom(api.search('demo'));
-    expect(person.hits).toEqual([expect.objectContaining({ kind: 'principal', title: 'Demo Mitglied' })]);
+    expect(person.hits).toEqual([
+      expect.objectContaining({ kind: 'principal', title: 'Demo Mitglied' }),
+    ]);
 
     const none = await firstValueFrom(api.search('zzzz'));
     expect(none).toEqual({ hits: [], truncated: false, failed: [] });
@@ -1913,7 +2191,13 @@ describe('mockApiInterceptor', () => {
     expect(page.items[0].tops[0]).not.toHaveProperty('markdown');
     expect(await firstValueFrom(http.get('/api/public/decisions'))).toMatchObject({
       total: 1,
-      items: [{ protocolId: 'pp-0001', result: 'passed', meetingTitle: '34. Sitzung des Studierendenparlaments' }],
+      items: [
+        {
+          protocolId: 'pp-0001',
+          result: 'passed',
+          meetingTitle: '34. Sitzung des Studierendenparlaments',
+        },
+      ],
     });
     expect(await firstValueFrom(http.get('/api/public/protocols/semesters'))).toEqual([
       { key: 'ss-2026', count: 2 },
@@ -1933,14 +2217,18 @@ describe('mockApiInterceptor', () => {
     it('serves the lead and the guest routes from the lazy mock, with problems as errors', async () => {
       const { api } = setup(true);
       const http = TestBed.inject(HttpClient);
-      expect(await firstValueFrom(api.listMeetingGuests('d0000000-0000-0000-0000-000000000001'))).toHaveLength(10);
+      expect(
+        await firstValueFrom(api.listMeetingGuests('d0000000-0000-0000-0000-000000000001')),
+      ).toHaveLength(10);
       expect((await firstValueFrom(api.getJoinLink('m'))).joinCode).toBe('7KQ4MP');
       expect((await firstValueFrom(api.guestMe('7KQ4MP'))).status).toBe('admitted');
       await expect(firstValueFrom(api.guestMe('MOCKJOIN'))).rejects.toMatchObject({
         status: 401,
         error: { code: 'guest_token_missing' },
       });
-      await expect(firstValueFrom(http.put('/api/public/meetings/7KQ4MP/me', {}))).rejects.toMatchObject({
+      await expect(
+        firstValueFrom(http.put('/api/public/meetings/7KQ4MP/me', {})),
+      ).rejects.toMatchObject({
         status: 404,
       });
     });
@@ -1950,12 +2238,20 @@ describe('mockApiInterceptor', () => {
       const id = 'd0000000-0000-0000-0000-000000000001';
       const off = await firstValueFrom(api.patchMeeting(id, { publicJoin: false }));
       expect(off.publicJoin).toBe(false);
-      const on = await firstValueFrom(api.patchMeeting(id, { publicJoin: true, guestsMode: 'watch' }));
-      expect(on).toEqual(expect.objectContaining({ publicJoin: true, guestsMode: 'watch', joinCode: '7KQ4MP' }));
+      const on = await firstValueFrom(
+        api.patchMeeting(id, { publicJoin: true, guestsMode: 'watch' }),
+      );
+      expect(on).toEqual(
+        expect.objectContaining({ publicJoin: true, guestsMode: 'watch', joinCode: '7KQ4MP' }),
+      );
       await firstValueFrom(api.patchMeeting(id, { guestsMode: 'vote' }));
-      const m = await firstValueFrom(api.openMeetingVote(id, { agendaItemId: 'ag-s2', guestsVote: true }));
+      const m = await firstValueFrom(
+        api.openMeetingVote(id, { agendaItemId: 'ag-s2', guestsVote: true }),
+      );
       const v = m.votes[m.votes.length - 1];
-      expect(v).toEqual(expect.objectContaining({ guestsVote: true, presentMembers: 5, presentGuests: 7 }));
+      expect(v).toEqual(
+        expect.objectContaining({ guestsVote: true, presentMembers: 5, presentGuests: 7 }),
+      );
       const m2 = await firstValueFrom(api.openMeetingVote(id, { agendaItemId: 'ag-s2' }));
       expect(m2.votes[m2.votes.length - 1].guestsVote).toBe(false);
     });
