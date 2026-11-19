@@ -139,7 +139,7 @@ async def record_outside_decision(
     if payload.meeting_id is not None:
         await _check_meeting(flow, payload.meeting_id, principal)
     target = await session.get(State, transition.to_state_id)
-    required = await flow._amount_required(transition.from_state_id, target, app.amount)
+    required = await flow._amount_required(transition.from_state_id, target, app)
     approves = payload.result == "passed" and target is not None and target.is_approved
     decision = payload.decision if approves else None
     check_amount_given(required, decision)

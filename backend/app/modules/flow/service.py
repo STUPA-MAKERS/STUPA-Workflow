@@ -246,18 +246,19 @@ class FlowService:
         return bool(approved)
 
     async def _amount_required(
-        self, from_state_id: UUID | None, target: State | None, requested: Decimal | None
+        self, from_state_id: UUID | None, target: State | None, app: Application
     ) -> bool:
         """Tell whether a move into `target` must name the approved amount (spec 001610).
 
-        The read of the left state runs only for an approved target.
+        The read of the left state and of the requested amount runs only for an approved
+        target.
         """
         if target is None or not target.is_approved:
             return False
         return amount_required(
             entering=True,
             was_approved=await self._is_approved_state(from_state_id),
-            requested=requested,
+            requested=app.amount,
         )
 
     async def _agenda_gremium(
@@ -337,9 +338,7 @@ class FlowService:
             transition,
             await self._agenda_gremium(transition, target, app.budget_id),
             allows_decision=target is not None and target.is_approved,
-            requires_amount=await self._amount_required(
-                transition.from_state_id, target, app.amount
-            ),
+            requires_amount=await self._amount_required(transition.from_state_id, target, app),
         )
 
     async def _outgoing(self, app: Application) -> list[Transition]:
@@ -822,7 +821,7 @@ class FlowService:
         target = await self.session.get(State, transition.to_state_id)
         if manual and not as_applicant:
             check_amount_given(
-                await self._amount_required(transition.from_state_id, target, app.amount),
+                await self._amount_required(transition.from_state_id, target, app),
                 decision,
             )
         vote_gremium = await self._entry_snapshot(app, transition.from_state_id, target)
@@ -1182,6 +1181,7 @@ class FlowService:
                 color=s.color,
                 editAllowed=s.edit_allowed,
                 kind=s.kind,
+                isApproved=s.is_approved,
             )
             for s in states
         ]
@@ -1194,9 +1194,14 @@ class FlowService:
         *,
         reason: str,
         note: str | None = None,
+        decision: DecisionIn | None = None,
         allow_unconfirmed: bool = True,
     ) -> TransitionResult:
         """Force an application directly into `target_state_id` and bypass the flow.
+
+        A forced move into an approved state from a state that is not approved must name
+        the approved amount (spec 001653), as a manual approval does (spec 001610). The
+        decision counts only for an approved target; any other target drops it.
 
         `reason` is the key of the reason (spec 001650) and `note` the optional text.
         The status event stores both and the mark `forced`; the audit entry holds the
@@ -1240,6 +1245,15 @@ class FlowService:
             raise ConflictError(
                 "Application is already in the target state.", code="already_in_state"
             )
+        old_approved: Decimal | None = None
+        if target.is_approved:
+            required = await self._amount_required(from_state_id, target, app)
+            check_amount_given(required, decision)
+            if decision is not None:
+                check_approved_amount(app.amount, decision.approved_amount)
+                old_approved = app.approved_amount
+        else:
+            decision = None
         vote_gremium = await self._entry_snapshot(app, from_state_id, target)
         result = cast(
             "CursorResult[Any]",
@@ -1293,6 +1307,16 @@ class FlowService:
                 "forceReason": reason,
             },
         )
+        if decision is not None:
+            await record_decision(
+                self.session,
+                app,
+                decision,
+                actor=principal.sub,
+                decided_by=principal.sub,
+                old_approved=old_approved,
+                status_event_id=status_event_id,
+            )
         await self.session.commit()
         await self._publish_cancelled(cancelled)
         return TransitionResult(

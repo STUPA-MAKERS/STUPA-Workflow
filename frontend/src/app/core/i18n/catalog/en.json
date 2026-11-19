@@ -590,7 +590,6 @@
   "applications.detail.eraseRequestFailed": "Erasure request failed.",
   "applications.detail.forceStatus": "Set status",
   "applications.detail.forceStatusTitle": "Force status",
-  "applications.detail.forceStatusLead": "Move the application straight into any state — bypassing the normal transitions and conditions. The action is recorded in the audit log.",
   "applications.detail.forceStatusField": "Target state",
   "applications.detail.forceStatusPlaceholder": "Choose a state …",
   "applications.detail.forceStatusReason": "Reason",
@@ -4696,7 +4695,6 @@
   "applications.amount.requested": "Requested",
   "applications.amount.approved": "Approved",
   "outsideDecision.title": "Record decision",
-  "outsideDecision.lead": "For a decision that the Gremium made in a meeting without a vote on the platform. Open votes on this application are cancelled.",
   "outsideDecision.result": "Result",
   "outsideDecision.passed": "Passed",
   "outsideDecision.failed": "Failed",
@@ -4757,7 +4755,6 @@
   "admin.forced.byReason": "By reason",
   "admin.forced.byPath": "By path",
   "admin.forced.showList": "{label}: show {n} applications",
-  "admin.forced.listTitle": "Forced status changes",
   "admin.forced.listEmpty": "No applications",
   "admin.mailTemplates.key.approved_amount_changed": "Approved amount changed"
 }

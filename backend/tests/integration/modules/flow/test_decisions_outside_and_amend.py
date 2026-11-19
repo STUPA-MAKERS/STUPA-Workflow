@@ -3,7 +3,7 @@
 Real Postgres. The tests cover specs 001600-001603 (a decision made outside the
 platform fires the branch, cancels the open votes and shows in the timeline), 001610
 (an approval names its amount), 001613 (the backfill of the migration), 001620-001622
-(a later change of the approved amount) and 001650-001652 (the reason of a forced
+(a later change of the approved amount) and 001650-001653 (the reason of a forced
 status and the report).
 """
 
@@ -321,6 +321,47 @@ async def test_manual_approval_needs_the_amount_once(session: AsyncSession) -> N
     )
     onward = await flow.available_transitions(app.id, principal)
     assert [t.requires_amount for t in onward] == [False]
+
+
+async def test_forced_approval_needs_the_amount(session: AsyncSession) -> None:
+    """§ 001653: a forced move into an approved state names the approved amount."""
+    world = await _seed(session)
+    app = await _app(session, world, "draft")
+    flow = FlowService(session)
+    approved = world.states["approved"].id
+    with pytest.raises(ValidationProblem) as err:
+        await flow.force_status(app.id, approved, _clerk(), reason="outside_decision")
+    assert err.value.code == "approved_amount_required"
+    await session.rollback()
+    await flow.force_status(
+        app.id,
+        approved,
+        _clerk(),
+        reason="outside_decision",
+        decision=DecisionIn(approvedAmount=Decimal("80.00")),
+    )
+    await session.refresh(app)
+    assert app.approved_amount == Decimal("80.00")
+    row = await session.scalar(
+        select(ApplicationDecision).where(ApplicationDecision.application_id == app.id)
+    )
+    assert row is not None
+    assert row.status_event_id is not None
+
+
+async def test_forced_move_elsewhere_drops_the_decision(session: AsyncSession) -> None:
+    """§ 001653: a target that is not approved ignores the decision."""
+    world = await _seed(session)
+    app = await _app(session, world, "draft")
+    await FlowService(session).force_status(
+        app.id,
+        world.states["rejected"].id,
+        _clerk(),
+        reason="applicant_error",
+        decision=DecisionIn(approvedAmount=Decimal("80.00")),
+    )
+    await session.refresh(app)
+    assert app.approved_amount is None
 
 
 async def test_amend_writes_a_new_decision_and_keeps_the_state(session: AsyncSession) -> None:

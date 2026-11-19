@@ -61,11 +61,12 @@ describe('ForcedStatusComponent', () => {
     expect(screen.getByRole('heading', { name: 'Nach Grund' })).toBeInTheDocument();
   });
 
-  it('lists the applications behind a count', async () => {
+  it('lists the applications behind a count below the tables', async () => {
     const { http, cmp, detectChanges } = await setup();
     http.expectOne(isReport).flush(REPORT);
     detectChanges();
-    cmp.openList(cmp.pathRows()[0]);
+    cmp.toggleList(cmp.pathRows()[0]);
+    expect(cmp.isOpen(cmp.pathRows()[0])).toBe(true);
     detectChanges();
     const req = http.expectOne(isEvents);
     expect(req.request.params.get('fromKey')).toBe('agenda');
@@ -83,8 +84,10 @@ describe('ForcedStatusComponent', () => {
     ]);
     detectChanges();
     expect(screen.getByRole('link', { name: 'Ohne Titel' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Auf Tagesordnung → Bewilligt' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
     expect(cmp.pathOf(cmp.events()[0])).toBe('Ohne Zustand → Bewilligt');
-    cmp.closeList();
+    cmp.toggleList(cmp.pathRows()[0]);
     expect(cmp.listRow()).toBeNull();
     cmp.openList(cmp.reasonRows()[0]);
     http.expectOne(isEvents).flush({}, { status: 500, statusText: 'x' });

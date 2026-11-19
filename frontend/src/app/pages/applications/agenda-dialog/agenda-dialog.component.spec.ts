@@ -86,7 +86,7 @@ describe('AgendaDialogComponent', () => {
     http.expectOne(LIST).flush(MEETINGS);
     detectChanges();
     const dialog = screen.getByRole('dialog', { name: /Auf Tagesordnung setzen/ });
-    expect(within(dialog).getByText('Zuschuss Party')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Zuschuss Party')).toBeNull();
     expect(within(dialog).getByText('Studierendenparlament')).toBeInTheDocument();
     const radios = within(dialog).getAllByRole('radio');
     expect(radios.map((r) => r.closest('label')?.querySelector('.agd__title')?.textContent)).toEqual([

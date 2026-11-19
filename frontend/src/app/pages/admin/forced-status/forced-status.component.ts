@@ -16,7 +16,6 @@ import {
   type ColumnDef,
   DataTableComponent,
   DatepickerComponent,
-  DialogComponent,
   EmptyStateComponent,
   PageHeaderComponent,
   SectionComponent,
@@ -61,7 +60,6 @@ export function defaultFrom(today: string): string {
     CellDirective,
     DataTableComponent,
     DatepickerComponent,
-    DialogComponent,
     EmptyStateComponent,
     PageHeaderComponent,
     SectionComponent,
@@ -168,7 +166,22 @@ export class ForcedStatusComponent {
     });
   }
 
-  /** Open the list of the applications behind a count. */
+  /** The list below the tables shows this count. */
+  isOpen(row: CountRow): boolean {
+    const open = this.listRow();
+    return open !== null && open.key === row.key;
+  }
+
+  /** Show the applications behind a count below the tables, or hide them again. */
+  toggleList(row: CountRow): void {
+    if (this.isOpen(row)) {
+      this.closeList();
+      return;
+    }
+    this.openList(row);
+  }
+
+  /** Load the list of the applications behind a count. */
   openList(row: CountRow): void {
     this.listRow.set(row);
     this.events.set([]);

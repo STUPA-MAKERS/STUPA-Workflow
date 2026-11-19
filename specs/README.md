@@ -229,6 +229,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/flow/001650](requirements/functional/applications/flow/001650_force-status-reason.md) | A forced status needs a reason from a list | approved |
 | [F/applications/flow/001651](requirements/functional/applications/flow/001651_force-status-report.md) | An admin page counts the forced status changes | approved |
 | [F/applications/flow/001652](requirements/functional/applications/flow/001652_force-status-old-reason.md) | A forced change without a reason counts as Ohne Grund | approved |
+| [F/applications/flow/001653](requirements/functional/applications/flow/001653_force-approval-asks-amount.md) | A forced approval asks for the approved amount | approved |
 | [F/applications/forms/000133](requirements/functional/applications/forms/000133_positions-shape.md) | A positions answer has label and offers | approved |
 | [F/applications/forms/000134](requirements/functional/applications/forms/000134_offer-limits.md) | Offer counts have limits | approved |
 | [F/applications/forms/000135](requirements/functional/applications/forms/000135_funding-field.md) | The requested funding is separate from the costs | approved |

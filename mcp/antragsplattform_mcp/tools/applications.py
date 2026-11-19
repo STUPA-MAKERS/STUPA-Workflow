@@ -356,6 +356,8 @@ async def force_application_status(
     state_id: str,
     reason: Literal["outside_decision", "applicant_error", "error_correction", "other"],
     note: str | None = None,
+    approved_amount: str | None = None,
+    conditions: list[str] | None = None,
 ) -> dict:
     """Put an application directly into a state, past the transitions and their guards.
 
@@ -366,10 +368,20 @@ async def force_application_status(
     sits in the target state, or a concurrent change moved it first. Prefer
     `fire_transition` or `record_outside_decision`, and ask the user before you force
     a status.
+
+    A move into an approved state (`isApproved` in `list_application_flow_states`) from
+    one that is not approved needs `approved_amount` (decimal string; 422
+    `approved_amount_required`); confirm it with the user. `conditions` are optional.
+    Any other target ignores the decision.
     """
+    decision = (
+        params(approvedAmount=approved_amount, conditions=conditions)
+        if approved_amount is not None or conditions is not None
+        else None
+    )
     return await api().post(
         f"/applications/{application_id}/force-status",
-        json=params(stateId=state_id, reason=reason, note=note),
+        json=params(stateId=state_id, reason=reason, note=note, decision=decision),
     )
 
 

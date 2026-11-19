@@ -590,7 +590,6 @@
   "applications.detail.eraseRequestFailed": "Löschantrag fehlgeschlagen.",
   "applications.detail.forceStatus": "Status setzen",
   "applications.detail.forceStatusTitle": "Status erzwingen",
-  "applications.detail.forceStatusLead": "Setzt den Antrag direkt in einen beliebigen Zustand — ohne die normalen Übergänge und Bedingungen. Die Aktion wird protokolliert.",
   "applications.detail.forceStatusField": "Zielzustand",
   "applications.detail.forceStatusPlaceholder": "Zustand wählen …",
   "applications.detail.forceStatusReason": "Grund",
@@ -4696,7 +4695,6 @@
   "applications.amount.requested": "Beantragt",
   "applications.amount.approved": "Genehmigt",
   "outsideDecision.title": "Beschluss erfassen",
-  "outsideDecision.lead": "Für einen Beschluss, den das Gremium in einer Sitzung ohne Abstimmung auf der Plattform gefasst hat. Offene Abstimmungen zu diesem Antrag werden abgebrochen.",
   "outsideDecision.result": "Ergebnis",
   "outsideDecision.passed": "Angenommen",
   "outsideDecision.failed": "Abgelehnt",
@@ -4757,7 +4755,6 @@
   "admin.forced.byReason": "Nach Grund",
   "admin.forced.byPath": "Nach Weg",
   "admin.forced.showList": "{label}: {n} Anträge zeigen",
-  "admin.forced.listTitle": "Erzwungene Status",
   "admin.forced.listEmpty": "Keine Anträge",
   "admin.mailTemplates.key.approved_amount_changed": "Genehmigter Betrag geändert"
 }

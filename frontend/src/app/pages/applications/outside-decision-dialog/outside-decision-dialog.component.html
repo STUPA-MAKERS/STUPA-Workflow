@@ -1,12 +1,10 @@
 <app-dialog
   [open]="open()"
   [title]="'outsideDecision.title' | t"
-  [subtitle]="applicationTitle()"
   [closeLabel]="'action.close' | t"
   (closed)="close()"
 >
   <form class="odd" (submit)="$event.preventDefault(); submit()">
-    <p class="odd__lead">{{ 'outsideDecision.lead' | t }}</p>
     <div class="odd__field" role="group" aria-labelledby="odd-result">
       <span id="odd-result" class="odd__cap">{{ 'outsideDecision.result' | t }}</span>
       <app-segmented

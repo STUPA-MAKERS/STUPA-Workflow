@@ -140,7 +140,7 @@ async def test_rows_maps_the_query() -> None:
 
 
 def test_meeting_date_is_not_in_the_future() -> None:
-    now = datetime(2026, 11, 19, 22, 30, tzinfo=UTC)
+    now = datetime(2026, 11, 19, 23, 30, tzinfo=UTC)
     check_meeting_date(date(2026, 11, 19), now)
     check_meeting_date(date(2026, 11, 20), now)
     with pytest.raises(ValidationProblem):

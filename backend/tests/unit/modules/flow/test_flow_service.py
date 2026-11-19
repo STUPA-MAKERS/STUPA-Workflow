@@ -606,7 +606,9 @@ async def test_revert_status_leaves_the_commit_to_the_caller() -> None:
 
 def _target_state(state_id: object, flow_id: object) -> SimpleNamespace:
     """Build a target state of a flow."""
-    return SimpleNamespace(id=state_id, flow_version_id=flow_id, kind="normal", config={})
+    return SimpleNamespace(
+        id=state_id, flow_version_id=flow_id, kind="normal", config={}, is_approved=False
+    )
 
 
 def _vote_cancel_stmts(db) -> list[Any]:
@@ -713,17 +715,18 @@ async def test_list_states_returns_flow_states() -> None:
     app = _app(uuid4(), flow_id)
     s1 = SimpleNamespace(
         id=uuid4(), key="draft", label_i18n={"de": "Entwurf"}, color=None,
-        edit_allowed=True, kind="normal",
+        edit_allowed=True, kind="normal", is_approved=False,
     )
     s2 = SimpleNamespace(
         id=uuid4(), key="done", label_i18n={}, color="#111",
-        edit_allowed=False, kind="normal",
+        edit_allowed=False, kind="normal", is_approved=True,
     )
     db = fake_session(result(app), result(s1, s2))
     out = await FlowService(db).list_states(app.id)
     assert [o.key for o in out] == ["draft", "done"]
     assert out[1].color == "#111"
     assert out[0].edit_allowed is True
+    assert [o.is_approved for o in out] == [False, True]
 
 
 async def test_list_states_unknown_application_404() -> None:

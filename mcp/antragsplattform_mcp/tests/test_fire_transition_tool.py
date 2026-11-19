@@ -83,6 +83,16 @@ def test_force_status_sends_the_reason(fake_api: _FakeApi) -> None:
     ]
 
 
+def test_force_status_sends_the_decision(fake_api: _FakeApi) -> None:
+    """§ 001653: a forced approval carries the approved amount."""
+    asyncio.run(
+        applications.force_application_status(
+            "a1", "s1", "outside_decision", approved_amount="80.00"
+        )
+    )
+    assert fake_api.calls[0][1]["decision"] == {"approvedAmount": "80.00"}
+
+
 def test_record_outside_decision(fake_api: _FakeApi) -> None:
     asyncio.run(
         applications.record_outside_decision(

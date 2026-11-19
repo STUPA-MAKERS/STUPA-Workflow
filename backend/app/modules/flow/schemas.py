@@ -80,12 +80,15 @@ class ForceStatusRequest(FrozenCamelModel, frozen=True):
     This is the privileged `application.force_status` override. The `reason` names why
     from a fixed list, because the report of the forced changes counts per reason and
     shows the ways that the flow lacks. The `note` is optional, except for `other`,
-    which needs at least 10 characters after the trim.
+    which needs at least 10 characters after the trim. A move into an approved state
+    from one that is not approved needs the `decision` with the approved amount (spec
+    001653).
     """
 
     state_id: UUID = Field(alias="stateId")
     reason: ForceReason
     note: str | None = None
+    decision: DecisionIn | None = None
 
     @model_validator(mode="after")
     def _note_for_other(self) -> ForceStatusRequest:

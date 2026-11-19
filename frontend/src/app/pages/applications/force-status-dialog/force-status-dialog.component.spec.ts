@@ -19,6 +19,7 @@ import { ForceStatusDialogComponent } from './force-status-dialog.component';
     <app-force-status-dialog
       [applicationId]="id()"
       [currentStateId]="current()"
+      [requested]="requested()"
       [(open)]="open"
       (done)="done = done + 1"
     />
@@ -27,6 +28,7 @@ import { ForceStatusDialogComponent } from './force-status-dialog.component';
 class Host {
   readonly id = signal<string | null>('app-1');
   readonly current = signal<string | null>('s1');
+  readonly requested = signal<string | null>(null);
   readonly open = signal(false);
   done = 0;
 }
@@ -35,6 +37,7 @@ const STATES: StateOutWire[] = [
   { id: 's1', key: 'submitted', label: { de: 'Eingereicht' }, color: null, editAllowed: true },
   { id: 's2', key: 'review', label: { de: 'In Prüfung' }, color: null, editAllowed: false },
   { id: 's3', key: 'closed', label: {}, color: null, editAllowed: false },
+  { id: 's4', key: 'approved', label: { de: 'Bewilligt' }, color: null, editAllowed: false, isApproved: true },
 ];
 
 const STATES_URL = (r: { url: string }) => r.url === '/api/applications/app-1/flow-states';
@@ -69,8 +72,8 @@ describe('ForceStatusDialogComponent', () => {
     http.verify();
     openIt();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(cmp.options().map((o) => o.value)).toEqual(['s2', 's3']);
-    expect(cmp.options().map((o) => o.label)).toEqual(['In Prüfung', 'closed']);
+    expect(cmp.options().map((o) => o.value)).toEqual(['s2', 's3', 's4']);
+    expect(cmp.options().map((o) => o.label)).toEqual(['In Prüfung', 'closed', 'Bewilligt']);
   });
 
   it('needs a state and a reason before it sends', async () => {
@@ -201,5 +204,30 @@ describe('ForceStatusDialogComponent', () => {
     cmp.note.set('Begründung lang genug');
     cmp.submit();
     http.verify();
+  });
+
+  it('asks for the approved amount when it forces an approval (spec 001653)', async () => {
+    const { http, host, cmp, openIt, detectChanges } = await setup();
+    host.requested.set('120.00');
+    openIt();
+    cmp.choice.set('s2');
+    expect(cmp.needsAmount()).toBe(false);
+    cmp.choice.set('s4');
+    cmp.reason.set('outside_decision');
+    detectChanges();
+    expect(cmp.needsAmount()).toBe(true);
+    expect(screen.getByLabelText(/Förderbetrag/)).toBeInTheDocument();
+    cmp.draft.set({ enabled: true, amount: '', conditions: [] });
+    expect(cmp.ready()).toBe(false);
+    cmp.draft.set({ enabled: true, amount: '100.00', conditions: [] });
+    expect(cmp.ready()).toBe(true);
+    cmp.submit();
+    const post = http.expectOne((r) => r.url === '/api/applications/app-1/force-status');
+    expect(post.request.body).toEqual({
+      stateId: 's4',
+      reason: 'outside_decision',
+      note: null,
+      decision: { approvedAmount: '100.00', conditions: [] },
+    });
   });
 });

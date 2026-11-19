@@ -517,6 +517,8 @@
 <app-force-status-dialog
   [applicationId]="app()?.id ?? null"
   [currentStateId]="app()?.state?.id ?? null"
+  [requested]="app()?.amount ?? null"
+  [currency]="app()?.currency ?? 'EUR'"
   [(open)]="forceDialogOpen"
   (done)="onForced()"
 />

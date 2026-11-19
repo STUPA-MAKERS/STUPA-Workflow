@@ -413,7 +413,12 @@ export function mockApplicationsWrite(method: string, p: string, body: unknown):
     return amendAmount(d, (body ?? {}) as AmendAmountBody);
   }
   if (method === 'POST' && m[2] === 'force-status') {
-    const req = (body ?? {}) as { stateId?: string; reason?: string; note?: string | null };
+    const req = (body ?? {}) as {
+      stateId?: string;
+      reason?: string;
+      note?: string | null;
+      decision?: { approvedAmount: string | null; conditions: readonly string[] } | null;
+    };
     const key = (Object.keys(STATES) as StateKey[]).find((k) => STATES[k].id === req.stateId);
     const event: TimelineEventOutWire | null = key
       ? {
@@ -427,7 +432,16 @@ export function mockApplicationsWrite(method: string, p: string, body: unknown):
           forceReason: req.reason ?? null,
         }
       : null;
-    const after = key && event ? replaceRow(d, { state: key, events: [...(d.events ?? []), event] }) : d;
+    const decision =
+      key === 'approved' && req.decision
+        ? {
+            approved: req.decision.approvedAmount !== null ? Number(req.decision.approvedAmount) : null,
+            conditions: req.decision.conditions,
+            at: new Date().toISOString(),
+          }
+        : d.decision;
+    const after =
+      key && event ? replaceRow(d, { state: key, events: [...(d.events ?? []), event], decision }) : d;
     return {
       newStateId: STATES[after.state].id,
       statusEventId: 'e1000000-0000-0000-0000-000000000002',

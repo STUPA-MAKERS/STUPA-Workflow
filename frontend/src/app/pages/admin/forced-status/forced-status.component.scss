@@ -12,6 +12,11 @@
   align-items: start;
 }
 
+.fs__list {
+  display: block;
+  margin-top: var(--space-4);
+}
+
 .fs__muted {
   margin: 0;
   color: var(--color-text-muted);

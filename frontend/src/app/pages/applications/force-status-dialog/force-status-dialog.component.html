@@ -4,7 +4,6 @@
   [closeLabel]="'action.close' | t"
   (closed)="close()"
 >
-  <p class="fsd__lead">{{ 'applications.detail.forceStatusLead' | t }}</p>
   <app-select
     [label]="'applications.detail.forceStatusField' | t"
     [placeholder]="'applications.detail.forceStatusPlaceholder' | t"
@@ -12,6 +11,17 @@
     [ngModel]="choice()"
     (ngModelChange)="choice.set($event)"
   />
+  @if (needsAmount()) {
+    <app-decision-editor
+      class="fsd__gap"
+      idPrefix="fsd"
+      [required]="true"
+      [requested]="requested()"
+      [currency]="currency()"
+      [draft]="draft()"
+      (draftChange)="draft.set($event)"
+    />
+  }
   <app-select
     class="fsd__gap"
     [label]="'applications.detail.forceStatusReason' | t"

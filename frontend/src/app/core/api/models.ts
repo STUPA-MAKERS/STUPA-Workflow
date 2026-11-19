@@ -788,6 +788,8 @@ export interface ForceStatusBody {
   readonly stateId: Uuid;
   readonly reason: ForceReason;
   readonly note?: string | null;
+  /** The approved amount of a move into an approved state (spec 001653). */
+  readonly decision?: DecisionProposal | null;
 }
 
 /** `POST /applications/{id}/outside-decision`: a decision made in a meeting. */

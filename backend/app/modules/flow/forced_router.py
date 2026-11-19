@@ -44,9 +44,7 @@ async def get_forced_report(
     return await forced_report(db, start, end)
 
 
-@router.get(
-    "/admin/forced-status/events", response_model=list[ForcedEventOut], responses=_ERRORS
-)
+@router.get("/admin/forced-status/events", response_model=list[ForcedEventOut], responses=_ERRORS)
 async def get_forced_events(
     db: DbSession,
     date_from: FromQuery = None,
@@ -57,6 +55,4 @@ async def get_forced_events(
 ) -> list[ForcedEventOut]:
     """List the forced status changes behind a count of the report, the newest first."""
     start, end = period(date_from, date_to, _today())
-    return await forced_events(
-        db, start, end, reason=reason, from_key=from_key, to_key=to_key
-    )
+    return await forced_events(db, start, end, reason=reason, from_key=from_key, to_key=to_key)

@@ -210,6 +210,7 @@ async def force_status(
         principal,
         reason=payload.reason,
         note=payload.clean_note,
+        decision=payload.decision,
         allow_unconfirmed=False,
     )
 

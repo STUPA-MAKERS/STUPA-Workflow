@@ -20,7 +20,8 @@ scope:
 The admin page `Erzwungene Status` (`Forced status changes`) must show the forced status
 changes in a period. The default period is the last 90 days. The page must show the count per
 reason and the count per path (from state, to state), the largest count first. A click on a
-count must list the Anträge of that count. The page needs the permission `audit.read`.
+count must list the Anträge of that count on the page, below the tables, without a dialog. A
+second click on the same count must hide the list. The page needs the permission `audit.read`.
 
 Reason: A path that admins force often is a way that the flow does not have. The count shows which transition to add.
 
