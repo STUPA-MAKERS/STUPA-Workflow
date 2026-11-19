@@ -30,6 +30,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   ChipComponent,
   DatepickerComponent,
   TimeInputComponent,
@@ -95,6 +96,7 @@ export interface TodoCardCopy {
     FormsModule,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     DatepickerComponent,
     TimeInputComponent,
     DialogComponent,

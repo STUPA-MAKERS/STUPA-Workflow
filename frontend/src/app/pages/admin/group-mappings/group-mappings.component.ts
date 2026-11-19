@@ -10,6 +10,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import type { Uuid } from '@core/api/models';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   ConfirmDialogComponent,
   DialogComponent,
   EmptyStateComponent,
@@ -113,6 +114,7 @@ const RESERVED_GROUP_PREFIX = 'vote:';
     RowMenuComponent,
     SkeletonComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     InputComponent,
     SelectFieldComponent,
     DialogComponent,

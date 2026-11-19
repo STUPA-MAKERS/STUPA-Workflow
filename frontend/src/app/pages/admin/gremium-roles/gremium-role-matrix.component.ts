@@ -16,6 +16,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   CapitalizePipe,
   ConfirmDialogComponent,
   EmptyStateComponent,
@@ -69,6 +70,7 @@ let nextId = 0;
     TranslatePipe,
     CapitalizePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     RowMenuComponent,
     SkeletonComponent,

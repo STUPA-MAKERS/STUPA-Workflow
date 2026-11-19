@@ -12,7 +12,7 @@ import type { ApplicationListItem, Transition } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { isRejection } from '../applications.util';
-import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@stupa-makers/ui-kit';
+import { RowMenuComponent, type RowMenuItem, type RowMenuSection, ButtonGroupComponent } from '@stupa-makers/ui-kit';
 
 type T = (key: Parameters<I18nService['translate']>[0]) => string;
 
@@ -56,7 +56,7 @@ export type RowAction =
   selector: 'app-row-transitions-menu',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RowMenuComponent],
+  imports: [ButtonGroupComponent, RowMenuComponent],
   templateUrl: './row-transitions-menu.component.html',
   styleUrl: './row-transitions-menu.component.scss',
 })

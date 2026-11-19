@@ -19,6 +19,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   EmptyStateComponent,
   IconComponent,
   MEDIA,
@@ -141,6 +142,7 @@ const MIN_FIT_SCALE = 0.75;
     FabComponent,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     VersionHistoryComponent,
     StateInspectorComponent,
     TransitionInspectorComponent,

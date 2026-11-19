@@ -5,7 +5,9 @@
   }
 </div>
 @if (!docked()) {
-  <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="closed.emit()">
-    <app-icon name="x" />
-  </app-button>
+  <app-button-group>
+    <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="closed.emit()">
+      <app-icon name="x" />
+    </app-button>
+  </app-button-group>
 }

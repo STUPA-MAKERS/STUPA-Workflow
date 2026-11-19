@@ -22,9 +22,11 @@
       <p class="bp__hint">{{ 'expenses.bulk.reassignFixed' | t: { names: fixedNames() } }}</p>
     }
     <div class="bp__end">
-      <app-button variant="fill" size="sm" [disabled]="!canReassign() || busy()" [loading]="busy()" (click)="reassign.emit()">
-        <span class="ff__btn"><app-icon name="repeat" />{{ 'expenses.bulk.reassignConfirm' | t }}</span>
-      </app-button>
+      <app-button-group [main]="true">
+        <app-button variant="fill" size="sm" [disabled]="!canReassign() || busy()" [loading]="busy()" (click)="reassign.emit()">
+          <span class="ff__btn"><app-icon name="repeat" />{{ 'expenses.bulk.reassignConfirm' | t }}</span>
+        </app-button>
+      </app-button-group>
     </div>
   </div>
 </ng-template>
@@ -82,9 +84,11 @@
           <app-section class="fd__sec" [heading]="'expenses.export' | t">
             <div class="bp__action">
               <span>{{ 'expenses.bulk.exportLine' | t: { count: rows().length } }}</span>
-              <app-button variant="fill" size="sm" [disabled]="busy()" (click)="exported.emit()">
-                <span class="ff__btn"><app-icon name="download" />{{ 'expenses.bulk.exportConfirm' | t }}</span>
-              </app-button>
+              <app-button-group [main]="true">
+                <app-button variant="fill" size="sm" [disabled]="busy()" (click)="exported.emit()">
+                  <span class="ff__btn"><app-icon name="download" />{{ 'expenses.bulk.exportConfirm' | t }}</span>
+                </app-button>
+              </app-button-group>
             </div>
           </app-section>
         }
@@ -92,11 +96,13 @@
         <app-section class="fd__sec" [heading]="'action.delete' | t">
           <div class="bp__action">
             <span>{{ deleteReason() ?? ('expenses.bulk.deleteLimit' | t: { max: deleteMax() }) }}</span>
-            <app-button variant="danger" size="sm" [disabled]="busy() || deleteReason() !== null" (click)="remove.emit()">
-              <span class="ff__btn"><app-icon name="trash" />{{
-                'expenses.bulk.deleteCount' | t: { count: rows().length }
-              }}</span>
-            </app-button>
+            <app-button-group>
+              <app-button variant="danger" size="sm" [disabled]="busy() || deleteReason() !== null" (click)="remove.emit()">
+                <span class="ff__btn"><app-icon name="trash" />{{
+                  'expenses.bulk.deleteCount' | t: { count: rows().length }
+                }}</span>
+              </app-button>
+            </app-button-group>
           </div>
         </app-section>
       </div>

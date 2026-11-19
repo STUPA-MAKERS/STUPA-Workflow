@@ -18,7 +18,7 @@ import type { Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { AvatarComponent, ButtonComponent, IconComponent, ToastService } from '@stupa-makers/ui-kit';
+import { AvatarComponent, ButtonComponent, ButtonGroupComponent, IconComponent, ToastService } from '@stupa-makers/ui-kit';
 import { DelegationDialogComponent } from './delegation-dialog/delegation-dialog.component';
 
 /** A change of the own delegation: a new one, or a revoked one with its delegator. */
@@ -49,6 +49,7 @@ export type DelegationCardChange = { readonly kind: 'created' } | { readonly kin
     LocalizedDatePipe,
     AvatarComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     DelegationDialogComponent,
   ],

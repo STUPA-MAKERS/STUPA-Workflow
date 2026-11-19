@@ -5,6 +5,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   EmptyStateComponent,
   IconComponent,
   liveSearch,
@@ -28,7 +29,7 @@ export const ARCHIVE_PAGE = 50;
   selector: 'app-todo-archive-sheet',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LoadErrorComponent, TranslatePipe, ButtonComponent, EmptyStateComponent, IconComponent, SearchPillComponent, SideSheetComponent],
+  imports: [LoadErrorComponent, TranslatePipe, ButtonComponent, ButtonGroupComponent, EmptyStateComponent, IconComponent, SearchPillComponent, SideSheetComponent],
   templateUrl: './todo-archive-sheet.component.html',
   styleUrl: './todo-archive-sheet.component.scss',
 })

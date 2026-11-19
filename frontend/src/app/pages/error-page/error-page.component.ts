@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { ButtonLinkComponent, IconComponent, type IconName } from '@stupa-makers/ui-kit';
+import { ButtonLinkComponent, IconComponent, type IconName, ButtonGroupComponent } from '@stupa-makers/ui-kit';
 
 /**
  * The block of an error page (403, 404): the code, a heading with its icon, one
@@ -11,7 +11,7 @@ import { ButtonLinkComponent, IconComponent, type IconName } from '@stupa-makers
   selector: 'app-error-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, ButtonLinkComponent, IconComponent],
+  imports: [ButtonGroupComponent, RouterLink, ButtonLinkComponent, IconComponent],
   templateUrl: './error-page.component.html',
   styleUrl: './error-page.component.scss',
 })

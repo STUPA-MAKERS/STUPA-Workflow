@@ -8,30 +8,32 @@
   >
     @if (showActions()) {
       <span sectionAction class="tl__actions">
-        @if (showLink()) {
-          <app-button
-            variant="text"
-            size="sm"
-            [iconOnly]="true"
-            [ariaLabel]="'todos.linked.link' | t"
-            data-testid="tl-link"
-            (click)="linkOpen.set(!linkOpen())"
-          >
-            <app-icon name="link" />
-          </app-button>
-        }
-        @if (showNew()) {
-          <app-button
-            variant="text"
-            size="sm"
-            [iconOnly]="true"
-            [ariaLabel]="'todos.linked.add' | t"
-            data-testid="tl-new"
-            (click)="newOpen.set(true)"
-          >
-            <app-icon name="plus" />
-          </app-button>
-        }
+        <app-button-group>
+          @if (showLink()) {
+            <app-button
+              variant="text"
+              size="sm"
+              [iconOnly]="true"
+              [ariaLabel]="'todos.linked.link' | t"
+              data-testid="tl-link"
+              (click)="linkOpen.set(!linkOpen())"
+            >
+              <app-icon name="link" />
+            </app-button>
+          }
+          @if (showNew()) {
+            <app-button
+              variant="text"
+              size="sm"
+              [iconOnly]="true"
+              [ariaLabel]="'todos.linked.add' | t"
+              data-testid="tl-new"
+              (click)="newOpen.set(true)"
+            >
+              <app-icon name="plus" />
+            </app-button>
+          }
+        </app-button-group>
       </span>
     }
     @if (hasRows()) {

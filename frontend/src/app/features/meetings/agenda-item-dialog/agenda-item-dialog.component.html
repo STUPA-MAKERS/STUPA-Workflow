@@ -137,13 +137,17 @@
       <app-empty-state shape="choice"
         [heading]="listText().noMatch | t: { q: activeQuery() }"
       >
-        <app-button variant="text" size="sm" (click)="clearSearch()">{{ 'invoices.filter.reset' | t }}</app-button>
+        <app-button-group>
+          <app-button variant="text" size="sm" (click)="clearSearch()">{{ 'invoices.filter.reset' | t }}</app-button>
+        </app-button-group>
       </app-empty-state>
     } @else {
       <app-empty-state shape="choice"
         [heading]="listText().none | t"
       >
-        <app-button variant="tonal" size="sm" (click)="asFreetext()">{{ 'meetings.agenda.asFreetext' | t }}</app-button>
+        <app-button-group>
+          <app-button variant="tonal" size="sm" (click)="asFreetext()">{{ 'meetings.agenda.asFreetext' | t }}</app-button>
+        </app-button-group>
       </app-empty-state>
     }
   </ng-template>

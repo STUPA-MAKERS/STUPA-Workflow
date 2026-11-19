@@ -55,10 +55,12 @@
             </div>
           } @else {
           <div class="cal-list__more">
-            <app-button variant="text" size="sm" [loading]="loading()" (click)="loadEarlier()">
-              <app-icon name="up" />
-              {{ 'calendar.list.earlier' | t }}
-            </app-button>
+            <app-button-group>
+              <app-button variant="text" size="sm" [loading]="loading()" (click)="loadEarlier()">
+                <app-icon name="up" />
+                {{ 'calendar.list.earlier' | t }}
+              </app-button>
+            </app-button-group>
           </div>
           @for (day of days(); track day.iso) {
             <app-list-group [label]="day.label">
@@ -79,10 +81,12 @@
             }
           }
           <div class="cal-list__more">
-            <app-button variant="text" size="sm" [loading]="loading()" (click)="loadLater()">
-              <app-icon name="down" />
-              {{ 'calendar.list.later' | t }}
-            </app-button>
+            <app-button-group>
+              <app-button variant="text" size="sm" [loading]="loading()" (click)="loadLater()">
+                <app-icon name="down" />
+                {{ 'calendar.list.later' | t }}
+              </app-button>
+            </app-button-group>
           </div>
           }
         }
@@ -116,22 +120,26 @@
 
     <div class="cal__tools" role="toolbar" [attr.aria-label]="titleKey | t">
       <div class="cal__nav">
-        <app-button
-          variant="text"
-          [iconOnly]="true"
-          [ariaLabel]="(view() === 'week' ? 'calendar.prev.week' : 'calendar.prev.month') | t"
-          [title]="(view() === 'week' ? 'calendar.prev.week' : 'calendar.prev.month') | t"
-          (click)="step(-1)"
-        ><app-icon name="left" /></app-button>
+        <app-button-group>
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="(view() === 'week' ? 'calendar.prev.week' : 'calendar.prev.month') | t"
+            [title]="(view() === 'week' ? 'calendar.prev.week' : 'calendar.prev.month') | t"
+            (click)="step(-1)"
+          ><app-icon name="left" /></app-button>
+        </app-button-group>
         <h2 class="cal__month" aria-live="polite">{{ heading() }}</h2>
-        <app-button
-          variant="text"
-          [iconOnly]="true"
-          [ariaLabel]="(view() === 'week' ? 'calendar.next.week' : 'calendar.next.month') | t"
-          [title]="(view() === 'week' ? 'calendar.next.week' : 'calendar.next.month') | t"
-          (click)="step(1)"
-        ><app-icon name="right" /></app-button>
-        <app-button class="cal__today" variant="outlined" (click)="goToday()">{{ 'meetings.overview.today' | t }}</app-button>
+        <app-button-group>
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="(view() === 'week' ? 'calendar.next.week' : 'calendar.next.month') | t"
+            [title]="(view() === 'week' ? 'calendar.next.week' : 'calendar.next.month') | t"
+            (click)="step(1)"
+          ><app-icon name="right" /></app-button>
+          <app-button class="cal__today" variant="outlined" (click)="goToday()">{{ 'meetings.overview.today' | t }}</app-button>
+        </app-button-group>
         <app-segmented
           class="cal__view"
           [ariaLabel]="'calendar.view.label' | t"

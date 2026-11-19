@@ -45,11 +45,13 @@
                     }
                   </span>
                   <span class="dl__act">
-                    <app-row-menu
-                      [sections]="rowMenu()"
-                      [label]="('ui.rowMenu.trigger' | t) + ': ' + who(d, 'from') + ' → ' + who(d, 'to')"
-                      (selected)="askRevoke(d)"
-                    />
+                    <app-button-group>
+                      <app-row-menu
+                        [sections]="rowMenu()"
+                        [label]="('ui.rowMenu.trigger' | t) + ': ' + who(d, 'from') + ' → ' + who(d, 'to')"
+                        (selected)="askRevoke(d)"
+                      />
+                    </app-button-group>
                   </span>
                 </li>
               }

@@ -10,6 +10,7 @@ import { erasureStatus } from '@shared/ui';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   CellDirective,
   type ColumnDef,
   ConfirmDialogComponent,
@@ -66,6 +67,7 @@ const PERSON_HITS = 6;
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     DataTableComponent,
     CellDirective,
     DialogComponent,

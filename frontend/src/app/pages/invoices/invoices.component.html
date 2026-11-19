@@ -109,7 +109,9 @@
         } @else if (!items().length) {
           <app-empty-state [heading]="'invoices.empty' | t">
             @if (activeFilterCount() > 0) {
-              <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'invoices.filter.reset' | t }}</app-button>
+              <app-button-group>
+                <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'invoices.filter.reset' | t }}</app-button>
+              </app-button-group>
             }
           </app-empty-state>
         } @else {
@@ -156,12 +158,14 @@
                             </span>
                           }
                           @if (menu.length) {
-                            <app-row-menu
-                              class="inv__menu"
-                              [label]="rowMenuLabel(i)"
-                              [sections]="menu"
-                              (selected)="onRowMenu($event, i)"
-                            />
+                            <app-button-group>
+                              <app-row-menu
+                                class="inv__menu"
+                                [label]="rowMenuLabel(i)"
+                                [sections]="menu"
+                                (selected)="onRowMenu($event, i)"
+                              />
+                            </app-button-group>
                           }
                         </span>
                       }
@@ -175,9 +179,11 @@
           @if (hasMore()) {
             <div class="inv__sentinel" appInfiniteScroll [scrollRoot]="split() ? scroller : null" (scrolledToEnd)="loadMore()" aria-hidden="true"></div>
             <div class="inv__more">
-              <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">{{
-                'invoices.loadMore' | t
-              }}</app-button>
+              <app-button-group>
+                <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">{{
+                  'invoices.loadMore' | t
+                }}</app-button>
+              </app-button-group>
             </div>
           }
         }

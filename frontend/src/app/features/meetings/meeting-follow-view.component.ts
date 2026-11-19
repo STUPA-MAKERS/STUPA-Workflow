@@ -22,6 +22,7 @@ import {
 } from '@shared/status-kind.util';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   EmptyStateComponent,
   IconComponent,
   MEDIA,
@@ -92,6 +93,7 @@ const EXCERPT_LENGTH = 160;
     TranslatePipe,
     ScrollFadeDirective,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     SideSheetComponent,
     AgendaPaneComponent,

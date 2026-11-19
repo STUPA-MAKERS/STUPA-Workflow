@@ -16,6 +16,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   DialogComponent,
   IconComponent,
 } from '@stupa-makers/ui-kit';
@@ -52,7 +53,7 @@ interface ModeOption {
   selector: 'app-handover-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, DialogComponent, ButtonComponent, IconComponent, AvatarComponent],
+  imports: [TranslatePipe, DialogComponent, ButtonComponent, ButtonGroupComponent, IconComponent, AvatarComponent],
   templateUrl: './handover-dialog.component.html',
   styleUrl: './handover-dialog.component.scss',
 })

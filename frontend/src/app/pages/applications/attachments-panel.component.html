@@ -19,18 +19,20 @@
         (change)="onFileSelected($event)"
         [attr.aria-label]="'applications.attachments.upload' | t"
       />
-      <app-button
-        variant="text"
-        size="sm"
-        [loading]="uploading()"
-        [title]="'applications.attachments.dropHint' | t"
-        (click)="fileInput.click()"
-      >
-        <span class="att__btn">
-          <app-icon name="upload" />
-          {{ (uploading() ? 'applications.attachments.uploading' : 'applications.attachments.upload') | t }}
-        </span>
-      </app-button>
+      <app-button-group>
+        <app-button
+          variant="text"
+          size="sm"
+          [loading]="uploading()"
+          [title]="'applications.attachments.dropHint' | t"
+          (click)="fileInput.click()"
+        >
+          <span class="att__btn">
+            <app-icon name="upload" />
+            {{ (uploading() ? 'applications.attachments.uploading' : 'applications.attachments.upload') | t }}
+          </span>
+        </app-button>
+      </app-button-group>
     </span>
   }
 
@@ -42,15 +44,17 @@
         [countLabel]="'applications.attachments.selectedCount' | t: { count: selectedCount() }"
         (cleared)="clearSelection()"
       >
-        <app-button
-          variant="danger"
-          size="sm"
-          [loading]="bulkDeleting()"
-          [disabled]="bulkDeleting()"
-          (click)="askBulkDelete()"
-        >
-          {{ 'applications.attachments.deleteSelected' | t }}
-        </app-button>
+        <app-button-group>
+          <app-button
+            variant="danger"
+            size="sm"
+            [loading]="bulkDeleting()"
+            [disabled]="bulkDeleting()"
+            (click)="askBulkDelete()"
+          >
+            {{ 'applications.attachments.deleteSelected' | t }}
+          </app-button>
+        </app-button-group>
       </app-selection-bar>
     }
     <ul class="rowgroup att__list">
@@ -78,46 +82,48 @@
             </span>
           </div>
           <div class="att__actions">
-            <!-- A file that the viewer shows opens there; its bar holds the download (001080). -->
-            @if (canPreview(att)) {
-              <app-button
-                variant="text"
-                size="sm"
-                [iconOnly]="true"
-                [ariaLabel]="'applications.attachments.open' | t"
-                [title]="'applications.attachments.open' | t"
-                [loading]="previewLoadingId() === att.id"
-                [disabled]="previewLoadingId() !== null && previewLoadingId() !== att.id"
-                (click)="openPreview(att)"
-              >
-                <app-icon name="file" />
-              </app-button>
-            } @else {
-              <app-button
-                variant="text"
-                size="sm"
-                [iconOnly]="true"
-                [ariaLabel]="'applications.attachments.download' | t"
-                [disabled]="att.scanState !== 'clean' || downloadingId() === att.id"
-                [loading]="downloadingId() === att.id"
-                (click)="download(att)"
-              >
-                <app-icon name="download" />
-              </app-button>
-            }
-            @if (deleteAllowed()) {
-              <app-button
-                variant="text"
-                size="sm"
-                [iconOnly]="true"
-                [ariaLabel]="'applications.attachments.delete' | t"
-                [disabled]="removingId() === att.id"
-                [loading]="removingId() === att.id"
-                (click)="askRemove(att)"
-              >
-                <app-icon name="trash" />
-              </app-button>
-            }
+            <app-button-group>
+              <!-- A file that the viewer shows opens there; its bar holds the download (001080). -->
+              @if (canPreview(att)) {
+                <app-button
+                  variant="text"
+                  size="sm"
+                  [iconOnly]="true"
+                  [ariaLabel]="'applications.attachments.open' | t"
+                  [title]="'applications.attachments.open' | t"
+                  [loading]="previewLoadingId() === att.id"
+                  [disabled]="previewLoadingId() !== null && previewLoadingId() !== att.id"
+                  (click)="openPreview(att)"
+                >
+                  <app-icon name="file" />
+                </app-button>
+              } @else {
+                <app-button
+                  variant="text"
+                  size="sm"
+                  [iconOnly]="true"
+                  [ariaLabel]="'applications.attachments.download' | t"
+                  [disabled]="att.scanState !== 'clean' || downloadingId() === att.id"
+                  [loading]="downloadingId() === att.id"
+                  (click)="download(att)"
+                >
+                  <app-icon name="download" />
+                </app-button>
+              }
+              @if (deleteAllowed()) {
+                <app-button
+                  variant="text"
+                  size="sm"
+                  [iconOnly]="true"
+                  [ariaLabel]="'applications.attachments.delete' | t"
+                  [disabled]="removingId() === att.id"
+                  [loading]="removingId() === att.id"
+                  (click)="askRemove(att)"
+                >
+                  <app-icon name="trash" />
+                </app-button>
+              }
+            </app-button-group>
           </div>
         </li>
       }

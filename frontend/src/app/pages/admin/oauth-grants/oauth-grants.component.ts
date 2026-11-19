@@ -8,6 +8,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   ConfirmDialogComponent,
   EmptyStateComponent,
   FilterSelectComponent,
@@ -61,6 +62,7 @@ const PAGE_SIZE = 25;
     LocalizedDatePipe,
     AvatarComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     EmptyStateComponent,
     FilterSelectComponent,
     NoteComponent,

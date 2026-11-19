@@ -4,7 +4,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { longDate } from '@shared/date-format';
-import { ButtonComponent, ButtonLinkComponent, ConfirmDialogComponent, IconComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, ButtonLinkComponent, ConfirmDialogComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { FileOpenService } from '@shared/viewer/file-open.service';
 import { MeetingSessionService } from '../meeting-session.service';
 import { type ProtocolAction, protocolActions, protocolMenuItems } from './protocol-actions.util';
@@ -44,6 +44,7 @@ import { ProtocolApprovalDialogComponent } from '../protocol-approval-dialog/pro
   imports: [
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     ButtonLinkComponent,
     ConfirmDialogComponent,
     IconComponent,

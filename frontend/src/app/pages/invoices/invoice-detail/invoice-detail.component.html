@@ -42,9 +42,11 @@
     <!-- "Buchung anlegen" stands in the head of the section "Buchungen" and in the head menu (§ 000671, 001292). -->
     @if (canManage() && i.status === 'open') {
       <div class="fd__actions">
-        <app-button variant="fill" [loading]="markingPaid()" (click)="markPaid.emit()">
-          <span class="fd__btn"><app-icon name="check" />{{ 'invoices.markPaid' | t }}</span>
-        </app-button>
+        <app-button-group [main]="true">
+          <app-button variant="fill" [loading]="markingPaid()" (click)="markPaid.emit()">
+            <span class="fd__btn"><app-icon name="check" />{{ 'invoices.markPaid' | t }}</span>
+          </app-button>
+        </app-button-group>
       </div>
     }
   </header>
@@ -121,9 +123,11 @@
       @if (i.linkedBookings !== undefined) {
         <app-section class="fd__sec id__secBookings" [heading]="'invoices.col.bookings' | t">
           @if (canManage()) {
-            <app-button sectionAction variant="tonal" size="sm" (click)="createBooking.emit()">
-              <span class="fd__btn"><app-icon name="plus" />{{ 'invoices.createBooking' | t }}</span>
-            </app-button>
+            <app-button-group ngProjectAs="[sectionAction]">
+              <app-button sectionAction variant="tonal" size="sm" (click)="createBooking.emit()">
+                <span class="fd__btn"><app-icon name="plus" />{{ 'invoices.createBooking' | t }}</span>
+              </app-button>
+            </app-button-group>
           }
           @if (!bookings().length) {
             <app-empty-state rows="1" [heading]="'invoices.detail.noBookings' | t" />

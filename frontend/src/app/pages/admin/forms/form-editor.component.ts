@@ -20,6 +20,7 @@ import type { FieldType, FormFieldDef, I18nMap, Uuid } from '@core/api/models';
 import { langFieldLabel, resolveI18n, sameI18n, setI18n } from '@shared/forms/i18n-text';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   CheckboxComponent,
   EmptyStateComponent,
   IconComponent,
@@ -118,6 +119,7 @@ type QPos = QuestionPos;
     FormsModule,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     CheckboxComponent,
     SelectFieldComponent,
     IconComponent,

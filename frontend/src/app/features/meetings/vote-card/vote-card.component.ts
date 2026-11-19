@@ -15,6 +15,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import type { MeetingStatus, MeetingVote, MyBallot, Uuid, Vote } from '@core/api/models';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   IconComponent,
   RowMenuComponent,
   type RowMenuItem,
@@ -87,6 +88,7 @@ import { problemDetail } from '@core/api/problem';
     TranslatePipe,
     BallotComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     ElectionResultComponent,
     IconComponent,
     PollResultComponent,

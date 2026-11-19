@@ -7,6 +7,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { backupStatus } from '@shared/ui';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   CellDirective,
   type ColumnDef,
   ConfirmDialogComponent,
@@ -74,6 +75,7 @@ const POLL_TIMEOUT_MS = 30 * 60 * 1000;
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     DataTableComponent,
     CellDirective,
     DialogComponent,

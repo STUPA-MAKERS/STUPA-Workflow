@@ -15,6 +15,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   InputComponent,
   SegmentedComponent,
   type SegmentedOption,
@@ -50,7 +51,7 @@ export interface OwnAttendanceChange {
   selector: 'app-participant-attendance',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, InputComponent, SegmentedComponent, StatusTextComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, ButtonGroupComponent, InputComponent, SegmentedComponent, StatusTextComponent],
   templateUrl: './participant-attendance.component.html',
   styleUrl: './participant-attendance.component.scss',
 })

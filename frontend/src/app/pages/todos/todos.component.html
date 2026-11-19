@@ -170,7 +170,9 @@
         <app-empty-state shape="card" fill [heading]="'todos.all.empty' | t" />
       } @else if (noMatch()) {
         <app-empty-state shape="card" fill [heading]="'todos.noMatch' | t">
-          <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'todos.filter.reset' | t }}</app-button>
+          <app-button-group>
+            <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'todos.filter.reset' | t }}</app-button>
+          </app-button-group>
         </app-empty-state>
       }
       <app-todo-board-rows
@@ -206,7 +208,9 @@
     } @else if (board(); as b) {
       @if (noMatch()) {
         <app-empty-state shape="card" fill [heading]="'todos.noMatch' | t">
-          <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'todos.filter.reset' | t }}</app-button>
+          <app-button-group>
+            <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'todos.filter.reset' | t }}</app-button>
+          </app-button-group>
         </app-empty-state>
       } @else if (view() === 'list') {
         <app-todo-list-view
