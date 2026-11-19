@@ -599,3 +599,10 @@ class ObserverEnd(FrozenStrictCamelModel, frozen=True):
     """End an observation with the token of the end link of a mail."""
 
     token: str = Field(min_length=1, max_length=200)
+
+
+class BulkCommentCreate(FrozenStrictCamelModel, frozen=True):
+    """`POST /bulk/applications/comments`: one public comment on each selected Antrag."""
+
+    application_ids: list[UUID] = Field(alias="applicationIds", min_length=1, max_length=100)
+    body: str = Field(min_length=1, max_length=10_000)

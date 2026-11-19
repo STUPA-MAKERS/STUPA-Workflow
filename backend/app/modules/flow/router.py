@@ -26,8 +26,13 @@ from app.modules.applications.access import (
 from app.modules.applications.decision import not_allowed_problem
 from app.modules.applications.schemas import StateOut
 from app.modules.auth.principal import Principal
+from app.modules.flow.bulk import bulk_fire, bulk_options
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
 from app.modules.flow.schemas import (
+    BulkResult,
+    BulkSelection,
+    BulkTransitionOption,
+    BulkTransitionRequest,
     ForceStatusRequest,
     TransitionOut,
     TransitionRequest,
@@ -244,3 +249,52 @@ async def fire_applicant_transition(
         note=payload.note,
         allow_unconfirmed=False,
     )
+
+
+#: A bulk action of the Antrag list needs both rights: the selection is a step of the
+#: application management (spec 001700), and the fire is a transition.
+BulkPrincipalDep = Annotated[
+    Principal, Depends(require_principal("application.manage", MANAGE_PERMISSION))
+]
+
+
+@router.post(
+    "/bulk/applications/transitions",
+    response_model=list[BulkTransitionOption],
+    responses=_errors(400, 401, 403, 422),
+)
+async def list_bulk_transitions(
+    payload: BulkSelection,
+    service: ServiceDep,
+    principal: BulkPrincipalDep,
+) -> list[BulkTransitionOption]:
+    """List the targets that every selected Antrag reaches by a manual transition.
+
+    A target in an approved state lists the requested amount of each Antrag, which the
+    fire approves. An Antrag that the caller cannot read leaves an empty list. A
+    transition onto an agenda is not offered, because it needs a meeting per Antrag.
+    """
+    return await bulk_options(service, payload.application_ids, principal)
+
+
+@router.post(
+    "/bulk/applications/transition",
+    response_model=BulkResult,
+    responses=_errors(400, 401, 403, 422),
+)
+async def fire_bulk_transition(
+    payload: BulkTransitionRequest,
+    service: ServiceDep,
+    principal: BulkPrincipalDep,
+) -> BulkResult:
+    """Move every selected Antrag into ``toStateId``, each in its own transaction.
+
+    The route checks the read right, the transition and its guard of each Antrag again.
+    An error at one Antrag does not stop the others: its entry carries the code and the
+    text of the error (spec 001703). An approved target approves each Antrag with its
+    requested amount.
+    """
+    results = await bulk_fire(
+        service, payload.application_ids, payload.to_state_id, principal, note=payload.note
+    )
+    return BulkResult(results=tuple(results))
