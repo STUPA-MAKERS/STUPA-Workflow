@@ -19,18 +19,14 @@
   background: var(--color-surface-1);
   overflow: hidden;
 }
-/* The band of the protocol is the top of the pane: an edge of the band follows the round
-   corners of the pane, or the pane cuts it. */
-app-protocol-bar {
-  --pb-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
-}
-
 .ts__head {
   display: flex;
   flex: none;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-5) 28px var(--space-2);
+  // The capitals of the kicker sit 28px below the top edge, as far as the text from the side:
+  // 5px of its 18px line are above the capitals.
+  padding: 23px 28px var(--space-2);
 }
 .ts__done {
   flex: none;
@@ -299,9 +295,6 @@ app-protocol-bar {
   // The protocol is the page there, not a card on it: no surface, no clip, and the format
   // bar sticks below the bar of the page (`--ld-bar-height`) while the text scrolls, as
   // frosted glass like that bar.
-  app-protocol-bar {
-    --pb-radius: 0;
-  }
   .ts {
     border-radius: 0;
     background: transparent;

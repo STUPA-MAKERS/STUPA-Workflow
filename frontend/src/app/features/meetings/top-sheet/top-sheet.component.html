@@ -2,9 +2,6 @@
 @let proto = protocol();
 
 <article class="ts">
-  @if (proto && m.status === 'closed') {
-    <app-protocol-bar [meeting]="m" [protocol]="proto" [finalizing]="finalizing()" (finalize)="finalize.emit()" />
-  }
   @if (top(); as t) {
     <header class="ts__head">
       <div class="ts__titles">

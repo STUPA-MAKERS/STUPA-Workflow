@@ -14,23 +14,13 @@ updates:
         patterns:
           - "@angular/*"
           - "@angular-eslint/*"
-    # Majors that couple to Angular 22 stay excluded (2026-07). That upgrade is a
-    # project of its own. It needs a @stupa-makers/ui-kit release, because the peers
-    # there are ^20.0.0. Until then these pull requests only turn the build red.
-    # Remove these entries during the Angular 22 migration.
+    # TypeScript 7 stays excluded, because Angular 22 accepts only TypeScript >=6.0 <6.1,
+    # so that pull request only turns the build red. Remove the entry with the Angular
+    # major that accepts TypeScript 7.
     ignore:
-      - dependency-name: "@angular/*"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "@angular-eslint/*"
-        update-types: ["version-update:semver-major"]
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
-      - dependency-name: "zone.js"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
-      - dependency-name: "jest-preset-angular"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "@testing-library/angular"
-        update-types: ["version-update:semver-major"]
+      # @eslint/js follows the major of eslint, which is 9.
       - dependency-name: "@eslint/js"
         update-types: ["version-update:semver-major"]
       # @types/node follows the CI and runtime Node major (setup-node: 22). A higher
@@ -39,10 +29,6 @@ updates:
         update-types: ["version-update:semver-major"]
       # Tailwind 4 brings a new CSS-first config model. Plan that migration separately.
       - dependency-name: "tailwindcss"
-        update-types: ["version-update:semver-major"]
-      # @ngx-formly/core 10 and later need @angular/forms >= 21, so npm ci fails with
-      # ERESOLVE on Angular 20. Remove this entry during the Angular migration.
-      - dependency-name: "@ngx-formly/core"
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: pip

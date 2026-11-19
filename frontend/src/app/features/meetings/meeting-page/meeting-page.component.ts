@@ -39,7 +39,10 @@ import {
   ScrollFadeDirective,
   SideSheetComponent,
 } from '@stupa-makers/ui-kit';
-import { meetingStatus } from '@shared/status-kind.util';
+import { meetingStatus, protocolStatus } from '@shared/status-kind.util';
+import { ProtocolBarComponent } from '../protocol-bar/protocol-bar.component';
+import { protocolActions, protocolMenuItems } from '../protocol-bar/protocol-actions.util';
+import { longDate } from '@shared/date-format';
 import {
   type AgendaMove,
   AgendaPaneComponent,
@@ -80,7 +83,9 @@ type SessionAction = 'todos' | 'open' | 'agenda' | 'settings' | 'attendance' | '
  * agenda and holds the attendance and the minute-taker (on a phone before the opening:
  * the session menu).
  *
- * A closed meeting finalizes its protocol from the protocol bar of the sheet. The
+ * A closed meeting shows the state of its protocol as the status of the header, the
+ * finalize or the PDF as the main action, and the other protocol actions as the first
+ * section of the session menu (spec 001304). The
  * attendance opens as a side sheet. A minute-taker picked in the dock of a live meeting
  * goes to the handover dialog of `MeetingsComponent`.
  *
@@ -116,6 +121,7 @@ type SessionAction = 'todos' | 'open' | 'agenda' | 'settings' | 'attendance' | '
     AttendanceSheetComponent,
     JoinQrComponent,
     AvatarComponent,
+    ProtocolBarComponent,
   ],
   templateUrl: './meeting-page.component.html',
   styleUrl: './meeting-page.component.scss',
@@ -233,7 +239,14 @@ export class MeetingPageComponent {
     );
   }
 
-  protected readonly status = computed(() => meetingStatus(this.meeting().status));
+  /** The status of the head: the state of the protocol once the meeting is closed (spec 001304). */
+  protected readonly status = computed(() => {
+    const m = this.meeting();
+    const p = this.protocol();
+    return m.status === 'closed' && p ? protocolStatus(p) : meetingStatus(m.status);
+  });
+  /** The protocol part of the head: its action, its dialogs and its menu section. */
+  private readonly protocolBar = viewChild(ProtocolBarComponent);
   protected readonly locked = computed(() => this.protocol()?.isLocked ?? false);
   /**
    * The text of the item can be written. A planned meeting has no protocol yet, but its
@@ -303,8 +316,24 @@ export class MeetingPageComponent {
     ].join(' · ');
   });
 
-  /** The first meeting of a Wiederholungssitzung (§ 000940). */
-  protected readonly firstLink = computed(() => firstMeetingLink(this.meeting(), this.i18n));
+  /**
+   * The link of the head: the meeting that approved the protocol (spec 001304), else the
+   * first meeting of a Wiederholungssitzung (§ 000940). The phone bar has one line below the
+   * title, so there the status "Protokoll genehmigt" stands alone.
+   */
+  protected readonly headLink = computed(() => {
+    const p = this.protocol();
+    if (this.meeting().status === 'closed' && p?.approvedAt) {
+      if (this.phone() || !p.approvedMeetingId) return null;
+      const date = longDate(p.approvedMeetingDate ?? '', this.i18n.formatLocale());
+      const meeting = [p.approvedMeetingTitle, date].filter(Boolean).join(' · ');
+      return {
+        label: this.i18n.translate('meetings.protocolHead.approvedIn', { meeting }),
+        to: `/meetings/${p.approvedMeetingId}`,
+      };
+    }
+    return firstMeetingLink(this.meeting(), this.i18n);
+  });
 
   /** Presence is shown to the people who run the meeting, while it is live. */
   protected readonly showPresence = computed(() => {
@@ -319,7 +348,7 @@ export class MeetingPageComponent {
 
   /**
    * The main action of the header: open a planned meeting or close a live one. A closed
-   * meeting finalizes its protocol in the protocol bar of the sheet. `null` when the
+   * meeting shows the action of its protocol at the same place (spec 001304). `null` when the
    * viewer has none.
    */
   private readonly now = openWindowClock();
@@ -350,7 +379,7 @@ export class MeetingPageComponent {
   /**
    * The session menu: settings, attendance and delete. Below the wide layout the beamer
    * of a planned or live meeting goes in here too; on a phone the header keeps only the title, so the opening (first)
-   * and the close move in as well (the finalize is in the protocol bar). Above the phone width both are header buttons.
+   * and the close move in as well (the protocol action too). Above the phone width both are header buttons.
    *
    * The beamer route and its stream need session.manage in the gremium.
    */
@@ -418,7 +447,16 @@ export class MeetingPageComponent {
         danger: true,
       }),
     ];
-    return [{ items: main }, { items: danger }];
+    const p = this.protocol();
+    // The items come from the page inputs, not from the child: the child gets its inputs only
+    // after this menu is first read.
+    const protocol =
+      m.status === 'closed' && p ? protocolMenuItems(protocolActions(m, p, true), p, this.phone(), t) : [];
+    return [
+      ...(protocol.length ? [{ label: t('meetings.protocolMenu.caption'), items: protocol }] : []),
+      { items: main },
+      { items: danger },
+    ];
   });
 
   /** The page shows no vote while `Abstimmungen` is off (spec 000758). */
@@ -594,6 +632,7 @@ export class MeetingPageComponent {
   }
 
   protected onMenu(item: RowMenuItem): void {
+    if (this.protocolBar()?.select(item.id)) return;
     switch (item.id as SessionAction) {
       case 'todos':
         this.todosOpen.set(true);

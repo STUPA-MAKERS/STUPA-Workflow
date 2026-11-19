@@ -10,7 +10,7 @@
 }
 .mh__titleLine {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
   min-width: 0;
 }
@@ -26,8 +26,7 @@
 }
 .mh__status {
   flex: none;
-  font-size: var(--mh-status-size, var(--fs-body));
-  font-weight: var(--fw-semibold);
+  font-size: var(--mh-status-size, var(--fs-small));
 }
 .mh__sub {
   font-size: var(--fs-small);
@@ -60,3 +59,4 @@
   line-height: 1.125rem;
   color: var(--color-primary);
 }
+

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
@@ -20,10 +20,13 @@ import { TicketsPageService } from './tickets-page.service';
 import { TICKET_PAGE, TicketsComponent } from './tickets.component';
 import { loadErrorToast, retryLoadError } from '../../../testing/load-error';
 
-@Component({ standalone: true, template: '<p>detail</p>' })
+@Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
+  standalone: true, template: '<p>detail</p>'
+})
 class DetailStub {}
 
-@Component({ standalone: true, template: '' })
+@Component({ changeDetection: ChangeDetectionStrategy.Eager, standalone: true, template: '' })
 class NoneStub {}
 
 const NOW = new Date(2026, 9, 15, 18, 0);

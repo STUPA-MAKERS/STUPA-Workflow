@@ -336,6 +336,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/todos/001076](requirements/functional/collaboration/todos/001076_free-board-api.md) | Free boards are created and managed through the API and MCP | approved |
 | [F/collaboration/todos/001077](requirements/functional/collaboration/todos/001077_gremium-board-entries.md) | A board of a Gremium takes more Gremien and persons | approved |
 | [F/collaboration/todos/001078](requirements/functional/collaboration/todos/001078_board-rights.md) | Board rights depend on the board kind and its entries | approved |
+| [F/collaboration/todos/001380](requirements/functional/collaboration/todos/001380_move-sheet-select-rows.md) | The move sheet lists the columns as the select sheet does | approved |
 | [F/finance/budget/000138](requirements/functional/finance/budget/000138_cost-centre-picker.md) | The cost centre pickers are fixed | approved |
 | [F/finance/budget/000139](requirements/functional/finance/budget/000139_close-fiscal-year.md) | A fiscal year closes and reopens | approved |
 | [F/finance/budget/000140](requirements/functional/finance/budget/000140_default-fiscal-year.md) | The default fiscal year holds today | approved |
@@ -642,6 +643,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/protocols/000970](requirements/functional/meetings/protocols/000970_known-names.md) | The known names are the persons of the platform | approved |
 | [F/meetings/protocols/000983](requirements/functional/meetings/protocols/000983_final-protocol-back-to-draft.md) | A final protocol goes back to draft until it is approved | approved |
 | [F/meetings/protocols/000997](requirements/functional/meetings/protocols/000997_sent-only-with-mail.md) | A protocol counts as sent only when its mail went out | approved |
+| [F/meetings/protocols/001304](requirements/functional/meetings/protocols/001304_protocol-in-meeting-head.md) | The protocol state and its actions sit in the meeting head | approved |
 | [F/meetings/voting/000024](requirements/functional/meetings/voting/000024_every-vote-is-secret.md) | Every vote is secret | approved |
 | [F/meetings/voting/000025](requirements/functional/meetings/voting/000025_ballot-does-not-change.md) | A cast ballot does not change | approved |
 | [F/meetings/voting/000026](requirements/functional/meetings/voting/000026_tie-rejects-motion.md) | A tie rejects a motion | approved |
@@ -881,8 +883,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/000741](requirements/non-functional/usability/controls/000741_load-more-button.md) | A button that loads more rows of a list is centred with a chevron | approved |
 | [NF/usability/controls/000931](requirements/non-functional/usability/controls/000931_back-closes-budget-dialogs.md) | Back closes the dialogs of the Haushalt | approved |
 | [NF/usability/controls/001082](requirements/non-functional/usability/controls/001082_open-label.md) | A button that opens a file says Öffnen | approved |
+| [NF/usability/controls/001305](requirements/non-functional/usability/controls/001305_head-status-chip.md) | The status in the head of a page is a chip | approved |
+| [NF/usability/controls/001306](requirements/non-functional/usability/controls/001306_head-meta-chips.md) | The meta line in the head of a detail is a list of chips | approved |
 | [NF/usability/controls/001314](requirements/non-functional/usability/controls/001314_press-ripple.md) | A press shows a ripple | approved |
 | [NF/usability/controls/001315](requirements/non-functional/usability/controls/001315_segment-ripple.md) | A pressed segment ripples only inside its segment | approved |
+| [NF/usability/controls/001330](requirements/non-functional/usability/controls/001330_search-palette-concentric-corner.md) | The search window has a corner concentric with its search bar | approved |
 | [NF/usability/layout/000192](requirements/non-functional/usability/layout/000192_one-geometry.md) | All list and detail pages share one geometry | approved |
 | [NF/usability/layout/000193](requirements/non-functional/usability/layout/000193_scroll-edges.md) | A scroll edge fades, or cuts at a line | approved |
 | [NF/usability/layout/000194](requirements/non-functional/usability/layout/000194_phone-breakpoint.md) | The phone layout starts below 768 px | approved |
@@ -933,6 +938,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/001081](requirements/non-functional/usability/layout/001081_phone-pdf-system-viewer.md) | A PDF on a phone opens in the system viewer | approved |
 | [NF/usability/layout/001084](requirements/non-functional/usability/layout/001084_file-viewer-glass-bar.md) | The file viewer is dark frosted glass | approved |
 | [NF/usability/layout/001313](requirements/non-functional/usability/layout/001313_attendance-pool-row-group.md) | The pool substitutes are an own row group | approved |
+| [NF/usability/layout/001340](requirements/non-functional/usability/layout/001340_detail-head-equal-inset.md) | A detail head is as far from the top as from the side | approved |
 | [P/integrations/webhooks/000963](protocols/integrations/webhooks/000963_webhook-delivery.md) | A webhook delivery is a signed JSON POST | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |

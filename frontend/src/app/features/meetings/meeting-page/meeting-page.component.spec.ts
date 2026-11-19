@@ -414,7 +414,7 @@ describe('MeetingPageComponent', () => {
     });
 
     /** A closed meeting has nothing for the beamer. */
-    it('moves the close into the menu on a phone; the finalize stays in the protocol bar', async () => {
+    it('moves the close into the menu on a phone, and the finalize into its protocol section', async () => {
       const { on, fixture } = await setup({}, [MEDIA.phone]);
       expect(screen.queryByRole('button', { name: 'Sitzung schließen' })).toBeNull();
       let menu = await openMenu();
@@ -422,17 +422,71 @@ describe('MeetingPageComponent', () => {
       expect(on.closeSession).toHaveBeenCalled();
       fixture.componentRef.setInput('meeting', meeting({ status: 'closed' }));
       fixture.detectChanges();
+      expect(screen.queryByRole('button', { name: 'Finalisieren & senden' })).toBeNull();
       menu = await openMenu();
-      expect(within(menu).queryByRole('menuitem', { name: 'Finalisieren & senden' })).toBeNull();
       expect(within(menu).queryByRole('menuitem', { name: 'Beamer-Ansicht' })).toBeNull();
-      await userEvent.keyboard('{Escape}');
-      await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & senden' }));
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'Finalisieren & senden' }));
       expect(on.finalize).toHaveBeenCalled();
     });
 
     it('shows no beamer for a closed meeting on a wide screen', async () => {
       await setup({ meeting: meeting({ status: 'closed' }) }, [MEDIA.wide]);
       expect(screen.queryByRole('button', { name: 'Beamer-Ansicht' })).toBeNull();
+    });
+  });
+
+  /** § 001304 (protocolHead) */
+  describe('protocolHead', () => {
+    const closed = meeting({ status: 'closed' });
+    const final = (over: Partial<Protocol> = {}) =>
+      protocol({ status: 'final', isFinal: true, isLocked: true, pdfUrl: '/p.pdf', sentAt: '2026-10-16T08:00:00Z', ...over });
+
+    it('shows the protocol state as the status of the head and the finalize as its action', async () => {
+      await setup({ meeting: closed }, [MEDIA.wide]);
+      const head = screen.getByRole('toolbar', { name: 'Sitzungssteuerung' });
+      expect(head).toHaveTextContent('Protokoll-Entwurf');
+      expect(head).not.toHaveTextContent('Geschlossen');
+      expect(within(head).getByRole('button', { name: 'Finalisieren & senden' })).toBeEnabled();
+      const menu = await openMenu();
+      expect(within(menu).getByText('Protokoll')).toBeInTheDocument();
+      expect(within(menu).getByRole('menuitem', { name: 'PDF intern' })).toBeInTheDocument();
+      expect(within(menu).getByRole('menuitem', { name: 'PDF öffentlich' })).toBeInTheDocument();
+      expect(within(menu).queryByRole('menuitem', { name: 'Finalisieren & senden' })).toBeNull();
+    });
+
+    it('shows the finalize disabled with the missing right to a writer without it', async () => {
+      await setup({ meeting: meeting({ status: 'closed', canFinalize: false }) }, [MEDIA.wide]);
+      const button = screen.getByRole('button', { name: 'Finalisieren & senden' });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute('title', expect.stringContaining('Protokoll finalisieren & senden'));
+    });
+
+    it('offers the PDF of a final protocol in the head and the rest in the menu', async () => {
+      const { fixture } = await setup({ meeting: closed, protocol: final({ publicPdfUrl: '/pub.pdf' }) }, [MEDIA.wide]);
+      const head = screen.getByRole('toolbar', { name: 'Sitzungssteuerung' });
+      expect(head).toHaveTextContent('Protokoll final');
+      expect(within(head).getByRole('link', { name: 'PDF intern' })).toHaveAttribute('href', '/p.pdf');
+      const menu = await openMenu();
+      expect(within(menu).getByRole('menuitem', { name: 'PDF öffentlich' })).toBeInTheDocument();
+      expect(within(menu).queryByRole('menuitem', { name: 'PDF intern' })).toBeNull();
+      await userEvent.keyboard('{Escape}');
+      fixture.componentRef.setInput('protocol', final({ sentAt: null }));
+      fixture.detectChanges();
+      expect(head).toHaveTextContent('Protokoll final, nicht versandt (keine Empfänger)');
+      expect(within(head).getByRole('link', { name: 'PDF' })).toHaveAttribute('href', '/p.pdf');
+    });
+
+    it('links the meeting that approved the protocol', async () => {
+      await setup(
+        {
+          meeting: closed,
+          protocol: final({ approvedAt: '2026-10-29T18:00:00Z', approvedMeetingId: 'm-2', approvedMeetingTitle: '34. Sitzung', approvedMeetingDate: '2026-10-29' }),
+        },
+        [MEDIA.wide],
+      );
+      const head = screen.getByRole('toolbar', { name: 'Sitzungssteuerung' });
+      expect(head).toHaveTextContent('Protokoll genehmigt');
+      expect(within(head).getByRole('link', { name: 'Genehmigt in 34. Sitzung · 29. Oktober 2026' })).toHaveAttribute('href', '/meetings/m-2');
     });
   });
 

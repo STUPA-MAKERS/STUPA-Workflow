@@ -38,7 +38,8 @@ import {
  *
  * The host is the `header` of the page, so the page keeps its frame rules (padding,
  * height, gap, role). The page can set `--mh-title-size` and `--mh-title-line`
- * for the title and `--mh-status-size` for the status.
+ * for the title and `--mh-status-size` for the status. Beside the title the status is a
+ * chip centred on the title line (spec 001305); in the phone bar it stays text.
  *
  * ```html
  * <header appMeetingHead class="mp__head" [heading]="m.title" [statusKind]="status().kind"

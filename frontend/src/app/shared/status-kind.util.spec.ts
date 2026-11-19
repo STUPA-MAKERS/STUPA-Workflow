@@ -6,6 +6,7 @@ import {
   invoiceStatus,
   meetingStatus,
   meetingVoteStatus,
+  protocolStatus,
   scanStatus,
   voteResultStatus,
   webhookDeliveryStatus,
@@ -156,6 +157,22 @@ describe('status kinds', () => {
   describe.each(tables)('%s status', (_name, fn, table) => {
     it.each(Object.entries(table))('maps %s', (status, [kind, label]) => {
       const view = fn(status as never);
+      expect(view.kind).toBe(kind);
+      expect(de[view.key]).toBe(label);
+    });
+  });
+
+  /** § 001304 (protocolStatus) */
+  describe('protocolStatus', () => {
+    const p = { status: 'draft' as const, isFinal: false, sentAt: null, approvedAt: null };
+    it.each([
+      [p, 'warn', 'Protokoll-Entwurf'],
+      [{ ...p, status: 'rendering' as const }, 'neutral', 'Protokoll wird erstellt'],
+      [{ ...p, status: 'final' as const, isFinal: true, sentAt: '2026-10-16T08:00:00Z' }, 'accent', 'Protokoll final'],
+      [{ ...p, status: 'final' as const, isFinal: true }, 'warn', 'Protokoll final, nicht versandt (keine Empfänger)'],
+      [{ ...p, status: 'final' as const, isFinal: true, approvedAt: '2026-10-29T18:00:00Z' }, 'accent', 'Protokoll genehmigt'],
+    ])('%o → %s %s', (protocol, kind, label) => {
+      const view = protocolStatus(protocol);
       expect(view.kind).toBe(kind);
       expect(de[view.key]).toBe(label);
     });

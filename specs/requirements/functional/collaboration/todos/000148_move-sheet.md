@@ -4,7 +4,7 @@ title: One move sheet
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
+updated: 2026-11-19
 implementation:
   - frontend/src/app/features/todos/move-sheet/todo-move-sheet.component.ts
 scope:
@@ -14,5 +14,5 @@ scope:
 
 # One move sheet
 
-A long press on a tile and the card detail must open the same "Verschieben" sheet: radio list,
-"Oben"/"Unten" and "In anderes Board verschieben".
+A long press on a tile and the card detail must open the same "Verschieben" sheet: the list of
+the columns (001380), "Oben"/"Unten" and "In anderes Board verschieben".

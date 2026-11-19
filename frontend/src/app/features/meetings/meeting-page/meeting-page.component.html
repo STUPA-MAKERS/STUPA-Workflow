@@ -10,7 +10,7 @@
   [statusKind]="status().kind"
   [statusText]="status().key | t"
   [sub]="subLine() || null"
-  [link]="firstLink()"
+  [link]="headLink()"
   (back)="back.emit()"
 >
   @if (phone()) {
@@ -31,6 +31,10 @@
         </app-button>
       }
     }
+  }
+
+  @if (proto && m.status === 'closed') {
+    <app-protocol-bar [meeting]="m" [protocol]="proto" [finalizing]="finalizing()" [compact]="phone()" (finalize)="finalize.emit()" />
   }
 
   <app-row-menu [sections]="menu()" [label]="'meetings.page.menu' | t" (selected)="onMenu($event)" />
@@ -66,12 +70,10 @@
       [canEdit]="canEdit()"
       [saveState]="saveState()"
       [revision]="revision()"
-      [finalizing]="finalizing()"
       [canRename]="canRenameTop()"
       [renamingTopId]="renamingTopId()"
       [(renameDraft)]="renameDraft"
       (bodyChange)="bodyChange.emit($event)"
-      (finalize)="finalize.emit()"
       (startRename)="startRename.emit($event)"
       (cancelRename)="cancelRename.emit()"
       (renameTop)="renameTop.emit($event)"

@@ -1,8 +1,9 @@
-import { Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { render } from '@testing-library/angular';
 import { BodyPortalDirective } from './body-portal.directive';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
   standalone: true,
   imports: [BodyPortalDirective],
   template: `

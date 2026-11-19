@@ -33,10 +33,11 @@ export interface MoveChoice {
 
 /**
  * "Verschieben": the phone moves a card with this bottom sheet instead of a
- * drag. The card detail and a long press on a tile open the same sheet. The columns as a
- * radio list, the place in the column as a segmented control
- * (Oben | Unten), then "Verschieben". With `canTransfer`, a row below the columns, "In
- * anderes Board verschieben", closes the sheet and emits `transfer` (the host opens the
+ * drag. The card detail and a long press on a tile open the same sheet. The columns as the
+ * rows of a select sheet (a row group, a check mark after the chosen column, spec 001380),
+ * the place in the column as a segmented control (Oben | Unten), then "Verschieben". With
+ * `canTransfer`, a row in its own group below the columns, "In anderes Board verschieben",
+ * closes the sheet and emits `transfer` (the host opens the
  * transfer dialog). A close without a choice (Escape, the scrim, the close button) emits
  * `dismissed`.
  */

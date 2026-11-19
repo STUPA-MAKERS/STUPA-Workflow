@@ -4,6 +4,7 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "outDir": "../out-tsc/e2e",
+    "rootDir": "..",
     "module": "esnext",
     "moduleResolution": "bundler",
     "types": ["node"],
