@@ -191,13 +191,7 @@
             />
           </div>
         } @else if (!rows().length) {
-          <app-empty-state [heading]="'applications.list.empty' | t">
-            @if (activeFilterCount() > 0) {
-              <app-button variant="text" size="sm" (click)="reset()">
-                {{ 'applications.list.filter.reset' | t }}
-              </app-button>
-            }
-          </app-empty-state>
+          <app-empty-state [heading]="'applications.list.empty' | t" />
         } @else {
           <div class="apps__groups" animate.enter="motion-fade-in" [class.skel-stale]="reloading()" [attr.inert]="reloading() ? '' : null">
             @for (group of groups(); track group.key + $index) {

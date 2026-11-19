@@ -21,8 +21,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.principal import Principal
 from app.modules.livevote.broker import PatternBroker
+from app.modules.todos import link_store
 from app.modules.todos.live import publish_pings
-from app.modules.todos.models import TodoBoard, TodoCard, TodoColumn, TodoLink
+from app.modules.todos.models import TodoBoard, TodoCard, TodoColumn
 from app.modules.todos.service import TodoService
 
 
@@ -49,9 +50,8 @@ class TicketTodoBridge:
                 select(TodoCard, TodoBoard)
                 .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
                 .join(TodoColumn, TodoColumn.id == TodoCard.column_id)
-                .join(TodoLink, TodoLink.card_id == TodoCard.id)
                 .where(
-                    TodoLink.ticket_id == ticket_id,
+                    TodoCard.id.in_(link_store.linked_ids("todo", "ticket", [ticket_id])),
                     TodoCard.archived_at.is_(None),
                     TodoColumn.is_done.is_(False),
                 )

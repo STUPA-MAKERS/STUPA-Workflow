@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import ColumnElement, and_, func, or_, select
+from sqlalchemy import ColumnElement, and_, func, or_, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.models import Application, ApplicationDecision
@@ -32,14 +32,14 @@ from app.modules.applications.service.service_base import _title_of
 from app.modules.budget.tree_models import BudgetExpense
 from app.modules.flow.models import State
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
+from app.modules.todos import link_store
 from app.modules.todos.grouping import grouped
+from app.modules.todos.link_store import Edge
 from app.modules.todos.models import (
-    LINK_COLUMNS,
     TodoBoard,
     TodoCard,
     TodoCardEvent,
     TodoEventSeries,
-    TodoLink,
 )
 from app.modules.voting.models import Vote
 from app.shared.errors import ConflictError
@@ -104,19 +104,8 @@ async def series_names(
     return dict(rows.tuples().all())
 
 
-async def _links(
-    session: AsyncSession, card_ids: Sequence[uuid.UUID], *kinds: str
-) -> list[TodoLink]:
-    return list(
-        (
-            await session.scalars(
-                select(TodoLink).where(
-                    TodoLink.card_id.in_(card_ids),
-                    or_(*(getattr(TodoLink, LINK_COLUMNS[kind]).isnot(None) for kind in kinds)),
-                )
-            )
-        ).all()
-    )
+async def _links(session: AsyncSession, card_ids: Sequence[uuid.UUID], *kinds: str) -> list[Edge]:
+    return await link_store.edges(session, "todo", card_ids, kinds)
 
 
 async def totals(session: AsyncSession, card_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, Totals]:
@@ -125,10 +114,10 @@ async def totals(session: AsyncSession, card_ids: Sequence[uuid.UUID]) -> dict[u
         return {}
     links = await _links(session, card_ids, "application", "expense")
     apps_of = _id_sets(
-        (link.card_id, link.application_id) for link in links if link.application_id is not None
+        (link.own_id, link.target_id) for link in links if link.kind == "application"
     )
     expenses_of = _id_sets(
-        (link.card_id, link.expense_id) for link in links if link.expense_id is not None
+        (link.own_id, link.target_id) for link in links if link.kind == "expense"
     )
     money, approved = await _application_money(
         session, frozenset(aid for ids in apps_of.values() for aid in ids)
@@ -250,9 +239,9 @@ def _card_totals(
 async def decisions(session: AsyncSession, card_id: uuid.UUID) -> list[Decision]:
     """The decisions of an Event: valid decisions of Anträge, closed votes of TOPs/votes."""
     links = await _links(session, [card_id], "application", "agenda_item", "vote")
-    app_ids = {link.application_id for link in links if link.application_id is not None}
-    item_ids = {link.agenda_item_id for link in links if link.agenda_item_id is not None}
-    vote_ids = {link.vote_id for link in links if link.vote_id is not None}
+    app_ids = {link.target_id for link in links if link.kind == "application"}
+    item_ids = {link.target_id for link in links if link.kind == "agenda_item"}
+    vote_ids = {link.target_id for link in links if link.kind == "vote"}
     app_rows = (
         (
             await session.execute(
@@ -406,11 +395,12 @@ async def check_one_event(
     }
     if not by_kind:
         return
-    conditions = [getattr(TodoLink, LINK_COLUMNS[kind]).in_(ids) for kind, ids in by_kind.items()]
+    cards = union_all(
+        *(link_store.linked_ids("todo", kind, ids) for kind, ids in by_kind.items())
+    ).subquery()
     taken = await session.scalar(
-        select(TodoLink.id)
-        .join(TodoCardEvent, TodoCardEvent.card_id == TodoLink.card_id)
-        .where(or_(*conditions), TodoLink.card_id != card_id)
+        select(TodoCardEvent.card_id)
+        .where(TodoCardEvent.card_id.in_(select(cards.c.own_id)), TodoCardEvent.card_id != card_id)
         .limit(1)
     )
     if taken is not None:

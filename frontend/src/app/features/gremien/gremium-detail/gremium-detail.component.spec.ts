@@ -75,6 +75,7 @@ async function start(url: string, opts: StartOptions = {}) {
     boards: jest.fn(() => of(opts.boards ?? [])),
     board: jest.fn(() => of(opts.board)),
     linked: jest.fn(() => of([])),
+    links: jest.fn(() => of({ canLink: false, links: [] })),
   };
   TestBed.overrideComponent(GremiumDetailComponent, {
     remove: { imports: [CreateMeetingDialogComponent] },

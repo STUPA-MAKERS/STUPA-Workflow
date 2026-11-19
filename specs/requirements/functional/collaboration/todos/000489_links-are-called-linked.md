@@ -2,14 +2,10 @@
 id: "000489"
 title: The cards of an element are under Verknüpft
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-10
-implementation:
-  - frontend/src/app/features/todos/linked-list/todo-linked-list.component.ts
-  - frontend/src/app/pages/applications/applications-detail.component.html
-  - frontend/src/app/pages/expenses/booking-detail/booking-detail.component.html
-  - frontend/src/app/pages/invoices/invoice-detail/invoice-detail.component.html
+updated: 2026-11-19
+replaced_by: F/collaboration/links/001407
 scope:
   - frontend/src/app/features/todos
   - frontend/src/app/pages/applications

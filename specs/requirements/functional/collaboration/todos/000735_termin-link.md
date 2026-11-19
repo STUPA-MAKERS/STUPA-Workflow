@@ -20,7 +20,7 @@ scope:
 
 The section `Verknüpft` of a card must offer the kind `Termin`. The link picker must find only the
 Termine that the person can read (F/meetings/calendar/000718). The detail of a Termin must show
-the cards that link it (F/collaboration/todos/000573).
+the cards that link it (F/collaboration/links/001401).
 
 A person who can read the card but not the Termin must read only the title, the start, the end
 and the place of the linked Termin. That person must never read its description, its invited
