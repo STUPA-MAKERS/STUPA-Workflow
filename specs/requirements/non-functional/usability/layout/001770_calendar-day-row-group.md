@@ -22,8 +22,8 @@ its own. Each row must have the icon of the kind as its lead, the title, a line 
 the time, the Gremium or calendar and the own answer to a Termin, and the chevron at its end.
 The whole row must be pressable (000714).
 
-In the very high contrast mode (000605), the column must not have the white edge, and a row
-must not have an edge of its own beyond the edge of a row group.
+In the very high contrast mode (000605), the column must not have the white edge, and the rows
+must look like the rows of Aktivität in that mode.
 
 Reason: A frame around cards of the same surface is a second list style beside the list of
 Aktivität and the list of the phone Kalender. A person reads the entries of a day as one list.
