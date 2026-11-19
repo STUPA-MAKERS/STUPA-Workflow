@@ -136,9 +136,7 @@
     @if (emptyCase() === 'noMatch') {
       <app-empty-state shape="choice"
         [heading]="listText().noMatch | t: { q: activeQuery() }"
-      >
-        <app-button variant="text" size="sm" (click)="clearSearch()">{{ 'invoices.filter.reset' | t }}</app-button>
-      </app-empty-state>
+       />
     } @else {
       <app-empty-state shape="choice"
         [heading]="listText().none | t"
