@@ -10,6 +10,7 @@ implementation:
   - frontend/src/app/pages/admin/admin-list/admin-list.component.html
   - frontend/src/app/pages/admin/admin-list/admin-list.component.scss
   - frontend/src/app/pages/admin/admin-list/frame-modes.ts
+  - frontend/vendor/ui-kit/src/lib/list-detail/list-detail-layout.component.ts
 scope:
   - frontend/src/app/pages/admin
   - frontend/src/app/pages/account
@@ -26,7 +27,8 @@ memory of the sheet.
 
 On a wide screen, the list and the open page sit side by side. Without an open page, the detail
 shows the empty pane (000665). One pane at a time, `/admin` and `/account` show the list, and a
-page shows with the bar of `app-list-detail` and its way back to the list.
+page shows with the bar of `app-list-detail`, which names the page (`barTitle`) and leads back
+to the list.
 
 Reason: The admin frame differed from a list/detail page only in details, and it repeated
 about 400 lines of layout that `app-list-detail` already has.

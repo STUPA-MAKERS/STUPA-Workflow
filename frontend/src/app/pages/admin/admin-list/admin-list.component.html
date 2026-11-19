@@ -1,5 +1,5 @@
 <div class="adl" [class.adl--split]="split()">
-  <app-list-detail [detailOpen]="!home()" (back)="goBack()">
+  <app-list-detail [detailOpen]="!home()" [barTitle]="true" (back)="goBack()">
     <nav list class="ld-pane adl__pane" [attr.aria-label]="mode().navLabel | t">
       <app-page-header
         [pane]="true"
