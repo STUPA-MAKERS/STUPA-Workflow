@@ -2,7 +2,7 @@
 id: "001142"
 title: Without a start time the agenda shows only durations
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:

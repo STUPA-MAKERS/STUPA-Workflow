@@ -2,7 +2,7 @@
 id: "001144"
 title: The agenda shows no planned end and no overrun
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:

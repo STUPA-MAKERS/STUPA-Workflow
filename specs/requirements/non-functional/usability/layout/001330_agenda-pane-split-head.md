@@ -2,7 +2,7 @@
 id: "001330"
 title: The agenda beside the protocol is a split head over its list
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:

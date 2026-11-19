@@ -2,7 +2,7 @@
 id: "001332"
 title: Each board lies on a surface of its own
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:

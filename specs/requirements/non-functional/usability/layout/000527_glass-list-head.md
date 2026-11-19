@@ -2,7 +2,7 @@
 id: "000527"
 title: A list head is solid on a wide screen and glass on a phone
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:

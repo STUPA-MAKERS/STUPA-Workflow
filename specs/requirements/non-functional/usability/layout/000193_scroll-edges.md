@@ -2,7 +2,7 @@
 id: "000193"
 title: A scroll area cuts at the edge of a surface
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
