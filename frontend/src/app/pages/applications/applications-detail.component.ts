@@ -35,6 +35,7 @@ import type {
   LinkedApplication,
   ApplicationType,
   ApplicationVersion,
+  I18nMap,
   FormFieldDef,
   FormSection,
   ProblemDetail,
@@ -106,6 +107,7 @@ import { DecisionSectionComponent } from '@shared/decision/decision-section.comp
 import { decisionHistoryLine } from '@shared/decision/decision.util';
 import { ApplicationsPageService } from './applications-page.service';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
+import { TypeChangeDialogComponent } from './type-change-dialog/type-change-dialog.component';
 import {
   type LinkedLead,
   TodoLinkedListComponent,
@@ -211,6 +213,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
     AnswerViewComponent,
     HistoryComponent,
     ForceStatusDialogComponent,
+    TypeChangeDialogComponent,
     AgendaDialogComponent,
     DecisionDialogComponent,
     DecisionSectionComponent,
@@ -470,6 +473,9 @@ export class ApplicationsDetailComponent {
    */
   readonly canForceStatus = computed(() => this.auth.can('application.force_status'));
   readonly forceDialogOpen = signal(false);
+  /** "Antragsart ändern" needs `application.change_type` and a submitted application (001660). */
+  readonly canChangeType = computed(() => this.auth.can('application.change_type'));
+  readonly typeDialogOpen = signal(false);
 
   private readonly router = inject(Router);
   readonly canManage = computed(() => this.auth.can('application.manage'));
@@ -614,10 +620,15 @@ export class ApplicationsDetailComponent {
     return formatMoney(value ?? 0, this.i18n.formatLocale());
   }
 
-  /** The label of a field of the diff, or its key when the form does not define it. */
-  private fieldLabel(key: string): string {
+  /**
+   * The label of a field of the diff, or its key when no form defines it. A version that
+   * changed the Antragsart brings the labels of the old form for the removed fields.
+   */
+  private fieldLabel(key: string, version?: ApplicationVersion): string {
     const field = this.fieldByKey().get(key);
-    return field ? resolveI18n(field.label, this.i18n.uiLocale()) : key;
+    const old = version?.typeChange?.fieldLabels?.[key];
+    const label = field?.label ?? old;
+    return label ? resolveI18n(label, this.i18n.uiLocale()) : key;
   }
 
   /**
@@ -632,7 +643,7 @@ export class ApplicationsDetailComponent {
       return (version.changedKeys ?? []).map((key) => ({
         kind: 'warn',
         tag: t('applications.history.diff.changed'),
-        label: this.fieldLabel(key),
+        label: this.fieldLabel(key, version),
       }));
     }
     const detail = (
@@ -652,7 +663,7 @@ export class ApplicationsDetailComponent {
         return {
           kind: 'warn' as const,
           tag: t('applications.history.diff.changed'),
-          label: this.fieldLabel(c.key),
+          label: this.fieldLabel(c.key, version),
           old: same ? null : old,
           new: same ? null : neu,
           detail: more,
@@ -661,14 +672,14 @@ export class ApplicationsDetailComponent {
       ...version.diff.added.map((a) => ({
         kind: 'accent' as const,
         tag: t('applications.history.diff.added'),
-        label: this.fieldLabel(a.key),
+        label: this.fieldLabel(a.key, version),
         new: this.fmt(a.value, a.key),
         detail: detail(a.key, { new: a.value }),
       })),
       ...version.diff.removed.map((r) => ({
         kind: 'error' as const,
         tag: t('applications.history.diff.removed'),
-        label: this.fieldLabel(r.key),
+        label: this.fieldLabel(r.key, version),
         old: this.fmt(r.value, r.key),
         detail: detail(r.key, { old: r.value }),
       })),
@@ -740,17 +751,26 @@ export class ApplicationsDetailComponent {
       .filter((v) => !(v.version === 1 && events.length))
       .map((v) => {
         const changes = v.version === 1 ? [] : this.versionChanges(v);
+        const typeChange = v.typeChange
+          ? t('applications.history.typeChange', {
+              from: this.typeLabel(v.typeChange.fromType),
+              to: this.typeLabel(v.typeChange.toType),
+            })
+          : null;
         return {
           at: v.at,
-          icon: 'edit',
-          title: t('applications.history.version', { version: v.version }),
+          icon: typeChange ? 'swap' : 'edit',
+          title: typeChange
+            ? `${t('applications.history.typeChanged')} · ${t('applications.history.version', { version: v.version })}`
+            : t('applications.history.version', { version: v.version }),
           actor: this.actor(v.changedByInfo, v.changedBy),
           body:
-            v.version === 1
+            typeChange ??
+            (v.version === 1
               ? t('applications.history.initial')
               : changes.length
                 ? null
-                : t('applications.history.diff.none'),
+                : t('applications.history.diff.none')),
           changes,
         };
       });
@@ -782,8 +802,13 @@ export class ApplicationsDetailComponent {
    */
   protected readonly contentLang = computed(() => langAttr(this.app()?.lang, this.i18n.uiLocale()));
 
+  /** The name of an Antragsart of the history in the UI language, or "—". */
+  private typeLabel(name: I18nMap | null | undefined): string {
+    return (name ? resolveI18n(name, this.i18n.uiLocale()) : '') || '—';
+  }
+
   /** The application types, for "<Typ> · Version n". */
-  private readonly types = signal<ApplicationType[]>([]);
+  protected readonly types = signal<ApplicationType[]>([]);
 
   /** "<Typ> · Version n" above the title. */
   readonly typeName = computed(() => {
@@ -851,6 +876,11 @@ export class ApplicationsDetailComponent {
         id: 'force',
         label: t('applications.detail.forceStatus'),
         icon: 'flow',
+      }),
+      ...when(this.canChangeType(), {
+        id: 'type',
+        label: t('applications.detail.changeType'),
+        icon: 'swap',
       }),
       ...when(this.canManageObservers(), {
         id: 'observers',
@@ -952,6 +982,9 @@ export class ApplicationsDetailComponent {
         break;
       case 'force':
         this.openForceDialog();
+        break;
+      case 'type':
+        this.typeDialogOpen.set(true);
         break;
       case 'versions':
         this.showVersions();

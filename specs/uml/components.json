@@ -206,22 +206,22 @@
       "to": "shared"
     },
     {
-      "count": 3,
+      "count": 4,
       "from": "applications",
       "to": "application_types"
     },
     {
-      "count": 18,
+      "count": 20,
       "from": "applications",
       "to": "audit"
     },
     {
-      "count": 25,
+      "count": 26,
       "from": "applications",
       "to": "auth"
     },
     {
-      "count": 10,
+      "count": 11,
       "from": "applications",
       "to": "budget"
     },
@@ -231,12 +231,12 @@
       "to": "files"
     },
     {
-      "count": 23,
+      "count": 26,
       "from": "applications",
       "to": "flow"
     },
     {
-      "count": 13,
+      "count": 16,
       "from": "applications",
       "to": "forms"
     },
@@ -256,7 +256,7 @@
       "to": "notifications"
     },
     {
-      "count": 53,
+      "count": 55,
       "from": "applications",
       "to": "shared"
     },

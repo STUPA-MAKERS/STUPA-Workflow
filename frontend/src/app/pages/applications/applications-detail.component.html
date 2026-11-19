@@ -505,6 +505,14 @@
   (done)="onForced()"
 />
 
+<app-type-change-dialog
+  [applicationId]="app()?.id ?? null"
+  [currentTypeId]="app()?.typeId ?? null"
+  [types]="types()"
+  [(open)]="typeDialogOpen"
+  (done)="onForced()"
+/>
+
 <app-agenda-dialog
   [applicationId]="app()?.id ?? null"
   [applicationTitle]="title()"

@@ -61,7 +61,12 @@ SCOPES: dict[str, frozenset[str]] = {
         }
     ),
     "applications:write": frozenset(
-        {"application.transition", "application.manage", "application.create_on_behalf"}
+        {
+            "application.transition",
+            "application.manage",
+            "application.create_on_behalf",
+            "application.change_type",
+        }
     ),
     "votes:write": frozenset({"vote.manage"}),
     "budget:write": frozenset({"budget.structure", "budget.book"}),
