@@ -516,6 +516,7 @@ describe('AgendaPaneComponent', () => {
         { kind: 'agenda_item', targetId: 't-3' },
         { kind: 'invoice', targetId: 'i-1' },
       ]);
+      view.fixture.detectChanges();
       expect(cmp.open()).toBe(false);
     });
 
