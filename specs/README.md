@@ -986,6 +986,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/001440](requirements/non-functional/usability/layout/001440_agenda-pane-split-head.md) | The agenda beside the protocol is a split head over its list | approved |
 | [NF/usability/layout/001441](requirements/non-functional/usability/layout/001441_rail-scroll-surface.md) | The scroll part of the navigation rail is a surface | approved |
 | [NF/usability/layout/001442](requirements/non-functional/usability/layout/001442_board-own-surface.md) | Each board lies on a surface of its own | approved |
+| [NF/usability/layout/001500](requirements/non-functional/usability/layout/001500_list-title-on-search-edge.md) | A wide list column has no visible title and puts its buttons beside the search | approved |
 | [P/integrations/webhooks/000963](protocols/integrations/webhooks/000963_webhook-delivery.md) | A webhook delivery is a signed JSON POST | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |
