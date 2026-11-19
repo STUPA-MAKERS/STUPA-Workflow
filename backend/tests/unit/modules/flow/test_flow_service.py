@@ -618,7 +618,7 @@ async def test_force_status_no_current_state_conflicts() -> None:
     app = _app(None, uuid4())
     db = fake_session(result(app))
     with pytest.raises(ConflictError) as ei:
-        await FlowService(db).force_status(app.id, uuid4(), _principal(), note="x")
+        await FlowService(db).force_status(app.id, uuid4(), _principal(), reason="other", note="x")
     assert ei.value.code == "no_current_state"
     assert db.committed == 0
 
@@ -629,7 +629,7 @@ async def test_force_status_unknown_target_state_404() -> None:
     app = _app(uuid4(), flow_id)
     db = fake_session(result(app), result())
     with pytest.raises(NotFoundError):
-        await FlowService(db).force_status(app.id, uuid4(), _principal(), note="x")
+        await FlowService(db).force_status(app.id, uuid4(), _principal(), reason="other", note="x")
     assert db.committed == 0
 
 
@@ -643,7 +643,9 @@ async def test_force_status_foreign_flow_state_404() -> None:
     foreign = _target_state(target_id, uuid4())
     db = fake_session(result(app), result(foreign))
     with pytest.raises(NotFoundError, match="does not belong"):
-        await FlowService(db).force_status(app.id, target_id, _principal(), note="x")
+        await FlowService(db).force_status(
+            app.id, target_id, _principal(), reason="other", note="x"
+        )
 
 
 async def test_force_status_same_state_conflicts() -> None:
@@ -653,7 +655,9 @@ async def test_force_status_same_state_conflicts() -> None:
     target = _target_state(cur, flow_id)
     db = fake_session(result(app), result(target))
     with pytest.raises(ConflictError) as ei:
-        await FlowService(db).force_status(app.id, cur, _principal(), note="x")
+        await FlowService(db).force_status(
+            app.id, cur, _principal(), reason="other", note="x"
+        )
     assert ei.value.code == "already_in_state"
     assert db.committed == 0
 
@@ -665,7 +669,9 @@ async def test_force_status_concurrent_change_409_rolls_back() -> None:
     target = _target_state(target_id, flow_id)
     db = fake_session(result(app), result(target), result(rowcount=0))
     with pytest.raises(ConflictError) as ei:
-        await FlowService(db).force_status(app.id, target_id, _principal(), note="x")
+        await FlowService(db).force_status(
+            app.id, target_id, _principal(), reason="other", note="x"
+        )
     assert ei.value.code == "concurrent_state_change"
     assert db.rolled_back == 1
     assert db.committed == 0
@@ -688,7 +694,7 @@ async def test_force_status_happy_writes_event_audit_and_cancels_votes() -> None
         result(), result(), result(),
     )
     res = await FlowService(db).force_status(
-        app.id, target_id, _principal(), note="admin override"
+        app.id, target_id, _principal(), reason="other", note="admin override"
     )
     assert res.new_state_id == target_id
     assert res.dispatched_actions == []

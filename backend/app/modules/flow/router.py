@@ -27,6 +27,7 @@ from app.modules.applications.decision import not_allowed_problem
 from app.modules.applications.schemas import StateOut
 from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
+from app.modules.flow.outside_decision import OutsideDecisionIn, record_outside_decision
 from app.modules.flow.schemas import (
     ForceStatusRequest,
     TransitionOut,
@@ -48,6 +49,10 @@ MANAGE_PERMISSION = "application.transition"
 #: Force an application into any state, past guards and transitions. It is separate from
 #: `application.transition` because it is an audited override.
 FORCE_PERMISSION = "application.force_status"
+
+#: Record a decision that a Gremium made outside the platform (spec 001603). It follows
+#: the flow, so it is separate from `application.force_status`.
+RECORD_DECISION_PERMISSION = "application.record_decision"
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
@@ -108,8 +113,19 @@ async def require_force_principal(
     return principal
 
 
+async def require_record_principal(
+    application_id: UUID,
+    db: DbSession,
+    principal: Annotated[Principal, Depends(require_principal(RECORD_DECISION_PERMISSION))],
+) -> Principal:
+    """Admit a principal with `application.record_decision` who can read the application."""
+    await resolve_app_read(db, application_id, principal, None)
+    return principal
+
+
 PrincipalDep = Annotated[Principal, Depends(require_transition_principal)]
 ForcePrincipalDep = Annotated[Principal, Depends(require_force_principal)]
+RecordPrincipalDep = Annotated[Principal, Depends(require_record_principal)]
 
 
 @router.get(
@@ -185,15 +201,41 @@ async def force_status(
 
     The route returns 200 with `{newStateId}`. It returns 409 when the application has
     no current state, already sits in the target state, or a concurrent change moved it
-    first.
+    first. It returns 422 without a `reason`, or for `other` with a note shorter than
+    10 characters.
     """
     return await service.force_status(
         application_id,
         payload.state_id,
         principal,
-        note=payload.note,
+        reason=payload.reason,
+        note=payload.clean_note,
         allow_unconfirmed=False,
     )
+
+
+@router.post(
+    "/applications/{application_id}/outside-decision",
+    response_model=TransitionResult,
+    responses=_errors(400, 401, 403, 404, 409, 422),
+)
+async def outside_decision(
+    application_id: UUID,
+    payload: OutsideDecisionIn,
+    service: ServiceDep,
+    principal: RecordPrincipalDep,
+) -> TransitionResult:
+    """Record a decision made in a meeting without a vote on the platform.
+
+    The result fires the `pass` or the `fail` branch of the vote state with its
+    actions and mails and cancels the open votes. The route gives 409 outside a vote
+    state (`not_in_vote_state`) or without the branch (`no_branch`), and 422 for a
+    meeting date after today, an unknown Gremium or meeting, or an approval into an
+    approved state without the approved amount (`approved_amount_required`).
+    """
+    staged = await record_outside_decision(service, application_id, payload, principal)
+    await service.session.commit()
+    return await service.after_commit(staged)
 
 
 @router.get(

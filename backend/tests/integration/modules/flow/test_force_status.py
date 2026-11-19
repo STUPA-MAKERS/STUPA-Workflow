@@ -136,7 +136,7 @@ async def test_force_status_moves_state_writes_event_and_audit(
     app = await _make_application(session, app_type)
 
     res = await FlowService(session).force_status(
-        app.id, states["done"].id, _forcer(), note="admin override"
+        app.id, states["done"].id, _forcer(), reason="error_correction", note="admin override"
     )
     assert res.new_state_id == states["done"].id
     assert res.dispatched_actions == []
@@ -158,6 +158,8 @@ async def test_force_status_moves_state_writes_event_and_audit(
     assert event.from_state_id == states["draft"].id
     assert event.actor == "forcer-1"
     assert event.note == "admin override"
+    assert event.forced is True
+    assert event.force_reason == "error_correction"
 
     audit = (
         await session.execute(
@@ -173,6 +175,7 @@ async def test_force_status_moves_state_writes_event_and_audit(
     assert forced[0].data["fromStateId"] == str(states["draft"].id)
     assert forced[0].data["toStateId"] == str(states["done"].id)
     assert forced[0].data["transitionId"] is None
+    assert forced[0].data["forceReason"] == "error_correction"
 
 
 async def test_force_status_cancels_open_votes(session: AsyncSession) -> None:
@@ -183,7 +186,7 @@ async def test_force_status_cancels_open_votes(session: AsyncSession) -> None:
     await session.commit()
 
     await FlowService(session).force_status(
-        app.id, states["review"].id, _forcer(), note="pull out of vote"
+        app.id, states["review"].id, _forcer(), reason="error_correction", note="pull out of vote"
     )
     await session.refresh(vote)
     assert vote.status == "cancelled"
@@ -195,7 +198,7 @@ async def test_force_status_same_state_conflicts(session: AsyncSession) -> None:
     app = await _make_application(session, app_type)
     with pytest.raises(ConflictError):
         await FlowService(session).force_status(
-            app.id, states["draft"].id, _forcer(), note="noop"
+            app.id, states["draft"].id, _forcer(), reason="error_correction", note="noop"
         )
 
 
@@ -219,7 +222,7 @@ async def test_force_status_foreign_flow_state_not_found(
     await session.commit()
     with pytest.raises(NotFoundError):
         await FlowService(session).force_status(
-            app.id, foreign.id, _forcer(), note="cross-flow"
+            app.id, foreign.id, _forcer(), reason="error_correction", note="cross-flow"
         )
 
 

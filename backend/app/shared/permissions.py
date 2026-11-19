@@ -18,6 +18,12 @@ Keys that need a note:
   flow guards and the transitions. The log records every use as a forced
   status_change, and you can revert it. It stays SEPARATE from
   `application.transition`; grant it deliberately.
+- `application.record_decision`: record on an application in a vote state the
+  decision that a Gremium made in a meeting without a vote on the platform. It fires
+  the `pass` or `fail` branch of the vote state with its actions and mails. It stays
+  SEPARATE from `application.force_status`, because it follows the flow.
+- `application.amend_decision`: change the approved amount of an approved
+  application, with a reason and the decision that allows it. The state stays.
 - `application.edit_any`: edit application data in ANY flow state, overriding the
   state edit lock.
 - `application.delete`: delete an application permanently with its versions, comments
@@ -103,6 +109,8 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "application.read_all",
     "application.transition",
     "application.force_status",
+    "application.record_decision",
+    "application.amend_decision",
     "application.manage",
     "application.edit_any",
     "application.delete",

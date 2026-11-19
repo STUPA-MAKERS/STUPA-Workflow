@@ -32,6 +32,7 @@ class _FakeService:
         """Record the `allow_unconfirmed` value of each call; every route passes False."""
         self.fired: dict[str, object] | None = None
         self.allow_unconfirmed: list[bool] = []
+        self.force_reasons: list[tuple[str, str | None]] = []
 
     async def available_transitions(
         self,
@@ -118,10 +119,12 @@ class _FakeService:
         target_state_id,
         principal,
         *,
-        note,
+        reason,
+        note=None,
         allow_unconfirmed=True,
     ):
         self.allow_unconfirmed.append(allow_unconfirmed)
+        self.force_reasons.append((reason, note))
         return TransitionResult(
             newStateId=target_state_id, statusEventId=uuid4(), dispatchedActions=[]
         )
@@ -353,7 +356,7 @@ def test_force_routes_hide_unconfirmed(
     assert client.get(f"/api/applications/{app_id}/flow-states").status_code == 200
     r = client.post(
         f"/api/applications/{app_id}/force-status",
-        json={"stateId": str(uuid4()), "note": "Korrektur"},
+        json={"stateId": str(uuid4()), "reason": "error_correction", "note": "Korrektur"},
     )
     assert r.status_code == 200
     assert fake_service.allow_unconfirmed == [False, False]
@@ -411,7 +414,31 @@ def test_force_routes_check_read_access(
     assert client.get(f"/api/applications/{app_id}/flow-states").status_code == 403
     r = client.post(
         f"/api/applications/{app_id}/force-status",
-        json={"stateId": str(uuid4()), "note": "Korrektur"},
+        json={"stateId": str(uuid4()), "reason": "error_correction", "note": "Korrektur"},
     )
     assert r.status_code == 403
     assert fake_service.allow_unconfirmed == []
+
+
+def test_force_status_needs_a_reason(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """§ 001650: a reason is required, and `other` needs a note of 10 characters."""
+    _as_principal(app, "application.force_status")
+    url = f"/api/applications/{uuid4()}/force-status"
+    state = str(uuid4())
+    assert client.post(url, json={"stateId": state, "note": "Korrektur"}).status_code == 422
+    assert client.post(url, json={"stateId": state, "reason": "nope"}).status_code == 422
+    short = client.post(url, json={"stateId": state, "reason": "other", "note": " kurz     "})
+    assert short.status_code == 422
+    for body in (
+        {"reason": "other", "note": "Ein langer Grund"},
+        {"reason": "applicant_error"},
+        {"reason": "outside_decision", "note": "  "},
+    ):
+        assert client.post(url, json={"stateId": state, **body}).status_code == 200
+    assert fake_service.force_reasons == [
+        ("other", "Ein langer Grund"),
+        ("applicant_error", None),
+        ("outside_decision", None),
+    ]

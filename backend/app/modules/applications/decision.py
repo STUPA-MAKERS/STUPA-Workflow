@@ -5,7 +5,11 @@ A decision holds an approved amount (NULL = as requested) and a list of conditio
 
 * the close of a passed application vote that carries a proposal (`vote.proposal`),
 * a manual transition into an approved state (`State.is_approved`, spec 000572) with
-  an optional `decision` in the request.
+  a `decision` in the request; a move into an approved state from a state that is not
+  approved must name the approved amount (`amount_required`, spec 001610),
+* a decision made outside the platform (`app.modules.flow.outside_decision`),
+* a later change of the approved amount (`app.modules.applications.amend`, spec
+  001620), which keeps the conditions and the state.
 
 The valid decision is the newest `application_decision` row with
 `superseded_at IS NULL`. `application.approved_amount` is its denormalized copy. A new
@@ -21,7 +25,7 @@ never the condition texts).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
@@ -49,6 +53,7 @@ MAX_AMOUNT = Decimal("9999999999.99")
 CODE_AMOUNT_INVALID = "approved_amount_invalid"
 CODE_AMOUNT_EXCEEDS = "approved_amount_exceeds_requested"
 CODE_NOT_ALLOWED = "decision_not_allowed"
+CODE_AMOUNT_REQUIRED = "approved_amount_required"
 
 _CENT = Decimal("0.01")
 
@@ -99,12 +104,16 @@ def _amount_problem(code: str, msg: str) -> ValidationProblem:
     return ValidationProblem(msg, code=code, errors=[{"field": "approvedAmount", "msg": msg}])
 
 
-def check_approved_amount(requested: Decimal | None, approved: Decimal | None) -> None:
+def check_approved_amount(
+    requested: Decimal | None, approved: Decimal | None, *, allow_above: bool = False
+) -> None:
     """Check the approved amount against the requested amount (pure).
 
     None ("as requested") always passes. Otherwise the amount must be at least 0, have
     at most two decimals and an application amount must exist. A 0 € approval is valid
-    and binds nothing in the budget (§F/finance/budget/000253).
+    and binds nothing in the budget (§F/finance/budget/000253). `allow_above` admits an
+    amount above the requested one: only a later change of the approved amount takes
+    it, because extra costs after the approval are its main case.
 
     Raises:
         ValidationProblem: `approved_amount_invalid` for a bad amount or an application
@@ -123,10 +132,39 @@ def check_approved_amount(requested: Decimal | None, approved: Decimal | None) -
             CODE_AMOUNT_INVALID,
             "The approved amount must be at least 0 and the application needs an amount.",
         )
-    if approved > requested:
+    if approved > requested and not allow_above:
         raise _amount_problem(
             CODE_AMOUNT_EXCEEDS, "The approved amount must not exceed the requested amount."
         )
+
+
+def amount_required(*, entering: bool, was_approved: bool, requested: Decimal | None) -> bool:
+    """Tell whether a move must name the approved amount (pure, spec 001610).
+
+    `entering` tells that the target is an approved state, `was_approved` that the
+    left state is one. A move into an approved state from a state that is not
+    approved must name the amount, so that every approval holds the amount that a
+    person or a vote confirmed. A move between two approved states must not ask
+    again. An application without an amount has nothing to approve.
+    """
+    return entering and not was_approved and requested is not None
+
+
+def required_amount_problem() -> ValidationProblem:
+    """Build the 422 `approved_amount_required`."""
+    return _amount_problem(
+        CODE_AMOUNT_REQUIRED, "An approval must name the approved amount."
+    )
+
+
+def check_amount_given(required: bool, decision: DecisionIn | None) -> None:
+    """Refuse a required approval without an approved amount (pure).
+
+    Raises:
+        ValidationProblem: `approved_amount_required` (422).
+    """
+    if required and (decision is None or decision.approved_amount is None):
+        raise required_amount_problem()
 
 
 def amount_deviates(requested: Decimal | None, approved: Decimal | None) -> bool:
@@ -171,6 +209,7 @@ async def record_decision(
     vote_id: UUID | None = None,
     status_event_id: UUID | None = None,
     now: datetime | None = None,
+    amendment: Amendment | None = None,
 ) -> ApplicationDecision:
     """Write a decision in the open transaction (no commit).
 
@@ -178,9 +217,11 @@ async def record_decision(
     `application.approved_amount` and records `application_decision`. The caller checks
     the amount (`check_approved_amount`) first. `old_approved` is the approved amount
     before this decision, for the audit entry (the flow sets the new amount before the
-    guard runs).
+    guard runs). `amendment` marks a later change of the approved amount: the row then
+    holds its reason, the old amount and the decision that allows it.
 
-    The audit entry holds amounts and counts only, because a condition is free text.
+    The audit entry holds amounts and counts only, because a condition and a reason
+    are free text.
     """
     stamp = now or datetime.now(UTC)
     await _lock_application(session, app)
@@ -200,6 +241,10 @@ async def record_decision(
         status_event_id=status_event_id,
         decided_at=stamp,
         decided_by=decided_by,
+        amend_reason=None if amendment is None else amendment.reason,
+        previous_amount=None if amendment is None else old_approved,
+        basis_date=None if amendment is None else amendment.basis_date,
+        basis_gremium_id=None if amendment is None else amendment.basis_gremium_id,
     )
     session.add(row)
     app.approved_amount = decision.approved_amount
@@ -219,9 +264,19 @@ async def record_decision(
             "conditionCount": len(decision.conditions),
             "voteId": None if vote_id is None else str(vote_id),
             "statusEventId": None if status_event_id is None else str(status_event_id),
+            "amended": amendment is not None,
         },
     )
     return row
+
+
+@dataclass(frozen=True, slots=True)
+class Amendment:
+    """A later change of the approved amount: why, and which decision allows it."""
+
+    reason: str
+    basis_date: date
+    basis_gremium_id: UUID
 
 
 @dataclass(frozen=True, slots=True)
@@ -434,7 +489,8 @@ async def decision_source(
     """Resolve the Gremium, the meeting title and the TOP number of a decision.
 
     A vote decision names the Gremium of its meeting (else of `eligible_group`), the
-    meeting title and the 1-based number of its agenda item. A manual decision names
+    meeting title and the 1-based number of its agenda item. A changed approved amount
+    names the Gremium of the decision that allows the change. A manual decision names
     the Gremium of the application.
     """
     from app.modules.gremien.models import Gremium
@@ -448,7 +504,9 @@ async def decision_source(
         else None
     )
     gremium_id = (
-        app.gremium_id
+        row.basis_gremium_id
+        if row.basis_gremium_id is not None
+        else app.gremium_id
         if vote is None
         else meeting.gremium_id
         if meeting is not None
