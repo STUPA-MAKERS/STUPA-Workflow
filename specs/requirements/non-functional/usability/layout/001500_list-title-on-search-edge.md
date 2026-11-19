@@ -6,7 +6,7 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:
-  - "frontend/vendor/ui-kit/src/lib/page-header/page-header.component.spec.ts:PageHeaderComponent styles"
+  - "frontend/vendor/ui-kit/src/lib/page-header/page-header.component.spec.ts:PageHeaderComponent"
 implementation:
   - frontend/vendor/ui-kit/src/lib/page-header
 scope:
