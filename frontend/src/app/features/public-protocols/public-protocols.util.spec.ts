@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Meta } from '@angular/platform-browser';
 import {
@@ -58,7 +58,7 @@ describe('public protocols util', () => {
   });
 
   it('sets noindex while the page lives and removes it after', () => {
-    @Component({ standalone: true, template: '' })
+    @Component({ changeDetection: ChangeDetectionStrategy.Eager, standalone: true, template: '' })
     class Page {
       constructor() {
         useNoindex();

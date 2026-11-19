@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
@@ -12,6 +12,7 @@ import type { StateOutWire } from '@core/api/models';
 import { ForceStatusDialogComponent } from './force-status-dialog.component';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
   standalone: true,
   imports: [ForceStatusDialogComponent],
   template: `

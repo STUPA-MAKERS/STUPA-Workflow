@@ -1,4 +1,4 @@
-import { Component, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, viewChild } from '@angular/core';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { of, throwError } from 'rxjs';
@@ -12,6 +12,7 @@ import { AttendanceDetailComponent, type AttendanceDetailRequest } from './atten
 import { loadErrorToast, retryLoadError } from '../../../../testing/load-error';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
   standalone: true,
   imports: [AttendanceDetailComponent],
   template: `

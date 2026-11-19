@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
@@ -18,7 +18,10 @@ import { VOTE_POLL_MS, VotingPageService } from './voting-page.service';
 import { loadErrorToast } from '../../../../testing/load-error';
 
 /** The detail of the outlet. The detail has its own spec; here only the route matters. */
-@Component({ standalone: true, template: '<p>detail</p>' })
+@Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
+  standalone: true, template: '<p>detail</p>'
+})
 class DetailStub {}
 
 /** A fixed local "now" (5 Oct 2026, 12:00), so that no case depends on the time of the run. */

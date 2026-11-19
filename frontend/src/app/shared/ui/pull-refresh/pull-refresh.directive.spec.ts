@@ -1,6 +1,6 @@
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { render } from '@testing-library/angular';
 import { cacheInterceptor, listContext } from '@core/cache/cache.interceptor';
 import { HttpCacheService } from '@core/cache/http-cache.service';
@@ -10,6 +10,7 @@ import { PULL_HOLD, PULL_THRESHOLD, PullRefreshDirective, rubberBand } from './p
 import { RING_LENGTH } from './pull-refresh-ring.component';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
   standalone: true,
   imports: [PullRefreshDirective],
   template: `
