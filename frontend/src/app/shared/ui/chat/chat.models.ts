@@ -1,7 +1,18 @@
 import type { IsoDateTime, PersonRef, ScanState } from '@core/api/models';
+import type { TranslationKey } from '@core/i18n/translations';
 
 /** The visibility of a message where a thread knows two (application comments). */
 export type ChatVisibility = 'internal' | 'public';
+
+/**
+ * The guarded visibility switch of a thread where a public message sends a mail: each option
+ * names its readers (`labels`), the composer shows the choice next to the send button (`hints`)
+ * and frames a public draft, and each new message starts again with the first option.
+ */
+export interface ChatVisibilityGuard {
+  readonly labels: Readonly<Record<ChatVisibility, TranslationKey>>;
+  readonly hints: Readonly<Record<ChatVisibility, TranslationKey>>;
+}
 
 /** The delivery state of a message. A message without a state counts as sent. */
 export type ChatMessageState = 'sent' | 'sending' | 'failed';

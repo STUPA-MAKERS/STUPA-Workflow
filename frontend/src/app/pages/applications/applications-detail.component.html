@@ -252,6 +252,7 @@
           [draftKey]="'application.' + application.id"
           [messages]="chatMessages()"
           [visibilityOptions]="chatVisibilities()"
+          [visibilityGuard]="chatVisibilityGuard"
           [canAttach]="canAttach()"
           [canPost]="!observer()"
           [mentionables]="mentionables()"
