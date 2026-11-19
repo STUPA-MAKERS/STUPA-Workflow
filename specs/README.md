@@ -171,6 +171,30 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/applications/001183](requirements/functional/applications/applications/001183_type-group-order.md) | Admins set the order of the groups and of the Antragsarten | approved |
 | [F/applications/applications/001184](requirements/functional/applications/applications/001184_no-general-apply-text.md) | Step 1 has no general text, only the group texts | approved |
 | [F/applications/applications/001185](requirements/functional/applications/applications/001185_apply-step-spacing.md) | The blocks of step 1 have one even spacing | approved |
+| [F/applications/applications/001610](requirements/functional/applications/applications/001610_approval-asks-amount.md) | Every approval asks for the approved amount | approved |
+| [F/applications/applications/001611](requirements/functional/applications/applications/001611_vote-stores-amount.md) | A vote that approves stores the approved amount | approved |
+| [F/applications/applications/001612](requirements/functional/applications/applications/001612_both-amounts-shown.md) | List, detail and export show the requested and the approved amount | approved |
+| [F/applications/applications/001613](requirements/functional/applications/applications/001613_backfill-approved-amount.md) | Existing approvals get their approved amount | approved |
+| [F/applications/applications/001620](requirements/functional/applications/applications/001620_amend-approved-amount.md) | An approved Antrag takes a new approved amount | approved |
+| [F/applications/applications/001621](requirements/functional/applications/applications/001621_amend-shows-old-and-new.md) | The timeline and the audit show the old and the new approved amount | approved |
+| [F/applications/applications/001622](requirements/functional/applications/applications/001622_amend-above-requested.md) | A changed approved amount can be higher than the requested amount | approved |
+| [F/applications/applications/001660](requirements/functional/applications/applications/001660_change-application-type.md) | A submitted Antrag can change its Antragsart | approved |
+| [F/applications/applications/001661](requirements/functional/applications/applications/001661_change-type-missing-fields.md) | A change of the Antragsart sends missing required fields to the applicant | approved |
+| [F/applications/applications/001662](requirements/functional/applications/applications/001662_change-type-old-values.md) | Values the new form does not have stay readable | approved |
+| [F/applications/applications/001663](requirements/functional/applications/applications/001663_change-type-timeline.md) | The timeline and the audit show the old and the new Antragsart | approved |
+| [F/applications/applications/001690](requirements/functional/applications/applications/001690_member-comment-internal.md) | A member comment is internal by default | approved |
+| [F/applications/applications/001691](requirements/functional/applications/applications/001691_comment-visibility-labels.md) | The visibility switch names who reads the comment | approved |
+| [F/applications/applications/001692](requirements/functional/applications/applications/001692_comment-visibility-visible.md) | The chosen visibility shows before sending | approved |
+| [F/applications/applications/001700](requirements/functional/applications/applications/001700_list-multi-select.md) | The Antrag list has a multiple selection | approved |
+| [F/applications/applications/001701](requirements/functional/applications/applications/001701_bulk-transition.md) | A bulk transition offers only transitions allowed for every selected Antrag | approved |
+| [F/applications/applications/001702](requirements/functional/applications/applications/001702_bulk-message.md) | A bulk message adds one public comment to each Antrag | approved |
+| [F/applications/applications/001703](requirements/functional/applications/applications/001703_bulk-result.md) | The bulk result shows success or error per Antrag | approved |
+| [F/applications/applications/001710](requirements/functional/applications/applications/001710_draft-not-submitted.md) | A draft says that it is not submitted | approved |
+| [F/applications/applications/001711](requirements/functional/applications/applications/001711_draft-reminder-mail.md) | A draft without a change for 7 days gets one reminder mail | approved |
+| [F/applications/applications/001712](requirements/functional/applications/applications/001712_withdraw-confirm.md) | A withdrawal asks first and does not show in a draft | approved |
+| [F/applications/applications/001720](requirements/functional/applications/applications/001720_new-version-button.md) | A denied or returned Antrag offers a new version | approved |
+| [F/applications/applications/001721](requirements/functional/applications/applications/001721_new-version-link.md) | A new version links to the old Antrag | approved |
+| [F/applications/applications/001722](requirements/functional/applications/applications/001722_new-version-closes-old.md) | Submitting the new version closes the old Antrag | approved |
 | [F/applications/dashboard/000421](requirements/functional/applications/dashboard/000421_dashboard.md) | The start page is a work list with a side sheet | replaced |
 | [F/applications/dashboard/000550](requirements/functional/applications/dashboard/000550_start-due-cards.md) | Start shows the due cards of the person | replaced |
 | [F/applications/dashboard/000650](requirements/functional/applications/dashboard/000650_start-apply-button-tab-line.md) | Antrag stellen stands in the tab line of the desktop start page | replaced |
@@ -198,6 +222,13 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/flow/000459](requirements/functional/applications/flow/000459_vote-state-branches.md) | A vote state has exactly one pass and one fail branch | approved |
 | [F/applications/flow/000571](requirements/functional/applications/flow/000571_approved-state.md) | A flow state can mark an Antrag as approved or denied | approved |
 | [F/applications/flow/000572](requirements/functional/applications/flow/000572_approved-amount-from-state.md) | The approved amount follows the approved state | approved |
+| [F/applications/flow/001600](requirements/functional/applications/flow/001600_decision-outside-platform.md) | A vote state takes a decision made outside the platform | approved |
+| [F/applications/flow/001601](requirements/functional/applications/flow/001601_outside-decision-cancels-votes.md) | A decision made outside the platform cancels the open votes | approved |
+| [F/applications/flow/001602](requirements/functional/applications/flow/001602_outside-decision-timeline.md) | The timeline shows a decision made outside the platform | approved |
+| [F/applications/flow/001603](requirements/functional/applications/flow/001603_record-decision-permission.md) | Recording a decision made outside the platform needs its own permission | approved |
+| [F/applications/flow/001650](requirements/functional/applications/flow/001650_force-status-reason.md) | A forced status needs a reason from a list | approved |
+| [F/applications/flow/001651](requirements/functional/applications/flow/001651_force-status-report.md) | An admin page counts the forced status changes | approved |
+| [F/applications/flow/001652](requirements/functional/applications/flow/001652_force-status-old-reason.md) | A forced change without a reason counts as Ohne Grund | approved |
 | [F/applications/forms/000133](requirements/functional/applications/forms/000133_positions-shape.md) | A positions answer has label and offers | approved |
 | [F/applications/forms/000134](requirements/functional/applications/forms/000134_offer-limits.md) | Offer counts have limits | approved |
 | [F/applications/forms/000135](requirements/functional/applications/forms/000135_funding-field.md) | The requested funding is separate from the costs | approved |
@@ -212,6 +243,18 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/forms/000288](requirements/functional/applications/forms/000288_finite-numbers.md) | Numbers are finite decimals | approved |
 | [F/applications/forms/000289](requirements/functional/applications/forms/000289_form-revision.md) | A form change is versioned and audited | approved |
 | [F/applications/forms/000471](requirements/functional/applications/forms/000471_type-retention.md) | Antrag types can keep their own retention | approved |
+| [F/applications/forms/001630](requirements/functional/applications/forms/001630_cost-total-line.md) | The Kostenaufstellung shows the total cost and the requested amount | approved |
+| [F/applications/forms/001631](requirements/functional/applications/forms/001631_cost-per-person.md) | The cost line shows the amount per person | approved |
+| [F/applications/forms/001632](requirements/functional/applications/forms/001632_cost-line-in-detail.md) | The Antrag detail shows the same cost line | approved |
+| [F/applications/forms/001640](requirements/functional/applications/forms/001640_placeholder-offer-warning.md) | The form warns about a placeholder offer | approved |
+| [F/applications/forms/001641](requirements/functional/applications/forms/001641_placeholder-warning-not-blocking.md) | A placeholder warning does not block the submit | approved |
+| [F/applications/forms/001670](requirements/functional/applications/forms/001670_form-rules.md) | A form version has rules across fields | approved |
+| [F/applications/forms/001671](requirements/functional/applications/forms/001671_form-rules-same-check.md) | Frontend and backend check the same form rules | approved |
+| [F/applications/forms/001680](requirements/functional/applications/forms/001680_cost-centre-field-subtree.md) | A Kostenstelle field can limit its picker to a subtree | approved |
+| [F/applications/forms/001681](requirements/functional/applications/forms/001681_cost-centre-outside-subtree.md) | The server refuses a Kostenstelle outside the subtree | approved |
+| [F/applications/forms/001730](requirements/functional/applications/forms/001730_position-files.md) | A position takes files in the form | approved |
+| [F/applications/forms/001731](requirements/functional/applications/forms/001731_submit-without-file-warning.md) | A submit without a file asks for a confirmation | approved |
+| [F/applications/forms/001732](requirements/functional/applications/forms/001732_type-requires-file.md) | An Antragsart can require a file | approved |
 | [F/collaboration/activity/001270](requirements/functional/collaboration/activity/001270_activity-page.md) | The activity page lists the events of the items of a person | approved |
 | [F/collaboration/activity/001271](requirements/functional/collaboration/activity/001271_items-of-a-person.md) | An item belongs to a person when they made, hold or touched it | approved |
 | [F/collaboration/activity/001272](requirements/functional/collaboration/activity/001272_reuse-gates.md) | The activity page reuses the read gate of each module | approved |
@@ -583,11 +626,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/001310](requirements/functional/meetings/meetings/001310_attendance-pool-rows.md) | The attendance matrix shows the pool substitutes | approved |
 | [F/meetings/meetings/001311](requirements/functional/meetings/meetings/001311_attendance-pool-cell.md) | A pool cell counts the pool seats | approved |
 | [F/meetings/meetings/001312](requirements/functional/meetings/meetings/001312_attendance-average-pool-seats.md) | The attendance average counts the pool seats | approved |
-| [F/meetings/meetings/001440](requirements/functional/meetings/meetings/001440_live-channel-reconnects.md) | The meeting page opens a dropped live channel again | approved |
-| [F/meetings/meetings/001441](requirements/functional/meetings/meetings/001441_live-resync-on-return.md) | A live meeting page connects and reads again when the page returns | approved |
 | [F/meetings/meetings/001460](requirements/functional/meetings/meetings/001460_votes-in-side-sheet.md) | The vote cards of an item are in a side sheet | approved |
 | [F/meetings/meetings/001461](requirements/functional/meetings/meetings/001461_phone-open-vote-replaces-text.md) | On a phone an open vote takes the place of the text | approved |
 | [F/meetings/meetings/001462](requirements/functional/meetings/meetings/001462_sheet-opens-for-voters.md) | The vote sheet opens by itself for a voter | approved |
+| [F/meetings/meetings/001738](requirements/functional/meetings/meetings/001738_live-channel-reconnects.md) | The meeting page opens a dropped live channel again | approved |
+| [F/meetings/meetings/001739](requirements/functional/meetings/meetings/001739_live-resync-on-return.md) | A live meeting page connects and reads again when the page returns | approved |
 | [F/meetings/protocols/000115](requirements/functional/meetings/protocols/000115_keeper-permission.md) | The keeper holds protocol.write | approved |
 | [F/meetings/protocols/000116](requirements/functional/meetings/protocols/000116_finalize.md) | Finalize needs a closed meeting and protocol.finalize | approved |
 | [F/meetings/protocols/000117](requirements/functional/meetings/protocols/000117_delete-draft-only.md) | Only a draft protocol is deleted | approved |
