@@ -179,13 +179,14 @@ describe('CalendarComponent (desktop)', () => {
     expect(screen.getByRole('button', { name: 'Mittwoch, 18. November 2026, 1 Eintrag' })).toBeInTheDocument();
   });
 
-  it('shows the entries of the picked day as the rows of one row group (001770)', async () => {
+  it('shows the entries of the picked day as the rows of one row group without a day label (001770)', async () => {
     const view = await setup();
     load(view);
     expect(panel()).toHaveAccessibleName('Mi, 11.11.2026 · Heute');
     expect(cards()).toEqual(['Angebot einholen', 'Zahnarzt', 'Jour fixe']);
-    expect(panel().querySelectorAll('app-list-group .rowgroup[role=list]').length).toBe(1);
-    expect(within(panel()).getByText('Mi, 11.11.2026 · Heute')).toBeInTheDocument();
+    expect(panel().querySelectorAll('.rowgroup[role=list]').length).toBe(1);
+    expect(panel().querySelector('app-list-group')).toBeNull();
+    expect(within(panel()).queryByText('Mi, 11.11.2026 · Heute')).toBeNull();
     const termin = dayRow(/Jour fixe/);
     expect(termin).toHaveTextContent('Termin');
     expect(termin).toHaveTextContent('14:00 – 15:30');
@@ -435,11 +436,15 @@ describe('CalendarComponent (desktop)', () => {
     expect(view.cmp.kindOptions().map((o) => o.value)).not.toContain('event');
   });
 
-  it('puts Kalender-Abo and Termin anlegen in one group at the end of the tools row (001771)', async () => {
+  it('puts Heute, Kalender-Abo and Termin anlegen in one group at the end of the tools row (001771)', async () => {
     const view = await setup();
     load(view);
     const group = screen.getByRole('toolbar').querySelector('.cal__nav app-button-group') as HTMLElement;
-    expect(within(group).getByRole('button', { name: 'Kalender-Abo' })).toBeInTheDocument();
+    expect(within(group).getAllByRole('button').map((b) => b.textContent?.trim() || b.getAttribute('aria-label'))).toEqual([
+      'Heute',
+      'Kalender-Abo',
+      'Termin anlegen',
+    ]);
     expect(within(group).getByRole('button', { name: 'Termin anlegen' })).toBeInTheDocument();
     expect(view.container.querySelector('app-fab')).toBeNull();
   });

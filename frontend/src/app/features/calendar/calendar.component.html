@@ -113,7 +113,6 @@
           [title]="(view() === 'week' ? 'calendar.next.week' : 'calendar.next.month') | t"
           (click)="step(1)"
         ><app-icon name="right" /></app-button>
-        <app-button class="cal__today" variant="outlined" (click)="goToday()">{{ 'meetings.overview.today' | t }}</app-button>
         <app-segmented
           class="cal__view"
           [ariaLabel]="'calendar.view.label' | t"
@@ -122,6 +121,7 @@
           (valueChange)="setView($event)"
         />
         <app-button-group class="cal__actions">
+          <app-button (click)="goToday()">{{ 'meetings.overview.today' | t }}</app-button>
           @if (isPublic) {
             <app-button [ariaPressed]="abo.isOpen()" (click)="abo.toggle($event.currentTarget)">
               <app-icon name="cal" />
@@ -271,19 +271,17 @@
           } @else if (!dayEntries().length && !loading()) {
             <app-empty-state shape="date" rows="3" [heading]="'calendar.day.empty' | t" />
           } @else {
-            <app-list-group [label]="dayHeading()">
-              <div class="rowgroup cal__rows" role="list">
-                @for (e of dayEntries(); track e.kind + e.id) {
-                  <app-list-item class="cal__dayRow" role="listitem" [title]="e.title" [wrap]="true" [subWrap]="true" (activate)="openEntry(e)">
-                    <span lead class="cal__lead cal__rowIcon"><app-icon [name]="icon(e.kind)" /></span>
-                    <span sub class="cal__sub">
-                      <ng-container *ngTemplateOutlet="facts; context: { $implicit: e, place: true }" />
-                    </span>
-                    <app-row-chevron trail />
-                  </app-list-item>
-                }
-              </div>
-            </app-list-group>
+            <div class="rowgroup cal__rows" role="list">
+              @for (e of dayEntries(); track e.kind + e.id) {
+                <app-list-item class="cal__dayRow" role="listitem" [title]="e.title" [wrap]="true" [subWrap]="true" (activate)="openEntry(e)">
+                  <span lead class="cal__lead cal__rowIcon"><app-icon [name]="icon(e.kind)" /></span>
+                  <span sub class="cal__sub">
+                    <ng-container *ngTemplateOutlet="facts; context: { $implicit: e, place: true }" />
+                  </span>
+                  <app-row-chevron trail />
+                </app-list-item>
+              }
+            </div>
           }
         </section>
       </div>
