@@ -58,7 +58,6 @@ import {
   imageUploadErrorKey,
 } from '@shared/markdown/markdown-image-upload.directive';
 import { meetingKeeperLine } from '../keepers.util';
-import { ProtocolBarComponent } from '../protocol-bar/protocol-bar.component';
 import { type LinkedLead, TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { voteResultResolver } from '../vote-result/vote-result';
 import { hasOpenBlackout } from '../../../shared/markdown/markdown.util';
@@ -160,7 +159,6 @@ const TOOLS: readonly FormatTool[] = [
     MarkdownImageUploadDirective,
     DocumentViewerComponent,
     NoteComponent,
-    ProtocolBarComponent,
     ScrollFadeDirective,
     SegmentedComponent,
     StatusTextComponent,
@@ -194,8 +192,6 @@ export class TopSheetComponent {
    * outside the editor, like a vote result, raises this number so the new text shows.
    */
   readonly revision = input(0);
-  /** The finalize runs. */
-  readonly finalizing = input(false);
   /**
    * The participant view: read only, "Jetzt"
    * before the item that the room handles, the line "Mara Keller führt das Protokoll"
@@ -225,8 +221,6 @@ export class TopSheetComponent {
   readonly renameDraft = model<string>('');
 
   readonly bodyChange = output<{ itemId: Uuid; body: string }>();
-  /** "Finalisieren & versenden" in the protocol bar of a closed meeting. */
-  readonly finalize = output<void>();
   readonly startRename = output<AgendaItem>();
   readonly cancelRename = output<void>();
   readonly renameTop = output<AgendaItem>();

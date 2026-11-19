@@ -201,16 +201,15 @@ describe('ApplicationsDetailComponent — header', () => {
 
   /**
    * The title opens the sheet on the line of the actions; no line stands above it. Intl puts a
-   * non-breaking space before the currency sign. The dots are CSS: every part draws one before it,
-   * and the line clips the one at each line start.
+   * non-breaking space before the currency sign. The meta line is a list of chips, with no dot
+   * between them (spec 001306, metaChips).
    */
-  it('shows the title and status · type · amount, with no line above the title and no gremium', async () => {
+  it('shows the title and the chips status, type and amount, with no line above the title and no gremium (metaChips)', async () => {
     await setup();
     expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
     expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     expect(screen.getByRole('heading', { level: 2, name: 'Zuschuss Kennenlernwochenende' })).toBeInTheDocument();
     const line = document.querySelector('.ad__line') as HTMLElement;
-    expect(line).toHaveClass('ad__seps');
     const parts = [...line.querySelectorAll('.ad__part')].map((el) => el.textContent?.replace(/\s+/g, ''));
     expect(parts).toEqual(['Eingereicht', 'Förderantrag', '1.250,00€']);
     expect(line.textContent).not.toContain('·');

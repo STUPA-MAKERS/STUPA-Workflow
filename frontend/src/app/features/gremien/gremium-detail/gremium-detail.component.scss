@@ -1,5 +1,5 @@
 @use 'breakpoints' as bp;
-@use 'dot-parts' as dots;
+@use 'meta-chips' as chips;
 
 :host {
   display: flex;
@@ -68,19 +68,15 @@
   min-width: 0;
 }
 
-.gd__line {
-  --gd-sep: 24px;
-  overflow-x: clip;
-}
 .gd__line:empty,
 .gd__parts:empty {
   display: none;
 }
 .gd__parts {
-  @include dots.list(var(--gd-sep));
+  @include chips.list;
 }
 .gd__part {
-  @include dots.part(var(--gd-sep));
+  @include chips.chip;
 }
 
 .gd__actions {
