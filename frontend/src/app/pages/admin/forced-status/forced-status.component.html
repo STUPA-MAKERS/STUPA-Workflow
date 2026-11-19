@@ -38,7 +38,7 @@
   } @else if (!events().length) {
     <app-empty-state [heading]="(filtered() ? 'admin.forced.emptyFiltered' : 'admin.forced.empty') | t" />
   } @else {
-    <div class="rowgroup fs__list" role="list" [attr.aria-label]="'admin.forced.title' | t">
+    <div class="rowgroup" role="list" [attr.aria-label]="'admin.forced.title' | t">
       @for (e of events(); track e.applicationId + e.at) {
         <app-list-item
           role="listitem"
