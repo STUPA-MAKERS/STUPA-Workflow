@@ -99,11 +99,15 @@ describe('LiveCardsComponent', () => {
     expect(c.vote).toBeNull();
   });
 
-  it('renders nothing without a live meeting or after an error', async () => {
+  it('renders nothing without a live meeting', async () => {
     await setup([meeting('p', 'planned')]);
     expect(screen.queryByRole('region')).toBeNull();
-    const failed = await setup('error');
-    expect(failed.fixture.componentInstance.cards()).toEqual([]);
+  });
+
+  it('renders nothing after an error', async () => {
+    const { fixture } = await setup('error');
+    expect(fixture.componentInstance.cards()).toEqual([]);
+    expect(screen.queryByRole('region')).toBeNull();
   });
 
   it('asks for no meeting while Sitzungen is off', async () => {
