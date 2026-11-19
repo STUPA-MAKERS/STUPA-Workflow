@@ -182,7 +182,7 @@
   min-height: 0;
 }
 // Each day is its own segment, 2px apart, like the rows of a row group: only the four outer
-// corners of the month are round. The month view has no surface of its own.
+// corners of the month are round. The month view has no surface of its own (spec 001780).
 .cal__grid {
   --cal-gap: 2px;
   --cal-in: 4px;
