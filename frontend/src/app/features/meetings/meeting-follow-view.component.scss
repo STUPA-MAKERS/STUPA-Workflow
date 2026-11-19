@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 
 :host {
   display: flex;
@@ -35,9 +34,6 @@
 
 .fv__fade {
   --fv-fade: var(--space-5);
-}
-.fv__fade {
-  @include fade.fade-y(var(--fv-fade));
 }
 
 .fv__body {

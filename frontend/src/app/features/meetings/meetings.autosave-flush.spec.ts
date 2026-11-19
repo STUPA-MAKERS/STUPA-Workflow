@@ -5,7 +5,7 @@ import {
 } from '@angular/common/http/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { render } from '@testing-library/angular';
-import { EMPTY, of } from 'rxjs';
+import { EMPTY, NEVER, of } from 'rxjs';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import type { MeetingOutWire, ProtocolOutWire } from '@core/api/models';
@@ -58,7 +58,7 @@ const AGENDA_ITEM = (over: Record<string, unknown> = {}) => ({
 
 class FakeWs {
   connectMeeting() {
-    return { messages$: of(), send: () => {}, close: () => {} };
+    return { messages$: NEVER, send: () => {}, close: () => {} };
   }
 }
 

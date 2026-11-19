@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use 'field' as f;
 
 :host {
@@ -53,9 +52,6 @@
   padding-inline: 0;
 }
 
-.af__navBody {
-  @include fade.fade-y(var(--space-6));
-}
 
 .af__hidden {
   display: none;
@@ -168,44 +164,24 @@
   --stb-bg: var(--color-surface-1);
 }
 .af--split .af__pageBody {
-  --af-fade: var(--space-6);
   position: relative;
   display: flex;
   flex: 1 1 0;
   flex-direction: column;
   min-height: 0;
-  padding: var(--space-6) var(--space-6) var(--space-7);
+  // The body is a round frame as wide as the fields, 24px inside the sheet, so a field that
+  // scrolls past an end keeps its round corners and the cut looks intended (spec 000193).
+  margin: var(--space-6);
+  padding: 0 0 var(--space-2);
+  border-radius: var(--radius-field);
   overflow-y: auto;
   overscroll-behavior: contain;
-  scroll-padding-block: var(--af-fade);
-  // A sticky element sticks below the top padding of its scroll box, so a bar with top 0 left
-  // the padding strip open and the rows scrolled through it. The bar sticks at the top edge.
-  --ld-sticky-top: calc(-1 * var(--space-6));
+  --ld-sticky-top: 0px;
 }
 .af--split .af__pageBody > ::ng-deep * {
   flex-shrink: 0;
 }
-// The mask is on the body, so the sheet keeps its colour and its shape.
-// The top fade of the body would make the stuck bar transparent, so the body fades only at the end.
-.af--split .af__pageBody.is-fade-start:has(app-sticky-bar:not(.stb--off)) {
-  mask-image: none;
-}
-.af--split .af__pageBody.is-fade-end:has(app-sticky-bar:not(.stb--off)) {
-  mask-image: linear-gradient(to top, transparent, #000 var(--af-fade));
-}
-.af--split .af__pageBody {
-  @include fade.fade-y(var(--af-fade));
-}
-// A mask makes the body the containing block of every `position: fixed` element in it, so an
-// open overlay of the page would be cut by the sheet. While one is open, the body has no fade.
-.af--split .af__pageBody:has(.dialog__backdrop, .ss__scrim) {
-  mask-image: none !important;
-}
-// The mask would make the body the containing block of the fixed button, so the body has no
-// fade. The page ends with room for the 56px button and 16px below and above it.
-.af--split .af__pageBody:has(app-fab) {
-  mask-image: none !important;
-}
+// The page ends with room for the floating button and 16px below and above it.
 .af .af__pageBody:has(app-fab) {
   padding-bottom: calc(56px + 2 * var(--space-4));
 }
@@ -213,7 +189,7 @@
   --fab-inset: var(--space-6);
 }
 .af--split .af__pageBody:has(app-fab) {
-  padding-bottom: calc(56px + var(--space-6) + var(--space-4));
+  padding-bottom: calc(56px + var(--space-4));
 }
 
 .af--pane,

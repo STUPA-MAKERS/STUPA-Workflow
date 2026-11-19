@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use '../budget/swatch';
 @use 'list-pane' as lp;
 
@@ -47,9 +46,6 @@
 }
 .exp--split .exp__scroll > * {
   flex: none;
-}
-.exp__scroll {
-  @include fade.fade-y(var(--exp-fade));
 }
 
 .exp__rows {

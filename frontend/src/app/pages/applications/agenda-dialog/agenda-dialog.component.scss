@@ -1,4 +1,3 @@
-@use 'scroll-fade' as fade;
 @use '../../../shared/ui/dialog-form' as df;
 @use 'field' as f;
 
@@ -146,6 +145,8 @@
   opacity: 1;
 }
 
+// The list cuts hard at its own rounded frame, and its rows run to the sides of the frame
+// (000193).
 .agd__list {
-  @include fade.fade-y(var(--space-5));
+  border-radius: var(--radius-lg);
 }

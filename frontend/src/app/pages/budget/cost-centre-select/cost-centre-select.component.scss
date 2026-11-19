@@ -1,7 +1,6 @@
 @use 'field' as f;
 @use 'display' as d;
 @use 'option-menu' as om;
-@use 'scroll-fade' as fade;
 
 :host {
   display: block;
@@ -194,7 +193,6 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 0 var(--space-2) var(--space-2);
-  @include fade.fade-y(var(--space-5));
 }
 // The black ring of a highlighted chosen row reaches 1px past the row (000598), so the
 // scrolling list leaves it room at the top, or the list cuts it off.
@@ -296,4 +294,10 @@
 }
 .ccs__empty {
   @include om.empty;
+}
+
+// The list cuts hard at its own rounded frame, and its rows run to the sides of the frame
+// (000193).
+.ccs__list--sheet {
+  border-radius: var(--radius-lg);
 }

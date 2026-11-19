@@ -2326,6 +2326,7 @@ describe('MeetingsComponent — methods', () => {
       cmp.agenda.set([AGENDA_ITEM(), AGENDA_ITEM({ id: 't-2', position: 1 })] as never);
       cmp.jumpNext('t-2', 't-1');
       expect(cmp.selectedTopId()).toBe('t-2');
+      expect(cmp.agenda()[0].doneAt).toEqual(expect.any(String));
       const req = http.expectOne('/api/meetings/m-1');
       expect(req.request.method).toBe('PATCH');
       expect(req.request.body).toEqual({ currentAgendaItemId: 't-2', completeAgendaItemId: 't-1' });
@@ -2334,6 +2335,16 @@ describe('MeetingsComponent — methods', () => {
         .expectOne((r) => r.method === 'GET' && r.url === '/api/meetings/m-1/agenda')
         .flush([AGENDA_ITEM({ doneAt: '2026-10-15T16:30:00Z' }), AGENDA_ITEM({ id: 't-2', position: 1 })]);
       expect(cmp.agenda()[0].doneAt).toBe('2026-10-15T16:30:00Z');
+    });
+
+    it('takes the tick of "Nächster TOP" back when the server refuses the step', async () => {
+      const { cmp, http } = await loaded();
+      cmp.meeting.set({ ...MEETING_MODEL, isProtokollant: true, currentAgendaItemId: 't-1' });
+      cmp.agenda.set([AGENDA_ITEM(), AGENDA_ITEM({ id: 't-2', position: 1 })] as never);
+      cmp.jumpNext('t-2', 't-1');
+      expect(cmp.agenda()[0].doneAt).toEqual(expect.any(String));
+      http.expectOne('/api/meetings/m-1').flush({ detail: 'nope' }, { status: 409, statusText: 'Conflict' });
+      expect(cmp.agenda()[0].doneAt).toBeNull();
     });
 
     it('leaves the meeting untouched when the "now" broadcast fails', async () => {

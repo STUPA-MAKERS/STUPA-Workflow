@@ -1,16 +1,14 @@
 ---
 id: "001144"
-title: The agenda shows the planned end and marks an overrun
+title: The agenda shows no planned end and no overrun
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-16
+updated: 2026-11-19
 tests:
-  - "frontend/src/app/features/meetings/agenda-plan.util.spec.ts:planOverrun"
   - "frontend/src/app/features/meetings/agenda-pane/agenda-pane.component.spec.ts:planRowsOverrun"
 implementation:
-  - frontend/src/app/features/meetings/agenda-pane/agenda-pane.component.ts
-  - frontend/src/app/features/meetings/agenda-pane/agenda-pane.component.scss
+  - frontend/src/app/features/meetings/agenda-pane/agenda-pane.component.html
 scope:
   - backend/app/modules/meetings
   - backend/app/modules/livevote
@@ -18,15 +16,15 @@ scope:
   - mcp
 ---
 
-# The agenda shows the planned end and marks an overrun
+# The agenda shows no planned end and no overrun
 
-When the plan has a start, the agenda must show the planned end of the last TOP as one line
-`Ende ca. HH:MM` below the last row. When the Sitzung has an end time and the planned end is
-later than it, the line must use the warning colour and keep its text. The line must not change
-the end time of the Sitzung.
+The agenda must not show a line with the planned end below the last row, because the agenda
+pane ends with its list (spec 001440). The planned start of each TOP in its row subline stays
+(spec 001141). When the planned end of the last TOP is later than the end time of the Sitzung,
+the agenda must not mark it, and no row must change its colour.
 
-Reason: The person who plans the agenda sees at once that the TOPs do not fit into the time of
-the Sitzung.
+Reason: The planned start in each row already shows how far the plan reaches. A mark would need
+a footer segment below the list or a colour that the row does not otherwise have.
 
-Test: Component test of the agenda pane: the line shows the planned end, and it carries the
-warning class when the end is after the end time.
+Test: Component test of the agenda pane: with a planned end after the end time of the Sitzung,
+no row carries a warning class and no end line is shown.
