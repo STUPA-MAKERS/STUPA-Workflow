@@ -145,11 +145,12 @@ describe('VotePanelComponent', () => {
     expect(screen.queryByText(/Zwischenstand/)).not.toBeInTheDocument();
   });
 
-  /** Only the status and the rules remain, with one separator between them. */
+  /** Only the status and the rules remain, as two chips with no dot between them (spec 001306). */
   it('shows no meeting line and no link for a motion without both', async () => {
     await setup({ context: { meeting: null, position: null }, vote: vote({ meetingId: null, applicationId: null }) });
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
-    expect(screen.getAllByText('·')).toHaveLength(1);
+    expect(screen.queryByText('·')).not.toBeInTheDocument();
+    expect(document.querySelectorAll('.vpn__meta .vpn__part')).toHaveLength(2);
   });
 
   it('shows the result of a closed vote and no ballot', async () => {
