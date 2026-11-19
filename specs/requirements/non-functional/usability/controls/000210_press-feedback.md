@@ -2,9 +2,10 @@
 id: "000210"
 title: A press gives feedback
 kind: non-functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
+updated: 2026-11-19
+replaced_by: NF/usability/controls/001314
 implementation:
   - frontend/vendor/ui-kit/src/styles/_press.scss
 scope:
