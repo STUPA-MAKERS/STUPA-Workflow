@@ -21,6 +21,9 @@
                 @if (m.status === 'delegated' && m.delegateName) {
                   <span class="gad__note">{{ 'gremien.attendance.delegateTo' | t: { name: m.delegateName } }}</span>
                 }
+                @if (m.status === 'seat' && m.delegateName) {
+                  <span class="gad__note">{{ 'gremien.attendance.seatFor' | t: { name: m.delegateName } }}</span>
+                }
               </span>
               <app-status-text [kind]="state(m.status).kind">{{ state(m.status).key | t }}</app-status-text>
               @if (m.lateExcuseUntil) {

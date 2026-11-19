@@ -17,6 +17,11 @@ Counting rules of the attendance (``attendance``):
 * ``member`` tells whether the principal holds a membership in the gremium. A
   membership has no term, so the value is the same in each month of a row, and a
   former member with records shows as no member.
+* A pool substitute has an own row with ``pool`` (§F/meetings/meetings/001310): every
+  principal with a pool entry in the gremium and every principal with a pool seat
+  (``meeting_delegation.via_pool``) in the range. Its cells count the pool seats. A
+  pool substitute who is no member gets no member row, unless the range holds a
+  number for it as a member.
 
 The excuse text (``meeting_attendance.note``) is never read.
 """
@@ -61,6 +66,7 @@ from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.gremien.access import views_all
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
+from app.modules.gremien.pool import pool_substitutes
 from app.modules.gremien_overview.schemas import (
     AttendanceCellOut,
     AttendanceMonthOut,
@@ -413,6 +419,41 @@ def _attendance_row(
     )
 
 
+def _pool_row(
+    pid: UUID,
+    person: tuple[str | None, str | None],
+    months: Sequence[Month],
+    seats: Mapping[str, int],
+    viewer_sub: str,
+) -> AttendanceRowOut:
+    """Build the row of one pool substitute: each cell counts the pool seats of a month."""
+    display, sub = person
+    return AttendanceRowOut(
+        principal_id=pid,
+        display_name=display,
+        role_key=None,
+        role_name=None,
+        is_self=sub is not None and sub == viewer_sub,
+        unexcused=0,
+        cells=tuple(
+            AttendanceCellOut(
+                month=month_key(m),
+                member=True,
+                present=seats.get(month_key(m), 0),
+                excused=0,
+                delegated=0,
+            )
+            for m in months
+        ),
+        pool=True,
+    )
+
+
+def _has_numbers(cells: Mapping[str, tuple[int, int, int]]) -> bool:
+    """Tell if a person has a present, excused or delegated meeting in the range."""
+    return any(any(numbers) for numbers in cells.values())
+
+
 def _attendance_cell(
     key: str, cells: Mapping[str, tuple[int, int, int]], *, member: bool
 ) -> AttendanceCellOut:
@@ -670,7 +711,9 @@ class GremienService:
 
         The rows are every principal with a membership in the gremium, and every
         principal with an attendance record or a vote transfer in the range.
-        One SQL aggregation gives the numbers per principal and month.
+        One SQL aggregation gives the numbers per principal and month. The pool
+        substitutes follow as rows with ``pool``; a pool substitute who is no member
+        has no member row without a number in the range.
 
         ``term`` is a day of the term whose unexcused absences the rows count; without
         it they count the current term. With ``term`` and without a range the matrix
@@ -705,11 +748,28 @@ class GremienService:
             for pid, month, present, excused, delegated in counts.all()
         )
 
+        seat_rows = await self.session.execute(
+            select(MeetingDelegation.delegate_principal_id, month_of, func.count())
+            .join(Meeting, Meeting.id == MeetingDelegation.meeting_id)
+            .where(in_range, MeetingDelegation.via_pool.is_(True))
+            .group_by(MeetingDelegation.delegate_principal_id, month_of)
+        )
+        seats = _nested((pid, str(month), int(n)) for pid, month, n in seat_rows.all())
+        pool_ids = await pool_substitutes(self.session, gremium_id) | set(seats)
+
         terms = await self._terms(gremium_id)
         periods = await self.session.get(MeetingSettings, 1)
         absences = await unexcused_counts(self.session, gremium_id, first_day, term_end(first_day))
-        principal_ids = {t.principal_id for t in terms} | set(cells) | set(absences)
-        people = await self._people(principal_ids)
+        member_ids = {t.principal_id for t in terms}
+        principal_ids = {
+            pid
+            for pid in member_ids | set(cells) | set(absences)
+            if pid in member_ids
+            or pid not in pool_ids
+            or absences.get(pid)
+            or _has_numbers(cells.get(pid, {}))
+        }
+        people = await self._people(principal_ids | pool_ids)
 
         rows = [
             _attendance_row(
@@ -723,6 +783,10 @@ class GremienService:
             )
             for pid in principal_ids
         ]
+        pool_rows = [
+            _pool_row(pid, people.get(pid, (None, None)), months, seats.get(pid, {}), principal.sub)
+            for pid in pool_ids
+        ]
         return AttendanceOut(
             from_month=month_key(months[0]),
             to_month=month_key(months[-1]),
@@ -733,7 +797,7 @@ class GremienService:
                 AttendanceMonthOut(month=month_key(m), meetings=held.get(month_key(m), 0))
                 for m in months
             ],
-            rows=sorted(rows, key=_attendance_order),
+            rows=[*sorted(rows, key=_attendance_order), *sorted(pool_rows, key=_attendance_order)],
         )
 
     async def _term_starts(self, gremium_id: UUID, start_month: int, today: _date) -> list[_date]:
@@ -844,19 +908,29 @@ class GremienService:
         return {pid: (display, sub) for pid, display, sub in rows.all()}
 
     async def member_attendance(
-        self, gremium_id: UUID, principal_id: UUID, month: str, *, requester_sub: str | None = None
+        self,
+        gremium_id: UUID,
+        principal_id: UUID,
+        month: str,
+        *,
+        requester_sub: str | None = None,
+        pool: bool = False,
     ) -> MemberAttendanceOut:
         """Return the closed meetings of one month with the state of one member.
 
         The own ``absent`` rows carry the end of the late-excuse window while it is open.
+        With ``pool`` the states are those of the pool row (§F/meetings/meetings/001310):
+        ``seat`` with the name of the represented member, or ``no_seat``.
 
         Raises:
             NotFoundError: The principal does not exist, or has neither a membership in
-                the gremium nor a record or a vote transfer in one of its meetings
+                the gremium nor a record or a vote transfer in one of its meetings; with
+                ``pool``, neither a pool entry nor a pool seat in the gremium
                 (404 ``member_not_found``).
         """
         person = await self.session.get(PrincipalRow, principal_id)
-        if person is None or not await self._related(gremium_id, principal_id):
+        related = self._in_pool if pool else self._related
+        if person is None or not await related(gremium_id, principal_id):
             raise NotFoundError("member not found", code=MEMBER_NOT_FOUND)
         first_month = parse_month(month)
         after = shift_month(first_month, 1)
@@ -879,6 +953,24 @@ class GremienService:
             .order_by(Meeting.date, Meeting.start_time.nulls_first(), Meeting.id)
         )
         meetings = tuple(found.all())
+        if pool:
+            represented = await self._pool_seats(principal_id, [mid for mid, *_ in meetings])
+            return MemberAttendanceOut(
+                principal_id=principal_id,
+                display_name=person.display_name,
+                month=month_key(first_month),
+                meetings=[
+                    MemberMeetingOut(
+                        meeting_id=mid,
+                        title=title,
+                        date=day,
+                        start_time=start,
+                        status="seat" if mid in represented else "no_seat",
+                        delegate_name=represented.get(mid),
+                    )
+                    for mid, title, day, start, _closed, _kept in meetings
+                ],
+            )
         records, delegates = await self._member_states(principal_id, [mid for mid, *_ in meetings])
         current = await self._excuse_days(own=person.sub == requester_sub)
         return MemberAttendanceOut(
@@ -944,6 +1036,36 @@ class GremienService:
         )
         delegates: dict[UUID, str | None] = dict(dele.all())
         return records, delegates
+
+    async def _pool_seats(self, principal_id: UUID, ids: Sequence[UUID]) -> dict[UUID, str | None]:
+        """Return the name of the represented member per meeting with a pool seat."""
+        if not ids:
+            return {}
+        rows = await self.session.execute(
+            select(MeetingDelegation.meeting_id, PrincipalRow.display_name)
+            .join(PrincipalRow, PrincipalRow.id == MeetingDelegation.delegator_principal_id)
+            .where(
+                MeetingDelegation.delegate_principal_id == principal_id,
+                MeetingDelegation.meeting_id.in_(ids),
+                MeetingDelegation.via_pool.is_(True),
+            )
+        )
+        return dict(rows.all())
+
+    async def _in_pool(self, gremium_id: UUID, principal_id: UUID) -> bool:
+        """Tell if a principal has a pool entry or a pool seat in a gremium."""
+        if principal_id in await pool_substitutes(self.session, gremium_id):
+            return True
+        found = await self.session.scalar(
+            select(literal(True)).where(
+                exists().where(
+                    MeetingDelegation.gremium_id == gremium_id,
+                    MeetingDelegation.delegate_principal_id == principal_id,
+                    MeetingDelegation.via_pool.is_(True),
+                )
+            )
+        )
+        return bool(found)
 
     async def _related(self, gremium_id: UUID, principal_id: UUID) -> bool:
         """Tell if a principal has a membership, a record or a vote transfer in a gremium."""
