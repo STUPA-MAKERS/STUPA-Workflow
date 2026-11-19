@@ -384,15 +384,14 @@ describe('AgendaPaneComponent', () => {
       expect(container.querySelector('.ap__over')).toBeNull();
     });
 
-    it('planRowsOverrun: marks an end after the end time of the meeting with the warning class only (§ 001144)', async () => {
+    it('planRowsOverrun: marks no overrun of the end time of the meeting (§ 001144)', async () => {
       const { container } = await setup({
         meeting: meeting({ status: 'planned', startTime: '18:00', endTime: '18:30' }),
         agenda: TIMED,
       });
-      const over = container.querySelectorAll('.ap__over');
-      expect(over).toHaveLength(1);
-      expect(over[0]).toHaveTextContent('ca. 18:35');
-      expect(over[0]).toHaveTextContent('Verschiedenes');
+      expect(screen.getByText('ca. 18:35')).toBeInTheDocument();
+      expect(container.querySelector('.ap__over')).toBeNull();
+      expect(screen.queryByText(/Ende ca\./)).toBeNull();
     });
 
     it('planRowsNoStart: shows only the durations without a start time (§ 001142)', async () => {

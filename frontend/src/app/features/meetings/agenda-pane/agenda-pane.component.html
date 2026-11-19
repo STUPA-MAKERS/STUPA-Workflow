@@ -20,7 +20,7 @@
     [cdkDropListDisabled]="!canChangeAgenda()"
     (cdkDropListDropped)="dropped($event)"
   >
-    @for (item of agenda(); track item.id; let i = $index, last = $last) {
+    @for (item of agenda(); track item.id; let i = $index) {
       @let done = isDone(item);
       <li
         class="ap__row"
@@ -51,7 +51,6 @@
           <app-list-item
             [title]="title(item)"
             [sub]="sub(item, i)"
-            [class.ap__over]="plan().overrun && last"
             [selected]="item.id === selectedId()"
             (activate)="pick.emit(item.id)"
           >

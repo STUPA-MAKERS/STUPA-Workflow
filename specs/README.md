@@ -567,7 +567,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/001141](requirements/functional/meetings/meetings/001141_agenda-time-plan.md) | The agenda shows a time plan from the durations | approved |
 | [F/meetings/meetings/001142](requirements/functional/meetings/meetings/001142_plan-without-start.md) | Without a start time the agenda shows only durations | draft |
 | [F/meetings/meetings/001143](requirements/functional/meetings/meetings/001143_live-plan.md) | A live Sitzung computes the plan of the open TOPs again | approved |
-| [F/meetings/meetings/001144](requirements/functional/meetings/meetings/001144_planned-end-overrun.md) | The agenda marks an overrun on the last TOP | draft |
+| [F/meetings/meetings/001144](requirements/functional/meetings/meetings/001144_planned-end-overrun.md) | The agenda shows no planned end and no overrun | draft |
 | [F/meetings/meetings/001145](requirements/functional/meetings/meetings/001145_time-plan-internal.md) | The time plan stays internal | approved |
 | [F/meetings/meetings/001310](requirements/functional/meetings/meetings/001310_attendance-pool-rows.md) | The attendance matrix shows the pool substitutes | approved |
 | [F/meetings/meetings/001311](requirements/functional/meetings/meetings/001311_attendance-pool-cell.md) | A pool cell counts the pool seats | approved |

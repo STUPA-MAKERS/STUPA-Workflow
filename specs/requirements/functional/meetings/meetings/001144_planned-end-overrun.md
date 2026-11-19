@@ -1,16 +1,14 @@
 ---
 id: "001144"
-title: The agenda marks an overrun on the last TOP
+title: The agenda shows no planned end and no overrun
 kind: functional
 status: draft
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:
-  - "frontend/src/app/features/meetings/agenda-plan.util.spec.ts:planOverrun"
   - "frontend/src/app/features/meetings/agenda-pane/agenda-pane.component.spec.ts:planRowsOverrun"
 implementation:
   - frontend/src/app/features/meetings/agenda-pane/agenda-pane.component.html
-  - frontend/src/app/features/meetings/agenda-pane/agenda-pane.component.scss
 scope:
   - backend/app/modules/meetings
   - backend/app/modules/livevote
@@ -18,16 +16,15 @@ scope:
   - mcp
 ---
 
-# The agenda marks an overrun on the last TOP
+# The agenda shows no planned end and no overrun
 
 The agenda must not show a line with the planned end below the last row, because the agenda
 pane ends with its list (spec 001330). The planned start of each TOP in its row subline stays
-(spec 001141). When the Sitzung has an end time and the planned end of the last TOP is later than
-it, the subline of the last row must use the warning colour and keep its text. The mark must not
-change the end time of the Sitzung.
+(spec 001141). When the planned end of the last TOP is later than the end time of the Sitzung,
+the agenda must not mark it, and no row must change its colour.
 
-Reason: The person who plans the agenda sees at once that the TOPs do not fit into the time of
-the Sitzung, without a footer segment below the list.
+Reason: The planned start in each row already shows how far the plan reaches. A mark would need
+a footer segment below the list or a colour that the row does not otherwise have.
 
-Test: Component test of the agenda pane: the last row carries the warning class when the planned
-end is after the end time, and no row carries it otherwise.
+Test: Component test of the agenda pane: with a planned end after the end time of the Sitzung,
+no row carries a warning class and no end line is shown.

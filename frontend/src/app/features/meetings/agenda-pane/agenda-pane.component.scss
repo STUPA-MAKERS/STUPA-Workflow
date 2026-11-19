@@ -231,9 +231,3 @@
   outline: 3px solid var(--vh-hi) !important;
   outline-offset: 2px !important;
 }
-
-// The planned end after the end time of the meeting colours the subline of the last item (§ 001144).
-.ap__over ::ng-deep .li__sub {
-  color: var(--color-warning);
-  font-weight: var(--fw-semibold);
-}
