@@ -18,7 +18,8 @@ scope:
 On a wide screen the head of a list column must be solid in the page colour, without glass. The
 head holds the title, the search bar, the filter chips and a pinned group head. The rows must
 cut hard at the lower edge of the head. In the very high contrast mode (000605), the rows of the
-column must lie in a frame with a white edge that starts below the head.
+column must lie in a frame with a white edge that starts below the head and ends with round
+corners above the bottom edge of the screen.
 
 On a phone the head of a list must be one frosted glass surface over the rows, as before. No
 state of the scroll, a fast scroll too, must show a row sharp through the glass. Where the
