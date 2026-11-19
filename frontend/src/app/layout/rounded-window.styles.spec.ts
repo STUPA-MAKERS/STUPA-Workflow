@@ -55,7 +55,8 @@ describe('rounded sheet styles', () => {
       expect(rule(css, ':host')).toMatch(/flex: 1 1 0;/);
       expect(rule(css, ':host')).not.toMatch(/height: 100dvh/);
     }
-    expect(rule(meetingPage, '.mp__body--wide .mp__votes')).toMatch(/border-radius: var\(--radius-xl\);/);
+    // The vote cards are a side sheet, not a column (spec 001460).
+    expect(meetingPage).not.toMatch(/\.mp__body--wide \.mp__votes/);
     expect(meetingPage).toMatch(
       /\.mp__body:not\(\.mp__body--wide\) \{[^}]*margin-inline: var\(--space-3\);[^}]*padding-inline: 0;[^}]*border-radius: var\(--radius-xl\);/,
     );
