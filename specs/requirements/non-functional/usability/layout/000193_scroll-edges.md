@@ -32,7 +32,7 @@ see. At each kind of place, the content must cut as this table says:
 | A column that reaches the bottom edge of the screen, for example the cost-centre tree of the Haushalt | At the edge of the screen. The column has no surface of its own. |
 | A list inside a dialog or a sheet, for example the bookings of a cost centre or the attendance | At the rounded frame of the list itself. The rows run to the sides of the frame, without side padding. |
 | The page body of the administration sheet on a wide screen | At a rounded frame that is exactly as wide as the fields, 24 px inside the sheet, so that a field that scrolls past an end keeps its rounded corners. |
-| The scroll part of the navigation rail | The scroll part lies on a surface of its own with rounded corners (001331). |
+| The scroll part of the navigation rail | The scroll part lies on a surface of its own with rounded corners (001441). |
 | A row of chips that scrolls sideways on a phone | At the edge of the screen. The row runs from screen edge to screen edge. |
 | The message log of a chat | At its rounded frame. |
 | The rows of a list column on a wide screen | At the lower edge of the list head (000527). |

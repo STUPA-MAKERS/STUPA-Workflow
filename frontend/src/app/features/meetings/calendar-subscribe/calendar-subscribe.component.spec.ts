@@ -1,4 +1,4 @@
-import { Component, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, viewChild } from '@angular/core';
 import { fireEvent, render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { Subject, of, throwError } from 'rxjs';
@@ -9,6 +9,7 @@ import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { CalendarSubscribeComponent } from './calendar-subscribe.component';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
   standalone: true,
   imports: [CalendarSubscribeComponent],
   template: `
@@ -65,6 +66,7 @@ describe('CalendarSubscribeComponent', () => {
   /** The public calendar has one address without a token: nothing is read and nothing is made new. */
   it('shows a fixed address with "Kopieren" only and reads nothing', async () => {
     @Component({
+      changeDetection: ChangeDetectionStrategy.Eager,
       standalone: true,
       imports: [CalendarSubscribeComponent],
       template: `

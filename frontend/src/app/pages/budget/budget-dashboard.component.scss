@@ -1,5 +1,5 @@
 @use 'breakpoints' as bp;
-@use 'dot-parts' as dots;
+@use 'meta-chips' as chips;
 @use 'swatch';
 @use 'display' as d;
 @use 'field' as f;
@@ -267,15 +267,11 @@
   flex: none;
   margin-inline: var(--space-6);
 }
-.bd__line {
-  --bd-sep: 24px;
-  overflow-x: clip;
-}
 .bd__parts {
-  @include dots.list(var(--bd-sep));
+  @include chips.list;
 }
 .bd__part {
-  @include dots.part(var(--bd-sep));
+  @include chips.chip;
 }
 .bd__keyPart {
   display: inline-flex;

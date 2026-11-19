@@ -4,48 +4,51 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { longDate } from '@shared/date-format';
-import { ButtonComponent, ConfirmDialogComponent, IconComponent, type IconName } from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonLinkComponent, ConfirmDialogComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { FileOpenService } from '@shared/viewer/file-open.service';
 import { MeetingSessionService } from '../meeting-session.service';
+import { type ProtocolAction, protocolActions, protocolMenuItems } from './protocol-actions.util';
 import { ProtocolApprovalDialogComponent } from '../protocol-approval-dialog/protocol-approval-dialog.component';
 
-/** The state line of the bar. */
-interface BarState {
-  readonly icon: IconName;
-  readonly tone: 'muted' | 'accent';
-  readonly label: TranslationKey;
-  readonly text: TranslationKey;
-}
-
 /**
- * The protocol bar on top of the sheet of a closed meeting.
+ * The protocol of a closed meeting in the head of the meeting page (spec 001304).
  *
- * - Draft: "Entwurf · Das Protokoll ist noch nicht versandt." and "Finalisieren &
- *   versenden" for a holder of `canFinalize` (write access plus the gremium right
- *   `protocol.finalize`). Without the right the bar says what is missing.
- * - Rendering: the worker renders and sends the PDF.
- * - Final: "Final · Das Protokoll ist final und wurde versandt." and the PDF links
- *   ("PDF intern", "PDF öffentlich" when an item is non-public).
- * - Final, gremium publishes its protocols: "Öffentlich" or "Nicht veröffentlicht",
- *   and for a holder of `canFinalize` the switch between the two (the protocol is held
- *   back from the public protocol page, or published again).
- * - Draft, with write access: "Entwurf senden" sends the PDF with the watermark "Entwurf"
- *   to the members, after a confirmation. The protocol stays a draft (§ 000925). A
- *   second send names the date of the last one in the confirmation (§ 000937).
- * - Draft: "PDF intern" and "PDF öffentlich" open the draft as a PDF
- *   with the watermark "Entwurf". The server renders it for this read and stores
- *   nothing (§ 000950).
- * - Final, for a holder of `canFinalize`: "Als genehmigt markieren" asks for the meeting
- *   that approved the protocol. With the mark the bar names that meeting and offers
- *   "Genehmigung entfernen", which asks before it removes the mark (§ 000924).
+ * The status of the head names the state of the protocol (`protocolStatus`), so this
+ * component draws no state line. It draws the one protocol action of the head and the
+ * dialogs, and it gives the session menu its "Protokoll" section (`menuItems`, `select`).
  *
- * The finalize is a step of its own after the close; a live meeting has no bar.
+ * - The head action: "Finalisieren & senden" for a draft and a holder of `canFinalize`
+ *   (write access plus the gremium right `protocol.finalize`). A writer without the right
+ *   sees the button disabled, with the missing right as its reason. A final protocol shows
+ *   "PDF" (or "PDF intern" when a public variant exists). On a phone the head has no action
+ *   (spec 000197), so the action is the first item of the section.
+ * - Draft: "Entwurf senden" sends the PDF with the watermark "Entwurf" to the members,
+ *   after a confirmation. The protocol stays a draft (§ 000925). A second send names the
+ *   date of the last one in the confirmation (§ 000937). "PDF intern" and "PDF öffentlich"
+ *   open the draft as a PDF with the watermark "Entwurf". The server renders it for this
+ *   read and stores nothing (§ 000950).
+ * - Final: "PDF öffentlich" when an item is non-public. For a holder of `canFinalize`
+ *   "Als genehmigt markieren" asks for the meeting that approved the protocol, and with the
+ *   mark "Genehmigung entfernen" asks before it removes the mark (§ 000924). Without the
+ *   mark "Zurück in Entwurf" asks before it sets the protocol back (§ 000983).
+ * - Final, gremium publishes its protocols: for a holder of `canFinalize`
+ *   "Nicht veröffentlichen" or "Veröffentlichen" (the protocol is held back from the public
+ *   protocol page, or published again).
+ *
+ * The finalize is a step of its own after the close; a live meeting has no protocol actions.
  */
 @Component({
   selector: 'app-protocol-bar',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ButtonComponent, ConfirmDialogComponent, IconComponent, ProtocolApprovalDialogComponent],
+  imports: [
+    TranslatePipe,
+    ButtonComponent,
+    ButtonLinkComponent,
+    ConfirmDialogComponent,
+    IconComponent,
+    ProtocolApprovalDialogComponent,
+  ],
   templateUrl: './protocol-bar.component.html',
   styleUrl: './protocol-bar.component.scss',
 })
@@ -53,30 +56,24 @@ export class ProtocolBarComponent {
   readonly meeting = input.required<Meeting>();
   readonly protocol = input.required<Protocol>();
   readonly finalizing = input(false);
+  /** A phone: the head has no action, so the head action is an item of the menu. */
+  readonly compact = input(false);
 
   readonly finalize = output<void>();
 
   /** The page session: it saves the publication. Absent outside the meeting page. */
   private readonly session = inject(MeetingSessionService, { optional: true });
-  protected readonly publicationSaving = computed(
-    () => this.session?.publicationSaving() ?? false,
-  );
 
-  /** A final protocol of a gremium that publishes its protocols. */
-  protected readonly publication = computed<'public' | 'withheld' | null>(() => {
-    const p = this.protocol();
-    if (!p.isFinal || !p.gremiumProtocolsPublic) return null;
-    return p.publicWithheld ? 'withheld' : 'public';
-  });
-
-  /** The switch between "public" and "withheld": a holder of `canFinalize`. */
-  protected readonly canPublish = computed(
-    () => this.publication() !== null && !!this.meeting().canFinalize && this.session !== null,
-  );
+  /** What the viewer can do (spec 001304): shared with the session menu of the page. */
+  private readonly actions = computed(() => protocolActions(this.meeting(), this.protocol(), this.session !== null));
+  protected readonly publication = computed(() => this.actions().publication);
+  protected readonly canFinalize = computed(() => this.actions().canFinalize);
+  protected readonly needsRight = computed(() => this.actions().needsRight);
+  protected readonly finalPdf = computed(() => this.actions().finalPdf);
+  private readonly draftPdf = computed(() => this.actions().draftPdf);
 
   private readonly i18n = inject(I18nService);
   private readonly files = inject(FileOpenService);
-  protected readonly draftSending = computed(() => this.session?.draftSending() ?? false);
   protected readonly approvalSaving = computed(() => this.session?.approvalSaving() ?? false);
   /** The confirmation of "Entwurf senden" is open. */
   protected readonly confirmDraft = signal(false);
@@ -94,49 +91,20 @@ export class ProtocolBarComponent {
   /** The confirmation of "Genehmigung entfernen" is open. */
   protected readonly confirmUnapprove = signal(false);
 
-  /** "Entwurf senden": a closed meeting, a draft and write access. */
-  protected readonly canSendDraft = computed(() => {
-    const m = this.meeting();
-    return m.status === 'closed' && !!m.canWrite && this.protocol().status === 'draft' && this.session !== null;
-  });
-
   /**
    * A PDF link opens the PDF in the file viewer (spec 001080). A click with a modifier
    * keeps the new tab of the link.
    */
   protected openPdf(event: MouseEvent, url: string, label: TranslationKey): void {
-    this.files.click(event, { name: `${this.meeting().title} · ${this.i18n.translate(label)}`, url, kind: 'pdf' });
+    this.files.click(event, this.pdfFile(url, label));
   }
 
-  /** The two PDF links of a draft of a closed meeting (§ 000950). */
-  protected readonly draftPdf = computed(() => {
-    const p = this.protocol();
-    if (p.status !== 'draft' || this.meeting().status !== 'closed') return null;
-    const base = `/api/protocols/${p.id}/draft-pdf`;
-    return { internal: base, public: `${base}?variant=public` };
-  });
+  private pdfFile(url: string, label: TranslationKey) {
+    return { name: `${this.meeting().title} · ${this.i18n.translate(label)}`, url, kind: 'pdf' as const };
+  }
 
-  /** The mark and its removal: a final protocol and the right to finalize. */
-  protected readonly canApprove = computed(
-    () => this.protocol().isFinal && !!this.meeting().canFinalize && this.session !== null,
-  );
-
-  /** "Zurück in Entwurf": a final protocol without the mark and the right to finalize (§ 000983). */
-  protected readonly canReopen = computed(() => this.canApprove() && !this.protocol().approvedAt);
-  protected readonly reopenSaving = computed(() => this.session?.reopenSaving() ?? false);
   /** The confirmation of "Zurück in Entwurf" is open. */
   protected readonly confirmReopen = signal(false);
-
-  /** "Genehmigt in der Sitzung … am …", or '' without the mark. */
-  protected readonly approvedText = computed(() => {
-    const p = this.protocol();
-    if (!p.approvedAt) return '';
-    const date = longDate(p.approvedMeetingDate ?? '', this.i18n.formatLocale());
-    const meeting = [p.approvedMeetingTitle, date].filter(Boolean).join(' · ');
-    return meeting
-      ? this.i18n.translate('meetings.protocolBar.approvedIn', { meeting })
-      : this.i18n.translate('meetings.protocolBar.approved');
-  });
 
   constructor() {
     // The dialog closes when the server stored the mark.
@@ -168,42 +136,54 @@ export class ProtocolBarComponent {
     this.session?.setPublicWithheld(this.publication() !== 'withheld');
   }
 
-  protected readonly state = computed<BarState>(() => {
-    const p = this.protocol();
-    if (p.isFinal) {
-      return {
-        icon: 'check',
-        tone: 'accent',
-        label: 'meetings.protocol.final',
-        text: p.sentAt ? 'meetings.protocolBar.finalSent' : 'meetings.protocolBar.final',
-      };
-    }
-    if (p.status === 'rendering') {
-      return {
-        icon: 'clock',
-        tone: 'muted',
-        label: 'meetings.protocol.rendering',
-        text: 'meetings.protocolBar.rendering',
-      };
-    }
-    return {
-      icon: 'edit',
-      tone: 'muted',
-      label: 'meetings.protocol.draft',
-      text: p.sentAt ? 'meetings.protocolBar.draftAgain' : 'meetings.protocolBar.draft',
-    };
-  });
+  /** The "Protokoll" section of the session menu, as the page builds it. */
+  readonly menuItems = computed(() =>
+    protocolMenuItems(this.actions(), this.protocol(), this.compact(), (key) => this.i18n.translate(key)),
+  );
 
-  /** Finalize: a closed meeting, a draft and the right. */
-  protected readonly canFinalize = computed(() => {
-    const m = this.meeting();
+  /** Runs an item of the "Protokoll" section. Returns false for an id of another section. */
+  select(id: string): boolean {
     const p = this.protocol();
-    return m.status === 'closed' && m.canFinalize && p.status === 'draft';
-  });
-
-  /** A writer without the right learns why there is no finalize. */
-  protected readonly needsRight = computed(() => {
-    const m = this.meeting();
-    return this.protocol().status === 'draft' && m.canWrite && !m.canFinalize;
-  });
+    switch (id as ProtocolAction) {
+      case 'protocol.finalize':
+        this.finalize.emit();
+        return true;
+      case 'protocol.pdf': {
+        const pdf = this.finalPdf();
+        if (pdf) this.files.open(this.pdfFile(pdf.url, pdf.label));
+        return true;
+      }
+      case 'protocol.pdfPublic':
+        if (p.publicPdfUrl) this.files.open(this.pdfFile(p.publicPdfUrl, 'meetings.protocolBar.pdfPublic'));
+        return true;
+      case 'protocol.draftPdf': {
+        const draft = this.draftPdf();
+        if (draft) this.files.open(this.pdfFile(draft.internal, 'meetings.protocolBar.pdfInternal'));
+        return true;
+      }
+      case 'protocol.draftPdfPublic': {
+        const draft = this.draftPdf();
+        if (draft) this.files.open(this.pdfFile(draft.public, 'meetings.protocolBar.pdfPublic'));
+        return true;
+      }
+      case 'protocol.sendDraft':
+        this.confirmDraft.set(true);
+        return true;
+      case 'protocol.approve':
+        this.approvalOpen.set(true);
+        return true;
+      case 'protocol.unapprove':
+        this.confirmUnapprove.set(true);
+        return true;
+      case 'protocol.reopen':
+        this.confirmReopen.set(true);
+        return true;
+      case 'protocol.publish':
+      case 'protocol.withhold':
+        this.togglePublication();
+        return true;
+      default:
+        return false;
+    }
+  }
 }

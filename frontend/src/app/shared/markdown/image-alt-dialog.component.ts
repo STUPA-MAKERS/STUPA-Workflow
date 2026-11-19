@@ -1,4 +1,11 @@
-import { Component, computed, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { ButtonComponent, CheckboxComponent, DialogComponent, InputComponent } from '@stupa-makers/ui-kit';
@@ -14,6 +21,7 @@ import { ButtonComponent, CheckboxComponent, DialogComponent, InputComponent } f
   standalone: true,
   imports: [FormsModule, TranslatePipe, DialogComponent, InputComponent, CheckboxComponent, ButtonComponent],
   templateUrl: './image-alt-dialog.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './image-alt-dialog.component.scss',
 })
 export class ImageAltDialogComponent {

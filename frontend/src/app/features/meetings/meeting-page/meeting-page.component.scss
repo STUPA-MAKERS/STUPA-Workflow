@@ -11,7 +11,7 @@
     calc(-1 * var(--main-pad-bottom, var(--space-8)));
   margin-inline: calc(-1 * var(--layout-gutter));
 }
-// The content keeps 12px of space to the navigation rail (001330).
+// The content keeps 12px of space to the navigation rail (001440).
 @include bp.not-phone {
   :host {
     padding-inline-start: var(--space-3);
@@ -135,7 +135,7 @@
   flex-direction: column;
   min-height: 0;
 }
-// The agenda pane is a split head over its list, and only the list scrolls (001330).
+// The agenda pane is a split head over its list, and only the list scrolls (001440).
 .mp__body--wide .mp__agenda > * {
   flex: 1 1 auto;
   min-height: 0;

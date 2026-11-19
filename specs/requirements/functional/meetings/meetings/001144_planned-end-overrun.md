@@ -19,7 +19,7 @@ scope:
 # The agenda shows no planned end and no overrun
 
 The agenda must not show a line with the planned end below the last row, because the agenda
-pane ends with its list (spec 001330). The planned start of each TOP in its row subline stays
+pane ends with its list (spec 001440). The planned start of each TOP in its row subline stays
 (spec 001141). When the planned end of the last TOP is later than the end time of the Sitzung,
 the agenda must not mark it, and no row must change its colour.
 

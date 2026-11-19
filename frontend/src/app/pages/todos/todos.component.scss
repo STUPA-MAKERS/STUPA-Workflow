@@ -291,7 +291,7 @@
 }
 
 // In very high contrast the board body has no frame of its own: each board has its white edge
-// (spec 001332), and a frame around them would double it.
+// (spec 001442), and a frame around them would double it.
 @include d.host-on(veryHigh) {
   .td.ld-pane--glass > .td__body--rows.ld-pane__rows:has(> app-todo-board-view, > app-todo-board-rows) {
     border: 0 !important;

@@ -1,4 +1,4 @@
-import { Component, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, viewChild } from '@angular/core';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { of, throwError } from 'rxjs';
@@ -12,6 +12,7 @@ import { AttendanceDetailComponent, type AttendanceDetailRequest } from './atten
 import { loadErrorToast, retryLoadError } from '../../../../testing/load-error';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
   standalone: true,
   imports: [AttendanceDetailComponent],
   template: `
@@ -248,10 +249,10 @@ describe('AttendanceDetailComponent', () => {
     });
     const matches = HTMLElement.prototype.matches;
     Object.defineProperty(HTMLElement.prototype, 'showPopover', { configurable: true, value: show });
-    HTMLElement.prototype.matches = function (sel: string) {
+    HTMLElement.prototype.matches = function (this: HTMLElement, sel: string) {
       if (sel === ':popover-open') return this.hasAttribute('data-open');
       return matches.call(this, sel);
-    };
+    } as typeof matches;
     try {
       const view = await setup();
       restore = view.restore;
@@ -269,10 +270,10 @@ describe('AttendanceDetailComponent', () => {
     const show = jest.fn();
     const matches = HTMLElement.prototype.matches;
     Object.defineProperty(HTMLElement.prototype, 'showPopover', { configurable: true, value: show });
-    HTMLElement.prototype.matches = function (sel: string) {
+    HTMLElement.prototype.matches = function (this: HTMLElement, sel: string) {
       if (sel === ':popover-open') throw new SyntaxError('unknown');
       return matches.call(this, sel);
-    };
+    } as typeof matches;
     try {
       const view = await setup();
       restore = view.restore;

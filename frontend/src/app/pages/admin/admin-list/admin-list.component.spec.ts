@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { of } from 'rxjs';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter, withComponentInputBinding } from '@angular/router';
@@ -12,7 +12,12 @@ import { PageFrameService } from '../../../layout/page-frame.service';
 import { ADMIN_PAGES } from './admin-pages';
 import { AdminListComponent } from './admin-list.component';
 
-@Component({ selector: 'app-stub-page', standalone: true, template: '<h1>Seite</h1>' })
+@Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
+  selector: 'app-stub-page',
+  standalone: true,
+  template: '<h1>Seite</h1>',
+})
 class StubPageComponent {}
 
 function fakeAuth(perms: string[]): Partial<AuthService> {

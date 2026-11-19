@@ -217,7 +217,7 @@
 }
 
 // Each board lies on a surface of its own, and its columns cut at the round edge of that
-// surface when they scroll sideways (spec 001332).
+// surface when they scroll sideways (spec 001442).
 .br__cols {
   padding: var(--space-2);
   border-radius: var(--radius-2xl);

@@ -291,7 +291,7 @@
 }
 
 // In the rows body of a wide screen the board lies on a surface of its own, and its columns cut
-// at the round edge of that surface when they scroll sideways (spec 001332).
+// at the round edge of that surface when they scroll sideways (spec 001442).
 :host-context(.td__body--rows) .bv:not(.bv--phone) {
   flex: none;
   padding: var(--space-2);
