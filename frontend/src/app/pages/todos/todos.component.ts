@@ -39,7 +39,6 @@ import type { TodoPing } from '@core/ws/ws-messages';
 import {
   FabComponent,
   ButtonComponent,
-  ButtonGroupComponent,
   EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
@@ -178,7 +177,6 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
     CdkScrollable,
     TranslatePipe,
     ButtonComponent,
-    ButtonGroupComponent,
     EmptyStateComponent,
     FabComponent,
     FilterSelectComponent,
