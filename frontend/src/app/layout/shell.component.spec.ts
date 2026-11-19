@@ -303,7 +303,7 @@ describe('ShellComponent', () => {
         'Tickets',
         'Protokolle',
         'Beschlüsse',
-        'Öffentlicher Kalender',
+        'Kalender',
         'Verwaltung',
       ]);
       expect(within(mainNav() as HTMLElement).getByRole('button', { name: 'Öffentlich' })).toHaveAttribute(
