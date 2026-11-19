@@ -2,7 +2,7 @@
 id: "001500"
 title: A wide list column has no visible title and puts its buttons beside the search
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:
