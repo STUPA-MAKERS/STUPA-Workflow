@@ -12,7 +12,6 @@ import {
   nodeKey,
   queryOf,
   sameFilters,
-  viewOf,
 } from './graph.util';
 
 const node = (kind: GraphNode['kind'], id: string): GraphNode => ({
@@ -87,9 +86,8 @@ describe('graph util', () => {
   });
 
   /** § F/collaboration/graph/001425: the filters are in the query of the URL. */
-  it('reads the filters and the view from the query', () => {
+  it('reads the filters from the query', () => {
     expect(filtersOf(convertToParamMap({}))).toEqual(NO_FILTERS);
-    expect(viewOf(convertToParamMap({}))).toBe('graph');
     const query = convertToParamMap({
       kinds: 'todo,bogus,meeting',
       from: '2026-01-01',
@@ -99,7 +97,6 @@ describe('graph util', () => {
       q: 'Haushalt',
       single: '1',
       noaccess: '1',
-      view: 'list',
     });
     expect(filtersOf(query)).toEqual({
       kinds: ['meeting', 'todo'],
@@ -111,17 +108,15 @@ describe('graph util', () => {
       single: true,
       noAccess: true,
     });
-    expect(viewOf(query)).toBe('list');
   });
 
   it('drops unknown values of the query', () => {
-    const filters = filtersOf(convertToParamMap({ from: 'gestern', to: '2026-1-1', rel: 'none', single: 'true', view: 'table' }));
+    const filters = filtersOf(convertToParamMap({ from: 'gestern', to: '2026-1-1', rel: 'none', single: 'true' }));
     expect(filters).toEqual(NO_FILTERS);
-    expect(viewOf(convertToParamMap({ view: 'table' }))).toBe('graph');
   });
 
-  it('writes the filters and the view to the query and back', () => {
-    expect(queryOf(NO_FILTERS, 'graph')).toEqual({
+  it('writes the filters to the query and back', () => {
+    expect(queryOf(NO_FILTERS)).toEqual({
       kinds: null,
       from: null,
       to: null,
@@ -130,7 +125,6 @@ describe('graph util', () => {
       q: null,
       single: null,
       noaccess: null,
-      view: null,
     });
     const filters = {
       kinds: ['meeting', 'todo'] as const,
@@ -142,7 +136,7 @@ describe('graph util', () => {
       single: true,
       noAccess: true,
     };
-    const query = queryOf(filters, 'list');
+    const query = queryOf(filters);
     expect(query).toEqual({
       kinds: 'meeting,todo',
       from: '2026-01-01',
@@ -152,7 +146,6 @@ describe('graph util', () => {
       q: 'Haushalt',
       single: '1',
       noaccess: '1',
-      view: 'list',
     });
     expect(filtersOf(convertToParamMap(query))).toEqual({ ...filters, q: 'Haushalt' });
   });

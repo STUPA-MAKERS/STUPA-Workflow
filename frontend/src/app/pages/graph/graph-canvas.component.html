@@ -36,6 +36,7 @@
         [attr.tabindex]="tabStop() === n.key ? 0 : -1"
         [attr.aria-label]="n.name"
         [attr.aria-pressed]="selected() === n.key"
+        [attr.aria-describedby]="n.near ? 'gc-near-' + n.key : null"
         [style.transform]="at(n.key)"
         (click)="choose(n.key)"
         (keydown)="onKey($event, n.key)"
@@ -45,6 +46,9 @@
           <app-icon [name]="n.icon" [size]="16" />
         </span>
         <span class="gc__label" aria-hidden="true">{{ n.title }}</span>
+        @if (n.near) {
+          <span class="sr-only" [id]="'gc-near-' + n.key">{{ n.near }}</span>
+        }
       </button>
     }
   </div>

@@ -2,10 +2,11 @@
 @use 'field' as f;
 @use 'list-pane' as lp;
 @use 'press';
+@use 'scroll-fade' as fade;
 @use './graph-kinds' as kinds;
 
-// The drawing fills the page, and the filters, the panel of the chosen node and the legend
-// float over it. The list is one column under the filters.
+// The drawing fills the page. One layer over it holds the filters at the top, the panel of
+// the chosen node under them and the state of the build-up at the foot.
 
 :host {
   @include lp.stack;
@@ -19,33 +20,67 @@
   min-height: 0;
   @include kinds.colors;
 }
+// The shell has more room under a page than beside it: the frame of the drawing takes the
+// difference, so its edge is the same on every side.
 .gr__pane {
-  @include lp.stack;
+  position: relative;
   flex: 1 1 auto;
-  gap: var(--space-3);
-  min-height: 0;
+  min-height: 24rem;
+  margin-bottom: calc(-1 * var(--space-5));
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-sunken);
 }
 
-// The list: the filters stick to the top of the page.
-.gr__float {
-  display: contents;
+// The loading, the error and the empty state show under the filters.
+.gr__body {
+  @include lp.stack;
+  position: absolute;
+  inset: 0;
+  padding: 6rem var(--space-4) 0;
 }
+.gr__body:has(.gr__canvas) {
+  padding: 0;
+}
+.gr__skel {
+  @include lp.stack;
+}
+.gr__canvas {
+  position: absolute;
+  inset: 0;
+}
+
+// The layer takes no pointer, its parts do.
+.gr__float {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  pointer-events: none;
+}
+// A popup of a filter is inside the layer, so the layer goes up with it.
+.gr__float:has([aria-expanded='true']) {
+  z-index: var(--z-dialog);
+}
+.gr__float > * {
+  flex: none;
+  pointer-events: auto;
+}
+
+// The filters are one surface inside the frame of the drawing, so each control shows on it
+// as on a page.
 .gr__bar {
-  position: sticky;
-  top: calc(var(--layout-header-height, 0px) + env(safe-area-inset-top, 0px));
-  z-index: calc(var(--z-sticky) - 1);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2) var(--space-3);
   min-width: 0;
-  padding-block: var(--space-2);
-  background: var(--color-bg);
-}
-// A popup of a filter is inside the bar, so the bar goes up with it.
-.gr__bar:has([aria-expanded='true']),
-.gr--draw .gr__float:has([aria-expanded='true']) {
-  z-index: var(--z-dialog);
+  padding: var(--space-2);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-1);
+  box-shadow: var(--shadow-md);
 }
 .gr__search {
   flex: 1 1 14rem;
@@ -59,134 +94,24 @@
 .gr__chip {
   max-width: 100%;
 }
-.gr__view {
-  flex: none;
-  margin-inline-start: auto;
-}
-
-.gr__body {
-  @include lp.stack;
-  gap: var(--space-3);
-  padding-bottom: var(--space-6);
-}
-.gr__skel {
-  @include lp.stack;
-}
-
-// The drawing: the pane is the frame, the drawing fills it, and one layer over it holds the
-// filters at the top, the panel under them and the legend at the foot. The layer takes no
-// pointer, its parts do.
-.gr--draw .gr__pane {
-  position: relative;
-  min-height: 24rem;
-}
-.gr--draw .gr__body {
-  position: absolute;
-  inset: 0;
-  padding: 6rem var(--space-4) 0;
-}
-.gr--draw .gr__body:has(.gr__stage) {
-  padding: 0;
-}
-.gr--draw .gr__float {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  pointer-events: none;
-}
-.gr--draw .gr__float > * {
-  flex: none;
-  pointer-events: auto;
-}
-.gr--draw .gr__float > .gr__panel {
-  flex: 0 1 auto;
-}
-.gr--draw .gr__bar {
-  position: static;
-  padding: 0;
-  background: none;
-  pointer-events: none;
-}
-.gr--draw .gr__bar > * {
-  pointer-events: auto;
-}
-// Each control has its own surface, so the nodes under it do not show through.
-.gr--draw .gr__search {
-  --sp-bg: var(--color-surface-1);
-  border-radius: var(--radius-pill);
-  box-shadow: var(--shadow-sm);
-}
-.gr--draw .gr__chips > * {
-  display: inline-flex;
-  border-radius: var(--radius-md);
-  background-color: var(--color-surface-1);
-}
-.gr--draw .gr__chips > .on {
-  background-color: var(--color-selected);
-}
-.gr--draw .gr__view {
-  border-radius: var(--radius-pill);
-  background-color: var(--color-surface-1);
-  box-shadow: var(--shadow-sm);
-}
-.gr__stage {
-  position: relative;
-  height: 100%;
-  min-height: 0;
-}
-.gr__canvas {
-  position: absolute;
-  inset: 0;
-}
-
-// The foot of the layer: the legend is one strip that scrolls sideways, and it leaves the
-// corner of the zoom buttons free.
-.gr__foot {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin-top: auto;
-  margin-inline-end: calc(var(--control-height) + var(--space-5));
-  min-width: 0;
-  pointer-events: none;
-}
-.gr__foot > * {
-  max-width: 100%;
-  pointer-events: auto;
-}
-.gr__pill {
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-1);
-  box-shadow: var(--shadow-sm);
-}
 
 .gr__mark {
-  @include kinds.mark(20px);
-}
-.gr__mark--lg {
-  width: 36px;
-  height: 36px;
+  @include kinds.mark(36px);
 }
 .gr__mark--muted {
   @include kinds.mark-muted;
 }
 
-// The panel of the chosen node: over the drawing at its start edge, on a phone at its foot.
+// The panel of the chosen node, under the filters at the start edge.
+.gr__float > .gr__panel {
+  flex: 0 1 auto;
+}
 .gr__panel {
   display: flex;
-  min-height: 0;
   flex-direction: column;
   gap: var(--space-3);
   width: min(20rem, 100%);
+  min-height: 0;
   padding: var(--space-4);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -198,26 +123,33 @@
 .gr__panel > * {
   flex: none;
 }
-.gr__panelHead {
+.gr__panelHead,
+.gr__sheetHead {
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
+}
+.gr__sheetHead {
+  align-items: center;
 }
 .gr__panelText {
   flex: 1 1 auto;
   min-width: 0;
 }
 .gr__panelTitle {
-  margin: 0;
+  margin: 0 0 var(--space-1);
   font-size: var(--fs-body);
   font-weight: var(--fw-semibold);
   line-height: 1.3;
   overflow-wrap: anywhere;
 }
 .gr__panelSub {
-  margin: var(--space-1) 0 0;
+  margin: 0;
   color: var(--color-text-muted);
   font-size: 0.8125rem;
+}
+.gr__panelSub + .gr__panelSub {
+  margin-top: var(--space-1);
 }
 .gr__hint {
   margin: 0;
@@ -257,219 +189,91 @@
   @include press.chrome-text;
   @include press.press;
 }
-.gr__nearTitle {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-  font-weight: var(--fw-medium);
-}
-.gr__near {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.gr__nearRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  min-height: var(--control-height);
-  padding: var(--space-1) var(--space-2);
-  border: 0;
-  border-radius: var(--radius-md);
-  background: none;
-  color: var(--color-text);
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
-  @include press.press;
-}
-.gr__nearText {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.gr__nearKind {
-  flex: none;
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-}
-
 .gr__close:focus-visible,
-.gr__open:focus-visible,
-.gr__nearRow:focus-visible,
-.gr__kind:focus-visible,
-.gr__row a:focus-visible {
+.gr__open:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
-.gr__legend {
+// The chosen element in the sheet of a phone.
+.gr__sheet {
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  // Room for the shadow of the chips inside the scroll frame.
-  margin: calc(-1 * var(--space-2));
-  padding: var(--space-2);
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
-  &::-webkit-scrollbar {
-    display: none;
-  }
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4) var(--space-5);
+  @include kinds.colors;
 }
-.gr__legend > * {
-  flex: none;
-  white-space: nowrap;
+
+// The foot of the layer: the state of the build-up. It leaves the corner of the zoom
+// buttons free.
+.gr__foot {
+  display: flex;
+  margin-top: auto;
+  margin-inline-end: calc(var(--control-height) + var(--space-5));
+  min-width: 0;
 }
-.gr__kind {
+.gr__pill {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
   min-height: 32px;
-  padding: 0 var(--space-3) 0 var(--space-2);
-  border: 0;
+  padding: 0 var(--space-3);
   border-radius: var(--radius-pill);
   background: var(--color-surface-1);
   box-shadow: var(--shadow-sm);
-  color: var(--color-text);
-  font: inherit;
-  font-size: 0.8125rem;
-  cursor: pointer;
-  @include press.press;
 }
-.gr__kind--on {
-  background: var(--color-selected);
-  color: var(--color-on-selected);
-}
-.gr__lineKey {
-  gap: var(--space-2);
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-}
-.gr__sample {
-  width: 22px;
-  border-top: 2px solid var(--color-border-strong);
-}
-.gr__sample--builtin {
-  border-top-style: dashed;
-}
-
-.gr__list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.gr__row {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-1);
-}
-.gr__rowText {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.gr__rowTitle {
-  color: var(--color-text);
-  font-weight: var(--fw-medium);
-  overflow-wrap: anywhere;
-}
-.gr__rowSub {
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-}
-.gr__rowNear {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-3);
-  margin: var(--space-1) 0 0;
-  padding: 0;
-  list-style: none;
-  font-size: 0.8125rem;
-}
-.gr__rowLink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-width: 0;
-  color: var(--color-text-muted);
-}
-.gr__rowLink a {
-  color: var(--color-accent-text);
-}
-
 .gr__growing {
   margin: 0;
   color: var(--color-text-muted);
   font-size: 0.8125rem;
 }
-.gr__more.gr__pill {
-  padding: 0 var(--space-1);
-}
 .gr__more {
-  @include lp.more;
+  padding: 0 var(--space-1);
 }
 
 @media (hover: hover) {
-  .gr__close:hover,
-  .gr__nearRow:hover {
+  .gr__close:hover {
     background-color: var(--color-surface-2);
   }
   .gr__open:hover {
     filter: brightness(1.08);
   }
-  .gr__kind:hover {
-    background-color: var(--color-surface-2);
-  }
-  .gr__kind--on:hover {
-    background-color: var(--color-selected);
-  }
 }
 
+// A phone: the drawing fills the screen above the bar of the shell, and the filters are one
+// strip at its top from edge to edge.
 @include bp.phone {
+  .gr__pane {
+    margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) calc(-1 * var(--space-6));
+    border-radius: 0;
+  }
+  .gr__canvas {
+    border-radius: 0;
+  }
+  .gr__float {
+    padding: 0;
+  }
+  .gr__bar {
+    flex-wrap: nowrap;
+    flex-direction: column;
+    align-items: stretch;
+    padding: var(--space-3) var(--space-4) var(--space-2);
+    border-radius: 0;
+  }
   .gr__search {
+    flex: none;
     max-width: none;
   }
   .gr__chips {
-    flex: 1 1 100%;
+    flex: none;
     @include lp.phone-chips;
+    @include fade.fade-x(var(--space-6), false);
   }
   .gr__chip,
   .gr__switch {
     flex: none;
   }
-  // The search and the switch of the view share the first line, the filters are the second.
-  .gr__search {
-    flex: 1 1 0;
-  }
-  .gr__chips {
-    order: 1;
-  }
-  .gr--draw .gr__float {
-    padding: var(--space-2);
-  }
-  // The panel is at the foot, over the legend.
-  .gr__panel {
-    width: auto;
-    max-height: 45%;
-    margin-top: auto;
-  }
-  .gr__panel + .gr__foot {
-    margin-top: 0;
+  .gr__foot {
+    padding: 0 var(--space-3) var(--space-3);
   }
 }
 
@@ -484,14 +288,10 @@
     color: var(--color-text);
     box-shadow: inset 0 0 0 2px var(--color-text);
   }
+  .gr__bar,
   .gr__panel,
-  .gr__row,
-  .gr__kind,
   .gr__pill {
     border: 2px solid var(--color-text);
     box-shadow: none;
-  }
-  .gr__sample {
-    border-top-color: var(--color-text);
   }
 }

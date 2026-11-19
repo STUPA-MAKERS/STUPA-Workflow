@@ -45,6 +45,8 @@ export interface CanvasNode {
   readonly name: string;
   /** An element that the person does not read (spec 001422). */
   readonly muted: boolean;
+  /** The neighbours of the node as text for a screen reader (spec 001428); empty without one. */
+  readonly near: string;
 }
 
 /** A line with the places of its two ends. */

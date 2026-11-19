@@ -14,8 +14,8 @@ scope:
 
 A press on a node must choose it. The drawing must then dim every node that is not a neighbour
 of the chosen node, and a panel must show the kind, the title, the date and the state of the
-element, the list of its neighbours and the action "Öffnen" (`Open`). "Öffnen" must go to the
-detail of the element. A press on a neighbour in the panel must choose that node. A press on
+element and the action "Öffnen" (`Open`). The panel must not list the neighbours: the drawing
+shows them. On a phone the panel must be a sheet from the foot of the screen. "Öffnen" must go to the detail of the element. A press on
 the empty drawing must end the choice. A drag on the empty drawing must move the view, and the
 wheel, a pinch and the buttons "+" and "−" must zoom it.
 

@@ -30,10 +30,10 @@ a card and else its creation, and the creation of an Antrag, a vote and a ticket
 a cost centre have no date and must pass every period. The filters must be in the query of the
 URL. The server must apply the filters.
 
-The drawing must fill the height of the page. The filters, the switch of the view, the panel of
-the chosen node and the legend must float over the drawing. The legend must be one strip at the
-foot that scrolls sideways. The page must not show a title. In the list view the filters must
-stick to the top of the page.
+The drawing must fill the height of the page. The filters and the panel of the chosen node
+must float over the drawing, the filters on one surface. The page must not show a title. On a
+phone the drawing must fill the screen above the bar of the shell, and the filters must be one
+strip from edge to edge at the top of the drawing, with the search in its full width.
 
 Reason: A graph of every year is too large to read. The person narrows it to the question at
 hand, and the URL keeps the view for a reload or for a colleague.

@@ -114,10 +114,7 @@ function day(value: string | null): string {
   return value !== null && DAY.test(value) ? value : '';
 }
 
-/** The view of the page: the drawing or the list (spec 001428). */
-export type GraphView = 'graph' | 'list';
-
-/** The filters and the view from the query of the URL (spec 001425). Unknown values drop. */
+/** The filters from the query of the URL (spec 001425). Unknown values drop. */
 export function filtersOf(query: ParamMap): GraphFilters {
   const kinds = (query.get('kinds') ?? '').split(',');
   const relations = query.get('rel') as GraphRelations | null;
@@ -133,12 +130,8 @@ export function filtersOf(query: ParamMap): GraphFilters {
   };
 }
 
-export function viewOf(query: ParamMap): GraphView {
-  return query.get('view') === 'list' ? 'list' : 'graph';
-}
-
-/** The query of the URL for the filters and the view; null removes a parameter. */
-export function queryOf(f: GraphFilters, view: GraphView): Readonly<Record<string, string | null>> {
+/** The query of the URL for the filters; null removes a parameter. */
+export function queryOf(f: GraphFilters): Readonly<Record<string, string | null>> {
   return {
     kinds: f.kinds.length ? f.kinds.join(',') : null,
     from: f.from || null,
@@ -148,11 +141,10 @@ export function queryOf(f: GraphFilters, view: GraphView): Readonly<Record<strin
     q: f.q.trim() || null,
     single: f.single ? '1' : null,
     noaccess: f.noAccess ? '1' : null,
-    view: view === 'list' ? 'list' : null,
   };
 }
 
 /** True when two sets of filters ask the server for the same graph. */
 export function sameFilters(a: GraphFilters, b: GraphFilters): boolean {
-  return JSON.stringify(queryOf(a, 'graph')) === JSON.stringify(queryOf(b, 'graph'));
+  return JSON.stringify(queryOf(a)) === JSON.stringify(queryOf(b));
 }

@@ -237,7 +237,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/graph/001425](requirements/functional/collaboration/graph/001425_graph-filters.md) | The graph has filters above the drawing | approved |
 | [F/collaboration/graph/001426](requirements/functional/collaboration/graph/001426_graph-builds-up.md) | The graph builds up piece by piece | approved |
 | [F/collaboration/graph/001427](requirements/functional/collaboration/graph/001427_graph-reduced-motion.md) | The graph does not move with reduced motion | approved |
-| [F/collaboration/graph/001428](requirements/functional/collaboration/graph/001428_graph-list-view.md) | The graph has a list view | approved |
+| [F/collaboration/graph/001428](requirements/functional/collaboration/graph/001428_graph-text-alternative.md) | The drawing has a text alternative | approved |
 | [F/collaboration/graph/001429](requirements/functional/collaboration/graph/001429_graph-node-press.md) | A press on a node shows the element and its neighbours | approved |
 | [F/collaboration/graph/001430](requirements/functional/collaboration/graph/001430_graph-node-look.md) | A node shows the icon and the colour of its kind | approved |
 | [F/collaboration/graph/001431](requirements/functional/collaboration/graph/001431_graph-api.md) | The graph has its own API | approved |

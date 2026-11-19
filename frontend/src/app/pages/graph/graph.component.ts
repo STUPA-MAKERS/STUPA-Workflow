@@ -1,4 +1,15 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  effect,
+  inject,
+  linkedSignal,
+  signal,
+  untracked,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import type { Subscription } from 'rxjs';
@@ -28,7 +39,8 @@ import {
   RangeChipComponent,
   type RangeValue,
   SearchPillComponent,
-  SegmentedComponent,
+  ScrollFadeDirective,
+  SideSheetComponent,
   SkeletonComponent,
   mediaQuery,
 } from '@stupa-makers/ui-kit';
@@ -38,7 +50,6 @@ import {
   AUTO_NODES,
   EMPTY_GRAPH,
   type Graph,
-  type GraphView,
   KIND_FEATURE,
   NO_FILTERS,
   filtersOf,
@@ -48,13 +59,12 @@ import {
   nodeKey,
   queryOf,
   sameFilters,
-  viewOf,
 } from './graph.util';
 
 /** The pause after the last key before the search asks the server, in ms. */
 export const SEARCH_PAUSE = 250;
 
-/** A node as the panel and the list show it. */
+/** A node as the drawing and the panel show it. */
 export interface GraphRow {
   readonly key: string;
   readonly node: GraphNode;
@@ -66,20 +76,15 @@ export interface GraphRow {
   readonly route: ReturnType<typeof splitUrl> | null;
 }
 
-/** A row of the list with its neighbours. */
-export interface GraphListRow extends GraphRow {
-  readonly near: readonly GraphRow[];
-}
-
 /**
  * The page "Graph" (`/graph`, specs 001420-001432): the elements that the person reads as
  * nodes and the relations between them as lines.
  *
  * The server applies the read rules and every filter. The page loads 60 nodes per step and
  * adds each step to the drawing, by itself until 300 nodes show; then "Mehr laden" loads
- * the next 300. The filters and the view are in the query of the URL. A press on a node
- * chooses it: the panel shows its facts, its neighbours and "Öffnen". The view "Liste"
- * shows the same nodes as rows, for a screen reader and for a person who prefers text.
+ * the next 300. The filters are in the query of the URL. The drawing fills the page, and the
+ * filters float over it. A press on a node chooses it: the panel shows its facts and
+ * "Öffnen", on a phone in a sheet. For a screen reader each node names its neighbours.
  */
 @Component({
   selector: 'app-graph',
@@ -92,12 +97,14 @@ export interface GraphListRow extends GraphRow {
     GraphCanvasComponent,
     IconComponent,
     LoadErrorComponent,
-      RangeChipComponent,
+    NgTemplateOutlet,
+    RangeChipComponent,
     RouterLink,
     SearchPillComponent,
-    SegmentedComponent,
+    ScrollFadeDirective,
+    SideSheetComponent,
     SkeletonComponent,
-      TranslatePipe,
+    TranslatePipe,
   ],
   templateUrl: './graph.component.html',
   styleUrl: './graph.component.scss',
@@ -112,7 +119,6 @@ export class GraphComponent {
   private readonly t: Translate = (key, params) => this.i18n.translate(key, params);
 
   readonly filters = signal<GraphFilters>(filtersOf(this.route.snapshot.queryParamMap));
-  readonly view = signal<GraphView>(viewOf(this.route.snapshot.queryParamMap));
   /** The text of the search field; it reaches the filters after a pause. */
   readonly searchText = signal(this.filters().q);
 
@@ -140,9 +146,6 @@ export class GraphComponent {
   );
 
   readonly kindOptions = computed(() => this.kinds().map((k) => ({ value: k, label: this.kindLabel(k) })));
-  readonly legend = computed(() =>
-    this.kinds().map((k) => ({ kind: k, icon: LINK_ICON[k], label: this.kindLabel(k), on: this.filters().kinds.includes(k) })),
-  );
   readonly gremiumOptions = computed(() => [
     { value: '', label: this.i18n.translate('graph.filter.allGremien') },
     ...this.gremien().map((g) => ({ value: g.id, label: g.name })),
@@ -156,19 +159,15 @@ export class GraphComponent {
   readonly relationsText = computed(() =>
     this.i18n.translate(`graph.relations.${this.filters().relations}` as TranslationKey),
   );
-  readonly viewOptions = computed(() => [
-    { value: 'graph', label: this.i18n.translate('graph.view.graph') },
-    { value: 'list', label: this.i18n.translate('graph.view.list') },
-  ]);
 
   readonly phone = mediaQuery(MEDIA.phone);
-  /** Where the drawing shows a chosen node: beside the panel, on a phone above it. */
+  /** Where the drawing shows a chosen node: beside the panel, on a phone above the sheet. */
   readonly focusAt = computed(() => (this.phone() ? { x: 0.5, y: 0.3 } : { x: 0.6, y: 0.5 }));
 
   readonly filtered = computed(() => isFiltered(this.filters()));
   readonly empty = computed(() => this.graph().nodes.length === 0);
-  /** True while the drawing shows: then the panel and the legend float over it. */
-  readonly drawing = computed(() => this.view() === 'graph' && !this.loading() && !this.error() && !this.empty());
+  /** True while the drawing shows. */
+  readonly drawing = computed(() => !this.loading() && !this.error() && !this.empty());
 
   readonly rows = computed<ReadonlyMap<string, GraphRow>>(() => {
     const locale = this.i18n.locale();
@@ -177,28 +176,29 @@ export class GraphComponent {
 
   private readonly near = computed(() => neighbours(this.graph().lines));
 
-  readonly canvasNodes = computed<readonly CanvasNode[]>(() =>
-    Array.from(this.rows().values()).map((r) => ({
+  readonly canvasNodes = computed<readonly CanvasNode[]>(() => {
+    const rows = this.rows();
+    const near = this.near();
+    return Array.from(rows.values()).map((r) => ({
       key: r.key,
       kind: r.node.kind,
       icon: r.icon,
       title: r.title,
       name: r.node.accessible ? `${r.kind}: ${r.title}` : r.title,
       muted: !r.node.accessible,
-    })),
-  );
-
-  readonly listRows = computed<readonly GraphListRow[]>(() => {
-    const rows = this.rows();
-    const near = this.near();
-    return Array.from(rows.values()).map((r) => ({ ...r, near: this.rowsOf(near.get(r.key), rows) }));
+      near: this.nearText(near.get(r.key), rows),
+    }));
   });
 
-  /** The chosen node with its neighbours; null without a choice. */
-  readonly chosen = computed<GraphListRow | null>(() => {
+  /** The chosen node; null without a choice. */
+  readonly chosen = computed<GraphRow | null>(() => {
     const key = this.selected();
-    const row = key === null ? undefined : this.rows().get(key);
-    return row ? { ...row, near: this.rowsOf(this.near().get(row.key), this.rows()) } : null;
+    return (key === null ? undefined : this.rows().get(key)) ?? null;
+  });
+  /** The node of the sheet: it stays while the sheet goes after the end of the choice. */
+  readonly sheetRow = linkedSignal<GraphRow | null, GraphRow | null>({
+    source: this.chosen,
+    computation: (row, before) => row ?? before?.value ?? null,
   });
 
   /** The label of the drawing for a screen reader (spec 001428). */
@@ -221,7 +221,6 @@ export class GraphComponent {
         this.filters.set(filters);
         this.searchText.set(filters.q);
       }
-      this.view.set(viewOf(query));
     });
 
     effect(() => {
@@ -230,7 +229,7 @@ export class GraphComponent {
     });
 
     effect(() => {
-      const queryParams = queryOf(this.filters(), this.view());
+      const queryParams = queryOf(this.filters());
       untracked(
         () =>
           void this.router.navigate([], {
@@ -248,18 +247,8 @@ export class GraphComponent {
     });
   }
 
-  setView(value: string | null): void {
-    this.view.set(value === 'list' ? 'list' : 'graph');
-  }
-
   setKinds(values: readonly string[]): void {
     this.patch({ kinds: GRAPH_KINDS.filter((k) => values.includes(k)) });
-  }
-
-  /** A press on a kind of the legend switches it in the filter "Art" (spec 001430). */
-  toggleKind(kind: GraphKind): void {
-    const kinds = this.filters().kinds;
-    this.patch({ kinds: GRAPH_KINDS.filter((k) => (k === kind ? !kinds.includes(k) : kinds.includes(k))) });
   }
 
   setPeriod(range: RangeValue): void {
@@ -323,11 +312,13 @@ export class GraphComponent {
     if (!sameFilters(next, this.filters())) this.filters.set(next);
   }
 
-  private rowsOf(keys: readonly string[] | undefined, rows: ReadonlyMap<string, GraphRow>): readonly GraphRow[] {
-    return (keys ?? []).flatMap((key) => {
+  /** The neighbours of a node as one line of text (spec 001428); empty without one. */
+  private nearText(keys: readonly string[] | undefined, rows: ReadonlyMap<string, GraphRow>): string {
+    const names = (keys ?? []).flatMap((key) => {
       const row = rows.get(key);
-      return row ? [row] : [];
+      return row ? [row.title] : [];
     });
+    return names.length ? this.i18n.translate('graph.node.near', { names: names.join(', ') }) : '';
   }
 
   private row(node: GraphNode, locale: string): GraphRow {

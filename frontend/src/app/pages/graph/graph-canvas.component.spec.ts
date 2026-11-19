@@ -13,6 +13,7 @@ const node = (key: string, over: Partial<CanvasNode> = {}): CanvasNode => ({
   title: `Titel ${key}`,
   name: `Sitzung: Titel ${key}`,
   muted: false,
+  near: '',
   ...over,
 });
 const line = (a: string, b: string, source: GraphLine['source'] = 'link'): GraphLine => ({

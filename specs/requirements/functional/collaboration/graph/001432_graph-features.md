@@ -15,7 +15,7 @@ scope:
 # A kind of a feature that is off does not show in the graph
 
 The graph must not show a node of a kind whose feature is off
-(F/administration/admin/000757), and the filter "Art" and the legend must not offer the kind.
+(F/administration/admin/000757), and the filter "Art" must not offer the kind.
 
 Reason: A feature that is off does not show anywhere in the UI
 (F/administration/admin/000758).

@@ -1,6 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { Component } from '@angular/core';
+import { Component, input, output } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
@@ -16,12 +16,27 @@ import {
   type GraphPage,
 } from '@core/api/graph.service';
 import { GremienApiService } from '@core/api/gremien.service';
+import { MEDIA } from '@stupa-makers/ui-kit';
 import { loadErrorToast, retryLoadError } from '../../../testing/load-error';
+import { matchMediaQueries } from '../../../testing/meeting-fixtures';
+import { type CanvasNode, GraphCanvasComponent } from './graph-canvas.component';
 import { GraphComponent, SEARCH_PAUSE } from './graph.component';
 import { AUTO_NODES, NO_FILTERS } from './graph.util';
 
 @Component({ standalone: true, template: '<p>Ziel</p>' })
 class TargetStub {}
+
+/** The drawing without its layout, for a test of the build-up with hundreds of nodes. */
+@Component({ selector: 'app-graph-canvas', standalone: true, template: '' })
+class CanvasStub {
+  readonly nodes = input<readonly CanvasNode[]>([]);
+  readonly lines = input<readonly unknown[]>([]);
+  readonly selected = input<string | null>(null);
+  readonly label = input('');
+  readonly focusAt = input({ x: 0.5, y: 0.5 });
+  readonly edge = input(0);
+  readonly chosen = output<string | null>();
+}
 
 function node(kind: GraphNode['kind'], id: string, over: Partial<GraphNode> = {}): GraphNode {
   return {
@@ -66,7 +81,12 @@ const FULL = page(
 
 type Answer = () => Observable<GraphPage>;
 
-async function start(url = '/graph', answers: Answer[] = [], gremien: Observable<unknown> = of([{ id: 'g1', name: 'StuPa' }])) {
+async function start(
+  url = '/graph',
+  answers: Answer[] = [],
+  gremien: Observable<unknown> = of([{ id: 'g1', name: 'StuPa' }]),
+  stub = false,
+) {
   localStorage.setItem('ap.locale', 'de');
   document.documentElement.setAttribute('data-display-motion', 'reduce');
   const calls: { readonly filters: GraphFilters; readonly cursor: string | null }[] = [];
@@ -90,6 +110,12 @@ async function start(url = '/graph', answers: Answer[] = [], gremien: Observable
       { provide: GremienApiService, useValue: { overview: jest.fn(() => gremien) } },
     ],
   });
+  if (stub) {
+    TestBed.overrideComponent(GraphComponent, {
+      remove: { imports: [GraphCanvasComponent] },
+      add: { imports: [CanvasStub] },
+    });
+  }
   const harness = await RouterTestingHarness.create();
   await harness.navigateByUrl(url);
   const settle = async (): Promise<void> => {
@@ -115,19 +141,23 @@ describe('GraphComponent', () => {
   it('draws the first page and names the drawing for a screen reader', async () => {
     const { calls, el, router } = await start('/graph', [() => of(FULL)]);
     expect(calls).toEqual([{ filters: NO_FILTERS, cursor: null }]);
-    // § 001425: no title shows, and the filters and the legend are in the layer over the drawing.
+    // § 001425: no title shows, and the filters are in the layer over the drawing.
     expect(el.querySelector('#gr-title')).toHaveTextContent('Graph');
     expect(el.querySelector('#gr-title')).toHaveClass('sr-only');
-    expect(el.querySelector('.gr')).toHaveClass('gr--draw');
     expect(el.querySelector('.gr__float .gr__bar [role="search"]')).not.toBeNull();
-    expect(el.querySelector('.gr__float .gr__foot .gr__legend')).not.toBeNull();
-    expect(el.querySelectorAll('.gr__legend .gr__lineKey.gr__pill')).toHaveLength(2);
+    expect(el.querySelector('.gr__foot')).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Legende' })).toBeNull();
     expect(
       screen.getByRole('group', {
-        name: 'Graph mit 6 Elementen und 5 Beziehungen. Die Ansicht „Liste“ zeigt dieselben Elemente als Text.',
+        name: 'Graph mit 6 Elementen und 5 Beziehungen.',
       }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Sitzung: Sondersitzung' })).toHaveAttribute('data-kind', 'meeting');
+    const meeting = screen.getByRole('button', { name: 'Sitzung: Sondersitzung' });
+    expect(meeting).toHaveAttribute('data-kind', 'meeting');
+    // § 001428: a node names its neighbours for a screen reader.
+    expect(meeting).toHaveAccessibleDescription(
+      'Verbunden mit: TOP 1: Haushalt, Flyer drucken, Antrag Sommerfest, Rechnung (kein Zugriff)',
+    );
     expect(screen.getByRole('button', { name: 'Abstimmung: Ohne Titel' })).toBeInTheDocument();
     // § 001422: an element without access has its kind only.
     expect(screen.getByRole('button', { name: 'Rechnung (kein Zugriff)' })).toHaveClass('gc__node--muted');
@@ -138,69 +168,37 @@ describe('GraphComponent', () => {
     expect(router.url).toBe('/graph');
   });
 
-  /** § F/collaboration/graph/001430: the legend names each kind and switches the filter "Art". */
-  it('shows the legend without counts and switches a kind with a press', async () => {
-    const { calls, settle, cmp } = await start();
-    const legend = within(screen.getByRole('group', { name: 'Legende' }));
-    const kinds = legend.getAllByRole('button');
-    expect(kinds.map((k) => k.textContent?.trim())).toEqual([
-      'Antrag',
-      'Sitzung',
-      'TOP',
-      'Abstimmung',
-      'Termin',
-      'Gremium',
-      'Rechnung',
-      'Buchung',
-      'Kostenstelle',
-      'Ticket',
-      'To-Do',
-    ]);
-    expect(kinds.every((k) => k.querySelector('app-icon') !== null && k.getAttribute('aria-pressed') === 'false')).toBe(true);
-    expect(legend.getByText('Verknüpfung')).toBeInTheDocument();
-    expect(legend.getByText('Feste Beziehung')).toBeInTheDocument();
-
-    legend.getByRole('button', { name: 'Sitzung' }).click();
-    await settle();
-    expect(last(calls).filters.kinds).toEqual(['meeting']);
-    within(screen.getByRole('group', { name: 'Legende' })).getByRole('button', { name: 'To-Do' }).click();
-    await settle();
-    expect(cmp.filters().kinds).toEqual(['meeting', 'todo']);
-    const again = within(screen.getByRole('group', { name: 'Legende' }));
-    expect(again.getByRole('button', { name: 'Sitzung' })).toHaveAttribute('aria-pressed', 'true');
-    again.getByRole('button', { name: 'Sitzung' }).click();
-    await settle();
-    expect(last(calls).filters.kinds).toEqual(['todo']);
-  });
-
   /** § F/collaboration/graph/001432: a kind of a feature that is off is not offered. */
   it('does not offer the kinds of a feature that is off', async () => {
     localStorage.setItem('ap.features.off', JSON.stringify(['invoices']));
     const { cmp } = await start();
     expect(cmp.kinds()).toEqual(GRAPH_KINDS.filter((k) => k !== 'invoice'));
     expect(cmp.kindOptions().map((o) => o.label)).not.toContain('Rechnung');
-    const legend = within(screen.getByRole('group', { name: 'Legende' }));
-    expect(legend.queryByRole('button', { name: 'Rechnung' })).toBeNull();
-    expect(legend.getByRole('button', { name: 'TOP' })).toBeInTheDocument();
+    expect(cmp.kindOptions().map((o) => o.label)).toContain('TOP');
   });
 
   /** § F/collaboration/graph/001426: the build-up, page by page, until 300 nodes show. */
   it('loads the pages by itself until 300 nodes show, then "Mehr laden" loads on', async () => {
     const first = cards(0, 60, '60');
-    const { calls, cmp, el, settle } = await start('/graph?view=list', [
-      () => of(first),
-      () => of(cards(60, 60, '120')),
-      () => of(cards(120, 60, '180')),
-      () => of(cards(180, 60, '240')),
-      () => of(cards(240, 60, '300')),
-      () => of(cards(300, 10, null)),
-    ]);
+    const { calls, cmp, settle } = await start(
+      '/graph',
+      [
+        () => of(first),
+        () => of(cards(60, 60, '120')),
+        () => of(cards(120, 60, '180')),
+        () => of(cards(180, 60, '240')),
+        () => of(cards(240, 60, '300')),
+        () => of(cards(300, 10, null)),
+      ],
+      undefined,
+      true,
+    );
     expect(calls.map((c) => c.cursor)).toEqual([null, '60', '120', '180', '240']);
     expect(cmp.graph().nodes).toHaveLength(AUTO_NODES);
     // The nodes of the first page keep their identity.
     expect(cmp.graph().nodes[0]).toBe(first.nodes[0]);
     expect(cmp.graph().nodes[59]).toBe(first.nodes[59]);
-    expect(el.querySelectorAll('.gr__row')).toHaveLength(300);
+    expect(cmp.canvasNodes()).toHaveLength(300);
     expect(cmp.growing()).toBe(false);
 
     screen.getByTestId('gr-more').click();
@@ -216,7 +214,7 @@ describe('GraphComponent', () => {
 
   it('shows that a later page loads, and keeps the graph when that page fails', async () => {
     const second = new Subject<GraphPage>();
-    const { calls, cmp, settle, el } = await start('/graph?view=list', [() => of(cards(0, 60, '60')), () => second]);
+    const { calls, cmp, settle, el } = await start('/graph', [() => of(cards(0, 60, '60')), () => second], undefined, true);
     expect(cmp.growing()).toBe(true);
     expect(el.querySelector('.gr__growing')).toHaveTextContent('Weitere Elemente werden geladen …');
     expect(el.querySelector('.gr__growing')).toHaveAttribute('role', 'status');
@@ -348,18 +346,13 @@ describe('GraphComponent', () => {
     expect(calls).toHaveLength(count);
   });
 
-  it('adopts the filters and the view when the URL changes', async () => {
-    const { calls, cmp, harness, settle, el } = await start();
+  it('adopts the filters when the URL changes', async () => {
+    const { calls, cmp, harness, settle } = await start();
     await harness.navigateByUrl('/graph?rel=links&q=Fest&view=list');
     await settle();
     expect(cmp.filters().relations).toBe('links');
     expect(cmp.searchText()).toBe('Fest');
-    expect(cmp.view()).toBe('list');
     expect(last(calls).filters).toEqual({ ...NO_FILTERS, relations: 'links', q: 'Fest' });
-    expect(el.querySelector('.gr__list')).not.toBeNull();
-    // The list is under the filters: no layer, no legend.
-    expect(el.querySelector('.gr')).not.toHaveClass('gr--draw');
-    expect(el.querySelector('.gr__foot')).toBeNull();
   });
 
   it('searches after a pause, with the last text only', async () => {
@@ -387,7 +380,7 @@ describe('GraphComponent', () => {
   });
 
   /** § F/collaboration/graph/001429: a press chooses a node: the panel, the dimmed nodes and "Öffnen". */
-  it('shows the panel of the pressed node with its neighbours and "Öffnen"', async () => {
+  it('shows the panel of the pressed node with "Öffnen" and dims the other nodes', async () => {
     const { settle, cmp, el } = await start('/graph', [() => of(FULL)]);
     expect(el.querySelector('.gr__panel')).toBeNull();
     screen.getByRole('button', { name: 'Sitzung: Sondersitzung' }).click();
@@ -398,20 +391,15 @@ describe('GraphComponent', () => {
     expect(panel.getByText('Sitzung')).toBeInTheDocument();
     expect(panel.getByText('03.11.2026')).toBeInTheDocument();
     expect(panel.getByRole('link', { name: 'Öffnen' })).toHaveAttribute('href', '/meetings/1');
-    expect(panel.getByRole('heading', { level: 3, name: 'Verbunden mit' })).toBeInTheDocument();
-    const near = panel.getAllByRole('button').filter((b) => b.classList.contains('gr__nearRow'));
-    expect(near.map((b) => b.querySelector('.gr__nearText')?.textContent)).toEqual([
-      'TOP 1: Haushalt',
-      'Flyer drucken',
-      'Antrag Sommerfest',
-      'Rechnung (kein Zugriff)',
-    ]);
+    // The panel has no list of the neighbours: the drawing shows them.
+    expect(panel.queryByRole('heading', { level: 3 })).toBeNull();
+    expect(panel.getAllByRole('button')).toHaveLength(1);
     // The node that is no neighbour dims.
     expect(screen.getByRole('button', { name: 'Abstimmung: Ohne Titel' })).toHaveClass('gc__node--dim');
     expect(screen.getByRole('button', { name: 'To-Do: Flyer drucken' })).not.toHaveClass('gc__node--dim');
 
-    // A press on a neighbour in the panel chooses that node.
-    near[0].click();
+    // A press on a neighbour in the drawing chooses that node.
+    screen.getByRole('button', { name: 'TOP: TOP 1: Haushalt' }).click();
     await settle();
     expect(cmp.selected()).toBe('agenda_item:2');
     const top = within(el.querySelector('.gr__panel') as HTMLElement);
@@ -453,54 +441,25 @@ describe('GraphComponent', () => {
     expect(cmp.selected()).toBeNull();
   });
 
-  it('shows no neighbours for a node without a line', async () => {
-    const { settle, cmp, el } = await start('/graph?single=1', [() => of(page([CARD], [edge(CARD, MEETING)]))]);
-    cmp.choose('todo:3');
-    await settle();
-    const panel = within(el.querySelector('.gr__panel') as HTMLElement);
-    expect(panel.queryByRole('heading', { level: 3 })).toBeNull();
-    expect(panel.getByRole('link', { name: 'Öffnen' })).toHaveAttribute('href', '/todos/b1?card=3');
-  });
-
-  /** § F/collaboration/graph/001428: the list shows the same nodes with their neighbours as links. */
-  it('shows the same nodes as a list with their neighbours as links', async () => {
-    const { el, cmp, settle, router } = await start('/graph?view=list', [() => of(FULL)]);
-    expect(el.querySelector('app-graph-canvas')).toBeNull();
-    expect(screen.queryByRole('group', { name: 'Legende' })).toBeNull();
-    const list = screen.getByRole('list', { name: 'Elemente des Graphen' });
-    const rows = Array.from(list.querySelectorAll<HTMLElement>(':scope > .gr__row'));
-    expect(rows.map((r) => r.querySelector('.gr__rowTitle')?.textContent)).toEqual([
-      'Sondersitzung',
-      'TOP 1: Haushalt',
-      'Flyer drucken',
-      'Antrag Sommerfest',
-      'Rechnung (kein Zugriff)',
-      'Ohne Titel',
-    ]);
-    expect(rows.every((r) => r.querySelector('app-icon') !== null)).toBe(true);
-    const meeting = within(rows[0]);
-    expect(meeting.getByRole('link', { name: 'Sondersitzung' })).toHaveAttribute('href', '/meetings/1');
-    expect(rows[0].querySelector('.gr__rowSub')).toHaveTextContent('Sitzung · 03.11.2026');
-    expect(rows[2].querySelector('.gr__rowSub')?.textContent?.trim()).toBe('To-Do');
-    const near = within(meeting.getByRole('list', { name: 'Verbunden mit' }));
-    expect(near.getByRole('link', { name: 'TOP 1: Haushalt' })).toHaveAttribute('href', '/meetings/1?top=2');
-    expect(near.getByRole('link', { name: 'Flyer drucken' })).toHaveAttribute('href', '/todos/b1?card=3');
-    expect(near.queryByRole('link', { name: 'Antrag Sommerfest' })).toBeNull();
-    expect(near.getByText('Antrag Sommerfest')).toBeInTheDocument();
-    // A row without a page is text, not a link.
-    expect(within(rows[3]).queryByRole('link', { name: 'Antrag Sommerfest' })).toBeNull();
-    expect(rows[4].querySelector('.gr__mark--muted')).not.toBeNull();
-
-    cmp.setView('graph');
-    await settle();
-    expect(el.querySelector('app-graph-canvas')).not.toBeNull();
-    expect(router.url).toBe('/graph');
-    cmp.setView('list');
-    await settle();
-    expect(router.url).toBe('/graph?view=list');
-    cmp.setView(null);
-    expect(cmp.view()).toBe('graph');
-    expect(cmp.viewOptions().map((o) => o.label)).toEqual(['Graph', 'Liste']);
+  /** § F/collaboration/graph/001429: on a phone the chosen element shows in a sheet. */
+  it('shows the chosen element in a sheet on a phone', async () => {
+    const restore = matchMediaQueries(MEDIA.phone);
+    try {
+      const { settle, cmp, el } = await start('/graph', [() => of(FULL)]);
+      screen.getByRole('button', { name: 'Sitzung: Sondersitzung' }).click();
+      await settle();
+      expect(el.querySelector('.gr__panel')).toBeNull();
+      const sheet = within(screen.getByRole('dialog', { name: 'Sondersitzung' }));
+      expect(sheet.getByText('03.11.2026')).toBeInTheDocument();
+      expect(sheet.getByRole('link', { name: 'Öffnen' })).toHaveAttribute('href', '/meetings/1');
+      // The sheet keeps the element while it goes.
+      cmp.choose(null);
+      await settle();
+      expect(cmp.chosen()).toBeNull();
+      expect(cmp.sheetRow()?.title).toBe('Sondersitzung');
+    } finally {
+      restore();
+    }
   });
 
   it('offers the Gremien of the person in the filter, and none when they do not load', async () => {
