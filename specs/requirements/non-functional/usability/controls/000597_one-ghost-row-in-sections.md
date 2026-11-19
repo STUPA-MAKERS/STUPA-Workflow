@@ -2,28 +2,10 @@
 id: "000597"
 title: A section in a detail and a small tile show one ghost row
 kind: non-functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation:
-  - frontend/src/app/features/apply/status-timeline.component.html
-  - frontend/src/app/features/gremien/attendance-detail/attendance-detail.component.html
-  - frontend/src/app/features/todos/linked-list/todo-linked-list.component.html
-  - frontend/src/app/pages/applications/applications-detail.component.html
-  - frontend/src/app/pages/applications/attachments-panel.component.html
-  - frontend/src/app/pages/tickets/ticket-detail.component.html
-  - frontend/src/app/pages/expenses/booking-detail/booking-detail.component.html
-  - frontend/src/app/pages/expenses/booking-form/booking-form.component.html
-  - frontend/src/app/pages/invoices/invoice-detail/invoice-detail.component.html
-  - frontend/src/app/pages/budget/budget-dashboard.component.html
-  - frontend/src/app/pages/admin/cd-variants/cd-variants.component.html
-  - frontend/src/app/pages/admin/webhooks/webhooks.component.html
-  - frontend/src/app/pages/admin/flow/transition-detail.component.html
-  - frontend/src/app/pages/admin/flow/transition-lists.component.html
-  - frontend/src/app/pages/admin/forms/form-editor.component.html
-  - frontend/src/app/pages/admin/version-history/version-history.component.html
-  - frontend/src/app/features/meetings/meetings-list/meetings-list.component.html
-  - frontend/src/app/features/meetings/calendar-subscribe/calendar-subscribe.component.html
+replaced_by: NF/usability/controls/001360
 scope:
   - frontend/src/app/
 ---

@@ -302,8 +302,15 @@ describe('ShellComponent', () => {
         'Rechnungen',
         'Tickets',
         'Graph',
+        'Protokolle',
+        'Beschlüsse',
+        'Kalender',
         'Verwaltung',
       ]);
+      expect(within(mainNav() as HTMLElement).getByRole('button', { name: 'Öffentlich' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
     });
 
     it('leads the rail with the mark, which links to the start page', async () => {

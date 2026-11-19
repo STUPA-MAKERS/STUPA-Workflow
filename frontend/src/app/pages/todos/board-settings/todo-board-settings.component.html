@@ -114,7 +114,7 @@
             (click)="editLabel(label)"
           >
             <span class="bs__dot" aria-hidden="true"></span>
-            {{ label.name }}
+            <span class="chip__text">{{ label.name }}</span>
           </button>
         } @empty {
           <span class="bs__none">{{ 'todos.settings.noLabels' | t }}</span>
