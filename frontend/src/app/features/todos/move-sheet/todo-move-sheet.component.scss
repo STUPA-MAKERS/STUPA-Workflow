@@ -9,7 +9,7 @@
   gap: var(--space-3);
   padding-bottom: var(--space-3);
 }
-/* The rows of the select sheet (spec 001350): tiles of a row group on surface 3, the
+/* The rows of the select sheet (spec 001380): tiles of a row group on surface 3, the
    chosen row with the check mark after its name. */
 .ms__row {
   @include om.option;
