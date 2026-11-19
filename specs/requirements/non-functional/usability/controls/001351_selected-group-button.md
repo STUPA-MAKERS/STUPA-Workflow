@@ -2,7 +2,7 @@
 id: "001351"
 title: A selected button of a group is filled and fully round
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:

@@ -2,7 +2,7 @@
 id: "001352"
 title: In very high contrast, a head group is yellow with black gaps
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:

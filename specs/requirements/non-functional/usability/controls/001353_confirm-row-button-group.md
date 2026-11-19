@@ -2,7 +2,7 @@
 id: "001353"
 title: The buttons of a dialog footer form a button group with a filled main action
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:
