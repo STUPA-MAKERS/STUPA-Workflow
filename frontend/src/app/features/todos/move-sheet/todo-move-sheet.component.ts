@@ -5,6 +5,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   IconComponent,
   SegmentedComponent,
   type SegmentedOption,
@@ -44,7 +45,7 @@ export interface MoveChoice {
   selector: 'app-todo-move-sheet',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ButtonComponent, IconComponent, SegmentedComponent, SideSheetComponent],
+  imports: [TranslatePipe, ButtonComponent, ButtonGroupComponent, IconComponent, SegmentedComponent, SideSheetComponent],
   templateUrl: './todo-move-sheet.component.html',
   styleUrl: './todo-move-sheet.component.scss',
 })

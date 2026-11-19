@@ -11,7 +11,7 @@ import type { JoinLink } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { QrCodeComponent, formatJoinCode } from '@shared/ui/qr-code/qr-code.component';
-import { ButtonComponent, CopyButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, CopyButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
 
 /** "Kopiert" shows this long after a copy (ms). */
 export const JOIN_COPIED_MS = 2000;
@@ -28,7 +28,7 @@ export const JOIN_COPIED_MS = 2000;
   selector: 'app-join-link',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ButtonComponent, CopyButtonComponent, IconComponent, QrCodeComponent],
+  imports: [TranslatePipe, ButtonComponent, ButtonGroupComponent, CopyButtonComponent, IconComponent, QrCodeComponent],
   templateUrl: './join-link.component.html',
   styleUrl: './join-link.component.scss',
 })

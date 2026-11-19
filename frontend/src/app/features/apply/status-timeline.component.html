@@ -107,7 +107,7 @@
             </p>
 
             @if (actions().length) {
-              <div class="ad__transitions" role="group" [attr.aria-label]="'status.actions.title' | t">
+              <app-button-group class="ad__transitionGroup" [label]="'status.actions.title' | t">
                 @for (t of actions(); track t.id) {
                   <app-button
                     [variant]="looks().get(t.id) ?? 'tonal'"
@@ -118,7 +118,7 @@
                     {{ t.label || ('status.actions.fallback' | t) }}
                   </app-button>
                 }
-              </div>
+              </app-button-group>
             }
             @if (lockReason(); as reason) {
               <app-note class="ad__note" icon="lock" role="status">{{ reason | t }}</app-note>

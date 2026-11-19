@@ -28,9 +28,9 @@
       [value]="position()"
       (valueChange)="setPosition($event)"
     />
-    <div class="ms__foot">
+    <app-button-group class="ms__foot" [main]="true">
       <app-button variant="text" (click)="open.set(false)">{{ 'action.cancel' | t }}</app-button>
       <app-button variant="fill" [disabled]="!columnId()" (click)="confirm()">{{ 'todos.move.confirm' | t }}</app-button>
-    </div>
+    </app-button-group>
   </div>
 </app-side-sheet>

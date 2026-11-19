@@ -145,10 +145,8 @@
 .ad__part {
   @include dots.part(var(--ad-sep));
 }
-.ad__transitions {
-  display: flex;
+.ad__transitionGroup {
   flex-wrap: wrap;
-  gap: var(--space-2);
   margin-top: var(--space-2);
 }
 .ad__note {
