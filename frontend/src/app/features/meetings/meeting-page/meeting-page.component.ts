@@ -31,6 +31,7 @@ import type {
 import {
   AvatarComponent,
   ButtonComponent,
+  EmptyStateComponent,
   IconComponent,
   MEDIA,
   mediaQuery,
@@ -116,6 +117,7 @@ type SessionAction = 'todos' | 'links' | 'open' | 'agenda' | 'settings' | 'atten
     NgTemplateOutlet,
     TranslatePipe,
     ButtonComponent,
+    EmptyStateComponent,
     IconComponent,
     RowMenuComponent,
     SegmentedComponent,
@@ -597,6 +599,12 @@ export class MeetingPageComponent {
       ? 'meetings.vote.openFor'
       : 'meetings.vote.prepareTitle',
   );
+
+  /** The name of the add button in the head of the vote sheet (spec 001802). */
+  protected readonly addVoteLabel = computed(() => {
+    const t = this.top();
+    return t?.applicationId || t?.planVersionId ? this.addVoteKey() : ('meetings.vote.addQuestion' as const);
+  });
 
   /** The column of the vote cards shows when there is a vote or one can be added. */
   protected readonly showVotes = computed(

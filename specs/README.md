@@ -633,6 +633,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/001739](requirements/functional/meetings/meetings/001739_live-resync-on-return.md) | A live meeting page connects and reads again when the page returns | approved |
 | [F/meetings/meetings/001800](requirements/functional/meetings/meetings/001800_linked-items-in-side-sheet.md) | The linked rows of an item are in a side sheet | approved |
 | [F/meetings/meetings/001801](requirements/functional/meetings/meetings/001801_attendance-edge-tab.md) | A tab at the end edge opens the attendance | approved |
+| [F/meetings/meetings/001802](requirements/functional/meetings/meetings/001802_vote-sheet-head-add.md) | The vote sheet has its add button in the head and an empty state | draft |
 | [F/meetings/protocols/000115](requirements/functional/meetings/protocols/000115_keeper-permission.md) | The keeper holds protocol.write | approved |
 | [F/meetings/protocols/000116](requirements/functional/meetings/protocols/000116_finalize.md) | Finalize needs a closed meeting and protocol.finalize | approved |
 | [F/meetings/protocols/000117](requirements/functional/meetings/protocols/000117_delete-draft-only.md) | Only a draft protocol is deleted | approved |

@@ -1021,6 +1021,18 @@ describe('MeetingPageComponent', () => {
       expect(screen.getByRole('dialog', { name: 'Abstimmungen' })).toHaveClass('ss--end');
     });
 
+    /** Spec 001802: the add button sits in the head of the vote sheet; no vote shows the empty state. */
+    it('puts the add button in the head of the vote sheet and shows an empty state', async () => {
+      const { on } = await setup({ meeting: meeting({ isProtokollant: false, votes: [] }) }, [MEDIA.wide]);
+      await userEvent.click(screen.getByRole('button', { name: 'Abstimmungen' }));
+      const sheet = screen.getByRole('dialog', { name: 'Abstimmungen' });
+      expect(within(sheet).getByText('Keine Abstimmungen')).toBeInTheDocument();
+      const head = sheet.querySelector('.mp__sheet-actions') as HTMLElement;
+      const add = within(head).getByRole('button', { name: /Abstimmung|Beschlussfrage/ });
+      await userEvent.click(add);
+      expect(on.voteDialog).toHaveBeenCalled();
+    });
+
     /** Spec 001800: the linked rows of the item are in a side sheet that an edge tab opens. */
     it('opens the linked rows of the item in a side sheet from the edge tab', async () => {
       const { fixture, http } = await setup({}, [MEDIA.wide]);

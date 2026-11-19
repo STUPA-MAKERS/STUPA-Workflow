@@ -175,12 +175,8 @@
 <ng-template #votesTpl>
   @for (vote of votes(); track vote.id) {
     <ng-container [ngTemplateOutlet]="voteCardTpl" [ngTemplateOutletContext]="{ $implicit: vote }" />
-  }
-  @if (canAddVote() && top(); as t) {
-    <app-button class="mp__addVote" variant="tonal" [block]="true" (click)="voteDialog.emit(t)">
-      <app-icon name="plus" />
-      {{ (t.applicationId || t.planVersionId ? addVoteKey() : 'meetings.vote.addQuestion') | t }}
-    </app-button>
+  } @empty {
+    <app-empty-state shape="row" rows="1" [heading]="'voting.list.empty' | t" />
   }
 </ng-template>
 
@@ -321,6 +317,14 @@
 </app-side-sheet>
 
 <app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'meetings.vote.count' | t" [(open)]="votesOpen">
+  <!-- "Abstimmung vorbereiten" stands in the head, in one group with the close button (spec 001802). -->
+  @if (canAddVote() && top(); as t) {
+    <span sheet-actions class="mp__sheet-actions">
+      <app-button variant="text" [iconOnly]="true" [ariaLabel]="addVoteLabel() | t" (click)="voteDialog.emit(t)">
+        <app-icon name="plus" />
+      </app-button>
+    </span>
+  }
   @if (votesOpen()) {
     <div class="mp__votes mp__votes--sheet">
       <ng-container [ngTemplateOutlet]="votesTpl" />
