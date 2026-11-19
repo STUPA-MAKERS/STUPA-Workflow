@@ -154,6 +154,10 @@
   font-size: var(--fs-small);
   color: var(--color-text-muted);
 }
+.ad__transitionGroup {
+  flex-wrap: wrap;
+  margin-top: var(--space-2);
+}
 .ad__transitions {
   display: flex;
   flex-wrap: wrap;
