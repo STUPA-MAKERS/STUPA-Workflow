@@ -94,7 +94,7 @@
   </div>
 } @else {
   <div class="cal">
-    <h1 class="sr-only">{{ titleKey | t }}</h1>
+    <app-page-header class="sr-only" [pane]="true" [title]="titleKey | t" />
 
     <div class="cal__tools" role="toolbar" [attr.aria-label]="titleKey | t">
       <div class="cal__nav">
