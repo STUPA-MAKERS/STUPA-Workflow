@@ -662,6 +662,19 @@ async def test_update_expense_all_fields_with_app() -> None:
     assert expense.invoice_id == inv.id
 
 
+async def test_update_expense_unknown_invoice_404() -> None:
+    """An edit that links an unknown invoice gives 404 (§ 001290: the edit pays nothing).
+
+    The gets are the booking, its fiscal year (missing, so open) and the invoice (missing).
+    """
+    expense = _expense()
+    sess = fake_session(gets=[expense, None, None])
+    svc = BudgetTreeService(sess)
+    with pytest.raises(NotFoundError):
+        await svc.update_expense(expense.id, ExpenseUpdate(invoiceId=uuid.uuid4()))
+    assert sess.committed == 0
+
+
 async def test_update_expense_no_app() -> None:
     """An update of a booking without an application.
 
