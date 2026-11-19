@@ -3,7 +3,7 @@
     <app-page-header [pane]="true" titleId="act-title" [title]="'activity.title' | t">
       @if (!phone()) {
         <ng-container ngProjectAs="[actions]">
-          <a class="act__new" routerLink="/apply">
+          <a appButton routerLink="/apply">
             <app-icon name="plus" [size]="16" />
             {{ 'fab.application' | t }}
           </a>
