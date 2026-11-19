@@ -5,6 +5,7 @@ import {
   Component,
   ElementRef,
   computed,
+  effect,
   inject,
   Injector,
   input,
@@ -12,6 +13,7 @@ import {
   output,
   signal,
   type TemplateRef,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
@@ -37,6 +39,8 @@ import {
   type RowMenuItem,
   type RowMenuSection,
   ScrollFadeDirective,
+  SegmentedComponent,
+  type SegmentedOption,
   SideSheetComponent,
 } from '@stupa-makers/ui-kit';
 import { meetingStatus, protocolStatus } from '@shared/status-kind.util';
@@ -89,12 +93,14 @@ type SessionAction = 'todos' | 'open' | 'agenda' | 'settings' | 'attendance' | '
  * attendance opens as a side sheet. A minute-taker picked in the dock of a live meeting
  * goes to the handover dialog of `MeetingsComponent`.
  *
- * Wide (>= 1200px): three columns. Below that the agenda moves into a sheet from the
- * start edge, and the vote cards go above the item. On a phone the agenda sheet, the
- * attendance and the minute-taker open as bottom sheets, and the protocol text has the
- * page to itself: the vote cards open as a bottom sheet from an icon button of the dock,
- * whose number turns to the accent colour while a vote of the item runs (from the session
- * menu while a planned meeting has no item to write and so no dock).
+ * Wide (>= 1200px): the agenda beside the sheet. Below that the agenda moves into a sheet
+ * from the start edge. The vote cards are a side sheet at every width (spec 001460), opened
+ * from an icon button of the dock whose number turns to the accent colour while a vote of the
+ * item runs (from the session menu while a planned meeting has no item to write and so no
+ * dock). Above the phone width the sheet opens by itself once per vote for a person who
+ * still has to vote (spec 001462). On a phone the agenda sheet, the attendance and the
+ * minute-taker open as bottom sheets, and an open vote of the item takes the place of the
+ * text, with a switch back to the text (spec 001461).
  *
  * The reason for a disabled action is visible text, not only a tooltip, because a disabled button
  * takes no focus and no touch. The agenda sheet stays outside the body, because the scroll fade of
@@ -112,6 +118,7 @@ type SessionAction = 'todos' | 'open' | 'agenda' | 'settings' | 'attendance' | '
     ButtonComponent,
     IconComponent,
     RowMenuComponent,
+    SegmentedComponent,
     SideSheetComponent,
     AgendaPaneComponent,
     SessionDockComponent,
@@ -219,8 +226,12 @@ export class MeetingPageComponent {
   readonly qrOpen = signal(false);
   /** The agenda sheet below the wide layout. */
   readonly agendaOpen = signal(false);
-  /** The bottom sheet of the vote cards on a phone. */
+  /** The side sheet of the vote cards (a bottom sheet on a phone, spec 001460). */
   readonly votesOpen = signal(false);
+  /** The votes for which the sheet opened by itself, so it opens only once each (spec 001462). */
+  private readonly autoOpened = signal<ReadonlySet<string>>(new Set());
+  /** The open vote for which the phone shows the text instead of the card (spec 001461). */
+  readonly textShownFor = signal<string | null>(null);
   /** The sheet "To-Dos" with the cards that link the meeting (spec 000551). */
   readonly todosOpen = signal(false);
   protected readonly todoList = viewChild<TodoLinkedListComponent>('todoList');
@@ -232,6 +243,16 @@ export class MeetingPageComponent {
 
   constructor() {
     pageItemTitle(() => this.meeting().title);
+    // Spec 001462: once per vote, for a person who may still vote, above the phone width.
+    effect(() => {
+      const v = this.openVote();
+      if (!v || this.phone() || !this.meeting().canVote || v.myBallot?.cast) return;
+      if (untracked(() => this.autoOpened().has(v.id))) return;
+      untracked(() => {
+        this.autoOpened.update((ids) => new Set([...ids, v.id]));
+        this.votesOpen.set(true);
+      });
+    });
     observeElementSize(
       () => this.dock().nativeElement,
       (size) => this.dockHeight.set(size.height),
@@ -259,10 +280,28 @@ export class MeetingPageComponent {
     const t = this.top();
     return this.editable() && t ? !!t.doneAt : null;
   });
-  /** The vote icon button of the dock below the wide layout: the number of votes, or `null`. */
+  /**
+   * The vote icon button of the dock, for the minute-taker only: the number of votes, or
+   * `null`. Everybody else opens the votes from the tab at the end edge, on a phone from the
+   * session menu (spec 001460).
+   */
   protected readonly dockVotes = computed<number | null>(() =>
-    !this.wide() && this.showVotes() ? this.votes().length : null,
+    this.meeting().isProtokollant && this.showVotes() ? this.votes().length : null,
   );
+  /** The open vote that a phone shows in the place of the text, or `null` (spec 001461). */
+  protected readonly phoneVote = computed<MeetingVote | null>(() =>
+    this.phone() ? this.openVote() : null,
+  );
+  /** The phone shows the text, not the card, for the open vote. */
+  protected readonly showText = computed(() => {
+    const v = this.phoneVote();
+    return !!v && this.textShownFor() === v.id;
+  });
+  /** The switch above the open vote on a phone: the vote or the text of the item. */
+  protected readonly swapOptions = computed<SegmentedOption[]>(() => [
+    { value: 'vote', label: this.i18n.translate('meetings.vote.inPlaceVote') },
+    { value: 'text', label: this.i18n.translate('meetings.vote.inPlaceText') },
+  ]);
   /** The view switch in the dock, while an item is open and its text is not locked. A planned
    * meeting has no protocol yet, but the text of its items can be prepared. */
   protected readonly dockModeToggle = computed(() => {
@@ -411,7 +450,7 @@ export class MeetingPageComponent {
         label: t('meetings.page.recordAttendance'),
         icon: 'users',
       }),
-      ...when(noDock && this.showVotes(), {
+      ...when(this.showVotes() && this.phone() && (noDock || !m.isProtokollant), {
         id: 'votes',
         label: t('meetings.vote.count'),
         icon: 'vote',

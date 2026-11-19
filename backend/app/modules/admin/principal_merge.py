@@ -133,6 +133,7 @@ from app.modules.site_config.models import PdfAsset, SiteConfigVersion
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
 from app.modules.todos.merge import fold_personal_board, rewrite_mentions
 from app.modules.todos.models import (
+    Link,
     TodoAssignee,
     TodoBoard,
     TodoBoardEntry,
@@ -140,7 +141,6 @@ from app.modules.todos.models import (
     TodoComment,
     TodoEvent,
     TodoEventSeries,
-    TodoLink,
 )
 from app.modules.translations.models import UiLanguage, UiTranslation
 from app.modules.voting.models import Vote, VotedMarker
@@ -234,7 +234,7 @@ ID_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("todos", TodoCard.created_by),
     ("todos", TodoComment.author_id),
     ("todos", TodoEvent.actor_id),
-    ("todos", TodoLink.created_by),
+    ("todos", Link.created_by),
     ("todos", TodoEventSeries.created_by),
     ("calendar", CalendarAppointment.creator_id),
 )

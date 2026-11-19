@@ -115,22 +115,16 @@ async def test_board_reader_reads_linked_booking_without_budget_read(
         assert booking["title"] == "Buchung 300.00"
         assert links["application"]["granted"] and links["todo"]["granted"]
 
-        view = _ok(client.get(f"/api/todos/cards/{party['id']}/links/{booking['id']}/view"))
+        view = _ok(client.get(f"/api/links/{booking['id']}/view"))
         facts = {f["key"]: f["value"] for f in view["facts"]}
         assert view["kind"] == "expense" and facts["amount"] == "300.00"
 
-        app_view = _ok(
-            client.get(
-                f"/api/todos/cards/{party['id']}/links/{links['application']['id']}/view"
-            )
-        )
+        app_view = _ok(client.get(f"/api/links/{links['application']['id']}/view"))
         answers = {f["key"]: f["value"] for f in app_view["facts"]}
         assert answers["zweck"] == "Party" and answers["amount"] == "800.00"
         assert "name" not in answers and "konto" not in answers
 
-        card_view = _ok(
-            client.get(f"/api/todos/cards/{party['id']}/links/{links['todo']['id']}/view")
-        )
+        card_view = _ok(client.get(f"/api/links/{links['todo']['id']}/view"))
         assert card_view["title"] == "Intern"
         assert "links" not in card_view
 
@@ -141,12 +135,12 @@ async def test_board_reader_reads_linked_booking_without_budget_read(
             201,
         )
         refused = client.post(
-            f"/api/todos/cards/{other['id']}/links",
-            json={"kind": "expense", "targetId": str(ids["parent"])},
+            "/api/links",
+            json={
+                "a": {"kind": "todo", "id": other["id"]},
+                "b": {"kind": "expense", "id": str(ids["parent"])},
+            },
         )
         assert refused.status_code == 422, refused.text
         assert refused.json()["code"] == "link_target_not_found"
-        stranger = client.get(
-            f"/api/todos/cards/{other['id']}/links/{booking['id']}/view"
-        )
-        assert stranger.status_code == 404
+        assert client.get(f"/api/links/{uuid.uuid4()}/view").status_code == 404

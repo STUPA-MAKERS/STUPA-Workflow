@@ -49,7 +49,7 @@ async def test_cost_centre_link_shows_to_every_card_reader(
 
     api.login(Principal(sub=admin.sub, roles=["admin"], permissions=set()))
     with TestClient(api.app) as client:
-        hits = _ok(client.get("/api/todos/link-targets", params={"q": "Bühnent", "kind": "budget"}))
+        hits = _ok(client.get("/api/links/targets", params={"q": "Bühnent", "kind": "budget"}))
         assert [(h["kind"], h["targetId"]) for h in hits] == [("budget", str(ks))]
         card = _ok(
             client.post(
@@ -64,8 +64,8 @@ async def test_cost_centre_link_shows_to_every_card_reader(
         )
         (own,) = card["links"]
         assert own["url"] == f"/budget?costCentre={ks}"
-        linked = _ok(client.get("/api/todos/linked", params={"kind": "budget", "targetId": ks}))
-        assert [c["title"] for c in linked] == ["Haushaltsplan Kultur"]
+        linked = _ok(client.get("/api/links", params={"kind": "budget", "id": ks}))
+        assert [row["card"]["title"] for row in linked["links"]] == ["Haushaltsplan Kultur"]
 
     api.login(reader)
     with TestClient(api.app) as client:
@@ -79,13 +79,13 @@ async def test_cost_centre_link_shows_to_every_card_reader(
             201,
         )
         refused = client.post(
-            f"/api/todos/cards/{other['id']}/links", json={"kind": "budget", "targetId": str(ks)}
+            "/api/links",
+            json={"a": {"kind": "todo", "id": other["id"]}, "b": {"kind": "budget", "id": str(ks)}},
         )
         assert refused.status_code == 422, refused.text
         assert refused.json()["code"] == "link_target_not_found"
         assert (
-            _ok(client.get("/api/todos/link-targets", params={"q": "Bühnent", "kind": "budget"}))
-            == []
+            _ok(client.get("/api/links/targets", params={"q": "Bühnent", "kind": "budget"})) == []
         )
 
 

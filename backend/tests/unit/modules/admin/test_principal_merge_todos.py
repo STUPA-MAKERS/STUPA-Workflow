@@ -30,7 +30,7 @@ def test_the_merge_lists_the_todo_columns() -> None:
         "TodoCard.created_by",
         "TodoComment.author_id",
         "TodoEvent.actor_id",
-        "TodoLink.created_by",
+        "Link.created_by",
         "TodoEventSeries.created_by",
     }
     assert "TodoAssignee.principal_id" in {str(c) for c in merge_mod.COMBINED_COLUMNS}

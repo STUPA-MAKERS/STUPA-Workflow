@@ -53,7 +53,7 @@
   "backend/app/modules/tickets/service.py": 10,
   "backend/app/modules/todos/boards.py": 1,
   "backend/app/modules/todos/hooks.py": 1,
-  "backend/app/modules/todos/service.py": 29,
+  "backend/app/modules/todos/service.py": 27,
   "backend/app/modules/translations/service.py": 4,
   "backend/app/modules/voting/election.py": 1,
   "backend/app/modules/voting/poll.py": 1,

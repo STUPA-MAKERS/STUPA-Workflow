@@ -3,12 +3,12 @@
 Every route needs a principal session (401). An OAuth token reads to-dos when its
 scope lets ``todo.write`` or ``todo.all`` (``todos:write``) or ``todo.read_all``
 (``read``) through: without one of them ``GET /todos/boards``, ``GET /todos/mine``,
-``GET /todos/mine/boards`` and ``GET /todos/all/boards`` answer 403, the link picker
-and ``linked`` ``[]``, and every board or card 404. A write needs ``todo.write`` or
-``todo.all`` in the scope. A board or card that the caller cannot read answers 404,
-never 403; a card write on a board that the caller reads but cannot write 403
-``todo_write_required``; a configuration change without ``todo.configure`` 403
-``todo_configure_required``.
+``GET /todos/mine/boards`` and ``GET /todos/all/boards`` answer 403 and every board or
+card 404. The links of a card live under ``/links`` (``links_router``, spec 001409). A
+write needs ``todo.write`` or ``todo.all`` in the scope. A board or card that the caller
+cannot read answers 404, never 403; a card write on a board that the caller reads but
+cannot write 403 ``todo_write_required``; a configuration change without
+``todo.configure`` 403 ``todo_configure_required``.
 
 ``GET /todos/boards/{id}``, ``GET /todos/mine/boards`` and ``GET /todos/all/boards``
 carry a weak ``ETag`` over their body and answer 304 to a matching
@@ -25,7 +25,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Request, Response, status
@@ -34,7 +34,6 @@ from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.files.service import FilesService
 from app.modules.livevote.broker import PatternBroker
 from app.modules.notifications.provider import mail_queue_from_pool
-from app.modules.todos.access import token_reads
 from app.modules.todos.live import publish_pings, todo_broker
 from app.modules.todos.mails import notify_todo_mails
 from app.modules.todos.schemas import (
@@ -59,7 +58,6 @@ from app.modules.todos.schemas import (
     EventIn,
     LabelCreate,
     LabelPatch,
-    LinkIn,
     SeriesCreate,
     TodoAssignedBoard,
     TodoBoardEntryOut,
@@ -71,11 +69,6 @@ from app.modules.todos.schemas import (
     TodoEventRef,
     TodoEventSeriesOut,
     TodoLabelOut,
-    TodoLinkedCard,
-    TodoLinkedKind,
-    TodoLinkKind,
-    TodoLinkTarget,
-    TodoLinkView,
     TodoMember,
     TodoMine,
 )
@@ -539,35 +532,6 @@ def _rows(
     return boards
 
 
-@router.get("/link-targets", response_model=list[TodoLinkTarget], responses=_errors(401, 422))
-async def link_targets(
-    service: ServiceDep,
-    principal: Member,
-    q: Annotated[str, Query(max_length=200)] = "",
-    kind: TodoLinkKind | Literal["all"] = "all",
-    exclude_card_id: Annotated[UUID | None, Query(alias="excludeCardId")] = None,
-) -> list[TodoLinkTarget]:
-    """Search the link targets that the caller may read (at most 5 per kind).
-
-    Below two characters the kind ``todo`` lists the newest cards and any other kind
-    nothing (spec 000548).
-    """
-    if not token_reads(principal):
-        return []
-    return await service.links.search(q, kind, principal, exclude_card_id=exclude_card_id)
-
-
-@router.get("/linked", response_model=list[TodoLinkedCard], responses=_errors(401, 422))
-async def linked(
-    service: ServiceDep,
-    principal: Member,
-    kind: TodoLinkedKind,
-    target_id: Annotated[UUID, Query(alias="targetId")],
-) -> list[TodoLinkedCard]:
-    """The readable live cards that link to the target (back-references)."""
-    return await service.linked(kind, target_id, principal)
-
-
 @router.post(
     "/cards",
     response_model=TodoCardDetail,
@@ -610,18 +574,6 @@ async def get_cards(
 async def get_card(card_id: UUID, service: ServiceDep, principal: Member) -> TodoCardDetail:
     """The whole card with links, checklist, events and comments (archived too)."""
     return await service.card(card_id, principal)
-
-
-@router.get(
-    "/cards/{card_id}/links/{link_id}/view",
-    response_model=TodoLinkView,
-    responses=_errors(401, 404),
-)
-async def get_link_view(
-    card_id: UUID, link_id: UUID, service: ServiceDep, principal: Member
-) -> TodoLinkView:
-    """The read sheet of a link: a card reader reads what the card links (spec 000487)."""
-    return await service.link_view(card_id, link_id, principal)
 
 
 @router.get("/cards/{card_id}/tile", response_model=TodoCardTile, responses=_errors(401, 404))
@@ -781,19 +733,6 @@ async def delete_check_item(
     return await service.delete_check_item(card_id, item_id, principal)
 
 
-@router.post(
-    "/cards/{card_id}/links",
-    response_model=TodoCardDetail,
-    responses=_errors(401, 403, 404, 409, 422),
-)
-async def add_link(
-    card_id: UUID, payload: LinkIn, service: ServiceDep, principal: Member
-) -> TodoCardDetail:
-    """Link the card to a target that the caller reads."""
-    kind: TodoLinkKind = payload.kind
-    return await service.add_link(card_id, kind, payload.target_id, principal)
-
-
 @router.put(
     "/cards/{card_id}/event",
     response_model=TodoCardDetail,
@@ -860,18 +799,6 @@ async def writable_events(
 ) -> list[TodoEventRef]:
     """The live Events on boards that the caller writes: the ``Veranstaltung`` picker."""
     return await service.writable_events(q, principal)
-
-
-@router.delete(
-    "/cards/{card_id}/links/{link_id}",
-    response_model=TodoCardDetail,
-    responses=_errors(401, 403, 404, 409),
-)
-async def remove_link(
-    card_id: UUID, link_id: UUID, service: ServiceDep, principal: Member
-) -> TodoCardDetail:
-    """Remove a link of the card."""
-    return await service.remove_link(card_id, link_id, principal)
 
 
 @router.post(

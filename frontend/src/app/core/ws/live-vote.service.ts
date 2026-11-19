@@ -1,4 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
+import type { Observable, Subscription } from 'rxjs';
+import { PageResumeService } from '../browser/page-resume.service';
 import type { MeetingChannel } from './ws.service';
 import { LIVE_VOTE_SOURCE, type LiveVoteSource } from './live-vote.source';
 import type {
@@ -34,14 +36,17 @@ export class LiveVoteSession {
   /** Consecutive failed attempts with no server response. This caps the reconnect storm. */
   private attempts = 0;
   private static readonly MAX_ATTEMPTS = 5;
+  private readonly resumeSub: Subscription | null;
 
   constructor(
     private readonly source: LiveVoteSource,
     private readonly meetingId: string,
     private readonly beamer: boolean,
     private readonly reconnectMs: number,
+    resume$: Observable<void> | null = null,
   ) {
     this.connect();
+    this.resumeSub = resume$?.subscribe(() => this.resume()) ?? null;
   }
 
   /**
@@ -49,17 +54,41 @@ export class LiveVoteSession {
    * otherwise a late drop counts wrongly toward the reconnect limit of a dead socket.
    */
   private connect(): void {
-    this.channel = this.source.connectMeeting(this.meetingId, this.beamer);
-    this.channel.messages$.subscribe({
+    const ch = this.source.connectMeeting(this.meetingId, this.beamer);
+    this.channel = ch;
+    ch.messages$.subscribe({
       next: (m) => {
+        if (ch !== this.channel) return;
         this.attempts = 0;
         this.handle(m);
       },
-      complete: () => this.onClosed(),
-      error: () => this.onClosed(),
+      complete: () => {
+        if (ch === this.channel) this.onClosed();
+      },
+      error: () => {
+        if (ch === this.channel) this.onClosed();
+      },
     });
     this.connection.set('open');
-    this.channel.send({ type: 'subscribe' });
+    ch.send({ type: 'subscribe' });
+  }
+
+  /**
+   * The page is back from the background (§F/meetings/meetings/001441). The socket may be dead
+   * without a `close` event, and the events of the gap are lost, so the session drops the old
+   * socket and opens a new one at once. Its `subscribe` makes the server replay the state. A
+   * session that gave up after `MAX_ATTEMPTS` starts again with a fresh count.
+   */
+  resume(): void {
+    if (this.closedByUser) return;
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    this.attempts = 0;
+    if (this.errorCode() === 'connection_failed') this.errorCode.set(null);
+    const old = this.channel;
+    this.channel = null;
+    old?.close();
+    this.connect();
   }
 
   /**
@@ -171,6 +200,7 @@ export class LiveVoteSession {
   /** Close the connection for good on component destroy. No reconnect follows. */
   close(): void {
     this.closedByUser = true;
+    this.resumeSub?.unsubscribe();
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.channel?.close();
     this.connection.set('closed');
@@ -184,6 +214,7 @@ export class LiveVoteSession {
 @Injectable({ providedIn: 'root' })
 export class LiveVoteService {
   private readonly source = inject(LIVE_VOTE_SOURCE);
+  private readonly pageResume = inject(PageResumeService);
 
   open(
     meetingId: string,
@@ -194,6 +225,7 @@ export class LiveVoteService {
       meetingId,
       opts.beamer ?? false,
       opts.reconnectMs ?? 1500,
+      this.pageResume.resume$,
     );
   }
 }

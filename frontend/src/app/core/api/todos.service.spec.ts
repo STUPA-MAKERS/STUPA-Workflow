@@ -79,8 +79,8 @@ describe('TodosApiService', () => {
     expect(http.expectOne((r) => r.url === '/api/todos/cards').request.params.getAll('ids')).toEqual(['k-1', 'k-2']);
     api.cardTile('k-1').subscribe();
     http.expectOne('/api/todos/cards/k-1/tile').flush({});
-    api.linkView('k-1', 'l-1').subscribe();
-    http.expectOne('/api/todos/cards/k-1/links/l-1/view').flush({});
+    api.linkView('l-1').subscribe();
+    http.expectOne('/api/links/l-1/view').flush({});
     api.card('k-1').subscribe();
     expect(http.expectOne('/api/todos/cards/k-1').request.context.get(SKIP_LOADING)).toBe(true);
     api.card('k-1', { detail: true }).subscribe();
@@ -102,12 +102,37 @@ describe('TodosApiService', () => {
     req.flush({});
   });
 
-  it('reads the cards linked to a target', () => {
-    api.linked('ticket', 't-1').subscribe();
-    const req = http.expectOne((r) => r.url === '/api/todos/linked');
+  it('reads the links of an element and the cards among them', () => {
+    let cards: unknown = null;
+    api.linked('ticket', 't-1').subscribe((c) => (cards = c));
+    const req = http.expectOne((r) => r.url === '/api/links');
     expect(req.request.params.get('kind')).toBe('ticket');
-    expect(req.request.params.get('targetId')).toBe('t-1');
-    req.flush([]);
+    expect(req.request.params.get('id')).toBe('t-1');
+    req.flush({ canLink: true, links: [{ id: 'l-1', card: { id: 'k-1' } }, { id: 'l-2', card: null }] });
+    expect(cards).toEqual([{ id: 'k-1' }]);
+  });
+
+  it('links two elements and takes a link off', () => {
+    api.link({ kind: 'invoice', id: 'i-1' }, { kind: 'application', id: 'a-1' }).subscribe();
+    const add = http.expectOne('/api/links');
+    expect(add.request.method).toBe('POST');
+    expect(add.request.body).toEqual({ a: { kind: 'invoice', id: 'i-1' }, b: { kind: 'application', id: 'a-1' } });
+    add.flush({ canLink: true, links: [] });
+    api.unlink('l-1').subscribe();
+    const del = http.expectOne('/api/links/l-1');
+    expect(del.request.method).toBe('DELETE');
+    del.flush(null);
+  });
+
+  it('links a card and reads the card again', () => {
+    api.addLink('k', 'ticket', 't').subscribe();
+    const add = http.expectOne('/api/links');
+    expect(add.request.body).toEqual({ a: { kind: 'todo', id: 'k' }, b: { kind: 'ticket', id: 't' } });
+    add.flush({ canLink: true, links: [] });
+    http.expectOne('/api/todos/cards/k').flush({});
+    api.removeLink('k', 'li').subscribe();
+    http.expectOne('/api/links/li').flush(null);
+    http.expectOne('/api/todos/cards/k').flush({});
   });
 
   it('polls a board with If-None-Match and keeps the state on a 304', () => {
@@ -230,8 +255,6 @@ describe('TodosApiService', () => {
       [() => api.addCheckItem('k', 'Punkt').subscribe(), 'POST', '/api/todos/cards/k/checklist', { text: 'Punkt' }],
       [() => api.patchCheckItem('k', 'i', { done: true }).subscribe(), 'PATCH', '/api/todos/cards/k/checklist/i', { done: true }],
       [() => api.deleteCheckItem('k', 'i').subscribe(), 'DELETE', '/api/todos/cards/k/checklist/i', null],
-      [() => api.addLink('k', 'ticket', 't').subscribe(), 'POST', '/api/todos/cards/k/links', { kind: 'ticket', targetId: 't' }],
-      [() => api.removeLink('k', 'li').subscribe(), 'DELETE', '/api/todos/cards/k/links/li', null],
       [() => api.addComment('k', 'Hallo', ['p']).subscribe(), 'POST', '/api/todos/cards/k/comments', { body: 'Hallo', mentions: ['p'] }],
       [() => api.addComment('k', 'Hallo').subscribe(), 'POST', '/api/todos/cards/k/comments', { body: 'Hallo', mentions: [] }],
       [
@@ -255,16 +278,17 @@ describe('TodosApiService', () => {
     }
   });
 
-  it('searches the link targets, without the card only when none is given', () => {
+  it('searches the link targets, without an element only when one is given', () => {
     api.linkTargets('Haus', 'all').subscribe();
-    const all = http.expectOne((r) => r.url === '/api/todos/link-targets');
+    const all = http.expectOne((r) => r.url === '/api/links/targets');
     expect(all.request.params.get('q')).toBe('Haus');
     expect(all.request.params.get('kind')).toBe('all');
-    expect(all.request.params.has('excludeCardId')).toBe(false);
+    expect(all.request.params.has('excludeKind')).toBe(false);
     all.flush([]);
-    api.linkTargets('Haus', 'todo', 'k').subscribe();
-    const own = http.expectOne((r) => r.url === '/api/todos/link-targets');
-    expect(own.request.params.get('excludeCardId')).toBe('k');
+    api.linkTargets('Haus', 'todo', { kind: 'invoice', id: 'i' }).subscribe();
+    const own = http.expectOne((r) => r.url === '/api/links/targets');
+    expect(own.request.params.get('excludeKind')).toBe('invoice');
+    expect(own.request.params.get('excludeId')).toBe('i');
     own.flush([]);
   });
 });

@@ -40,7 +40,7 @@ async function setup(answer: TodoLinkView | null | 'never' = VIEW, first: TodoLi
     linkView: jest.fn(() => (answer === 'never' ? NEVER : answer ? of(answer) : throwError(() => new Error('404')))),
   };
   const r = await render(TodoLinkViewComponent, {
-    inputs: { cardId: 'c-1', link: first, open: true },
+    inputs: { link: first, open: true },
     providers: [{ provide: TodosApiService, useValue: api }],
   });
   r.fixture.detectChanges();
@@ -50,7 +50,7 @@ async function setup(answer: TodoLinkView | null | 'never' = VIEW, first: TodoLi
 describe('TodoLinkViewComponent', () => {
   it('reads the linked Buchung through the card and shows its facts read only', async () => {
     const { api } = await setup();
-    expect(api.linkView).toHaveBeenCalledWith('c-1', 'l-1');
+    expect(api.linkView).toHaveBeenCalledWith('l-1');
     expect(screen.getByRole('heading', { name: 'Getränke', level: 2 })).toBeInTheDocument();
     const sheet = screen.getByTestId('link-view');
     for (const text of ['Betrag', '300,00', 'Einnahme', 'Überweisung', 'Getränke', '03.11.2026', 'Zweck', 'Party', 'Anmerkungen']) {
@@ -74,7 +74,7 @@ describe('TodoLinkViewComponent', () => {
     fixture.detectChanges();
     fixture.componentRef.setInput('link', { ...BOOKING, id: 'l-2' });
     fixture.detectChanges();
-    expect(api.linkView).toHaveBeenLastCalledWith('c-1', 'l-2');
+    expect(api.linkView).toHaveBeenLastCalledWith('l-2');
     expect(cmp.heading()).toBe('Getränke');
   });
 

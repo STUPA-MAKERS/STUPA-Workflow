@@ -49,6 +49,7 @@ import type { ChatEdit, ChatMessage, ChatRef, ChatSend } from '@shared/ui/chat/c
 import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   ButtonLinkComponent,
   ConfirmDialogComponent,
   DropOverlayComponent,
@@ -149,6 +150,7 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
     ChatComponent,
     StatusTextComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     ButtonLinkComponent,
     IconComponent,
     AttachmentsPanelComponent,

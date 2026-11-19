@@ -11,12 +11,12 @@
     @if (variant() === 'settings') {
       @if (confirming()) {
         <p class="jl__confirm" role="alert">{{ 'guests.link.rotateConfirm' | t }}</p>
-        <div class="jl__actions">
+        <app-button-group class="jl__actions">
           <app-button size="sm" variant="danger" [loading]="rotating()" (click)="confirmRotate()">
             {{ 'guests.link.rotateYes' | t }}
           </app-button>
           <app-button size="sm" variant="text" (click)="confirming.set(false)">{{ 'action.cancel' | t }}</app-button>
-        </div>
+        </app-button-group>
       } @else {
         <div class="jl__actions">
           <app-copy-button
