@@ -36,7 +36,7 @@
         [attr.aria-pressed]="kind() === chip.value"
         (click)="setKind(chip.value)"
       >
-        {{ chip.label | t }}
+        <span class="chip__text">{{ chip.label | t }}</span>
       </button>
     }
   </div>

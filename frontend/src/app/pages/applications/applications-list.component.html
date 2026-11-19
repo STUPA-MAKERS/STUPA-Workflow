@@ -68,7 +68,7 @@
               [attr.aria-label]="'applications.list.filter.mineClear' | t"
               (click)="clearMine()"
             >
-              {{ 'applications.list.filter.mine' | t }}
+              <span class="chip__text">{{ 'applications.list.filter.mine' | t }}</span>
               <app-icon name="x" [size]="15" />
             </button>
           }

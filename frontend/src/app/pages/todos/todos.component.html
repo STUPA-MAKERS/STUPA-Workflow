@@ -78,7 +78,7 @@
           (click)="filtersOpen.set(!filtersOpen())"
         >
           <app-icon name="tune" [size]="15" />
-          {{ 'todos.filter.group' | t }}
+          <span class="chip__text">{{ 'todos.filter.group' | t }}</span>
           <app-icon name="down" [size]="15" />
         </button>
       }
