@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - backend/app/modules/graph/relations.py
+  - frontend/src/app/pages/graph
 scope:
   - backend/app/modules
   - frontend/src/app/pages
@@ -24,6 +26,7 @@ show these built-in relations as dashed lines:
 | Antrag and its Buchung | the Antrag of a Buchung |
 | meeting and its TOP | the meeting of an agenda item |
 | meeting and its Gremium | the Gremium of a meeting |
+| meeting and its vote | the meeting of a vote without a TOP |
 | TOP and its vote | the agenda item of a vote |
 | TOP and its card | the card of an agenda item |
 | invoice and its Buchung | the invoice of a Buchung |

@@ -5,7 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - backend/app/modules/graph/router.py
+  - backend/app/shared/permissions.py
+  - backend/migrations/versions/b7e3d9a41c62_graph_view_permission.py
+  - frontend/src/app/app.routes.ts
 scope:
   - backend/app/modules
   - frontend/src/app/pages

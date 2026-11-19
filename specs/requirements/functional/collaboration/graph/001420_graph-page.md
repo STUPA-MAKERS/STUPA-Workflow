@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - backend/app/modules/graph
+  - frontend/src/app/pages/graph
+  - frontend/src/app/layout/nav.service.ts
 scope:
   - backend/app/modules
   - frontend/src/app/pages

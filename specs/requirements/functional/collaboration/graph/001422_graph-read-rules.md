@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - backend/app/modules/graph/service.py
+  - frontend/src/app/pages/graph
 scope:
   - backend/app/modules
 ---

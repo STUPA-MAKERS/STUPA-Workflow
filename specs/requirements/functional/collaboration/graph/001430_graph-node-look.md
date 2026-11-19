@@ -5,7 +5,8 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - frontend/src/app/pages/graph
 scope:
   - frontend/src/app/pages
 ---

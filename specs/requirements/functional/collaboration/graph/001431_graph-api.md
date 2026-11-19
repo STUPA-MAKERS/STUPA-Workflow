@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - backend/app/modules/graph
+  - mcp/antragsplattform_mcp/tools/session.py
+  - frontend/src/app/core/api/graph.service.ts
 scope:
   - backend/app/modules
   - mcp

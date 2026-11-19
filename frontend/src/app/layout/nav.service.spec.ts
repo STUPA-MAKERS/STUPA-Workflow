@@ -57,6 +57,16 @@ describe('NavService', () => {
     expect(NAV_ITEMS.findIndex((i) => i.key === 'tickets')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'invoices') + 1);
   });
 
+  /** § F/collaboration/graph/001420 and 001421: the entry "Graph" needs `graph.view`. */
+  it('opens the graph with graph.view, after the tickets', () => {
+    expect(keysFor({ ...BASE, permissions: ['graph.view'] })).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', 'graph']);
+    const item = NAV_ITEMS.find((i) => i.key === 'graph');
+    expect(item).toMatchObject({ path: '/graph', labelKey: 'nav.graph', permissions: ['graph.view'], place: 'main' });
+    expect(NAV_ITEMS.findIndex((i) => i.key === 'graph')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'tickets') + 1);
+    const route = routes.flatMap((r) => [r, ...(r.children ?? [])]).find((r) => r.path === 'graph');
+    expect(route?.data).toMatchObject({ title: 'nav.graph', permission: 'graph.view' });
+  });
+
   it('opens the tickets to a reporter without ticket.manage', () => {
     expect(keysFor({ ...BASE, has_reported_tickets: true })).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', 'tickets']);
   });

@@ -50,6 +50,7 @@ export type NavKey =
   | 'applications'
   | 'tasks'
   | 'activity'
+  | 'graph'
   | 'todos'
   | 'calendar'
   | 'meetings'
@@ -147,6 +148,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'expenses', path: '/expenses', labelKey: 'nav.expenses', icon: 'swap', permissions: BUDGET_PERMISSIONS, feature: 'budget', place: 'main' },
   { key: 'invoices', path: '/invoices', labelKey: 'nav.invoices', icon: 'receipt', permissions: BUDGET_PERMISSIONS, feature: 'invoices', place: 'main' },
   { key: 'tickets', path: '/tickets', labelKey: 'nav.tickets', icon: 'ticket', permissions: ['ticket.manage'], reportedTickets: true, feature: 'tickets', place: 'main' },
+  /** The graph of the elements and their relations (specs 001420, 001421). */
+  { key: 'graph', path: '/graph', labelKey: 'nav.graph', icon: 'shapes', permissions: ['graph.view'], place: 'main' },
   { key: 'admin', path: '/admin', labelKey: 'nav.admin', icon: 'shield', permissions: ADMIN_AREA_PERMISSIONS, place: 'end' },
 ];
 
