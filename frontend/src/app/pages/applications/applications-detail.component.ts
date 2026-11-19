@@ -58,6 +58,7 @@ import { PredecessorFieldComponent } from '../../features/apply/predecessor-fiel
 import { ChatComponent, ChatDrafts, ChatOutbox, appendOnce, withScanStates, draftDropper, filesRefused, sendErrorKey, toChatAttachments, HistoryComponent, flowColorKind, chatPeople, type ChatEdit, type ChatPerson, type ChatMessage, type ChatRef, type ChatSend, type ChatVisibility, type HistoryChange, type HistoryEntry } from '@shared/ui';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   ConfirmDialogComponent,
   DialogComponent,
   DropOverlayComponent,
@@ -202,6 +203,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
     RowMenuComponent,
     StatusTextComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     DialogComponent,
     IconComponent,
     TabPageDirective,

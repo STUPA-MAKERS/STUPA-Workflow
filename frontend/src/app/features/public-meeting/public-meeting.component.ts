@@ -25,6 +25,7 @@ import { meetingStatus } from '@shared/status-kind.util';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   IconComponent,
   InputComponent,
   NoteComponent,
@@ -69,6 +70,7 @@ export function normalizeJoinCode(raw: string): string {
     TranslatePipe,
     AvatarComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     InputComponent,
     NoteComponent,

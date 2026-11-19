@@ -112,6 +112,7 @@
                 : ('applications.comments.open' | t: { n: comments().length })
             "
             [count]="commentsLoading() ? null : comments().length"
+            [ariaExpanded]="commentsOpen()"
             data-testid="ad-comments-open"
             (click)="commentsOpen.set(true)"
           >
@@ -168,7 +169,7 @@
         </p>
 
         @if (canTransition() && !application.observer && transitions().length) {
-          <div class="ad__transitions" role="group" [attr.aria-label]="'applications.transitions.title' | t">
+          <app-button-group class="ad__transitionGroup" [label]="'applications.transitions.title' | t">
             @for (t of transitions(); track t.id) {
               <app-button
                 [variant]="looks().get(t.id) ?? 'tonal'"
@@ -182,7 +183,7 @@
                 {{ t.label || ('applications.transitions.fallback' | t) }}
               </app-button>
             }
-          </div>
+          </app-button-group>
         } @else if (canTransition() && !application.observer && transitionsLoading()) {
           <ng-container *ngTemplateOutlet="transitionsSkel" />
         }
