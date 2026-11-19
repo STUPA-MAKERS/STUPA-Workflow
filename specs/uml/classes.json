@@ -1776,6 +1776,12 @@
           "type": "BOOLEAN"
         },
         {
+          "name": "attachment_required",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
           "name": "comparison_offers",
           "nullable": true,
           "primaryKey": false,
@@ -1990,6 +1996,12 @@
         },
         {
           "name": "field_key",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "position_id",
           "nullable": true,
           "primaryKey": false,
           "type": "TEXT"
@@ -3716,6 +3728,12 @@
         {
           "name": "description_i18n",
           "nullable": true,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "rules",
+          "nullable": false,
           "primaryKey": false,
           "type": "JSONB"
         },

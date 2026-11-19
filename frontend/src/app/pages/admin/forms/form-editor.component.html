@@ -475,14 +475,16 @@
                   [downDisabled]="ri === rules().length - 1"
                   (move)="moveRule(ri, $event)"
                 />
-                <app-button
-                  variant="text"
-                  size="sm"
-                  [iconOnly]="true"
-                  [ariaLabel]="'admin.forms.rules.remove' | t"
-                  [title]="'admin.forms.rules.remove' | t"
-                  (click)="removeRule(ri)"
-                ><app-icon name="trash" /></app-button>
+                <app-button-group>
+                  <app-button
+                    variant="text"
+                    size="sm"
+                    [iconOnly]="true"
+                    [ariaLabel]="'admin.forms.rules.remove' | t"
+                    [title]="'admin.forms.rules.remove' | t"
+                    (click)="removeRule(ri)"
+                  ><app-icon name="trash" /></app-button>
+                </app-button-group>
               </div>
               <label class="fe__code">
                 <span class="fe__codeLabel">{{ 'admin.forms.rules.logic' | t }}</span>
@@ -511,9 +513,11 @@
               }
             </div>
           }
-          <app-button class="fe__inlineAdd" variant="text" size="sm" (click)="addRule()">
-            <app-icon name="plus" /> {{ 'admin.forms.rules.add' | t }}
-          </app-button>
+          <app-button-group class="fe__ruleAdd">
+            <app-button variant="text" size="sm" (click)="addRule()">
+              <app-icon name="plus" /> {{ 'admin.forms.rules.add' | t }}
+            </app-button>
+          </app-button-group>
         </section>
 
         @if (typeId()) {

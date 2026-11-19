@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - frontend/src/app/shared/forms/answer-view/answer-view.component.ts
+  - frontend/src/app/shared/forms/positions-view/positions-view.component.ts
 scope:
   - backend/app/modules/forms
   - frontend/src/app/features/apply
