@@ -94,11 +94,7 @@
           </div>
         } @else if (!rows().length) {
           @if (activeFilterCount() > 0) {
-            <app-empty-state [heading]="'voting.list.noMatch' | t">
-              <app-button-group>
-                <app-button variant="text" size="sm" (click)="reset()">{{ 'voting.list.filter.reset' | t }}</app-button>
-              </app-button-group>
-            </app-empty-state>
+            <app-empty-state [heading]="'voting.list.noMatch' | t" />
           } @else if (split()) {
             <app-empty-state rows="3" [heading]="'voting.list.empty' | t" />
           } @else {

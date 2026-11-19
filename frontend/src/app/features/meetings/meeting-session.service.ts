@@ -114,7 +114,7 @@ export class MeetingSessionService implements OnDestroy {
   readonly myChoices = signal<Record<string, string>>({});
 
   private channel: MeetingChannel | null = null;
-  /** Failed reconnects in a row without a frame of the server (§F/meetings/meetings/001440). */
+  /** Failed reconnects in a row without a frame of the server (§F/meetings/meetings/001738). */
   private liveAttempts = 0;
   private liveTimer: ReturnType<typeof setTimeout> | null = null;
   private destroyed = false;
@@ -898,7 +898,7 @@ export class MeetingSessionService implements OnDestroy {
 
   /**
    * The socket ended without a close of the page: open it again with a growing wait and read the
-   * state again, because the events of the gap are lost (§F/meetings/meetings/001440). After
+   * state again, because the events of the gap are lost (§F/meetings/meetings/001738). After
    * `LIVE_MAX_ATTEMPTS` failed tries in a row the page waits for its next return.
    */
   private onLiveClosed(ch: MeetingChannel, meetingId: Uuid): void {
@@ -916,7 +916,7 @@ export class MeetingSessionService implements OnDestroy {
   }
 
   /**
-   * The page is back from the background (§F/meetings/meetings/001441). iOS drops the socket of a
+   * The page is back from the background (§F/meetings/meetings/001739). iOS drops the socket of a
    * frozen PWA, often without a `close` event, so the page opens a new socket at once and reads
    * the state again.
    */

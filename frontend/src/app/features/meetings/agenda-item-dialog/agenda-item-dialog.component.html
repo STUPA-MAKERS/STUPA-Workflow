@@ -19,6 +19,7 @@
       @if (kind() === 'application' || kind() === 'plan') {
         <app-search-pill
           size="md"
+          [clearable]="true"
           [placeholder]="listText().search | t"
           [value]="query()"
           (valueChange)="query.set($event)"
@@ -56,6 +57,7 @@
       } @else if (kind() === 'todo') {
         <app-search-pill
           size="md"
+          [clearable]="true"
           [placeholder]="'meetings.agenda.searchTodo' | t"
           [value]="todoQuery()"
           (valueChange)="todoQuery.set($event)"
@@ -136,11 +138,7 @@
     @if (emptyCase() === 'noMatch') {
       <app-empty-state shape="choice"
         [heading]="listText().noMatch | t: { q: activeQuery() }"
-      >
-        <app-button-group>
-          <app-button variant="text" size="sm" (click)="clearSearch()">{{ 'invoices.filter.reset' | t }}</app-button>
-        </app-button-group>
-      </app-empty-state>
+       />
     } @else {
       <app-empty-state shape="choice"
         [heading]="listText().none | t"

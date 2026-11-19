@@ -132,13 +132,7 @@
           }
         </ul>
       } @else {
-        <app-empty-state shape="table" [heading]="'admin.audit.empty' | t">
-          @if (activeFilterCount()) {
-            <app-button-group>
-              <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'admin.audit.filter.reset' | t }}</app-button>
-            </app-button-group>
-          }
-        </app-empty-state>
+        <app-empty-state shape="table" [heading]="'admin.audit.empty' | t" />
       }
 
       @if (hasMore()) {

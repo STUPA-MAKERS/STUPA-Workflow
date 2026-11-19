@@ -55,6 +55,9 @@
           [text]="semesterText()"
           [active]="semesterFilter() !== ''"
         />
+        @if (hasFilters()) {
+          <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'publicProtocols.filter.resetAll' | t }}</app-button>
+        }
         <span class="pp__spacer"></span>
         @if (!loading()) {
           <span class="pp__count" aria-live="polite">{{ countText() }}</span>
@@ -71,11 +74,7 @@
         <app-empty-state shape="date"
           [heading]="'publicProtocols.empty.filtered' | t"
           [body]="'publicProtocols.empty.filteredBody' | t"
-        >
-          <app-button-group>
-            <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'publicProtocols.filter.resetAll' | t }}</app-button>
-          </app-button-group>
-        </app-empty-state>
+         />
       </div>
     } @else {
       @for (group of groups(); track group.key) {
