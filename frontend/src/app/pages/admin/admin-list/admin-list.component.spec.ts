@@ -165,6 +165,13 @@ describe('AdminListComponent (spec 001480, 001481)', () => {
     expect(on.map((a) => a.getAttribute('href'))).toEqual(['/admin/committees']);
   });
 
+  it('has no "Zustand" tiles', async () => {
+    const view = await setup(ALL);
+    expect(screen.queryByText('Zustand')).toBeNull();
+    expect(view.api.listBackups).not.toHaveBeenCalled();
+    expect(view.api.latestAuditVerification).not.toHaveBeenCalled();
+  });
+
   it('filters the entries by title and description, and says when nothing matches', async () => {
     const view = await setup(ALL);
     const search = screen.getByRole('searchbox', { name: 'Einstellungen durchsuchen' });
@@ -174,7 +181,6 @@ describe('AdminListComponent (spec 001480, 001481)', () => {
     await userEvent.type(search, 'xyz');
     expect(links(view.container)).toHaveLength(0);
     expect(screen.getByText('Keine Einstellung gefunden.')).toBeInTheDocument();
-    expect(view.container.querySelector('app-admin-health')).toHaveClass('adl__hidden');
   });
 
   it('opens the detail on every page below /admin, and shows the list on /admin', async () => {
@@ -225,13 +231,11 @@ describe('AdminListComponent (spec 001480, 001481)', () => {
 describe('AdminListComponent in account mode', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('lists the account pages under "Konto", without search, tiles and group heading', async () => {
+  it('lists the account pages under "Konto", without search and group heading', async () => {
     const view = await setup(['mcp.use'], '/account', true, 'account');
     expect(screen.getByRole('heading', { name: 'Konto', level: 1 })).toBeInTheDocument();
     expect(links(view.container)).toEqual(['/account/profile', '/account/notifications', '/account/grants']);
     expect(screen.queryByRole('searchbox')).toBeNull();
-    expect(view.container.querySelector('app-admin-health')).toBeNull();
-    expect(view.api.listBackups).not.toHaveBeenCalled();
     expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
   });
 

@@ -3,10 +3,6 @@
 // The same two panes as every list/detail page (spec 001480).
 @include lp.frame('adl');
 
-.adl__hidden {
-  display: none;
-}
-
 .adl__rows {
   @include lp.stack;
 }
@@ -26,6 +22,8 @@
 .adl--split .adl__detail {
   padding: 0;
   overflow: hidden;
+  // A sticky bar of the page lies on the sheet, so it takes the colour of the sheet.
+  --stb-bg: var(--color-surface-1);
 }
 .adl--split .adl__body {
   position: relative;

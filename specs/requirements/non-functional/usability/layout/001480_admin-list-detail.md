@@ -20,12 +20,14 @@ scope:
 
 `/admin` and `/account` must be list/detail pages built on `app-list-detail`, the same as the
 Gremien and the Tickets. The list is the navigation of the area: the title, the search
-"Einstellungen durchsuchen" (Verwaltung only), the "Zustand" tiles (Verwaltung only) and the
-groups of pages. The detail is the open page. The app must have no frame component of its own
+"Einstellungen durchsuchen" (Verwaltung only) and the groups of pages. The list has no
+"Zustand" tiles. The detail is the open page. The app must have no frame component of its own
 for these areas: no own split, no own sheet, no own bar, no own swipe back and no own scroll
 memory of the sheet.
 
-On a wide screen, the list and the open page sit side by side. Without an open page, the detail
+On a wide screen, the list and the open page sit side by side. The open page scrolls inside a
+round frame 24px inside the sheet (000193), and a sticky bar of the page has the colour of the
+sheet. Without an open page, the detail
 shows the empty pane (000665). One pane at a time, `/admin` and `/account` show the list, and a
 page shows with the bar of `app-list-detail`, which names the page (`barTitle`) and leads back
 to the list.

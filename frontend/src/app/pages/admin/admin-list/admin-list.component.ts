@@ -32,7 +32,6 @@ import {
 } from '@stupa-makers/ui-kit';
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { PageFrameService } from '../../../layout/page-frame.service';
-import { AdminHealthComponent } from '../admin-health/admin-health.component';
 import { FRAME_MODES, type FrameModeKey, type FramePage } from './frame-modes';
 
 /** One group of the list with the pages the principal may open. */
@@ -66,8 +65,7 @@ function parentOf(root: ActivatedRouteSnapshot): string | null {
  * (`app-list-detail`, spec 001480), the same as the Gremien or the Tickets.
  *
  * - The list is the navigation of the area: the title, "Einstellungen durchsuchen" (filters
- *   the entries by title and description, in the browser), the "Zustand" tiles and the
- *   groups of `ADMIN_GROUPS`. An entry shows only with one of its permissions and while its
+ *   the entries by title and description, in the browser) and the groups of `ADMIN_GROUPS`. An entry shows only with one of its permissions and while its
  *   feature is on, so the list never leads to the 403 page. The guard and the server stay
  *   authoritative.
  * - Each entry is an `app-list-item` with the icon, the title and the description (001481).
@@ -84,7 +82,7 @@ function parentOf(root: ActivatedRouteSnapshot): string | null {
  * width (001482).
  *
  * The area comes from the route data (`frame: 'admin' | 'account'`, `FRAME_MODES`); Konto
- * has no search and no tiles.
+ * has no search.
  */
 @Component({
   selector: 'app-admin-list',
@@ -92,7 +90,6 @@ function parentOf(root: ActivatedRouteSnapshot): string | null {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgTemplateOutlet,
-    AdminHealthComponent,
     EmptyStateComponent,
     IconComponent,
     ListDetailLayoutComponent,

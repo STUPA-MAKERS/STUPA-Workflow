@@ -121,10 +121,6 @@ describe('rowsAndFills (§000619, §000621)', () => {
     expect(RULES).toMatch(/\.cal__num:not\(\.cal__num--today\) \{\s*color: var\(--vh-hi\) !important;/);
   });
 
-  it('fills the chosen tile of Zustand', () => {
-    expect(RULES).toMatch(/\.ah__tile--on \{\s*@include vh\.fill;/);
-  });
-
   it('turns the text of the chosen budget node black', () => {
     expect(RULES).toMatch(/\.tn--on \{\s*@include vh\.ink\(var\(--vh-bg\), var\(--vh-bg\)\);/);
   });

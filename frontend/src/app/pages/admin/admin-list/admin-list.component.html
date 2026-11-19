@@ -18,10 +18,6 @@
       }
 
       <div class="adl__scroll" appScrollFade="y">
-        @if (mode().health) {
-          <app-admin-health [class.adl__hidden]="!!query()" />
-        }
-
         @for (g of groups(); track g.key) {
           @if (g.title; as title) {
             <app-list-group [label]="title | t">
