@@ -2,7 +2,7 @@
 id: "001360"
 title: An empty list shows a face in a ring of dots
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:

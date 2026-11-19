@@ -2,7 +2,7 @@
 id: "001363"
 title: An empty state has no reset button
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
