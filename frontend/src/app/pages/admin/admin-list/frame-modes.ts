@@ -47,8 +47,6 @@ export interface FrameMode {
   readonly pages: readonly FramePage[];
   /** Show "Einstellungen durchsuchen" above the entries. */
   readonly search: boolean;
-  /** Show the "Zustand" tiles above the entries. */
-  readonly health: boolean;
 }
 
 /** The modes of the frame. A route picks one with `data: { frame: '<key>' }`. */
@@ -60,7 +58,6 @@ export const FRAME_MODES: Readonly<Record<FrameModeKey, FrameMode>> = {
     groups: ADMIN_GROUPS,
     pages: ADMIN_PAGES,
     search: true,
-    health: true,
   },
   account: {
     home: '/account',
@@ -69,6 +66,5 @@ export const FRAME_MODES: Readonly<Record<FrameModeKey, FrameMode>> = {
     groups: ACCOUNT_GROUPS,
     pages: ACCOUNT_PAGES,
     search: false,
-    health: false,
   },
 };

@@ -6,11 +6,11 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 tests:
-  - "frontend/src/app/pages/admin/admin-frame/admin-pages.spec.ts:ADMIN_PAGES"
+  - "frontend/src/app/pages/admin/admin-list/admin-pages.spec.ts:ADMIN_PAGES"
 implementation:
-  - frontend/src/app/pages/admin/admin-frame/admin-pages.ts
+  - frontend/src/app/pages/admin/admin-list/admin-pages.ts
 scope:
-  - frontend/src/app/pages/admin/admin-frame
+  - frontend/src/app/pages/admin/admin-list
 ---
 
 # Each entry of the admin menu has its own icon
@@ -20,5 +20,5 @@ No two entries of `ADMIN_PAGES` must have the same icon. Gruppen-Zuordnung has t
 
 Reason: An icon that several entries share does not help to find an entry.
 
-Test: `frontend/src/app/pages/admin/admin-frame/admin-pages.spec.ts`: the icons of
+Test: `frontend/src/app/pages/admin/admin-list/admin-pages.spec.ts`: the icons of
 `ADMIN_PAGES` are unique.

@@ -1,4 +1,4 @@
-import type { FrameGroup, FramePage } from '../admin/admin-frame/frame-modes';
+import type { FrameGroup, FramePage } from '../admin/admin-list/frame-modes';
 
 /** The one group of the account navigation. It has no heading: the frame title says "Konto". */
 export const ACCOUNT_GROUPS: readonly FrameGroup[] = [{ key: 'account', title: null }];
