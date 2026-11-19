@@ -14,8 +14,8 @@
   cursor: grab;
 }
 :host-context([data-theme='dark']) {
-  --tile-bg: var(--color-surface-3);
-  --tile-hover: var(--color-surface-4);
+  --tile-bg: var(--board-tile-bg, var(--color-surface-3));
+  --tile-hover: var(--board-tile-hover, var(--color-surface-4));
   --avatar-bg: var(--color-surface-4);
 }
 @media (hover: hover) {

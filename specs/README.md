@@ -912,6 +912,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/001313](requirements/non-functional/usability/layout/001313_attendance-pool-row-group.md) | The pool substitutes are an own row group | approved |
 | [NF/usability/layout/001330](requirements/non-functional/usability/layout/001330_agenda-pane-split-head.md) | The agenda beside the protocol is a split head over its list | draft |
 | [NF/usability/layout/001331](requirements/non-functional/usability/layout/001331_rail-scroll-surface.md) | The scroll part of the navigation rail is a surface | draft |
+| [NF/usability/layout/001332](requirements/non-functional/usability/layout/001332_board-columns-screen-edge.md) | Board columns cut at the screen edge and stand out from the page | draft |
 | [P/integrations/webhooks/000963](protocols/integrations/webhooks/000963_webhook-delivery.md) | A webhook delivery is a signed JSON POST | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |
