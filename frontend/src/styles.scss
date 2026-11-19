@@ -78,10 +78,6 @@
   }
 }
 
-.af--split .af__page {
-  @include surface.context(1);
-}
-
 // A pane page fills the free height of `.main` and its panes scroll inside themselves. A basis
 // of 0 keeps the rows from pushing it taller than the viewport. It pulls the bottom padding
 // back and keeps only `--pane-foot-gap`. A closed side sheet would still take the gap, so it gets

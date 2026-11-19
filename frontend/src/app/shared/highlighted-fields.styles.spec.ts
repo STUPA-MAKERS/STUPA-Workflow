@@ -77,7 +77,6 @@ describe('highlightedFields (§000598)', () => {
     ['features/meetings/delegation-dialog/delegation-dialog.component.scss', '.dd__row--on'],
     ['features/meetings/agenda-item-dialog/agenda-item-dialog.component.scss', '.aid__row--on'],
     ['pages/budget/budget-dashboard.component.scss', '.tn--on'],
-    ['pages/admin/admin-frame/admin-frame.component.scss', '.af__item--on'],
     ['pages/admin/forms/form-editor.component.scss', '.fe__row--on'],
     ['pages/applications/agenda-dialog/agenda-dialog.component.scss', '.agd__row--on'],
     ['features/meetings/attendance-sheet/attendance-sheet.component.scss', '.as__opt--on'],

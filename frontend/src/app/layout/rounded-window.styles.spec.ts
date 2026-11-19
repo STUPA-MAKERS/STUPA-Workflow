@@ -13,7 +13,6 @@ const read = (path: string): string => readFileSync(join(app, path), 'utf8');
 
 const shell = read('../../vendor/ui-kit/shell/src/shell/shell.component.scss');
 const listDetail = read('../../vendor/ui-kit/src/lib/list-detail/list-detail-layout.component.scss');
-const adminFrame = read('pages/admin/admin-frame/admin-frame.component.scss');
 const budget = read('pages/budget/budget-dashboard.component.scss');
 const globalStyles = readFileSync(join(app, '../styles.scss'), 'utf8');
 const meetingPage = read('features/meetings/meeting-page/meeting-page.component.scss');
@@ -32,13 +31,6 @@ describe('rounded sheet styles', () => {
     const pane = rule(listDetail, ':host(.ld--split) .ld__detail');
     expect(pane).toMatch(/border-radius: var\(--ld-detail-radius, var\(--radius-2xl\)\);/);
     expect(rule(listDetail, '.ld__list,\n.ld__detail')).toMatch(/overflow-y: auto;/);
-  });
-
-  it('makes the admin sheet clip and its body scroll', () => {
-    const sheet = rule(adminFrame, '.af--split .af__page');
-    expect(sheet).toMatch(/overflow: hidden;/);
-    expect(sheet).toMatch(/border-radius: var\(--radius-2xl\);/);
-    expect(rule(adminFrame, '.af--split .af__pageBody')).toMatch(/overflow-y: auto;/);
   });
 
   it('keeps the budget sheet clipping', () => {
@@ -78,9 +70,5 @@ describe('rounded sheet styles', () => {
     expect(rule(globalStyles, '.pane-page')).toMatch(
       /margin-bottom: calc\(var\(--pane-foot-gap, 0px\) - var\(--main-pad-bottom, 0px\)\);/,
     );
-  });
-
-  it('gives the admin frame no width cap, so its column starts next to the rail', () => {
-    expect(rule(adminFrame, '.af')).not.toMatch(/max-width|margin-inline: auto/);
   });
 });
