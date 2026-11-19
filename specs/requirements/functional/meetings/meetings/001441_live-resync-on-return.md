@@ -2,7 +2,7 @@
 id: "001441"
 title: A live meeting page connects and reads again when the page returns
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:
