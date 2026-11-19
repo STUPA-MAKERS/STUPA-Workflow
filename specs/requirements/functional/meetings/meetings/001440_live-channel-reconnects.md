@@ -2,7 +2,7 @@
 id: "001440"
 title: The meeting page opens a dropped live channel again
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:
