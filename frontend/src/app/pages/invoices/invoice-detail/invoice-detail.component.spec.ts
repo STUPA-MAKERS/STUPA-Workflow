@@ -163,7 +163,11 @@ describe('InvoiceDetailComponent', () => {
     // § 000671: exactly one button "Buchung anlegen", in the head of the section "Buchungen".
     expect(screen.getAllByRole('button', { name: 'Buchung anlegen' })).toHaveLength(1);
     await user.click(screen.getByRole('button', { name: 'Buchung anlegen' }));
-    expect(createBooking).toHaveBeenCalled();
+    expect(createBooking).toHaveBeenCalledTimes(1);
+    // § 001292: the head menu has "Buchung anlegen" too.
+    await user.click(screen.getByRole('button', { name: 'Weitere Aktionen' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Buchung anlegen' }));
+    expect(createBooking).toHaveBeenCalledTimes(2);
     await user.click(screen.getAllByRole('button', { name: 'Beleg öffnen' })[0]);
     expect(openFile).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: /RE-2026-118\.pdf/ }));

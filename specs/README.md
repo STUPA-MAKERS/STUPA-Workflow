@@ -430,9 +430,12 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/001263](requirements/functional/finance/budget/001263_income-titel-tree-row.md) | The tree row of an income Titel shows its Ansatz and the reached part | approved |
 | [F/finance/budget/001264](requirements/functional/finance/budget/001264_income-titel-section.md) | Income nodes are listed under "Einnahmen" | approved |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
-| [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | approved |
+| [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | replaced |
 | [F/finance/invoices/000262](requirements/functional/finance/invoices/000262_invoice-segments.md) | The invoice list has four segments | replaced |
 | [F/finance/invoices/000263](requirements/functional/finance/invoices/000263_zugferd-import.md) | A ZUGFeRD invoice fills the form | approved |
+| [F/finance/invoices/001290](requirements/functional/finance/invoices/001290_booking-pays-invoice.md) | A new booking sets its invoice to paid | draft |
+| [F/finance/invoices/001291](requirements/functional/finance/invoices/001291_revert-reopens-invoice.md) | The revert of a booking sets the invoice it paid back to open | draft |
+| [F/finance/invoices/001292](requirements/functional/finance/invoices/001292_invoice-menu-books.md) | The head menu of an invoice has "Buchung anlegen" | draft |
 | [F/integrations/external/000176](requirements/functional/integrations/external/000176_optional.md) | Integrations are optional | approved |
 | [F/integrations/external/000177](requirements/functional/integrations/external/000177_preview-access.md) | A link preview uses the access of the viewer | approved |
 | [F/integrations/mcp/000174](requirements/functional/integrations/mcp/000174_acts-as-user.md) | The MCP server acts as the logged-in user | approved |

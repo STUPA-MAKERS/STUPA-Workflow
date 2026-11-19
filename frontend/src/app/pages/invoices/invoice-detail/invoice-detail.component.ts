@@ -132,19 +132,30 @@ export class InvoiceDetailComponent {
       label: this.i18n.translate('invoices.openFile'),
       icon: 'file',
     };
+    // "Buchung anlegen" also stands in the head menu (spec 001292, exception of 000671).
+    const book: RowMenuItem = {
+      id: 'book',
+      label: this.i18n.translate('invoices.createBooking'),
+      icon: 'plus',
+    };
     const remove: RowMenuSection = {
       items: [
         { id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true },
       ],
     };
+    const items: RowMenuItem[] = [
+      ...(this.canManage() ? [book] : []),
+      ...(this.phone() && i.hasFile ? [file] : []),
+    ];
     return [
-      ...(this.phone() && i.hasFile ? [{ items: [file] }] : []),
+      ...(items.length ? [{ items }] : []),
       ...(this.canManage() ? [remove] : []),
     ];
   });
 
   onMenu(item: RowMenuItem): void {
-    if (item.id === 'file') this.openFile.emit();
+    if (item.id === 'book') this.createBooking.emit();
+    else if (item.id === 'file') this.openFile.emit();
     else if (item.id === 'delete') this.remove.emit();
   }
 
