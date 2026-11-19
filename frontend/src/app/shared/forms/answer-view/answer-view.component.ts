@@ -9,7 +9,6 @@ import {
   PositionsViewComponent,
   type PositionFile,
 } from '../positions-view/positions-view.component';
-import { type CostLine, costLine } from '../form-rules';
 import { runs } from '@shared/util/immutable';
 import { FieldGroupComponent, FieldRowComponent, SectionComponent } from '@stupa-makers/ui-kit';
 
@@ -48,8 +47,6 @@ export type AnswerChunk =
       readonly key: string;
       readonly label: string;
       readonly value: unknown;
-      /** The cost line below the last positions field (spec 001632), else null. */
-      readonly costLine: CostLine | null;
     };
 
 /** A section of the form with its visible answers. */
@@ -139,16 +136,12 @@ export class AnswerViewComponent {
     const shown = (f: FormFieldDef): boolean =>
       !skip.has(f.key) && !NOT_SHOWN.has(f.type) && isFieldVisible(f.visibleIf, ctx);
     const textLang = langAttr(this.contentLang(), lang);
-    const all = this.sections().flatMap((s) => s.fields);
-    const lastPositions = all.filter((f) => f.type === 'positions').at(-1)?.key;
-    const line = lastPositions ? costLine(all, data) : null;
-    const lineOf = (key: string): CostLine | null => (key === lastPositions ? line : null);
     const sectionBlocks = this.sections().map((section) => ({
       key: section.key,
       label: resolveI18n(section.label, lang),
       labelLang: langAttr(resolvedI18nLang(section.label, lang), lang),
       chunks: chunksOf(
-        section.fields.filter(shown).flatMap((f) => this.piece(f, data, ctx, lang, lineOf(f.key))),
+        section.fields.filter(shown).flatMap((f) => this.piece(f, data, ctx, lang)),
       ),
     }));
     const otherChunks = chunksOf(
@@ -181,7 +174,6 @@ export class AnswerViewComponent {
     data: Readonly<Record<string, unknown>>,
     ctx: Readonly<Record<string, unknown>>,
     lang: string,
-    line: CostLine | null = null,
   ): readonly AnswerPiece[] {
     const raw = f.type === 'computed' ? this.computedValue(f, data, ctx) : data[f.key];
     if (isEmptyAnswer(raw)) return [];
@@ -192,7 +184,7 @@ export class AnswerViewComponent {
         return [
           {
             kind: 'positions',
-            chunk: { kind: 'positions', key: f.key, label, value: raw, costLine: line },
+            chunk: { kind: 'positions', key: f.key, label, value: raw },
           },
         ];
       case 'table':

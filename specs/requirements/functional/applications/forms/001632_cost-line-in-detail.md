@@ -1,6 +1,6 @@
 ---
 id: "001632"
-title: The Antrag detail shows the same cost line
+title: The Antrag detail shows no cost line
 kind: functional
 status: approved
 owner: frederikbeimgraben
@@ -14,11 +14,14 @@ scope:
   - frontend/src/app/pages/admin/forms
 ---
 
-# The Antrag detail shows the same cost line
+# The Antrag detail shows no cost line
 
-The Antrag detail must show the line of 001630 and 001631 below the Kostenaufstellung, with the
-same values that the form showed.
+The line of 001630 and 001631 must show only in the step of the form where the applicant
+enters the positions. The Antrag detail and the review step of the form must not show it below
+the Kostenaufstellung. They show the total of the positions and the answers for the funding and
+the number of participants as their own rows.
 
-Reason: The reviewer must see the same numbers as the applicant.
+Reason: The line repeats the total directly above it, and the detail shows the funding and the
+number of participants already.
 
-Test: A frontend unit test renders the detail of an Antrag with positions, funding and a number of participants.
+Test: A frontend unit test renders the detail of an Antrag with positions, funding and a number of participants and finds no cost line.

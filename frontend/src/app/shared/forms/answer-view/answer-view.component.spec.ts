@@ -194,7 +194,7 @@ describe('AnswerViewComponent', () => {
     expect(screen.queryByText(/Ohne Regel/)).not.toBeInTheDocument();
   });
 
-  it('shows the cost line and the files of each position (specs 001632, 001730)', async () => {
+  it('shows no cost line and the files of each position (specs 001632, 001730)', async () => {
     const { container } = await view(
       one([
         { key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung' } },
@@ -215,8 +215,7 @@ describe('AnswerViewComponent', () => {
         ],
       },
     );
-    const line = container.querySelector('.pv__line')?.textContent?.replace(/\s+/g, ' ').trim();
-    expect(line).toBe('Gesamtkosten 1.000,00 €, davon beantragt 600,00 €, 150,00 € pro Person');
+    expect(container.textContent).not.toContain('davon beantragt');
     fireEvent.click(screen.getByRole('button', { name: /Bus/ }));
     await screen.findByText('angebot.pdf');
     expect(screen.queryByText('sonst.pdf')).toBeNull();

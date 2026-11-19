@@ -16,7 +16,6 @@ import {
   type CostPosition,
   type PositionOffer,
 } from '../positions';
-import type { CostLine } from '../form-rules';
 
 /** A file of a position as the view lists it. */
 export interface PositionFile {
@@ -58,8 +57,7 @@ let nextId = 0;
  * http(s) URL is a link in the open position (a link cannot sit in the row button).
  *
  * The files of a position (spec 001730) are listed in the open position by name; the
- * block "Anhänge" opens them. Below the total, `costLine` gives the line "Gesamtkosten X
- * €, davon beantragt Y €" with the amount per person, as the form showed it (spec 001632).
+ * block "Anhänge" opens them. It shows no cost line below the total (spec 001632).
  */
 @Component({
   selector: 'app-positions-view',
@@ -80,8 +78,6 @@ export class PositionsViewComponent {
   readonly surface = input<1 | 2 | 3>(2);
   /** Open every position at the start, for example in the review step of the wizard. */
   readonly expanded = input(false);
-  /** The figures of the cost line, or null when this field does not show it. */
-  readonly costLine = input<CostLine | null>(null);
   /** The files of the application; the view lists those of each position. */
   readonly files = input<readonly PositionFile[]>([]);
 
@@ -103,19 +99,6 @@ export class PositionsViewComponent {
       preferred: preferredOffer(p)?.label.trim() ?? '',
       files: p.id ? this.files().filter((f) => f.positionId === p.id) : [],
     }));
-  });
-
-  /** "Gesamtkosten 1.200,00 €, davon beantragt 800,00 €, 40,00 € pro Person", or ''. */
-  protected readonly lineText = computed(() => {
-    const line = this.costLine();
-    if (!line) return '';
-    const head = this.i18n.translate('forms.costLine.total', {
-      total: this.money(line.total),
-      requested: this.money(line.requested),
-    });
-    return line.perPerson === null
-      ? head
-      : `${head}, ${this.i18n.translate('forms.costLine.perPerson', { amount: this.money(line.perPerson) })}`;
   });
 
   protected readonly total = computed(() => this.money(positionsTotal(this.rows())));
