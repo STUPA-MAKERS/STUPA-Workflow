@@ -2,7 +2,7 @@
 id: "001341"
 title: A dialog or sheet head is as far from the top as from the side
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:
