@@ -13,7 +13,7 @@ export function linkedKey(kind: TodoLinkKind, targetId: Uuid): string {
 
 /**
  * Tells the back-references on screen that a card was linked to their target. The list
- * reads `GET /todos/linked` only when its target changes, so a card created next to it
+ * reads `GET /links` only when its target changes, so a card created next to it
  * (the TOP menu beside the top sheet) needs this nudge to show up.
  */
 @Injectable({ providedIn: 'root' })

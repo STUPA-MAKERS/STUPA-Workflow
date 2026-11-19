@@ -19,7 +19,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { AgendaItem, Meeting, MeetingVote, Uuid } from '@core/api/models';
-import { TodosApiService, type TodoCardDetail } from '@core/api/todos.service';
+import { TodosApiService, type LinkEnd, type TodoCardDetail, type TodoLinkTarget } from '@core/api/todos.service';
 import {
   BadgeComponent,
   ButtonComponent,
@@ -32,13 +32,14 @@ import {
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
+  ToastService,
 } from '@stupa-makers/ui-kit';
 import {
   TodoNewDialogComponent,
   type NewTodoLink,
 } from '../../todos/new-dialog/todo-new-dialog.component';
 import { BodyPortalDirective } from '@shared/ui/body-portal/body-portal.directive';
-import { TodoLinkCardDialogComponent } from '../../todos/link-card-dialog/todo-link-card-dialog.component';
+import { TodoLinkPickerComponent } from '../../todos/link-picker/todo-link-picker.component';
 import { TodoLinkedRefresh } from '../../todos/linked-list/todo-linked-refresh';
 import { TopBadgeComponent } from '../top-badge/top-badge.component';
 import { agendaPlan, minutesInvalid, parseMinutes, planClock } from '../agenda-plan.util';
@@ -116,7 +117,7 @@ export interface AgendaMove {
     ListItemComponent,
     RowMenuComponent,
     TodoNewDialogComponent,
-    TodoLinkCardDialogComponent,
+    TodoLinkPickerComponent,
     BodyPortalDirective,
   ],
   templateUrl: './agenda-pane.component.html',
@@ -127,6 +128,7 @@ export class AgendaPaneComponent {
   private readonly auth = inject(AuthService);
   private readonly linkedRefresh = inject(TodoLinkedRefresh);
   private readonly todosApi = inject(TodosApiService);
+  private readonly toast = inject(ToastService);
 
   readonly meeting = input.required<Meeting>();
   readonly agenda = input.required<AgendaItem[]>();
@@ -189,10 +191,9 @@ export class AgendaPaneComponent {
   /** "Neues To-Do" from the menu of an item: open, and the links it starts with. */
   protected readonly todoOpen = signal(false);
   protected readonly todoLinks = signal<readonly NewTodoLink[]>([]);
-  /** "To-Do verknüpfen" from the menu of an item: the item, and the cards that link it already. */
-  protected readonly linkItem = signal<AgendaItem | null>(null);
+  /** "Verknüpfen" from the menu of an item: the item as a link end (spec 001408). */
+  protected readonly linkEnd = signal<LinkEnd | null>(null);
   protected readonly linkOpen = signal(false);
-  protected readonly linkExclude = signal<readonly Uuid[]>([]);
   /** The item that "TOP entfernen?" asks about. */
   protected readonly removing = signal<AgendaItem | null>(null);
   /** The person may write To-Dos on the board of the gremium of the meeting. */
@@ -455,18 +456,27 @@ export class AgendaPaneComponent {
   }
 
   /**
-   * "To-Do verknüpfen": the search over the cards that the person writes (spec 000548). The
-   * cards that link the item already leave the list once the server answers.
+   * "Verknüpfen": the one picker over every kind (spec 001408). The server leaves out the
+   * item and what it links already.
    */
   private openLink(item: AgendaItem): void {
-    this.linkExclude.set([]);
-    this.linkItem.set(item);
+    this.linkEnd.set({ kind: 'agenda_item', id: item.id });
     this.linkOpen.set(true);
-    this.todosApi.linked('agenda_item', item.id).subscribe({
-      next: (cards) => {
-        if (this.linkItem()?.id === item.id) this.linkExclude.set(cards.map((c) => c.id));
+  }
+
+  /** A pick links the item; the "Verknüpft" lists of both ends read again. */
+  protected linkPicked(hit: TodoLinkTarget): void {
+    const end = this.linkEnd();
+    if (!end) return;
+    this.todosApi.link(end, { kind: hit.kind, id: hit.targetId }).subscribe({
+      next: () => {
+        this.linkOpen.set(false);
+        this.linkedRefresh.touch([
+          { kind: end.kind, targetId: end.id },
+          { kind: hit.kind, targetId: hit.targetId },
+        ]);
       },
-      error: () => undefined,
+      error: () => this.toast.error(this.i18n.translate('links.error.add')),
     });
   }
 
