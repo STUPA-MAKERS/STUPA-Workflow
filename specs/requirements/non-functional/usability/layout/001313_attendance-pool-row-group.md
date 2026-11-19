@@ -2,7 +2,7 @@
 id: "001313"
 title: The pool substitutes are an own row group
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:

@@ -2,7 +2,7 @@
 id: "001311"
 title: A pool cell counts the pool seats
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:

@@ -2,7 +2,7 @@
 id: "001310"
 title: The attendance matrix shows the pool substitutes
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:
