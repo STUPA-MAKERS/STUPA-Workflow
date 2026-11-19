@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { openWindowClock, openWindowState, openWindowWhen } from './open-window.util';
 
 const NOW = Date.parse('2026-10-20T15:30:00Z');
@@ -29,7 +29,10 @@ describe('openWindowWhen', () => {
 });
 
 describe('openWindowClock', () => {
-  @Component({ selector: 'app-clock-host', standalone: true, template: '' })
+  @Component({
+    changeDetection: ChangeDetectionStrategy.Eager,
+    selector: 'app-clock-host', standalone: true, template: ''
+  })
   class Host {
     readonly now = openWindowClock(1000);
   }

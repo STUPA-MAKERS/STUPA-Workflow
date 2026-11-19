@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { render, screen } from '@testing-library/angular';
@@ -6,6 +6,7 @@ import { provideFormly } from '../formly.providers';
 import { FormlyDisplayType } from './formly-display.type';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
   standalone: true,
   imports: [ReactiveFormsModule, FormlyForm],
   template: `<formly-form [form]="form" [fields]="fields" [model]="model" />`,

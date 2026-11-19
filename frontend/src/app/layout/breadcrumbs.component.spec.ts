@@ -1,11 +1,11 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { Router, provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import { BreadcrumbsComponent } from './breadcrumbs.component';
 import { I18nService } from '@core/i18n/i18n.service';
 import { PageFrameService } from './page-frame.service';
 
-@Component({ standalone: true, template: 'page' })
+@Component({ changeDetection: ChangeDetectionStrategy.Eager, standalone: true, template: 'page' })
 class StubPage {}
 
 /**

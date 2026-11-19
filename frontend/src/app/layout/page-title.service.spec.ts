@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Title } from '@angular/platform-browser';
 import { type Route, Router, TitleStrategy, provideRouter } from '@angular/router';
@@ -12,7 +12,10 @@ import { PageFrameService } from './page-frame.service';
 import { PageTitleService, pageItemTitle } from './page-title.service';
 
 /** A detail page that names its item once the item "loaded". */
-@Component({ standalone: true, template: '<h1>{{ name() }}</h1>' })
+@Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
+  standalone: true, template: '<h1>{{ name() }}</h1>'
+})
 class DetailPage {
   static readonly itemName = signal<string | null>(null);
   readonly name = DetailPage.itemName;
@@ -21,7 +24,10 @@ class DetailPage {
   }
 }
 
-@Component({ standalone: true, template: '<h1>Seite</h1>' })
+@Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
+  standalone: true, template: '<h1>Seite</h1>'
+})
 class PlainPage {}
 
 describe('PageTitleService', () => {

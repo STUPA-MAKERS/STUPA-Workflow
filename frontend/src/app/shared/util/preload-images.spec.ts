@@ -1,4 +1,5 @@
-import { preloadImages } from './preload-images';
+import { TestBed } from '@angular/core/testing';
+import { IMAGE_PRELOAD_LIMIT_MS, IMAGE_PRELOADER, preloadImages } from './preload-images';
 
 interface FakeImage {
   src: string;
@@ -53,5 +54,23 @@ describe('preloadImages', () => {
     jest.advanceTimersByTime(1);
     await Promise.resolve();
     expect(done).toBe(true);
+  });
+
+  it('§NF/performance/loading/001280: by default builds real images and waits up to the app limit', async () => {
+    jest.useFakeTimers();
+    const made = jest.spyOn(window, 'Image');
+    let done = false;
+    void preloadImages(['/real']).then(() => (done = true));
+    expect(made).toHaveBeenCalledTimes(1);
+    jest.advanceTimersByTime(IMAGE_PRELOAD_LIMIT_MS - 1);
+    await Promise.resolve();
+    expect(done).toBe(false);
+    jest.advanceTimersByTime(1);
+    await Promise.resolve();
+    expect(done).toBe(true);
+  });
+
+  it('§NF/performance/loading/001280: the preloader of the app resolves at once without a URL', async () => {
+    await expect(TestBed.inject(IMAGE_PRELOADER)([])).resolves.toBeUndefined();
   });
 });

@@ -1,9 +1,9 @@
 ---
 name: frontend
-description: Angular 20 standalone SPA for STUPA-Workflow — apply wizard, meetings/live-vote/beamer, voting, budget/expenses/invoices, dashboard, tasks, account, and the whole admin config (forms/flow/committees/roles/branding/mail-templates). Covers core (ApiClient, authGuard+authInterceptor, i18n DE/EN, theme, ws live-vote, loading bar, branding, pwa), shared ui-kit + formly, lazy permission-gated routes, DESIGN_SYSTEM tokens. Use when working on any component, route, service, interceptor, UI-kit element, i18n string, theme/branding, or build in frontend/.
+description: Angular 22 standalone SPA for STUPA-Workflow — apply wizard, meetings/live-vote/beamer, voting, budget/expenses/invoices, dashboard, tasks, account, and the whole admin config (forms/flow/committees/roles/branding/mail-templates). Covers core (ApiClient, authGuard+authInterceptor, i18n DE/EN, theme, ws live-vote, loading bar, branding, pwa), shared ui-kit + formly, lazy permission-gated routes, DESIGN_SYSTEM tokens. Use when working on any component, route, service, interceptor, UI-kit element, i18n string, theme/branding, or build in frontend/.
 ---
 
-# Frontend — Angular 20 SPA — `frontend`
+# Frontend — Angular 22 SPA — `frontend`
 
 **Does:** The single-page app of the student-government platform. It holds the public apply wizard + status timeline, a role-aware dashboard, and full screens for applications, voting (live-vote/beamer/cast) and meetings (agenda/attendance/protocol). It also covers budget/expenses/invoices, account, and the admin config surface. Standalone components, signals, lazy permission-gated routes, typed API client over `/api`.
 

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
@@ -14,7 +14,10 @@ import { TasksNoneComponent } from './tasks-none.component';
 import { loadErrorToast, retryLoadError } from '../../../testing/load-error';
 
 /** The detail of the outlet. The detail has its own spec; here only the route matters. */
-@Component({ standalone: true, template: '<p>detail</p>' })
+@Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
+  standalone: true, template: '<p>detail</p>'
+})
 class DetailStub {}
 
 const DAY = 86_400_000;

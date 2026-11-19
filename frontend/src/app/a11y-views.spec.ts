@@ -10,7 +10,7 @@
  * component without its own `<main>` gets a `<main>` wrapper, so the content sits inside
  * a landmark.
  */
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
@@ -92,6 +92,7 @@ describe('Kern-Views a11y (axe)', () => {
 
   describe('Fehlerseiten', () => {
     @Component({
+      changeDetection: ChangeDetectionStrategy.Eager,
       standalone: true,
       imports: [ForbiddenComponent],
       template: `<main><app-forbidden /></main>`,
@@ -99,6 +100,7 @@ describe('Kern-Views a11y (axe)', () => {
     class ForbiddenHost {}
 
     @Component({
+      changeDetection: ChangeDetectionStrategy.Eager,
       standalone: true,
       imports: [NotFoundComponent],
       template: `<main><app-not-found /></main>`,
@@ -156,6 +158,7 @@ describe('Kern-Views a11y (axe)', () => {
     };
 
     @Component({
+      changeDetection: ChangeDetectionStrategy.Eager,
       standalone: true,
       imports: [ApplyWizardComponent],
       template: `<main><app-apply-wizard /></main>`,
@@ -196,6 +199,7 @@ describe('Kern-Views a11y (axe)', () => {
     };
 
     @Component({
+      changeDetection: ChangeDetectionStrategy.Eager,
       standalone: true,
       imports: [VoteCastComponent],
       template: `<main><app-vote-cast /></main>`,
@@ -259,6 +263,7 @@ describe('Kern-Views a11y (axe)', () => {
     });
 
     @Component({
+      changeDetection: ChangeDetectionStrategy.Eager,
       standalone: true,
       imports: [BeamerComponent],
       template: `<main><app-beamer /></main>`,
@@ -322,6 +327,7 @@ describe('Kern-Views a11y (axe)', () => {
     const adminHttp = [provideHttpClient(), provideHttpClientTesting()];
 
     @Component({
+      changeDetection: ChangeDetectionStrategy.Eager,
       standalone: true,
       imports: [AdminHomeComponent],
       template: `<main><app-admin-home /></main>`,
@@ -329,6 +335,7 @@ describe('Kern-Views a11y (axe)', () => {
     class AdminHomeHost {}
 
     @Component({
+      changeDetection: ChangeDetectionStrategy.Eager,
       standalone: true,
       imports: [UsersComponent],
       template: `<main><app-admin-users /></main>`,
@@ -336,6 +343,7 @@ describe('Kern-Views a11y (axe)', () => {
     class UsersHost {}
 
     @Component({
+      changeDetection: ChangeDetectionStrategy.Eager,
       standalone: true,
       imports: [FlowEditorComponent],
       template: `<main><app-flow-editor /></main>`,
@@ -343,6 +351,7 @@ describe('Kern-Views a11y (axe)', () => {
     class FlowEditorHost {}
 
     @Component({
+      changeDetection: ChangeDetectionStrategy.Eager,
       standalone: true,
       imports: [BrandingEditorComponent],
       template: `<main><app-branding-editor /></main>`,
@@ -350,6 +359,7 @@ describe('Kern-Views a11y (axe)', () => {
     class BrandingHost {}
 
     @Component({
+      changeDetection: ChangeDetectionStrategy.Eager,
       standalone: true,
       imports: [AdminGremienComponent],
       template: `<main><app-admin-gremien /></main>`,
@@ -357,6 +367,7 @@ describe('Kern-Views a11y (axe)', () => {
     class GremienHost {}
 
     @Component({
+      changeDetection: ChangeDetectionStrategy.Eager,
       standalone: true,
       imports: [GremiumMembersComponent],
       template: `<main><app-gremium-members /></main>`,
@@ -364,6 +375,7 @@ describe('Kern-Views a11y (axe)', () => {
     class MembersHost {}
 
     @Component({
+      changeDetection: ChangeDetectionStrategy.Eager,
       standalone: true,
       imports: [DelegationsComponent],
       template: `<main><app-delegations /></main>`,
