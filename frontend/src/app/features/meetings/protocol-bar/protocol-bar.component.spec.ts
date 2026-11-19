@@ -38,10 +38,12 @@ async function setup(m: Meeting, p: Protocol, opts: { session?: boolean; compact
     ],
   });
   const labels = () => view.fixture.componentInstance.menuItems().map((i) => i.label);
-  const select = (label: string) => {
+  const select = async (label: string) => {
     const item = view.fixture.componentInstance.menuItems().find((i) => i.label === label);
     if (!item) throw new Error(`no item ${label}`);
     view.fixture.componentInstance.select(item.id);
+    view.fixture.detectChanges();
+    await view.fixture.whenStable();
     view.fixture.detectChanges();
   };
   return { ...view, finalize, session, api, labels, select };
@@ -78,7 +80,7 @@ describe('ProtocolBarComponent', () => {
     const { fixture, finalize, labels, select } = await setup(closed(), protocol(), { compact: true });
     expect(screen.queryByRole('button', { name: 'Finalisieren & senden' })).toBeNull();
     expect(labels()[0]).toBe('Finalisieren & senden');
-    select('Finalisieren & senden');
+    await select('Finalisieren & senden');
     expect(finalize).toHaveBeenCalled();
     fixture.componentRef.setInput('protocol', final({ pdfUrl: '/p.pdf' }));
     fixture.detectChanges();
@@ -122,7 +124,7 @@ describe('ProtocolBarComponent', () => {
     /** § 000925 */
     it('sends the draft to the members after a confirmation', async () => {
       const { session, select } = await setup(closed(), protocol());
-      select('Entwurf senden');
+      await select('Entwurf senden');
       const confirm = screen.getByRole('dialog', { name: 'Entwurf senden?' });
       expect(confirm).toHaveTextContent('Wasserzeichen „Entwurf“');
       expect(session.sendProtocolDraft).not.toHaveBeenCalled();
@@ -134,7 +136,7 @@ describe('ProtocolBarComponent', () => {
     /** §F/meetings/protocols/000937 (draftSentAt) */
     it('names the date of the last send in the confirmation of a second send', async () => {
       const { session, select } = await setup(closed(), protocol({ draftSentAt: '2026-11-03T18:30:00Z' }));
-      select('Entwurf senden');
+      await select('Entwurf senden');
       const confirm = screen.getByRole('dialog', { name: 'Entwurf senden?' });
       expect(confirm).toHaveTextContent('Der Entwurf ging zuletzt am 3. November 2026 an die Mitglieder des Gremiums.');
       expect(confirm).not.toHaveTextContent('Wasserzeichen');
@@ -144,7 +146,7 @@ describe('ProtocolBarComponent', () => {
 
     it('keeps the draft on "Abbrechen", and offers no send to a reader or for a live meeting', async () => {
       const { session, fixture, select, labels } = await setup(closed(), protocol());
-      select('Entwurf senden');
+      await select('Entwurf senden');
       await userEvent.click(within(screen.getByRole('dialog', { name: 'Entwurf senden?' })).getByRole('button', { name: 'Abbrechen' }));
       expect(session.sendProtocolDraft).not.toHaveBeenCalled();
       fixture.componentRef.setInput('meeting', closed({ canWrite: false, canFinalize: false }));
@@ -166,7 +168,7 @@ describe('ProtocolBarComponent', () => {
       ];
       const { session, api, fixture, select, labels } = await setup(own, final(), { meetings });
       expect(labels()).not.toContain('Entwurf senden');
-      select('Als genehmigt markieren');
+      await select('Als genehmigt markieren');
       expect(api.listMeetings).toHaveBeenCalledWith('g-1');
       const dialog = screen.getByRole('dialog', { name: 'Als genehmigt markieren' });
       expect(within(dialog).getByLabelText(/Genehmigt in der Sitzung/)).toHaveTextContent('34. Sitzung · 29. Oktober 2026');
@@ -175,7 +177,7 @@ describe('ProtocolBarComponent', () => {
       fixture.componentRef.setInput('protocol', final({ approvedAt: '2026-10-29T18:00:00Z', approvedMeetingId: 'm-2' }));
       fixture.detectChanges();
       expect(screen.queryByRole('dialog', { name: 'Als genehmigt markieren' })).toBeNull();
-      select('Genehmigung entfernen');
+      await select('Genehmigung entfernen');
       expect(session.setProtocolApproval).toHaveBeenCalledTimes(1);
       const ask = screen.getByRole('dialog', { name: 'Genehmigung entfernen?' });
       await userEvent.click(within(ask).getByRole('button', { name: 'Entfernen' }));
@@ -193,7 +195,7 @@ describe('ProtocolBarComponent', () => {
     /** § 000983 (reopenProtocol) */
     it('sets a final protocol back to draft after a confirmation, and not an approved one', async () => {
       const { session, fixture, select, labels } = await setup(closed(), final());
-      select('Zurück in Entwurf');
+      await select('Zurück in Entwurf');
       expect(session.reopenProtocol).not.toHaveBeenCalled();
       const ask = screen.getByRole('dialog', { name: 'Protokoll zurück in den Entwurf setzen?' });
       await userEvent.click(within(ask).getByRole('button', { name: 'Zurück in Entwurf' }));
@@ -209,7 +211,7 @@ describe('ProtocolBarComponent', () => {
 
     it('closes the pick on "Abbrechen"', async () => {
       const { session, select } = await setup(closed(), final());
-      select('Als genehmigt markieren');
+      await select('Als genehmigt markieren');
       await userEvent.click(within(screen.getByRole('dialog', { name: 'Als genehmigt markieren' })).getByRole('button', { name: 'Abbrechen' }));
       expect(screen.queryByRole('dialog', { name: 'Als genehmigt markieren' })).toBeNull();
       expect(session.setProtocolApproval).not.toHaveBeenCalled();
@@ -221,25 +223,29 @@ describe('ProtocolBarComponent', () => {
 
     it('offers to hold a public protocol back', async () => {
       const { session, select } = await setup(closed(), pub());
-      select('Nicht veröffentlichen');
+      await select('Nicht veröffentlichen');
       expect(session.setPublicWithheld).toHaveBeenCalledWith(true);
     });
 
     it('publishes a held-back protocol again', async () => {
       const { session, select } = await setup(closed(), pub({ publicWithheld: true }));
-      select('Veröffentlichen');
+      await select('Veröffentlichen');
       expect(session.setPublicWithheld).toHaveBeenCalledWith(false);
     });
 
-    it('offers no switch without the right, for a private gremium, or outside the meeting page', async () => {
-      const a = await setup(closed({ canFinalize: false }), pub());
-      expect(a.labels()).not.toContain('Nicht veröffentlichen');
-      a.fixture.destroy();
-      const b = await setup(closed(), pub({ gremiumProtocolsPublic: false }));
-      expect(b.labels()).not.toContain('Nicht veröffentlichen');
-      b.fixture.destroy();
-      const c = await setup(closed(), pub(), { session: false });
-      expect(c.labels()).not.toContain('Nicht veröffentlichen');
+    it('offers no switch without the right', async () => {
+      const { labels } = await setup(closed({ canFinalize: false }), pub());
+      expect(labels()).not.toContain('Nicht veröffentlichen');
+    });
+
+    it('offers no switch for a private gremium', async () => {
+      const { labels } = await setup(closed(), pub({ gremiumProtocolsPublic: false }));
+      expect(labels()).not.toContain('Nicht veröffentlichen');
+    });
+
+    it('offers no switch outside the meeting page (no session)', async () => {
+      const { labels } = await setup(closed(), pub(), { session: false });
+      expect(labels()).not.toContain('Nicht veröffentlichen');
     });
   });
 });
