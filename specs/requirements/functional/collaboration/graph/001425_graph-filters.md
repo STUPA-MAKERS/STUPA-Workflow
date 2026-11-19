@@ -14,7 +14,7 @@ scope:
 ---
 # The graph has filters above the drawing
 
-The head of the page must have these filters:
+The page must have these filters:
 
 | Filter | Effect |
 | --- | --- |
@@ -29,6 +29,11 @@ invoice date of an invoice, the invoice date of a Buchung and else its creation,
 a card and else its creation, and the creation of an Antrag, a vote and a ticket. A Gremium and
 a cost centre have no date and must pass every period. The filters must be in the query of the
 URL. The server must apply the filters.
+
+The drawing must fill the height of the page. The filters, the switch of the view, the panel of
+the chosen node and the legend must float over the drawing. The legend must be one strip at the
+foot that scrolls sideways. The page must not show a title. In the list view the filters must
+stick to the top of the page.
 
 Reason: A graph of every year is too large to read. The person narrows it to the question at
 hand, and the URL keeps the view for a reload or for a colleague.

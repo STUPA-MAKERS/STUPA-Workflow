@@ -1,18 +1,7 @@
-<div class="gr">
-  <section class="ld-pane" aria-labelledby="gr-title">
-    <app-page-header [pane]="true" titleId="gr-title" [title]="'graph.title' | t">
-      <ng-container ngProjectAs="[actions]">
-        <app-segmented
-          class="gr__view"
-          [ariaLabel]="'graph.view.group' | t"
-          [options]="viewOptions()"
-          [value]="view()"
-          (valueChange)="setView($event)"
-        />
-      </ng-container>
-    </app-page-header>
-
-    <app-sticky-bar class="ld-pane__filters">
+<div class="gr" [class.gr--draw]="view() === 'graph'">
+  <section class="gr__pane" aria-labelledby="gr-title">
+    <h1 id="gr-title" class="sr-only">{{ 'graph.title' | t }}</h1>
+    <div class="gr__float">
       <div class="gr__bar">
         <div class="gr__search" role="search">
           <app-search-pill
@@ -90,8 +79,100 @@
             </app-button>
           }
         </div>
+        <app-segmented
+          class="gr__view"
+          [ariaLabel]="'graph.view.group' | t"
+          [options]="viewOptions()"
+          [value]="view()"
+          (valueChange)="setView($event)"
+        />
       </div>
-    </app-sticky-bar>
+      @if (drawing() && chosen(); as c) {
+        <aside class="gr__panel" aria-labelledby="gr-panel-title" [attr.data-kind]="c.node.kind">
+          <header class="gr__panelHead">
+            <span class="gr__mark gr__mark--lg" [class.gr__mark--muted]="!c.node.accessible">
+              <app-icon [name]="c.icon" [size]="18" />
+            </span>
+            <div class="gr__panelText">
+              <h2 id="gr-panel-title" class="gr__panelTitle">{{ c.title }}</h2>
+              <p class="gr__panelSub">{{ facts(c) }}</p>
+              @if (dateLine(c); as day) {
+                <p class="gr__panelSub">{{ day }}</p>
+              }
+            </div>
+            <button
+              type="button"
+              class="gr__close"
+              [attr.aria-label]="'graph.panel.close' | t"
+              (click)="choose(null)"
+            >
+              <app-icon name="x" [size]="16" />
+            </button>
+          </header>
+          @if (c.route; as to) {
+            <a class="gr__open" [routerLink]="to.path" [queryParams]="to.query">
+              {{ 'graph.panel.open' | t }}
+              <app-icon name="arrow" [size]="16" />
+            </a>
+          } @else if (c.node.granted) {
+            <p class="gr__hint">{{ 'graph.panel.granted' | t }}</p>
+          }
+          @if (c.near.length) {
+            <h3 class="gr__nearTitle">{{ 'graph.panel.neighbours' | t }}</h3>
+            <ul class="gr__near">
+              @for (n of c.near; track n.key) {
+                <li>
+                  <button type="button" class="gr__nearRow" [attr.data-kind]="n.node.kind" (click)="choose(n.key)">
+                    <span class="gr__mark" [class.gr__mark--muted]="!n.node.accessible">
+                      <app-icon [name]="n.icon" [size]="12" />
+                    </span>
+                    <span class="gr__nearText">{{ n.title }}</span>
+                    <span class="gr__nearKind">{{ n.kind }}</span>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+        </aside>
+      }
+      @if (drawing()) {
+        <div class="gr__foot">
+          @if (growing()) {
+            <p class="gr__growing gr__pill" role="status">{{ 'graph.growing' | t }}</p>
+          } @else if (cursor()) {
+            <div class="gr__more gr__pill">
+              <app-button variant="text" size="sm" data-testid="gr-more" (click)="loadMore()">
+                <app-icon name="down" />
+                {{ 'graph.loadMore' | t }}
+              </app-button>
+            </div>
+          }
+          <div class="gr__legend" role="group" [attr.aria-label]="'graph.legend' | t">
+            @for (k of legend(); track k.kind) {
+              <button
+                type="button"
+                class="gr__kind"
+                [class.gr__kind--on]="k.on"
+                [attr.data-kind]="k.kind"
+                [attr.aria-pressed]="k.on"
+                (click)="toggleKind(k.kind)"
+              >
+                <span class="gr__mark"><app-icon [name]="k.icon" [size]="12" /></span>
+                {{ k.label }}
+              </button>
+            }
+            <span class="gr__lineKey gr__pill">
+              <span class="gr__sample" aria-hidden="true"></span>
+              {{ 'graph.legend.link' | t }}
+            </span>
+            <span class="gr__lineKey gr__pill">
+              <span class="gr__sample gr__sample--builtin" aria-hidden="true"></span>
+              {{ 'graph.legend.builtin' | t }}
+            </span>
+          </div>
+        </div>
+      }
+    </div>
 
     <div class="gr__body" [attr.aria-busy]="loading() || null">
       @if (loading()) {
@@ -116,79 +197,9 @@
               [selected]="selected()"
               [label]="canvasLabel()"
               [focusAt]="focusAt()"
+              [edge]="64"
               (chosen)="choose($event)"
             />
-            @if (chosen(); as c) {
-              <aside class="gr__panel" aria-labelledby="gr-panel-title" [attr.data-kind]="c.node.kind">
-                <header class="gr__panelHead">
-                  <span class="gr__mark gr__mark--lg" [class.gr__mark--muted]="!c.node.accessible">
-                    <app-icon [name]="c.icon" [size]="18" />
-                  </span>
-                  <div class="gr__panelText">
-                    <h2 id="gr-panel-title" class="gr__panelTitle">{{ c.title }}</h2>
-                    <p class="gr__panelSub">{{ facts(c) }}</p>
-                    @if (dateLine(c); as day) {
-                      <p class="gr__panelSub">{{ day }}</p>
-                    }
-                  </div>
-                  <button
-                    type="button"
-                    class="gr__close"
-                    [attr.aria-label]="'graph.panel.close' | t"
-                    (click)="choose(null)"
-                  >
-                    <app-icon name="x" [size]="16" />
-                  </button>
-                </header>
-                @if (c.route; as to) {
-                  <a class="gr__open" [routerLink]="to.path" [queryParams]="to.query">
-                    {{ 'graph.panel.open' | t }}
-                    <app-icon name="arrow" [size]="16" />
-                  </a>
-                } @else if (c.node.granted) {
-                  <p class="gr__hint">{{ 'graph.panel.granted' | t }}</p>
-                }
-                @if (c.near.length) {
-                  <h3 class="gr__nearTitle">{{ 'graph.panel.neighbours' | t }}</h3>
-                  <ul class="gr__near">
-                    @for (n of c.near; track n.key) {
-                      <li>
-                        <button type="button" class="gr__nearRow" [attr.data-kind]="n.node.kind" (click)="choose(n.key)">
-                          <span class="gr__mark" [class.gr__mark--muted]="!n.node.accessible">
-                            <app-icon [name]="n.icon" [size]="12" />
-                          </span>
-                          <span class="gr__nearText">{{ n.title }}</span>
-                          <span class="gr__nearKind">{{ n.kind }}</span>
-                        </button>
-                      </li>
-                    }
-                  </ul>
-                }
-              </aside>
-            }
-          </div>
-          <div class="gr__legend" role="group" [attr.aria-label]="'graph.legend' | t">
-            @for (k of legend(); track k.kind) {
-              <button
-                type="button"
-                class="gr__kind"
-                [class.gr__kind--on]="k.on"
-                [attr.data-kind]="k.kind"
-                [attr.aria-pressed]="k.on"
-                (click)="toggleKind(k.kind)"
-              >
-                <span class="gr__mark"><app-icon [name]="k.icon" [size]="12" /></span>
-                {{ k.label }}
-              </button>
-            }
-            <span class="gr__lineKey">
-              <span class="gr__sample" aria-hidden="true"></span>
-              {{ 'graph.legend.link' | t }}
-            </span>
-            <span class="gr__lineKey">
-              <span class="gr__sample gr__sample--builtin" aria-hidden="true"></span>
-              {{ 'graph.legend.builtin' | t }}
-            </span>
           </div>
         } @else {
           <ul class="gr__list" [attr.aria-label]="'graph.list.label' | t">
@@ -228,15 +239,17 @@
             }
           </ul>
         }
-        @if (growing()) {
-          <p class="gr__growing" role="status">{{ 'graph.growing' | t }}</p>
-        } @else if (cursor()) {
-          <div class="gr__more">
-            <app-button variant="text" size="sm" data-testid="gr-more" (click)="loadMore()">
-              <app-icon name="down" />
-              {{ 'graph.loadMore' | t }}
-            </app-button>
-          </div>
+        @if (view() === 'list') {
+          @if (growing()) {
+            <p class="gr__growing" role="status">{{ 'graph.growing' | t }}</p>
+          } @else if (cursor()) {
+            <div class="gr__more">
+              <app-button variant="text" size="sm" data-testid="gr-more" (click)="loadMore()">
+                <app-icon name="down" />
+                {{ 'graph.loadMore' | t }}
+              </app-button>
+            </div>
+          }
         }
       }
     </div>

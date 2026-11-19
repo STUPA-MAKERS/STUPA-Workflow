@@ -117,6 +117,8 @@ export class GraphCanvasComponent {
    * height of the frame. The page moves it away from the panel that covers a part.
    */
   readonly focusAt = input<{ readonly x: number; readonly y: number }>({ x: 0.5, y: 0.5 });
+  /** The room at the top and at the foot that the fit leaves free for controls over the drawing. */
+  readonly edge = input(0);
   /** A press on a node (its key) or on the empty drawing (null). */
   readonly chosen = output<string | null>();
 
@@ -353,7 +355,9 @@ export class GraphCanvasComponent {
   private refit(): void {
     if (this.free) return;
     const { width, height } = this.size();
-    this.view.set(fit(bounds(this.bodies(), FIT_PAD), width, height));
+    const edge = this.edge();
+    const view = fit(bounds(this.bodies(), FIT_PAD), width, Math.max(height - 2 * edge, 1));
+    this.view.set({ ...view, y: view.y + edge });
   }
 
   /**

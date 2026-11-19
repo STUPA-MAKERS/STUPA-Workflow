@@ -115,7 +115,13 @@ describe('GraphComponent', () => {
   it('draws the first page and names the drawing for a screen reader', async () => {
     const { calls, el, router } = await start('/graph', [() => of(FULL)]);
     expect(calls).toEqual([{ filters: NO_FILTERS, cursor: null }]);
+    // § 001425: no title shows, and the filters and the legend are in the layer over the drawing.
     expect(el.querySelector('#gr-title')).toHaveTextContent('Graph');
+    expect(el.querySelector('#gr-title')).toHaveClass('sr-only');
+    expect(el.querySelector('.gr')).toHaveClass('gr--draw');
+    expect(el.querySelector('.gr__float .gr__bar [role="search"]')).not.toBeNull();
+    expect(el.querySelector('.gr__float .gr__foot .gr__legend')).not.toBeNull();
+    expect(el.querySelectorAll('.gr__legend .gr__lineKey.gr__pill')).toHaveLength(2);
     expect(
       screen.getByRole('group', {
         name: 'Graph mit 6 Elementen und 5 Beziehungen. Die Ansicht „Liste“ zeigt dieselben Elemente als Text.',
@@ -351,6 +357,9 @@ describe('GraphComponent', () => {
     expect(cmp.view()).toBe('list');
     expect(last(calls).filters).toEqual({ ...NO_FILTERS, relations: 'links', q: 'Fest' });
     expect(el.querySelector('.gr__list')).not.toBeNull();
+    // The list is under the filters: no layer, no legend.
+    expect(el.querySelector('.gr')).not.toHaveClass('gr--draw');
+    expect(el.querySelector('.gr__foot')).toBeNull();
   });
 
   it('searches after a pause, with the last text only', async () => {

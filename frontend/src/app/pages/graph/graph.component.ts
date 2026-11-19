@@ -25,13 +25,11 @@ import {
   IconComponent,
   type IconName,
   MEDIA,
-  PageHeaderComponent,
   RangeChipComponent,
   type RangeValue,
   SearchPillComponent,
   SegmentedComponent,
   SkeletonComponent,
-  StickyBarComponent,
   mediaQuery,
 } from '@stupa-makers/ui-kit';
 import { LINK_ICON, LINK_KIND_LABEL, linkSub, splitUrl } from '../../features/todos/todos.util';
@@ -94,14 +92,12 @@ export interface GraphListRow extends GraphRow {
     GraphCanvasComponent,
     IconComponent,
     LoadErrorComponent,
-    PageHeaderComponent,
-    RangeChipComponent,
+      RangeChipComponent,
     RouterLink,
     SearchPillComponent,
     SegmentedComponent,
     SkeletonComponent,
-    StickyBarComponent,
-    TranslatePipe,
+      TranslatePipe,
   ],
   templateUrl: './graph.component.html',
   styleUrl: './graph.component.scss',
@@ -167,10 +163,12 @@ export class GraphComponent {
 
   readonly phone = mediaQuery(MEDIA.phone);
   /** Where the drawing shows a chosen node: beside the panel, on a phone above it. */
-  readonly focusAt = computed(() => (this.phone() ? { x: 0.5, y: 0.22 } : { x: 0.6, y: 0.5 }));
+  readonly focusAt = computed(() => (this.phone() ? { x: 0.5, y: 0.3 } : { x: 0.6, y: 0.5 }));
 
   readonly filtered = computed(() => isFiltered(this.filters()));
   readonly empty = computed(() => this.graph().nodes.length === 0);
+  /** True while the drawing shows: then the panel and the legend float over it. */
+  readonly drawing = computed(() => this.view() === 'graph' && !this.loading() && !this.error() && !this.empty());
 
   readonly rows = computed<ReadonlyMap<string, GraphRow>>(() => {
     const locale = this.i18n.locale();

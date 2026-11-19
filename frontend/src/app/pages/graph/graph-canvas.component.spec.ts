@@ -256,6 +256,14 @@ describe('GraphCanvasComponent', () => {
     expect(capture).toHaveBeenCalledWith(7);
   });
 
+  it('leaves the edge at the top and at the foot free when it fits the drawing', async () => {
+    const { cmp, fixture } = await setup();
+    const fitted = cmp.view();
+    fixture.componentRef.setInput('edge', 250);
+    screen.getByRole('button', { name: 'Alles zeigen' }).click();
+    expect(cmp.view().zoom).toBeLessThan(fitted.zoom);
+  });
+
   it('zooms with a pinch, the wheel and the buttons, and fits the drawing again', async () => {
     const { cmp, surface, fixture, container } = await setup();
     const fitted = cmp.view();

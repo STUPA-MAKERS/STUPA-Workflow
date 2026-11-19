@@ -15,7 +15,7 @@ scope:
 A node must show the icon of its kind (F/collaboration/links/001407) on a fill in the colour
 of its kind. The title must show under the node from a zoom step at which it is readable, and
 always for the chosen node and its neighbours. A legend must name each kind with its icon and
-colour. A press on a kind in the legend must switch the kind in the filter "Art". The page
+colour, and the two kinds of line ("Verknüpfung", "Feste Beziehung"), each in a chip. A press on a kind in the legend must switch the kind in the filter "Art". The page
 must not show a count of the nodes of a kind.
 
 Reason: The icon tells the kind without colour (NF/accessibility/perception/000502). Titles
