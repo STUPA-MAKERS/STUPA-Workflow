@@ -50,7 +50,7 @@ describe('LiveVoteService', () => {
 
   /**
    * A return of the page drops the old socket (dead or not) and opens a new one, whose
-   * `subscribe` replays the state (§F/meetings/meetings/001441).
+   * `subscribe` replays the state (§F/meetings/meetings/001521).
    */
   it('opens a new socket on a return of the page and ignores the old one', () => {
     const s = svc.open('m-1');

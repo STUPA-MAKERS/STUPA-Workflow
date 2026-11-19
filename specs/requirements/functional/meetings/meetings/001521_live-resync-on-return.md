@@ -1,5 +1,5 @@
 ---
-id: "001441"
+id: "001521"
 title: A live meeting page connects and reads again when the page returns
 kind: functional
 status: approved
@@ -29,7 +29,7 @@ from the back-forward cache, or when the device is online again. The events of o
 must count once. On each return, every page with a live meeting channel must close its
 channel, open a new channel at once and read its state again: the meeting page, the vote
 page, the beamer and the guest page of a public meeting. A page that stopped its tries
-(001440) must start again with a count of zero. A page that the user left must open no
+(001520) must start again with a count of zero. A page that the user left must open no
 channel.
 
 Reason: iOS freezes a PWA in the background and ends its sockets, often without a close

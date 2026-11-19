@@ -300,7 +300,7 @@ export class GuestSessionService implements OnDestroy {
   }
 
   /**
-   * The page is back from the background (§F/meetings/meetings/001441): drop the socket, which
+   * The page is back from the background (§F/meetings/meetings/001521): drop the socket, which
    * may be dead without a `close` event, and read the own state again. The read opens a new
    * socket while the request or the participation still runs.
    */

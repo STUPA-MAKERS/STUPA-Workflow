@@ -586,7 +586,7 @@ function liveSetup() {
   return { channels, resume, http, session, reads };
 }
 
-/** The live channel survives a drop and a return of the page (§F/meetings/meetings/001440, 001441). */
+/** The live channel survives a drop and a return of the page (§F/meetings/meetings/001520, 001521). */
 describe('MeetingSessionService live channel', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());

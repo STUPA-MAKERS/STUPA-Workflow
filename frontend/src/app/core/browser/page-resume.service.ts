@@ -12,7 +12,7 @@ export const RESUME_FOLD_MS = 500;
  *
  * iOS freezes a background PWA and drops its sockets, often without a `close` event, and
  * a socket that comes back delivers none of the events of the gap. A live page therefore
- * opens its socket again and reads its state again on `resume$` (§F/meetings/meetings/001441).
+ * opens its socket again and reads its state again on `resume$` (§F/meetings/meetings/001521).
  */
 @Injectable({ providedIn: 'root' })
 export class PageResumeService {
