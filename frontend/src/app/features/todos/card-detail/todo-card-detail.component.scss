@@ -350,8 +350,7 @@ button.cd__linkOpen {
   line-height: 1.5;
   text-align: start;
   cursor: text;
-  transition: scale var(--motion-xs) var(--ease-standard);
-  @include press.press(row);
+  @include press.press;
 }
 .cd__descEmpty:focus-visible {
   outline: 2px solid var(--color-focus-ring);
