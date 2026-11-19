@@ -209,6 +209,16 @@
 :host-context(.mp__agenda) .ap__head:not(:has(.ap__add)) .ap__title {
   border-radius: var(--radius-2xl) var(--radius-2xl) 6px 6px;
 }
+// Without a list below it (an empty agenda), the head is round at the bottom too (001440).
+:host-context(.mp__agenda) .ap__head:not(:has(~ .ap__list)) .ap__title {
+  border-radius: var(--radius-2xl) 6px 6px var(--radius-2xl);
+}
+:host-context(.mp__agenda) .ap__head:not(:has(~ .ap__list)) .ap__add {
+  border-radius: 6px var(--radius-2xl) var(--radius-2xl) 6px;
+}
+:host-context(.mp__agenda) .ap__head:not(:has(~ .ap__list)):not(:has(.ap__add)) .ap__title {
+  border-radius: var(--radius-2xl);
+}
 // In the very high contrast mode each segment has the white edge of a surface, and the add
 // segment is black with a yellow plus, not a yellow button.
 :host-context([data-very-high-contrast='on'] .mp__agenda) .ap__title,
@@ -222,6 +232,9 @@
   background: var(--vh-bg) !important;
   color: var(--vh-hi) !important;
   box-shadow: none !important;
+}
+:host-context([data-very-high-contrast='on'] .mp__agenda) .ap__head:not(:has(~ .ap__list)) .ap__add {
+  border-radius: 6px var(--radius-2xl) var(--radius-2xl) 6px !important;
 }
 :host-context([data-very-high-contrast='on'] .mp__agenda) .ap__add::before,
 :host-context([data-very-high-contrast='on'] .mp__agenda) .ap__add::after {

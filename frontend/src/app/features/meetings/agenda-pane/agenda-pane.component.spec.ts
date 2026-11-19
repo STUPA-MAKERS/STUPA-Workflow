@@ -106,7 +106,7 @@ describe('AgendaPaneComponent', () => {
 
   it('shows the empty agenda hint', async () => {
     await setup({ agenda: [] });
-    expect(screen.getByText('Noch keine Anträge auf der Tagesordnung.')).toBeInTheDocument();
+    expect(screen.getByText('Noch keine Punkte auf der Tagesordnung.')).toBeInTheDocument();
   });
 
   /** An item before "now" without a tick is not done. */
