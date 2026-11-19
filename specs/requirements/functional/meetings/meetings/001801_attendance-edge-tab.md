@@ -2,7 +2,7 @@
 id: "001801"
 title: A tab at the end edge opens the attendance
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:
