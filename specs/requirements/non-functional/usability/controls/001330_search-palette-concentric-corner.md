@@ -2,7 +2,7 @@
 id: "001330"
 title: The search window has a corner concentric with its search bar
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
