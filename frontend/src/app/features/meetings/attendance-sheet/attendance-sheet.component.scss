@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use 'field' as f;
 
 :host {
@@ -41,9 +40,6 @@
   min-height: 0;
   overflow-y: auto;
   padding: 0 var(--space-1) var(--space-2);
-}
-.as__scroll {
-  @include fade.fade-y(var(--as-fade));
 }
 
 .as__rows,
@@ -226,4 +222,11 @@
   .as__menuGap {
     display: none;
   }
+}
+
+// The list cuts hard at its own rounded frame, and its rows run to the sides of the frame
+// (000193).
+.as__scroll {
+  border-radius: var(--radius-lg);
+  padding-inline: 0;
 }

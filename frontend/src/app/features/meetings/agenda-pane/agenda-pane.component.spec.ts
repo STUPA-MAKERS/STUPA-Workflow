@@ -375,31 +375,30 @@ describe('AgendaPaneComponent', () => {
       item({ id: 't-3', title: 'Verschiedenes', position: 2 }),
     ];
 
-    it('planRows: shows the planned start and the duration in the sub line and the end below (§ 001141, § 001144)', async () => {
+    it('planRows: shows the planned start and the duration in the sub line and no end line (§ 001141, § 001144)', async () => {
       const { container } = await setup({ meeting: meeting({ status: 'planned', startTime: '18:00' }), agenda: TIMED });
       expect(screen.getByText('ca. 18:00 · 5 Min.')).toBeInTheDocument();
       expect(screen.getByText('ca. 18:05 · 30 Min.')).toBeInTheDocument();
       expect(screen.getByText('ca. 18:35')).toBeInTheDocument();
-      const end = container.querySelector('.ap__plan-end');
-      expect(end).toHaveTextContent('Ende ca. 18:35');
-      expect(end).not.toHaveClass('ap__plan-end--over');
+      expect(screen.queryByText(/Ende ca\./)).toBeNull();
+      expect(container.querySelector('.ap__over')).toBeNull();
     });
 
-    it('planRowsOverrun: marks an end after the end time of the meeting with the warning class only (§ 001144)', async () => {
+    it('planRowsOverrun: marks no overrun of the end time of the meeting (§ 001144)', async () => {
       const { container } = await setup({
         meeting: meeting({ status: 'planned', startTime: '18:00', endTime: '18:30' }),
         agenda: TIMED,
       });
-      const end = container.querySelector('.ap__plan-end');
-      expect(end).toHaveClass('ap__plan-end--over');
-      expect(end).toHaveTextContent(/^Ende ca\. 18:35$/);
+      expect(screen.getByText('ca. 18:35')).toBeInTheDocument();
+      expect(container.querySelector('.ap__over')).toBeNull();
+      expect(screen.queryByText(/Ende ca\./)).toBeNull();
     });
 
-    it('planRowsNoStart: shows only the durations and the sum without a start time (§ 001142)', async () => {
-      const { container } = await setup({ meeting: meeting({ status: 'planned', startTime: null }), agenda: TIMED });
+    it('planRowsNoStart: shows only the durations without a start time (§ 001142)', async () => {
+      await setup({ meeting: meeting({ status: 'planned', startTime: null }), agenda: TIMED });
       expect(screen.getByText('5 Min.')).toBeInTheDocument();
       expect(screen.queryByText(/ca\. \d\d:\d\d/)).toBeNull();
-      expect(container.querySelector('.ap__plan-end')).toHaveTextContent('Dauer ca. 35 Min.');
+      expect(screen.queryByText(/Dauer ca\./)).toBeNull();
     });
 
     it('planRowsLive: shows the recorded time of a reached item without "ca." (§ 001143)', async () => {
@@ -417,7 +416,7 @@ describe('AgendaPaneComponent', () => {
 
     it('planRowsNone: shows no plan without any duration (§ 001141)', async () => {
       const { container } = await setup({ meeting: meeting({ status: 'planned' }) });
-      expect(container.querySelector('.ap__plan-end')).toBeNull();
+      expect(container.querySelector('.ap__over')).toBeNull();
       expect(screen.queryByText(/ca\. \d\d:\d\d/)).toBeNull();
     });
 

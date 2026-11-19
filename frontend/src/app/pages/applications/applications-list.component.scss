@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use '../../shared/ui/surface-card' as sc;
 @use 'list-pane' as lp;
 
@@ -85,9 +84,6 @@
 }
 .apps--split .apps__scroll > * {
   flex: none;
-}
-.apps__scroll {
-  @include fade.fade-y(var(--apps-fade));
 }
 
 .apps__rows {
