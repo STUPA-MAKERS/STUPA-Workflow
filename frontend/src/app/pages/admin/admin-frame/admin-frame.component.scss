@@ -164,19 +164,19 @@
   --stb-bg: var(--color-surface-1);
 }
 .af--split .af__pageBody {
-  --af-fade: var(--space-6);
   position: relative;
   display: flex;
   flex: 1 1 0;
   flex-direction: column;
   min-height: 0;
-  padding: var(--space-6) var(--space-6) var(--space-7);
+  // The body is a round frame as wide as the fields, 24px inside the sheet, so a field that
+  // scrolls past an end keeps its round corners and the cut looks intended (spec 000193).
+  margin: var(--space-6);
+  padding: 0 0 var(--space-2);
+  border-radius: var(--radius-field);
   overflow-y: auto;
   overscroll-behavior: contain;
-  scroll-padding-block: var(--af-fade);
-  // A sticky element sticks below the top padding of its scroll box, so a bar with top 0 left
-  // the padding strip open and the rows scrolled through it. The bar sticks at the top edge.
-  --ld-sticky-top: calc(-1 * var(--space-6));
+  --ld-sticky-top: 0px;
 }
 .af--split .af__pageBody > ::ng-deep * {
   flex-shrink: 0;
@@ -189,7 +189,7 @@
   --fab-inset: var(--space-6);
 }
 .af--split .af__pageBody:has(app-fab) {
-  padding-bottom: calc(56px + var(--space-6) + var(--space-4));
+  padding-bottom: calc(56px + var(--space-4));
 }
 
 .af--pane,
