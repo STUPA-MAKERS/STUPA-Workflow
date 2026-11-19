@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  Injector,
+  runInInjectionContext,
+  signal,
+} from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { closeOnBack } from './close-on-back';
 
@@ -72,5 +79,17 @@ describe('closeOnBack', () => {
     window.history.back();
     await pop;
     expect(fixture.componentInstance.closes()).toBe(0);
+  });
+
+  it('§NF/usability/controls/000931: does nothing without a window', () => {
+    const doc = { defaultView: null } as unknown as Document;
+    const open = signal(true);
+    const close = jest.fn();
+    const injector = Injector.create({
+      providers: [{ provide: DOCUMENT, useValue: doc }],
+      parent: TestBed.inject(Injector),
+    });
+    expect(() => runInInjectionContext(injector, () => closeOnBack(open, close))).not.toThrow();
+    expect(close).not.toHaveBeenCalled();
   });
 });
