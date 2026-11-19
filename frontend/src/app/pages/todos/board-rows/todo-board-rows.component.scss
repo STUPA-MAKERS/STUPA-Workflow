@@ -116,13 +116,10 @@
   min-width: 0;
   padding: var(--space-2);
   border-radius: var(--radius-xl);
-  background: var(--color-surface-3);
+  background: var(--color-surface-2);
 }
-// A column stands out from the page, and its cards a step more (spec 001332).
 :host-context([data-theme='dark']) .br__col {
-  --board-tile-bg: var(--color-surface-4);
-  --board-tile-hover: color-mix(in srgb, var(--color-text) 8%, var(--color-surface-4));
-  background: var(--color-surface-3);
+  background: var(--color-surface-1);
 }
 .br__colHead {
   display: flex;
@@ -207,25 +204,14 @@
   min-width: 0;
   padding: var(--space-2);
   border-radius: var(--radius-xl);
-  background: var(--color-surface-3);
+  background: var(--color-surface-2);
 }
 :host-context([data-theme='dark']) .br__list {
-  --board-tile-bg: var(--color-surface-4);
-  --board-tile-hover: color-mix(in srgb, var(--color-text) 8%, var(--color-surface-4));
-  background: var(--color-surface-3);
+  background: var(--color-surface-1);
 }
 .br__moreItem {
   display: flex;
 }
 .br__empty {
   padding: 0 var(--space-2);
-}
-
-// On a wide screen the columns of a row scroll sideways up to the screen edge and the rail, not
-// to the gutter of the page (spec 001332). The body of the page bleeds the same way
-// (`todos.component`).
-.br__cols {
-  margin-inline: calc(-1 * var(--layout-gutter));
-  padding-inline: var(--layout-gutter);
-  scroll-padding-inline: var(--layout-gutter);
 }

@@ -1,6 +1,5 @@
 @use 'breakpoints' as bp;
 @use 'frosted' as *;
-@use 'display' as d;
 :host {
   display: flex;
   flex-direction: column;
@@ -287,23 +286,5 @@
 @keyframes td-fade-out {
   to {
     opacity: 0;
-  }
-}
-
-// On a wide screen the rows body runs over the gutter of the page to the screen edge and the
-// rail, so a board cuts there and not before (spec 001332). It wins over the side margins of
-// the kit for the rows of a glass head. In very high contrast it has no frame of its own,
-// because the frame would touch the line of the rail, and each column has its white edge.
-@include bp.not-phone {
-  .td.ld-pane--glass > .td__body--rows.td__body--rows.td__body--rows.td__body--rows.td__body--rows {
-    margin-inline: calc(-1 * var(--layout-gutter));
-    padding-inline: var(--layout-gutter);
-    scroll-padding-inline: var(--layout-gutter);
-  }
-}
-@include d.host-on(veryHigh) {
-  .td.ld-pane--glass > .td__body--rows.ld-pane__rows {
-    border: 0 !important;
-    border-radius: 0 !important;
   }
 }

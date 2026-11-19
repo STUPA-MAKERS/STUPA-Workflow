@@ -32,13 +32,10 @@
   min-height: 0;
   padding: var(--space-2);
   border-radius: var(--radius-xl);
-  background: var(--color-surface-3);
+  background: var(--color-surface-2);
 }
-// A column stands out from the page, and its cards a step more (spec 001332).
 :host-context([data-theme='dark']) .bv__col {
-  --board-tile-bg: var(--color-surface-4);
-  --board-tile-hover: color-mix(in srgb, var(--color-text) 8%, var(--color-surface-4));
-  background: var(--color-surface-3);
+  background: var(--color-surface-1);
 }
 .bv__scroll {
   display: flex;
@@ -291,12 +288,4 @@
   padding: var(--space-6) var(--space-2);
   color: var(--color-text-muted);
   text-align: center;
-}
-
-// In the rows body of a wide screen the columns scroll sideways up to the screen edge and the
-// rail (spec 001332).
-:host-context(.td__body--rows) .bv:not(.bv--phone) {
-  margin-inline: calc(-1 * var(--layout-gutter));
-  padding-inline: var(--layout-gutter);
-  scroll-padding-inline: var(--layout-gutter);
 }
