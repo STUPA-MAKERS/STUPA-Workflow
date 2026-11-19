@@ -416,12 +416,11 @@ export class MeetingAgendaService implements OnDestroy {
     const local = this.localBody;
     const done = this.pendingDone;
     this.agenda.set(
-      rows.map((a) => {
-        let row = a;
-        if (local && a.id === local.itemId) row = { ...row, body: local.body };
-        if (done && a.id === done.itemId && !a.doneAt) row = { ...row, doneAt: done.doneAt };
-        return row;
-      }),
+      rows.map((a) => ({
+        ...a,
+        ...(local && a.id === local.itemId ? { body: local.body } : {}),
+        ...(done && a.id === done.itemId && !a.doneAt ? { doneAt: done.doneAt } : {}),
+      })),
     );
   }
 }
