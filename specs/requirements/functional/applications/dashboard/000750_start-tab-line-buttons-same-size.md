@@ -2,15 +2,12 @@
 id: "000750"
 title: The two buttons in the tab line of the start page have the same size
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-12
-tests:
-  - "frontend/src/app/pages/dashboard/dashboard.component.spec.ts:DashboardComponent"
-implementation:
-  - frontend/src/app/pages/dashboard/dashboard.component.scss
+updated: 2026-11-19
+replaced_by: F/collaboration/activity/001300
 scope:
-  - frontend/src/app/pages/dashboard
+  - frontend/src/app/pages/activity
 ---
 
 # The two buttons in the tab line of the start page have the same size

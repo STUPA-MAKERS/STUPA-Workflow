@@ -76,7 +76,7 @@ describe('PageIndexService', () => {
   it('still offers the pages that stand on their own', () => {
     const svc = setup({ canAny: () => true });
     const paths = svc.visible().map((e) => e.path);
-    expect(paths).toContain('/dashboard');
+    expect(paths).toContain('/activity');
     expect(paths).toContain('/apply');
   });
 

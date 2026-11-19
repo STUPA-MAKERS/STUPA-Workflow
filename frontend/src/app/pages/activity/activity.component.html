@@ -1,6 +1,15 @@
 <div class="act">
   <section class="ld-pane" aria-labelledby="act-title">
-    <app-page-header [pane]="true" titleId="act-title" [title]="'activity.title' | t" />
+    <app-page-header [pane]="true" titleId="act-title" [title]="'activity.title' | t">
+      @if (!phone()) {
+        <ng-container ngProjectAs="[actions]">
+          <a class="act__new" routerLink="/apply">
+            <app-icon name="plus" [size]="16" />
+            {{ 'fab.application' | t }}
+          </a>
+        </ng-container>
+      }
+    </app-page-header>
 
     <app-sticky-bar class="ld-pane__filters">
       <div class="act__chips" role="group" [attr.aria-label]="'activity.filter.group' | t">
@@ -28,6 +37,7 @@
     </app-sticky-bar>
 
     <div class="act__scroll" appScrollFade="y" [attr.aria-busy]="loading() || null">
+      <app-live-cards class="act__live" />
       @if (loading()) {
         <div class="act__skel skel-in">
           <app-list-group skeleton="7rem" />
@@ -92,3 +102,7 @@
     </div>
   </section>
 </div>
+
+@if (phone()) {
+  <app-fab [label]="'fab.application' | t" link="/apply" />
+}

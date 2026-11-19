@@ -148,7 +148,7 @@ export class ShellComponent {
 
   /** The mark without the wordmark: the upload of the branding, else the built-in one. */
   readonly brand = computed<ShellBrand>(() => ({
-    home: '/dashboard',
+    home: '/activity',
     label: this.branding.appName(),
     mark: this.branding.markSrc(),
   }));

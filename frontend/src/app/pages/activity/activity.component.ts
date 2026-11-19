@@ -15,10 +15,14 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { clock, isoDay, localToday, weekdayDate } from '@shared/date-format';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
+import { RouterLink } from '@angular/router';
+import { FabLinkDirective } from '@stupa-makers/ui-kit/shell';
+import { LiveCardsComponent } from '../../features/meetings/live-cards/live-cards.component';
 import { RailStatusService } from '../../layout/rail-status.service';
 import {
   ButtonComponent,
   EmptyStateComponent,
+  FabComponent,
   FilterSelectComponent,
   IconComponent,
   type IconName,
@@ -65,6 +69,10 @@ export interface ActivityDay {
  * item. A row after the last visit carries a dot; the first step that loads sets the
  * visit mark to the `readAt` of the server, and the dot of the navigation goes at once.
  * The page loads 50 rows per step and the next 50 at the end of the list.
+ *
+ * It is the start page of a signed-in person (spec 001300): above the list it shows the
+ * live meetings (spec 001302), and "Antrag stellen" is the one action of the header, on a
+ * phone the floating button (spec 001301).
  */
 @Component({
   selector: 'app-activity',
@@ -74,7 +82,11 @@ export interface ActivityDay {
     TranslatePipe,
     ButtonComponent,
     EmptyStateComponent,
+    FabComponent,
+    FabLinkDirective,
     FilterSelectComponent,
+    LiveCardsComponent,
+    RouterLink,
     IconComponent,
     InfiniteScrollDirective,
     ListGroupComponent,

@@ -1,0 +1,46 @@
+@for (c of cards(); track c.meeting.id) {
+  <section class="lc" [attr.aria-label]="'dashboard.today.liveRegion' | t">
+    <div class="lc__head">
+      <app-date-block [date]="c.meeting.date" [live]="true" />
+      <div class="lc__text">
+        <span class="lc__title">
+          <span class="lc__name" [title]="c.meeting.title">{{ c.meeting.title }}</span>
+          <app-status-text kind="accent">{{ 'meetings.status.live' | t }}</app-status-text>
+        </span>
+        @if (c.sub) {
+          <span class="lc__sub">{{ c.sub }}</span>
+        }
+      </div>
+    </div>
+    @if (c.now; as now) {
+      <div class="lc__progress">
+        <div class="lc__progressLine">
+          <span class="lc__progressLabel">{{ 'dashboard.sessions.progress' | t: { n: now.position, count: now.count } }}</span>
+          <span class="mono lc__progressCount" aria-hidden="true">{{ now.position }} / {{ now.count }}</span>
+        </div>
+        <app-seg-bar
+          size="thin"
+          [segments]="[{ value: now.position, tone: 'filled' }]"
+          [total]="now.count"
+          [label]="'dashboard.sessions.progress' | t: { n: now.position, count: now.count }"
+        />
+        @if (now.title) {
+          <span class="lc__sub ell" [title]="now.title">{{ now.title }}</span>
+        }
+      </div>
+    }
+    @if (c.vote; as v) {
+      <p class="lc__voteLine">
+        <app-status-text kind="accent">{{ 'meetings.overview.voteOpen' | t }}</app-status-text>
+        @if (v.ballot) {
+          <span class="lc__dot" aria-hidden="true">·</span>
+          <span>{{ (v.ballot === 'cast' ? 'dashboard.today.voted' : 'dashboard.today.voteMissing') | t }}</span>
+        }
+      </p>
+    }
+    <a class="lc__join" [routerLink]="['/meetings', c.meeting.id]">
+      <app-icon name="play" [size]="14" />
+      {{ 'dashboard.sessions.join' | t }}
+    </a>
+  </section>
+}
