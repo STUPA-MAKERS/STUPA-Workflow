@@ -104,8 +104,11 @@ import { AgendaDialogComponent } from './agenda-dialog/agenda-dialog.component';
 import { DecisionDialogComponent } from './decision-dialog/decision-dialog.component';
 import { DecisionSectionComponent } from '@shared/decision/decision-section.component';
 import { decisionHistoryLine } from '@shared/decision/decision.util';
+import { amountChangeLines, forcedLine, outsideDecisionLines } from '@shared/decision/timeline-lines';
 import { ApplicationsPageService } from './applications-page.service';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
+import { OutsideDecisionDialogComponent } from './outside-decision-dialog/outside-decision-dialog.component';
+import { AmendAmountDialogComponent } from './amend-amount-dialog/amend-amount-dialog.component';
 import {
   type LinkedLead,
   TodoLinkedListComponent,
@@ -211,6 +214,8 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
     AnswerViewComponent,
     HistoryComponent,
     ForceStatusDialogComponent,
+    OutsideDecisionDialogComponent,
+    AmendAmountDialogComponent,
     AgendaDialogComponent,
     DecisionDialogComponent,
     DecisionSectionComponent,
@@ -471,6 +476,32 @@ export class ApplicationsDetailComponent {
   readonly canForceStatus = computed(() => this.auth.can('application.force_status'));
   readonly forceDialogOpen = signal(false);
 
+  /**
+   * "Beschluss erfassen" (spec 001600): a decision made outside the platform, for an
+   * application in a vote state, with `application.record_decision`.
+   */
+  readonly canRecordDecision = computed(() => {
+    const app = this.app();
+    return !!app && !app.observer && app.state?.kind === 'vote' && this.auth.can('application.record_decision');
+  });
+  readonly outsideOpen = signal(false);
+
+  /**
+   * "Genehmigten Betrag ändern" (spec 001620): for an application with money in an
+   * approved state, with `application.amend_decision`.
+   */
+  readonly canAmendAmount = computed(() => {
+    const app = this.app();
+    return (
+      !!app &&
+      !app.observer &&
+      app.amount !== null &&
+      !!app.state?.isApproved &&
+      this.auth.can('application.amend_decision')
+    );
+  });
+  readonly amendOpen = signal(false);
+
   private readonly router = inject(Router);
   readonly canManage = computed(() => this.auth.can('application.manage'));
   /**
@@ -701,7 +732,22 @@ export class ApplicationsDetailComponent {
     const versions = this.versions();
     const capture = this.app()?.capture ?? null;
     const firstVersion = versions.some((v) => v.version === 1);
-    const statusEntries: HistoryEntry[] = events.map((e, i) => {
+    const locale = this.i18n.formatLocale();
+    const currency = this.app()?.currency ?? 'EUR';
+    const amountEntries: HistoryEntry[] = events.flatMap((e) =>
+      e.kind === 'amountChange' && e.amountChange
+        ? [
+            {
+              at: e.at,
+              icon: 'edit' as const,
+              title: t('amendAmount.historyTitle'),
+              actor: this.actor(e.actorInfo, e.actor),
+              body: amountChangeLines(e.amountChange, locale, currency, t).join('\n'),
+            },
+          ]
+        : [],
+    );
+    const statusEntries: HistoryEntry[] = events.filter((e) => e.kind !== 'amountChange').map((e, i) => {
       const first = i === 0;
       const intake = capture?.intake
         ? [t('applications.history.intake', { intake: capture.intake })]
@@ -709,8 +755,8 @@ export class ApplicationsDetailComponent {
       const decision = e.decision
         ? decisionHistoryLine(
             e.decision,
-            this.i18n.formatLocale(),
-            this.app()?.currency ?? 'EUR',
+            locale,
+            currency,
             t,
           )
         : null;
@@ -720,7 +766,11 @@ export class ApplicationsDetailComponent {
         ...(e.transitionLabel
           ? [t('applications.history.transition', { label: e.transitionLabel })]
           : []),
-        ...(e.note && !e.note.startsWith('vote:') ? [e.note] : []),
+        ...(e.outsideDecision
+          ? [t('outsideDecision.historyTitle'), ...outsideDecisionLines(e.outsideDecision, locale, t)]
+          : []),
+        ...(e.forced ? [forcedLine(e.forceReason, t)] : []),
+        ...(e.note && !e.note.startsWith('vote:') && !e.note.startsWith('outside:') ? [e.note] : []),
         ...(decision ? [decision] : []),
         ...(e.voteDeleted ? [t('applications.history.voteDeleted')] : []),
       ];
@@ -733,7 +783,14 @@ export class ApplicationsDetailComponent {
         body: lines.join('\n') || null,
         link: e.voteId
           ? { label: t('applications.history.voteLink'), route: ['/voting', e.voteId] }
-          : null,
+          : e.outsideDecision?.meetingId
+            ? {
+                label: e.outsideDecision.meetingTitle
+                  ? t('outsideDecision.meetingLink', { title: e.outsideDecision.meetingTitle })
+                  : t('outsideDecision.meetingLinkPlain'),
+                route: ['/meetings', e.outsideDecision.meetingId],
+              }
+            : null,
       };
     });
     const versionEntries: HistoryEntry[] = versions
@@ -767,7 +824,7 @@ export class ApplicationsDetailComponent {
         ? { label: t('applications.predecessor.open'), route: ['/applications', e.predecessor.id] }
         : null,
     }));
-    return [...statusEntries, ...versionEntries, ...linkEntries];
+    return [...statusEntries, ...amountEntries, ...versionEntries, ...linkEntries];
   });
 
   private id: Uuid = '';
@@ -847,6 +904,16 @@ export class ApplicationsDetailComponent {
     ];
     const pdf: RowMenuItem = { id: 'pdf', label: t('applications.detail.openPdf'), icon: 'file' };
     const more = [
+      ...when(this.canRecordDecision(), {
+        id: 'outside',
+        label: t('outsideDecision.title'),
+        icon: 'check',
+      }),
+      ...when(this.canAmendAmount(), {
+        id: 'amend',
+        label: t('amendAmount.title'),
+        icon: 'edit',
+      }),
       ...when(this.canForceStatus(), {
         id: 'force',
         label: t('applications.detail.forceStatus'),
@@ -952,6 +1019,12 @@ export class ApplicationsDetailComponent {
         break;
       case 'force':
         this.openForceDialog();
+        break;
+      case 'outside':
+        this.outsideOpen.set(true);
+        break;
+      case 'amend':
+        this.amendOpen.set(true);
         break;
       case 'versions':
         this.showVersions();
@@ -1282,12 +1355,24 @@ export class ApplicationsDetailComponent {
 
   /**
    * The approved amount when it deviates from the requested one, else `''`. The
-   * header and the cost centre then name it next to the struck requested amount.
+   * header and the cost centre then name it next to the struck requested amount. A
+   * state without the flag `Bewilligt` shows none (spec 001612).
    */
   approvedAmount(app: Application): string {
+    if (!app.state?.isApproved) return '';
     if (app.approvedAmount === null || app.approvedAmount === undefined || app.amount === null) return '';
     if (Number(app.approvedAmount) === Number(app.amount)) return '';
     return formatMoney(app.approvedAmount, this.i18n.formatLocale(), { currency: app.currency });
+  }
+
+  /**
+   * The approved amount of the field "Genehmigt" (spec 001612): empty unless the state
+   * carries the flag `Bewilligt`; without a stored amount it is the requested one.
+   */
+  approvedShown(app: Application): string {
+    if (!app.state?.isApproved || app.amount === null) return '';
+    const value = app.approvedAmount ?? app.amount;
+    return formatMoney(value, this.i18n.formatLocale(), { currency: app.currency }) || value;
   }
 
   /**

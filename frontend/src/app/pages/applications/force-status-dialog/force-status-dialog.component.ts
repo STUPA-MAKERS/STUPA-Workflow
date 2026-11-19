@@ -12,7 +12,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiClient } from '@core/api/api-client.service';
-import type { ApplicationState, Uuid } from '@core/api/models';
+import { type ApplicationState, FORCE_REASONS, type ForceReason, type Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
@@ -20,12 +20,18 @@ import {
   DialogComponent,
   SelectFieldComponent,
   type SelectOption,
+  TextareaComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 
+/** The shortest note of the reason `other` (spec 001650, as the server). */
+export const MIN_OTHER_NOTE = 10;
+
 /**
  * "Status setzen": put an application straight into a state of its flow
- * (`application.force_status`). The server bypasses the guards; a reason is mandatory.
+ * (`application.force_status`). The server bypasses the guards. A reason from the list
+ * is mandatory (spec 001650); the note is optional, except for `other`, which needs a
+ * note of at least 10 characters.
  *
  * The flow states load each time the dialog opens for an application. The list (row
  * menu) and the detail (overflow menu) both open it; `done` fires after a success, so
@@ -35,7 +41,14 @@ import {
   selector: 'app-force-status-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, DialogComponent, SelectFieldComponent],
+  imports: [
+    FormsModule,
+    TranslatePipe,
+    ButtonComponent,
+    DialogComponent,
+    SelectFieldComponent,
+    TextareaComponent,
+  ],
   templateUrl: './force-status-dialog.component.html',
   styleUrl: './force-status-dialog.component.scss',
 })
@@ -53,8 +66,24 @@ export class ForceStatusDialogComponent {
 
   private readonly states = signal<ApplicationState[]>([]);
   readonly choice = signal('');
+  readonly reason = signal<ForceReason | ''>('');
   readonly note = signal('');
   readonly saving = signal(false);
+
+  /** The reasons of the list, in their order. */
+  readonly reasonOptions = computed<SelectOption[]>(() =>
+    FORCE_REASONS.map((r) => ({
+      value: r,
+      label: this.i18n.translate(`applications.forceReason.${r}`),
+    })),
+  );
+
+  /** `other` needs a note of at least 10 characters. */
+  readonly noteRequired = computed(() => this.reason() === 'other');
+  readonly noteMissing = computed(
+    () => this.noteRequired() && this.note().trim().length < MIN_OTHER_NOTE,
+  );
+  readonly ready = computed(() => !!this.choice() && !!this.reason() && !this.noteMissing());
 
   /** Every state of the flow except the current one. */
   readonly options = computed<SelectOption[]>(() => {
@@ -82,6 +111,7 @@ export class ForceStatusDialogComponent {
 
   private reset(id: Uuid): void {
     this.choice.set('');
+    this.reason.set('');
     this.note.set('');
     this.states.set([]);
     this.seq = this.seq + 1;
@@ -98,10 +128,11 @@ export class ForceStatusDialogComponent {
   submit(): void {
     const id = this.applicationId();
     const stateId = this.choice();
+    const reason = this.reason();
     const note = this.note().trim();
-    if (!id || !stateId || !note || this.saving()) return;
+    if (!id || !reason || !this.ready() || this.saving()) return;
     this.saving.set(true);
-    this.api.forceStatus(id, { stateId, note }).subscribe({
+    this.api.forceStatus(id, { stateId, reason, note: note || null }).subscribe({
       next: () => {
         this.saving.set(false);
         this.open.set(false);

@@ -205,8 +205,14 @@ async def test_outside_meeting_check_maps_a_refusal(monkeypatch: pytest.MonkeyPa
     assert err.value.code == "meeting_unknown"
 
 
-async def test_failed_outside_decision_drops_a_decision(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A `failed` result never carries a decision, whatever the body holds."""
+@pytest.mark.parametrize("outcome", ["failed", "passed"])
+async def test_outside_decision_drops_a_decision_without_approval(
+    monkeypatch: pytest.MonkeyPatch, outcome: str
+) -> None:
+    """A result whose branch does not approve never carries a decision, whatever the body holds.
+
+    The dialog offers the amount on every `passed`, because it does not know the branch.
+    """
     state = SimpleNamespace(id=uuid4(), kind="vote")
     target = SimpleNamespace(id=uuid4(), is_approved=False)
     transition = SimpleNamespace(id=uuid4(), from_state_id=state.id, to_state_id=target.id)
@@ -241,7 +247,7 @@ async def test_failed_outside_decision_drops_a_decision(monkeypatch: pytest.Monk
     monkeypatch.setattr(FlowService, "_cancel_votes", _cancel)
     payload = OutsideDecisionIn.model_validate(
         {
-            "result": "failed",
+            "result": outcome,
             "meetingDate": "2026-11-18",
             "gremiumId": str(uuid4()),
             "decision": {"approvedAmount": "1.00"},
@@ -251,7 +257,7 @@ async def test_failed_outside_decision_drops_a_decision(monkeypatch: pytest.Monk
         flow, app.id, payload, Principal(sub="x"), now=datetime(2026, 11, 19, tzinfo=UTC)
     )
     assert seen["decision"] is None
-    assert seen["note"] == "outside:failed"
+    assert seen["note"] == f"outside:{outcome}"
     assert staged.cancelled_vote_ids == ("v1",)
 
 

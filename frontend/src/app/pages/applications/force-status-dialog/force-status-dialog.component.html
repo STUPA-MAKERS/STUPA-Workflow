@@ -12,22 +12,37 @@
     [ngModel]="choice()"
     (ngModelChange)="choice.set($event)"
   />
-  <label class="fsd__reason">
-    <span>{{ 'applications.detail.forceStatusReason' | t }}</span>
+  <app-select
+    class="fsd__gap"
+    [label]="'applications.detail.forceStatusReason' | t"
+    [placeholder]="'applications.detail.forceStatusReasonPick' | t"
+    [options]="reasonOptions()"
+    [ngModel]="reason()"
+    (ngModelChange)="reason.set($event)"
+  />
+  <app-textarea
+    class="fsd__gap"
+    [label]="(noteRequired() ? 'applications.detail.forceStatusNoteRequired' : 'applications.detail.forceStatusNote') | t"
+    [invalid]="noteRequired() && note().length > 0 && noteMissing()"
+  >
     <textarea
       rows="3"
-      name="forceReason"
+      name="forceNote"
+      [attr.aria-required]="noteRequired()"
       [placeholder]="'applications.detail.forceStatusReasonPlaceholder' | t"
       [ngModel]="note()"
       (ngModelChange)="note.set($event)"
     ></textarea>
-  </label>
+  </app-textarea>
+  @if (noteRequired() && note().length > 0 && noteMissing()) {
+    <p class="fsd__error" role="alert">{{ 'applications.detail.forceStatusNoteShort' | t }}</p>
+  }
   <div dialog-footer>
     <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
     <app-button
       variant="danger"
       [loading]="saving()"
-      [disabled]="!choice() || !note().trim()"
+      [disabled]="!ready()"
       (click)="submit()"
     >{{ 'applications.detail.forceStatusConfirm' | t }}</app-button>
   </div>

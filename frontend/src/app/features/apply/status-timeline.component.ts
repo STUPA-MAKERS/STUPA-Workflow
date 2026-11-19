@@ -41,6 +41,7 @@ import { applyServerErrors, clearServerErrors } from '@shared/forms/server-error
 import { type ActorLabelOptions, actorLabel } from '@shared/actor-label.util';
 import { DecisionSectionComponent } from '@shared/decision/decision-section.component';
 import { decisionHistoryLine } from '@shared/decision/decision.util';
+import { amountChangeLines, outsideDecisionLines } from '@shared/decision/timeline-lines';
 import { flowColorKind } from '@shared/status-kind.util';
 import { HistoryComponent, type HistoryEntry } from '@shared/ui/history/history.component';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
@@ -326,20 +327,31 @@ export class StatusTimelineComponent {
     const actor = (info: ActorInfo | null | undefined, legacy: string | null): string | null =>
       actorLabel(info, legacy, t, this.applicantLabel());
     const events = [...this.timeline()].sort((a, b) => a.at.localeCompare(b.at));
-    const statusEntries: readonly HistoryEntry[] = events.map((e, i) => {
-      const decision = e.decision
-        ? decisionHistoryLine(
-            e.decision,
-            this.i18n.formatLocale(),
-            this.application()?.currency ?? 'EUR',
-            t,
-          )
-        : null;
+    const locale = this.i18n.formatLocale();
+    const currency = this.application()?.currency ?? 'EUR';
+    const amountEntries: readonly HistoryEntry[] = events.flatMap((e) =>
+      e.kind === 'amountChange' && e.amountChange
+        ? [
+            {
+              at: e.at,
+              icon: 'edit' as const,
+              title: t('amendAmount.historyTitle'),
+              actor: actor(e.actorInfo, e.actor),
+              body: amountChangeLines(e.amountChange, locale, currency, t).join('\n'),
+            },
+          ]
+        : [],
+    );
+    const statusEntries: readonly HistoryEntry[] = events.filter((e) => e.kind !== 'amountChange').map((e, i) => {
+      const decision = e.decision ? decisionHistoryLine(e.decision, locale, currency, t) : null;
       const lines = [
         ...(e.transitionLabel
           ? [t('applications.history.transition', { label: e.transitionLabel })]
           : []),
-        ...(e.note ? [this.noteText(e.note)] : []),
+        ...(e.outsideDecision
+          ? [t('outsideDecision.historyTitle'), ...outsideDecisionLines(e.outsideDecision, locale, t)]
+          : []),
+        ...(e.note && !e.note.startsWith('outside:') ? [this.noteText(e.note)] : []),
         ...(decision ? [decision] : []),
         ...(e.voteDeleted ? [t('applications.history.voteDeleted')] : []),
       ];
@@ -366,7 +378,7 @@ export class StatusTimelineComponent {
             : null,
         };
       });
-    return [...statusEntries, ...versionEntries];
+    return [...statusEntries, ...amountEntries, ...versionEntries];
   });
 
   /**

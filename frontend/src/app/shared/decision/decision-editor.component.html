@@ -1,15 +1,18 @@
 <div class="dec">
-  <app-switch
-    [id]="idPrefix() + '-switch'"
-    [checked]="draft().enabled"
-    (checkedChange)="setEnabled($event)"
-    ><span class="dec__switchLabel">{{ 'decision.switch' | t }}</span></app-switch
-  >
+  @if (!required()) {
+    <app-switch
+      [id]="idPrefix() + '-switch'"
+      [checked]="draft().enabled"
+      (checkedChange)="setEnabled($event)"
+      ><span class="dec__switchLabel">{{ 'decision.switch' | t }}</span></app-switch
+    >
+  }
 
   @if (draft().enabled) {
     <div class="dec__box">
       <app-currency-input
         [label]="'decision.amount' | t"
+        [required]="required()"
         [name]="idPrefix() + '-amount'"
         [hint]="amountHint()"
         [error]="amountError()"

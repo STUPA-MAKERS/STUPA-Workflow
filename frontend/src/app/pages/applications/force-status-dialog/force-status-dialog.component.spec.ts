@@ -80,7 +80,37 @@ describe('ForceStatusDialogComponent', () => {
     cmp.choice.set('s2');
     cmp.note.set('   ');
     cmp.submit();
+    expect(cmp.ready()).toBe(false);
     http.verify();
+  });
+
+  /** Spec 001650: the reasons come from a fixed list. */
+  it('offers the four reasons of the list', async () => {
+    const { cmp, openIt } = await setup();
+    openIt();
+    expect(cmp.reasonOptions().map((o) => o.value)).toEqual([
+      'outside_decision',
+      'applicant_error',
+      'error_correction',
+      'other',
+    ]);
+    expect(cmp.reasonOptions()[0].label).toBe('Beschluss außerhalb der Plattform');
+  });
+
+  /** Spec 001650: "Sonstiges" needs a note of at least 10 characters. */
+  it('needs a note of ten characters for "Sonstiges"', async () => {
+    const { http, cmp, openIt, detectChanges } = await setup();
+    openIt();
+    cmp.choice.set('s2');
+    cmp.reason.set('other');
+    cmp.note.set('  kurz  ');
+    detectChanges();
+    expect(cmp.noteMissing()).toBe(true);
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    cmp.submit();
+    http.verify();
+    cmp.note.set('Einzelfall laut Vorstand');
+    expect(cmp.ready()).toBe(true);
   });
 
   it('forces the state with the reason, closes and reports done', async () => {
@@ -88,15 +118,26 @@ describe('ForceStatusDialogComponent', () => {
     const success = jest.spyOn(toast, 'success');
     openIt();
     cmp.choice.set('s2');
+    cmp.reason.set('error_correction');
     cmp.note.set(' Fehler im Flow ');
     cmp.submit();
     cmp.submit();
     const post = http.expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-1/force-status');
-    expect(post.request.body).toEqual({ stateId: 's2', note: 'Fehler im Flow' });
+    expect(post.request.body).toEqual({ stateId: 's2', reason: 'error_correction', note: 'Fehler im Flow' });
     post.flush({ newStateId: 's2', statusEventId: 'e1', dispatchedActions: [] });
     expect(host.open()).toBe(false);
     expect(host.done).toBe(1);
     expect(success).toHaveBeenCalled();
+  });
+
+  it('sends no note when the field is empty', async () => {
+    const { http, cmp, openIt } = await setup();
+    openIt();
+    cmp.choice.set('s2');
+    cmp.reason.set('applicant_error');
+    cmp.submit();
+    const post = http.expectOne((r) => r.method === 'POST');
+    expect(post.request.body).toEqual({ stateId: 's2', reason: 'applicant_error', note: null });
   });
 
   it.each([
@@ -108,7 +149,7 @@ describe('ForceStatusDialogComponent', () => {
     const error = jest.spyOn(toast, 'error');
     openIt();
     cmp.choice.set('s2');
-    cmp.note.set('Grund');
+    cmp.reason.set('outside_decision');
     cmp.submit();
     http.expectOne((r) => r.method === 'POST').flush({}, { status, statusText: 'x' });
     expect(cmp.saving()).toBe(false);
@@ -131,6 +172,7 @@ describe('ForceStatusDialogComponent', () => {
     host.open.set(true);
     detectChanges();
     expect(cmp.choice()).toBe('');
+    expect(cmp.reason()).toBe('');
     expect(cmp.note()).toBe('');
     http.expectOne(STATES_URL).flush({}, { status: 500, statusText: 'x' });
     expect(cmp.options()).toEqual([]);
@@ -155,7 +197,8 @@ describe('ForceStatusDialogComponent', () => {
     host.open.set(true);
     detectChanges();
     cmp.choice.set('s2');
-    cmp.note.set('x');
+    cmp.reason.set('other');
+    cmp.note.set('Begründung lang genug');
     cmp.submit();
     http.verify();
   });

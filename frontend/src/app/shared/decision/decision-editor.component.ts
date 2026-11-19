@@ -43,10 +43,12 @@ export class DecisionEditorComponent {
   readonly currency = input<string | null>('EUR');
   /** A unique prefix for the ids of the controls. */
   readonly idPrefix = input('dec');
+  /** The move must name the approved amount: no switch, the draft stays on (spec 001610). */
+  readonly required = input(false);
 
   readonly maxLength = MAX_CONDITION_LENGTH;
   readonly canAdd = computed(() => this.draft().conditions.length < MAX_CONDITIONS);
-  readonly error = computed(() => draftError(this.draft(), this.requested()));
+  readonly error = computed(() => draftError(this.draft(), this.requested(), this.required()));
 
   /** "Beantragt: 1.250,00 € · Abweichung −350,00 €". */
   readonly amountHint = computed(() => {
@@ -62,7 +64,9 @@ export class DecisionEditorComponent {
   /** The error of the amount field, else the hint. */
   readonly amountError = computed(() => {
     const err = this.error();
-    return err === 'decision.error.amountInvalid' || err === 'decision.error.amountExceeds'
+    return err === 'decision.error.amountInvalid' ||
+      err === 'decision.error.amountRequired' ||
+      err === 'decision.error.amountExceeds'
       ? this.i18n.translate(err)
       : '';
   });

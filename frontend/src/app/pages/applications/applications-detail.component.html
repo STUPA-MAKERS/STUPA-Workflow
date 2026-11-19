@@ -306,6 +306,19 @@
           }
         </div>
       }
+      @if (application.amount !== null) {
+        <div class="ad__pair">
+          <app-field-row [label]="'applications.amount.requested' | t">{{ amount(application) }}</app-field-row>
+          <app-field-row [label]="'applications.amount.approved' | t">
+            {{ approvedShown(application) || '—' }}
+            @if (canAmendAmount()) {
+              <app-button trail variant="text" size="sm" (click)="amendOpen.set(true)">
+                {{ 'amendAmount.change' | t }}
+              </app-button>
+            }
+          </app-field-row>
+        </div>
+      }
       @if (budgetRow()) {
       <app-field-row
         [label]="application.fiscalYearId && fiscalLabel(application.fiscalYearId)
@@ -502,6 +515,27 @@
   [applicationId]="app()?.id ?? null"
   [currentStateId]="app()?.state?.id ?? null"
   [(open)]="forceDialogOpen"
+  (done)="onForced()"
+/>
+
+<app-outside-decision-dialog
+  [applicationId]="app()?.id ?? null"
+  [applicationTitle]="title()"
+  [requested]="app()?.amount ?? null"
+  [currency]="app()?.currency ?? 'EUR'"
+  [gremiumId]="app()?.voteGremiumId ?? app()?.gremiumId ?? null"
+  [(open)]="outsideOpen"
+  (done)="onForced()"
+/>
+
+<app-amend-amount-dialog
+  [applicationId]="app()?.id ?? null"
+  [applicationTitle]="title()"
+  [requested]="app()?.amount ?? null"
+  [approved]="app()?.approvedAmount ?? null"
+  [currency]="app()?.currency ?? 'EUR'"
+  [gremiumId]="app()?.gremiumId ?? null"
+  [(open)]="amendOpen"
   (done)="onForced()"
 />
 

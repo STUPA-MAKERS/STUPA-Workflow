@@ -1,0 +1,98 @@
+<section class="fs admin-page">
+  <app-page-header [flush]="true" [title]="'admin.forced.title' | t">
+    <app-breadcrumbs crumbs />
+  </app-page-header>
+
+  <div class="fs__period" role="group" [attr.aria-label]="'admin.forced.period' | t">
+    <app-datepicker
+      name="forcedFrom"
+      [label]="'admin.forced.from' | t"
+      [max]="to()"
+      [ngModel]="from()"
+      (ngModelChange)="setFrom($event ?? '')"
+    />
+    <app-datepicker
+      name="forcedTo"
+      [label]="'admin.forced.to' | t"
+      [error]="periodError()"
+      [ngModel]="to()"
+      (ngModelChange)="setTo($event ?? '')"
+    />
+  </div>
+
+  @if (failed()) {
+    <app-empty-state shape="table" [heading]="'admin.forced.loadError' | t" />
+  } @else if (!loading() && !reasonRows().length) {
+    <app-empty-state shape="table" [heading]="'admin.forced.empty' | t" />
+  } @else {
+    <div class="fs__grid">
+      <app-section [level]="2" [heading]="'admin.forced.byReason' | t">
+        <app-data-table
+          surface="rowgroup"
+          [loading]="loading()"
+          [loadingText]="'common.loading' | t"
+          [columns]="reasonColumns()"
+          [rows]="reasonRows()"
+        >
+          <ng-template appCell="count" let-r>
+            <app-button
+              variant="text"
+              size="sm"
+              [ariaLabel]="'admin.forced.showList' | t: { label: asRow(r).label, n: asRow(r).count }"
+              (click)="openList(asRow(r))"
+            ><span class="mono">{{ asRow(r).count }}</span></app-button>
+          </ng-template>
+        </app-data-table>
+      </app-section>
+
+      <app-section [level]="2" [heading]="'admin.forced.byPath' | t">
+        <app-data-table
+          surface="rowgroup"
+          [loading]="loading()"
+          [loadingText]="'common.loading' | t"
+          [columns]="pathColumns()"
+          [rows]="pathRows()"
+        >
+          <ng-template appCell="count" let-r>
+            <app-button
+              variant="text"
+              size="sm"
+              [ariaLabel]="'admin.forced.showList' | t: { label: asRow(r).label, n: asRow(r).count }"
+              (click)="openList(asRow(r))"
+            ><span class="mono">{{ asRow(r).count }}</span></app-button>
+          </ng-template>
+        </app-data-table>
+      </app-section>
+    </div>
+  }
+</section>
+
+<app-dialog
+  [open]="listRow() !== null"
+  [title]="'admin.forced.listTitle' | t"
+  [subtitle]="listRow()?.label ?? ''"
+  [closeLabel]="'action.close' | t"
+  (closed)="closeList()"
+>
+  @if (eventsLoading()) {
+    <p class="fs__muted" role="status">{{ 'common.loading' | t }}</p>
+  } @else if (!events().length) {
+    <p class="fs__muted">{{ 'admin.forced.listEmpty' | t }}</p>
+  } @else {
+    <ul class="fs__events">
+      @for (e of events(); track e.applicationId + e.at) {
+        <li class="fs__event">
+          <a class="fs__eventTitle" [routerLink]="['/applications', e.applicationId]" (click)="closeList()">{{ titleOf(e) }}</a>
+          <span class="fs__eventMeta">
+            <time [attr.datetime]="e.at">{{ e.at | ldate: 'medium' }}</time>
+            · {{ pathOf(e) }} · {{ reasonLabel(e.reason) }}
+          </span>
+          @if (e.note) {
+            <span class="fs__eventNote">{{ e.note }}</span>
+          }
+        </li>
+      }
+    </ul>
+  }
+  <app-button dialog-footer variant="text" (click)="closeList()">{{ 'action.close' | t }}</app-button>
+</app-dialog>

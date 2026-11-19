@@ -110,7 +110,9 @@ async def record_outside_decision(
     """Stage a decision made outside the platform and its branch, without a commit.
 
     The caller commits and then runs `FlowService.after_commit` with the result, which
-    sends `vote_cancelled` for the cancelled votes and dispatches the actions.
+    sends `vote_cancelled` for the cancelled votes and dispatches the actions. The
+    decision counts only for a `passed` branch into an approved state; any other result
+    drops it, because the dialog cannot see where the branch leads.
 
     Raises:
         NotFoundError: The application does not exist or is unconfirmed (404).
@@ -118,8 +120,7 @@ async def record_outside_decision(
             the state has no such branch (`no_branch`), the guard fails or a
             concurrent change won (409).
         ValidationProblem: a meeting date after today, an unknown Gremium or meeting,
-            a missing or bad approved amount, or a decision on a branch that does not
-            lead into an approved state (422).
+            or a missing or bad approved amount (422).
     """
     session = flow.session
     check_meeting_date(payload.meeting_date, now or datetime.now(UTC))
@@ -139,7 +140,8 @@ async def record_outside_decision(
         await _check_meeting(flow, payload.meeting_id, principal)
     target = await session.get(State, transition.to_state_id)
     required = await flow._amount_required(transition.from_state_id, target, app.amount)
-    decision = payload.decision if payload.result == "passed" else None
+    approves = payload.result == "passed" and target is not None and target.is_approved
+    decision = payload.decision if approves else None
     check_amount_given(required, decision)
     staged = await flow.stage_fire(
         application_id,
