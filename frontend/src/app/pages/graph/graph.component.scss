@@ -1,6 +1,5 @@
 @use 'breakpoints' as bp;
 @use 'list-pane' as lp;
-@use 'scroll-fade' as fade;
 @use './graph-kinds' as kinds;
 
 // The drawing fills the page. One layer over it holds the filters at the top, the panel of
@@ -25,7 +24,8 @@
   flex: 1 1 auto;
   min-height: 24rem;
   margin-bottom: calc(-1 * var(--space-5));
-  border-radius: var(--radius-lg);
+  // The radius of the detail pane of a list page.
+  border-radius: var(--radius-2xl);
   background: var(--color-surface-sunken);
 }
 
@@ -35,6 +35,7 @@
   position: absolute;
   inset: 0;
   padding: 6rem var(--space-4) 0;
+  border-radius: inherit;
 }
 .gr__body:has(.gr__canvas) {
   padding: 0;
@@ -45,6 +46,7 @@
 .gr__canvas {
   position: absolute;
   inset: 0;
+  border-radius: inherit;
 }
 
 // The layer takes no pointer, its parts do.
@@ -75,7 +77,8 @@
   align-items: center;
   gap: var(--space-2) var(--space-3);
   min-width: 0;
-  padding: var(--space-2);
+  // More room at the end: a chip has small corners and would touch the round corner.
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
   // Concentric with the search field: half the height of the field and the padding.
   border-radius: calc(1.375rem + var(--space-2));
   background: var(--color-surface-1);
@@ -116,7 +119,7 @@
   padding: var(--space-4);
   overflow-y: auto;
   overscroll-behavior: contain;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   background: var(--color-surface-1);
   box-shadow: var(--shadow-md);
 }
@@ -203,7 +206,9 @@
     margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) calc(-1 * var(--space-6));
     border-radius: 0;
   }
-  .gr__canvas {
+  // From edge to edge: no corner and no frame, also not in "Hoher Kontrast".
+  .gr__pane .gr__body .gr__canvas {
+    border: 0;
     border-radius: 0;
   }
   .gr__float {
@@ -224,7 +229,6 @@
     flex: none;
     justify-content: flex-start;
     @include lp.phone-chips;
-    @include fade.fade-x(var(--space-6), false);
   }
   .gr__chip,
   .gr__switch {
@@ -251,5 +255,10 @@
   .gr__pill {
     border: 2px solid var(--color-text);
     box-shadow: none;
+  }
+}
+@include bp.phone {
+  :host-context([data-very-high-contrast='on']) .gr__bar {
+    border-width: 0 0 2px;
   }
 }
