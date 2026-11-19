@@ -72,7 +72,7 @@ import { clock, weekdayDate } from '@shared/date-format';
 import { pageItemTitle } from '../../../layout/page-title.service';
 
 /** The ids of the session menu. */
-type SessionAction = 'todos' | 'open' | 'agenda' | 'settings' | 'attendance' | 'votes' | 'keeper' | 'beamer' | 'qr' | 'close' | 'delete';
+type SessionAction = 'todos' | 'links' | 'open' | 'agenda' | 'settings' | 'attendance' | 'votes' | 'keeper' | 'beamer' | 'qr' | 'close' | 'delete';
 
 /**
  * The session page of the meeting lead and the minute-taker (`/meetings/:id`).
@@ -235,6 +235,9 @@ export class MeetingPageComponent {
   /** The sheet "To-Dos" with the cards that link the meeting (spec 000551). */
   readonly todosOpen = signal(false);
   protected readonly todoList = viewChild<TodoLinkedListComponent>('todoList');
+  /** The side sheet of the linked rows of the open item (a bottom sheet on a phone, spec 001800). */
+  readonly linksOpen = signal(false);
+  protected readonly topLinks = viewChild<TodoLinkedListComponent>('topLinks');
   /** The list of the people who have the meeting open. */
   protected readonly presenceOpen = signal(false);
 
@@ -444,6 +447,8 @@ export class MeetingPageComponent {
       // The cards that link the meeting: a sheet, because a long agenda would push them out
       // of sight (spec 000551).
       { id: 'todos', label: t('todos.meeting.sheet'), icon: 'kanban' },
+      // The linked rows of the open item; above the phone width the edge tab opens them (spec 001800).
+      ...when(this.phone() && !!this.top(), { id: 'links', label: t('todos.linked.title'), icon: 'link' }),
       ...when(m.canManage, { id: 'settings', label: t('meetings.settings.title'), icon: 'edit' }),
       ...when(!this.phone() || noDock, {
         id: 'attendance',
@@ -598,6 +603,15 @@ export class MeetingPageComponent {
     () => this.votes().length > 0 || this.canAddVote(),
   );
 
+  /** The edge tab of the votes: above the phone width, for everybody but the minute-taker (spec 001460). */
+  protected readonly showVoteTab = computed(
+    () => !this.phone() && this.showVotes() && !this.votesOpen() && this.dockVotes() === null,
+  );
+  /** The edge tab of the linked rows: above the phone width, while an item is open (spec 001800). */
+  protected readonly showLinkTab = computed(() => !this.phone() && !!this.top() && !this.linksOpen());
+  /** The edge tab of the attendance sheet: above the phone width, beside the dock chip (spec 001801). */
+  protected readonly showAttendanceTab = computed(() => !this.phone() && this.panel() !== 'attendance');
+
   /** The own ballot of the open vote, for the dock. */
   protected readonly myVote = computed<string | null>(() => {
     const v = this.openVote();
@@ -675,6 +689,9 @@ export class MeetingPageComponent {
     switch (item.id as SessionAction) {
       case 'todos':
         this.todosOpen.set(true);
+        break;
+      case 'links':
+        this.linksOpen.set(true);
         break;
       case 'open':
         this.startSession.emit();

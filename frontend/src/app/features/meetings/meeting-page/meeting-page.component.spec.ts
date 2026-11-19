@@ -1010,15 +1010,64 @@ describe('MeetingPageComponent', () => {
     it('gives the dock vote button only to the minute-taker', async () => {
       const { fixture } = await setup({ meeting: meeting({ votes: [vote({ status: 'draft' })] }) }, [MEDIA.wide]);
       const host = fixture.nativeElement as HTMLElement;
-      expect(host.querySelector('.mp__edgeTab')).toBeNull();
+      expect(host.querySelector('.mp__edgeTab--votes')).toBeNull();
       expect(screen.getByRole('button', { name: 'Abstimmungen' })).toBeInTheDocument();
       fixture.componentRef.setInput('meeting', meeting({ isProtokollant: false, votes: [vote({ status: 'draft' })] }));
       fixture.detectChanges();
-      const tab = host.querySelector('.mp__edgeTab') as HTMLElement;
+      const tab = host.querySelector('.mp__edgeTab--votes') as HTMLElement;
       expect(tab).not.toBeNull();
       expect(screen.getAllByRole('button', { name: 'Abstimmungen' })).toEqual([tab]);
       await userEvent.click(tab);
       expect(screen.getByRole('dialog', { name: 'Abstimmungen' })).toHaveClass('ss--end');
+    });
+
+    /** Spec 001800: the linked rows of the item are in a side sheet that an edge tab opens. */
+    it('opens the linked rows of the item in a side sheet from the edge tab', async () => {
+      const { fixture, http } = await setup({}, [MEDIA.wide]);
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('.mp__main app-todo-linked-list')).toBeNull();
+      http.expectNone((r) => r.url.endsWith('/api/links') && r.params.get('kind') === 'agenda_item');
+      const tab = screen.getByRole('button', { name: 'Verknüpft' });
+      expect(tab).toHaveClass('mp__edgeTab--links');
+      await userEvent.click(tab);
+      fixture.detectChanges();
+      http.expectOne((r) => r.url.endsWith('/api/links') && r.params.get('kind') === 'agenda_item').flush(linksOf([], [], true));
+      http.match((r) => r.url.endsWith('/api/todos/boards')).forEach((req) => req.flush([{ id: 'b-1', name: 'StuPa', kind: 'gremium', gremiumId: 'g-1', canWrite: true }]));
+      fixture.detectChanges();
+      const sheet = await screen.findByRole('dialog', { name: 'Verknüpft' });
+      expect(sheet).toHaveClass('ss--end');
+      expect(within(sheet).getByText('Nichts verknüpft')).toBeInTheDocument();
+      expect(within(sheet).getByRole('button', { name: 'Verknüpfen' })).toBeInTheDocument();
+      expect(within(sheet).getByRole('button', { name: 'To-Do anlegen' })).toBeInTheDocument();
+      expect(host.querySelector('.mp__edgeTab--links')).toBeNull();
+    });
+
+    /** Spec 001801: a tab at the end edge opens the attendance too, beside the dock and the menu. */
+    it('opens the attendance from the edge tab above the phone width', async () => {
+      const { fixture, flushDelegations } = await setup({}, [MEDIA.wide]);
+      const host = fixture.nativeElement as HTMLElement;
+      const tab = host.querySelector('.mp__edgeTab--attendance') as HTMLElement;
+      expect(tab).toHaveAccessibleName('Anwesenheit');
+      await userEvent.click(tab);
+      expect(screen.getByRole('dialog', { name: 'Anwesenheit' })).toBeInTheDocument();
+      expect(host.querySelector('.mp__edgeTab--attendance')).toBeNull();
+      flushDelegations();
+    });
+
+    it('has no edge tabs on a phone', async () => {
+      const { fixture } = await setup({}, [MEDIA.phone]);
+      expect((fixture.nativeElement as HTMLElement).querySelector('.mp__edgeTabs')).toBeNull();
+    });
+
+    it('opens the linked rows from the phone menu, and offers no entry without an item', async () => {
+      const { fixture } = await setup({}, [MEDIA.phone]);
+      expect(screen.queryByRole('button', { name: 'Verknüpft' })).toBeNull();
+      await userEvent.click(within(await openMenu()).getByRole('menuitem', { name: 'Verknüpft' }));
+      expect(await screen.findByRole('dialog', { name: 'Verknüpft' })).toHaveClass('ss--bottom');
+      await userEvent.keyboard('{Escape}');
+      fixture.componentRef.setInput('top', null);
+      fixture.detectChanges();
+      expect(within(await openMenu()).queryByRole('menuitem', { name: 'Verknüpft' })).toBeNull();
     });
 
     it('opens the votes from the phone menu for a person who does not keep the minutes', async () => {
