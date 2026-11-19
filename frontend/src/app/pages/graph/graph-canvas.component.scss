@@ -41,6 +41,8 @@
   top: 0;
   left: 0;
   width: 1px;
+  // The world has no width, and the base styles limit an SVG to the width of its parent.
+  max-width: none;
   height: 1px;
   overflow: visible;
   pointer-events: none;
@@ -83,6 +85,13 @@
 .gc__node--dim {
   opacity: 0.22;
 }
+// The chosen node and its neighbours lie over the other nodes, with their titles.
+.gc__node--lit {
+  z-index: 1;
+}
+.gc__node--chosen {
+  z-index: 2;
+}
 
 .gc__dot {
   @include kinds.mark(36px);
@@ -113,17 +122,20 @@
   }
 }
 
-// The title shows from a zoom at which it is readable, and always for the chosen node and
-// its neighbours (spec 001430).
+// The title shows from a zoom at which the titles do not cover each other, and always for
+// the chosen node and its neighbours (spec 001430). It keeps its size at every zoom: the
+// scale takes the zoom of the world back.
 .gc__label {
   position: absolute;
   top: calc(100% + 3px);
   left: 50%;
   display: none;
+  width: max-content;
   max-width: 9.5rem;
   padding: 0 var(--space-1);
   overflow: hidden;
-  transform: translateX(-50%);
+  transform: translateX(-50%) scale(calc(1 / var(--gc-zoom, 1)));
+  transform-origin: top center;
   border-radius: var(--radius-sm);
   background: var(--color-surface-sunken);
   color: var(--color-text);
@@ -136,6 +148,10 @@
 .gc--labels .gc__label,
 .gc__node--lit .gc__label {
   display: block;
+}
+// A dimmed node has no title: a dimmed text is below the contrast of a text.
+.gc__node--dim .gc__label {
+  display: none;
 }
 .gc__node--muted .gc__label {
   color: var(--color-text-muted);
@@ -209,6 +225,13 @@
   }
   .gc__node--muted .gc__label {
     color: var(--color-text);
+  }
+  // A dimmed node stays readable: it only steps back.
+  .gc__node--dim {
+    opacity: 0.5;
+  }
+  .gc__line--dim {
+    opacity: 0.45;
   }
   .gc__tools {
     border: 2px solid var(--color-text);

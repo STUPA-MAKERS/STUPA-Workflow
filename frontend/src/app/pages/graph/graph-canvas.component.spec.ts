@@ -322,6 +322,32 @@ describe('GraphCanvasComponent', () => {
     expect(cmp.at('gone')).toBe('translate(0px, 0px)');
   });
 
+  it('goes to 1:1 on a chosen node when the titles are too small to show', async () => {
+    const { cmp, fixture, container } = await setup();
+    cmp.bodies.set([
+      { id: 'a', x: 100, y: 50, vx: 0, vy: 0 },
+      { id: 'b', x: 900, y: 0, vx: 0, vy: 0 },
+      { id: 'c', x: 0, y: 40, vx: 0, vy: 0 },
+    ]);
+    cmp.view.set({ x: 400, y: 300, zoom: 0.5 });
+    fixture.componentRef.setInput('selected', 'a');
+    fixture.detectChanges();
+    expect(cmp.view()).toEqual({ x: 300, y: 250, zoom: 1 });
+
+    // The page moves the place of a chosen node away from its panel.
+    fixture.componentRef.setInput('focusAt', { x: 0.25, y: 0.5 });
+    cmp.view.set({ x: 0, y: 0, zoom: 0.5 });
+    fixture.componentRef.setInput('selected', 'b');
+    fixture.detectChanges();
+    expect(cmp.view()).toEqual({ x: 200 - 900, y: 300, zoom: 1 });
+    fixture.componentRef.setInput('selected', 'c');
+    cmp.view.set({ x: 5000, y: 0, zoom: 1 });
+    fixture.componentRef.setInput('selected', 'a');
+    fixture.detectChanges();
+    expect(cmp.view()).toEqual({ x: 200 - 100, y: 300 - 50, zoom: 1 });
+    expect((container.querySelector('.gc') as HTMLElement).style.getPropertyValue('--gc-zoom')).toBe('1');
+  });
+
   it('measures the frame again when its size changes', async () => {
     const observed: ResizeObserverCallback[] = [];
     const Original = globalThis.ResizeObserver;

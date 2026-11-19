@@ -24,6 +24,7 @@ import {
   FilterSelectComponent,
   IconComponent,
   type IconName,
+  MEDIA,
   PageHeaderComponent,
   RangeChipComponent,
   type RangeValue,
@@ -31,6 +32,7 @@ import {
   SegmentedComponent,
   SkeletonComponent,
   StickyBarComponent,
+  mediaQuery,
 } from '@stupa-makers/ui-kit';
 import { LINK_ICON, LINK_KIND_LABEL, linkSub, splitUrl } from '../../features/todos/todos.util';
 import { type CanvasNode, GraphCanvasComponent } from './graph-canvas.component';
@@ -162,6 +164,10 @@ export class GraphComponent {
     { value: 'graph', label: this.i18n.translate('graph.view.graph') },
     { value: 'list', label: this.i18n.translate('graph.view.list') },
   ]);
+
+  readonly phone = mediaQuery(MEDIA.phone);
+  /** Where the drawing shows a chosen node: beside the panel, on a phone above it. */
+  readonly focusAt = computed(() => (this.phone() ? { x: 0.5, y: 0.22 } : { x: 0.6, y: 0.5 }));
 
   readonly filtered = computed(() => isFiltered(this.filters()));
   readonly empty = computed(() => this.graph().nodes.length === 0);
@@ -344,6 +350,11 @@ export class GraphComponent {
   /** The line of facts of the chosen element: its kind and its state. */
   facts(row: GraphRow): string {
     return linkSub(row.node, this.i18n.locale(), this.i18n.uiLocale(), this.t);
+  }
+
+  /** The date of the chosen element, unless the line of facts already has it. */
+  dateLine(row: GraphRow): string | null {
+    return row.date !== null && !this.facts(row).includes(row.date) ? row.date : null;
   }
 
   /** Start the build-up again (spec 001426). */

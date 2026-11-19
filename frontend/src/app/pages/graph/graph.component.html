@@ -115,6 +115,7 @@
               [lines]="graph().lines"
               [selected]="selected()"
               [label]="canvasLabel()"
+              [focusAt]="focusAt()"
               (chosen)="choose($event)"
             />
             @if (chosen(); as c) {
@@ -126,8 +127,8 @@
                   <div class="gr__panelText">
                     <h2 id="gr-panel-title" class="gr__panelTitle">{{ c.title }}</h2>
                     <p class="gr__panelSub">{{ facts(c) }}</p>
-                    @if (c.date) {
-                      <p class="gr__panelSub mono">{{ c.date }}</p>
+                    @if (dateLine(c); as day) {
+                      <p class="gr__panelSub">{{ day }}</p>
                     }
                   </div>
                   <button
@@ -205,7 +206,7 @@
                   <span class="gr__rowSub">
                     {{ r.kind }}
                     @if (r.date) {
-                      · <span class="mono">{{ r.date }}</span>
+                      · {{ r.date }}
                     }
                   </span>
                   @if (r.near.length) {

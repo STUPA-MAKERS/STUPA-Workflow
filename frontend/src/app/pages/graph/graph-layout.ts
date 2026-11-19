@@ -24,13 +24,13 @@ export interface Spring {
 }
 
 /** The length that a line pulls its nodes to, in px. */
-export const LINK_LENGTH = 84;
+export const LINK_LENGTH = 70;
 /** The strength of the push between two nodes. */
-const REPULSION = 5200;
+const REPULSION = 11000;
 /** The strength of a line. */
-const STIFFNESS = 0.09;
+const STIFFNESS = 0.14;
 /** The pull to the origin. */
-const GRAVITY = 0.012;
+const GRAVITY = 0.01;
 /** The part of the speed that a node keeps per step. */
 const DAMPING = 0.78;
 /** The least distance of the push, so two nodes at one place do not fly apart. */
@@ -41,7 +41,7 @@ const MAX_SPEED = 42;
 /** `alpha` at the start of a run, after new nodes arrive. */
 export const ALPHA_START = 1;
 /** The factor of `alpha` per step. */
-export const ALPHA_DECAY = 0.965;
+export const ALPHA_DECAY = 0.975;
 /** Below this `alpha` the layout rests. */
 export const ALPHA_MIN = 0.02;
 /** The steps from {@link ALPHA_START} to rest. */

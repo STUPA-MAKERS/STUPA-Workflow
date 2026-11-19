@@ -2,6 +2,7 @@
   class="gc"
   [class.gc--labels]="labels()"
   [class.gc--still]="still()"
+  [style.--gc-zoom]="view().zoom"
   (pointerdown)="onDown($event)"
   (pointermove)="onMove($event)"
   (pointerup)="onUp($event)"

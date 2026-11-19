@@ -91,8 +91,9 @@ const ARROWS: Readonly<Record<string, Direction>> = {
  * settling. With reduced motion the layout runs to its end before the paint and nothing
  * moves. The view follows the drawing until the person moves or zooms it: a drag on the
  * empty drawing moves it, the wheel, a pinch and the buttons zoom it. A press on a node
- * chooses it, a press on the empty drawing ends the choice. Tab moves to one node, the
- * arrow keys to the nearest node in that direction.
+ * chooses it, a press on the empty drawing ends the choice. The view goes to the chosen
+ * node when it is outside the frame or too small to read. Tab moves to one node, the arrow
+ * keys to the nearest node in that direction.
  */
 @Component({
   selector: 'app-graph-canvas',
@@ -111,6 +112,11 @@ export class GraphCanvasComponent {
   readonly selected = input<string | null>(null);
   /** The label of the drawing for a screen reader (spec 001428). */
   readonly label = input.required<string>();
+  /**
+   * Where a chosen node goes when the view moves to it, as parts of the width and the
+   * height of the frame. The page moves it away from the panel that covers a part.
+   */
+  readonly focusAt = input<{ readonly x: number; readonly y: number }>({ x: 0.5, y: 0.5 });
   /** A press on a node (its key) or on the empty drawing (null). */
   readonly chosen = output<string | null>();
 
@@ -350,18 +356,27 @@ export class GraphCanvasComponent {
     this.view.set(fit(bounds(this.bodies(), FIT_PAD), width, height));
   }
 
-  /** Move the view so that the node is inside the frame. */
+  /**
+   * Move the view so that the node is inside the frame. From a zoom at which the titles
+   * hide, the view also goes to 1:1, so the titles of the node and its neighbours have room.
+   */
   private reveal(key: string): void {
     const body = this.places().get(key);
     const { width, height } = this.size();
     if (!body || width <= 0 || height <= 0) return;
     const v = this.view();
+    const at = this.focusAt();
+    if (v.zoom < LABEL_ZOOM) {
+      this.free = true;
+      this.view.set({ x: width * at.x - body.x, y: height * at.y - body.y, zoom: 1 });
+      return;
+    }
     const x = body.x * v.zoom + v.x;
     const y = body.y * v.zoom + v.y;
     const inside =
       x >= REVEAL_MARGIN && x <= width - REVEAL_MARGIN && y >= REVEAL_MARGIN && y <= height - REVEAL_MARGIN;
     if (inside) return;
     this.free = true;
-    this.view.set({ x: width / 2 - body.x * v.zoom, y: height / 2 - body.y * v.zoom, zoom: v.zoom });
+    this.view.set({ x: width * at.x - body.x * v.zoom, y: height * at.y - body.y * v.zoom, zoom: v.zoom });
   }
 }
