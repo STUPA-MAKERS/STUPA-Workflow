@@ -27,6 +27,16 @@
               [sections]="sortSections()"
               (selected)="onHeaderMenu($event)"
             />
+            @if (selectSections().length) {
+              <app-button
+                variant="text"
+                [iconOnly]="true"
+                data-testid="apps-select"
+                [ariaLabel]="'applications.bulk.start' | t"
+                [title]="'applications.bulk.start' | t"
+                (click)="selecting.set(true)"
+              ><app-icon name="boxok" /></app-button>
+            }
           }
         </ng-container>
       </app-page-header>
@@ -122,6 +132,36 @@
             </app-button>
           }
         </div>
+        @if (selecting()) {
+          <app-selection-bar
+            inline
+            data-testid="apps-selection"
+            [count]="selectedCount()"
+            [countLabel]="selectionLabel()"
+            [allSelected]="allSelected()"
+            [selectAllLabel]="'applications.bulk.selectAll' | t"
+            [clearLabel]="'applications.bulk.stop' | t"
+            (selectAll)="toggleSelectAll($event)"
+            (cleared)="stopSelecting()"
+          >
+            <app-button
+              variant="text"
+              [iconOnly]="phone()"
+              [ariaLabel]="'applications.bulk.transition' | t"
+              [title]="'applications.bulk.transition' | t"
+              [disabled]="!selectedCount() || overMax()"
+              (click)="openBulk('transition')"
+            ><app-icon name="flow" />@if (!phone()) { {{ 'applications.bulk.transition' | t }} }</app-button>
+            <app-button
+              variant="text"
+              [iconOnly]="phone()"
+              [ariaLabel]="'applications.bulk.message' | t"
+              [title]="'applications.bulk.message' | t"
+              [disabled]="!selectedCount() || overMax()"
+              (click)="openBulk('message')"
+            ><app-icon name="mail" />@if (!phone()) { {{ 'applications.bulk.message' | t }} }</app-button>
+          </app-selection-bar>
+        }
         @if (reloading()) {
           <span class="skel-progress apps__progress" aria-hidden="true"></span>
         }
@@ -166,14 +206,27 @@
                       role="listitem"
                       class="apps__row"
                       [class.apps__row--busy]="busyRow() === row.item.id"
+                      [class.apps__row--checked]="selecting() && isSelected(row.item.id)"
                       [title]="row.title"
-                      [link]="['/applications', row.item.id]"
+                      [link]="selecting() ? null : ['/applications', row.item.id]"
                       linkQueryParamsHandling="preserve"
-                      [selected]="row.item.id === selectedId()"
-                      [swipeRight]="row.swipeRight"
-                      [swipeLeft]="row.swipeLeft"
+                      [selected]="!selecting() && row.item.id === selectedId()"
+                      [swipeRight]="selecting() ? null : row.swipeRight"
+                      [swipeLeft]="selecting() ? null : row.swipeLeft"
                       (swiped)="onRowSwiped(row.item, $event)"
+                      (activate)="onRowActivate(row.item)"
                     >
+                      @if (selecting()) {
+                        <app-checkbox
+                          lead
+                          class="apps__rowCheck"
+                          [ngModel]="isSelected(row.item.id)"
+                          (ngModelChange)="toggleSelect(row.item.id, $event)"
+                          ><span class="sr-only">{{
+                            'applications.bulk.selectRow' | t: { title: row.title }
+                          }}</span></app-checkbox
+                        >
+                      }
                       <span sub>
                         @if (row.stateLabel) {
                           <app-status-text [kind]="row.stateKind">{{ row.stateLabel }}</app-status-text>
@@ -258,6 +311,16 @@
     </div>
   </app-list-detail>
 </div>
+
+@if (bulkMode(); as mode) {
+  <app-bulk-dialog
+    [open]="true"
+    (openChange)="$event ? null : bulkMode.set(null)"
+    [mode]="mode"
+    [targets]="bulkTargets()"
+    (done)="onBulkDone()"
+  />
+}
 
 @if (phone()) {
   <app-side-sheet

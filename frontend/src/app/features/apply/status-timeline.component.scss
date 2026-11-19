@@ -148,6 +148,24 @@
 .ad__note {
   margin-top: var(--space-2);
 }
+.ad__draftSubmit {
+  margin-top: var(--space-2);
+}
+.ad__replaced {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+}
+.ad__replacedLink {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-accent-text);
+  font-weight: var(--fw-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .ad__cols {
   display: flex;
   flex-wrap: wrap;

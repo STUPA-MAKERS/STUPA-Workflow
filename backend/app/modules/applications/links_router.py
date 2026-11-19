@@ -198,6 +198,22 @@ _NEW_VERSION_ERRORS: dict[int | str, dict[str, object]] = {
 }
 
 
+async def _new_version_access(
+    application_id: UUID,
+    db: AsyncSession,
+    principal: Principal | None,
+    applicant: Applicant | None,
+) -> Access:
+    """The applicant, or else a person with ``application.manage`` and the edit right."""
+    manager = principal is not None and principal.has(MANAGE_PERMISSION)
+    try:
+        return await require_app_applicant(application_id, db, principal, applicant)
+    except ForbiddenError:
+        if not manager:
+            raise
+    return await require_app_edit(application_id, db, principal, applicant)
+
+
 @router.post(
     "/applications/{application_id}/new-version",
     response_model=NewVersionCreated,
@@ -229,12 +245,7 @@ async def create_new_version(
     anonymized.
     """
     db = service.session
-    try:
-        access = await require_app_applicant(application_id, db, principal, applicant)
-    except ForbiddenError:
-        if principal is None or not principal.has(MANAGE_PERMISSION):
-            raise
-        access = await require_app_edit(application_id, db, principal, applicant)
+    access = await _new_version_access(application_id, db, principal, applicant)
     hidden = await hidden_pii_keys(db, access)
     app, email = await service.new_version(
         access.application_id, actor=access.actor, hidden=hidden, dispatcher=dispatcher

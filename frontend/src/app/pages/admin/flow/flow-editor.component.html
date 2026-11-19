@@ -273,6 +273,7 @@
             (editAllowedChange)="setStateEditAllowed(s.key, $event)"
             (terminalChange)="setStateTerminal(s.key, $event)"
             (outcomeChange)="setStateOutcome(s.key, $event.outcome, $event.on)"
+            (replacedTargetChange)="setStateReplacedTarget(s.key, $event)"
             (kindChange)="setStateKind(s.key, $event)"
             (gremiumChange)="setStateGremium(s.key, $event)"
             (gremiumSourceChange)="setStateGremiumSource(s.key, $event)"
@@ -302,6 +303,9 @@
             (branchChange)="setTransitionBranch(sel.index, $event)"
             (remove)="removeSelectedTransition()"
           />
+          @if (draftWithdrawal(sel.t)) {
+            <app-note class="fe__warn" icon="alert" data-testid="draft-withdrawal">{{ 'admin.flow.warn.draftWithdrawal' | t }}</app-note>
+          }
           <app-transition-detail
             [transition]="sel.t"
             [roleOptions]="globalRoleOptions()"

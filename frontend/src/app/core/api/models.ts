@@ -220,6 +220,10 @@ export interface StateOutWire {
   readonly editAllowed: boolean;
   /** State kind: normal|vote. */
   readonly kind?: string;
+  /** The initial state: an Antrag in it is a draft, not submitted yet. */
+  readonly isInitial?: boolean;
+  readonly isTerminal?: boolean;
+  readonly isDenied?: boolean;
 }
 
 /** `ApplicantOut`. It holds PII. The backend fills it only for an authorized reader. */
@@ -369,6 +373,10 @@ export interface ApplicationLinksWire {
   readonly predecessor?: LinkedApplicationWire | null;
   readonly successors?: readonly LinkedApplicationWire[];
   readonly events?: readonly LinkEventWire[];
+  /** The Antrag that this one is a new version of. */
+  readonly replaces?: LinkedApplicationWire | null;
+  /** The new versions of this Antrag. */
+  readonly replacedBy?: readonly LinkedApplicationWire[];
 }
 
 /** `ApplicationPrefillOut`. The answers of a Vorgänger that fit the current form. */
@@ -614,6 +622,8 @@ export interface TransitionOutWire {
   readonly agendaGremiumId?: Uuid | null;
   /** The target is an accepted state of the cost center, so a fire takes a decision. */
   readonly allowsDecision?: boolean;
+  /** The target is a terminal state. */
+  readonly toTerminal?: boolean;
 }
 
 /** A field change in the version diff (`FieldChange`). */
@@ -757,6 +767,12 @@ export interface ApplicationState {
   readonly editAllowed: boolean;
   /** State kind: normal|vote. */
   readonly kind: string;
+  /** Set only when true: the initial state, so the Antrag is a draft (001710). */
+  readonly isInitial?: true;
+  /** Set only when true: a terminal state. */
+  readonly isTerminal?: true;
+  /** Set only when true: a denied state. */
+  readonly isDenied?: true;
 }
 
 export interface Applicant {
@@ -861,11 +877,55 @@ export interface ApplicationLinks {
   readonly predecessor: LinkedApplication | null;
   readonly successors: readonly LinkedApplication[];
   readonly events: readonly ApplicationLinkEvent[];
+  /** Set only when there is one: the Antrag that this one is a new version of (001721). */
+  readonly replaces?: LinkedApplication;
+  /** Set only when not empty: the new versions of this Antrag. */
+  readonly replacedBy?: readonly LinkedApplication[];
 }
 
 /** Result of `POST /applications`, frontend view. */
 export interface ApplicationCreated {
   readonly applicationId: Uuid;
+}
+
+/** Result of `POST /applications/{id}/new-version` (001720). */
+export interface NewVersionCreated {
+  readonly applicationId: Uuid;
+  /** The session does not reach the new draft, so a login link went out by mail. */
+  readonly linkSent: boolean;
+}
+
+/** The requested amount of one Antrag that a bulk approval approves (001701). */
+export interface BulkAmount {
+  readonly applicationId: Uuid;
+  readonly title: string | null;
+  readonly amount: string | null;
+}
+
+/** A target state that every selected Antrag reaches (`BulkTransitionOption`). */
+export interface BulkTransitionOptionWire {
+  readonly toStateId: Uuid;
+  readonly label: I18nMap;
+  readonly color?: string | null;
+  readonly approves?: boolean;
+  readonly amounts?: readonly BulkAmount[];
+}
+
+/** A bulk target, frontend view: the label resolved to the locale. */
+export interface BulkTransitionOption {
+  readonly toStateId: Uuid;
+  readonly label: string;
+  readonly color: string | null;
+  readonly approves: boolean;
+  readonly amounts: readonly BulkAmount[];
+}
+
+/** The outcome of a bulk action at one Antrag (001703). */
+export interface BulkItemResult {
+  readonly applicationId: Uuid;
+  readonly ok: boolean;
+  readonly code?: string | null;
+  readonly error?: string | null;
 }
 
 /** Timeline entry, frontend view. The `label` comes from `toState`. */
@@ -946,6 +1006,8 @@ export interface Transition {
    * menu then open the decision dialog, which can approve with deviations.
    */
   readonly allowsDecision?: boolean;
+  /** Set only when true: the target is terminal, so the applicant page asks first (001712). */
+  readonly toTerminal?: true;
 }
 
 /** A changed field cell, frontend view. The `key` comes out of the diff map. */

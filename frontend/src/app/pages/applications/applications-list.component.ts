@@ -32,6 +32,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 import {
   ButtonComponent,
+  CheckboxComponent,
   ConfirmDialogComponent,
   CurrencyInputComponent,
   DatepickerComponent,
@@ -46,6 +47,7 @@ import {
   mediaQuery,
   RowMenuComponent,
   type RowMenuItem,
+  SelectionBarComponent,
   type RowMenuSection,
   type RowSwipeAction,
   ScrollFadeDirective,
@@ -77,6 +79,7 @@ import {
   rowForceItem,
 } from './row-transitions-menu/row-transitions-menu.component';
 import { ApplicationCaptureComponent } from './capture/application-capture.component';
+import { BULK_MAX, BulkDialogComponent, type BulkMode } from './bulk-dialog/bulk-dialog.component';
 import { debounced } from '@shared/debounced';
 import { AmountComponent } from '@shared/ui/amount/amount.component';
 import { groupByMonth, type MonthGroup } from '@shared/group-by-month';
@@ -195,6 +198,9 @@ type FilterSheet = 'more' | null;
     AgendaDialogComponent,
     DecisionDialogComponent,
     ApplicationCaptureComponent,
+    BulkDialogComponent,
+    CheckboxComponent,
+    SelectionBarComponent,
   ],
   providers: [ApplicationsPageService],
   templateUrl: './applications-list.component.html',
@@ -212,6 +218,33 @@ export class ApplicationsListComponent {
   private readonly page = inject(ApplicationsPageService);
 
   readonly canExport = computed(() => this.auth.can('application.export'));
+  /** The multiple selection with its bulk actions (001700). */
+  readonly canBulk = computed(() => this.auth.can('application.manage'));
+  /** The rows show check boxes. */
+  readonly selecting = signal(false);
+  readonly selected = signal<ReadonlySet<Uuid>>(new Set());
+  readonly selectedCount = computed(() => this.selected().size);
+  /** One action takes at most `BULK_MAX` Anträge (001700). */
+  readonly overMax = computed(() => this.selectedCount() > BULK_MAX);
+  readonly allSelected = computed(() => {
+    const list = this.rows();
+    return list.length > 0 && list.every((r) => this.selected().has(r.item.id));
+  });
+  readonly selectionLabel = computed(() => {
+    const count = this.i18n.translate('applications.bulk.selectedCount', {
+      count: String(this.selectedCount()),
+    });
+    if (!this.overMax()) return count;
+    return `${count} · ${this.i18n.translate('applications.bulk.max', { max: String(BULK_MAX) })}`;
+  });
+  /** The open bulk dialog, or null. */
+  readonly bulkMode = signal<BulkMode | null>(null);
+  /** The selected rows as the bulk dialog names them. */
+  readonly bulkTargets = computed(() =>
+    this.items()
+      .filter((item) => this.selected().has(item.id))
+      .map((item) => ({ id: item.id, title: this.titleOf(item) })),
+  );
   /** #11: "Antrag erfassen" for another person. */
   readonly canCapture = computed(() => this.auth.can('application.create_on_behalf'));
   /** "Antrag erfassen" is open. */
@@ -417,13 +450,20 @@ export class ApplicationsListComponent {
       createdAt: item.createdAt,
       title: this.titleOf(item),
       typeLabel: this.typesById().get(item.typeId) ?? '',
-      stateLabel: item.state?.label ?? null,
-      stateKind: flowColorKind(item.state?.color),
+      ...this.stateOf(item),
       amount: this.money(item),
       approved: this.approvedMoney(item),
       ...this.swipeOf(item),
     })),
   );
+
+  /** A draft says that it is not submitted yet (001710). */
+  private stateOf(item: ApplicationListItem): Pick<ListRow, 'stateLabel' | 'stateKind'> {
+    if (item.state?.isInitial) {
+      return { stateLabel: this.i18n.translate('status.draft.note'), stateKind: 'warn' };
+    }
+    return { stateLabel: item.state?.label ?? null, stateKind: flowColorKind(item.state?.color) };
+  }
 
   /**
    * The swipe actions of a row: the same items, ids and permissions as its row menu.
@@ -472,9 +512,17 @@ export class ApplicationsListComponent {
     return [
       ...this.sortSections(),
       ...(this.exportShown() ? [{ items: [exportItem] }] : []),
+      ...this.selectSections(),
       refreshMenuSection((key) => this.i18n.translate(key)),
     ];
   });
+
+  /** "Mehrere auswählen" for a person with `application.manage` (001700). */
+  readonly selectSections = computed<RowMenuSection[]>(() =>
+    this.canBulk() && !this.selecting()
+      ? [{ items: [{ id: 'select', label: this.i18n.translate('applications.bulk.start'), icon: 'check' }] }]
+      : [],
+  );
 
   /** The row the force-status dialog acts on. */
   readonly forceFor = signal<ApplicationListItem | null>(null);
@@ -650,6 +698,10 @@ export class ApplicationsListComponent {
       this.onExport();
       return;
     }
+    if (item.id === 'select') {
+      this.selecting.set(this.canBulk());
+      return;
+    }
     const [sort, order] = item.id.split(':');
     this.navigate({ sort, order });
   }
@@ -727,6 +779,41 @@ export class ApplicationsListComponent {
   }
 
   /** A swipe of a phone carried out an item of the row menu. */
+  stopSelecting(): void {
+    this.selecting.set(false);
+    this.selected.set(new Set());
+  }
+
+  isSelected(id: Uuid): boolean {
+    return this.selected().has(id);
+  }
+
+  toggleSelect(id: Uuid, checked: boolean): void {
+    this.selected.update((cur) =>
+      checked ? new Set([...cur, id]) : new Set([...cur].filter((x) => x !== id)),
+    );
+  }
+
+  toggleSelectAll(checked: boolean): void {
+    this.selected.set(checked ? new Set(this.rows().map((r) => r.item.id)) : new Set());
+  }
+
+  /** A row in selection mode: a click toggles it instead of opening the Antrag. */
+  onRowActivate(item: ApplicationListItem): void {
+    if (this.selecting()) this.toggleSelect(item.id, !this.isSelected(item.id));
+  }
+
+  /** Open a bulk action for the selection; more than `BULK_MAX` rows open nothing. */
+  openBulk(mode: BulkMode): void {
+    if (!this.selectedCount() || this.overMax()) return;
+    this.bulkMode.set(mode);
+  }
+
+  /** The bulk action ran: the rows show the new states, the selection stays for the result. */
+  onBulkDone(): void {
+    this.reload();
+  }
+
   onRowSwiped(item: ApplicationListItem, action: RowSwipeAction): void {
     if (action.id === 'force') this.onRowAction(item, { kind: 'force' });
     else if (action.id === 'archive') this.swipeArchive(item, action.leaves === true);

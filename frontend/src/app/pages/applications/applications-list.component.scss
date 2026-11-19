@@ -169,3 +169,14 @@
     @include lp.phone-chips;
   }
 }
+
+// The multiple selection (001700): the box sits above the row link, a chosen row is selected.
+.apps__rowCheck {
+  position: relative;
+  z-index: 1;
+}
+.apps__row--checked {
+  --li-bg: var(--color-selected);
+  --li-hover: var(--color-selected);
+  --li-color: var(--color-on-selected);
+}

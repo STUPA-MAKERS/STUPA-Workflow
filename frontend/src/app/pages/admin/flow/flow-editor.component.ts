@@ -23,6 +23,7 @@ import {
   IconComponent,
   MEDIA,
   mediaQuery,
+  NoteComponent,
   observeElementSize,
   RowMenuComponent,
   type RowMenuItem,
@@ -51,6 +52,7 @@ import {
   autoLayout,
   blankTransition,
   emptyFlowGraph,
+  isDraftWithdrawal,
   normalizeFlowGraph,
   serializeFlowGraph,
   validateFlowGraph,
@@ -151,6 +153,7 @@ const MIN_FIT_SCALE = 0.75;
     BreadcrumbsComponent,
     IconComponent,
     StatusTextComponent,
+    NoteComponent,
     RowMenuComponent,
     ScrollFadeDirective,
   ],
@@ -662,6 +665,15 @@ export class FlowEditorComponent {
 
   protected setStateTerminal(key: string, on: boolean): void {
     this.graph.update((g) => ops.setStateTerminal(g, key, on));
+  }
+
+  protected setStateReplacedTarget(key: string, on: boolean): void {
+    this.graph.update((g) => ops.setStateReplacedTarget(g, key, on));
+  }
+
+  /** The selected transition withdraws a draft (001712): the inspector warns. */
+  protected draftWithdrawal(t: TransitionDef): boolean {
+    return isDraftWithdrawal(t, this.graph().states);
   }
 
   protected setStateOutcome(key: string, outcome: 'approved' | 'denied', on: boolean): void {

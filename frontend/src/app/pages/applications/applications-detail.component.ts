@@ -513,8 +513,39 @@ export class ApplicationsDetailComponent {
     return [
       ...(l.predecessor ? [row(l.predecessor, t('applications.predecessor.field'))] : []),
       ...l.successors.map((s) => row(s, t('applications.predecessor.successor'))),
+      ...(l.replaces ? [row(l.replaces, t('applications.links.replaces'))] : []),
+      ...(l.replacedBy ?? []).map((s) => row(s, t('status.replacedBy'))),
     ];
   });
+
+  /**
+   * A denied Antrag, or one sent back for changes, offers a new version to a person with
+   * `application.manage` (001720).
+   */
+  readonly offersNewVersion = computed(() => {
+    const app = this.app();
+    const state = app?.state;
+    if (!state || !this.canManage() || app.observer) return false;
+    return Boolean(state.isDenied) || (state.editAllowed && !state.isInitial);
+  });
+  /** "Neue Fassung" is running. */
+  readonly creatingVersion = signal(false);
+
+  /** Create the new version (001720) and open it. */
+  createNewVersion(): void {
+    if (this.creatingVersion()) return;
+    this.creatingVersion.set(true);
+    this.api.newVersion(this.id).subscribe({
+      next: (res) => {
+        this.creatingVersion.set(false);
+        void this.router.navigate(['/applications', res.applicationId]);
+      },
+      error: () => {
+        this.creatingVersion.set(false);
+        this.toast.error(this.i18n.translate('status.newVersion.failed'));
+      },
+    });
+  }
   readonly archiving = signal(false);
 
   /**

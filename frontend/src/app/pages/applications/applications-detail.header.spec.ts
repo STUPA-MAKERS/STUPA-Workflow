@@ -264,6 +264,7 @@ describe('ApplicationsDetailComponent — header', () => {
       'Ablehnen',
       'Auf Tagesordnung setzen',
       'Nachforderung stellen',
+      'Neue Fassung',
     ]);
     expect(buttons[0]).toHaveClass('btn--danger');
     expect(buttons[1]).toHaveClass('btn--fill');
