@@ -46,6 +46,7 @@
         (ngModelChange)="date.set($event ?? '')"
       />
       <app-select
+        name="aadGremium"
         [label]="'outsideDecision.gremium' | t"
         [placeholder]="'outsideDecision.gremiumPick' | t"
         [options]="gremiumOptions()"

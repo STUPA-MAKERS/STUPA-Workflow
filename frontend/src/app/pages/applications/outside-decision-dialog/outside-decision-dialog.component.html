@@ -28,6 +28,7 @@
         (ngModelChange)="date.set($event ?? '')"
       />
       <app-select
+        name="oddGremium"
         [label]="'outsideDecision.gremium' | t"
         [placeholder]="'outsideDecision.gremiumPick' | t"
         [options]="gremiumOptions()"
@@ -74,6 +75,7 @@
       }
     </div>
     <app-select
+      name="oddMeeting"
       [label]="'outsideDecision.meeting' | t"
       [placeholder]="'outsideDecision.noMeeting' | t"
       [options]="meetingOptions()"
