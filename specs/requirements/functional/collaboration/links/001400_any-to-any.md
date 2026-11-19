@@ -6,10 +6,10 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
-  - backend/app/modules/links
+  - backend/app/modules/todos
 scope:
-  - backend/app/modules/links
-  - frontend/src/app/features/links
+  - backend/app/modules/todos
+  - frontend/src/app/features/todos
 ---
 
 # Any two elements can link to each other

@@ -6,10 +6,9 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
-  - backend/app/modules/links/router.py
-  - mcp/antragsplattform_mcp/tools/links.py
+  - backend/app/modules/todos
+  - mcp/antragsplattform_mcp/tools/todos.py
 scope:
-  - backend/app/modules/links
   - backend/app/modules/todos
   - mcp/
 ---

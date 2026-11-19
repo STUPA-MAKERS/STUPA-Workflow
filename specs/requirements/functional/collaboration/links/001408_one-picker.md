@@ -6,9 +6,9 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
-  - frontend/src/app/features/links/link-picker/link-picker.component.ts
+  - frontend/src/app/features/todos
 scope:
-  - frontend/src/app/features/links
+  - frontend/src/app/features/todos
 ---
 
 # Verknüpfen searches every kind

@@ -6,10 +6,10 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
-  - backend/app/modules/links/models.py
+  - backend/app/modules/todos
   - backend/migrations/versions
 scope:
-  - backend/app/modules/links
+  - backend/app/modules/todos
 ---
 
 # A link is one row with two typed ends

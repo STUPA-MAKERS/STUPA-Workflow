@@ -8,7 +8,6 @@ updated: 2026-11-19
 implementation:
   - backend/migrations/versions
 scope:
-  - backend/app/modules/links
   - backend/app/modules/todos
 ---
 

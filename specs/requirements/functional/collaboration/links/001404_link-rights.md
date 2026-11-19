@@ -6,9 +6,9 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
-  - backend/app/modules/links/access.py
+  - backend/app/modules/todos
 scope:
-  - backend/app/modules/links
+  - backend/app/modules/todos
 ---
 
 # A person links what the person reads and writes on one end

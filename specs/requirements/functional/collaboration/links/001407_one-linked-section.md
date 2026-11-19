@@ -6,9 +6,8 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
-  - frontend/src/app/features/links/linked-list/linked-list.component.ts
+  - frontend/src/app/features/todos
 scope:
-  - frontend/src/app/features/links
   - frontend/src/app/features/todos
   - frontend/src/app/pages
   - frontend/src/app/features/meetings

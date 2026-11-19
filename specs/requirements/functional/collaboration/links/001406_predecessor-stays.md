@@ -9,7 +9,7 @@ implementation:
   - backend/app/modules/applications/service/links.py
 scope:
   - backend/app/modules/applications
-  - backend/app/modules/links
+  - backend/app/modules/todos
 ---
 
 # The Vorgänger stays its own relation

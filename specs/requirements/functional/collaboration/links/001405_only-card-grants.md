@@ -6,9 +6,8 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
-  - backend/app/modules/links/resolver.py
+  - backend/app/modules/todos
 scope:
-  - backend/app/modules/links
   - backend/app/modules/todos
 ---
 

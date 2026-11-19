@@ -6,10 +6,10 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
-  - backend/app/modules/links/service.py
+  - backend/app/modules/todos
 scope:
-  - backend/app/modules/links
-  - frontend/src/app/features/links
+  - backend/app/modules/todos
+  - frontend/src/app/features/todos
 ---
 
 # A link has no direction
