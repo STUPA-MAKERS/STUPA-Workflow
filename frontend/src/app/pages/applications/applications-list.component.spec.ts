@@ -439,7 +439,7 @@ describe('ApplicationsListComponent', () => {
       const { http, settle } = await start('/applications', { perms: MANAGE });
       await userEvent.click(screen.getByTestId('apps-select'));
       await settle();
-      await userEvent.click(screen.getByRole('checkbox', { name: 'Alle wählen' }));
+      await userEvent.click(screen.getByRole('checkbox', { name: /^Alle wählen/ }));
       await settle();
       await userEvent.click(within(screen.getByTestId('apps-selection')).getByRole('button', { name: 'Mitteilung senden' }));
       await settle();

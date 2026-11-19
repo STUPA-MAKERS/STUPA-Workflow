@@ -179,7 +179,9 @@
           <app-note class="ad__archived" icon="info" role="status" data-testid="draft-note">{{ 'status.draft.note' | t }}</app-note>
         }
 
-        @if (offersNewVersion() || (canTransition() && !application.observer && transitions().length)) {
+        @if (canTransition() && !application.observer && transitionsLoading()) {
+          <ng-container *ngTemplateOutlet="transitionsSkel" />
+        } @else if (offersNewVersion() || (canTransition() && !application.observer && transitions().length)) {
           <app-button-group class="ad__transitionGroup" [label]="'applications.transitions.title' | t">
             @for (t of canTransition() && !application.observer ? transitions() : []; track t.id) {
               <app-button
@@ -203,8 +205,6 @@
               ><app-icon name="copy" />{{ 'status.newVersion.action' | t }}</app-button>
             }
           </app-button-group>
-        } @else if (canTransition() && !application.observer && transitionsLoading()) {
-          <ng-container *ngTemplateOutlet="transitionsSkel" />
         }
 
         @if (application.archivedAt) {
