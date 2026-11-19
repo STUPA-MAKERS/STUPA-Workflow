@@ -29,9 +29,9 @@ export function preloadImages(
     (url) =>
       new Promise<void>((resolve) => {
         const img = make();
-        img.onload = () => resolve();
-        img.onerror = () => resolve();
-        img.src = url;
+        img.addEventListener('load', () => resolve(), { once: true });
+        img.addEventListener('error', () => resolve(), { once: true });
+        img.setAttribute('src', url);
       }),
   );
   return new Promise<void>((resolve) => {

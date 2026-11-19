@@ -1,12 +1,21 @@
 import { preloadImages } from './preload-images';
 
+interface FakeImage {
+  src: string;
+  fire: (type: 'load' | 'error') => void;
+}
+
 /** A fake image: records its src, and the test fires load or error by hand. */
 function fakes() {
-  const made: HTMLImageElement[] = [];
+  const made: FakeImage[] = [];
   const make = () => {
-    const img = {} as HTMLImageElement;
-    made.push(img);
-    return img;
+    const listeners = new Map<string, () => void>();
+    const fake: FakeImage = { src: '', fire: (type) => listeners.get(type)?.() };
+    made.push(fake);
+    return {
+      addEventListener: (type: string, fn: () => void) => listeners.set(type, fn),
+      setAttribute: (_name: string, value: string) => (fake.src = value),
+    } as unknown as HTMLImageElement;
   };
   return { made, make };
 }
@@ -25,10 +34,10 @@ describe('preloadImages', () => {
     let done = false;
     const p = preloadImages(['/a', '/b', '/a'], 3000, make).then(() => (done = true));
     expect(made.map((i) => i.src)).toEqual(['/a', '/b']);
-    made[0].onload?.(new Event('load'));
+    made[0].fire('load');
     await Promise.resolve();
     expect(done).toBe(false);
-    made[1].onerror?.(new Event('error'));
+    made[1].fire('error');
     await p;
     expect(done).toBe(true);
   });
