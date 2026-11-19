@@ -7,7 +7,7 @@
   >
     <app-breadcrumbs crumbs />
     @if (hasVersion()) {
-      <app-status-text badge heading [kind]="active() ? 'accent' : 'muted'">
+      <app-status-text chip heading [kind]="active() ? 'accent' : 'muted'">
         {{ (active() ? 'admin.forms.active' : 'admin.forms.inactive') | t }}
       </app-status-text>
     }

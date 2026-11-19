@@ -28,7 +28,7 @@
     <p class="sheet-line fd__line fd__seps">
       <span class="fd__parts">
         <span class="fd__part">
-          <app-status-text badge [kind]="status().kind">{{ status().key | t }}</app-status-text>
+          <app-status-text chip [kind]="status().kind">{{ status().key | t }}</app-status-text>
         </span>
         @if (i.dueDate) {
           <span class="fd__part mono">{{ 'invoices.dueLine' | t: { date: (i.dueDate | ldate: 'mediumDate') } }}</span>

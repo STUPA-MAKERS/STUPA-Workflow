@@ -2,7 +2,7 @@
   <app-page-header [flush]="true" [title]="'admin.flow.title' | t" [meta]="versionMeta()">
     <app-breadcrumbs crumbs />
     @if (loaded()) {
-      <app-status-text badge heading class="fe__validity" [kind]="validation().valid ? 'accent' : 'error'">
+      <app-status-text chip heading class="fe__validity" [kind]="validation().valid ? 'accent' : 'error'">
         <app-icon [name]="validation().valid ? 'check' : 'alert'" [size]="16" />
         {{ validation().valid ? ('admin.common.valid' | t) : (validationMessages().length === 1 ? ('admin.flow.errorCountOne' | t) : ('admin.flow.errorCount' | t: { n: validationMessages().length })) }}
       </app-status-text>
