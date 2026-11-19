@@ -74,7 +74,7 @@ export class LiveVoteSession {
   }
 
   /**
-   * The page is back from the background (§F/meetings/meetings/001441). The socket may be dead
+   * The page is back from the background (§F/meetings/meetings/001739). The socket may be dead
    * without a `close` event, and the events of the gap are lost, so the session drops the old
    * socket and opens a new one at once. Its `subscribe` makes the server replay the state. A
    * session that gave up after `MAX_ATTEMPTS` starts again with a fresh count.

@@ -169,9 +169,7 @@
       } @else if (allEmpty()) {
         <app-empty-state shape="card" fill [heading]="'todos.all.empty' | t" />
       } @else if (noMatch()) {
-        <app-empty-state shape="card" fill [heading]="'todos.noMatch' | t">
-          <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'todos.filter.reset' | t }}</app-button>
-        </app-empty-state>
+        <app-empty-state shape="card" fill [heading]="'todos.noMatch' | t" />
       }
       <app-todo-board-rows
         animate.enter="motion-fade-in"
@@ -205,9 +203,7 @@
       </div>
     } @else if (board(); as b) {
       @if (noMatch()) {
-        <app-empty-state shape="card" fill [heading]="'todos.noMatch' | t">
-          <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'todos.filter.reset' | t }}</app-button>
-        </app-empty-state>
+        <app-empty-state shape="card" fill [heading]="'todos.noMatch' | t" />
       } @else if (view() === 'list') {
         <app-todo-list-view
           animate.enter="motion-fade-in"
