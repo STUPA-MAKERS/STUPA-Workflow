@@ -119,7 +119,7 @@
   background: var(--color-surface-2);
 }
 :host-context([data-theme='dark']) .br__col {
-  background: var(--color-surface-1);
+  background: var(--color-surface-2);
 }
 .br__colHead {
   display: flex;
@@ -214,4 +214,19 @@
 }
 .br__empty {
   padding: 0 var(--space-2);
+}
+
+// Each board lies on a surface of its own, and its columns cut at the round edge of that
+// surface when they scroll sideways (spec 001332).
+.br__cols {
+  padding: var(--space-2);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+  scroll-padding-inline: var(--space-2);
+}
+@include d.host-on(veryHigh) {
+  .br__cols {
+    border: var(--vh-edge);
+    background: var(--vh-bg);
+  }
 }

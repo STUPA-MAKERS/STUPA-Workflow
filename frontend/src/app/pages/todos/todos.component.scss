@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use 'display' as d;
 @use 'frosted' as *;
 :host {
   display: flex;
@@ -286,5 +287,14 @@
 @keyframes td-fade-out {
   to {
     opacity: 0;
+  }
+}
+
+// In very high contrast the board body has no frame of its own: each board has its white edge
+// (spec 001332), and a frame around them would double it.
+@include d.host-on(veryHigh) {
+  .td.ld-pane--glass > .td__body--rows.ld-pane__rows:has(> app-todo-board-view, > app-todo-board-rows) {
+    border: 0 !important;
+    border-radius: 0 !important;
   }
 }
