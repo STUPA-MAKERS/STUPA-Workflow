@@ -883,7 +883,7 @@
   "meetings.agenda.done": "Done",
   "meetings.agenda.markDone": "Mark as done",
   "meetings.agenda.markOpen": "Mark as not done",
-  "meetings.agenda.empty": "No applications on the agenda yet.",
+  "meetings.agenda.empty": "No items on the agenda yet.",
   "meetings.agenda.addFreetext": "Add item",
   "meetings.agenda.untitled": "Untitled item",
   "meetings.agenda.nonPublic": "Non-public",
