@@ -312,7 +312,7 @@
       [showTitle]="false"
       [targetId]="t.id"
       [gremiumId]="m.gremiumId"
-      [linkLabel]="t.title"
+      [linkLabel]="t.title ?? ''"
       [lead]="applicationLead()"
       [emptyHeading]="'todos.linked.empty' | t"
       [headActions]="true"
