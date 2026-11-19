@@ -582,7 +582,7 @@ function liveSetup() {
   const session = TestBed.inject(MeetingSessionService);
   session.meeting.set(M({ status: 'live', canWrite: false }));
   session['connectLive']('m-1');
-  const reads = () => http.match((r) => r.method === 'GET').map((r) => r.url);
+  const reads = () => http.match((r) => r.method === 'GET').map((r) => r.request.url);
   return { channels, resume, http, session, reads };
 }
 
