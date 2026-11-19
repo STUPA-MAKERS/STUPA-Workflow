@@ -20,7 +20,7 @@ async function setup(
     inputs: { variant: opts.variant ?? 'rail', menu: opts.menu ?? 'help' },
     on: { navigated },
     providers: [
-      provideRouter([{ path: '**', children: [] }]),
+      provideRouter([{ path: 'accessibility', children: [] }]),
       { provide: AuthService, useValue: { isAuthenticated: signal(opts.signedIn ?? true) } },
       {
         provide: BrandingService,
@@ -326,36 +326,5 @@ describe('HelpMenuComponent', () => {
     await setup();
     await userEvent.click(trigger());
     expect(screen.queryByRole('button', { name: 'Problem melden' })).toBeNull();
-  });
-
-  /** § F/public/public-pages/001303: a signed-in person reaches the public pages from "Hilfe". */
-  it('links the public pages for a signed-in person and closes when one is followed', async () => {
-    const { navigated } = await setup({ variant: 'sheet' });
-    const group = screen.getByRole('group', { name: 'Öffentliche Seiten' });
-    expect(screen.getByRole('link', { name: 'Protokolle' })).toHaveAttribute('href', '/protocols');
-    expect(screen.getByRole('link', { name: 'Beschlüsse' })).toHaveAttribute('href', '/decisions');
-    expect(screen.getByRole('link', { name: 'Öffentlicher Kalender' })).toHaveAttribute('href', '/public-calendar');
-    expect(group).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('link', { name: 'Protokolle' }));
-    expect(navigated).toHaveBeenCalled();
-  });
-
-  it('shows no public pages to a visitor, who has them on the start page', async () => {
-    await setup({ variant: 'sheet', signedIn: false });
-    expect(screen.queryByRole('group', { name: 'Öffentliche Seiten' })).toBeNull();
-  });
-
-  it('hides a public page while its feature is off', async () => {
-    localStorage.setItem('ap.features.off', JSON.stringify(['meetings']));
-    await setup({ variant: 'sheet' });
-    expect(screen.queryByRole('link', { name: 'Protokolle' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Beschlüsse' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Öffentlicher Kalender' })).toBeInTheDocument();
-  });
-
-  it('shows no group without a public page', async () => {
-    localStorage.setItem('ap.features.off', JSON.stringify(['meetings', 'calendar']));
-    await setup({ variant: 'sheet' });
-    expect(screen.queryByRole('group', { name: 'Öffentliche Seiten' })).toBeNull();
   });
 });

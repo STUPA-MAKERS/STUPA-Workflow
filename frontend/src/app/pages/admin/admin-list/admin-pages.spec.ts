@@ -4,11 +4,19 @@ import { join } from 'node:path';
 import { routes } from '../../../app.routes';
 import { ADMIN_PAGES } from './admin-pages';
 
-/** The child paths of the `/admin` route in `app.routes.ts`. */
+/**
+ * The paths below `/admin` in `app.routes.ts`: the children of the list page and the two
+ * editors beside it (spec 001482).
+ */
 function adminChildPaths(): readonly string[] {
   const shell = routes.find((r) => r.children?.some((c) => c.path === 'admin'));
-  const admin = (shell?.children ?? routes).find((r) => r.path === 'admin');
-  return (admin?.children ?? []).map((c) => c.path ?? '');
+  const siblings = shell?.children ?? routes;
+  const admin = siblings.find((r) => r.path === 'admin');
+  const editors = siblings
+    .map((r) => r.path ?? '')
+    .filter((p) => p.startsWith('admin/'))
+    .map((p) => p.slice('admin/'.length));
+  return [...(admin?.children ?? []).map((c) => c.path ?? ''), ...editors];
 }
 
 /**
@@ -17,7 +25,7 @@ function adminChildPaths(): readonly string[] {
  * beside the role matrix that the committees page uses too.
  */
 const SHARED_FOLDERS: Readonly<Record<string, readonly string[]>> = {
-  admin: ['admin-frame'],
+  admin: ['admin-list'],
   texts: ['branding'],
   committees: ['committees', 'gremium-roles'],
 };

@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/pages/admin/admin-frame/admin-frame.component.scss
-  - frontend/src/app/pages/admin/admin-frame/frame-modes.ts
+  - frontend/src/app/pages/admin/admin-list/admin-list.component.scss
+  - frontend/src/app/pages/admin/admin-list/frame-modes.ts
 scope:
   - frontend/src/app/pages/admin
 ---
