@@ -549,7 +549,7 @@ export class GremiumAttendanceComponent {
     month: string,
     kind: CellView['kind'],
     view: CellView,
-    pool = false,
+    pool: boolean,
   ): string {
     const when = monthYear(month, this.i18n.formatLocale());
     switch (kind) {
