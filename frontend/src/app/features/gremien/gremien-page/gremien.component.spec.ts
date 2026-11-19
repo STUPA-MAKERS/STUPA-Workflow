@@ -107,7 +107,7 @@ describe('GremienComponent', () => {
     expect(s.frame.fill()).toBe(false);
   });
 
-  it('keeps the skeleton until the logos of the first answer have loaded (001280)', async () => {
+  it('§NF/performance/loading/001280: keeps the skeleton until the logos of the first answer have loaded', async () => {
     let done!: () => void;
     const preload = jest.fn(() => new Promise<void>((r) => (done = r)));
     const s = await start('/committees', { preload });
@@ -121,7 +121,7 @@ describe('GremienComponent', () => {
     expect(screen.getByText('Wahlausschuss')).toBeTruthy();
   });
 
-  it('does not wait without a logo (001280)', async () => {
+  it('§NF/performance/loading/001280: does not wait without a logo', async () => {
     const preload = jest.fn(() => Promise.resolve());
     const s = await start('/committees', { preload, items: [gremium()] });
     restore = s.restore;

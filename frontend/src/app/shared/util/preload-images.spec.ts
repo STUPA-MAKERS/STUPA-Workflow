@@ -14,13 +14,13 @@ function fakes() {
 describe('preloadImages', () => {
   afterEach(() => jest.useRealTimers());
 
-  it('resolves at once without a URL', async () => {
+  it('§NF/performance/loading/001280: resolves at once without a URL', async () => {
     const { made, make } = fakes();
     await expect(preloadImages(['', ''], 3000, make)).resolves.toBeUndefined();
     expect(made).toHaveLength(0);
   });
 
-  it('waits for each image, once per URL, and counts a failed one as done', async () => {
+  it('§NF/performance/loading/001280: waits for each image, once per URL, and counts a failed one as done', async () => {
     const { made, make } = fakes();
     let done = false;
     const p = preloadImages(['/a', '/b', '/a'], 3000, make).then(() => (done = true));
@@ -33,7 +33,7 @@ describe('preloadImages', () => {
     expect(done).toBe(true);
   });
 
-  it('resolves after the limit when an image never answers', async () => {
+  it('§NF/performance/loading/001280: resolves after the limit when an image never answers', async () => {
     jest.useFakeTimers();
     const { make } = fakes();
     let done = false;
