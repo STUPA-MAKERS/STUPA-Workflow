@@ -137,7 +137,7 @@
       <app-empty-state shape="choice"
         [heading]="listText().noMatch | t: { q: activeQuery() }"
       >
-        <app-button variant="text" size="sm" (click)="clearSearch()">{{ 'invoices.filter.reset' | t }}</app-button>
+        <app-button variant="tonal" size="sm" (click)="clearSearch()"><app-icon name="reset" />{{ 'invoices.filter.reset' | t }}</app-button>
       </app-empty-state>
     } @else {
       <app-empty-state shape="choice"
