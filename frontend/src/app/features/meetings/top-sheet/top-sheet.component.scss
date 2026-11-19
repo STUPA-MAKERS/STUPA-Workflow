@@ -30,7 +30,9 @@ app-protocol-bar {
   flex: none;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-5) 28px var(--space-2);
+  // The capitals of the kicker sit 28px below the top edge, as far as the text from the side:
+  // 5px of its 18px line are above the capitals.
+  padding: 23px 28px var(--space-2);
 }
 .ts__done {
   flex: none;
