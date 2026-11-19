@@ -70,8 +70,9 @@ async def test_mine_lists_the_cards_and_counts_the_due_soon_ones() -> None:
             [],
             [],
             [],
+            [],
         ],
-        scalars=[[], [lab]],
+        scalars=[[lab]],
     )
     out = await _svc(session).mine(USER)
     assert [i.id for i in out.items] == [soon.id, late.id, none.id]

@@ -151,7 +151,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Create ``todo_link`` again from the links with a card end and drop ``link``."""
+    """Create ``todo_link`` again with its indexes from the links with a card end; drop ``link``."""
     columns = ",\n".join(
         f"{column} uuid CONSTRAINT fk_todo_link_{column}_{table} "
         f"REFERENCES {table} (id) ON DELETE CASCADE"
@@ -183,6 +183,16 @@ def downgrade() -> None:
                 FROM link WHERE {own}_kind = 'todo' AND {other}_kind = '{kind}'
                 """
             )
+    op.execute("CREATE INDEX IF NOT EXISTS ix_todo_link_card_id ON todo_link (card_id)")
+    for _kind, _table, column in KINDS:
+        op.execute(
+            f"CREATE UNIQUE INDEX IF NOT EXISTS uq_todo_link_{column} "
+            f"ON todo_link (card_id, {column}) WHERE {column} IS NOT NULL"
+        )
+        op.execute(
+            f"CREATE INDEX IF NOT EXISTS ix_todo_link_{column} "
+            f"ON todo_link ({column}) WHERE {column} IS NOT NULL"
+        )
     for _kind, table, _column in KINDS:
         op.execute(f"DROP TRIGGER IF EXISTS link_drop_ends ON {table}")
     op.execute("DROP FUNCTION IF EXISTS link_drop_ends()")

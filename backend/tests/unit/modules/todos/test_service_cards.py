@@ -301,7 +301,7 @@ async def test_create_takes_the_checklist_of_a_duplicate_as_open_items() -> None
 async def test_create_in_the_done_column_completes_and_tells_the_tickets() -> None:
     b = board()
     done = column(b.id, "Erledigt", is_done=True)
-    session = ScriptedSession(scalars=[[done], []], execute=[[_ticket_link()]])
+    session = ScriptedSession(scalars=[[done], []], execute=[[], [_ticket_link()]])
     session.put(b)
     service = _svc(session)
     _stub(service)
@@ -410,7 +410,7 @@ async def test_move_into_done_and_back() -> None:
     session, b, col, c, service = _setup()
     done = column(b.id, "Erledigt", 1, is_done=True)
     session.scalars_q[:] = [[col, done], []]
-    session.execute_q[:] = [[_ticket_link(c.id)]]
+    session.execute_q[:] = [[], [_ticket_link(c.id)]]
     await service.move(c.id, _move(done), USER)
     assert c.column_id == done.id and c.completed_at is not None
     assert session.refreshed == [c]
@@ -535,7 +535,7 @@ async def test_transfer_into_the_done_column_maps_labels_and_assignees() -> None
     match = label(t.id, "eilig")
     tail = card(t, done, rank="k")
     session.scalars_q[:] = [[_first, done], [urgent, later], [match], [ME, OTHER], [tail]]
-    session.execute_q[:] = [[_ticket_link(c.id)]]
+    session.execute_q[:] = [[], [], [], [], [_ticket_link(c.id)]]
     await service.transfer(c.id, _transfer(t, done), USER)
     assert (c.board_id, c.column_id) == (t.id, done.id)
     assert c.rank > "k" and c.completed_at is not None and c.version == 1
