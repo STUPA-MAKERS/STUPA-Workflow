@@ -1231,12 +1231,12 @@
       "to": "todos"
     },
     {
-      "count": 8,
+      "count": 9,
       "from": "todos",
       "to": "applications"
     },
     {
-      "count": 16,
+      "count": 20,
       "from": "todos",
       "to": "auth"
     },
@@ -1246,7 +1246,7 @@
       "to": "budget"
     },
     {
-      "count": 4,
+      "count": 7,
       "from": "todos",
       "to": "calendar"
     },
@@ -1276,7 +1276,7 @@
       "to": "livevote"
     },
     {
-      "count": 3,
+      "count": 4,
       "from": "todos",
       "to": "meetings"
     },
@@ -1286,7 +1286,7 @@
       "to": "notifications"
     },
     {
-      "count": 16,
+      "count": 19,
       "from": "todos",
       "to": "shared"
     },
@@ -1296,12 +1296,12 @@
       "to": "site_config"
     },
     {
-      "count": 5,
+      "count": 6,
       "from": "todos",
       "to": "tickets"
     },
     {
-      "count": 5,
+      "count": 6,
       "from": "todos",
       "to": "voting"
     },

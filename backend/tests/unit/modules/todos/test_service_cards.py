@@ -15,13 +15,13 @@ from app.modules.todos import service as svc_mod
 from app.modules.todos.lexorank import MAX_LENGTH
 from app.modules.todos.links import Resolved
 from app.modules.todos.models import (
+    Link,
     TodoAssignee,
     TodoCard,
     TodoCardLabel,
     TodoCheckItem,
     TodoComment,
     TodoEvent,
-    TodoLink,
 )
 from app.modules.todos.schemas import (
     CardCreate,
@@ -44,12 +44,21 @@ from tests.unit.modules.todos.fakes import (
     card,
     column,
     comment,
+    edge,
     event,
     label,
     link,
+    link_row,
 )
 
 OUT = object()
+
+
+def _ticket_link(card_id: uuid.UUID | None = None) -> Any:
+    """The link of a card to ``TICKET`` as the ticket query of a done card reads it."""
+    return link(card_id or uuid.uuid4(), ticket_id=TICKET)
+
+
 TICKET = uuid.UUID(int=61)
 APP = uuid.UUID(int=31)
 NOW_UTC = datetime(2026, 10, 2, tzinfo=UTC)
@@ -176,9 +185,14 @@ async def test_card_detail_resolves_people_links_events_and_comments(
         id=uuid.uuid4(), filename="a.png", mime="image/png", size=3, scan_state="scanning"
     )
     session = ScriptedSession(
-        execute=[[(c.id, lab.id)], [(c.id, OTHER)], [(c.id, 1, 1)], [(c.id, 2)]],
-        scalars=[
+        execute=[
+            [(c.id, lab.id)],
+            [(c.id, OTHER)],
+            [(c.id, 1, 1)],
+            [(c.id, 2)],
             [app_link, ticket_link],
+        ],
+        scalars=[
             [first, done],
             [lab, unused],
             [item],
@@ -262,8 +276,8 @@ async def test_create_in_the_first_column_with_everything() -> None:
     assert new.completed_at is None and new.due_date == date(2026, 10, 20)
     assert len([o for o in session.added if isinstance(o, TodoAssignee)]) == 2
     assert len([o for o in session.added if isinstance(o, TodoCardLabel)]) == 1
-    (new_link,) = [o for o in session.added if isinstance(o, TodoLink)]
-    assert new_link.ticket_id == TICKET
+    (new_link,) = [o for o in session.added if isinstance(o, Link)]
+    assert new_link.has_end(("ticket", TICKET)) and new_link.has_end(("todo", new.id))
     assert [e.kind for e in _events(session)] == ["created"]
     assert service.outbox == [TodoMail("assigned", new.id, (OTHER,), ME, None)]
 
@@ -287,7 +301,7 @@ async def test_create_takes_the_checklist_of_a_duplicate_as_open_items() -> None
 async def test_create_in_the_done_column_completes_and_tells_the_tickets() -> None:
     b = board()
     done = column(b.id, "Erledigt", is_done=True)
-    session = ScriptedSession(scalars=[[done], [], [TICKET]])
+    session = ScriptedSession(scalars=[[done], []], execute=[[], [_ticket_link()]])
     session.put(b)
     service = _svc(session)
     _stub(service)
@@ -395,7 +409,8 @@ async def test_move_into_done_and_back() -> None:
     """
     session, b, col, c, service = _setup()
     done = column(b.id, "Erledigt", 1, is_done=True)
-    session.scalars_q[:] = [[col, done], [], [TICKET]]
+    session.scalars_q[:] = [[col, done], []]
+    session.execute_q[:] = [[], [_ticket_link(c.id)]]
     await service.move(c.id, _move(done), USER)
     assert c.column_id == done.id and c.completed_at is not None
     assert session.refreshed == [c]
@@ -519,7 +534,8 @@ async def test_transfer_into_the_done_column_maps_labels_and_assignees() -> None
     urgent, later = label(b.id, "Eilig"), label(b.id, "Später")
     match = label(t.id, "eilig")
     tail = card(t, done, rank="k")
-    session.scalars_q[:] = [[_first, done], [urgent, later], [match], [ME, OTHER], [tail], [TICKET]]
+    session.scalars_q[:] = [[_first, done], [urgent, later], [match], [ME, OTHER], [tail]]
+    session.execute_q[:] = [[], [], [], [], [_ticket_link(c.id)]]
     await service.transfer(c.id, _transfer(t, done), USER)
     assert (c.board_id, c.column_id) == (t.id, done.id)
     assert c.rank > "k" and c.completed_at is not None and c.version == 1
@@ -809,83 +825,52 @@ async def test_checklist() -> None:
     assert actions == ["added", "added", "renamed", "done", "undone", "removed"]
 
 
-async def test_links() -> None:
-    session, _b, _col, c, service = _setup()
-    service.links = FakeLinks(readable=[("ticket", TICKET)])  # type: ignore[assignment]
-    session.scalar_q[:] = [c, c]
-    with pytest.raises(ValidationProblem) as exc:
-        await service.add_link(c.id, "todo", c.id, USER)
-    assert exc.value.code == "link_self"
-    with pytest.raises(ValidationProblem) as exc:
-        await service.add_link(c.id, "application", APP, USER)
-    assert exc.value.code == "link_target_not_found"
-    assert "FOR UPDATE" in str(session.statements[0])
-    session.scalar_q[:] = [c, uuid.uuid4(), c, None]
-    with pytest.raises(ConflictError) as exc:
-        await service.add_link(c.id, "ticket", TICKET, USER)
-    assert exc.value.code == "link_exists"
-    await service.add_link(c.id, "ticket", TICKET, USER)
-    (new,) = [o for o in session.added if isinstance(o, TodoLink)]
-    foreign = link(uuid.uuid4(), ticket_id=TICKET)
-    session.put(foreign)
-    session.scalar_q[:] = [c, c]
-    with pytest.raises(NotFoundError):
-        await service.remove_link(c.id, foreign.id, USER)
-    await service.remove_link(c.id, new.id, USER)
-    removal = str(session.statements[-1])
-    assert removal.startswith("DELETE FROM todo_link") and " OR " not in removal
-    assert [e.kind for e in _events(session)] == ["linked", "unlinked"]
-    assert _events(session)[1].payload == {"linkKind": "ticket", "targetId": str(TICKET)}
-
-
 async def test_a_link_between_two_cards_shows_on_both() -> None:
-    """§ 000573: card B shows the link of card A to it, and each other card once."""
+    """§ 001401: card B shows its links without direction; an unreadable card stays out."""
     b = board()
     col = column(b.id)
     a_card, b_card = card(b, col), card(b, col)
-    hidden_src = uuid.uuid4()
-    to_b = link(a_card.id, todo_id=b_card.id)
-    back = link(b_card.id, todo_id=a_card.id)
-    unreadable = link(hidden_src, todo_id=b_card.id)
-    ticket_link = link(b_card.id, ticket_id=TICKET)
+    hidden = uuid.uuid4()
+    to_a = edge(link(b_card.id, todo_id=a_card.id))
+    to_hidden = edge(link(b_card.id, todo_id=hidden))
+    ticket_link = edge(link(b_card.id, ticket_id=TICKET))
     session = ScriptedSession()
     session.put(b, col, a_card, b_card)
     readable = Resolved(True, "Karte A", f"/todos?card={a_card.id}")
     service = _svc(session, FakeLinks(resolved={("todo", a_card.id): readable}))
-    links, resolved = await service._card_links(
-        {b_card.id}, [ticket_link, to_b, back, unreadable], USER
-    )
+    links, resolved = await service._card_links({b_card.id}, [ticket_link, to_a, to_hidden], USER)
     assert [(ln.kind, ln.target_id) for ln in links[b_card.id]] == [
         ("ticket", TICKET),
         ("todo", a_card.id),
     ]
-    assert links[b_card.id][1].id == back.id
-    assert ("todo", hidden_src) in resolved
-    only_incoming, _ = await service._card_links(
-        {b_card.id}, [to_b], USER
-    )
-    assert only_incoming[b_card.id][0].id == to_b.id
+    assert links[b_card.id][1].id == to_a.id
+    assert ("todo", hidden) in resolved
 
 
-async def test_a_card_link_goes_from_either_card() -> None:
-    """§ 000573: card B views and removes the link of card A; the removal takes both ways."""
+async def test_a_card_reads_a_link_from_either_end() -> None:
+    """§ 001401: a stored link shows on the card whatever the order of its ends."""
     session, _b, col, c, service = _setup()
     other = card(_b, col)
-    incoming = link(other.id, todo_id=c.id)
-    session.put(other, incoming)
-    session.scalar_q[:] = [c, c]
-    service.links = FakeLinks(readable=[("todo", other.id)])  # type: ignore[assignment]
-    found = await service._card_link(c, incoming.id)
+    first = link_row(("todo", other.id), ("todo", c.id))
+    second = link_row(("todo", c.id), ("ticket", TICKET))
+    foreign = link_row(("todo", other.id), ("ticket", TICKET))
+    session.put(other, first, second, foreign)
+    found = await service._card_link(c, first.id)
     assert (found.kind, found.target_id) == ("todo", other.id)
-    await service.remove_link(c.id, incoming.id, USER)
-    removal = str(session.statements[-1])
-    assert removal.startswith("DELETE FROM todo_link") and " OR " in removal
-    assert _events(session)[-1].payload == {"linkKind": "todo", "targetId": str(other.id)}
-    session.scalar_q[:] = [c, uuid.uuid4()]
-    with pytest.raises(ConflictError) as exc:
-        await service.add_link(c.id, "todo", other.id, USER)
-    assert exc.value.code == "link_exists"
-    assert " OR " in str(session.statements[-1])
+    found = await service._card_link(c, second.id)
+    assert (found.kind, found.target_id) == ("ticket", TICKET)
+    with pytest.raises(NotFoundError):
+        await service._card_link(c, foreign.id)
+    with pytest.raises(NotFoundError):
+        await service._card_link(c, uuid.uuid4())
+
+
+async def test_note_link_writes_the_card_event() -> None:
+    session, b, _col, c, service = _setup()
+    service.note_link(c, b, ("ticket", TICKET), ME, added=True)
+    service.note_link(c, b, ("ticket", TICKET), ME, added=False)
+    assert [e.kind for e in _events(session)] == ["linked", "unlinked"]
+    assert _events(session)[1].payload == {"linkKind": "ticket", "targetId": str(TICKET)}
 
 
 async def test_comments(people: dict[uuid.UUID, PersonRef]) -> None:
