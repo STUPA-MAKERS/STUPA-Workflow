@@ -220,7 +220,6 @@
   position: static;
 }
 :host-context(.mp__agenda) .ap__menu,
-:host-context(.mp__agenda) .ap__row:hover .ap__menu,
 :host-context(.mp__agenda) .ap__row:focus-within .ap__menu {
   position: absolute;
   inset-block: 0;
@@ -232,6 +231,13 @@
   overflow: visible;
   border-radius: 6px;
   background: var(--color-surface-1);
+}
+// The hover rule of a row widens the menu to its own size, so a hover keeps the box width.
+@media (hover: hover) {
+  :host-context(.mp__agenda) .ap__row:hover .ap__menu {
+    width: 56px;
+    margin: 0;
+  }
 }
 :host-context(.mp__agenda) .ap__row:last-child .ap__menu {
   border-end-end-radius: var(--radius-2xl);
