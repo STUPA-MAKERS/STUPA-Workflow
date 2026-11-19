@@ -1,7 +1,5 @@
 @use 'breakpoints' as bp;
-@use 'field' as f;
 @use 'list-pane' as lp;
-@use 'press';
 @use 'scroll-fade' as fade;
 @use './graph-kinds' as kinds;
 
@@ -78,7 +76,8 @@
   gap: var(--space-2) var(--space-3);
   min-width: 0;
   padding: var(--space-2);
-  border-radius: var(--radius-lg);
+  // Concentric with the search field: half the height of the field and the padding.
+  border-radius: calc(1.375rem + var(--space-2));
   background: var(--color-surface-1);
   box-shadow: var(--shadow-md);
 }
@@ -87,9 +86,11 @@
   max-width: 22rem;
   min-width: 0;
 }
+// The filters are at the end edge, the search at the start edge.
 .gr__chips {
   @include lp.chips;
   flex: 1 1 auto;
+  justify-content: flex-end;
 }
 .gr__chip {
   max-width: 100%;
@@ -156,43 +157,8 @@
   color: var(--color-text-muted);
   font-size: 0.8125rem;
 }
-.gr__close {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: var(--control-height-sm);
-  height: var(--control-height-sm);
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  @include press.press;
-}
 .gr__open {
-  display: inline-flex;
-  align-items: center;
   align-self: flex-start;
-  justify-content: center;
-  gap: var(--space-2);
-  height: var(--control-height);
-  padding: 0 var(--space-5);
-  border-radius: var(--radius-pill);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  font-weight: var(--fw-semibold);
-  line-height: 1;
-  text-decoration: none;
-  white-space: nowrap;
-  @include f.highlight-surface;
-  @include press.chrome-text;
-  @include press.press;
-}
-.gr__close:focus-visible,
-.gr__open:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
 }
 
 // The chosen element in the sheet of a phone.
@@ -230,15 +196,6 @@
   padding: 0 var(--space-1);
 }
 
-@media (hover: hover) {
-  .gr__close:hover {
-    background-color: var(--color-surface-2);
-  }
-  .gr__open:hover {
-    filter: brightness(1.08);
-  }
-}
-
 // A phone: the drawing fills the screen above the bar of the shell, and the filters are one
 // strip at its top from edge to edge.
 @include bp.phone {
@@ -265,6 +222,7 @@
   }
   .gr__chips {
     flex: none;
+    justify-content: flex-start;
     @include lp.phone-chips;
     @include fade.fade-x(var(--space-6), false);
   }

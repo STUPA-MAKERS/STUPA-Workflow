@@ -31,6 +31,7 @@ import { dayMonthYear } from '@shared/date-format';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 import {
   ButtonComponent,
+  ButtonLinkComponent,
   EmptyStateComponent,
   FilterSelectComponent,
   IconComponent,
@@ -92,6 +93,7 @@ export interface GraphRow {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ButtonComponent,
+    ButtonLinkComponent,
     EmptyStateComponent,
     FilterSelectComponent,
     GraphCanvasComponent,
