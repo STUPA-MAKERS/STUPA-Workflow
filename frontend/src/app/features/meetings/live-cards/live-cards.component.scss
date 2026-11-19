@@ -114,8 +114,7 @@
   white-space: nowrap;
   text-decoration: none;
   transition: filter var(--motion-fast) var(--ease-standard),
-    background-color var(--motion-fast) var(--ease-standard),
-    scale var(--motion-xs) var(--ease-standard);
+    background-color var(--motion-fast) var(--ease-standard);
   @include f.highlight-surface;
   @include press.chrome-text;
   @include press.press;

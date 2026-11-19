@@ -6,7 +6,6 @@
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { pressUses } from '../../vendor/ui-kit/testing/scss';
 
 const SRC = join(__dirname, '..');
 const read = (rel: string): string => readFileSync(join(__dirname, rel), 'utf8');
@@ -95,11 +94,11 @@ describe('touch styles', () => {
     expect(rule).toMatch(/app-bottom-bar \{\s*display: none;/);
   });
 
-  /** The pill shrinks like a button; the entry keeps its size. The kit shell draws both bars. */
+  /** The pill ripples from its centre; the entry is the control. The kit shell draws both bars. */
   it.each([
     ['bottom bar', 'bottom-bar/bottom-bar.component.scss', 'bar-item'],
     ['navigation rail', 'nav-rail/nav-rail.component.scss', 'rail-item'],
-  ])('gives the %s entries the press tint and keeps their labels unselectable', (_n, path, mixin) => {
+  ])('gives the %s entries the ripple and keeps their labels unselectable', (_n, path, mixin) => {
     const kit = '../../vendor/ui-kit/shell/src/';
     const scss = read(kit + path);
     expect(scss).toContain("@use '../../../src/styles/press';");
@@ -108,39 +107,36 @@ describe('touch styles', () => {
     expect(scss).toContain(`@include nav-items.${mixin};`);
     const items = read('../../vendor/ui-kit/src/styles/_nav-items.scss');
     const body = items.slice(items.indexOf(`@mixin ${mixin}(`));
-    expect(body).toContain('.#{$b}__item:active .#{$b}__ind::after {\n    background: var(--press-tint);');
-    expect(body).toContain('.#{$b}__item:active .#{$b}__ind {\n    @include press.press-scale;');
+    expect(body).toContain('.#{$b}__item {\n    @include press.host;');
+    expect(body).toMatch(/\.#\{\$b\}__item:active \.#\{\$b\}__ind::after,[^{]*\{[^}]*@include press\.paint;/);
   });
 
   /**
-   * A press state of its own scales too. Two `:active` rules are no press: the canvas of the flow
-   * editor shows the grab cursor, and the rows of the dashboard colour an `app-list-item` that
-   * scales itself.
+   * Nothing shrinks on press (001314). A press state of its own paints the ripple. One `:active`
+   * rule is no press: the canvas of the flow editor shows the grab cursor.
    */
-  it('shrinks every pressed element of the app and eases it back on the release', () => {
+  it('shrinks no pressed element of the app and paints the ripple in a press state of its own', () => {
     const files = [...scssFiles(SRC)];
-    const offenders = files.flatMap((file) =>
-      pressUses(readFileSync(file, 'utf8'))
-        .filter((u) => u.include.includes('$scale: none') || !u.transition?.includes('scale var(--motion-xs)'))
-        .map((u) => `${relative(SRC, file)}: ${u.selector}`),
-    );
-    expect(offenders).toEqual([]);
+    const scaled = files
+      .filter((file) => /press-scale|scale var\(--motion-xs\)|\$scale/.test(readFileSync(file, 'utf8')))
+      .map((file) => relative(SRC, file));
+    expect(scaled).toEqual([]);
     const own = files
       .filter((file) => {
         const text = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-        return /:active\b/.test(text) && !text.includes('@include press.press-scale');
+        return /:active\b/.test(text) && !text.includes('@include press.paint');
       })
       .map((file) => relative(SRC, file));
     expect(own).toEqual(['app/pages/admin/flow/flow-editor.component.scss']);
   });
 
   it('gives the app cards and the page header actions the press and the chrome text', () => {
-    expect(read('pages/home.component.scss')).toContain('@include press.press($scale: row);');
+    expect(read('pages/home.component.scss')).toContain('@include press.press;');
     const start = read('pages/activity/activity.component.scss');
     expect(start).toContain('@include press.press;');
     expect(start).toContain('@include press.chrome-text;');
     expect(read('features/todos/card-tile/todo-card-tile.component.scss')).toMatch(
-      /:host\(:active\) \{\s*background-image: linear-gradient\(var\(--press-tint\), var\(--press-tint\)\);\s*@include press\.press-scale\(row\);/,
+      /:host\(:active\),\s*:host\(\[data-press-key\]\) \{\s*@include press\.paint;/,
     );
     expect(read('../styles.scss')).toMatch(/\.sheet-back-link \{[^}]*@include press\.press;/);
     expect(read('../../vendor/ui-kit/src/lib/page-header/page-header.component.scss')).toContain(
