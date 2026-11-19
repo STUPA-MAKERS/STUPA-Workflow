@@ -183,12 +183,14 @@ describe('AdminListComponent (spec 001480, 001481)', () => {
     expect(screen.getByText('Keine Einstellung gefunden.')).toBeInTheDocument();
   });
 
-  it('opens the detail on every page below /admin, and shows the list on /admin', async () => {
+  it('shows the list on /admin', async () => {
     const view = await setup(ALL, '/admin', false);
     expect(screen.getByRole('heading', { name: 'Verwaltung', level: 1 })).toBeInTheDocument();
     expect(view.container.querySelector('.ld__detail')).toHaveAttribute('hidden');
     expect(view.container.querySelector('.ld__list')).not.toHaveAttribute('hidden');
+  });
 
+  it('opens the detail on every page below /admin', async () => {
     const page = await setup(ALL, '/admin/roles', false);
     expect(page.container.querySelector('.ld__list')).toHaveAttribute('hidden');
     expect(page.container.querySelector('.ld__detail')).not.toHaveAttribute('hidden');
