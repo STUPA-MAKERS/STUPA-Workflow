@@ -122,7 +122,8 @@ function reload(view: View, items: readonly CalendarEntry[] = MONTH): TestReques
 
 const cell = (name: RegExp) => screen.getByRole('button', { name }).closest('.cal__cell') as HTMLElement;
 const panel = () => screen.getByRole('complementary');
-const cards = () => within(panel()).queryAllByRole('button').map((b) => b.querySelector('.cal__cardTitle')?.textContent);
+const cards = () => within(panel()).queryAllByRole('listitem').map((r) => r.querySelector('.li__title')?.textContent?.trim());
+const dayRow = (name: RegExp) => within(panel()).getByRole('button', { name }).closest('[role=listitem]') as HTMLElement;
 
 jest.setTimeout(20_000);
 
@@ -178,17 +179,20 @@ describe('CalendarComponent (desktop)', () => {
     expect(screen.getByRole('button', { name: 'Mittwoch, 18. November 2026, 1 Eintrag' })).toBeInTheDocument();
   });
 
-  it('shows the entries of the picked day as cards', async () => {
+  it('shows the entries of the picked day as the rows of one row group (001770)', async () => {
     const view = await setup();
     load(view);
     expect(panel()).toHaveAccessibleName('Mi, 11.11.2026 · Heute');
     expect(cards()).toEqual(['Angebot einholen', 'Zahnarzt', 'Jour fixe']);
-    const termin = within(panel()).getByRole('button', { name: /Jour fixe/ });
+    expect(panel().querySelectorAll('app-list-group .rowgroup[role=list]').length).toBe(1);
+    expect(within(panel()).getByText('Mi, 11.11.2026 · Heute')).toBeInTheDocument();
+    const termin = dayRow(/Jour fixe/);
     expect(termin).toHaveTextContent('Termin');
     expect(termin).toHaveTextContent('14:00 – 15:30');
-    expect(termin).toHaveTextContent('Haushaltsausschuss · AStA-Büro');
+    expect(termin).toHaveTextContent('Haushaltsausschuss');
+    expect(termin).toHaveTextContent('AStA-Büro');
     expect(termin).toHaveTextContent('Zusage');
-    expect(within(panel()).getByRole('button', { name: /Angebot einholen/ })).not.toHaveTextContent('Ganztägig');
+    expect(dayRow(/Angebot einholen/)).not.toHaveTextContent('Ganztägig');
     await userEvent.click(screen.getByRole('button', { name: /14\. November/ }));
     expect(panel()).toHaveAccessibleName('Sa, 14.11.2026');
     expect(within(panel()).getByText('Keine Einträge an diesem Tag.')).toBeInTheDocument();

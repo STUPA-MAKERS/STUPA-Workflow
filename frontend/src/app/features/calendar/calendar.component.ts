@@ -32,6 +32,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { dayMonth, dayMonthYear, isoDay, monthYear, parseDay, weekdayDate } from '@shared/date-format';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
 import {
   ButtonComponent,
@@ -148,6 +149,7 @@ const KEY_STEPS: Readonly<Record<string, number>> = {
     LoadErrorComponent,
     PageHeaderComponent,
     PublicEntryComponent,
+    RowChevronComponent,
     RowMenuComponent,
     ScrollFadeDirective,
     SearchPillComponent,

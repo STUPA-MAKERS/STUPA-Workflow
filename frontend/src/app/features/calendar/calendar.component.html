@@ -266,31 +266,27 @@
 
     <aside class="cal__panel" [attr.aria-label]="dayHeading()">
       <div class="cal__panelScroll" appScrollFade="y">
-        <section class="cal__cards" aria-live="polite" [attr.aria-label]="dayHeading()">
+        <section class="cal__day" aria-live="polite" [attr.aria-label]="dayHeading()">
           @if (error()) {
             <app-load-error [message]="'calendar.error' | t" (retry)="reload()" />
           } @else if (firstLoad()) {
-            <app-skeleton class="skel-in" variant="items" [count]="3" [lead]="true" [label]="'common.loading' | t" />
+            <app-skeleton class="skel-in" variant="items" [count]="3" [lead]="true" [grouped]="true" [label]="'common.loading' | t" />
           } @else if (!dayEntries().length && !loading()) {
             <app-empty-state shape="date" rows="3" [heading]="'calendar.day.empty' | t" />
-          }
-          @for (e of dayEntries(); track e.kind + e.id) {
-            <button type="button" class="cal__card" (click)="openEntry(e)">
-              <span class="cal__lead cal__cardIcon"><app-icon [name]="icon(e.kind)" /></span>
-              <span class="cal__cardText">
-                <span class="cal__cardKind">
-                  <ng-container *ngTemplateOutlet="facts; context: { $implicit: e, short: true }" />
-                </span>
-                <span class="cal__cardTitle">{{ e.title }}</span>
-                @if (e.source || e.place) {
-                  <span class="cal__cardSrc">{{ e.source }}@if (e.source && e.place) { · }{{ e.place }}</span>
+          } @else {
+            <app-list-group [label]="dayHeading()">
+              <div class="rowgroup cal__rows" role="list">
+                @for (e of dayEntries(); track e.kind + e.id) {
+                  <app-list-item class="cal__row" role="listitem" [title]="e.title" [wrap]="true" [subWrap]="true" (activate)="openEntry(e)">
+                    <span lead class="cal__lead cal__rowIcon"><app-icon [name]="icon(e.kind)" /></span>
+                    <span sub class="cal__sub">
+                      <ng-container *ngTemplateOutlet="facts; context: { $implicit: e, place: true }" />
+                    </span>
+                    <app-row-chevron trail />
+                  </app-list-item>
                 }
-                @if (e.myAnswer; as answer) {
-                  <span class="cal__cardState"><app-status-text [kind]="answerKind(answer)">{{ answerKey(answer) | t }}</app-status-text></span>
-                }
-              </span>
-              <app-icon class="cal__go" name="right" />
-            </button>
+              </div>
+            </app-list-group>
           }
         </section>
       </div>
@@ -298,11 +294,12 @@
   </div>
 }
 
-<ng-template #facts let-e let-short="short">
+<ng-template #facts let-e let-place="place">
   <app-status-text kind="neutral">{{ kindKey(e.kind) | t }}</app-status-text>
   @if (time(e); as when) {<span aria-hidden="true">·</span><span class="mono">{{ when }}</span>}
-  @if (!short && e.source) {<span aria-hidden="true">·</span><span>{{ e.source }}</span>}
-  @if (!short && e.myAnswer) {<span aria-hidden="true">·</span><app-status-text [kind]="answerKind(e.myAnswer)">{{ answerKey(e.myAnswer) | t }}</app-status-text>}
+  @if (e.source) {<span aria-hidden="true">·</span><span>{{ e.source }}</span>}
+  @if (place && e.place) {<span aria-hidden="true">·</span><span>{{ e.place }}</span>}
+  @if (e.myAnswer) {<span aria-hidden="true">·</span><app-status-text [kind]="answerKind(e.myAnswer)">{{ answerKey(e.myAnswer) | t }}</app-status-text>}
 </ng-template>
 
 <ng-template #chips let-size="size">
