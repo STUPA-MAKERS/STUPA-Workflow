@@ -2,7 +2,7 @@
 id: "001482"
 title: The form editor and the flow editor open without the list
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:

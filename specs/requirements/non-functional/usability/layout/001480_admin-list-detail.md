@@ -2,7 +2,7 @@
 id: "001480"
 title: Verwaltung and Konto are ordinary list/detail pages
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:

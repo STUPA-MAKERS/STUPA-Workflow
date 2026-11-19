@@ -2,7 +2,7 @@
 id: "001481"
 title: A row of the Verwaltung list is an ordinary list row
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
