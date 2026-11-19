@@ -1245,15 +1245,12 @@ class FlowService:
             raise ConflictError(
                 "Application is already in the target state.", code="already_in_state"
             )
-        old_approved: Decimal | None = None
+        approval = decision if target.is_approved else None
         if target.is_approved:
-            required = await self._amount_required(from_state_id, target, app)
-            check_amount_given(required, decision)
-            if decision is not None:
-                check_approved_amount(app.amount, decision.approved_amount)
-                old_approved = app.approved_amount
-        else:
-            decision = None
+            check_amount_given(await self._amount_required(from_state_id, target, app), approval)
+        if approval is not None:
+            check_approved_amount(app.amount, approval.approved_amount)
+        old_approved = app.approved_amount if approval is not None else None
         vote_gremium = await self._entry_snapshot(app, from_state_id, target)
         result = cast(
             "CursorResult[Any]",
@@ -1307,11 +1304,11 @@ class FlowService:
                 "forceReason": reason,
             },
         )
-        if decision is not None:
+        if approval is not None:
             await record_decision(
                 self.session,
                 app,
-                decision,
+                approval,
                 actor=principal.sub,
                 decided_by=principal.sub,
                 old_approved=old_approved,
