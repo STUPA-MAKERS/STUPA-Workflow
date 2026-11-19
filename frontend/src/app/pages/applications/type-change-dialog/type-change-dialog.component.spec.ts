@@ -115,12 +115,12 @@ async function setup() {
   const cmp = view.fixture.debugElement.children[0].componentInstance as TypeChangeDialogComponent;
   const openIt = () => {
     host.open.set(true);
-    detectChanges();
+    view.detectChanges();
   };
   const pick = (typeId: string, preview: TypeChangePreview) => {
     cmp.pickType(typeId);
     http.expectOne(PREVIEW_URL(typeId)).flush(preview);
-    detectChanges();
+    view.detectChanges();
   };
   return { ...view, http, toast, host, cmp, openIt, pick };
 }
