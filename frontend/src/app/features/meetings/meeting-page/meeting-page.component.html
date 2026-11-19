@@ -242,6 +242,25 @@
   }
 </app-side-sheet>
 
+<!-- Above the phone width a small tab at the end edge opens the votes for everybody but the
+     minute-taker, who has the vote button in the dock (spec 001460). -->
+@if (!phone() && showVotes() && !votesOpen() && dockVotes() === null) {
+  <button
+    type="button"
+    class="mp__edgeTab"
+    [class.mp__edgeTab--live]="!!openVote()"
+    [attr.aria-label]="'meetings.vote.count' | t"
+    [title]="'meetings.vote.count' | t"
+    (click)="votesOpen.set(true)"
+  >
+    <app-icon name="chevron-left" [size]="16" />
+    <app-icon name="vote" [size]="20" />
+    @if (votes().length) {
+      <span class="mp__edgeBadge num" aria-hidden="true">{{ votes().length }}</span>
+    }
+  </button>
+}
+
 <app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'meetings.vote.count' | t" [(open)]="votesOpen">
   @if (votesOpen()) {
     <div class="mp__votes mp__votes--sheet">

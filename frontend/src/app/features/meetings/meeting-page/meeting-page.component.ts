@@ -278,9 +278,13 @@ export class MeetingPageComponent {
     const t = this.top();
     return this.editable() && t ? !!t.doneAt : null;
   });
-  /** The vote icon button of the dock: the number of votes, or `null` (spec 001460). */
+  /**
+   * The vote icon button of the dock, for the minute-taker only: the number of votes, or
+   * `null`. Everybody else opens the votes from the tab at the end edge, on a phone from the
+   * session menu (spec 001460).
+   */
   protected readonly dockVotes = computed<number | null>(() =>
-    this.showVotes() ? this.votes().length : null,
+    this.meeting().isProtokollant && this.showVotes() ? this.votes().length : null,
   );
   /** The open vote that a phone shows in the place of the text, or `null` (spec 001461). */
   protected readonly phoneVote = computed<MeetingVote | null>(() =>
@@ -444,7 +448,7 @@ export class MeetingPageComponent {
         label: t('meetings.page.recordAttendance'),
         icon: 'users',
       }),
-      ...when(noDock && this.showVotes(), {
+      ...when(this.showVotes() && this.phone() && (noDock || !m.isProtokollant), {
         id: 'votes',
         label: t('meetings.vote.count'),
         icon: 'vote',

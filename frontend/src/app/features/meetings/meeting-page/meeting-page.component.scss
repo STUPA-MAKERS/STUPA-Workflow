@@ -264,6 +264,49 @@
   outline-offset: -2px;
 }
 
+// The tab at the end edge that opens the votes above the phone width (spec 001460): a small
+// half pill on the edge of the window, accent while a vote of the item is open.
+.mp__edgeTab {
+  position: fixed;
+  top: 50%;
+  inset-inline-end: 0;
+  z-index: var(--z-sticky, 10);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  width: 36px;
+  padding: var(--space-3) 0 var(--space-3) 2px;
+  border: var(--border-width) solid var(--color-border);
+  border-inline-end: 0;
+  border-start-start-radius: var(--radius-xl);
+  border-end-start-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+.mp__edgeTab--live {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
+}
+@media (hover: hover) {
+  .mp__edgeTab:not(.mp__edgeTab--live):hover {
+    background: var(--color-surface-3);
+  }
+}
+.mp__edgeTab:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.mp__edgeBadge {
+  font-size: 0.75rem;
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+}
+
 /* "Verknüpfen" and "To-Do anlegen" of the sheet To-Dos sit in its head, before the close button. */
 .mp__sheet-actions {
   display: flex;
@@ -298,5 +341,21 @@
     .mp__chip:not([aria-expanded='true']):hover {
       background: var(--field-bg-hover);
     }
+  }
+}
+
+/* Very high contrast: the edge tab is a field, black on yellow with the black edge; while a
+   vote is open it is yellow on black. */
+@include d.host-on(fields) {
+  .mp__edgeTab {
+    border-color: var(--field-text);
+    background: var(--field-bg);
+    color: var(--field-text);
+    outline: 2px solid var(--field-text);
+    outline-offset: -2px;
+  }
+  .mp__edgeTab--live {
+    background: var(--field-text);
+    color: var(--field-bg);
   }
 }
