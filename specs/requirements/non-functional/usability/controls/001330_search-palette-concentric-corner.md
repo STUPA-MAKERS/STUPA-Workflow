@@ -17,7 +17,7 @@ The corner radius of the search window (Strg+K) must be the radius of its search
 the inset of the bar: half of `--control-height-lg` plus `--space-3` (38px). The same
 radius must apply on a phone and on a wider screen.
 
-The Esc key at the end of the search bar must be a pill of 40px, inset 6px from the end, the
+The Esc key at the end of the search bar must be a pill of 32px, inset 10px from the end, the
 top and the bottom of the 52px bar, so that its end is concentric with the bar. The key
 hints below the bar must be centred horizontally.
 
