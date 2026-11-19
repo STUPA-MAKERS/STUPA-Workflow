@@ -344,6 +344,103 @@ describe('GremiumAttendanceComponent', () => {
     expect(view.api.memberAttendance).not.toHaveBeenCalled();
   });
 
+  describe('poolRows (§F/meetings/meetings/001310, 001311, 001312, 001313)', () => {
+    const withPool = () => {
+      const data = attendance();
+      return attendance({
+        rows: [
+          ...data.rows,
+          {
+            principalId: 'p-7',
+            displayName: 'Lea Pool',
+            roleKey: null,
+            roleName: null,
+            isSelf: false,
+            unexcused: 0,
+            pool: true,
+            cells: [
+              { month: '2026-09', member: true, present: 1, excused: 0, delegated: 0 },
+              { month: '2026-10', member: true, present: 0, excused: 0, delegated: 0 },
+            ],
+          },
+          {
+            principalId: 'p-1',
+            displayName: 'Finn Schulze',
+            roleKey: null,
+            roleName: null,
+            isSelf: false,
+            unexcused: 0,
+            pool: true,
+            cells: [
+              { month: '2026-09', member: true, present: 0, excused: 0, delegated: 0 },
+              { month: '2026-10', member: true, present: 0, excused: 0, delegated: 0 },
+            ],
+          },
+        ],
+      });
+    };
+    const poolApi = () => gremienApiMock({ attendance: jest.fn(() => of(withPool())) });
+
+    it('shows the pool substitutes in an own row group after the members', async () => {
+      const view = await setup({ api: poolApi() });
+      restore = view.restore;
+      expect(view.cmp.memberRows().map((r) => r.name)).toEqual(['Finn Schulze', 'Anna Berg', 'Kai Meier']);
+      expect(view.cmp.poolRows().map((r) => r.name)).toEqual(['Finn Schulze', 'Lea Pool']);
+      const table = screen.getByRole('table');
+      expect(within(table).getByText('Pool-Vertretungen')).toBeTruthy();
+      const seat = screen.getByRole('button', { name: 'Lea Pool, September 2026: 1 von 2 Sitzungen vertreten' });
+      expect(seat).toHaveTextContent('1/2');
+      const rows = within(table).getAllByRole('row');
+      const lea = rows.find((r) => r.textContent?.includes('Lea Pool'));
+      expect(lea).toHaveTextContent('1/2');
+      expect(lea).not.toHaveTextContent('%');
+      const foot = rows[rows.length - 1];
+      expect([...foot.querySelectorAll('td')].map((c) => c.textContent?.trim())).toEqual(['2,0', '—', '2,0']);
+      expect(await runAxe(view.container)).toHaveNoViolations();
+    });
+
+    it('opens the seats of a month with the pool flag', async () => {
+      const view = await setup({ api: poolApi() });
+      restore = view.restore;
+      screen.getByRole('button', { name: /^Lea Pool, September 2026/ }).click();
+      view.fixture.detectChanges();
+      expect(view.api.memberAttendance).toHaveBeenCalledWith('g-1', 'p-7', '2026-09', true);
+      expect(screen.getByRole('dialog', { name: 'Lea Pool · September 2026' })).toHaveTextContent(
+        '1 von 2 Sitzungen vertreten',
+      );
+    });
+
+    it('filters the pool substitutes with the role chip and exports them in the CSV', async () => {
+      const view = await setup({ api: poolApi() });
+      restore = view.restore;
+      expect(view.cmp.roleOptions().map((o) => o.label)).toContain('Pool-Vertretung');
+      view.cmp.role.set('__pool');
+      expect(view.cmp.rows().map((r) => r.name)).toEqual(['Finn Schulze', 'Lea Pool']);
+      view.cmp.role.set('member');
+      expect(view.cmp.rows().map((r) => [r.name, r.pool])).toEqual([
+        ['Finn Schulze', false],
+        ['Kai Meier', false],
+      ]);
+      view.cmp.role.set('');
+      view.cmp.exportCsv();
+      const csv = await readBlob((downloadBlob as jest.Mock).mock.calls[0][0] as Blob);
+      expect(csv).toContain('Lea Pool;Pool-Vertretung');
+    });
+
+    it('shows the pool cards under their title on a phone', async () => {
+      const view = await setup({ api: poolApi(), phone: true });
+      restore = view.restore;
+      expect(screen.getByRole('heading', { name: 'Pool-Vertretungen' })).toBeTruthy();
+      const card = screen.getByRole('button', { name: 'Lea Pool, 1 von 2 Sitzungen vertreten' });
+      card.click();
+      view.fixture.detectChanges();
+      expect(view.api.memberAttendance).toHaveBeenCalledWith('g-1', 'p-7', '2026-09', true);
+      expect(screen.getByRole('dialog', { name: 'Lea Pool' })).toHaveTextContent(
+        'Pool-Vertretung · 1 von 2 Sitzungen vertreten',
+      );
+    });
+  });
+
   describe('emptyMonth (§F/meetings/meetings/000610)', () => {
     it('shows a month without a meeting as a narrow column with a dash in every row', async () => {
       const view = await setup();
