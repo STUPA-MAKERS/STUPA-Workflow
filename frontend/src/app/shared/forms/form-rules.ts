@@ -83,12 +83,29 @@ export function promotedAmount(
   return funding ?? promoted;
 }
 
-/** The values that a rule reads: the answers, `amount` and `costTotal`. */
+const RULE_NUMBER: ReadonlySet<FieldType> = new Set<FieldType>(['number', 'currency', 'funding']);
+
+/**
+ * The values that a rule reads: the answers, `amount` and `costTotal`. A numeric answer
+ * that the form holds as a text (`"5"`) is read as its number, because a rule over a text
+ * can never be evaluated and so always passes.
+ */
 export function ruleContext(
   fields: readonly RuleField[],
   data: Readonly<Record<string, unknown>>,
 ): Record<string, unknown> {
-  return { ...data, amount: promotedAmount(fields, data), costTotal: costTotal(fields, data) };
+  const numbers = Object.fromEntries(
+    fields
+      .filter((f) => RULE_NUMBER.has(f.type) && typeof data[f.key] === 'string')
+      .map((f) => [f.key, finiteNumber(data[f.key])] as const)
+      .filter(([, n]) => n !== null),
+  );
+  return {
+    ...data,
+    ...numbers,
+    amount: promotedAmount(fields, data),
+    costTotal: costTotal(fields, data),
+  };
 }
 
 /**

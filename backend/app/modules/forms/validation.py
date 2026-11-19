@@ -56,6 +56,7 @@ from app.shared.jsonlogic import JsonLogicError, eval_jsonlogic, validate_jsonlo
 
 #: Field types with a numeric value, used by the promoted extraction and by min and max.
 _NUMERIC_TYPES = frozenset({"number", "currency"})
+_RULE_NUMBER_TYPES = _NUMERIC_TYPES | {"funding"}
 
 _PATTERN_MAX_INPUT_LEN = 4096
 _PATTERN_MATCH_TIMEOUT_SECONDS = 1.0
@@ -986,11 +987,21 @@ def rule_context(fields: Sequence[FormFieldDef], data: Mapping[str, Any]) -> dic
     The answers by field key, plus ``amount`` (the amount of the Antrag, as
     `extract_promoted` makes it) and ``costTotal`` (the sum of the preferred offers). Both
     are ``float`` or ``None``, because the JsonLogic evaluator compares plain numbers.
+    For the same reason a numeric answer that the form sends as a text (``"5"``) is read
+    as its number; without that a rule over it could never be evaluated and always passed.
     """
     amount = _finite_decimal(extract_promoted(fields, data).get("amount"))
     total = cost_total(fields, data)
+    numbers = {
+        f.key: float(num)
+        for f in fields
+        if f.type in _RULE_NUMBER_TYPES
+        and isinstance(data.get(f.key), str)
+        and (num := _finite_decimal(data.get(f.key))) is not None
+    }
     return {
         **data,
+        **numbers,
         "amount": float(amount) if amount is not None else None,
         "costTotal": float(total) if total is not None else None,
     }

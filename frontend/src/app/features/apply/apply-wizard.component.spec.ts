@@ -1192,7 +1192,7 @@ describe('ApplyWizardComponent', () => {
         s.fixture.detectChanges();
         await userEvent.type(screen.getByLabelText('Position'), 'Bus');
         await userEvent.type(screen.getByLabelText('Anbieter'), 'x');
-        await userEvent.type(screen.getByLabelText('Betrag'), '1');
+        await userEvent.type(screen.getByLabelText(/^Betrag/), '1');
         s.fixture.detectChanges();
         expect(screen.getByText(/sieht nach einem Platzhalter aus/)).toBeInTheDocument();
       });

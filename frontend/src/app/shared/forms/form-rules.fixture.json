@@ -83,6 +83,16 @@
       "broken": []
     },
     {
+      "name": "An excursion with the numbers as texts breaks the limit per person",
+      "data": {
+        "art": "exk",
+        "kosten": [{ "label": "Bus", "offers": [{ "label": "A", "value": 1200, "preferred": true }] }],
+        "foerderung": "1050",
+        "teilnehmer": "5"
+      },
+      "broken": [1]
+    },
+    {
       "name": "A division by zero participants cannot be evaluated and counts as met",
       "data": {
         "art": "exk",
