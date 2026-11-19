@@ -2,7 +2,7 @@
 id: "001461"
 title: On a phone an open vote takes the place of the text
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:

@@ -2,7 +2,7 @@
 id: "001462"
 title: The vote sheet opens by itself for a voter
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:

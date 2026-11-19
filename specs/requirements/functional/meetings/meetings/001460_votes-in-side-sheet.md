@@ -2,7 +2,7 @@
 id: "001460"
 title: The vote cards of an item are in a side sheet
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:
