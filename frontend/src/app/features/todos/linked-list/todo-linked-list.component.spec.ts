@@ -1,10 +1,14 @@
 import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import { Subject, of, throwError, type Observable } from 'rxjs';
-import { TodosApiService, type TodoLinkedCard } from '@core/api/todos.service';
+import { TodosApiService, type LinksOut, type TodoLinkedCard } from '@core/api/todos.service';
 import { TestBed } from '@angular/core/testing';
+import { ToastService } from '@stupa-makers/ui-kit';
+import { linkRow, linksOf } from '../../../../testing/todo-fixtures';
+import { TodoLinkPickerComponent } from '../link-picker/todo-link-picker.component';
 import { TodoLinkedListComponent } from './todo-linked-list.component';
 import { TodoLinkedRefresh } from './todo-linked-refresh';
+import { By } from '@angular/platform-browser';
 
 function card(over: Partial<TodoLinkedCard> = {}): TodoLinkedCard {
   return {
@@ -22,8 +26,10 @@ function card(over: Partial<TodoLinkedCard> = {}): TodoLinkedCard {
   };
 }
 
-async function setup(answer: () => Observable<TodoLinkedCard[]>, extra: Record<string, unknown> = {}) {
-  const api = { linked: jest.fn(answer) };
+const ids = (cmp: TodoLinkedListComponent) => cmp.links().map((l) => l.targetId);
+
+async function setup(answer: () => Observable<LinksOut>, extra: Record<string, unknown> = {}) {
+  const api = { links: jest.fn(answer), boards: jest.fn(() => of([])) };
   const view = await render(TodoLinkedListComponent, {
     inputs: { kind: 'application', targetId: 'a-1', headingId: 'ad-todos', ...extra },
     providers: [provideRouter([]), { provide: TodosApiService, useValue: api }],
@@ -35,8 +41,10 @@ describe('TodoLinkedListComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('lists the linked cards with board, column, due date and people, each a link to its card', async () => {
-    const { api, cmp } = await setup(() => of([card(), card({ id: 'k-2', title: 'Erledigt', isDone: true, dueDate: null, assignees: [] })]));
-    expect(api.linked).toHaveBeenCalledWith('application', 'a-1');
+    const { api, cmp } = await setup(() =>
+      of(linksOf([card(), card({ id: 'k-2', title: 'Erledigt', isDone: true, dueDate: null, assignees: [] })])),
+    );
+    expect(api.links).toHaveBeenCalledWith('application', 'a-1');
     expect(screen.getByRole('heading', { name: 'Verknüpft' })).toHaveAttribute('id', 'ad-todos');
     expect(screen.getByRole('link', { name: 'Raum buchen' })).toHaveAttribute('href', '/todos?card=k-1');
     expect(screen.getByText('Studierendenparlament · In Arbeit · fällig 17.10.')).toBeInTheDocument();
@@ -47,31 +55,50 @@ describe('TodoLinkedListComponent', () => {
     expect(document.querySelectorAll('app-avatar-stack')).toHaveLength(1);
   });
 
+  /** §F/collaboration/links/001407: the section shows the links of every kind. */
+  it('lists the links of the other kinds with their page or "kein Zugriff"', async () => {
+    await setup(() =>
+      of(
+        linksOf(
+          [card()],
+          [
+            linkRow({ id: 'l-2', kind: 'invoice', title: 'RE-2026-17', url: '/invoices?id=i-1' }),
+            linkRow({ id: 'l-3', kind: 'expense', targetId: 'e-1', accessible: false, title: null, url: null }),
+          ],
+        ),
+      ),
+    );
+    expect(screen.getByRole('link', { name: 'RE-2026-17' })).toHaveAttribute('href', '/invoices?id=i-1');
+    expect(screen.getByText('Buchung (kein Zugriff)')).toHaveClass('tl__muted');
+    expect(document.querySelectorAll('[data-testid="tl-link-row"]')).toHaveLength(2);
+  });
+
   it('leaves out the heading on request and keeps the name of the section', async () => {
-    await setup(() => of([card()]), { showTitle: false });
+    await setup(() => of(linksOf([card()])), { showTitle: false });
     const heading = screen.getByRole('heading', { name: 'Verknüpft' });
     expect(heading.closest('.section__head')).toHaveClass('section__head--hidden');
     expect(screen.getByRole('group', { name: 'Verknüpft' })).toBeInTheDocument();
   });
 
   it('shows the cards of the page without a read of its own', async () => {
-    const { api, fixture } = await setup(() => of([card({ id: 'k-8', title: 'Vom Server' })]), {
+    const { api, fixture } = await setup(() => of(linksOf([card({ id: 'k-8', title: 'Vom Server' })])), {
       items: [card()],
       avatarSize: 'xs',
     });
-    expect(api.linked).not.toHaveBeenCalled();
+    expect(api.links).not.toHaveBeenCalled();
     expect(screen.getByRole('link', { name: 'Raum buchen' })).toBeInTheDocument();
     expect(document.querySelector('app-avatar')).toHaveClass('av--xs');
+    expect(document.querySelector('[data-testid="tl-unlink"]')).toBeNull();
     TestBed.inject(TodoLinkedRefresh).touch([{ kind: 'application', targetId: 'a-1' }]);
     fixture.componentRef.setInput('items', [card({ id: 'k-2', title: 'Zweite' })]);
     fixture.detectChanges();
-    expect(api.linked).not.toHaveBeenCalled();
+    expect(api.links).not.toHaveBeenCalled();
     expect(screen.getByRole('link', { name: 'Zweite' })).toBeInTheDocument();
   });
 
   it('shows a linked Event with its dates, board, place and balance (spec 000489)', async () => {
     const event = { startsOn: '2026-11-20', endsOn: '2026-11-21', startTime: null, endTime: null, place: 'Mensa', participants: null, seriesId: null, seriesName: null };
-    await setup(() => of([card({ id: 'ev', title: 'Erstiparty', event, balance: '-725.40' }), card()]));
+    await setup(() => of(linksOf([card({ id: 'ev', title: 'Erstiparty', event, balance: '-725.40' }), card()])));
     const rows = [...document.querySelectorAll('.tl__row')];
     expect(rows[0]).toHaveClass('tl__row--event');
     expect(rows[0]).toHaveTextContent('Erstiparty');
@@ -80,8 +107,8 @@ describe('TodoLinkedListComponent', () => {
     expect(rows[0]).toHaveTextContent('Mensa');
   });
 
-  it('shows nothing without linked cards', async () => {
-    const { container } = await setup(() => of([]));
+  it('shows nothing without links', async () => {
+    const { container } = await setup(() => of(linksOf()));
     expect(container.querySelector('section')).toBeNull();
   });
 
@@ -91,68 +118,72 @@ describe('TodoLinkedListComponent', () => {
   });
 
   it('reads again for another target and drops a late answer', async () => {
-    const late = new Subject<TodoLinkedCard[]>();
+    const late = new Subject<LinksOut>();
     let first = true;
     const { api, fixture, cmp } = await setup(() => {
       if (first) {
         first = false;
         return late;
       }
-      return of([card({ id: 'k-9', title: 'Neu' })]);
+      return of(linksOf([card({ id: 'k-9', title: 'Neu' })]));
     });
     fixture.componentRef.setInput('kind', 'agenda_item');
     fixture.componentRef.setInput('targetId', 'ai-1');
     fixture.detectChanges();
-    expect(api.linked).toHaveBeenLastCalledWith('agenda_item', 'ai-1');
-    late.next([card()]);
-    expect(cmp.cards().map((c) => c.id)).toEqual(['k-9']);
+    expect(api.links).toHaveBeenLastCalledWith('agenda_item', 'ai-1');
+    late.next(linksOf([card()]));
+    expect(ids(cmp)).toEqual(['k-9']);
   });
 
-  it('reads again, keeping the list, when a card is linked to its target elsewhere', async () => {
-    let answer = [card()];
+  it('reads again, keeping the list, when a link of its target changes elsewhere', async () => {
+    let answer = linksOf([card()]);
     const { api, fixture, cmp } = await setup(() => of(answer));
     const refresh = TestBed.inject(TodoLinkedRefresh);
-    expect(api.linked).toHaveBeenCalledTimes(1);
+    expect(api.links).toHaveBeenCalledTimes(1);
     refresh.touch([{ kind: 'agenda_item', targetId: 'a-1' }]);
     fixture.detectChanges();
-    expect(api.linked).toHaveBeenCalledTimes(1);
+    expect(api.links).toHaveBeenCalledTimes(1);
     refresh.touch([]);
     fixture.detectChanges();
-    expect(api.linked).toHaveBeenCalledTimes(1);
-    const late = new Subject<TodoLinkedCard[]>();
-    api.linked.mockReturnValueOnce(late);
+    expect(api.links).toHaveBeenCalledTimes(1);
+    const late = new Subject<LinksOut>();
+    api.links.mockReturnValueOnce(late);
     refresh.touch([{ kind: 'application', targetId: 'a-1' }]);
     fixture.detectChanges();
-    expect(api.linked).toHaveBeenCalledTimes(2);
-    expect(cmp.cards().map((c) => c.id)).toEqual(['k-1']);
-    answer = [card(), card({ id: 'k-2', title: 'Neu' })];
+    expect(api.links).toHaveBeenCalledTimes(2);
+    expect(ids(cmp)).toEqual(['k-1']);
+    answer = linksOf([card(), card({ id: 'k-2', title: 'Neu' })]);
     late.next(answer);
     fixture.detectChanges();
     expect(screen.getByRole('link', { name: 'Neu' })).toBeInTheDocument();
   });
 
   it('does not read twice for a change made before it was shown', async () => {
-    const { api, fixture } = await setup(() => of([card()]));
+    const { api, fixture } = await setup(() => of(linksOf([card()])));
     TestBed.inject(TodoLinkedRefresh).touch([{ kind: 'application', targetId: 'a-1' }]);
     fixture.detectChanges();
-    const before = api.linked.mock.calls.length;
+    const before = api.links.mock.calls.length;
     const second = TestBed.createComponent(TodoLinkedListComponent);
     second.componentRef.setInput('kind', 'application');
     second.componentRef.setInput('targetId', 'a-1');
     second.detectChanges();
     second.detectChanges();
-    expect(api.linked).toHaveBeenCalledTimes(before + 1);
-    expect(second.componentInstance.cards().map((c) => c.id)).toEqual(['k-1']);
+    expect(api.links).toHaveBeenCalledTimes(before + 1);
+    expect(ids(second.componentInstance)).toEqual(['k-1']);
   });
 });
 
-describe('TodoLinkedListComponent actions (specs 000547, 000548)', () => {
+describe('TodoLinkedListComponent actions (specs 000547, 001404, 001408)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  async function withActions(writes: boolean, linked: TodoLinkedCard[] = []) {
+  async function withActions(writes: boolean, out: LinksOut = linksOf(), more: Record<string, unknown> = {}) {
     const api = {
-      linked: jest.fn(() => of(linked)),
+      links: jest.fn(() => of(out)),
+      link: jest.fn(() => of(linksOf([], [linkRow()], true))),
+      unlink: jest.fn(() => of(undefined)),
+      linkTargets: jest.fn(() => of([])),
       boards: jest.fn(() => of([{ id: 'b-1', name: 'StuPa', kind: 'gremium', gremiumId: 'g-1', canWrite: writes }])),
+      ...more,
     };
     const view = await render(TodoLinkedListComponent, {
       inputs: { kind: 'application', targetId: 'a-1', headingId: 'ad-todos', actions: true, gremiumId: 'g-1', linkLabel: 'Lerncafé' },
@@ -161,12 +192,18 @@ describe('TodoLinkedListComponent actions (specs 000547, 000548)', () => {
     return { ...view, api, cmp: view.fixture.componentInstance };
   }
 
-  it('shows "Mit To-Do verknüpfen" and "To-Do anlegen" also without a linked card', async () => {
+  it('shows "Verknüpfen" and "To-Do anlegen" also without a link', async () => {
     const { cmp } = await withActions(true);
     expect(screen.getByRole('heading', { name: 'Verknüpft' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Mit To-Do verknüpfen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Verknüpfen' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'To-Do anlegen' })).toBeInTheDocument();
     expect(cmp.showActions()).toBe(true);
+  });
+
+  it('shows "Verknüpfen" without "To-Do anlegen" to a person who changes the element only', async () => {
+    await withActions(false, linksOf([], [], true));
+    expect(screen.getByRole('button', { name: 'Verknüpfen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'To-Do anlegen' })).toBeNull();
   });
 
   it('opens the create dialog of an Antrag with the link and the board of its Gremium', async () => {
@@ -179,41 +216,73 @@ describe('TodoLinkedListComponent actions (specs 000547, 000548)', () => {
     expect(document.querySelector('app-todo-new-dialog')).not.toBeNull();
   });
 
-  it('opens the link dialog without the cards that link the element already', async () => {
-    const { cmp, fixture } = await withActions(true, [card()]);
-    screen.getByRole('button', { name: 'Mit To-Do verknüpfen' }).click();
+  it('opens the one picker without the element, and links the pick', async () => {
+    const { cmp, fixture, api } = await withActions(true, linksOf([card()]));
+    screen.getByRole('button', { name: 'Verknüpfen' }).click();
     fixture.detectChanges();
+    const picker = fixture.debugElement.query(By.directive(TodoLinkPickerComponent)).componentInstance as TodoLinkPickerComponent;
     expect(cmp.linkOpen()).toBe(true);
-    expect(cmp.linkedIds()).toEqual(['k-1']);
-    expect(document.querySelector('app-todo-link-card-dialog')).not.toBeNull();
+    expect(picker.exclude()).toEqual({ kind: 'application', id: 'a-1' });
+    expect([...picker.linked()]).toEqual(['todo:k-1']);
+    const touch = jest.spyOn(TestBed.inject(TodoLinkedRefresh), 'touch');
+    picker.picked.emit({ kind: 'invoice', targetId: 'i-1', title: 'RE-2026-17', detail: {} });
+    fixture.detectChanges();
+    expect(api.link).toHaveBeenCalledWith({ kind: 'application', id: 'a-1' }, { kind: 'invoice', id: 'i-1' });
+    expect(touch).toHaveBeenCalledWith([{ kind: 'invoice', targetId: 'i-1' }]);
+    expect(screen.getByRole('link', { name: 'RE-2026-17' })).toBeInTheDocument();
+  });
+
+  it('takes a link off with the × of a removable row, and a pick of a linked hit', async () => {
+    const out = linksOf([], [linkRow({ id: 'l-2', removable: true }), linkRow({ id: 'l-3', targetId: 'i-3', title: 'RE-3' })]);
+    const { cmp, fixture, api } = await withActions(true, out);
+    const x = screen.getAllByRole('button', { name: /RE-2026-17/ });
+    expect(x).toHaveLength(1);
+    x[0].click();
+    fixture.detectChanges();
+    expect(api.unlink).toHaveBeenCalledWith('l-2');
+    expect(screen.queryByRole('link', { name: 'RE-2026-17' })).toBeNull();
+    cmp.pick({ kind: 'invoice', targetId: 'i-3', title: 'RE-3', detail: {} });
+    expect(api.unlink).toHaveBeenLastCalledWith('l-3');
+  });
+
+  it('tells a refused link or removal in a toast', async () => {
+    const fail = () => throwError(() => new Error('403'));
+    const { cmp } = await withActions(true, linksOf([], [linkRow({ removable: true })]), { link: jest.fn(fail), unlink: jest.fn(fail) });
+    const toast = TestBed.inject(ToastService);
+    const error = jest.spyOn(toast, 'error');
+    cmp.pick({ kind: 'ticket', targetId: 't-1', title: 'T-0001', detail: {} });
+    expect(error).toHaveBeenLastCalledWith('Die Verknüpfung ist fehlgeschlagen.');
+    cmp.remove(cmp.links()[0]);
+    expect(error).toHaveBeenLastCalledWith('Die Verknüpfung konnte nicht entfernt werden.');
   });
 
   /** Spec 000582: the section with actions and no row shows the empty state. */
   it('shows the empty state below the actions when nothing is linked', async () => {
     await withActions(true);
     expect(screen.getByRole('heading', { name: 'Verknüpft' })).toBeInTheDocument();
-    expect(screen.getByText('Keine To-Dos verknüpft')).toBeInTheDocument();
+    expect(screen.getByText('Nichts verknüpft')).toBeInTheDocument();
   });
 
-  /** Spec 000758: without Boards the section has no card and no action. */
-  it('asks nothing and shows no action while Boards is off', async () => {
+  /** Spec 000758: without Boards the section keeps its links and has no "To-Do anlegen". */
+  it('keeps the links and shows no "To-Do anlegen" while Boards is off', async () => {
     localStorage.setItem('ap.features.off', JSON.stringify(['todos']));
-    const { api, cmp } = await withActions(true, [card()]);
+    const { api, cmp } = await withActions(true, linksOf([], [linkRow()]));
     localStorage.removeItem('ap.features.off');
-    expect(api.linked).not.toHaveBeenCalled();
+    expect(api.links).toHaveBeenCalled();
     expect(api.boards).not.toHaveBeenCalled();
-    expect(cmp.showActions()).toBe(false);
-    expect(screen.queryByRole('heading', { name: 'Verknüpft' })).toBeNull();
+    expect(cmp.showNew()).toBe(false);
+    expect(screen.getByRole('link', { name: 'RE-2026-17' })).toBeInTheDocument();
   });
 
-  it('hides the actions from a person who writes no board', async () => {
+  it('hides the actions from a person who writes no board and changes nothing', async () => {
     await withActions(false);
     expect(screen.queryByRole('button', { name: 'To-Do anlegen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Verknüpfen' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Verknüpft' })).toBeNull();
   });
 
   it('reads no boards without actions, and shows the empty state it is given', async () => {
-    const api = { linked: jest.fn(() => of([])), boards: jest.fn(() => of([])) };
+    const api = { links: jest.fn(() => of(linksOf())), boards: jest.fn(() => of([])) };
     await render(TodoLinkedListComponent, {
       inputs: { kind: 'meeting', targetId: 'm-1', emptyHeading: 'Keine To-Dos zu dieser Sitzung' },
       providers: [provideRouter([]), { provide: TodosApiService, useValue: api }],
@@ -224,9 +293,9 @@ describe('TodoLinkedListComponent actions (specs 000547, 000548)', () => {
 
   it('reads the list again after a new card', async () => {
     const { cmp, api } = await withActions(true);
-    expect(api.linked).toHaveBeenCalledTimes(1);
+    expect(api.links).toHaveBeenCalledTimes(1);
     cmp.created();
     TestBed.tick();
-    expect(api.linked).toHaveBeenCalledTimes(2);
+    expect(api.links).toHaveBeenCalledTimes(2);
   });
 });

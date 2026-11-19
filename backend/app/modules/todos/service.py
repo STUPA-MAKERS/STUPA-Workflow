@@ -33,7 +33,7 @@ from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
 from pydantic import JsonValue
-from sqlalchemy import ColumnElement, and_, delete, exists, func, or_, select, true, update
+from sqlalchemy import delete, exists, func, select, true, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth import policy
@@ -47,6 +47,7 @@ from app.modules.gremien.models import Gremium
 from app.modules.site_config.square_logos import logo_url_of, square_logo_variants
 from app.modules.tickets.models import TicketEvent
 from app.modules.todos import events as todo_events
+from app.modules.todos import link_store
 from app.modules.todos.access import (
     TODO_CONFIGURE,
     BoardAccess,
@@ -57,11 +58,12 @@ from app.modules.todos.access import (
 from app.modules.todos.boards import add_default_columns, ensure_personal_board
 from app.modules.todos.grouping import grouped
 from app.modules.todos.lexorank import MAX_LENGTH, RankError, between, spread
-from app.modules.todos.link_view import LinkViewer
+from app.modules.todos.link_store import Edge
 from app.modules.todos.links import HIDDEN, LinkRef, LinkResolver, Resolved, link_kinds_on
 from app.modules.todos.live import BoardPings
 from app.modules.todos.models import (
-    LINK_COLUMNS,
+    LINK_KINDS,
+    Link,
     TodoAssignee,
     TodoBoard,
     TodoBoardEntry,
@@ -74,7 +76,6 @@ from app.modules.todos.models import (
     TodoEvent,
     TodoEventSeries,
     TodoLabel,
-    TodoLink,
 )
 from app.modules.todos.schemas import (
     BoardCreate,
@@ -115,7 +116,6 @@ from app.modules.todos.schemas import (
     TodoLabelOut,
     TodoLinkedCard,
     TodoLinkOut,
-    TodoLinkView,
     TodoMember,
     TodoMine,
     TodoMineItem,
@@ -176,29 +176,16 @@ class TodoMail:
 
 @dataclass(frozen=True, slots=True)
 class CardLink:
-    """A link as a card shows it: its own links and the links of other cards to it.
-
-    A link of card B to card A shows on A as a link of the kind ``todo`` to B, with the id
-    of the row (spec 000573).
-    """
+    """A link as a card shows it: the id of the row and the other end (spec 001401)."""
 
     id: uuid.UUID
     kind: str
     target_id: uuid.UUID
 
 
-def card_links(
-    own: Iterable[TodoLink], incoming: Iterable[TodoLink]
-) -> dict[uuid.UUID, tuple[CardLink, ...]]:
-    """The links of each card: its own first, then the cards that link it, each target once."""
-    pairs = (
-        *((link.card_id, CardLink(link.id, link.kind, link.target_id)) for link in own),
-        *(
-            (link.todo_id, CardLink(link.id, "todo", link.card_id))
-            for link in incoming
-            if link.todo_id is not None
-        ),
-    )
+def card_links(found: Iterable[Edge]) -> dict[uuid.UUID, tuple[CardLink, ...]]:
+    """The links of each card, the oldest first: a link has no direction (spec 001401)."""
+    pairs = ((edge.own_id, CardLink(edge.id, edge.kind, edge.target_id)) for edge in found)
     return {card_id: _first_per_target(group) for card_id, group in grouped(pairs).items()}
 
 
@@ -278,17 +265,6 @@ def _mine_item(
         board_kind=board.kind,  # pyright: ignore[reportArgumentType]
         column_name=column.name,
         labels=[_label_out(labels[i]) for i in tile.label_ids if i in labels],
-    )
-
-
-def _linked_order(card: TodoLinkedCard) -> tuple[bool, bool, bool, date, str]:
-    """Sort key of the back-references: Events first, then open cards, each by due date."""
-    return (
-        card.event is None,
-        card.is_done,
-        card.due_date is None,
-        card.due_date or date.max,
-        card.title,
     )
 
 
@@ -635,15 +611,9 @@ class TodoService:
                 .group_by(TodoComment.card_id)
             )
         ).all()
-        all_link_rows = (
-            await self.session.scalars(
-                select(TodoLink)
-                .where(or_(TodoLink.card_id.in_(ids), TodoLink.todo_id.in_(ids)))
-                .order_by(TodoLink.created_at, TodoLink.id)
-            )
-        ).all()
-        kinds_on = await link_kinds_on(self.session)
-        link_rows = [link for link in all_link_rows if link.kind in kinds_on]
+        link_rows = await link_store.edges(
+            self.session, "todo", ids, await link_kinds_on(self.session)
+        )
         assignees = grouped((card_id, principal_id) for card_id, principal_id in assignee_rows)
         people = await person_refs(
             self.session, {pid for pids in assignees.values() for pid in pids}
@@ -666,23 +636,22 @@ class TodoService:
         )
 
     async def _card_links(
-        self, ids: set[uuid.UUID], rows: Sequence[TodoLink], principal: Principal
+        self, ids: set[uuid.UUID], rows: Sequence[Edge], principal: Principal
     ) -> tuple[dict[uuid.UUID, tuple[CardLink, ...]], dict[LinkRef, Resolved]]:
         """The links of the cards ``ids`` and the resolved first link of each card.
 
-        ``rows`` holds the links of the cards and the links of other cards to them. A card
-        shows the cards that link it, when the principal reads that card (spec 000573).
+        A linked card shows only when the principal reads it (spec 000573).
         """
-        own = [link for link in rows if link.card_id in ids]
-        to_them = [link for link in rows if link.todo_id in ids]
-        firsts = {link.card_id: (link.kind, link.target_id) for link in reversed(own)}
+        firsts = {edge.own_id: edge.target for edge in reversed(rows)}
         resolved = await self.links.resolve(
-            {*firsts.values(), *(("todo", link.card_id) for link in to_them)}, principal
+            {*firsts.values(), *(edge.target for edge in rows if edge.kind == "todo")}, principal
         )
         readable = [
-            link for link in to_them if resolved.get(("todo", link.card_id), HIDDEN).accessible
+            edge
+            for edge in rows
+            if edge.kind != "todo" or resolved.get(edge.target, HIDDEN).accessible
         ]
-        return card_links(own, readable), resolved
+        return card_links(readable), resolved
 
     async def tiles(self, cards: Sequence[TodoCard], principal: Principal) -> list[TodoCardTile]:
         """Build the tiles of the cards (in the given order)."""
@@ -1453,34 +1422,17 @@ class TodoService:
         card, board = await self._card(card_id, principal)
         return await self._detail(card, board, principal)
 
-    async def link_view(
-        self, card_id: uuid.UUID, link_id: uuid.UUID, principal: Principal
-    ) -> TodoLinkView:
-        """Return the read sheet of one link of a card (spec 000487).
-
-        A reader of the card reads its links, also those that the rule of their kind
-        hides. A ticket and a gremium have no sheet.
-
-        Raises:
-            NotFoundError: The card is not readable, the link is not on the card, or the
-                target has no sheet (HTTP 404).
-        """
-        card, _board = await self._card(card_id, principal)
-        link = await self._card_link(card, link_id)
-        return await LinkViewer(self.session, self.links).view(link.kind, link.target_id, principal)
-
     async def _card_link(self, card: TodoCard, link_id: uuid.UUID) -> CardLink:
-        """One link as ``card`` shows it: its own, or the link of another card to it (000573).
+        """One link as ``card`` shows it (spec 001401).
 
         Raises:
-            NotFoundError: The link is neither on the card nor to the card (HTTP 404).
+            NotFoundError: The link has no end on the card (HTTP 404).
         """
-        link = await self.session.get(TodoLink, link_id)
-        if link is not None and link.card_id == card.id:
-            return CardLink(link.id, link.kind, link.target_id)
-        if link is not None and link.todo_id == card.id:
-            return CardLink(link.id, "todo", link.card_id)
-        raise NotFoundError(f"link {link_id} not found")
+        link = await self.session.get(Link, link_id)
+        if link is None or not link.has_end(("todo", card.id)):
+            raise NotFoundError(f"link {link_id} not found")
+        kind, target_id = link.other(("todo", card.id))
+        return CardLink(link.id, kind, target_id)
 
     async def cards(
         self, card_ids: Sequence[uuid.UUID], principal: Principal
@@ -1690,7 +1642,7 @@ class TodoService:
         for label_id in label_ids:
             self.session.add(TodoCardLabel(card_id=card.id, label_id=label_id))
         for kind, target_id in links:
-            self.session.add(_new_link(card.id, kind, target_id, actor))
+            self.session.add(Link.between(("todo", card.id), (kind, target_id), actor, now))
         for position, text in enumerate(payload.checklist):
             self.session.add(
                 TodoCheckItem(
@@ -2002,13 +1954,10 @@ class TodoService:
     async def _write_ticket_done(
         self, card: TodoCard, board: TodoBoard, actor: uuid.UUID | None
     ) -> None:
-        ticket_ids = (
-            await self.session.scalars(
-                select(TodoLink.ticket_id).where(
-                    TodoLink.card_id == card.id, TodoLink.ticket_id.is_not(None)
-                )
-            )
-        ).all()
+        ticket_ids = [
+            edge.target_id
+            for edge in await link_store.edges(self.session, "todo", [card.id], ("ticket",))
+        ]
         for ticket_id in ticket_ids:
             self.session.add(
                 TicketEvent(
@@ -2212,36 +2161,43 @@ class TodoService:
         await self.session.commit()
         return await self._detail(card, board, principal)
 
-    async def add_link(
-        self, card_id: uuid.UUID, kind: str, target_id: uuid.UUID, principal: Principal
-    ) -> TodoCardDetail:
-        """Link the card to a target that the caller reads.
+    async def card_end(
+        self, card_id: uuid.UUID, principal: Principal, *, write: bool
+    ) -> tuple[TodoCard, TodoBoard]:
+        """The card of a link end, locked, for a link change (spec 001404).
 
         Raises:
-            ValidationProblem: ``link_self`` or ``link_target_not_found`` (HTTP 422).
-            ConflictError: The link exists (``link_exists``), or the card is an Event and
-                another Event links the Antrag, Buchung or invoice (``event_link_taken``)
-                (HTTP 409).
+            NotFoundError: The card is not readable (HTTP 404).
+            ForbiddenError: ``write`` and the caller does not write the card (HTTP 403).
         """
-        actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal, lock=True, write=True)
-        if kind == "todo" and target_id == card.id:
-            raise _invalid("A card cannot link to itself.", "link_self", "targetId")
-        if not await self.links.readable(kind, target_id, principal):
-            raise _invalid("The link target was not found.", "link_target_not_found", "targetId")
-        column = getattr(TodoLink, LINK_COLUMNS[kind])
-        present = await self.session.scalar(
-            select(TodoLink.id).where(_link_between(card.id, kind, target_id, column))
-        )
-        if present is not None:
-            raise ConflictError("The card has this link.", code="link_exists")
+        return await self._card(card_id, principal, lock=True, write=write)
+
+    async def check_new_link(self, card: TodoCard, other: tuple[str, uuid.UUID]) -> None:
+        """Refuse a link that would give the Antrag, Buchung or invoice a second Event.
+
+        Raises:
+            ConflictError: ``event_link_taken`` (HTTP 409).
+        """
         if await self.session.get(TodoCardEvent, card.id) is not None:
-            await todo_events.check_one_event(self.session, card.id, [(kind, target_id)])
-        self.session.add(_new_link(card.id, kind, target_id, actor))
-        self._event(card, "linked", actor, {"linkKind": kind, "targetId": str(target_id)})
+            await todo_events.check_one_event(self.session, card.id, [other])
+
+    def note_link(
+        self,
+        card: TodoCard,
+        board: TodoBoard,
+        other: tuple[str, uuid.UUID],
+        actor: uuid.UUID,
+        *,
+        added: bool,
+    ) -> None:
+        """Write the card event of a link change and touch the board. No commit."""
+        payload: dict[str, JsonValue] = {"linkKind": other[0], "targetId": str(other[1])}
+        self._event(card, "linked" if added else "unlinked", actor, payload)
         self._touch(board, card)
-        await self.session.commit()
-        return await self._detail(card, board, principal)
+
+    async def actor_of(self, principal: Principal) -> uuid.UUID:
+        """The principal row id of the caller (the author of a link)."""
+        return await self._actor(principal)
 
     async def _check_event(self, board: TodoBoard, payload: EventIn) -> None:
         """Check the event data of a card on ``board``.
@@ -2292,12 +2248,7 @@ class TodoService:
         await self._check_event(board, payload)
         row = await self.session.get(TodoCardEvent, card.id)
         if row is None:
-            refs = [
-                (link.kind, link.target_id)
-                for link in (
-                    await self.session.scalars(select(TodoLink).where(TodoLink.card_id == card.id))
-                ).all()
-            ]
+            refs = [edge.target for edge in await link_store.edges(self.session, "todo", [card.id])]
             await todo_events.check_one_event(self.session, card.id, refs)
             self.session.add(_event_row(card.id, payload))
         else:
@@ -2498,27 +2449,6 @@ class TodoService:
             )
             for card, row in rows
         ]
-
-    async def remove_link(
-        self, card_id: uuid.UUID, link_id: uuid.UUID, principal: Principal
-    ) -> TodoCardDetail:
-        """Remove a link of the card.
-
-        A link between two cards goes from either card, and with it every link between
-        the two (spec 000573).
-        """
-        actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal, lock=True, write=True)
-        link = await self._card_link(card, link_id)
-        payload: dict[str, JsonValue] = {"linkKind": link.kind, "targetId": str(link.target_id)}
-        column = getattr(TodoLink, LINK_COLUMNS[link.kind])
-        await self.session.execute(
-            delete(TodoLink).where(_link_between(card.id, link.kind, link.target_id, column))
-        )
-        self._event(card, "unlinked", actor, payload)
-        self._touch(board, card)
-        await self.session.commit()
-        return await self._detail(card, board, principal)
 
     async def _check_mentions(self, board: TodoBoard, mentions: Sequence[uuid.UUID]) -> None:
         if mentions and not set(mentions) <= await self.access.member_ids(board):
@@ -2812,35 +2742,36 @@ class TodoService:
         )
         return boards, cards
 
-    async def linked(
-        self, kind: str, target_id: uuid.UUID, principal: Principal
-    ) -> list[TodoLinkedCard]:
-        """The readable live cards that link to a target.
+    async def linked_cards(
+        self, card_ids: Sequence[uuid.UUID], principal: Principal
+    ) -> dict[uuid.UUID, TodoLinkedCard]:
+        """The readable live cards of ``card_ids`` with their board, column and Event.
 
-        A linked Event is first and carries its dates, its place and its balance (spec
-        000489). Then come the open cards, then the done cards, each by due date.
+        A linked Event carries its dates, its place and its balance (spec 000489).
         """
-        if not token_reads(principal):
-            return []
+        if not card_ids or not token_reads(principal):
+            return {}
         scope = await self.access.scope(principal)
-        column = getattr(TodoLink, LINK_COLUMNS[kind])
         rows = (
             await self.session.execute(
                 select(TodoCard, TodoBoard, TodoColumn)
                 .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
                 .join(TodoColumn, TodoColumn.id == TodoCard.column_id)
-                .join(TodoLink, TodoLink.card_id == TodoCard.id)
-                .where(column == target_id, TodoCard.archived_at.is_(None), scope.condition())
+                .where(
+                    TodoCard.id.in_(list(card_ids)),
+                    TodoCard.archived_at.is_(None),
+                    scope.condition(),
+                )
             )
         ).all()
         if not rows:
-            return []
+            return {}
         facts = await self._facts([card for card, _b, _c in rows], principal)
         sums = await todo_events.totals(
             self.session, [card.id for card, _b, _c in rows if card.id in facts.events]
         )
-        found = [
-            TodoLinkedCard(
+        return {
+            card.id: TodoLinkedCard(
                 id=card.id,
                 board_id=board.id,
                 board_name=board.name,
@@ -2855,8 +2786,7 @@ class TodoService:
                 ),
             )
             for card, board, col in rows
-        ]
-        return sorted(found, key=_linked_order)
+        }
 
     async def search(
         self, q: str, principal: Principal, *, limit: int
@@ -3124,14 +3054,10 @@ class TodoService:
     ) -> None:
         """Link the card to the agenda item when it is not linked yet. No commit."""
         actor = await self._actor(principal)
-        present = await self.session.scalar(
-            select(TodoLink.id).where(
-                TodoLink.card_id == card.id, TodoLink.agenda_item_id == agenda_item_id
-            )
-        )
-        if present is not None:
+        ends = (("todo", card.id), ("agenda_item", agenda_item_id))
+        if await link_store.link_between(self.session, *ends) is not None:
             return
-        self.session.add(_new_link(card.id, "agenda_item", agenda_item_id, actor))
+        self.session.add(Link.between(*ends, actor))
         self._event(
             card, "linked", actor, {"linkKind": "agenda_item", "targetId": str(agenda_item_id)}
         )
@@ -3284,25 +3210,6 @@ def _event_fields(payload: EventIn) -> dict[str, object]:
 
 def _event_row(card_id: uuid.UUID, payload: EventIn) -> TodoCardEvent:
     return TodoCardEvent(card_id=card_id, **_event_fields(payload))
-
-
-def _link_between(
-    card_id: uuid.UUID,
-    kind: str,
-    target_id: uuid.UUID,
-    column: Any,  # noqa: ANN401
-) -> ColumnElement[bool]:
-    """The links of the card to the target, and for a card target also its links back."""
-    own = and_(TodoLink.card_id == card_id, column == target_id)
-    if kind != "todo":
-        return own
-    return or_(own, and_(TodoLink.card_id == target_id, TodoLink.todo_id == card_id))
-
-
-def _new_link(card_id: uuid.UUID, kind: str, target_id: uuid.UUID, actor: uuid.UUID) -> TodoLink:
-    link = TodoLink(id=uuid.uuid4(), card_id=card_id, created_by=actor, created_at=_now())
-    setattr(link, LINK_COLUMNS[kind], target_id)
-    return link
 
 
 def _by_card[R: (TodoCheckItem, TodoEvent, TodoComment)](
@@ -3458,7 +3365,7 @@ def _uuid_of(value: object) -> uuid.UUID | None:
 def _ref_of(payload: dict[str, Any]) -> tuple[str, uuid.UUID] | None:
     kind = payload.get("linkKind")
     target = _uuid_of(payload.get("targetId"))
-    if kind in LINK_COLUMNS and target is not None:
+    if kind in LINK_KINDS and target is not None:
         return (kind, target)
     return None
 

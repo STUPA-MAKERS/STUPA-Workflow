@@ -70,3 +70,17 @@
   display: inline-flex;
   gap: var(--space-1);
 }
+.tl__plain {
+  color: var(--color-text);
+  font-weight: var(--fw-medium);
+}
+.tl__muted {
+  color: var(--color-text-muted);
+  font-weight: var(--fw-regular);
+}
+// The × stands above the link of the row, whose ::after covers the whole row.
+.tl__x {
+  position: relative;
+  z-index: 1;
+  flex: none;
+}

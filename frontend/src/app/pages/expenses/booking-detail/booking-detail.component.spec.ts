@@ -5,7 +5,7 @@ import type { Application } from '@core/api/models';
 import type { BudgetTreeNode, Expense, Invoice } from '../../budget/budget-tree.api';
 import { costCentreIndex } from '../../budget/expense-display.util';
 import { BookingDetailComponent } from './booking-detail.component';
-import { NO_LINKED_TODOS } from '../../../../testing/todo-fixtures';
+import { NO_LINKED_TODOS, linksOf } from '../../../../testing/todo-fixtures';
 import { TodosApiService } from '@core/api/todos.service';
 import { of } from 'rxjs';
 
@@ -170,14 +170,18 @@ describe('BookingDetailComponent', () => {
   });
 
   it('lists the to-dos that link the booking', async () => {
-    const linked = jest.fn(() =>
-      of([{ id: 'k-1', boardId: 'b', boardName: 'StuPa', title: 'Beleg nachreichen', columnName: 'Offen', isDone: false, dueDate: null, assignees: [] }]),
+    const links = jest.fn(() =>
+      of(
+        linksOf([
+          { id: 'k-1', boardId: 'b', boardName: 'StuPa', title: 'Beleg nachreichen', columnName: 'Offen', isDone: false, dueDate: null, assignees: [] },
+        ]),
+      ),
     );
     await render(BookingDetailComponent, {
       inputs: { expense: EXPENSE },
-      providers: [provideRouter([]), { provide: TodosApiService, useValue: { linked, boards: () => of([]) } }],
+      providers: [provideRouter([]), { provide: TodosApiService, useValue: { links, boards: () => of([]) } }],
     });
-    expect(linked).toHaveBeenCalledWith('expense', EXPENSE.id);
+    expect(links).toHaveBeenCalledWith('expense', EXPENSE.id);
     expect(screen.getByRole('link', { name: 'Beleg nachreichen' })).toBeInTheDocument();
   });
 

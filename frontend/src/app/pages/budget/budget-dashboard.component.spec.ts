@@ -22,7 +22,7 @@ import type {
   Expense,
   FiscalYear,
 } from './budget-tree.api';
-import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
+import { NO_LINKED_TODOS, linkRow, linksOf } from '../../../testing/todo-fixtures';
 import { TodosApiService } from '@core/api/todos.service';
 import { PALETTE, shadeColor } from './budget-color.util';
 import { itemApp, itemBooking } from './budget-items/budget-items.fixtures';
@@ -1586,8 +1586,8 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   it('shows the cards that link the cost centre on its card, with the actions', async () => {
     const todos = {
-      linked: jest.fn(() =>
-        of([
+      links: jest.fn(() =>
+        of(linksOf([
           {
             id: 'k-1',
             boardId: 'b-1',
@@ -1600,15 +1600,17 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
             event: null,
             balance: null,
           },
-        ]),
+        ], [linkRow({ kind: 'invoice', title: 'RE-2026-17' })])),
       ),
       boards: jest.fn(() => of([{ id: 'b-1', name: 'StuPa', kind: 'gremium', gremiumId: 'g-1', canWrite: true }])),
     };
     await setup({ queryParams: { costCentre: 'b-810' }, todos });
-    expect(todos.linked).toHaveBeenCalledWith('budget', 'b-810');
+    expect(todos.links).toHaveBeenCalledWith('budget', 'b-810');
     const list = document.querySelector('app-todo-linked-list[kind="budget"]') as HTMLElement;
     expect(within(list).getByRole('heading', { name: 'Verknüpft' })).toBeInTheDocument();
     expect(within(list).getByRole('link', { name: 'Inventur Bühnentechnik' })).toHaveAttribute('href', '/todos?card=k-1');
+    expect(within(list).getByRole('link', { name: 'RE-2026-17' })).toHaveAttribute('href', '/invoices?id=i-1');
+    expect(within(list).getByRole('button', { name: 'Verknüpfen' })).toBeInTheDocument();
     expect(within(list).getByRole('button', { name: 'To-Do anlegen' })).toBeInTheDocument();
   });
 
