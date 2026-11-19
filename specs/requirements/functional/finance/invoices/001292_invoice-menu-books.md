@@ -2,7 +2,7 @@
 id: "001292"
 title: The head menu of an invoice has "Buchung anlegen"
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:

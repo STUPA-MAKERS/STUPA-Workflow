@@ -2,7 +2,7 @@
 id: "001290"
 title: A new booking sets its invoice to paid
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:

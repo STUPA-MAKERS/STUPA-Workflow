@@ -2,7 +2,7 @@
 id: "001291"
 title: The revert of a booking sets the invoice it paid back to open
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:
