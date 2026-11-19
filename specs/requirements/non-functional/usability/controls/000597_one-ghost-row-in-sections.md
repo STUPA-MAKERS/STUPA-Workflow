@@ -4,7 +4,7 @@ title: A section in a detail and a small tile show one ghost row
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-10
+updated: 2026-11-19
 implementation:
   - frontend/src/app/features/apply/status-timeline.component.html
   - frontend/src/app/features/gremien/attendance-detail/attendance-detail.component.html
@@ -22,7 +22,6 @@ implementation:
   - frontend/src/app/pages/admin/flow/transition-lists.component.html
   - frontend/src/app/pages/admin/forms/form-editor.component.html
   - frontend/src/app/pages/admin/version-history/version-history.component.html
-  - frontend/src/app/pages/dashboard/dashboard.component.html
   - frontend/src/app/features/meetings/meetings-list/meetings-list.component.html
   - frontend/src/app/features/meetings/calendar-subscribe/calendar-subscribe.component.html
 scope:
@@ -39,13 +38,12 @@ tile. All other empty lists keep their ghost rows (000205, 000412).
   lists, "Verknüpft" and the linked to-dos (000582), Ticket "Duplikat", webhook deliveries, the
   actions and transitions of the flow editor, an empty form group, the version history and the
   attendance of one meeting.
-- Small tile: Start "Heute", "Meine Anträge" and "Aufgaben", "Keine kommenden Sitzungen" and
-  the calendar subscription in the account.
+- Small tile: "Keine kommenden Sitzungen" and the calendar subscription in the account.
 - Unchanged: dialogs, sheets and pickers keep their rows, so the dialog height does not jump
   while the user types. Main lists and tabs keep 3 or 5 rows, because they fill the page. The
   chat and the protocol text keep their own shapes.
 
 Reason: A detail has many sections and a tile is small. One row says "empty" and keeps the
-detail and the start page short.
+detail short.
 
 Test: Review of the `rows` input of each `app-empty-state` in the files above.

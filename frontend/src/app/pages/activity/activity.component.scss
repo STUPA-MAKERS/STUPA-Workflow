@@ -1,5 +1,7 @@
 @use 'scroll-fade' as fade;
 @use 'list-pane' as lp;
+@use 'press';
+@use 'field' as f;
 
 // One column on every screen: a row opens the page of its item.
 
@@ -68,4 +70,41 @@
 }
 .act__more {
   @include lp.more;
+}
+
+.act__live {
+  margin-bottom: var(--space-4);
+}
+
+// "Antrag stellen" in the header (spec 001301): the filled pill of the old start page.
+.act__new {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--control-height);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: filter var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard);
+  @include f.highlight-surface;
+  @include press.chrome-text;
+  @include press.press;
+}
+.act__new:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  .act__new:hover {
+    filter: brightness(1.08);
+  }
 }

@@ -2,14 +2,12 @@
 id: "000550"
 title: Start shows the due cards of the person
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-09
-implementation:
-  - frontend/src/app/pages/dashboard/dashboard.component.ts
-  - frontend/src/app/pages/dashboard/dashboard.component.html
+updated: 2026-11-19
+replaced_by: F/collaboration/activity/001300
 scope:
-  - frontend/src/app/pages/dashboard
+  - frontend/src/app/pages/activity
   - backend/app/modules/todos
 ---
 

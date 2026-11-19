@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -78,6 +79,8 @@ function termRange(start: string): MonthRange {
   const from = start.slice(0, 7);
   return { from, to: shiftMonth(from, 11) };
 }
+/** The choice of the chip "Rolle" that shows only the pool substitutes. */
+export const POOL_ROLE = '__pool';
 const SORTS: readonly AttendanceSort[] = ['quotaAsc', 'quotaDesc', 'name'];
 const SORT_KEYS: Record<AttendanceSort, TranslationKey> = {
   quotaAsc: 'gremien.attendance.sortQuotaAsc',
@@ -117,6 +120,12 @@ export interface RowModel {
   readonly unexcused: string;
   /** The next unexcused absence reaches the limit, or the limit is reached. */
   readonly nearLimit: boolean;
+  /** The row of a pool substitute: the cells count pool seats, the total has no quota. */
+  readonly pool: boolean;
+  /** The key of the row in the template: a person can have a member row and a pool row. */
+  readonly key: string;
+  /** "2 von 3 anwesend", or for a pool row "1 von 2 Sitzungen vertreten". */
+  readonly sumLabel: string;
 }
 
 /**
@@ -147,6 +156,11 @@ export interface RowModel {
  * - A phone shows a card per person with a small cell per month; a tap opens the bottom
  *   sheet with every meeting of the range.
  * - A range without a meeting shows a grey skeleton of the matrix, not an error.
+ * - The pool substitutes of the Gremium follow the members in an own row group
+ *   "Pool-Vertretungen" (spec 001310): a cell counts the pool seats of a month
+ *   ("1/2"), the total has no quota and no unexcused absences. The chip "Rolle" has the
+ *   choice "Pool-Vertretung", the sort orders each group, and "Ø anwesend je Sitzung"
+ *   counts the pool seats too, as the head of a meeting does (spec 000946).
  */
 @Component({
   selector: 'app-gremium-attendance',
@@ -154,6 +168,7 @@ export interface RowModel {
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '[class.gat-host--fill]': 'fill()' },
   imports: [
+    NgTemplateOutlet,
     RowChevronComponent,
     LoadErrorComponent,
     EmptyStateComponent,
@@ -245,12 +260,16 @@ export class GremiumAttendanceComponent {
       row.roleKey ? [{ key: row.roleKey, roleName: row.roleName }] : [],
     );
     const roles = groupInOrder(withRole, (r) => r.key);
+    const pool = (this.data()?.rows ?? []).some((row) => row.pool)
+      ? [{ value: POOL_ROLE, label: this.i18n.translate('gremien.attendance.poolRole') }]
+      : [];
     return [
       { value: '', label: this.i18n.translate('gremien.members.roleAll') },
       ...roles.map(({ key, first }) => ({
         value: key,
         label: localized(first.roleName, locale, key),
       })),
+      ...pool,
     ];
   });
   readonly roleText = computed(() => {
@@ -282,15 +301,32 @@ export class GremiumAttendanceComponent {
     if (!data) return [];
     const locale = this.i18n.locale();
     const role = this.role();
-    const filtered = data.rows.filter((r) => !role || r.roleKey === role);
-    const sorted = sortRows(filtered, data.months, this.phone() ? 'name' : this.sort(), locale);
+    const shown = (r: GremiumAttendanceRow) =>
+      !role || (role === POOL_ROLE ? !!r.pool : !r.pool && r.roleKey === role);
+    const order = this.phone() ? 'name' : this.sort();
+    const members = data.rows.filter((r) => !r.pool && shown(r));
+    const pool = data.rows.filter((r) => !!r.pool && shown(r));
+    const sorted = [
+      ...sortRows(members, data.months, order, locale),
+      ...sortRows(pool, data.months, order, locale),
+    ];
     return sorted.map((row) => {
       const name = personName(row.displayName);
+      const isPool = !!row.pool;
+      const totals = rowTotals(row, data.months);
       return {
         row,
         name,
-        role: localized(row.roleName, locale, row.roleKey ?? ''),
-        totals: rowTotals(row, data.months),
+        pool: isPool,
+        key: `${row.principalId}${isPool ? ':pool' : ''}`,
+        sumLabel: isPool
+          ? this.poolSummary(totals.present, totals.held)
+          : this.i18n.translate('gremien.attendance.ofPresent', {
+              present: totals.present,
+              held: totals.held,
+            }),
+        role: isPool ? '' : localized(row.roleName, locale, row.roleKey ?? ''),
+        totals,
         unexcused: row.unexcused
           ? this.i18n.translate('gremien.attendance.unexcused', { n: row.unexcused, limit: data.absenceLimit })
           : '',
@@ -301,7 +337,7 @@ export class GremiumAttendanceComponent {
           return {
             view,
             month: cell.month,
-            label: this.cellLabel(name, cell.month, empty ? 'none' : view.kind, view),
+            label: this.cellLabel(name, cell.month, empty ? 'none' : view.kind, view, isPool),
             strength: cellStrength(view.share),
             empty,
           };
@@ -309,6 +345,11 @@ export class GremiumAttendanceComponent {
       };
     });
   });
+
+  /** The member rows, in the chosen order. */
+  readonly memberRows = computed(() => this.rows().filter((r) => !r.pool));
+  /** The rows of the pool substitutes, after the members (spec 001310). */
+  readonly poolRows = computed(() => this.rows().filter((r) => r.pool));
 
   readonly averages = computed(() => {
     const locale = this.i18n.locale();
@@ -364,8 +405,11 @@ export class GremiumAttendanceComponent {
         principalId: model.row.principalId,
         name: model.name,
         heading: `${model.name} · ${monthYear(cell.month, this.i18n.formatLocale())}`,
-        summary: this.summary(v.present, v.held, v.excused, v.delegated),
+        summary: model.pool
+          ? this.poolSummary(v.present, v.held)
+          : this.summary(v.present, v.held, v.excused, v.delegated),
         months: [cell.month],
+        pool: model.pool,
       },
       anchor,
     );
@@ -379,11 +423,13 @@ export class GremiumAttendanceComponent {
       .map((m) => m.month)
       .reverse();
     const parts = [
-      model.role,
-      this.i18n.translate('gremien.attendance.ofPresent', {
-        present: model.totals.present,
-        held: model.totals.held,
-      }),
+      model.pool ? this.i18n.translate('gremien.attendance.poolRole') : model.role,
+      model.pool
+        ? this.poolSummary(model.totals.present, model.totals.held)
+        : this.i18n.translate('gremien.attendance.ofPresent', {
+            present: model.totals.present,
+            held: model.totals.held,
+          }),
       rangeLabel(r.from, r.to, this.i18n.locale()),
     ].filter(Boolean);
     this.detail()?.open(
@@ -393,6 +439,7 @@ export class GremiumAttendanceComponent {
         heading: model.name,
         summary: parts.join(' · '),
         months,
+        pool: model.pool,
       },
       anchor,
     );
@@ -421,9 +468,10 @@ export class GremiumAttendanceComponent {
       `${t('gremien.attendance.total')} ${t('gremien.attendance.csvMeetings')}`,
       `${t('gremien.attendance.total')} %`,
     ];
+    const poolRole = t('gremien.attendance.poolRole');
     const body = this.rows().map((r): readonly (string | number | null)[] => [
       r.name,
-      r.role,
+      r.pool ? poolRole : r.role,
       ...r.cells.flatMap((c) =>
         c.view.kind === 'na'
           ? [null, null, null, null]
@@ -491,7 +539,18 @@ export class GremiumAttendanceComponent {
     return parts.join(', ');
   }
 
-  private cellLabel(name: string, month: string, kind: CellView['kind'], view: CellView): string {
+  /** "1 von 2 Sitzungen vertreten": the pool seats of a pool row. */
+  private poolSummary(seats: number, held: number): string {
+    return this.i18n.translate('gremien.attendance.poolSummary', { seats, held });
+  }
+
+  private cellLabel(
+    name: string,
+    month: string,
+    kind: CellView['kind'],
+    view: CellView,
+    pool: boolean,
+  ): string {
     const when = monthYear(month, this.i18n.formatLocale());
     switch (kind) {
       case 'na':
@@ -499,7 +558,9 @@ export class GremiumAttendanceComponent {
       case 'none':
         return this.i18n.translate('gremien.attendance.cellNone', { name, month: when });
       case 'count': {
-        const summary = this.summary(view.present, view.held, view.excused, view.delegated);
+        const summary = pool
+          ? this.poolSummary(view.present, view.held)
+          : this.summary(view.present, view.held, view.excused, view.delegated);
         return `${name}, ${when}: ${summary}`;
       }
       default:

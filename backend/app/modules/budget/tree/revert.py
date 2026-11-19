@@ -13,8 +13,8 @@ from app.modules.audit.models import AuditEntry
 from app.modules.budget.tree.allocations import AllocationOps
 from app.modules.budget.tree.expenses import ExpenseOps
 from app.modules.budget.tree.nodes import NodeOps
-from app.modules.budget.tree.service_base import _json_safe
-from app.modules.budget.tree_models import Budget, BudgetExpense
+from app.modules.budget.tree.service_base import _json_safe, _set_invoice_status
+from app.modules.budget.tree_models import Budget, BudgetExpense, Invoice
 from app.modules.budget.tree_schemas import AllocationSet, BudgetNodeUpdate, ExpenseUpdate
 from app.shared.errors import ConflictError
 
@@ -43,7 +43,7 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
         target_id = entry.target_id or ""
         match action:
             case AuditAction.BUDGET_EXPENSE_CREATE:
-                await self._revert_expense_create(UUID(target_id), entry.id)
+                await self._revert_expense_create(UUID(target_id), entry.id, data)
             case AuditAction.BUDGET_TRANSFER_CREATE:
                 await self._revert_transfer_create(UUID(target_id), entry.id)
             case AuditAction.BUDGET_NODE_CREATE:
@@ -57,12 +57,15 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
             case _:  # pragma: no cover - the dispatcher only passes revertable actions
                 raise ConflictError("This budget action cannot be reverted.", code="not_revertable")
 
-    async def _revert_expense_create(self, expense_id: UUID, reverted_audit_id: int) -> None:
-        """Delete the booking.
+    async def _revert_expense_create(
+        self, expense_id: UUID, reverted_audit_id: int, data: dict[str, Any]
+    ) -> None:
+        """Delete the booking and undo the payment of its invoice (spec 001291).
 
-        The linked invoice keeps its status. A booking does not set its invoice
-        to paid, so the revert has no invoice status to undo. A user sets the
-        status of the invoice with an invoice update.
+        The create of a booking pays its invoice, and the audit entry then holds
+        ``invoicePaid``. The revert sets that invoice back to `open`, but only while
+        it is still `paid` and no other booking links it, because another booking
+        still pays it. Without ``invoicePaid`` the invoice keeps its status.
         """
         expense = await self.session.get(BudgetExpense, expense_id)
         if expense is None:
@@ -82,8 +85,25 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
                 "revertedAuditId": reverted_audit_id,
             },
         )
+        invoice_id = expense.invoice_id if data.get("invoicePaid") is True else None
         await self.session.delete(expense)
+        if invoice_id is not None:
+            await self.session.flush()
+            await self._reopen_invoice(invoice_id)
         await self.session.commit()
+
+    async def _reopen_invoice(self, invoice_id: UUID) -> None:
+        """Set a paid invoice back to `open` when no booking links it any more."""
+        inv = await self.session.get(Invoice, invoice_id)
+        if inv is None or inv.status != "paid":
+            return
+        linked = (
+            await self.session.execute(
+                select(BudgetExpense.id).where(BudgetExpense.invoice_id == invoice_id).limit(1)
+            )
+        ).first()
+        if linked is None:
+            _set_invoice_status(inv, "open")
 
     async def _revert_transfer_create(self, transfer_id: UUID, reverted_audit_id: int) -> None:
         """Delete both rows of a transfer, the expense and the income."""

@@ -2,16 +2,12 @@
 id: "000650"
 title: Antrag stellen stands in the tab line of the desktop start page
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-11
-tests:
-  - "frontend/src/app/pages/dashboard/dashboard.component.spec.ts:DashboardComponent"
-implementation:
-  - frontend/src/app/pages/dashboard/dashboard.component.html
-  - frontend/src/app/pages/dashboard/dashboard.component.scss
+updated: 2026-11-19
+replaced_by: F/collaboration/activity/001301
 scope:
-  - frontend/src/app/pages/dashboard
+  - frontend/src/app/pages/activity
 ---
 
 # Antrag stellen stands in the tab line of the desktop start page

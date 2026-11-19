@@ -89,6 +89,8 @@ async def test_segments_and_counts(session: AsyncSession) -> None:
             ),
             actor="t",
         )
+        # A booking pays its invoice (001290); a user sets a part payment open again.
+        await svc.update_invoice(invoice_id, InvoiceUpdate(status="open"))
 
     async def ids(status: str | None = None, booked: bool | None = None) -> set[uuid.UUID]:
         page = await svc.list_invoices_paged(

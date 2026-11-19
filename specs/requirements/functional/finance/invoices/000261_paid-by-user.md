@@ -2,12 +2,10 @@
 id: "000261"
 title: Only a user sets an invoice to paid
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation:
-  - backend/app/modules/budget/tree/invoices.py
-  - frontend/src/app/pages/invoices/invoice-detail/invoice-detail.component.ts
+updated: 2026-11-19
+replaced_by: F/finance/invoices/001290
 scope:
   - backend/app/modules/budget
 ---
