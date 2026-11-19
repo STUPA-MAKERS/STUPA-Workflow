@@ -31,7 +31,7 @@
           [placeholder]="searchPlaceholder()"
           [label]="'gremien.list.searchLabel' | t"
           [clearable]="true"
-          [results]="store.loading() ? null : visibleCount()"
+          [results]="showSkeleton() ? null : visibleCount()"
           [value]="query()"
           (valueChange)="query.set($event)"
         />
@@ -57,7 +57,7 @@
         (appPullRefresh)="store.refresh()"
         appScrollFade="y"
       >
-        @if (store.loading()) {
+        @if (showSkeleton()) {
           <div class="grl__skel skel-in">
             <app-list-group skeleton="6.5rem" />
             <app-skeleton

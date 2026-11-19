@@ -2,8 +2,10 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
@@ -45,6 +47,7 @@ import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.componen
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import { IMAGE_PRELOADER } from '@shared/util/preload-images';
 
 /** The permission that shows every gremium, also without a membership. */
 export const GREMIUM_VIEW_ALL = 'gremium.view_all';
@@ -117,6 +120,17 @@ export class GremienComponent {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   protected readonly store = inject(GremienStore);
+  private readonly preload = inject(IMAGE_PRELOADER);
+
+  /**
+   * The logos of the first answer are still loading (spec 001280): the skeleton stays until
+   * each logo has loaded or failed, at most `IMAGE_PRELOAD_LIMIT_MS`. A refresh does not wait.
+   */
+  private readonly logosPending = signal(true);
+  private logosStarted = false;
+
+  /** The skeleton shows: the list or the logos of its first answer are still loading. */
+  readonly showSkeleton = computed(() => this.store.loading() || this.logosPending());
 
   readonly phone = mediaQuery(MEDIA.phone);
 
@@ -174,7 +188,7 @@ export class GremienComponent {
       this.i18n,
       { plain: 'gremien.list.searchLabel', one: 'gremien.list.searchOne', many: 'gremien.list.search' },
       this.visibleCount(),
-      this.store.loading(),
+      this.showSkeleton(),
     ),
   );
 
@@ -193,7 +207,18 @@ export class GremienComponent {
       reads: (r) => [inject(GremienApiService).meetings(r.item.id)],
     });
     this.store.load();
-
+    effect(() => {
+      if (this.store.loading() || this.logosStarted) return;
+      this.logosStarted = true;
+      const urls = untracked(() => this.store.items())
+        .map((g) => g.logoUrl)
+        .filter((u): u is string => !!u);
+      if (!urls.length) {
+        this.logosPending.set(false);
+        return;
+      }
+      void this.preload(urls).then(() => this.logosPending.set(false));
+    });
   }
 
   /** "Zur Liste": close the gremium, keep the tab. */
