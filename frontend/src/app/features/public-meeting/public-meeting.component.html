@@ -138,10 +138,10 @@
               [ngModel]="name()"
               (ngModelChange)="name.set($event)"
             />
-            <div class="pm__row">
+            <app-button-group class="pm__row" [main]="true">
               <app-button variant="text" (click)="renaming.set(false)">{{ 'action.cancel' | t }}</app-button>
               <app-button variant="fill" [loading]="guest.saving()" [disabled]="!nameValid()" (click)="saveRename()">{{ 'action.save' | t }}</app-button>
-            </div>
+            </app-button-group>
           </form>
         } @else {
           <div class="pm__row">
