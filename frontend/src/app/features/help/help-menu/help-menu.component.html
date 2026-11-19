@@ -56,18 +56,6 @@
         <span class="hm__text">{{ 'help.report' | t }}</span>
       </button>
     }
-    @if (publicLinks().length) {
-      <div class="hm__sep" role="separator"></div>
-      <div role="group" [attr.aria-labelledby]="panelId + '-public'">
-        <p class="hm__group" [class.cap]="variant() === 'sheet'" [id]="panelId + '-public'">{{ 'help.public' | t }}</p>
-        @for (link of publicLinks(); track link.path) {
-          <a class="hm__item" [routerLink]="link.path" (click)="onStatement()">
-            <app-icon [name]="link.icon" [size]="19" />
-            <span class="hm__text">{{ link.label | t }}</span>
-          </a>
-        }
-      </div>
-    }
   }
 </ng-template>
 
