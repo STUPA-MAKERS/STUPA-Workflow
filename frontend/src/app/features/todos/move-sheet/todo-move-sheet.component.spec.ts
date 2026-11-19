@@ -33,7 +33,7 @@ describe('TodoMoveSheetComponent', () => {
     expect(screen.getByRole('radio', { name: /In Arbeit/ })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: 'Offen' })).toHaveTextContent(/^\s*Offen\s*$/);
     // Spec 001380: the rows of the select sheet, the check mark after the chosen name only.
-    expect(screen.getByRole('radiogroup')).toHaveClass('rowgroup', 'rowgroup--bg3');
+    expect(screen.getByRole('radiogroup', { name: 'Spalte' })).toHaveClass('rowgroup', 'rowgroup--bg3');
     expect(screen.getByRole('radio', { name: /In Arbeit/ }).querySelector('.ms__check')).not.toBeNull();
     expect(screen.getByRole('radio', { name: 'Offen' }).querySelector('.ms__check')).toBeNull();
     fireEvent.click(screen.getByRole('radio', { name: 'Erledigt' }));
