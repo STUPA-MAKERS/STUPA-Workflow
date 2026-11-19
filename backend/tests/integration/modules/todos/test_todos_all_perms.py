@@ -19,6 +19,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.oauth import scope_permissions
 from app.modules.auth.principal import Principal
 from app.modules.todos.service import TodoService
@@ -145,12 +146,14 @@ async def test_a_read_all_holder_reads_every_shared_board_but_no_foreign_persona
         members = _ok(client.get(f"/api/todos/boards/{w.gboard}/members"))
         assert [m["principalId"] for m in members] == [str(w.writer_id)]
         assert _ok(client.get(f"/api/todos/boards/{w.gboard}/archive"))["total"] == 0
-        linked = _ok(client.get(f"/api/todos/linked?kind=ticket&targetId={w.ticket}"))
-        assert [c["id"] for c in linked] == [w.card["id"]]
-        targets = _ok(client.get("/api/todos/link-targets?q=Plakat&kind=todo"))
+        assert client.get(f"/api/links?kind=ticket&id={w.ticket}").status_code == 404
+        linked = _ok(client.get(f"/api/links?kind=todo&id={w.card['id']}"))
+        assert linked["canLink"] is False
+        assert [(row["kind"], row["accessible"]) for row in linked["links"]] == [("ticket", False)]
+        targets = _ok(client.get("/api/links/targets?q=Plakat&kind=todo"))
         assert [t["targetId"] for t in targets] == [w.card["id"]]
         assert client.get(f"/api/todos/boards/{w.personal}").status_code == 404
-        assert _ok(client.get("/api/todos/link-targets?q=Privat&kind=todo")) == []
+        assert _ok(client.get("/api/links/targets?q=Privat&kind=todo")) == []
         _problem(
             client.patch(f"/api/todos/boards/{w.gboard}", json={"name": "X"}),
             403,
@@ -176,8 +179,6 @@ def _write_calls(w: _World) -> list[tuple[str, str, dict[str, Any] | None]]:
         ("POST", f"/api/todos/cards/{cid}/checklist", {"text": "Mehr"}),
         ("PATCH", f"/api/todos/cards/{cid}/checklist/{w.item}", {"done": True}),
         ("DELETE", f"/api/todos/cards/{cid}/checklist/{w.item}", None),
-        ("POST", f"/api/todos/cards/{cid}/links", {"kind": "ticket", "targetId": w.ticket}),
-        ("DELETE", f"/api/todos/cards/{cid}/links/{w.link}", None),
         ("POST", f"/api/todos/cards/{cid}/comments", {"body": "Ich auch"}),
         ("PATCH", f"/api/todos/cards/{cid}/comments/{w.comment}", {"body": "Z"}),
         ("DELETE", f"/api/todos/cards/{cid}/comments/{w.comment}", None),
@@ -199,8 +200,6 @@ _WRITE_ROUTES = [
     "check-add",
     "check-patch",
     "check-delete",
-    "link-add",
-    "link-remove",
     "comment-add",
     "comment-edit",
     "comment-delete",
@@ -217,6 +216,34 @@ async def test_every_card_write_of_a_read_all_holder_is_403(
     with TestClient(api.app) as client:
         before = client.get(f"/api/todos/boards/{w.gboard}").headers["ETag"]
         _problem(client.request(method, url, json=body), 403, "todo_write_required")
+        assert client.get(f"/api/todos/boards/{w.gboard}").headers["ETag"] == before
+
+
+async def test_a_read_all_holder_links_nothing_on_a_shared_board(
+    api: Api, maker: async_sessionmaker[AsyncSession]
+) -> None:
+    """§F/collaboration/links/001404: reading both ends is not enough, one needs a change right.
+
+    The ticket of the existing link stays unreadable, so its removal names the missing end.
+    """
+    w = await _world(api, maker)
+    async with maker() as session:
+        writer = await session.get(PrincipalRow, w.writer_id)
+        assert writer is not None
+    api.login(Principal(sub=writer.sub))
+    with TestClient(api.app) as client:
+        second = _ok(
+            client.post("/api/todos/cards", json={"boardId": w.gboard, "title": "Zweite"}), 201
+        )
+    api.login(w.reader)
+    with TestClient(api.app) as client:
+        before = client.get(f"/api/todos/boards/{w.gboard}").headers["ETag"]
+        pair = {
+            "a": {"kind": "todo", "id": w.card["id"]},
+            "b": {"kind": "todo", "id": second["id"]},
+        }
+        _problem(client.post("/api/links", json=pair), 403, "link_forbidden")
+        _problem(client.delete(f"/api/links/{w.link}"), 422, "link_target_not_found")
         assert client.get(f"/api/todos/boards/{w.gboard}").headers["ETag"] == before
 
 

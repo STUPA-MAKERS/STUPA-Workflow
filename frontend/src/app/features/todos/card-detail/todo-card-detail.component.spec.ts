@@ -258,7 +258,7 @@ describe('TodoCardDetailComponent', () => {
     expect(screen.queryByRole('link', { name: 'Getränke' })).toBeNull();
     fireEvent.click(screen.getByTestId('cd-link-view'));
     detect();
-    expect(api.linkView).toHaveBeenCalledWith(expect.any(String), 'l-9');
+    expect(api.linkView).toHaveBeenCalledWith('l-9');
     expect(screen.getByTestId('link-view')).toHaveTextContent('300,00');
   });
 

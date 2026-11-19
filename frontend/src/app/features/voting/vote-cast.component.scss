@@ -106,10 +106,7 @@
   display: flex;
   flex: none;
   align-items: center;
-  gap: var(--space-1);
-}
-.vc--sheet .vc__actions {
-  margin-inline-end: calc(-1 * var(--space-3));
+  gap: 2px;
 }
 .vc--ready.vc--sheet .vc__body {
   flex: 1 1 auto;
