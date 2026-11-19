@@ -113,6 +113,8 @@ Gremien and Kalender: `gremien_overview`, `gremium_members`, `gremium_decisions`
 `create_appointment`, `answer_appointment`.
 Search and profile: `search`, `get_profile`.
 Activity: `list_activity`, `get_activity_status`, `mark_activity_seen`.
+
+Graph: `graph_read` (the elements of the caller and their relations, one page per call; needs `graph.view`).
 Tickets: `tickets_list`, `tickets_get`, `tickets_note`, `tickets_update`,
 `tickets_block_sender`, `tickets_unblock_sender`, `tickets_blocked_senders`,
 `tickets_delete_blocked_sender` (need `ticket.manage`); as a reporter `tickets_report`,
