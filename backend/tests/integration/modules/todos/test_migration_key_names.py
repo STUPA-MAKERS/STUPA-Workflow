@@ -27,7 +27,7 @@ _TABLES = (
     "todo_check_item",
     "todo_comment",
     "todo_event",
-    "todo_link",
+    "link",
 )
 
 

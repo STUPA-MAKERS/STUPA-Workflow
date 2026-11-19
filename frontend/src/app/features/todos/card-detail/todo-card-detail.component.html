@@ -518,7 +518,7 @@
         <app-todo-link-picker
           class="cd__picker"
           [(open)]="pickerOpen"
-          [excludeCardId]="card.id"
+          [exclude]="linkSelf()"
           [linked]="linkedKeys()"
           (picked)="pickLink($event)"
         />
@@ -856,5 +856,5 @@
   <p class="cd__warn">{{ 'todos.eventCard.makeEventText' | t: { title: card()?.title ?? '' } }}</p>
 </app-confirm-dialog>
 @if (card(); as c) {
-  <app-todo-link-view [cardId]="c.id" [link]="viewedLink()" [(open)]="linkViewOpen" />
+  <app-todo-link-view [link]="viewedLink()" [(open)]="linkViewOpen" />
 }

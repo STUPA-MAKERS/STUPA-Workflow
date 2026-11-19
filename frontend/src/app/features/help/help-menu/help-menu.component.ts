@@ -14,7 +14,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { FeatureService, type FeatureKey } from '@core/features/feature.service';
+import { FeatureService } from '@core/features/feature.service';
 import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -66,21 +66,6 @@ const DISPLAY_ROWS: readonly {
   { key: 'veryHigh', icon: 'eye', label: 'help.display.veryHigh' },
 ];
 
-/** A public page in the menu "Hilfe". */
-export interface PublicLink {
-  readonly path: string;
-  readonly label: TranslationKey;
-  readonly icon: IconName;
-  readonly feature: FeatureKey;
-}
-
-/** The public pages, in the order of the public start page (spec 001303). */
-export const PUBLIC_LINKS: readonly PublicLink[] = [
-  { path: '/protocols', label: 'help.public.protocols', icon: 'file', feature: 'meetings' },
-  { path: '/decisions', label: 'help.public.decisions', icon: 'vote', feature: 'meetings' },
-  { path: '/public-calendar', label: 'help.public.calendar', icon: 'cal', feature: 'calendar' },
-];
-
 /** Space between the trigger and the popover, and the least distance to the viewport edge. */
 const GAP = 8;
 
@@ -93,8 +78,7 @@ let nextId = 0;
  * "Hilfe" holds "Handbuch im Wiki" (the configured `help.wikiUrl`, a real link in a new tab)
  * and "Problem melden", which opens the report dialog. A signed-in person always gets
  * "Problem melden". A visitor gets it only while the admin allows tickets without an account
- * (`tickets.publicEnabled`). For a signed-in person it also links the public pages
- * (spec 001303).
+ * (`tickets.publicEnabled`).
  *
  * "Barrierefreiheit" has the eye icon. It holds the group "Darstellung" and the link to the
  * accessibility statement, which no other place links to (spec 000496). "Darstellung"
@@ -161,15 +145,6 @@ export class HelpMenuComponent {
     () =>
       this.features.isOn('tickets') &&
       (this.auth.isAuthenticated() || this.branding.ticketsPublic()),
-  );
-
-  /**
-   * The public pages, for a signed-in person (spec 001303): the public start page `/`
-   * holds the only other links to them, and it leads a session to the activity page.
-   * A page shows only while its feature is on.
-   */
-  readonly publicLinks = computed<readonly PublicLink[]>(() =>
-    this.auth.isAuthenticated() ? PUBLIC_LINKS.filter((l) => this.features.isOn(l.feature)) : [],
   );
 
   /** The link without the scheme, as the second line: it wraps, it is never cut. */

@@ -485,7 +485,7 @@ describe('ApplicationsDetailComponent', () => {
     const busy = view.container.querySelector('article.ad--busy')!;
     expect(busy).not.toHaveClass('ad--split');
     expect(busy.querySelector('app-tabs')).not.toBeNull();
-    expect(busy.querySelector('.ad__transitions')).toBeNull();
+    expect(busy.querySelector('.ad__transitions, .ad__transitionGroup')).toBeNull();
     const http = view.fixture.debugElement.injector.get(HttpTestingController);
     for (const req of http.match(() => true)) req.flush(null, { status: 404, statusText: 'x' });
   });
@@ -566,7 +566,7 @@ describe('ApplicationsDetailComponent', () => {
     req.flush([]);
     detectChanges();
     expect(cmp.transitionsLoading()).toBe(false);
-    expect(container.querySelector('.ad__head .ad__transitions')).toBeNull();
+    expect(container.querySelector('.ad__head .ad__transitions, .ad__head .ad__transitionGroup')).toBeNull();
     flushAttachments(http);
     http.verify();
   });

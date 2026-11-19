@@ -77,6 +77,7 @@ from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.site_config.models import SiteConfigVersion
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
 from app.modules.todos.models import (
+    Link,
     TodoAssignee,
     TodoBoard,
     TodoCard,
@@ -86,7 +87,6 @@ from app.modules.todos.models import (
     TodoComment,
     TodoEvent,
     TodoLabel,
-    TodoLink,
 )
 from app.modules.translations.models import UiLanguage, UiTranslation
 from app.modules.voting.models import SecretBallot, Vote, VotedMarker
@@ -175,7 +175,7 @@ __all__ = [
     "TodoComment",
     "TodoEvent",
     "TodoLabel",
-    "TodoLink",
+    "Link",
     "Transition",
     "UiLanguage",
     "UiTranslation",

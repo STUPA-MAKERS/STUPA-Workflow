@@ -68,15 +68,14 @@ from app.modules.site_config.features import Feature, active_features
 from app.modules.tickets.access import TICKET_MANAGE
 from app.modules.tickets.models import Ticket
 from app.modules.tickets.service import format_number
+from app.modules.todos import link_store
 from app.modules.todos.access import BoardAccess
 from app.modules.todos.grouping import grouped
 from app.modules.todos.models import (
-    LINK_COLUMNS,
     LINK_KINDS,
     TodoBoard,
     TodoCard,
     TodoColumn,
-    TodoLink,
 )
 from app.modules.todos.schemas import TodoLinkDetail, TodoLinkTarget
 from app.modules.voting.listing import read_scope as vote_read_scope
@@ -304,14 +303,15 @@ class LinkResolver:
         """The ids of ``ids`` that a card on a board that the principal reads links."""
         if kind not in GRANT_KINDS or not ids:
             return set()
-        column = getattr(TodoLink, LINK_COLUMNS[kind])
         scope = await self.access.scope(principal)
-        rows = await self.session.scalars(
-            select(column)
-            .join(TodoCard, TodoCard.id == TodoLink.card_id)
+        cards = (
+            select(TodoCard.id)
             .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
-            .where(column.in_(ids), scope.condition())
-            .distinct()
+            .where(scope.condition())
+        )
+        ends = link_store.linked_ids(kind, "todo", cards).subquery()
+        rows = await self.session.scalars(
+            select(ends.c.own_id).where(ends.c.own_id.in_(list(ids))).distinct()
         )
         return set(rows.all())
 
