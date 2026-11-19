@@ -371,4 +371,9 @@
   .mp__dock:not(.mp__dock--quiet) {
     border: var(--vh-edge);
   }
+  .mp__edgeTab {
+    border: var(--vh-edge);
+    border-inline-end: 0;
+    outline: none;
+  }
 }
