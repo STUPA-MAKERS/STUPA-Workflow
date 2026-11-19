@@ -76,6 +76,11 @@
             [to]="amountMax()"
             (applied)="onAmountRange($event)"
           />
+          @if (activeFilterCount() > 0) {
+            <app-button variant="text" size="sm" (click)="resetFilters()">
+              {{ 'expenses.filter.reset' | t }}
+            </app-button>
+          }
         </div>
 
         @if (selecting() && tab() === 'bookings') {

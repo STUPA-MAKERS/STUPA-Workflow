@@ -19,6 +19,7 @@
       @if (kind() === 'application' || kind() === 'plan') {
         <app-search-pill
           size="md"
+          [clearable]="true"
           [placeholder]="listText().search | t"
           [value]="query()"
           (valueChange)="query.set($event)"
@@ -56,6 +57,7 @@
       } @else if (kind() === 'todo') {
         <app-search-pill
           size="md"
+          [clearable]="true"
           [placeholder]="'meetings.agenda.searchTodo' | t"
           [value]="todoQuery()"
           (valueChange)="todoQuery.set($event)"

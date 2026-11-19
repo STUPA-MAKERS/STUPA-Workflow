@@ -101,7 +101,9 @@
                         <app-icon [name]="row.icon" [size]="20" />
                         <span class="sr-only">{{ row.kindLabel }}</span>
                       </span>
-                      <span trail class="tk__trail"> @else if (row.assignee; as a) {
+                      <span trail class="tk__trail">
+                        @if (!manager) {
+                        } @else if (row.assignee; as a) {
                           <app-avatar
                             size="sm"
                             [name]="a.displayName || ('chat.deletedPerson' | t)"

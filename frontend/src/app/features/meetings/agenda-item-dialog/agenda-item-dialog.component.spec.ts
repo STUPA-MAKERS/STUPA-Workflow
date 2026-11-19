@@ -375,12 +375,10 @@ describe('AgendaItemDialogComponent', () => {
     expect(screen.getByRole('radiogroup', { name: 'Zuweisbare Anträge' })).toBeInTheDocument();
   });
 
-  it('shows ghost rows behind the message of an empty list, hidden from the screen reader', async () => {
+  it('shows the face above the hint of an empty list, hidden from the screen reader', async () => {
     const { http, fixture } = await setup();
     flushApps(http, fixture, []);
-    const ghosts = document.querySelector('.es__ghosts') as HTMLElement;
-    expect(ghosts).toHaveAttribute('aria-hidden', 'true');
-    expect(ghosts.querySelectorAll('.es__ghost')).toHaveLength(5);
+    expect(document.querySelector('.es__face')).toHaveAttribute('aria-hidden', 'true');
     expect(screen.queryByRole('radiogroup', { name: /Zuweisbare Anträge/ })).toBeNull();
     expect(screen.getByRole('button', { name: 'Als Freitext anlegen' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Filter zurücksetzen' })).toBeNull();
@@ -414,13 +412,14 @@ describe('AgendaItemDialogComponent', () => {
     expect(cmp.freetext()).toBe('');
   });
 
-  it('resets the search when nothing matches it', async () => {
+  it('clears the search with the button of the search field when nothing matches it', async () => {
     const { http, fixture, cmp } = await setup();
     flushApps(http, fixture);
     await userEvent.type(screen.getByRole('searchbox', { name: 'Antrag suchen' }), 'Kühlschrank');
     expect(screen.getByText('Kein Antrag passt zu „Kühlschrank“')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Als Freitext anlegen' })).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    expect(screen.queryByRole('button', { name: 'Filter zurücksetzen' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Suche leeren' }));
     expect(cmp.query()).toBe('');
     expect(cmp.kind()).toBe('application');
     expect(within(screen.getByRole('radiogroup', { name: /Zuweisbare Anträge/ })).getAllByRole('radio')).toHaveLength(3);
@@ -573,7 +572,7 @@ describe('AgendaItemDialogComponent', () => {
       http.expectOne((r) => r.url === '/api/todos/boards').flush([BOARDS[0], BOARDS[2]]);
       fixture.detectChanges();
       expect(screen.queryByRole('radiogroup', { name: 'Offene To-Dos' })).toBeNull();
-      expect(document.querySelector('.es__ghosts')).toHaveAttribute('aria-hidden', 'true');
+      expect(document.querySelector('.es__face')).toHaveAttribute('aria-hidden', 'true');
       await userEvent.type(screen.getByRole('searchbox', { name: 'To-Do suchen' }), 'Grillfest');
       expect(screen.getByText('Keine offenen To-Dos')).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Als Freitext anlegen' }));
@@ -581,12 +580,12 @@ describe('AgendaItemDialogComponent', () => {
       expect(cmp.freetext()).toBe('Grillfest');
     });
 
-    it('resets the to-do search when nothing matches it', async () => {
+    it('clears the to-do search with the button of the search field when nothing matches it', async () => {
       const { http, fixture, cmp } = await todoSetup();
       flushBoard(http, fixture);
       await userEvent.type(screen.getByRole('searchbox', { name: 'To-Do suchen' }), 'Mensa');
       expect(screen.getByText('Kein To-Do passt zu „Mensa“')).toBeInTheDocument();
-      await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Suche leeren' }));
       expect(cmp.todoQuery()).toBe('');
       expect(cmp.kind()).toBe('todo');
       expect(within(screen.getByRole('radiogroup', { name: 'Offene To-Dos' })).getAllByRole('radio')).toHaveLength(3);
