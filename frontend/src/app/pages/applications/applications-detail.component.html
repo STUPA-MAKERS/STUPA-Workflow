@@ -149,11 +149,11 @@
           }
         </app-sheet-bar>
 
-        <p class="sheet-line ad__line ad__seps">
+        <p class="sheet-line ad__line">
           <span class="ad__parts">
             @if (application.state) {
               <span class="ad__part">
-                <app-status-text [kind]="stateKind()">{{ application.state.label }}</app-status-text>
+                <app-status-text chip [kind]="stateKind()">{{ application.state.label }}</app-status-text>
               </span>
             }
             @if (typeName(); as type) {

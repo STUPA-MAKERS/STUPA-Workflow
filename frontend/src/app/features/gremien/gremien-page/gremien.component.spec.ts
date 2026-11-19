@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
@@ -17,7 +17,10 @@ import { GREMIUM_VIEW_ALL, GremienComponent } from './gremien.component';
 import { loadErrorToast, retryLoadError } from '../../../../testing/load-error';
 import { IMAGE_PRELOADER, type ImagePreloader } from '@shared/util/preload-images';
 
-@Component({ standalone: true, template: '<p>Detail</p>' })
+@Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
+  standalone: true, template: '<p>Detail</p>'
+})
 class DetailStub {}
 
 const ITEMS: GremiumOverview[] = [

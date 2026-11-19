@@ -373,7 +373,7 @@ describe('MeetingsComponent', () => {
     expect(finReq.request.method).toBe('POST');
     finReq.flush({ ...PROTOCOL, status: 'final', pdfUrl: 'https://example/p.pdf' });
 
-    expect(await screen.findByText('Final')).toBeInTheDocument();
+    expect(await screen.findByText(/^Protokoll final/)).toBeInTheDocument();
   });
 
   /**
@@ -395,8 +395,8 @@ describe('MeetingsComponent', () => {
 
     const internal = await screen.findByRole('link', { name: 'PDF intern' });
     expect(internal).toHaveAttribute('href', '/api/protocols/p-1/pdf');
-    const pub = await screen.findByRole('link', { name: 'PDF öffentlich' });
-    expect(pub).toHaveAttribute('href', '/api/protocols/p-1/pdf/public');
+    await userEvent.click(screen.getByRole('button', { name: 'Sitzungsmenü' }));
+    expect(await screen.findByRole('menuitem', { name: 'PDF öffentlich' })).toBeInTheDocument();
   });
 
   /**
@@ -491,7 +491,7 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1/agenda').flush([]);
     flushDelegationContext(http);
 
-    await screen.findByText('Final');
+    await screen.findByText(/^Protokoll final/);
     expect(container.querySelector('.mtg__saveState')).toBeNull();
   });
 
@@ -541,7 +541,7 @@ describe('MeetingsComponent', () => {
   it('keeps the final protocol of a closed meeting locked for every writer', async () => {
     const { http, fixture } = await setup();
     flushClosed(http, 'final');
-    await screen.findByText('Final');
+    await screen.findByText(/^Protokoll final/);
     expect((fixture.componentInstance as Cmp).canEditProtocol()).toBe(true);
     expect(screen.queryByRole('toolbar', { name: 'Format' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Ins Protokoll übernehmen' })).toBeNull();
@@ -567,7 +567,7 @@ describe('MeetingsComponent', () => {
     const finReq = http.expectOne('/api/protocols/p-1/finalize');
     expect(finReq.request.method).toBe('POST');
     finReq.flush({ ...PROTOCOL, status: 'final', pdfUrl: 'https://example/p.pdf' });
-    expect(await screen.findByText('Final')).toBeInTheDocument();
+    expect(await screen.findByText(/^Protokoll final/)).toBeInTheDocument();
   });
 
   /** "Abbrechen" closes without a finalize. */
@@ -620,7 +620,8 @@ describe('MeetingsComponent', () => {
     await screen.findByText('Sitzungssteuerung');
     ws.subject.next({ type: 'meeting_state', activeApplicationId: 'app-2', status: 'closed' });
     fixture.detectChanges();
-    expect(screen.getByText('Geschlossen', { selector: 'app-status-text' })).toBeInTheDocument();
+    // A closed meeting with a protocol shows the state of the protocol (spec 001304).
+    expect(screen.getByText('Protokoll-Entwurf', { selector: 'app-status-text' })).toBeInTheDocument();
   });
 
   it('shows an error notice when the meeting fails to load', async () => {

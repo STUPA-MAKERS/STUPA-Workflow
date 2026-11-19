@@ -7,7 +7,7 @@ import {
   provideBrowserGlobalErrorListeners,
   provideZoneChangeDetection,
 } from '@angular/core';
-import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { provideHttpClient, withInterceptors, withXhr } from '@angular/common/http';
 import {
   TitleStrategy,
   UrlSerializer,
@@ -83,6 +83,7 @@ export const appConfig: ApplicationConfig = {
       provideRouteMotion(),
     ),
     provideHttpClient(
+      withXhr(),
       withInterceptors(
         isDevMode()
           ? [loadingInterceptor, cacheInterceptor, reachabilityInterceptor, authInterceptor, lazyMockApiInterceptor]

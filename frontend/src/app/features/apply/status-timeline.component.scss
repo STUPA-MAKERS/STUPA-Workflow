@@ -1,5 +1,5 @@
 @use 'breakpoints' as bp;
-@use 'dot-parts' as dots;
+@use 'meta-chips' as chips;
 
 :host {
   display: flex;
@@ -133,17 +133,11 @@
   border-radius: var(--radius-2xl);
   background: var(--color-surface-1);
 }
-.ad__line {
-  --ad-sep: 24px;
-}
-.ad__seps {
-  overflow-x: clip;
-}
 .ad__parts {
-  @include dots.list(var(--ad-sep));
+  @include chips.list;
 }
 .ad__part {
-  @include dots.part(var(--ad-sep));
+  @include chips.chip;
 }
 .ad__transitionGroup {
   flex-wrap: wrap;
