@@ -1,7 +1,7 @@
 import { render } from '@testing-library/angular';
 import { TodoPickDialogComponent } from './todo-pick-dialog.component';
 
-async function setup(inputs: { pick?: string | null; busy?: boolean } = {}) {
+async function setup(inputs: { pick?: string | null; busy?: boolean; rows?: { id: string; title: string; sub: string }[] } = {}) {
   const view = await render(TodoPickDialogComponent, {
     inputs: {
       open: true,
@@ -9,7 +9,7 @@ async function setup(inputs: { pick?: string | null; busy?: boolean } = {}) {
       listLabel: 'Liste',
       emptyHeading: 'Nichts da',
       submitLabel: 'Übernehmen',
-      rows: [{ id: 'r-1', title: 'Eins', sub: '' }],
+      rows: inputs.rows ?? [{ id: 'r-1', title: 'Eins', sub: '' }],
       pick: inputs.pick ?? null,
       busy: inputs.busy ?? false,
     },
@@ -39,6 +39,23 @@ describe('TodoPickDialogComponent', () => {
     const { cmp, picked } = await setup({ pick: 'r-1', busy: true });
     cmp.submit();
     expect(picked).not.toHaveBeenCalled();
+  });
+
+  it('lists the rows as select-sheet tiles with a check after the chosen one (001790)', async () => {
+    await setup({
+      pick: 'r-2',
+      rows: [
+        { id: 'r-1', title: 'Eins', sub: 'Mo., 23.11.' },
+        { id: 'r-2', title: 'Zwei', sub: '' },
+      ],
+    });
+    const list = document.querySelector('[role="radiogroup"]');
+    expect(list?.classList).toContain('rowgroup--bg3');
+    const rows = Array.from(document.querySelectorAll('[data-testid="pick-row"]'));
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.querySelector('.pd__check') !== null)).toEqual([false, true]);
+    expect(rows[1].classList).toContain('pd__row--on');
+    expect(document.querySelector('.pd__mark')).toBeNull();
   });
 
   it('closes on cancel', async () => {

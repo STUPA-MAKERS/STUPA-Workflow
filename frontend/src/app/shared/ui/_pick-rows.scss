@@ -1,0 +1,76 @@
+// The choice list of a pick dialog ("TOP hinzufügen", "Auf Tagesordnung setzen", spec 001790):
+// the rows of the select sheet (001380) with a subtitle. Tiles of a row group on surface 3,
+// 2px apart, inner corners 4px and outer corners `--radius-lg`. No radio circle: the chosen
+// row shows a check mark after its text. The radio input stays for the keyboard and the
+// screen reader, but it is invisible.
+// Emulated encapsulation scopes styles per component, so each dialog includes the mixins.
+//   @use '../../shared/ui/pick-rows' as pr;
+@use 'field' as f;
+@use 'option-menu' as om;
+
+@mixin list {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+  border-radius: var(--radius-lg);
+}
+
+@mixin row {
+  @include om.option;
+  @include om.option-sheet;
+  position: relative;
+  flex: none;
+  min-width: 0;
+  padding-block: 6px;
+}
+
+@mixin row-hover {
+  @include om.option-hover;
+}
+
+@mixin row-focus {
+  @include om.option-focus;
+}
+
+@mixin row-on {
+  @include f.highlight-chosen;
+}
+
+@mixin radio {
+  position: absolute;
+  inset-inline-start: var(--space-4);
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@mixin text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+@mixin title {
+  min-width: 0;
+  font-weight: var(--fw-medium);
+}
+
+@mixin title-on {
+  font-weight: var(--fw-semibold);
+}
+
+@mixin sub {
+  font-size: var(--fs-small);
+  font-weight: var(--fw-regular);
+  color: var(--color-text-muted);
+}
+
+@mixin check {
+  @include om.check;
+}

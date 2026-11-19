@@ -1,6 +1,6 @@
 @use 'breakpoints' as bp;
 @use '../../../shared/ui/dialog-form' as df;
-@use 'field' as f;
+@use '../../../shared/ui/pick-rows' as pr;
 
 @include df.host;
 
@@ -34,81 +34,40 @@
   min-height: 0;
 }
 
+// The choice list: the rows of the select sheet with a subtitle (001790).
 .pd__list {
-  display: flex;
-  flex: 0 1 auto;
-  flex-direction: column;
-  gap: 2px;
-  min-height: 0;
-  overflow-y: auto;
+  @include pr.list;
 }
-
 .pd__row {
-  position: relative;
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
-  min-height: 52px;
-  padding: 6px 14px;
-  border-radius: var(--radius-lg);
-  cursor: pointer;
+  @include pr.row;
 }
 @media (hover: hover) {
   .pd__row:hover {
-    background: var(--color-surface-2);
+    @include pr.row-hover;
   }
 }
 .pd__row--on {
-  background: var(--color-selected);
-  color: var(--color-on-selected);
-  @include f.highlight-chosen;
-}
-@media (hover: hover) {
-  .pd__row--on:hover {
-    background: var(--color-selected);
-  }
+  @include pr.row-on;
 }
 .pd__row:has(.pd__radio:focus-visible) {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
+  @include pr.row-focus;
 }
 .pd__radio {
-  position: absolute;
-  inset-inline-start: 14px;
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  opacity: 0;
-}
-.pd__mark {
-  flex: none;
-  color: var(--color-text-muted);
-}
-.pd__row--on .pd__mark {
-  color: var(--color-accent-text);
+  @include pr.radio;
 }
 .pd__text {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
+  @include pr.text;
 }
 .pd__title {
-  min-width: 0;
-  font-weight: var(--fw-medium);
+  @include pr.title;
+}
+.pd__row--on .pd__title {
+  @include pr.title-on;
 }
 .pd__sub {
-  font-size: var(--fs-small);
-  color: var(--color-text-muted);
+  @include pr.sub;
 }
-.pd__row--on .pd__sub {
-  color: inherit;
+.pd__check {
+  @include pr.check;
 }
 
-// The list cuts hard at its own rounded frame, and its rows run to the sides of the frame
-// (000193).
-.pd__list {
-  border-radius: var(--radius-lg);
-}
