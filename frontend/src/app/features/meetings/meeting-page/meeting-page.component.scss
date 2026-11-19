@@ -110,6 +110,21 @@
   flex: 1 1 auto;
   min-height: 24rem;
 }
+// The open vote in the place of the text on a phone (spec 001461): the switch to the text on
+// top, the card below it.
+.mp__swap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.mp__swapSeg {
+  align-self: center;
+}
+// The sheet stays in the page behind the card, so the editor keeps its state.
+.mp__sheet[hidden] {
+  display: none;
+}
 // The application and the to-dos of the item sit above the sheet, so the sheet holds only
 // the protocol.
 .mp__linked {
@@ -124,10 +139,6 @@
   align-items: stretch;
   padding: 0 var(--space-3) 0 0;
   overflow: hidden;
-}
-.mp__body--wide.mp__body--votes {
-  grid-template-columns: 320px minmax(0, 1fr) 320px;
-  grid-template-areas: 'agenda main votes';
 }
 .mp__body--wide .mp__agenda {
   grid-area: agenda;
@@ -146,14 +157,6 @@
 }
 .mp__body--wide .mp__sheet {
   min-height: 0;
-}
-.mp__body--wide .mp__votes {
-  grid-area: votes;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  border-radius: var(--radius-xl);
-  scroll-padding-block: var(--space-4);
 }
 
 // The radius of the cards, so a card that scrolls past an end is clipped round, not straight.
@@ -268,6 +271,49 @@
   outline-offset: -2px;
 }
 
+// The tab at the end edge that opens the votes above the phone width (spec 001460): a small
+// half pill on the edge of the window, accent while a vote of the item is open.
+.mp__edgeTab {
+  position: fixed;
+  top: 50%;
+  inset-inline-end: 0;
+  z-index: var(--z-sticky, 10);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  width: 36px;
+  padding: var(--space-3) 0 var(--space-3) 2px;
+  border: var(--border-width) solid var(--color-border);
+  border-inline-end: 0;
+  border-start-start-radius: var(--radius-xl);
+  border-end-start-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+.mp__edgeTab--live {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
+}
+@media (hover: hover) {
+  .mp__edgeTab:not(.mp__edgeTab--live):hover {
+    background: var(--color-surface-3);
+  }
+}
+.mp__edgeTab:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.mp__edgeBadge {
+  font-size: 0.75rem;
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+}
+
 /* "Verknüpfen" and "To-Do anlegen" of the sheet To-Dos sit in its head, before the close button. */
 .mp__sheet-actions {
   display: flex;
@@ -302,5 +348,39 @@
     .mp__chip:not([aria-expanded='true']):hover {
       background: var(--field-bg-hover);
     }
+  }
+}
+
+/* Very high contrast: the edge tab is a field, black on yellow with the black edge; while a
+   vote is open it is yellow on black. */
+@include d.host-on(fields) {
+  .mp__edgeTab {
+    border-color: var(--field-text);
+    background: var(--field-bg);
+    color: var(--field-text);
+    outline: 2px solid var(--field-text);
+    outline-offset: -2px;
+  }
+  .mp__edgeTab--live {
+    background: var(--field-text);
+    color: var(--field-bg);
+  }
+}
+
+/* Very high contrast (spec 000605): the vote card in the place of the text and the dock have
+   the white edge of every surface; the page behind them is black like they are. */
+@include d.host-on(veryHigh) {
+  .mp__inPlace {
+    border: var(--vh-edge);
+    border-radius: var(--radius-xl);
+  }
+  // The floating dock is a surface too, so it has the same edge.
+  .mp__dock:not(.mp__dock--quiet) {
+    border: var(--vh-edge);
+  }
+  .mp__edgeTab {
+    border: var(--vh-edge);
+    border-inline-end: 0;
+    outline: none;
   }
 }
