@@ -94,25 +94,7 @@
   </div>
 } @else {
   <div class="cal">
-    <app-page-header [pane]="true" [title]="titleKey | t">
-      <ng-container ngProjectAs="[actions]">
-        @if (isPublic) {
-          <app-button variant="outlined" [ariaPressed]="abo.isOpen()" (click)="abo.toggle($event.currentTarget)">
-            <app-icon name="cal" />
-            {{ 'calendar.public.subscribe' | t }}
-          </app-button>
-        } @else {
-          <app-button
-            variant="text"
-            [iconOnly]="true"
-            [ariaLabel]="'meetings.overview.subscribe' | t"
-            [ariaPressed]="abo.isOpen()"
-            (click)="abo.toggle($event.currentTarget)"
-          ><app-icon name="cal" /></app-button>
-        }
-        <app-calendar-subscribe #abo [fixedUrl]="publicFeed" />
-      </ng-container>
-    </app-page-header>
+    <h1 class="sr-only">{{ titleKey | t }}</h1>
 
     <div class="cal__tools" role="toolbar" [attr.aria-label]="titleKey | t">
       <div class="cal__nav">
@@ -139,6 +121,24 @@
           [value]="view()"
           (valueChange)="setView($event)"
         />
+        <app-button-group class="cal__actions">
+          @if (isPublic) {
+            <app-button [ariaPressed]="abo.isOpen()" (click)="abo.toggle($event.currentTarget)">
+              <app-icon name="cal" />
+              {{ 'calendar.public.subscribe' | t }}
+            </app-button>
+          } @else {
+            <app-button
+              [iconOnly]="true"
+              [ariaLabel]="'meetings.overview.subscribe' | t"
+              [title]="'meetings.overview.subscribe' | t"
+              [ariaPressed]="abo.isOpen()"
+              (click)="abo.toggle($event.currentTarget)"
+            ><app-icon name="cal" /></app-button>
+            <app-button (click)="createAppointment()"><app-icon name="plus" />{{ 'fab.appointment' | t }}</app-button>
+          }
+        </app-button-group>
+        <app-calendar-subscribe #abo [fixedUrl]="publicFeed" />
       </div>
       <div class="cal__filters">
         <div class="cal__searchBox" role="search" tabindex="-1" (keydown)="onSearchKey($event)">
@@ -258,9 +258,6 @@
             </div>
           }
         </div>
-      }
-      @if (!isPublic) {
-        <app-fab [contained]="true" [label]="'fab.appointment' | t" (activate)="createAppointment()" />
       }
     </div>
 

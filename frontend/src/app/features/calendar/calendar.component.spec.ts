@@ -435,6 +435,15 @@ describe('CalendarComponent (desktop)', () => {
     expect(view.cmp.kindOptions().map((o) => o.value)).not.toContain('event');
   });
 
+  it('puts Kalender-Abo and Termin anlegen in one group at the end of the tools row (001771)', async () => {
+    const view = await setup();
+    load(view);
+    const group = screen.getByRole('toolbar').querySelector('.cal__nav app-button-group') as HTMLElement;
+    expect(within(group).getByRole('button', { name: 'Kalender-Abo' })).toBeInTheDocument();
+    expect(within(group).getByRole('button', { name: 'Termin anlegen' })).toBeInTheDocument();
+    expect(view.container.querySelector('app-fab')).toBeNull();
+  });
+
   it('creates a Termin on the picked day and shows it at once', async () => {
     const view = await setup();
     load(view);

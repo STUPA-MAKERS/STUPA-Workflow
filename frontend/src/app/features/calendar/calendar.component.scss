@@ -45,7 +45,8 @@
   gap: 0 6px;
 }
 
-// The desktop: the title and the tools over both columns, then the grid and the cards.
+// The desktop: the tools over both columns, then the grid and the day list. The title is only
+// for a screen reader; the actions stand at the end of the first tools row (spec 001771).
 .cal {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -55,10 +56,9 @@
 :host(.cal--wide) .cal {
   flex: 1 1 0;
   grid-template-columns: minmax(0, 1fr) 380px;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
 }
-:host(.cal--wide) .cal > app-page-header,
 :host(.cal--wide) .cal__tools {
   grid-column: 1 / -1;
 }
@@ -73,8 +73,12 @@
 }
 .cal__nav {
   display: flex;
+  flex: 1 1 100%;
   align-items: center;
   gap: var(--space-1);
+}
+.cal__actions {
+  margin-inline-start: auto;
 }
 .cal__month {
   min-width: 10.5rem;

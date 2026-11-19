@@ -36,6 +36,7 @@ import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.componen
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   EmptyStateComponent,
   FabComponent,
   FilterSelectComponent,
@@ -137,6 +138,7 @@ const KEY_STEPS: Readonly<Record<string, number>> = {
     AppointmentDetailComponent,
     AppointmentDialogComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     CalendarSubscribeComponent,
     CalendarWeekComponent,
     EmptyStateComponent,
