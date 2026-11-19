@@ -229,7 +229,7 @@ export class MeetingPageComponent {
   /** The side sheet of the vote cards (a bottom sheet on a phone, spec 001460). */
   readonly votesOpen = signal(false);
   /** The votes for which the sheet opened by itself, so it opens only once each (spec 001462). */
-  private readonly autoOpened = new Set<string>();
+  private readonly autoOpened = signal<ReadonlySet<string>>(new Set());
   /** The open vote for which the phone shows the text instead of the card (spec 001461). */
   readonly textShownFor = signal<string | null>(null);
   /** The sheet "To-Dos" with the cards that link the meeting (spec 000551). */
@@ -247,9 +247,11 @@ export class MeetingPageComponent {
     effect(() => {
       const v = this.openVote();
       if (!v || this.phone() || !this.meeting().canVote || v.myBallot?.cast) return;
-      if (untracked(() => this.autoOpened.has(v.id))) return;
-      this.autoOpened.add(v.id);
-      untracked(() => this.votesOpen.set(true));
+      if (untracked(() => this.autoOpened().has(v.id))) return;
+      untracked(() => {
+        this.autoOpened.update((ids) => new Set([...ids, v.id]));
+        this.votesOpen.set(true);
+      });
     });
     observeElementSize(
       () => this.dock().nativeElement,
