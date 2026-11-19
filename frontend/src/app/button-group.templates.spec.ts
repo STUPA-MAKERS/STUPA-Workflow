@@ -8,7 +8,8 @@
  * stands in a group of one.
  *
  * The chrome of the shell (rail, bottom bar, account menu) is not an action row, so its slots
- * are left out.
+ * are left out. A component whose host is a segment of the group of its parent
+ * (`btn-grp__seg` on the host) draws its button at the root of its template.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -41,6 +42,8 @@ const CHROME_SLOTS = [
   'shellrailend',
   'shellrailtools',
 ];
+/** The templates whose host is a segment of the group of the parent (`btn-grp__seg`). */
+const SEGMENT_HOSTS = ['app/features/meetings/protocol-bar/protocol-bar.component.html'];
 const VOID = new Set(['input', 'img', 'br', 'hr', 'meta', 'link', 'source', 'col', 'area', 'wbr']);
 
 interface Tag {
@@ -57,8 +60,8 @@ function htmlFiles(dir: string): string[] {
 }
 
 const attrNames = (attrs: string): string[] =>
-  Array.from(attrs.matchAll(/(?:^|\s)([^\s=/]+)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?/g)).map((m) =>
-    m[1].toLowerCase(),
+  Array.from(attrs.matchAll(/(?:^|\s)([^\s=/]+)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?/g)).map(
+    (m) => m[1].toLowerCase(),
   );
 
 const isButton = (tag: Tag): boolean =>
@@ -72,7 +75,9 @@ const isGroup = (tag: Tag): boolean => {
   return (
     GROUP_TAGS.includes(tag.name) ||
     /class="[^"]*\bbtn-grp\b/.test(tag.attrs) ||
-    names.some((n) => GROUP_SLOTS.includes(n) || CHROME_SLOTS.includes(n) || GROUP_ATTRS.includes(n)) ||
+    names.some(
+      (n) => GROUP_SLOTS.includes(n) || CHROME_SLOTS.includes(n) || GROUP_ATTRS.includes(n),
+    ) ||
     GROUP_SLOTS.includes(projectAs)
   );
 };
@@ -80,7 +85,9 @@ const isGroup = (tag: Tag): boolean => {
 /** The line of each button of `source` that stands outside a group. */
 export function loneButtons(source: string): readonly number[] {
   const text = source.replace(/<!--[\s\S]*?-->/g, (c) => c.replace(/[^\n]/g, ' '));
-  const tags = Array.from(text.matchAll(/<(\/?)([a-zA-Z][\w-]*)((?:"[^"]*"|'[^']*'|[^'">])*?)(\/?)>/g));
+  const tags = Array.from(
+    text.matchAll(/<(\/?)([a-zA-Z][\w-]*)((?:"[^"]*"|'[^']*'|[^'">])*?)(\/?)>/g),
+  );
   return tags.reduce<{ stack: readonly Tag[]; found: readonly number[] }>(
     (acc, m) => {
       const name = m[2].toLowerCase();
@@ -101,17 +108,25 @@ export function loneButtons(source: string): readonly number[] {
 describe('ButtonGroupTemplates', () => {
   it('finds a lone button and passes a button in a group or a group slot', () => {
     expect(loneButtons('<div>\n<app-button>A</app-button></div>')).toEqual([2]);
-    expect(loneButtons('<app-button-group><app-button>A</app-button></app-button-group>')).toEqual([]);
+    expect(loneButtons('<app-button-group><app-button>A</app-button></app-button-group>')).toEqual(
+      [],
+    );
     expect(loneButtons('<span class="x btn-grp"><a appButton>A</a></span>')).toEqual([]);
-    expect(loneButtons('<app-dialog><app-button dialog-footer>A</app-button></app-dialog>')).toEqual([]);
-    expect(loneButtons('<ng-container ngProjectAs="[actions]"><app-row-menu /></ng-container>')).toEqual([]);
+    expect(
+      loneButtons('<app-dialog><app-button dialog-footer>A</app-button></app-dialog>'),
+    ).toEqual([]);
+    expect(
+      loneButtons('<ng-container ngProjectAs="[actions]"><app-row-menu /></ng-container>'),
+    ).toEqual([]);
     expect(loneButtons('<!-- <app-button>A</app-button> -->')).toEqual([]);
   });
 
   it('puts every button of the app in a button group (001354)', () => {
-    const offenders = htmlFiles(join(SRC, 'app')).flatMap((path) =>
-      loneButtons(readFileSync(path, 'utf8')).map((line) => `${relative(SRC, path)}:${line}`),
-    );
+    const offenders = htmlFiles(join(SRC, 'app'))
+      .filter((path) => !SEGMENT_HOSTS.includes(relative(SRC, path)))
+      .flatMap((path) =>
+        loneButtons(readFileSync(path, 'utf8')).map((line) => `${relative(SRC, path)}:${line}`),
+      );
     expect(offenders).toEqual([]);
   });
 });

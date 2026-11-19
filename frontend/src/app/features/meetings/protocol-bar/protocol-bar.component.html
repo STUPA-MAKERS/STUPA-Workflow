@@ -1,23 +1,29 @@
-@if (!compact()) {
-  <app-button-group [main]="true">
-    @if (canFinalize() || needsRight()) {
-      <app-button
-        variant="fill"
-        [loading]="finalizing()"
-        [disabled]="!canFinalize()"
-        [title]="(canFinalize() ? 'meetings.protocol.finalize' : 'meetings.protocolBar.needsRight') | t"
-        (click)="finalize.emit()"
-      >
-        <app-icon name="send" />
-        {{ 'meetings.protocol.finalize' | t }}
-      </app-button>
-    } @else if (finalPdf(); as pdf) {
-      <a appButton="tonal" [href]="pdf.url" target="_blank" rel="noopener" (click)="openPdf($event, pdf.url, pdf.label)">
-        <app-icon name="file" />
-        {{ pdf.label | t }}
-      </a>
-    }
-  </app-button-group>
+@if (hasAction()) {
+  @if (canFinalize() || needsRight()) {
+    <app-button
+      variant="fill"
+      [loading]="finalizing()"
+      [disabled]="!canFinalize()"
+      [title]="
+        (canFinalize() ? 'meetings.protocol.finalize' : 'meetings.protocolBar.needsRight') | t
+      "
+      (click)="finalize.emit()"
+    >
+      <app-icon name="send" />
+      {{ 'meetings.protocol.finalize' | t }}
+    </app-button>
+  } @else if (finalPdf(); as pdf) {
+    <a
+      appButton="tonal"
+      [href]="pdf.url"
+      target="_blank"
+      rel="noopener"
+      (click)="openPdf($event, pdf.url, pdf.label)"
+    >
+      <app-icon name="file" />
+      {{ pdf.label | t }}
+    </a>
+  }
 }
 
 <app-confirm-dialog
