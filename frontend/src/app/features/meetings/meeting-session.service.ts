@@ -27,6 +27,7 @@ import type {
   Uuid,
 } from '@core/api/models';
 import { WsService, type MeetingChannel } from '@core/ws/ws.service';
+import { PageResumeService } from '@core/browser/page-resume.service';
 import type { BodyDraftMsg, LiveViewer, ServerMessage } from '@core/ws/ws-messages';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { MeetingAgendaService } from './meeting-agenda.service';
@@ -67,6 +68,7 @@ export class MeetingSessionService implements OnDestroy {
   private readonly ws = inject(WsService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly useMock = inject(USE_MOCK_API);
+  private readonly pageResume = inject(PageResumeService);
   private readonly agendaSvc = inject(MeetingAgendaService);
   /** The join requests and the guests; provided beside this service. */
   private readonly guests = inject(MeetingGuestsService, { optional: true });
@@ -76,6 +78,9 @@ export class MeetingSessionService implements OnDestroy {
       const m = this.meeting();
       untracked(() => this.guests?.sync(m));
     });
+    this.pageResume.resume$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.onResume());
   }
 
   readonly loading = signal(false);
@@ -109,6 +114,10 @@ export class MeetingSessionService implements OnDestroy {
   readonly myChoices = signal<Record<string, string>>({});
 
   private channel: MeetingChannel | null = null;
+  /** Failed reconnects in a row without a frame of the server (§F/meetings/meetings/001440). */
+  private liveAttempts = 0;
+  private liveTimer: ReturnType<typeof setTimeout> | null = null;
+  private destroyed = false;
   /** Counts the vote events of the live channel, so a slower read cannot undo one. */
   private voteEvents = 0;
   /**
@@ -179,7 +188,9 @@ export class MeetingSessionService implements OnDestroy {
   );
 
   ngOnDestroy(): void {
+    this.destroyed = true;
     this.clearDraft();
+    if (this.liveTimer !== null) clearTimeout(this.liveTimer);
     this.channel?.close();
     if (this.renderPollTimer !== null) clearTimeout(this.renderPollTimer);
   }
@@ -861,11 +872,76 @@ export class MeetingSessionService implements OnDestroy {
     this.clearDraft();
     this.draftSeen = new Map();
     if (this.useMock) return;
-    this.channel?.close();
-    this.channel = this.ws.connectMeeting(meetingId);
-    this.channel.messages$
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((msg) => this.onLive(msg));
+    this.liveAttempts = 0;
+    this.openChannel(meetingId);
+  }
+
+  /** Open the live channel of the meeting in place of the old one. */
+  private openChannel(meetingId: Uuid): void {
+    if (this.liveTimer !== null) clearTimeout(this.liveTimer);
+    this.liveTimer = null;
+    const old = this.channel;
+    this.channel = null;
+    old?.close();
+    const ch = this.ws.connectMeeting(meetingId);
+    this.channel = ch;
+    ch.messages$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (msg) => {
+        if (ch !== this.channel) return;
+        this.liveAttempts = 0;
+        this.onLive(msg);
+      },
+      complete: () => this.onLiveClosed(ch, meetingId),
+      error: () => this.onLiveClosed(ch, meetingId),
+    });
+  }
+
+  /**
+   * The socket ended without a close of the page: open it again with a growing wait and read the
+   * state again, because the events of the gap are lost (§F/meetings/meetings/001440). After
+   * `LIVE_MAX_ATTEMPTS` failed tries in a row the page waits for its next return.
+   */
+  private onLiveClosed(ch: MeetingChannel, meetingId: Uuid): void {
+    if (ch !== this.channel || this.destroyed) return;
+    this.channel = null;
+    this.liveAttempts += 1;
+    if (this.liveAttempts > LIVE_MAX_ATTEMPTS) return;
+    const wait = Math.min(LIVE_RECONNECT_MS * this.liveAttempts, LIVE_RECONNECT_MAX_MS);
+    this.liveTimer = setTimeout(() => {
+      this.liveTimer = null;
+      if (this.destroyed || this.meeting()?.id !== meetingId) return;
+      this.openChannel(meetingId);
+      this.resync(meetingId);
+    }, wait);
+  }
+
+  /**
+   * The page is back from the background (§F/meetings/meetings/001441). iOS drops the socket of a
+   * frozen PWA, often without a `close` event, so the page opens a new socket at once and reads
+   * the state again.
+   */
+  private onResume(): void {
+    const m = this.meeting();
+    if (!m || this.useMock || this.destroyed) return;
+    this.liveAttempts = 0;
+    this.openChannel(m.id);
+    this.resync(m.id);
+  }
+
+  /** Read the meeting, the agenda, the roster and the open protocol again (quiet GETs). */
+  private resync(meetingId: Uuid): void {
+    const m = this.meeting();
+    if (m?.id !== meetingId) return;
+    this.reloadAfterState(meetingId);
+    this.agendaSvc.load(meetingId, m.currentAgendaItemId);
+    this.loadAttendance(meetingId);
+    const proto = this.protocol();
+    if ((this.canWrite() || this.canViewAll()) && proto && !proto.isFinal) {
+      this.api.getProtocol(meetingId, { quiet: true }).subscribe({
+        next: (p) => this.applyProtocolUpdate(p),
+        error: () => {},
+      });
+    }
   }
 
   /**
@@ -1028,6 +1104,12 @@ export class MeetingSessionService implements OnDestroy {
     });
   }
 }
+
+/** The wait before the first reconnect of the live channel; each further try waits longer. */
+const LIVE_RECONNECT_MS = 1000;
+const LIVE_RECONNECT_MAX_MS = 15_000;
+/** Failed reconnects in a row before the page waits for its next return. */
+const LIVE_MAX_ATTEMPTS = 8;
 
 /** The current time as an ISO timestamp, for a vote that changed here or by a live event. */
 function nowIso(): string {
