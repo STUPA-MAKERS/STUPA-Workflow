@@ -18,7 +18,7 @@ specs/
     functional/
       administration/  accounts, admin, audit, backups, files, privacy, translations
       applications/    applications, dashboard, flow, forms
-      collaboration/   activity, committees, notifications, search, tickets, todos
+      collaboration/   activity, committees, graph, notifications, search, tickets, todos
       finance/         budget, invoices
       integrations/    external, mcp, webhooks
       meetings/        calendar, delegations, meetings, protocols, voting
@@ -229,6 +229,19 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/committees/001013](requirements/functional/collaboration/committees/001013_info-markdown.md) | The Info text is sanitized Markdown | approved |
 | [F/collaboration/committees/001014](requirements/functional/collaboration/committees/001014_info-save.md) | An Info save is versioned and audited | approved |
 | [F/collaboration/committees/001015](requirements/functional/collaboration/committees/001015_info-empty.md) | An empty Info tab shows only to its editors | approved |
+| [F/collaboration/graph/001420](requirements/functional/collaboration/graph/001420_graph-page.md) | The page Graph shows the elements of a person and their relations | draft |
+| [F/collaboration/graph/001421](requirements/functional/collaboration/graph/001421_graph-permission.md) | The graph needs its own permission | draft |
+| [F/collaboration/graph/001422](requirements/functional/collaboration/graph/001422_graph-read-rules.md) | The graph shows only what the person reads | draft |
+| [F/collaboration/graph/001423](requirements/functional/collaboration/graph/001423_graph-nodes.md) | The graph shows the elements that have a relation | draft |
+| [F/collaboration/graph/001424](requirements/functional/collaboration/graph/001424_graph-relations.md) | The graph shows links and the built-in relations | draft |
+| [F/collaboration/graph/001425](requirements/functional/collaboration/graph/001425_graph-filters.md) | The graph has filters above the drawing | draft |
+| [F/collaboration/graph/001426](requirements/functional/collaboration/graph/001426_graph-builds-up.md) | The graph builds up piece by piece | draft |
+| [F/collaboration/graph/001427](requirements/functional/collaboration/graph/001427_graph-reduced-motion.md) | The graph does not move with reduced motion | draft |
+| [F/collaboration/graph/001428](requirements/functional/collaboration/graph/001428_graph-list-view.md) | The graph has a list view | draft |
+| [F/collaboration/graph/001429](requirements/functional/collaboration/graph/001429_graph-node-press.md) | A press on a node shows the element and its neighbours | draft |
+| [F/collaboration/graph/001430](requirements/functional/collaboration/graph/001430_graph-node-look.md) | A node shows the icon and the colour of its kind | draft |
+| [F/collaboration/graph/001431](requirements/functional/collaboration/graph/001431_graph-api.md) | The graph has its own API | draft |
+| [F/collaboration/graph/001432](requirements/functional/collaboration/graph/001432_graph-features.md) | A kind of a feature that is off does not show in the graph | draft |
 | [F/collaboration/notifications/000151](requirements/functional/collaboration/notifications/000151_task-mail-recipients.md) | Task mails go only to who can act | approved |
 | [F/collaboration/notifications/000152](requirements/functional/collaboration/notifications/000152_team-mails-opt-in.md) | Team mails about Anträge are off by default | approved |
 | [F/collaboration/notifications/000153](requirements/functional/collaboration/notifications/000153_sandboxed-templates.md) | Mail placeholders use camelCase | approved |
