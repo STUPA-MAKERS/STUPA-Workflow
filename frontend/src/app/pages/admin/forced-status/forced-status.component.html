@@ -3,99 +3,51 @@
     <app-breadcrumbs crumbs />
   </app-page-header>
 
-  <div class="fs__period" role="group" [attr.aria-label]="'admin.forced.period' | t">
-    <app-datepicker
-      name="forcedFrom"
-      [label]="'admin.forced.from' | t"
-      [max]="to()"
-      [ngModel]="from()"
-      (ngModelChange)="setFrom($event ?? '')"
-    />
-    <app-datepicker
-      name="forcedTo"
-      [label]="'admin.forced.to' | t"
-      [error]="periodError()"
-      [ngModel]="to()"
-      (ngModelChange)="setTo($event ?? '')"
-    />
-  </div>
-
-  @if (failed()) {
-    <app-empty-state shape="table" [heading]="'admin.forced.loadError' | t" />
-  } @else if (!loading() && !reasonRows().length) {
-    <app-empty-state shape="table" [heading]="'admin.forced.empty' | t" />
-  } @else {
-    <div class="fs__grid">
-      <app-section [level]="2" [heading]="'admin.forced.byReason' | t">
-        <app-data-table
-          surface="rowgroup"
-          [loading]="loading()"
-          [loadingText]="'common.loading' | t"
-          [columns]="reasonColumns()"
-          [rows]="reasonRows()"
-        >
-          <ng-template appCell="count" let-r>
-            <app-button-group>
-              <app-button
-                [variant]="isOpen(asRow(r)) ? 'tonal' : 'text'"
-                size="sm"
-                [ariaPressed]="isOpen(asRow(r))"
-                [ariaControls]="isOpen(asRow(r)) ? 'fs-list' : null"
-                [ariaLabel]="'admin.forced.showList' | t: { label: asRow(r).label, n: asRow(r).count }"
-                (click)="toggleList(asRow(r))"
-              ><span class="mono">{{ asRow(r).count }}</span></app-button>
-            </app-button-group>
-          </ng-template>
-        </app-data-table>
-      </app-section>
-
-      <app-section [level]="2" [heading]="'admin.forced.byPath' | t">
-        <app-data-table
-          surface="rowgroup"
-          [loading]="loading()"
-          [loadingText]="'common.loading' | t"
-          [columns]="pathColumns()"
-          [rows]="pathRows()"
-        >
-          <ng-template appCell="count" let-r>
-            <app-button-group>
-              <app-button
-                [variant]="isOpen(asRow(r)) ? 'tonal' : 'text'"
-                size="sm"
-                [ariaPressed]="isOpen(asRow(r))"
-                [ariaControls]="isOpen(asRow(r)) ? 'fs-list' : null"
-                [ariaLabel]="'admin.forced.showList' | t: { label: asRow(r).label, n: asRow(r).count }"
-                (click)="toggleList(asRow(r))"
-              ><span class="mono">{{ asRow(r).count }}</span></app-button>
-            </app-button-group>
-          </ng-template>
-        </app-data-table>
-      </app-section>
+  <app-sticky-bar>
+    <div class="fs__filters" role="group" [attr.aria-label]="'admin.forced.filters' | t">
+      <app-filter-select
+        [label]="'admin.forced.filter.reason' | t"
+        [text]="reasonText()"
+        [active]="!!reason()"
+        [options]="reasonOptions()"
+        [value]="reason()"
+        (valueChange)="setReason($event)"
+      />
+      <app-filter-select
+        [label]="'admin.forced.filter.path' | t"
+        [text]="pathText()"
+        [active]="!!path()"
+        [options]="pathOptions()"
+        [value]="path()"
+        (valueChange)="setPath($event)"
+      />
+      <app-range-chip
+        kind="date"
+        [label]="'admin.forced.period' | t"
+        [from]="from()"
+        [to]="to()"
+        (applied)="setRange($event)"
+      />
     </div>
+  </app-sticky-bar>
 
-    @if (listRow(); as row) {
-      <app-section id="fs-list" class="fs__list" [level]="2" [heading]="row.label">
-        @if (eventsLoading()) {
-          <p class="fs__muted" role="status">{{ 'common.loading' | t }}</p>
-        } @else if (!events().length) {
-          <p class="fs__muted">{{ 'admin.forced.listEmpty' | t }}</p>
-        } @else {
-          <ul class="fs__events">
-            @for (e of events(); track e.applicationId + e.at) {
-              <li class="fs__event">
-                <a class="fs__eventTitle" [routerLink]="['/applications', e.applicationId]">{{ titleOf(e) }}</a>
-                <span class="fs__eventMeta">
-                  <time [attr.datetime]="e.at">{{ e.at | ldate: 'medium' }}</time>
-                  · {{ pathOf(e) }} · {{ reasonLabel(e.reason) }}
-                </span>
-                @if (e.note) {
-                  <span class="fs__eventNote">{{ e.note }}</span>
-                }
-              </li>
-            }
-          </ul>
-        }
-      </app-section>
-    }
+  @if (loading() && !events().length) {
+    <app-skeleton variant="rows" [count]="5" [label]="'common.loading' | t" />
+  } @else if (failed()) {
+    <app-empty-state [heading]="'admin.forced.loadError' | t" />
+  } @else if (!events().length) {
+    <app-empty-state [heading]="(filtered() ? 'admin.forced.emptyFiltered' : 'admin.forced.empty') | t" />
+  } @else {
+    <div class="rowgroup fs__list" role="list" [attr.aria-label]="'admin.forced.title' | t">
+      @for (e of events(); track e.applicationId + e.at) {
+        <app-list-item
+          role="listitem"
+          [title]="titleOf(e)"
+          [link]="['/applications', e.applicationId]"
+          [subWrap]="true"
+          [sub]="(e.at | ldate: 'medium') + ' · ' + pathOf(e) + ' · ' + reasonLabel(e.reason) + (e.note ? ' · ' + e.note : '')"
+        />
+      }
+    </div>
   }
 </section>

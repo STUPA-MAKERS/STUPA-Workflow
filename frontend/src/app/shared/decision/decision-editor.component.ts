@@ -4,6 +4,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   CurrencyInputComponent,
   IconComponent,
   MoveButtonsComponent,
@@ -30,7 +31,7 @@ import { formatMoney } from '../format-money';
   selector: 'app-decision-editor',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MoveButtonsComponent, FormsModule, TranslatePipe, ButtonComponent, CurrencyInputComponent, IconComponent, SwitchComponent],
+  imports: [MoveButtonsComponent, FormsModule, TranslatePipe, ButtonComponent, ButtonGroupComponent, CurrencyInputComponent, IconComponent, SwitchComponent],
   templateUrl: './decision-editor.component.html',
   styleUrl: './decision-editor.component.scss',
 })

@@ -13,7 +13,6 @@
   />
   @if (needsAmount()) {
     <app-decision-editor
-      class="fsd__gap"
       idPrefix="fsd"
       [required]="true"
       [requested]="requested()"
@@ -23,30 +22,35 @@
     />
   }
   <app-select
-    class="fsd__gap"
     [label]="'applications.detail.forceStatusReason' | t"
     [placeholder]="'applications.detail.forceStatusReasonPick' | t"
     [options]="reasonOptions()"
     [ngModel]="reason()"
     (ngModelChange)="reason.set($event)"
   />
-  <app-textarea
-    class="fsd__gap"
-    [label]="(noteRequired() ? 'applications.detail.forceStatusNoteRequired' : 'applications.detail.forceStatusNote') | t"
-    [invalid]="noteRequired() && note().length > 0 && noteMissing()"
-  >
-    <textarea
-      rows="3"
-      name="forceNote"
-      [attr.aria-required]="noteRequired()"
-      [placeholder]="'applications.detail.forceStatusReasonPlaceholder' | t"
-      [ngModel]="note()"
-      (ngModelChange)="note.set($event)"
-    ></textarea>
-  </app-textarea>
-  @if (noteRequired() && note().length > 0 && noteMissing()) {
-    <p class="fsd__error" role="alert">{{ 'applications.detail.forceStatusNoteShort' | t }}</p>
-  }
+  <div class="fsd__note">
+    <app-textarea
+      [label]="
+        (noteRequired()
+          ? 'applications.detail.forceStatusNoteRequired'
+          : 'applications.detail.forceStatusNote'
+        ) | t
+      "
+      [invalid]="noteRequired() && note().length > 0 && noteMissing()"
+    >
+      <textarea
+        rows="3"
+        name="forceNote"
+        [attr.aria-required]="noteRequired()"
+        [placeholder]="'applications.detail.forceStatusReasonPlaceholder' | t"
+        [ngModel]="note()"
+        (ngModelChange)="note.set($event)"
+      ></textarea>
+    </app-textarea>
+    @if (noteRequired() && note().length > 0 && noteMissing()) {
+      <p class="fsd__error" role="alert">{{ 'applications.detail.forceStatusNoteShort' | t }}</p>
+    }
+  </div>
   <app-button dialog-footer variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
   <app-button
     dialog-footer
@@ -54,5 +58,6 @@
     [loading]="saving()"
     [disabled]="!ready()"
     (click)="submit()"
-  >{{ 'applications.detail.forceStatusConfirm' | t }}</app-button>
+    >{{ 'applications.detail.forceStatusConfirm' | t }}</app-button
+  >
 </app-dialog>

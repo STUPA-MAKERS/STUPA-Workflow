@@ -1,8 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
-import { FORCE_REASONS, type ForcedEvent, type ForcedReport } from '@core/api/models';
+import { FORCE_REASONS, type ForcedEvent, type ForcedPathCount } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -10,28 +8,20 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { isoDay, localToday } from '@shared/date-format';
 import { i18nLabel } from '@shared/forms/i18n-text';
 import {
-  ButtonComponent,
-  ButtonGroupComponent,
-  CellDirective,
-  type ColumnDef,
-  DataTableComponent,
-  DatepickerComponent,
   EmptyStateComponent,
+  FilterSelectComponent,
+  type FilterSelectOption,
+  ListItemComponent,
   PageHeaderComponent,
-  SectionComponent,
+  RangeChipComponent,
+  type RangeValue,
+  SkeletonComponent,
+  StickyBarComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 
 /** The default period: the last 90 days (spec 001651, as the server). */
 export const DEFAULT_DAYS = 90;
-
-/** One row of a count table, with the filter of its list. */
-export interface CountRow {
-  readonly key: string;
-  readonly label: string;
-  readonly count: number;
-  readonly filter: { readonly reason?: string; readonly fromKey?: string; readonly toKey?: string };
-}
 
 /** The first day of the default period: `DEFAULT_DAYS` before `today`. */
 export function defaultFrom(today: string): string {
@@ -39,30 +29,32 @@ export function defaultFrom(today: string): string {
   return isoDay(new Date(y, m - 1, d - DEFAULT_DAYS, 12));
 }
 
+/** The filter value of a path: `<from key>><to key>`, an empty from key for no state. */
+export function pathValue(fromKey: string | null, toKey: string): string {
+  return `${fromKey ?? ''}>${toKey}`;
+}
+
 /**
- * "Erzwungene Status" (specs 001651, 001652): the forced status changes of a period,
- * counted per reason and per path (from state, to state), the largest count first. A
- * click on a count lists the applications behind it. A forced change from before the
- * reason list counts as "Ohne Grund". The page needs `audit.read`.
+ * "Erzwungene Status" (specs 001651, 001652): one list of the forced status changes, the
+ * newest first, with filters for the reason, the path (from state, to state) and the
+ * period (the last 90 days by default). A row opens the application. A forced change from
+ * before the reason list reads "Ohne Grund". The page needs `audit.read`.
  */
 @Component({
   selector: 'app-forced-status',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    FormsModule,
-    RouterLink,
     TranslatePipe,
     LocalizedDatePipe,
     BreadcrumbsComponent,
-    ButtonComponent,
-    ButtonGroupComponent,
-    CellDirective,
-    DataTableComponent,
-    DatepickerComponent,
     EmptyStateComponent,
+    FilterSelectComponent,
+    ListItemComponent,
     PageHeaderComponent,
-    SectionComponent,
+    RangeChipComponent,
+    SkeletonComponent,
+    StickyBarComponent,
   ],
   templateUrl: './forced-status.component.html',
   styleUrl: './forced-status.component.scss',
@@ -73,54 +65,34 @@ export class ForcedStatusComponent {
 
   readonly to = signal(localToday());
   readonly from = signal(defaultFrom(localToday()));
-  readonly report = signal<ForcedReport | null>(null);
+  readonly reason = signal('');
+  readonly path = signal('');
+  readonly paths = signal<readonly ForcedPathCount[]>([]);
+  readonly events = signal<readonly ForcedEvent[]>([]);
   readonly loading = signal(true);
   readonly failed = signal(false);
 
-  /** The open list behind a count. */
-  readonly listRow = signal<CountRow | null>(null);
-  readonly events = signal<ForcedEvent[]>([]);
-  readonly eventsLoading = signal(false);
-
-  readonly periodError = computed(() =>
-    this.from() && this.to() && this.from() > this.to()
-      ? this.i18n.translate('admin.forced.periodInvalid')
-      : '',
+  readonly reasonOptions = computed<FilterSelectOption[]>(() =>
+    [...FORCE_REASONS, 'none'].map((r) => ({ value: r, label: this.reasonLabel(r) })),
   );
 
-  readonly reasonColumns = computed<ColumnDef[]>(() => [
-    { key: 'label', label: this.i18n.translate('admin.forced.col.reason'), card: 'title' },
-    { key: 'count', label: this.i18n.translate('admin.forced.col.count'), align: 'end', width: '7rem' },
-  ]);
-
-  readonly pathColumns = computed<ColumnDef[]>(() => [
-    { key: 'label', label: this.i18n.translate('admin.forced.col.path'), card: 'title' },
-    { key: 'count', label: this.i18n.translate('admin.forced.col.count'), align: 'end', width: '7rem' },
-  ]);
-
-  readonly reasonRows = computed<CountRow[]>(() =>
-    (this.report()?.byReason ?? []).map((r) => ({
-      key: `reason:${r.reason}`,
-      label: this.reasonLabel(r.reason),
-      count: r.count,
-      filter: { reason: r.reason },
-    })),
+  /** The paths of the period, from the report of the server. */
+  readonly pathOptions = computed<FilterSelectOption[]>(() =>
+    this.paths().map((p) => ({ value: pathValue(p.fromKey, p.toKey), label: this.pathLabel(p) })),
   );
 
-  readonly pathRows = computed<CountRow[]>(() => {
-    const lang = this.i18n.uiLocale();
-    const none = this.i18n.translate('admin.forced.noState');
-    return (this.report()?.byPath ?? []).map((p) => ({
-      key: `path:${p.fromKey ?? ''}:${p.toKey}`,
-      label: `${p.fromKey ? i18nLabel(p.fromLabel, lang, p.fromKey) : none} → ${i18nLabel(p.toLabel, lang, p.toKey)}`,
-      count: p.count,
-      filter: { fromKey: p.fromKey ?? '', toKey: p.toKey },
-    }));
-  });
+  readonly reasonText = computed(
+    () => this.reasonOptions().find((o) => o.value === this.reason())?.label ?? null,
+  );
+  readonly pathText = computed(
+    () => this.pathOptions().find((o) => o.value === this.path())?.label ?? null,
+  );
+  readonly filtered = computed(() => !!this.reason() || !!this.path());
 
   private seq = 0;
 
   constructor() {
+    this.loadPaths();
     this.load();
   }
 
@@ -134,71 +106,63 @@ export class ForcedStatusComponent {
     );
   }
 
-  /** Set a bound of the period and load again. */
-  setFrom(value: string): void {
-    this.from.set(value);
+  setReason(value: string | readonly string[]): void {
+    this.reason.set(typeof value === 'string' ? value : (value[0] ?? ''));
     this.load();
   }
 
-  setTo(value: string): void {
-    this.to.set(value);
+  setPath(value: string | readonly string[]): void {
+    this.path.set(typeof value === 'string' ? value : (value[0] ?? ''));
     this.load();
   }
 
-  load(): void {
-    if (this.periodError()) return;
-    this.seq = this.seq + 1;
-    const seq = this.seq;
-    this.loading.set(true);
-    this.failed.set(false);
-    this.api.forcedReport({ from: this.from() || undefined, to: this.to() || undefined }).subscribe({
-      next: (report) => {
-        if (seq !== this.seq) return;
-        this.report.set(report);
-        this.loading.set(false);
-      },
-      error: () => {
-        if (seq !== this.seq) return;
-        this.report.set(null);
-        this.failed.set(true);
-        this.loading.set(false);
-      },
+  /** The period chip sets both days at once; an empty day falls back to the default. */
+  setRange(v: RangeValue): void {
+    this.from.set(v.from || defaultFrom(localToday()));
+    this.to.set(v.to || localToday());
+    this.path.set('');
+    this.loadPaths();
+    this.load();
+  }
+
+  private range(): { from?: string; to?: string } {
+    return { from: this.from() || undefined, to: this.to() || undefined };
+  }
+
+  private loadPaths(): void {
+    this.api.forcedReport(this.range()).subscribe({
+      next: (report) => this.paths.set(report.byPath),
+      error: () => this.paths.set([]),
     });
   }
 
-  /** The list below the tables shows this count. */
-  isOpen(row: CountRow): boolean {
-    const open = this.listRow();
-    return open !== null && open.key === row.key;
-  }
-
-  /** Show the applications behind a count below the tables, or hide them again. */
-  toggleList(row: CountRow): void {
-    if (this.isOpen(row)) {
-      this.closeList();
-      return;
-    }
-    this.openList(row);
-  }
-
-  /** Load the list of the applications behind a count. */
-  openList(row: CountRow): void {
-    this.listRow.set(row);
-    this.events.set([]);
-    this.eventsLoading.set(true);
+  load(): void {
+    this.seq = this.seq + 1;
+    const seq = this.seq;
+    const [fromKey, toKey] = this.path() ? this.path().split('>') : [undefined, undefined];
+    this.loading.set(true);
+    this.failed.set(false);
     this.api
-      .forcedEvents({ from: this.from() || undefined, to: this.to() || undefined, ...row.filter })
+      .forcedEvents({ ...this.range(), reason: this.reason() || undefined, fromKey, toKey })
       .subscribe({
         next: (events) => {
+          if (seq !== this.seq) return;
           this.events.set(events);
-          this.eventsLoading.set(false);
+          this.loading.set(false);
         },
-        error: () => this.eventsLoading.set(false),
+        error: () => {
+          if (seq !== this.seq) return;
+          this.events.set([]);
+          this.failed.set(true);
+          this.loading.set(false);
+        },
       });
   }
 
-  closeList(): void {
-    this.listRow.set(null);
+  private pathLabel(p: ForcedPathCount): string {
+    const lang = this.i18n.uiLocale();
+    const none = this.i18n.translate('admin.forced.noState');
+    return `${p.fromKey ? i18nLabel(p.fromLabel, lang, p.fromKey) : none} → ${i18nLabel(p.toLabel, lang, p.toKey)}`;
   }
 
   /** "In Prüfung → Bewilligt" of one event. */
@@ -210,9 +174,5 @@ export class ForcedStatusComponent {
 
   titleOf(e: ForcedEvent): string {
     return e.title || this.i18n.translate('applications.list.untitled');
-  }
-
-  asRow(row: unknown): CountRow {
-    return row as CountRow;
   }
 }

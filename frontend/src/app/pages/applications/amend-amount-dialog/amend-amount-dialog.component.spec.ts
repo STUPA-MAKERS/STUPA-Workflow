@@ -61,7 +61,6 @@ describe('AmendAmountDialogComponent', () => {
     expect(cmp.amount()).toBe('200.00');
     expect(cmp.gremium()).toBe('g1');
     expect(cmp.gremiumOptions()).toEqual([{ value: 'g1', label: 'StuPa' }]);
-    expect(cmp.amountHint().replace(/\u00a0/g, ' ')).toBe('Bisher genehmigt: 200,00 € · Beantragt: 250,00 €');
   });
 
   it('starts with the requested amount when the approval was as requested', async () => {

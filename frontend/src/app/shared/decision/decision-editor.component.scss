@@ -28,7 +28,6 @@
   min-width: 0;
 }
 .dec__cap {
-  padding: 0 2px;
   font-size: var(--fs-small);
   font-weight: var(--fw-medium);
   color: var(--color-text-muted);
@@ -73,7 +72,6 @@
 }
 .dec__add {
   align-self: flex-start;
-  margin-left: 2rem;
 }
 .dec__error {
   margin: 0;

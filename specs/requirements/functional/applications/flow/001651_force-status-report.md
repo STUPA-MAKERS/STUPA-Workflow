@@ -1,6 +1,6 @@
 ---
 id: "001651"
-title: An admin page counts the forced status changes
+title: An admin page lists the forced status changes
 kind: functional
 status: approved
 owner: frederikbeimgraben
@@ -15,14 +15,14 @@ scope:
   - frontend/src/app/pages/admin
 ---
 
-# An admin page counts the forced status changes
+# An admin page lists the forced status changes
 
-The admin page `Erzwungene Status` (`Forced status changes`) must show the forced status
-changes in a period. The default period is the last 90 days. The page must show the count per
-reason and the count per path (from state, to state), the largest count first. A click on a
-count must list the Anträge of that count on the page, below the tables, without a dialog. A
-second click on the same count must hide the list. The page needs the permission `audit.read`.
+The admin page `Erzwungene Status` (`Forced status changes`) must show one list of the forced
+status changes, the newest first. Each row names the Antrag, the time, the path (from state, to
+state), the reason and the note, and opens the Antrag. Filters narrow the list by reason, by
+path and by period. The default period is the last 90 days. The page shows no counts and no
+dialog. The page needs the permission `audit.read`.
 
-Reason: A path that admins force often is a way that the flow does not have. The count shows which transition to add.
+Reason: A path that admins force often is a way that the flow does not have. The filter by path shows which transition to add.
 
-Test: A backend unit test counts forced changes per reason and per path in a period.
+Test: A backend unit test filters the forced changes by reason and by path in a period; a frontend unit test shows one list with its filters.

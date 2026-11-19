@@ -17,7 +17,6 @@ import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { localToday } from '@shared/date-format';
-import { formatMoney } from '@shared/format-money';
 import {
   ButtonComponent,
   CurrencyInputComponent,
@@ -112,16 +111,6 @@ export class AmendAmountDialogComponent {
   readonly gremiumOptions = computed<SelectOption[]>(() =>
     this.gremien().map((g) => ({ value: g.id, label: g.name })),
   );
-
-  /** "Bisher genehmigt: 1.000,00 € · Beantragt: 1.250,00 €". */
-  readonly amountHint = computed(() => {
-    const locale = this.i18n.formatLocale();
-    const currency = this.currency();
-    return this.i18n.translate('amendAmount.hint', {
-      current: formatMoney(this.current(), locale, { currency }),
-      requested: formatMoney(this.requested(), locale, { currency }),
-    });
-  });
 
   readonly amountError = computed(() => {
     const text = this.amount();

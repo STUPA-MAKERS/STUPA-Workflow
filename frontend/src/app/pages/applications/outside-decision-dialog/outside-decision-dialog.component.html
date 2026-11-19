@@ -5,16 +5,14 @@
   (closed)="close()"
 >
   <form class="odd" (submit)="$event.preventDefault(); submit()">
-    <div class="odd__field" role="group" aria-labelledby="odd-result">
-      <span id="odd-result" class="odd__cap">{{ 'outsideDecision.result' | t }}</span>
-      <app-segmented
-        width="equal"
-        [ariaLabel]="'outsideDecision.result' | t"
-        [options]="resultOptions()"
-        [value]="result()"
-        (valueChange)="result.set($any($event))"
-      />
-    </div>
+    <app-segmented
+      class="odd__result"
+      width="equal"
+      [ariaLabel]="'outsideDecision.result' | t"
+      [options]="resultOptions()"
+      [value]="result()"
+      (valueChange)="result.set($any($event))"
+    />
     <div class="odd__pair">
       <app-datepicker
         name="oddDate"

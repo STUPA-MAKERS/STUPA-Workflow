@@ -3,23 +3,40 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import { USE_MOCK_API } from '@core/api/api.config';
-import type { ForcedReport } from '@core/api/models';
-import { ForcedStatusComponent, defaultFrom } from './forced-status.component';
+import type { ForcedEvent, ForcedReport } from '@core/api/models';
+import { ForcedStatusComponent, defaultFrom, pathValue } from './forced-status.component';
 
 const REPORT: ForcedReport = {
   from: '2026-08-21',
   to: '2026-11-19',
   total: 4,
-  byReason: [
-    { reason: 'outside_decision', count: 2 },
-    { reason: 'none', count: 1 },
-    { reason: 'other', count: 1 },
-  ],
+  byReason: [{ reason: 'outside_decision', count: 2 }],
   byPath: [
     { fromKey: 'agenda', fromLabel: { de: 'Auf Tagesordnung' }, toKey: 'approved', toLabel: { de: 'Bewilligt' }, count: 3 },
     { fromKey: null, fromLabel: null, toKey: 'draft', toLabel: null, count: 1 },
   ],
 };
+
+const EVENTS: ForcedEvent[] = [
+  {
+    applicationId: 'app-1',
+    title: null,
+    at: '2026-11-12T10:15:00Z',
+    reason: 'outside_decision',
+    note: 'Beschluss vom 11.11.',
+    fromLabel: null,
+    toLabel: { de: 'Bewilligt' },
+  },
+  {
+    applicationId: 'app-2',
+    title: 'Drucker',
+    at: '2026-11-03T09:40:00Z',
+    reason: 'legacy',
+    note: null,
+    fromLabel: { de: 'Auf Tagesordnung' },
+    toLabel: { de: 'Bewilligt' },
+  },
+];
 
 const isReport = (r: { url: string }) => r.url === '/api/admin/forced-status';
 const isEvents = (r: { url: string }) => r.url === '/api/admin/forced-status/events';
@@ -43,73 +60,57 @@ describe('ForcedStatusComponent', () => {
 
   it('defaults to the last 90 days', () => {
     expect(defaultFrom('2026-11-19')).toBe('2026-08-21');
+    expect(pathValue(null, 'draft')).toBe('>draft');
   });
 
-  /** Specs 001651, 001652: the counts per reason and per path; no reason reads "Ohne Grund". */
-  it('shows the counts per reason and per path', async () => {
-    const { http, cmp, detectChanges } = await setup();
-    const req = http.expectOne(isReport);
-    expect(req.request.params.get('from')).toBe(cmp.from());
-    req.flush(REPORT);
-    detectChanges();
-    expect(cmp.reasonRows().map((r) => [r.label, r.count])).toEqual([
-      ['Beschluss außerhalb der Plattform', 2],
-      ['Ohne Grund', 1],
-      ['Sonstiges', 1],
-    ]);
-    expect(cmp.pathRows().map((r) => r.label)).toEqual(['Auf Tagesordnung → Bewilligt', 'Ohne Zustand → draft']);
-    expect(screen.getByRole('heading', { name: 'Nach Grund' })).toBeInTheDocument();
-  });
-
-  it('lists the applications behind a count below the tables', async () => {
+  /** Specs 001651, 001652: one list, the rows link the application; no reason reads "Ohne Grund". */
+  it('lists every forced change in one list', async () => {
     const { http, cmp, detectChanges } = await setup();
     http.expectOne(isReport).flush(REPORT);
+    http.expectOne(isEvents).flush(EVENTS);
     detectChanges();
-    cmp.toggleList(cmp.pathRows()[0]);
-    expect(cmp.isOpen(cmp.pathRows()[0])).toBe(true);
-    detectChanges();
-    const req = http.expectOne(isEvents);
-    expect(req.request.params.get('fromKey')).toBe('agenda');
-    expect(req.request.params.get('toKey')).toBe('approved');
-    req.flush([
-      {
-        applicationId: 'app-1',
-        title: null,
-        at: '2026-11-12T10:15:00Z',
-        reason: 'outside_decision',
-        note: 'Beschluss vom 11.11.',
-        fromLabel: null,
-        toLabel: { de: 'Bewilligt' },
-      },
-    ]);
-    detectChanges();
-    expect(screen.getByRole('link', { name: 'Ohne Titel' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Auf Tagesordnung → Bewilligt' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ohne Titel' })).toHaveAttribute('href', '/applications/app-1');
+    expect(screen.getByRole('link', { name: 'Drucker' })).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(cmp.pathOf(cmp.events()[0])).toBe('Ohne Zustand → Bewilligt');
-    cmp.toggleList(cmp.pathRows()[0]);
-    expect(cmp.listRow()).toBeNull();
-    cmp.openList(cmp.reasonRows()[0]);
-    http.expectOne(isEvents).flush({}, { status: 500, statusText: 'x' });
-    expect(cmp.eventsLoading()).toBe(false);
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(cmp.pathOf(EVENTS[0])).toBe('Ohne Zustand → Bewilligt');
+    expect(cmp.reasonLabel('legacy')).toBe('Ohne Grund');
+    expect(cmp.pathOptions().map((o) => o.label)).toEqual(['Auf Tagesordnung → Bewilligt', 'Ohne Zustand → draft']);
   });
 
-  it('reloads for a new period and refuses a reversed one', async () => {
+  it('filters by reason and by path on the server', async () => {
+    const { http, cmp } = await setup();
+    http.expectOne(isReport).flush(REPORT);
+    http.expectOne(isEvents).flush(EVENTS);
+    cmp.setReason('outside_decision');
+    const byReason = http.expectOne(isEvents);
+    expect(byReason.request.params.get('reason')).toBe('outside_decision');
+    byReason.flush([]);
+    expect(cmp.reasonText()).toBe('Beschluss außerhalb der Plattform');
+    expect(cmp.filtered()).toBe(true);
+    cmp.setPath(['agenda>approved']);
+    const byPath = http.expectOne(isEvents);
+    expect(byPath.request.params.get('fromKey')).toBe('agenda');
+    expect(byPath.request.params.get('toKey')).toBe('approved');
+    byPath.flush([]);
+    expect(cmp.pathText()).toBe('Auf Tagesordnung → Bewilligt');
+  });
+
+  it('reloads for a new period and shows a load error', async () => {
     const { http, cmp, detectChanges } = await setup();
     http.expectOne(isReport).flush(REPORT);
-    cmp.setFrom('2026-01-01');
-    http.expectOne((r) => isReport(r) && r.params.get('from') === '2026-01-01').flush({ ...REPORT, byReason: [], byPath: [] });
+    http.expectOne(isEvents).flush(EVENTS);
+    cmp.setPath('agenda>approved');
+    http.expectOne(isEvents).flush(EVENTS);
+    cmp.setRange({ from: '2026-10-01', to: '' });
+    expect(cmp.path()).toBe('');
+    const report = http.expectOne(isReport);
+    expect(report.request.params.get('from')).toBe('2026-10-01');
+    report.flush({}, { status: 500, statusText: 'x' });
+    http.expectOne(isEvents).flush({}, { status: 500, statusText: 'x' });
     detectChanges();
-    expect(screen.getByText('Keine erzwungenen Status im Zeitraum')).toBeInTheDocument();
-    cmp.setTo('2025-01-01');
-    expect(cmp.periodError()).toBe('Der Beginn liegt nach dem Ende.');
-    http.expectNone(isReport);
-  });
-
-  it('names a failed load', async () => {
-    const { http, detectChanges } = await setup();
-    http.expectOne(isReport).flush({}, { status: 500, statusText: 'x' });
-    detectChanges();
-    expect(screen.getByText('Der Bericht konnte nicht geladen werden.')).toBeInTheDocument();
+    expect(cmp.failed()).toBe(true);
+    expect(cmp.paths()).toEqual([]);
+    expect(screen.getByText('Die Liste konnte nicht geladen werden.')).toBeInTheDocument();
   });
 });

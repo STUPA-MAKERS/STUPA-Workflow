@@ -9,31 +9,31 @@
       name="aadAmount"
       [label]="'amendAmount.amount' | t"
       [required]="true"
-      [hint]="amountHint()"
       [error]="amountError()"
       [ngModel]="amount()"
       (ngModelChange)="amount.set($event ?? '')"
     />
     @if (aboveRequested()) {
-      <app-note kind="warn" icon="alert" role="status">{{ 'amendAmount.aboveRequested' | t }}</app-note>
+      <app-note kind="warn" icon="alert" role="status">{{
+        'amendAmount.aboveRequested' | t
+      }}</app-note>
     }
-    <app-textarea
-      [label]="'amendAmount.reason' | t"
-      [invalid]="reasonShort()"
-    >
-      <textarea
-        rows="3"
-        name="aadReason"
-        aria-required="true"
-        [attr.maxlength]="maxReason"
-        [placeholder]="'amendAmount.reasonPlaceholder' | t"
-        [ngModel]="reason()"
-        (ngModelChange)="reason.set($event)"
-      ></textarea>
-    </app-textarea>
-    @if (reasonShort()) {
-      <p class="aad__error" role="alert">{{ 'amendAmount.error.reasonShort' | t }}</p>
-    }
+    <div class="aad__note">
+      <app-textarea [label]="'amendAmount.reason' | t" [invalid]="reasonShort()">
+        <textarea
+          rows="3"
+          name="aadReason"
+          aria-required="true"
+          [attr.maxlength]="maxReason"
+          [placeholder]="'amendAmount.reasonPlaceholder' | t"
+          [ngModel]="reason()"
+          (ngModelChange)="reason.set($event)"
+        ></textarea>
+      </app-textarea>
+      @if (reasonShort()) {
+        <p class="aad__error" role="alert">{{ 'amendAmount.error.reasonShort' | t }}</p>
+      }
+    </div>
     <div class="aad__pair">
       <app-datepicker
         name="aadDate"
