@@ -63,9 +63,6 @@ export class ProtocolBarComponent {
 
   /** The page session: it saves the publication. Absent outside the meeting page. */
   private readonly session = inject(MeetingSessionService, { optional: true });
-  protected readonly publicationSaving = computed(
-    () => this.session?.publicationSaving() ?? false,
-  );
 
   /** What the viewer can do (spec 001304): shared with the session menu of the page. */
   private readonly actions = computed(() => protocolActions(this.meeting(), this.protocol(), this.session !== null));
@@ -77,7 +74,6 @@ export class ProtocolBarComponent {
 
   private readonly i18n = inject(I18nService);
   private readonly files = inject(FileOpenService);
-  protected readonly draftSending = computed(() => this.session?.draftSending() ?? false);
   protected readonly approvalSaving = computed(() => this.session?.approvalSaving() ?? false);
   /** The confirmation of "Entwurf senden" is open. */
   protected readonly confirmDraft = signal(false);
@@ -107,7 +103,6 @@ export class ProtocolBarComponent {
     return { name: `${this.meeting().title} · ${this.i18n.translate(label)}`, url, kind: 'pdf' as const };
   }
 
-  protected readonly reopenSaving = computed(() => this.session?.reopenSaving() ?? false);
   /** The confirmation of "Zurück in Entwurf" is open. */
   protected readonly confirmReopen = signal(false);
 
