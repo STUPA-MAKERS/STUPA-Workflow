@@ -276,20 +276,30 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
       : `${head}, ${this.i18n.translate('forms.costLine.perPerson', { amount: this.fmt(line.perPerson) })}`;
   }
 
-  /** The placeholder warning of one offer (spec 001640), or ''. */
-  protected offerWarning(p: Position, oi: number): string {
+  /**
+   * The placeholder warning under one field of an offer (spec 001640), or '': `label`
+   * for the supplier (too short, or the same as another offer), `value` for the amount.
+   */
+  protected offerWarning(p: Position, oi: number, field: 'label' | 'value'): string {
     const reasons = placeholderReasons(p.offers)[oi] ?? [];
-    if (!reasons.length) return '';
-    const texts = reasons.map((r) => this.t(`forms.positions.placeholder.${r}`));
-    const hint =
-      this.allowNoOffers && !p.noOffers
-        ? [
-            this.i18n.translate('forms.positions.placeholder.useSwitch', {
-              switch: this.t('apply.positions.noOffers'),
-            }),
-          ]
-        : [];
-    return [...texts, ...hint].join(' ');
+    return reasons
+      .filter((r) => (field === 'value' ? r === 'value' : r !== 'value'))
+      .map((r) => this.t(`forms.positions.placeholder.${r}`))
+      .join(' ');
+  }
+
+  /**
+   * The hint under the offers of a position with a placeholder offer, when the field
+   * offers the switch for no comparison offers and it is off (spec 001641), or ''.
+   */
+  protected switchHint(p: Position): string {
+    if (!this.allowNoOffers || p.noOffers) return '';
+    const any = placeholderReasons(p.offers).some((r) => r.length > 0);
+    return any
+      ? this.i18n.translate('forms.positions.placeholder.useSwitch', {
+          switch: this.t('apply.positions.noOffers'),
+        })
+      : '';
   }
 
   /** The inputs of the files block of one position. */

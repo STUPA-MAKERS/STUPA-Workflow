@@ -874,16 +874,37 @@ describe('FormlyPositionsType — placeholder warnings (specs 001640, 001641)', 
     { label: ' thomann', value: 60, preferred: false },
   ];
 
-  it('names each reason and the switch for no comparison offers', async () => {
+  it('names the reasons under the field they belong to', async () => {
     const { cmp, control } = await setup({ value: [{ label: 'P', offers }] });
     const p = (control.value as Position[])[0];
-    expect(prot(cmp).offerWarning(p, 0)).toBe(
-      'Ein Angebot über 0 € oder 1 € sieht nach einem Platzhalter aus. ' +
-        'Der Anbieter hat weniger als 3 Zeichen. ' +
-        'Gibt es keine Vergleichsangebote, schalte „Für diese Position sind keine Vergleichsangebote möglich“ ein.',
+    expect(prot(cmp).offerWarning(p, 0, 'value')).toBe('Wie ein Platzhalter.');
+    expect(prot(cmp).offerWarning(p, 0, 'label')).toBe('Weniger als 3 Zeichen.');
+    expect(prot(cmp).offerWarning(p, 1, 'label')).toBe('Steht schon bei einem anderen Angebot.');
+    expect(prot(cmp).offerWarning(p, 1, 'value')).toBe('');
+    expect(prot(cmp).offerWarning({ ...p, offers: [offers[1]] }, 0, 'label')).toBe('');
+  });
+
+  it('marks the field and links the warning to its input', async () => {
+    const { cmp, host, detect } = await setup({ value: [{ label: 'P', offers }] });
+    prot(cmp).toggleOpen(0);
+    detect();
+    const warned = host.querySelectorAll('.pf--warn');
+    expect(warned).toHaveLength(4);
+    const input = warned[0].querySelector('input') as HTMLInputElement;
+    const hint = host.querySelector(`#${input.getAttribute('aria-describedby')}`);
+    expect(hint?.textContent?.trim()).toBe('Weniger als 3 Zeichen.');
+  });
+
+  it('names the switch for no comparison offers once below the offers', async () => {
+    const { cmp, control, host, detect } = await setup({ value: [{ label: 'P', offers }] });
+    prot(cmp).toggleOpen(0);
+    detect();
+    const p = (control.value as Position[])[0];
+    expect(prot(cmp).switchHint(p)).toBe(
+      'Gibt es keine Vergleichsangebote, schalte „Für diese Position sind keine Vergleichsangebote möglich“ ein.',
     );
-    expect(prot(cmp).offerWarning(p, 1)).toContain('denselben Anbieter');
-    expect(prot(cmp).offerWarning({ ...p, offers: [offers[1]] }, 0)).toBe('');
+    expect(host.querySelectorAll('.pos__warn')).toHaveLength(1);
+    expect(prot(cmp).switchHint({ ...p, offers: [offers[1]] })).toBe('');
   });
 
   it('does not name the switch when the field does not offer it', async () => {
@@ -892,8 +913,8 @@ describe('FormlyPositionsType — placeholder warnings (specs 001640, 001641)', 
       props: { allowNoOffers: false },
     });
     const p = (control.value as Position[])[0];
-    expect(prot(cmp).offerWarning(p, 0)).not.toContain('Vergleichsangebote');
-    expect(prot(cmp).offerWarning({ ...p, noOffers: true }, 0)).not.toContain('schalte');
+    expect(prot(cmp).switchHint(p)).toBe('');
+    expect(prot(cmp).switchHint({ ...p, noOffers: true })).toBe('');
   });
 
   it('keeps a complete position with a warning valid', async () => {

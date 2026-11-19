@@ -1194,7 +1194,7 @@ describe('ApplyWizardComponent', () => {
         await userEvent.type(screen.getByLabelText('Anbieter'), 'x');
         await userEvent.type(screen.getByLabelText(/^Betrag/), '1');
         s.fixture.detectChanges();
-        expect(screen.getByText(/sieht nach einem Platzhalter aus/)).toBeInTheDocument();
+        expect(screen.getByText(/Wie ein Platzhalter/)).toBeInTheDocument();
       });
       s.comp.submit();
       s.fixture.detectChanges();
