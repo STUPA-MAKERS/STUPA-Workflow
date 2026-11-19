@@ -147,20 +147,20 @@
             <app-button-group>
             <app-button
               variant="text"
-              [iconOnly]="phone()"
+              [iconOnly]="true"
               [ariaLabel]="'applications.bulk.transition' | t"
               [title]="'applications.bulk.transition' | t"
               [disabled]="!selectedCount() || overMax()"
               (click)="openBulk('transition')"
-            ><app-icon name="flow" />@if (!phone()) { {{ 'applications.bulk.transition' | t }} }</app-button>
+            ><app-icon name="flow" /></app-button>
             <app-button
               variant="text"
-              [iconOnly]="phone()"
+              [iconOnly]="true"
               [ariaLabel]="'applications.bulk.message' | t"
               [title]="'applications.bulk.message' | t"
               [disabled]="!selectedCount() || overMax()"
               (click)="openBulk('message')"
-            ><app-icon name="mail" />@if (!phone()) { {{ 'applications.bulk.message' | t }} }</app-button>
+            ><app-icon name="mail" /></app-button>
             </app-button-group>
           </app-selection-bar>
         }
