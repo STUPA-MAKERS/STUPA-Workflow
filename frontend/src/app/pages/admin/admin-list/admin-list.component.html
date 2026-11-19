@@ -1,0 +1,60 @@
+<div class="adl" [class.adl--split]="split()">
+  <app-list-detail [detailOpen]="!home()" (back)="goBack()">
+    <nav list class="ld-pane adl__pane" [attr.aria-label]="mode().navLabel | t">
+      <app-page-header
+        [pane]="true"
+        [title]="mode().title | t"
+        [titleTag]="home() ? 'h1' : 'p'"
+      />
+      @if (mode().search) {
+        <app-sticky-bar class="ld-pane__filters">
+          <app-search-pill
+            [clearable]="true"
+            [placeholder]="'admin.frame.search' | t"
+            [value]="query()"
+            (valueChange)="query.set($event)"
+          />
+        </app-sticky-bar>
+      }
+
+      <div class="adl__scroll" appScrollFade="y">
+        @if (mode().health) {
+          <app-admin-health [class.adl__hidden]="!!query()" />
+        }
+
+        @for (g of groups(); track g.key) {
+          @if (g.title; as title) {
+            <app-list-group [label]="title | t">
+              <ng-container *ngTemplateOutlet="pages; context: { $implicit: g }" />
+            </app-list-group>
+          } @else {
+            <ng-container *ngTemplateOutlet="pages; context: { $implicit: g }" />
+          }
+        } @empty {
+          <app-empty-state role="status" [heading]="'admin.frame.noMatch' | t" />
+        }
+      </div>
+    </nav>
+
+    <div detail class="adl__detail">
+      <router-outlet />
+    </div>
+  </app-list-detail>
+</div>
+
+<ng-template #pages let-g>
+  <div class="adl__rows" [class.rowgroup]="!split()" role="list">
+    @for (p of g.pages; track p.link) {
+      <app-list-item
+        role="listitem"
+        class="adl__row"
+        [title]="p.title | t"
+        [sub]="p.desc | t"
+        [link]="linkOf(p)"
+        [selected]="isOpen(p)"
+      >
+        <app-icon lead class="adl__icon" [name]="p.icon" [size]="20" />
+      </app-list-item>
+    }
+  </div>
+</ng-template>

@@ -33,12 +33,10 @@ const KNOWN_LIST_PAGES = [
   'features/voting/voting-page/voting.component',
   'pages/expenses/expenses.component',
   'pages/invoices/invoices.component',
+  'pages/admin/admin-list/admin-list.component',
 ];
 /** Pages with a column of their own beside a sheet (no `app-list-detail`). */
-const COLUMN_PAGES = [
-  'pages/budget/budget-dashboard.component',
-  'pages/admin/admin-frame/admin-frame.component',
-];
+const COLUMN_PAGES = ['pages/budget/budget-dashboard.component'];
 /** The Kalender: no list column on a desktop, but the same header as the list pages. */
 const HEADER_ONLY_PAGES = ['features/calendar/calendar.component'];
 
@@ -151,12 +149,10 @@ describe('the one list/detail geometry', () => {
     expect(offenders.map((f) => relative(APP, f))).toEqual([]);
   });
 
-  it('only the Verwaltung frame moves the header inset, and only in one column', () => {
+  it('no page moves the header inset itself', () => {
     const offenders = appStyles()
       .filter((f) => /--ph-inset\s*:/.test(code(f)))
       .map((f) => relative(APP, f));
-    expect(offenders).toEqual(['pages/admin/admin-frame/admin-frame.component.scss']);
-    const scss = read('pages/admin/admin-frame/admin-frame.component', 'scss');
-    expect(scss).toMatch(/\.af:not\(\.af--split\)\s*\{\s*--ph-inset:/);
+    expect(offenders).toEqual([]);
   });
 });

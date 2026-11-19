@@ -121,9 +121,8 @@ describe('rowsAndFills (§000619, §000621)', () => {
     expect(RULES).toMatch(/\.cal__num:not\(\.cal__num--today\) \{\s*color: var\(--vh-hi\) !important;/);
   });
 
-  it('fills the open page and the chosen tile of the admin frame', () => {
-    const fill = selectorsOf('  .af__item--on,', 'fill');
-    expect(fill).toContain('.ah__tile--on');
+  it('fills the chosen tile of Zustand', () => {
+    expect(RULES).toMatch(/\.ah__tile--on \{\s*@include vh\.fill;/);
   });
 
   it('turns the text of the chosen budget node black', () => {

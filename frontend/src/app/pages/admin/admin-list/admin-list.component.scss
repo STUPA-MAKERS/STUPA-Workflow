@@ -1,0 +1,39 @@
+@use 'list-pane' as lp;
+
+// The same two panes as every list/detail page (spec 001440).
+@include lp.frame('adl');
+
+.adl__hidden {
+  display: none;
+}
+
+.adl__rows {
+  @include lp.stack;
+}
+.adl--split .adl__row {
+  border-radius: var(--radius-lg);
+}
+
+.adl__icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+
+// An admin page opens with its page header, not with a sheet bar, so the sheet has the gutter
+// at the top too. A sticky bar sticks below the top padding of its scroll box, so a bar sticks
+// at the top edge instead and the rows do not scroll through the padding strip.
+.adl--split .adl__detail {
+  padding-top: var(--space-6);
+  --ld-sticky-top: calc(-1 * var(--space-6));
+}
+.adl--split .adl__detail:has(app-detail-none) {
+  padding: 0;
+}
+
+// The detail ends with room for the floating button of an admin page and 16px above it.
+.adl__detail:has(app-fab) {
+  padding-bottom: calc(56px + 2 * var(--space-4));
+}
+.adl--split {
+  --fab-inset: var(--space-6);
+}

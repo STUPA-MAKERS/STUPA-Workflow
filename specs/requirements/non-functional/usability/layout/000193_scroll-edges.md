@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
-  - frontend/src/app/pages/admin/admin-frame/admin-frame.component.scss
+  - frontend/src/app/pages/admin/admin-list/admin-list.component.scss
   - frontend/src/app/features/todos/card-detail/todo-card-detail.component.scss
   - frontend/vendor/ui-kit/src/styles/_frosted.scss
   - frontend/vendor/ui-kit/src/styles/list-detail.scss
