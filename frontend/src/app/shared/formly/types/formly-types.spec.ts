@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { fireEvent, render, screen } from '@testing-library/angular';
@@ -19,6 +19,7 @@ import { pickOption } from '../../../../testing/select';
 import { runAxe } from '../../../../testing/a11y';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
   standalone: true,
   imports: [ReactiveFormsModule, FormlyForm],
   template: `<formly-form [form]="form" [fields]="fields" [model]="model" />`,

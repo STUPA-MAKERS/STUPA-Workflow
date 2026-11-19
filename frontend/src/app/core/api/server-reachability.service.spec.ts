@@ -1,7 +1,8 @@
-import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HttpClient, HttpRequest, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { ToastService } from '@stupa-makers/ui-kit';
+import { throwError } from 'rxjs';
 import { reachabilityInterceptor } from './reachability.interceptor';
 import { HEALTH_POLL_MS, ServerReachabilityService, isUnreachableStatus } from './server-reachability.service';
 
@@ -71,6 +72,21 @@ describe('ServerReachabilityService', () => {
     ctrl.expectOne('/api/x').flush('', { status: 500, statusText: 'Error' });
     expect(reach.state()).toBe('up');
     ctrl.verify();
+  });
+
+  it('reports nothing for an error that is no HTTP answer', () => {
+    const { reach } = setup();
+    const failure = jest.spyOn(reach, 'reportFailure');
+    const success = jest.spyOn(reach, 'reportSuccess');
+    const errors: unknown[] = [];
+    TestBed.runInInjectionContext(() =>
+      reachabilityInterceptor(new HttpRequest('GET', '/api/x'), () =>
+        throwError(() => new Error('kaputt')),
+      ),
+    ).subscribe({ error: (e: unknown) => errors.push(e) });
+    expect(errors).toHaveLength(1);
+    expect(failure).not.toHaveBeenCalled();
+    expect(success).not.toHaveBeenCalled();
   });
 
   it('ends the unreachable state on any API answer, and checks only once at a time', () => {

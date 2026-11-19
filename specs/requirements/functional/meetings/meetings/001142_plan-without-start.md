@@ -23,7 +23,7 @@ scope:
 When the Sitzung has no start time, the agenda must show no planned start. Each TOP with a
 duration must show `N Min.` in the row subline. The agenda must not show the sum of the
 durations, not below the last row and not in the head, because the agenda pane ends with its
-list (spec 001330) and a heading carries no count.
+list (spec 001350) and a heading carries no count.
 
 Reason: A planned clock time needs a start. A line below the list would be a footer segment of
 the pane, and the pane has none.

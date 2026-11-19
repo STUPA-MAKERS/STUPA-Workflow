@@ -1,86 +1,22 @@
-@let s = state();
-@let p = protocol();
-
-<div class="pb" role="status">
-  <app-icon class="pb__icon" [class.pb__icon--accent]="s.tone === 'accent'" [name]="s.icon" [size]="18" />
-  <p class="pb__text">
-    <strong>{{ s.label | t }}</strong> · {{ s.text | t }}
-    @if (publication(); as pub) {
-      <span class="pb__hint pb__pub" [class.pb__pub--on]="pub === 'public'">
-        {{ (pub === 'public' ? 'meetings.protocolBar.public' : 'meetings.protocolBar.withheld') | t }}
-      </span>
-    }
-    @if (approvedText()) {
-      <span class="pb__hint pb__pub pb__pub--on">{{ approvedText() }}</span>
-    }
-    @if (needsRight()) {
-      <span class="pb__hint">{{ 'meetings.protocolBar.needsRight' | t }}</span>
-    }
-  </p>
-  <div class="pb__actions">
-    @if (canFinalize()) {
-      <app-button variant="fill" size="sm" [loading]="finalizing()" (click)="finalize.emit()">
-        <app-icon name="send" />
-        {{ 'meetings.protocol.finalize' | t }}
-      </app-button>
-    }
-    @if (canSendDraft()) {
-      <app-button variant="text" size="sm" [loading]="draftSending()" (click)="confirmDraft.set(true)">
-        <app-icon name="mail" />
-        {{ 'meetings.protocolBar.sendDraft' | t }}
-      </app-button>
-    }
-    @if (canApprove()) {
-      @if (p.approvedAt) {
-        <app-button variant="text" size="sm" [loading]="approvalSaving()" (click)="confirmUnapprove.set(true)">
-          <app-icon name="x" />
-          {{ 'meetings.protocolBar.unapprove' | t }}
-        </app-button>
-      } @else {
-        <app-button variant="text" size="sm" (click)="approvalOpen.set(true)">
-          <app-icon name="check" />
-          {{ 'meetings.protocolBar.approve' | t }}
-        </app-button>
-      }
-    }
-    @if (canReopen()) {
-      <app-button variant="text" size="sm" [loading]="reopenSaving()" (click)="confirmReopen.set(true)">
-        <app-icon name="edit" />
-        {{ 'meetings.protocolBar.reopen' | t }}
-      </app-button>
-    }
-    @if (canPublish()) {
-      <app-button variant="text" size="sm" [loading]="publicationSaving()" (click)="togglePublication()">
-        <app-icon [name]="publication() === 'withheld' ? 'globe' : 'eyeslash'" />
-        {{ (publication() === 'withheld' ? 'meetings.protocolBar.publish' : 'meetings.protocolBar.withhold') | t }}
-      </app-button>
-    }
-    @if (draftPdf(); as draft) {
-      <a class="pb__pdf" [href]="draft.internal" target="_blank" rel="noopener" (click)="openPdf($event, draft.internal, 'meetings.protocolBar.pdfInternal')">
-        <app-icon name="file" [size]="15" />
-        {{ 'meetings.protocolBar.pdfInternal' | t }}
-      </a>
-      <a class="pb__pdf" [href]="draft.public" target="_blank" rel="noopener" (click)="openPdf($event, draft.public, 'meetings.protocolBar.pdfPublic')">
-        <app-icon name="file" [size]="15" />
-        {{ 'meetings.protocolBar.pdfPublic' | t }}
-      </a>
-    }
-    @if (p.isFinal) {
-      @if (p.pdfUrl) {
-        <a class="pb__pdf" [href]="p.pdfUrl" target="_blank" rel="noopener" (click)="openPdf($event, p.pdfUrl, p.publicPdfUrl ? 'meetings.protocolBar.pdfInternal' : 'meetings.protocolBar.pdf')">
-          <app-icon name="file" [size]="15" />
-          {{ (p.publicPdfUrl ? 'meetings.protocolBar.pdfInternal' : 'meetings.protocolBar.pdf') | t }}
-        </a>
-      }
-      @if (p.publicPdfUrl) {
-        <a class="pb__pdf" [href]="p.publicPdfUrl" target="_blank" rel="noopener" (click)="openPdf($event, p.publicPdfUrl, 'meetings.protocolBar.pdfPublic')">
-          <app-icon name="file" [size]="15" />
-          {{ 'meetings.protocolBar.pdfPublic' | t }}
-        </a>
-      }
-    }
-  </div>
-</div>
+@if (!compact()) {
+  @if (canFinalize() || needsRight()) {
+    <app-button
+      variant="fill"
+      [loading]="finalizing()"
+      [disabled]="!canFinalize()"
+      [title]="(canFinalize() ? 'meetings.protocol.finalize' : 'meetings.protocolBar.needsRight') | t"
+      (click)="finalize.emit()"
+    >
+      <app-icon name="send" />
+      {{ 'meetings.protocol.finalize' | t }}
+    </app-button>
+  } @else if (finalPdf(); as pdf) {
+    <a appButton="tonal" [href]="pdf.url" target="_blank" rel="noopener" (click)="openPdf($event, pdf.url, pdf.label)">
+      <app-icon name="file" />
+      {{ pdf.label | t }}
+    </a>
+  }
+}
 
 <app-confirm-dialog
   [open]="confirmDraft()"

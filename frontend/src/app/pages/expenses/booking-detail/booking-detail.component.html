@@ -16,10 +16,10 @@
         <app-row-menu [label]="'expenses.detail.menu' | t" [sections]="menu()" (selected)="onMenu($event)" />
       }
     </app-sheet-bar>
-    <p class="sheet-line fd__line fd__seps">
+    <p class="sheet-line fd__line">
       <span class="fd__parts">
         <span class="fd__part">
-          <app-status-text [kind]="e.kind === 'income' ? 'accent' : 'neutral'">{{
+          <app-status-text chip [kind]="e.kind === 'income' ? 'accent' : 'neutral'">{{
             (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t
           }}</app-status-text>
         </span>

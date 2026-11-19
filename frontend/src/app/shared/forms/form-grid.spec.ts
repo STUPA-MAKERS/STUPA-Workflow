@@ -6,7 +6,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { render } from '@testing-library/angular';
@@ -65,6 +65,7 @@ const SECTIONS: FormSection[] = [
 ];
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
   standalone: true,
   imports: [ReactiveFormsModule, FormlyForm],
   template: `<div class="fe-form"><formly-form [form]="form" [fields]="fields" [model]="model" /></div>`,

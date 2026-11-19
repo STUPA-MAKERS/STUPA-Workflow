@@ -1,4 +1,4 @@
-import { Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
@@ -19,14 +19,20 @@ import { board, tile } from '../../../../testing/todo-fixtures';
 import { GremienComponent } from '../gremien-page/gremien.component';
 import { GremiumDetailComponent } from './gremium-detail.component';
 
-@Component({ selector: 'app-create-meeting-dialog', standalone: true, template: '' })
+@Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
+  selector: 'app-create-meeting-dialog', standalone: true, template: ''
+})
 class CreateMeetingStub {
   readonly open = input(false);
   readonly gremiumId = input('');
   readonly closed = output<void>();
 }
 
-@Component({ standalone: true, template: '<p>Ziel</p>' })
+@Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
+  standalone: true, template: '<p>Ziel</p>'
+})
 class TargetStub {}
 
 const ITEMS: GremiumOverview[] = [

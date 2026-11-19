@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { render } from '@testing-library/angular';
 import { of, throwError } from 'rxjs';
 
@@ -24,6 +24,7 @@ const PAIRS = [
 ];
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
   standalone: true,
   imports: [BudgetYearSelectComponent],
   template: `<app-budget-year-select
