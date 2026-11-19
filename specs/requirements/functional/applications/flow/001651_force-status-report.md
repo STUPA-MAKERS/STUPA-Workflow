@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - backend/app/modules/flow/forced_report.py
+  - backend/app/modules/flow/forced_router.py
+  - frontend/src/app/pages/admin/forced-status/forced-status.component.ts
 scope:
   - backend/app/modules/flow
   - backend/app/modules/admin

@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - backend/app/modules/flow/schemas.py
+  - backend/app/modules/flow/service.py
+  - frontend/src/app/pages/applications/force-status-dialog/force-status-dialog.component.ts
 scope:
   - backend/app/modules/flow
   - frontend/src/app/pages/applications

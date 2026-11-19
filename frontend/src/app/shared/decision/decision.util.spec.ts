@@ -31,6 +31,18 @@ describe('decision.util', () => {
     expect(emptyDraft(undefined).amount).toBe('');
   });
 
+  /** Spec 001610: a move into an approved state names the amount. */
+  it('starts a required draft switched on, and always sends its amount', () => {
+    const draft = emptyDraft('1250.00', true);
+    expect(draft.enabled).toBe(true);
+    expect(draftError({ ...draft, amount: '' }, '1250.00', true)).toBe('decision.error.amountRequired');
+    expect(draftError(draft, '1250.00', true)).toBeNull();
+    expect(toProposal({ ...draft, conditions: [' a '] }, '1250.00', true)).toEqual({
+      approvedAmount: '1250.00',
+      conditions: ['a'],
+    });
+  });
+
   it('cleans the conditions', () => {
     expect(cleanConditions(['  a ', '', '   ', 'b'])).toEqual(['a', 'b']);
   });

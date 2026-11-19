@@ -80,18 +80,6 @@ def test_berlin_today_crosses_midnight() -> None:
     assert berlin_today(datetime(2026, 11, 19, 23, 30, tzinfo=UTC)) == date(2026, 11, 20)
 
 
-class _Session:
-    def __init__(self, row: object, gremium: str | None = "StuPa") -> None:
-        self.row = row
-        self.gremium = gremium
-
-    async def execute(self, _stmt: object) -> Any:
-        return SimpleNamespace(first=lambda: self.row)
-
-    async def scalar(self, _stmt: object) -> str | None:
-        return self.gremium
-
-
 class _Service:
     template: object = None
     fail = False
@@ -123,10 +111,26 @@ class _Service:
         return True
 
 
+def _facts(
+    found: bool = True, currency: str | None = "EUR", gremium: str | None = "StuPa"
+) -> Any:
+    """Stub `mail_facts`; the integration suite runs the query on Postgres."""
+
+    async def _read(*_a: object) -> mail_mod.MailFacts | None:
+        if not found:
+            return None
+        return mail_mod.MailFacts(
+            data={"title": "Exkursion"}, currency=currency, created_by=None, gremium=gremium
+        )
+
+    return _read
+
+
 @pytest.fixture
 def service(monkeypatch: pytest.MonkeyPatch) -> type[_Service]:
     _Service.template = None
     _Service.last = None
+    monkeypatch.setattr(mail_mod, "mail_facts", _facts())
 
     async def _lang(*_a: object, **_kw: object) -> str:
         return "de"
@@ -140,9 +144,9 @@ def service(monkeypatch: pytest.MonkeyPatch) -> type[_Service]:
     return _Service
 
 
-async def _send(session: object, previous: Decimal | None = Decimal("100.00")) -> int:
+async def _send(previous: Decimal | None = Decimal("100.00")) -> int:
     return await mail_mod.send_amount_changed_mail(
-        session,  # type: ignore[arg-type]
+        object(),  # type: ignore[arg-type]
         queue=None,
         settings=SETTINGS,
         application_id=uuid.uuid4(),
@@ -155,7 +159,7 @@ async def _send(session: object, previous: Decimal | None = Decimal("100.00")) -
 
 async def test_mail_names_the_old_and_the_new_amount(service: type[_Service]) -> None:
     """§ 001621: the applicant gets the old and the new amount."""
-    assert await _send(_Session(({"title": "Exkursion"}, "EUR", None))) == 1
+    assert await _send() == 1
     assert service.last is not None
     kind, rendered = service.last.sent[0]
     assert kind == "builtin"
@@ -165,9 +169,12 @@ async def test_mail_names_the_old_and_the_new_amount(service: type[_Service]) ->
     assert "19.11.2026" in rendered.text
 
 
-async def test_mail_uses_a_stored_template(service: type[_Service]) -> None:
+async def test_mail_uses_a_stored_template(
+    service: type[_Service], monkeypatch: pytest.MonkeyPatch
+) -> None:
     service.template = object()
-    assert await _send(_Session(({}, None, "sub"), gremium=None), previous=None) == 1
+    monkeypatch.setattr(mail_mod, "mail_facts", _facts(currency=None, gremium=None))
+    assert await _send(previous=None) == 1
     assert service.last is not None
     kind, context = service.last.sent[0]
     assert kind == "template"
@@ -178,13 +185,15 @@ async def test_mail_uses_a_stored_template(service: type[_Service]) -> None:
 async def test_mail_skips_a_missing_application_and_no_recipient(
     service: type[_Service], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    assert await _send(_Session(None)) == 0
+    monkeypatch.setattr(mail_mod, "mail_facts", _facts(found=False))
+    assert await _send() == 0
+    monkeypatch.setattr(mail_mod, "mail_facts", _facts())
 
     async def _none(*_a: object) -> list[str]:
         return []
 
     monkeypatch.setattr(mail_mod, "filter_recipients_by_preference", _none)
-    assert await _send(_Session(({}, "EUR", None))) == 0
+    assert await _send() == 0
 
 
 async def test_mail_survives_a_render_error(
@@ -194,7 +203,7 @@ async def test_mail_survives_a_render_error(
         raise TemplateRenderError("boom")
 
     monkeypatch.setattr(mail_mod, "render_mail", _broken)
-    assert await _send(_Session(({}, "EUR", None))) == 0
+    assert await _send() == 0
 
 
 def test_mail_date_in_english() -> None:

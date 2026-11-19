@@ -287,12 +287,14 @@ def test_outside_route_needs_its_permission_and_commits(
     """§ 001603: 403 without `application.record_decision`."""
     calls: list[str] = []
 
-    class _Session:
+    class _Tx:
+        """Only records the commit of the route; it runs no query."""
+
         async def commit(self) -> None:
             calls.append("commit")
 
     class _Flow:
-        session = _Session()
+        session = _Tx()
 
         async def after_commit(self, staged: object) -> TransitionResult:
             calls.append("after")

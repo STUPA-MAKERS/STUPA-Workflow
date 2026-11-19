@@ -313,9 +313,11 @@
           <app-field-row [label]="'applications.amount.approved' | t">
             {{ approvedShown(application) || '—' }}
             @if (canAmendAmount()) {
-              <app-button trail variant="text" size="sm" (click)="amendOpen.set(true)">
-                {{ 'amendAmount.change' | t }}
-              </app-button>
+              <app-button-group trail>
+                <app-button variant="text" size="sm" (click)="amendOpen.set(true)">
+                  {{ 'amendAmount.change' | t }}
+                </app-button>
+              </app-button-group>
             }
           </app-field-row>
         </div>

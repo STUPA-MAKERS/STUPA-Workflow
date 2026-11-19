@@ -92,6 +92,7 @@ export const AXE_ROUTES: readonly AxeRoute[] = [
   fixed('admin/audit'),
   fixed('admin/delegations'),
   fixed('admin/deadlines'),
+  fixed('admin/forced-status'),
   fixed('admin/notifications'),
   { path: 'oauth/consent', url: () => '/oauth/consent?client_id=missing' },
   fixed('account'),

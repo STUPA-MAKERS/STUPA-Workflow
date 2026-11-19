@@ -35,12 +35,14 @@
           [rows]="reasonRows()"
         >
           <ng-template appCell="count" let-r>
-            <app-button
-              variant="text"
-              size="sm"
-              [ariaLabel]="'admin.forced.showList' | t: { label: asRow(r).label, n: asRow(r).count }"
-              (click)="openList(asRow(r))"
-            ><span class="mono">{{ asRow(r).count }}</span></app-button>
+            <app-button-group>
+              <app-button
+                variant="text"
+                size="sm"
+                [ariaLabel]="'admin.forced.showList' | t: { label: asRow(r).label, n: asRow(r).count }"
+                (click)="openList(asRow(r))"
+              ><span class="mono">{{ asRow(r).count }}</span></app-button>
+            </app-button-group>
           </ng-template>
         </app-data-table>
       </app-section>
@@ -54,12 +56,14 @@
           [rows]="pathRows()"
         >
           <ng-template appCell="count" let-r>
-            <app-button
-              variant="text"
-              size="sm"
-              [ariaLabel]="'admin.forced.showList' | t: { label: asRow(r).label, n: asRow(r).count }"
-              (click)="openList(asRow(r))"
-            ><span class="mono">{{ asRow(r).count }}</span></app-button>
+            <app-button-group>
+              <app-button
+                variant="text"
+                size="sm"
+                [ariaLabel]="'admin.forced.showList' | t: { label: asRow(r).label, n: asRow(r).count }"
+                (click)="openList(asRow(r))"
+              ><span class="mono">{{ asRow(r).count }}</span></app-button>
+            </app-button-group>
           </ng-template>
         </app-data-table>
       </app-section>

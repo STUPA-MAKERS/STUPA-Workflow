@@ -11,6 +11,7 @@ import { isoDay, localToday } from '@shared/date-format';
 import { i18nLabel } from '@shared/forms/i18n-text';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   CellDirective,
   type ColumnDef,
   DataTableComponent,
@@ -56,6 +57,7 @@ export function defaultFrom(today: string): string {
     LocalizedDatePipe,
     BreadcrumbsComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     CellDirective,
     DataTableComponent,
     DatepickerComponent,

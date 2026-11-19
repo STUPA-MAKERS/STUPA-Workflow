@@ -37,13 +37,12 @@
   @if (noteRequired() && note().length > 0 && noteMissing()) {
     <p class="fsd__error" role="alert">{{ 'applications.detail.forceStatusNoteShort' | t }}</p>
   }
-  <div dialog-footer>
-    <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-    <app-button
-      variant="danger"
-      [loading]="saving()"
-      [disabled]="!ready()"
-      (click)="submit()"
-    >{{ 'applications.detail.forceStatusConfirm' | t }}</app-button>
-  </div>
+  <app-button dialog-footer variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+  <app-button
+    dialog-footer
+    variant="danger"
+    [loading]="saving()"
+    [disabled]="!ready()"
+    (click)="submit()"
+  >{{ 'applications.detail.forceStatusConfirm' | t }}</app-button>
 </app-dialog>

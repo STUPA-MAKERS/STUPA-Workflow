@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.modules.admin.service.forms import FormVersionWriter
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.amend import AmendIn, amend_approved_amount
+from app.modules.applications.amend_mail import mail_facts
 from app.modules.applications.decision import DecisionIn
 from app.modules.applications.models import Application, ApplicationDecision, StatusEvent
 from app.modules.applications.schemas import ApplicationCreate
@@ -375,6 +376,10 @@ async def test_amend_writes_a_new_decision_and_keeps_the_state(session: AsyncSes
     hidden = next(e for e in seen if e.kind == "amountChange")
     assert hidden.amount_change is not None
     assert hidden.amount_change.reason is None
+    facts = await mail_facts(session, app.id, world.gremium.id)
+    assert facts is not None
+    assert facts.gremium == world.gremium.name
+    assert await mail_facts(session, uuid.uuid4(), world.gremium.id) is None
 
 
 @pytest.mark.parametrize(

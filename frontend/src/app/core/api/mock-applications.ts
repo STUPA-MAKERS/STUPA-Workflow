@@ -1,5 +1,7 @@
 import type { HttpParams } from '@angular/common/http';
 import type {
+  AmendAmountBody,
+  AmendAmountResult,
   ApplicantCandidate,
   ApplicationCapture,
   ApplicationDecision,
@@ -12,6 +14,7 @@ import type {
   MeetingOutWire,
   Page,
   OnBehalfApplication,
+  OutsideDecisionBody,
   ProblemDetail,
   StateOutWire,
   TimelineDecision,
@@ -54,7 +57,7 @@ const STATES = {
   submitted: { id: '66666666-6666-6666-6666-666666666661', key: 'submitted', label: { de: 'Eingereicht', en: 'Submitted' }, color: '#4a90d9', editAllowed: true },
   review: { id: '66666666-6666-6666-6666-666666666662', key: 'review', label: { de: 'In Prüfung', en: 'In review' }, color: '#e8a33d', editAllowed: false },
   agenda: { id: '66666666-6666-6666-6666-666666666665', key: 'agenda', label: { de: 'Auf Tagesordnung', en: 'On the agenda' }, color: '#72a384', editAllowed: false, kind: 'vote' },
-  approved: { id: '66666666-6666-6666-6666-666666666666', key: 'approved', label: { de: 'Bewilligt', en: 'Approved' }, color: '#3f8f5a', editAllowed: false },
+  approved: { id: '66666666-6666-6666-6666-666666666666', key: 'approved', label: { de: 'Bewilligt', en: 'Approved' }, color: '#3f8f5a', editAllowed: false, isApproved: true },
   rejected: { id: '66666666-6666-6666-6666-666666666664', key: 'rejected', label: { de: 'Abgelehnt', en: 'Rejected' }, color: '#c0392b', editAllowed: false },
 } satisfies Record<string, StateOutWire>;
 
@@ -305,6 +308,7 @@ function transitions(d: DemoApp): readonly TransitionOutWire[] {
     addsToAgenda: t.agenda === true,
     agendaGremiumId: t.agenda ? GREMIUM : null,
     allowsDecision: t.decision === true,
+    requiresAmount: t.decision === true && d.amount !== null,
   }));
 }
 
@@ -341,7 +345,8 @@ export function mockApplicationsGet(p: string, params: HttpParams): unknown {
   }
 }
 
-const MUTATION_PATH = /\/applications\/(a1000000-[^/]+)(?:\/(transition|archive|force-status))?$/;
+const MUTATION_PATH =
+  /\/applications\/(a1000000-[^/]+)(?:\/(transition|archive|force-status|outside-decision|approved-amount))?$/;
 
 /** A write to a demo row. `undefined`: not a path of this module. */
 export function mockApplicationsWrite(method: string, p: string, body: unknown): unknown {
@@ -401,10 +406,28 @@ export function mockApplicationsWrite(method: string, p: string, body: unknown):
     };
     return result;
   }
+  if (method === 'POST' && m[2] === 'outside-decision') {
+    return outsideDecision(d, (body ?? {}) as OutsideDecisionBody);
+  }
+  if (method === 'POST' && m[2] === 'approved-amount') {
+    return amendAmount(d, (body ?? {}) as AmendAmountBody);
+  }
   if (method === 'POST' && m[2] === 'force-status') {
-    const stateId = (body as { stateId?: string } | null)?.stateId;
-    const key = (Object.keys(STATES) as StateKey[]).find((k) => STATES[k].id === stateId);
-    const after = key ? replaceRow(d, { state: key }) : d;
+    const req = (body ?? {}) as { stateId?: string; reason?: string; note?: string | null };
+    const key = (Object.keys(STATES) as StateKey[]).find((k) => STATES[k].id === req.stateId);
+    const event: TimelineEventOutWire | null = key
+      ? {
+          fromStateId: STATES[d.state].id,
+          toStateId: STATES[key].id,
+          toState: STATES[key],
+          ...demoActor(),
+          at: new Date().toISOString(),
+          note: req.note ?? null,
+          forced: true,
+          forceReason: req.reason ?? null,
+        }
+      : null;
+    const after = key && event ? replaceRow(d, { state: key, events: [...(d.events ?? []), event] }) : d;
     return {
       newStateId: STATES[after.state].id,
       statusEventId: 'e1000000-0000-0000-0000-000000000002',
@@ -412,6 +435,98 @@ export function mockApplicationsWrite(method: string, p: string, body: unknown):
     };
   }
   return undefined;
+}
+
+const demoActor = () => ({
+  actor: 'Demo Mitglied',
+  actorInfo: { kind: 'principal' as const, displayName: 'Demo Mitglied' },
+});
+
+/** `POST …/outside-decision`: fire the branch of the vote state of a demo row (spec 001600). */
+function outsideDecision(d: DemoApp, req: OutsideDecisionBody): unknown {
+  if (d.state !== 'agenda') {
+    return {
+      status: 409,
+      problem: { type: 'about:blank', title: 'Conflict', status: 409, code: 'not_in_vote_state' },
+    } satisfies MockFailure;
+  }
+  const to: StateKey = req.result === 'passed' ? 'approved' : 'rejected';
+  const proposal = to === 'approved' ? req.decision : null;
+  const decided = proposal
+    ? replaceRow(d, {
+        decision: {
+          approved:
+            proposal.approvedAmount !== null && Number(proposal.approvedAmount) !== d.amount
+              ? Number(proposal.approvedAmount)
+              : null,
+          conditions: proposal.conditions,
+          at: new Date().toISOString(),
+        },
+      })
+    : d;
+  const event: TimelineEventOutWire = {
+    fromStateId: STATES[d.state].id,
+    toStateId: STATES[to].id,
+    toState: STATES[to],
+    ...demoActor(),
+    at: new Date().toISOString(),
+    note: `outside:${req.result}`,
+    decision: proposal ? timelineDecision(decided) : null,
+    outsideDecision: {
+      result: req.result,
+      meetingDate: req.meetingDate,
+      gremiumId: req.gremiumId,
+      gremiumName: 'Studierendenparlament',
+      yes: req.yes ?? null,
+      no: req.no ?? null,
+      abstain: req.abstain ?? null,
+      meetingId: req.meetingId ?? null,
+      meetingTitle: req.meetingId ? '34. Sitzung' : null,
+    },
+  };
+  replaceRow(decided, { state: to, events: [...(decided.events ?? []), event] });
+  return {
+    newStateId: STATES[to].id,
+    statusEventId: 'e1000000-0000-0000-0000-000000000003',
+    dispatchedActions: [],
+  } satisfies TransitionResult;
+}
+
+/** `POST …/approved-amount`: change the approved amount of a demo row (spec 001620). */
+function amendAmount(d: DemoApp, req: AmendAmountBody): unknown {
+  if (d.state !== 'approved') {
+    return {
+      status: 409,
+      problem: { type: 'about:blank', title: 'Conflict', status: 409, code: 'application_not_approved' },
+    } satisfies MockFailure;
+  }
+  const previous = d.decision?.approved ?? d.amount;
+  const at = new Date().toISOString();
+  const event: TimelineEventOutWire = {
+    fromStateId: STATES[d.state].id,
+    toStateId: STATES[d.state].id,
+    toState: STATES[d.state],
+    ...demoActor(),
+    at,
+    note: null,
+    kind: 'amountChange',
+    amountChange: {
+      previousAmount: previous === null ? null : previous.toFixed(2),
+      approvedAmount: req.approvedAmount,
+      reason: req.reason,
+      decisionDate: req.decisionDate,
+      gremiumName: 'Studierendenparlament',
+    },
+  };
+  replaceRow(d, {
+    decision: { approved: Number(req.approvedAmount), conditions: d.decision?.conditions ?? [], at },
+    events: [...(d.events ?? []), event],
+  });
+  return {
+    previousAmount: previous === null ? null : previous.toFixed(2),
+    approvedAmount: req.approvedAmount,
+    decidedAt: at,
+  } satisfies AmendAmountResult;
 }
 
 /** Fire transition `t` on a demo row: record the decision and the event, move the state. */

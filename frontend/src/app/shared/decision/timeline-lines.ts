@@ -8,7 +8,7 @@ import { formatMoney } from '@shared/format-money';
  * and the Gremium, and, when they were given, the counts. The link to the meeting is
  * not a line; the caller makes it from `meetingId`.
  */
-export function outsideDecisionLines(o: OutsideDecision, locale: string, t: Translate): string[] {
+export function outsideDecisionLines(o: OutsideDecision, locale: string, t: Translate): readonly string[] {
   const result = t(o.result === 'passed' ? 'outsideDecision.passed' : 'outsideDecision.failed');
   const date = dayMonthYear(o.meetingDate, locale);
   const counts = [
@@ -36,7 +36,7 @@ export function amountChangeLines(
   locale: string,
   currency: string | null,
   t: Translate,
-): string[] {
+): readonly string[] {
   const money = (v: string | null | undefined) => formatMoney(v, locale, { currency }) || '—';
   const date = c.decisionDate ? dayMonthYear(c.decisionDate, locale) : '';
   const basis =

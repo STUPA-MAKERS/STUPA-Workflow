@@ -12,8 +12,10 @@ from __future__ import annotations
 
 import logging
 import uuid
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,6 +44,33 @@ def _date_text(value: date, lang: str) -> str:
     return value.strftime("%d.%m.%Y") if lang == "de" else value.isoformat()
 
 
+@dataclass(frozen=True, slots=True)
+class MailFacts:
+    """The rows that the mail reads: the answers, the currency, the creator, the Gremium."""
+
+    data: dict[str, Any] | None
+    currency: str | None
+    created_by: str | None
+    gremium: str | None
+
+
+async def mail_facts(
+    session: AsyncSession, application_id: uuid.UUID, gremium_id: uuid.UUID
+) -> MailFacts | None:
+    """Read the facts of the mail, or None for an application that does not exist."""
+    row = (
+        await session.execute(
+            select(Application.data, Application.currency, Application.created_by).where(
+                Application.id == application_id
+            )
+        )
+    ).first()
+    if row is None:
+        return None
+    gremium = await session.scalar(select(Gremium.name).where(Gremium.id == gremium_id))
+    return MailFacts(data=row[0], currency=row[1], created_by=row[2], gremium=gremium)
+
+
 async def send_amount_changed_mail(
     session: AsyncSession,
     *,
@@ -58,31 +87,23 @@ async def send_amount_changed_mail(
     Returns:
         The number of mail jobs that went to the queue.
     """
-    row = (
-        await session.execute(
-            select(Application.data, Application.currency, Application.created_by).where(
-                Application.id == application_id
-            )
-        )
-    ).first()
-    if row is None:
+    facts = await mail_facts(session, application_id, gremium_id)
+    if facts is None:
         return 0
-    data, currency, created_by = row
     service = NotificationService(
         session, queue=queue, settings=settings, expand_specs=application_specs
     )
     lang = await resolve_application_lang(session, application_id=application_id, settings=settings)
-    gremium = await session.scalar(select(Gremium.name).where(Gremium.id == gremium_id))
-    title = (data or {}).get("title")
-    cur = currency or "EUR"
-    link = application_link(settings, application_id, guest=created_by is None)
+    title = (facts.data or {}).get("title")
+    cur = facts.currency or "EUR"
+    link = application_link(settings, application_id, guest=facts.created_by is None)
     context: dict[str, object] = {
         "link": link.url,
         "applicationId": str(application_id),
         "applicationTitle": title.strip() if isinstance(title, str) else "",
         "previousAmount": "" if previous is None else format_money(previous, cur, lang),
         "approvedAmount": format_money(approved, cur, lang),
-        "gremium": gremium or "",
+        "gremium": facts.gremium or "",
         "decisionDate": _date_text(decision_date, lang),
     }
     resolved = await service.resolver.resolve(
