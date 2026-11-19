@@ -2,7 +2,7 @@
 id: "001611"
 title: A vote that approves stores the approved amount
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

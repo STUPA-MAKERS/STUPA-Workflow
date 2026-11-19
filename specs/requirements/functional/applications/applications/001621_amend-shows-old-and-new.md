@@ -2,7 +2,7 @@
 id: "001621"
 title: The timeline and the audit show the old and the new approved amount
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

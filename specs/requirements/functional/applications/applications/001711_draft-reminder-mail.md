@@ -2,7 +2,7 @@
 id: "001711"
 title: A draft without a change for 7 days gets one reminder mail
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

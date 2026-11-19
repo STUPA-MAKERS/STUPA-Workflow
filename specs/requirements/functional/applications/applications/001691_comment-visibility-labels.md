@@ -2,7 +2,7 @@
 id: "001691"
 title: The visibility switch names who reads the comment
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

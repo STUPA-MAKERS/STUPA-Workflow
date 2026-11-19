@@ -2,7 +2,7 @@
 id: "001670"
 title: A form version has rules across fields
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

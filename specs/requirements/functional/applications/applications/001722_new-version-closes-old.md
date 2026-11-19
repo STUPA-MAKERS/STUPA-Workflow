@@ -2,7 +2,7 @@
 id: "001722"
 title: Submitting the new version closes the old Antrag
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

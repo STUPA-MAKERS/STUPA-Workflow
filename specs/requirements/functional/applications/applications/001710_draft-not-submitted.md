@@ -2,7 +2,7 @@
 id: "001710"
 title: A draft says that it is not submitted
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

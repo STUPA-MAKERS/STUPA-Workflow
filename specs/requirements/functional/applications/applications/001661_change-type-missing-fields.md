@@ -2,7 +2,7 @@
 id: "001661"
 title: A change of the Antragsart sends missing required fields to the applicant
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

@@ -2,7 +2,7 @@
 id: "001720"
 title: A denied or returned Antrag offers a new version
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

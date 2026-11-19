@@ -2,7 +2,7 @@
 id: "001620"
 title: An approved Antrag takes a new approved amount
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

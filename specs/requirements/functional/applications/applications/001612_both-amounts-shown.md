@@ -2,7 +2,7 @@
 id: "001612"
 title: List, detail and export show the requested and the approved amount
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

@@ -2,7 +2,7 @@
 id: "001671"
 title: Frontend and backend check the same form rules
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

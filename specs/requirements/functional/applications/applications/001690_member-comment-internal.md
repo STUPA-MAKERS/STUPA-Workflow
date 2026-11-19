@@ -2,7 +2,7 @@
 id: "001690"
 title: A member comment is internal by default
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

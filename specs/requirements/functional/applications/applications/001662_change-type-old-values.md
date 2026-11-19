@@ -2,7 +2,7 @@
 id: "001662"
 title: Values the new form does not have stay readable
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

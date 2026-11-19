@@ -2,7 +2,7 @@
 id: "001630"
 title: The Kostenaufstellung shows the total cost and the requested amount
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

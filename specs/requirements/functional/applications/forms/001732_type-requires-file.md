@@ -2,7 +2,7 @@
 id: "001732"
 title: An Antragsart can require a file
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

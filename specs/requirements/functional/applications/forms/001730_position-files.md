@@ -2,7 +2,7 @@
 id: "001730"
 title: A position takes files in the form
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

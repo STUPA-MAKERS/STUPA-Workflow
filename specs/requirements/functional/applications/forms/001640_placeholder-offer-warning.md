@@ -2,7 +2,7 @@
 id: "001640"
 title: The form warns about a placeholder offer
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

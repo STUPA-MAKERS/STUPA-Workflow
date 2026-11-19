@@ -2,7 +2,7 @@
 id: "001652"
 title: A forced change without a reason counts as Ohne Grund
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

@@ -2,7 +2,7 @@
 id: "001721"
 title: A new version links to the old Antrag
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

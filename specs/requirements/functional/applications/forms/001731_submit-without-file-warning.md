@@ -2,7 +2,7 @@
 id: "001731"
 title: A submit without a file asks for a confirmation
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

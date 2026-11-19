@@ -2,7 +2,7 @@
 id: "001651"
 title: An admin page counts the forced status changes
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

@@ -2,7 +2,7 @@
 id: "001641"
 title: A placeholder warning does not block the submit
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

@@ -2,7 +2,7 @@
 id: "001681"
 title: The server refuses a Kostenstelle outside the subtree
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

@@ -2,7 +2,7 @@
 id: "001632"
 title: The Antrag detail shows the same cost line
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

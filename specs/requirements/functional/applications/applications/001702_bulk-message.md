@@ -2,7 +2,7 @@
 id: "001702"
 title: A bulk message adds one public comment to each Antrag
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

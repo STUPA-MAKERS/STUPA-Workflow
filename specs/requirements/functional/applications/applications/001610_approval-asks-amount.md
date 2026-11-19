@@ -2,7 +2,7 @@
 id: "001610"
 title: Every approval asks for the approved amount
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

@@ -2,7 +2,7 @@
 id: "001601"
 title: A decision made outside the platform cancels the open votes
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

@@ -2,7 +2,7 @@
 id: "001701"
 title: A bulk transition offers only transitions allowed for every selected Antrag
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

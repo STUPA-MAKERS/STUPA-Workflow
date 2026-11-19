@@ -2,7 +2,7 @@
 id: "001600"
 title: A vote state takes a decision made outside the platform
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null
