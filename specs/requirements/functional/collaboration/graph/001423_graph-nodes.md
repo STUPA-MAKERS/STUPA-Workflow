@@ -2,7 +2,7 @@
 id: "001423"
 title: The graph shows the elements that have a relation
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

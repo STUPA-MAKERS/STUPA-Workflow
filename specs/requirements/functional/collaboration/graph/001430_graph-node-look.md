@@ -2,7 +2,7 @@
 id: "001430"
 title: A node shows the icon and the colour of its kind
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

@@ -2,7 +2,7 @@
 id: "001422"
 title: The graph shows only what the person reads
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

@@ -2,7 +2,7 @@
 id: "001431"
 title: The graph has its own API
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

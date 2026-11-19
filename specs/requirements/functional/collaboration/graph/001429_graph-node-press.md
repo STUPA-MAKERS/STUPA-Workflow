@@ -2,7 +2,7 @@
 id: "001429"
 title: A press on a node shows the element and its neighbours
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

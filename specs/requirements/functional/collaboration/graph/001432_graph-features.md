@@ -2,7 +2,7 @@
 id: "001432"
 title: A kind of a feature that is off does not show in the graph
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null

@@ -2,7 +2,7 @@
 id: "001421"
 title: The graph needs its own permission
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 implementation: null
