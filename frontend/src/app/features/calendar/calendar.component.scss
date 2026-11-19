@@ -422,3 +422,8 @@
     box-shadow: inset 0 0 0 1px var(--vh-fg, #fff);
   }
 }
+
+// The face of the empty state has a ring of dots around it; it needs room under the tools row.
+.cal__dayList > app-empty-state {
+  padding-top: var(--space-8);
+}
