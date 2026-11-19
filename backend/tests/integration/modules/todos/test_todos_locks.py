@@ -25,8 +25,17 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.auth.principal import Principal
 from app.modules.todos.link_service import LinkService
+from app.modules.todos.links_router import add_link
 from app.modules.todos.models import Link
-from app.modules.todos.schemas import CardCreate, CardMove, CardPatch, CardTransfer, LabelCreate
+from app.modules.todos.schemas import (
+    CardCreate,
+    CardMove,
+    CardPatch,
+    CardTransfer,
+    LabelCreate,
+    LinkCreate,
+    LinksOut,
+)
 from app.modules.todos.service import TodoService
 from app.shared.errors import ConflictError
 from tests.integration.modules.todos.conftest import add_gremium, add_member, add_person
@@ -34,6 +43,16 @@ from tests.integration.modules.todos.test_todos_lifecycle import _personal
 from worker.todos import archive_done_todos
 
 pytestmark = pytest.mark.integration
+
+
+async def _link(
+    session: AsyncSession, one: uuid.UUID, other: uuid.UUID, who: Principal
+) -> LinksOut:
+    """Link two cards through the route, with its commit (spec 001400)."""
+    payload = LinkCreate.model_validate(
+        {"a": {"kind": "todo", "id": str(one)}, "b": {"kind": "todo", "id": str(other)}}
+    )
+    return await add_link(payload, LinkService.on(session), who)
 
 
 async def _as_a_move(
@@ -254,7 +273,7 @@ async def test_two_identical_links_and_labels_give_one_409(
 
     async def link() -> Any:
         async with maker() as session:
-            return await LinkService(session).add(("todo", ids[0]), ("todo", ids[1]), me)
+            return await _link(session, ids[0], ids[1], me)
 
     async def label() -> Any:
         async with maker() as session:
@@ -336,8 +355,7 @@ async def test_two_cards_on_two_boards_link_each_other_at_once(
 
     async def link(one: uuid.UUID, other: uuid.UUID) -> int:
         async with maker() as session:
-            out = await LinkService(session).add(("todo", one), ("todo", other), lead)
-            return len(out.links)
+            return len((await _link(session, one, other, lead)).links)
 
     async with maker() as holder:
         low = min(board_a, board_b, key=str)

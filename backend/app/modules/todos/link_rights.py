@@ -18,6 +18,7 @@ one of them. The change right of an end is the right that changes the element it
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,13 +47,17 @@ GLOBAL_RIGHT: dict[str, str] = {
 VOTE_RIGHTS: tuple[str, ...] = ("vote.manage", "session.manage")
 
 
+@dataclass(frozen=True, slots=True)
 class LinkRights:
-    """Tell for one principal whether it changes an element of a link kind."""
+    """Tell for one principal whether it changes an element of a link kind.
 
-    def __init__(self, session: AsyncSession, access: BoardAccess) -> None:
-        """Bind the check to a session and the board access check."""
-        self.session = session
-        self.access = access
+    Attributes:
+        session: The database session.
+        access: The board access check of the cards.
+    """
+
+    session: AsyncSession
+    access: BoardAccess
 
     async def can_change(self, kind: str, target_id: uuid.UUID, principal: Principal) -> bool:
         """Tell if the principal changes the element ``(kind, target_id)``."""

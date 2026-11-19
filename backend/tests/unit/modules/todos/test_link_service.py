@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -82,8 +83,7 @@ def _service(
     session: ScriptedSession, *, readable: Any = (), resolved: Any = None, change: Any = ()
 ) -> tuple[LinkService, _Todos]:
     todos = _Todos(session, FakeLinks(readable=readable, resolved=resolved))
-    service = LinkService(session, todos=todos)  # type: ignore[arg-type]
-    service.rights = _Rights(*change)  # type: ignore[assignment]
+    service = LinkService(session, todos, _Rights(*change))  # type: ignore[arg-type]
     return service, todos
 
 
@@ -196,13 +196,13 @@ async def test_add_links_two_elements_and_notes_the_card_ends() -> None:
     c = todos.add_card()
     me, ticket = ("todo", c.id), ("ticket", TICKET)
     todos.links.ok = {me, ticket}
-    service.rights = _Rights(me)  # type: ignore[assignment]
+    service = replace(service, rights=_Rights(me))
     session.scalar_q.append(None)
-    out = await service.add(me, ticket, USER)
+    await service.add(me, ticket, USER)
     (new,) = [o for o in session.added if isinstance(o, Link)]
     assert new.has_end(me) and new.has_end(ticket)
     assert todos.checked == [(c.id, ticket)] and todos.notes == [(c.id, ticket, True)]
-    assert session.committed == 1 and out.links == []
+    assert session.committed == 0
 
 
 async def test_add_between_two_cards_notes_both_and_keeps_an_event_to_itself() -> None:
@@ -211,7 +211,7 @@ async def test_add_between_two_cards_notes_both_and_keeps_an_event_to_itself() -
     one, two = todos.add_card(), todos.add_card()
     a, b = ("todo", one.id), ("todo", two.id)
     todos.links.ok = {a, b}
-    service.rights = _Rights(a)  # type: ignore[assignment]
+    service = replace(service, rights=_Rights(a))
     todos.taken = True
     session.scalar_q.append(None)
     with pytest.raises(ConflictError):
@@ -247,10 +247,10 @@ async def test_remove_takes_the_link_from_both_ends() -> None:
     todos.links.ok = {me, app}
     with pytest.raises(ForbiddenError):
         await service.remove(row.id, USER)
-    service.rights = _Rights(app)  # type: ignore[assignment]
+    service = replace(service, rights=_Rights(app))
     await service.remove(row.id, USER)
     assert session.deleted == [row]
-    assert todos.notes == [(c.id, app, False)] and session.committed == 1
+    assert todos.notes == [(c.id, app, False)] and session.committed == 0
 
 
 async def test_view_needs_a_readable_card_end() -> None:
@@ -307,33 +307,6 @@ def test_the_stored_order_is_stable() -> None:
     assert first.a_kind == "application" and first.other(other) == one
     same = Link.between(("todo", uuid.UUID(int=7)), ("todo", uuid.UUID(int=3)), ME)
     assert (same.a_id, same.b_id) == (uuid.UUID(int=3), uuid.UUID(int=7))
-
-
-class _RacingSession(ScriptedSession):
-    """A session whose commit meets a parallel equal link."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.rolled_back = 0
-
-    async def commit(self) -> None:
-        from sqlalchemy.exc import IntegrityError
-
-        raise IntegrityError("INSERT", {}, Exception("uq_link_ends"))
-
-    async def rollback(self) -> None:
-        self.rolled_back += 1
-
-
-async def test_a_parallel_equal_link_is_link_exists() -> None:
-    """§F/collaboration/links/001400: at most one link per pair, also under a race."""
-    session = _RacingSession()
-    app, inv = ("application", APP), ("invoice", INVOICE)
-    service, _ = _service(session, readable=[app, inv], change=[app])
-    session.scalar_q.append(None)
-    with pytest.raises(ConflictError) as exc:
-        await service.add(app, inv, USER)
-    assert exc.value.code == "link_exists" and session.rolled_back == 1
 
 
 async def test_the_card_ends_lock_in_the_order_of_their_boards() -> None:

@@ -187,7 +187,8 @@ export class TodoLinkedListComponent {
     const items = this.items();
     return items ? items.map(cardRow) : (this.loaded()?.links ?? []);
   });
-  private seq = 0;
+  /** The number of the newest list read; an older answer is dropped. */
+  private readonly seq = signal(0);
 
   constructor() {
     effect(() => {
@@ -213,11 +214,12 @@ export class TodoLinkedListComponent {
   }
 
   private load(kind: TodoLinkKind, id: Uuid, keep: boolean): void {
-    const seq = ++this.seq;
+    const seq = this.seq() + 1;
+    this.seq.set(seq);
     if (!keep) this.loaded.set(null);
     this.api.links(kind, id).subscribe({
       next: (out) => {
-        if (seq === this.seq) this.loaded.set(out);
+        if (seq === this.seq()) this.loaded.set(out);
       },
       error: () => undefined,
     });
@@ -235,7 +237,7 @@ export class TodoLinkedListComponent {
     }
     this.api.link(this.self(), { kind: hit.kind, id: hit.targetId }).subscribe({
       next: (out) => {
-        this.seq++;
+        this.seq.update((n) => n + 1);
         this.loaded.set(out);
         this.touch(hit.kind, hit.targetId);
       },
@@ -246,7 +248,7 @@ export class TodoLinkedListComponent {
   remove(row: LinkRow): void {
     this.api.unlink(row.id).subscribe({
       next: () => {
-        this.seq++;
+        this.seq.update((n) => n + 1);
         this.loaded.update((out) => out && { ...out, links: out.links.filter((l) => l.id !== row.id) });
         this.touch(row.kind, row.targetId);
       },
