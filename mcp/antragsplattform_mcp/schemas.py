@@ -935,6 +935,11 @@ class TodoLinkIn(WireModel, frozen=True):
     )
 
 
+class LinkEndIn(WireModel, frozen=True):
+    kind: TodoLinkKind
+    id: str = Field(description="The id of the element; the caller must be able to read it")
+
+
 TodoEntryRole = Literal["read", "edit", "manage"]
 
 

@@ -540,6 +540,13 @@
       "to": "Principal"
     },
     {
+      "column": "created_by",
+      "from": "Link",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "Principal"
+    },
+    {
       "column": "application_id",
       "from": "MagicLink",
       "multiplicity": "*",
@@ -1105,97 +1112,6 @@
       "multiplicity": "*",
       "onDelete": "CASCADE",
       "to": "TodoBoard"
-    },
-    {
-      "column": "application_id",
-      "from": "TodoLink",
-      "multiplicity": "*",
-      "onDelete": "CASCADE",
-      "to": "Application"
-    },
-    {
-      "column": "appointment_id",
-      "from": "TodoLink",
-      "multiplicity": "*",
-      "onDelete": "CASCADE",
-      "to": "Appointment"
-    },
-    {
-      "column": "budget_id",
-      "from": "TodoLink",
-      "multiplicity": "*",
-      "onDelete": "CASCADE",
-      "to": "Budget"
-    },
-    {
-      "column": "expense_id",
-      "from": "TodoLink",
-      "multiplicity": "*",
-      "onDelete": "CASCADE",
-      "to": "BudgetExpense"
-    },
-    {
-      "column": "gremium_id",
-      "from": "TodoLink",
-      "multiplicity": "*",
-      "onDelete": "CASCADE",
-      "to": "Gremium"
-    },
-    {
-      "column": "invoice_id",
-      "from": "TodoLink",
-      "multiplicity": "*",
-      "onDelete": "CASCADE",
-      "to": "Invoice"
-    },
-    {
-      "column": "meeting_id",
-      "from": "TodoLink",
-      "multiplicity": "*",
-      "onDelete": "CASCADE",
-      "to": "Meeting"
-    },
-    {
-      "column": "agenda_item_id",
-      "from": "TodoLink",
-      "multiplicity": "*",
-      "onDelete": "CASCADE",
-      "to": "MeetingAgendaItem"
-    },
-    {
-      "column": "created_by",
-      "from": "TodoLink",
-      "multiplicity": "*",
-      "onDelete": "NO ACTION",
-      "to": "Principal"
-    },
-    {
-      "column": "ticket_id",
-      "from": "TodoLink",
-      "multiplicity": "*",
-      "onDelete": "CASCADE",
-      "to": "Ticket"
-    },
-    {
-      "column": "card_id",
-      "from": "TodoLink",
-      "multiplicity": "*",
-      "onDelete": "CASCADE",
-      "to": "TodoCard"
-    },
-    {
-      "column": "todo_id",
-      "from": "TodoLink",
-      "multiplicity": "*",
-      "onDelete": "CASCADE",
-      "to": "TodoCard"
-    },
-    {
-      "column": "vote_id",
-      "from": "TodoLink",
-      "multiplicity": "*",
-      "onDelete": "CASCADE",
-      "to": "Vote"
     },
     {
       "column": "flow_version_id",
@@ -4258,6 +4174,83 @@
     {
       "attributes": [
         {
+          "name": "a_kind",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "application",
+            "meeting",
+            "agenda_item",
+            "vote",
+            "appointment",
+            "gremium",
+            "invoice",
+            "expense",
+            "budget",
+            "ticket",
+            "todo"
+          ]
+        },
+        {
+          "name": "a_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "b_kind",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "application",
+            "meeting",
+            "agenda_item",
+            "vote",
+            "appointment",
+            "gremium",
+            "invoice",
+            "expense",
+            "budget",
+            "ticket",
+            "todo"
+          ]
+        },
+        {
+          "name": "b_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_by",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "Link",
+      "module": "todos",
+      "name": "Link",
+      "path": "backend/app/modules/todos/models.py",
+      "table": "link"
+    },
+    {
+      "attributes": [
+        {
           "name": "id",
           "nullable": false,
           "primaryKey": true,
@@ -6955,105 +6948,6 @@
       "name": "TodoLabel",
       "path": "backend/app/modules/todos/models.py",
       "table": "todo_label"
-    },
-    {
-      "attributes": [
-        {
-          "name": "card_id",
-          "nullable": false,
-          "primaryKey": false,
-          "type": "CHAR(32)"
-        },
-        {
-          "name": "application_id",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "CHAR(32)"
-        },
-        {
-          "name": "meeting_id",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "CHAR(32)"
-        },
-        {
-          "name": "agenda_item_id",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "CHAR(32)"
-        },
-        {
-          "name": "vote_id",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "CHAR(32)"
-        },
-        {
-          "name": "appointment_id",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "CHAR(32)"
-        },
-        {
-          "name": "gremium_id",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "CHAR(32)"
-        },
-        {
-          "name": "invoice_id",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "CHAR(32)"
-        },
-        {
-          "name": "expense_id",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "CHAR(32)"
-        },
-        {
-          "name": "budget_id",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "CHAR(32)"
-        },
-        {
-          "name": "ticket_id",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "CHAR(32)"
-        },
-        {
-          "name": "todo_id",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "CHAR(32)"
-        },
-        {
-          "name": "created_by",
-          "nullable": false,
-          "primaryKey": false,
-          "type": "CHAR(32)"
-        },
-        {
-          "name": "created_at",
-          "nullable": false,
-          "primaryKey": false,
-          "type": "DATETIME"
-        },
-        {
-          "name": "id",
-          "nullable": false,
-          "primaryKey": true,
-          "type": "CHAR(32)"
-        }
-      ],
-      "id": "TodoLink",
-      "module": "todos",
-      "name": "TodoLink",
-      "path": "backend/app/modules/todos/models.py",
-      "table": "todo_link"
     },
     {
       "attributes": [

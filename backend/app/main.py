@@ -93,6 +93,7 @@ from app.modules.protocol.public_router import router as public_protocol_router
 from app.modules.protocol.router import router as protocol_router
 from app.modules.search.router import router as search_router
 from app.modules.tickets.router import router as tickets_router
+from app.modules.todos.links_router import router as links_router
 from app.modules.todos.router import router as todos_router
 from app.modules.todos.socket import ws_router as todos_ws_router
 from app.modules.translations.router import public_router as i18n_public_router
@@ -156,6 +157,7 @@ api_router.include_router(search_router)
 api_router.include_router(activity_router)
 api_router.include_router(tickets_router)
 api_router.include_router(todos_router)
+api_router.include_router(links_router)
 api_router.include_router(todos_ws_router)
 api_router.include_router(gremien_authed_router)
 api_router.include_router(gremien_tab_router)

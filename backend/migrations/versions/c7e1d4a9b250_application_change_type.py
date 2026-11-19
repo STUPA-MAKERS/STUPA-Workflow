@@ -18,7 +18,7 @@ baseline (0001), because the model already declares them, so the upgrade uses
 The downgrade removes the role rows of the permission and drops the three columns.
 
 Revision ID: c7e1d4a9b250
-Revises: a4c71e2b9d05
+Revises: c4d1e2f3a5b6
 Create Date: 2026-11-19 23:00:00
 """
 
@@ -29,7 +29,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "c7e1d4a9b250"
-down_revision: str | None = "a4c71e2b9d05"
+down_revision: str | None = "c4d1e2f3a5b6"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

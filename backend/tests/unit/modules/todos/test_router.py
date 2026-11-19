@@ -42,10 +42,6 @@ from app.modules.todos.schemas import (
     TodoEventRef,
     TodoEventSeriesOut,
     TodoLabelOut,
-    TodoLinkDetail,
-    TodoLinkedCard,
-    TodoLinkTarget,
-    TodoLinkView,
     TodoMember,
     TodoMine,
 )
@@ -94,11 +90,6 @@ _ANSWERS: dict[str, Callable[[], Any]] = {
     "mine": lambda: TodoMine(),
     "mine_boards": lambda: [TodoAssignedBoard(id=BID, name="B", kind="gremium", cards=[_tile()])],
     "all_boards": lambda: [TodoAssignedBoard(id=BID, name="B", kind="personal", cards=[_tile()])],
-    "linked": lambda: [
-        TodoLinkedCard(
-            id=CID, board_id=BID, board_name="B", title="t", column_name="c", is_done=False
-        )
-    ],
     "create": _detail,
     "card": _detail,
     "tile": _tile,
@@ -114,28 +105,16 @@ _ANSWERS: dict[str, Callable[[], Any]] = {
     "add_check_item": _detail,
     "patch_check_item": _detail,
     "delete_check_item": _detail,
-    "add_link": _detail,
-    "remove_link": _detail,
     "add_comment": lambda: _COMMENT,
     "edit_comment": lambda: _COMMENT,
     "delete_comment": lambda: None,
 }
 
 
-class _Links:
-    def __init__(self) -> None:
-        self.calls: list[Any] = []
-
-    async def search(self, q: str, kind: str, _p: Any, *, exclude_card_id: Any) -> Any:
-        self.calls.append((q, kind, exclude_card_id))
-        return [TodoLinkTarget(kind="ticket", target_id=XID, title="T")]
-
-
 class _FakeService:
     def __init__(self) -> None:
         self.calls: list[tuple[str, tuple[Any, ...], dict[str, Any]]] = []
         self.outbox: list[TodoMail] = []
-        self.links = _Links()
         self.mail_on: set[str] = set()
         self.pings = BoardPings()
         self.ping_on: set[str] = set()
@@ -286,26 +265,8 @@ def test_mine_boards_etag_changes_with_the_body() -> None:
 def test_cross_board_routes(env: _Env) -> None:
     c = env.client
     assert c.get("/api/todos/mine").json() == {"items": [], "dueSoonCount": 0}
-    hits = c.get(f"/api/todos/link-targets?q=ab&kind=ticket&excludeCardId={CID}")
-    assert hits.json()[0]["targetId"] == str(XID)
-    assert env.service.links.calls == [("ab", "ticket", CID)]
-    assert c.get("/api/todos/link-targets?kind=todo").status_code == 200
-    assert env.service.links.calls[-1] == ("", "todo", None)
-    linked = c.get(f"/api/todos/linked?kind=meeting&targetId={XID}")
-    assert linked.json()[0]["boardName"] == "B"
-    assert c.get(f"/api/todos/linked?kind=todo&targetId={XID}").status_code == 422
-    for kind in ("vote", "gremium", "invoice", "expense", "budget"):
-        assert c.get(f"/api/todos/linked?kind={kind}&targetId={XID}").status_code == 200
-        assert c.get(f"/api/todos/link-targets?q=ab&kind={kind}").status_code == 200
-    assert c.get("/api/todos/link-targets?q=ab&kind=cost_centre").status_code == 422
-
-
-def test_the_link_picker_without_the_scope_is_empty(env: _Env) -> None:
-    env.app.dependency_overrides[get_current_principal] = lambda: Principal(
-        sub="t", scope_permissions=frozenset({"vote.cast"})
-    )
-    assert env.client.get("/api/todos/link-targets?q=ab").json() == []
-    assert env.service.links.calls == []
+    assert c.get("/api/todos/link-targets?q=ab").status_code == 404
+    assert c.get(f"/api/todos/linked?kind=meeting&targetId={XID}").status_code == 404
 
 
 def test_card_routes(env: _Env) -> None:
@@ -335,10 +296,8 @@ def test_card_routes(env: _Env) -> None:
         c.patch(f"/api/todos/cards/{CID}/checklist/{XID}", json={"done": True}).status_code == 200
     )
     assert c.delete(f"/api/todos/cards/{CID}/checklist/{XID}").status_code == 200
-    link = c.post(f"/api/todos/cards/{CID}/links", json={"kind": "ticket", "targetId": str(XID)})
-    assert link.status_code == 200
-    assert env.last()[1][1:3] == ("ticket", XID)
-    assert c.delete(f"/api/todos/cards/{CID}/links/{XID}").status_code == 200
+    gone = c.post(f"/api/todos/cards/{CID}/links", json={"kind": "ticket", "targetId": str(XID)})
+    assert gone.status_code in (404, 405)
     comment = c.post(f"/api/todos/cards/{CID}/comments", json={"body": "b", "mentions": [str(XID)]})
     assert comment.status_code == 201
     assert c.patch(f"/api/todos/cards/{CID}/comments/{XID}", json={"body": "c"}).status_code == 200
@@ -361,7 +320,6 @@ def test_event_routes(env: _Env, monkeypatch: pytest.MonkeyPatch) -> None:
     series = TodoEventSeriesOut(id=XID, name="Sommerfest")
     answers: dict[str, Callable[[], Any]] = {
         "cards": lambda: [_detail()],
-        "link_view": lambda: TodoLinkView(kind="vote", title="Abstimmung", detail=TodoLinkDetail()),
         "set_event": _detail,
         "remove_event": _event_permanent,
         "follow_up": _detail,
@@ -378,9 +336,6 @@ def test_event_routes(env: _Env, monkeypatch: pytest.MonkeyPatch) -> None:
     assert [card["id"] for card in got.json()] == [str(CID)]
     assert env.last()[0:2] == ("cards", ([CID, XID], USER))
     assert c.get("/api/todos/cards").status_code == 422
-    view = c.get(f"/api/todos/cards/{CID}/links/{XID}/view")
-    assert view.json()["title"] == "Abstimmung"
-    assert env.last()[1][:2] == (CID, XID)
     event = c.put(f"/api/todos/cards/{CID}/event", json={"startsOn": "2026-06-01"})
     assert event.status_code == 200
     assert str(env.last()[1][1].starts_on) == "2026-06-01"

@@ -86,6 +86,7 @@ from app.modules.privacy.models import ErasureRequest
 from app.modules.site_config.models import PdfAsset, SiteConfigVersion
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
 from app.modules.todos.models import (
+    Link,
     TodoAssignee,
     TodoBoard,
     TodoCard,
@@ -93,7 +94,6 @@ from app.modules.todos.models import (
     TodoComment,
     TodoEvent,
     TodoEventSeries,
-    TodoLink,
 )
 from app.modules.translations.models import UiLanguage, UiTranslation
 from app.modules.voting.models import SecretBallot, Vote, VotedMarker
@@ -480,7 +480,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
                     card_id=card.id, author_id=old.id, body="Merken", mentions=[str(old.id)]
                 ),
                 TodoEvent(card_id=card.id, actor_id=old.id, kind="created"),
-                TodoLink(card_id=card.id, ticket_id=ticket.id, created_by=old.id),
+                Link.between(("todo", card.id), ("ticket", ticket.id), old.id),
                 TodoEventSeries(name=f"Reihe {tag}", created_by=old.id),
                 CalendarAppointment(
                     title=f"Termin {tag}",
