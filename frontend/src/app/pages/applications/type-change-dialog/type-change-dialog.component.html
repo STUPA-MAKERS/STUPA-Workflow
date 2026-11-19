@@ -54,14 +54,14 @@
       </label>
     }
   }
-  <div dialog-footer>
-    <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-    <app-button
-      variant="primary"
-      [loading]="saving()"
-      [disabled]="!canSubmit()"
-      (click)="submit()"
-      >{{ 'applications.typeChange.confirm' | t }}</app-button
-    >
-  </div>
+  <app-button dialog-footer variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+  <app-button
+    dialog-footer
+    variant="fill"
+    [loading]="saving()"
+    [disabled]="!canSubmit()"
+    (click)="submit()"
+  >
+    {{ 'applications.typeChange.confirm' | t }}
+  </app-button>
 </app-dialog>
