@@ -6,7 +6,7 @@ The answer is one page of the graph; the client adds each page to the drawing.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date as Day
 from typing import Literal
 from uuid import UUID
 
@@ -39,7 +39,7 @@ class GraphNode(FrozenCamelModel, frozen=True):
     id: UUID
     accessible: bool
     title: str | None = None
-    date: date | None = None
+    date: Day | None = None
     #: The detail page, app-relative. A granted node has none: it opens in the read view.
     url: str | None = None
     #: Readable only through a card (spec 000487).
