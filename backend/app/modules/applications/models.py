@@ -85,6 +85,11 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
         received_on: The date on which the application reached the Gremium. The
             capturing person sets it (default: the day of the capture). It is
             information only.
+        replaces_id: The Antrag that this one is a new version of ("Neue Fassung").
+            The submit of this Antrag closes that one. A delete of that Antrag sets it
+            to NULL, so the new version stays.
+        draft_reminder_at: When the worker sent the reminder mail of this draft. It is
+            set once, so a draft gets the mail at most once.
     """
 
     __tablename__ = "application"
@@ -116,6 +121,12 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     captured_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     capture_intake: Mapped[str | None] = mapped_column(Text, nullable=True)
     received_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    replaces_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("application.id", ondelete="SET NULL"), nullable=True
+    )
+    draft_reminder_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     __table_args__ = (
         Index(
@@ -132,6 +143,7 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
         Index("ix_application_type_id", "type_id"),
         Index("ix_application_created_at", "created_at"),
         Index("ix_application_archived_at", "archived_at"),
+        Index("ix_application_replaces_id", "replaces_id"),
     )
 
 

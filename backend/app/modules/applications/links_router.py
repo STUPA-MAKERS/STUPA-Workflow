@@ -8,6 +8,8 @@ The read and edit rules of the applications apply to both applications of a link
   the Vorgänger. The change adds no version and leaves the answers as they are.
 - ``GET .../prefill`` gives the answers of a readable Vorgänger for a new Antrag. It
   needs a logged-in caller, because a guest has no read scope beyond the own Antrag.
+- ``POST .../new-version`` creates the new version of a denied or returned Antrag
+  ("Neue Fassung"). The applicant and a person with ``application.manage`` may.
 """
 
 from __future__ import annotations
@@ -15,27 +17,36 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import get_current_applicant, get_current_principal
+from app.deps import SettingsDep, get_current_applicant, get_current_principal
 from app.modules.applications.access import (
+    MANAGE_PERMISSION,
     Access,
     hidden_pii_keys,
+    require_app_applicant,
     require_app_edit,
     require_app_read,
     require_app_view,
     resolve_app_read,
 )
-from app.modules.applications.router import get_applications_service
+from app.modules.applications.router import (
+    MagicLinkSender,
+    get_applications_service,
+    get_magic_link_sender,
+)
 from app.modules.applications.schemas import (
     ApplicationLinksOut,
     ApplicationPrefillOut,
+    NewVersionCreated,
     PredecessorSet,
 )
 from app.modules.applications.service import ApplicationsService
 from app.modules.applications.service.links import link_event_out
 from app.modules.auth.principal import Applicant, Principal
+from app.modules.flow.dispatch import ActionDispatcher
+from app.modules.flow.router import get_action_dispatcher
 from app.shared.errors import ForbiddenError, UnauthorizedError
 
 router = APIRouter(tags=["applications"])
@@ -71,10 +82,14 @@ async def _links_out(service: ApplicationsService, access: Access) -> Applicatio
     predecessor = await service.predecessor_of(application_id)
     successors = await service.successors_of(application_id)
     events = await service.link_events(application_id)
+    replaces = await service.replaces_of(application_id)
+    replaced_by = await service.replaced_by_of(application_id)
     candidates = {
         *([predecessor] if predecessor else []),
         *successors,
         *(ev.predecessor_id for ev in events if ev.predecessor_id),
+        *([replaces] if replaces else []),
+        *replaced_by,
     }
     readable = {i for i in candidates if await _can_read(db, i, access.principal, access.applicant)}
     shown = await service.linked_out(readable)
@@ -88,6 +103,8 @@ async def _links_out(service: ApplicationsService, access: Access) -> Applicatio
         predecessor=shown.get(predecessor) if predecessor else None,
         successors=tuple(shown[i] for i in successors if i in shown),
         events=tuple(link_event_out(ev, actors, shown) for ev in events),
+        replaces=shown.get(replaces) if replaces else None,
+        replacedBy=tuple(shown[i] for i in replaced_by if i in shown),
     )
 
 
@@ -173,3 +190,57 @@ async def get_prefill(
         raise ForbiddenError("A Vorgänger needs a login.")
     hidden = await hidden_pii_keys(service.session, access)
     return await service.prefill(access.application_id, hidden=hidden)
+
+
+_NEW_VERSION_ERRORS: dict[int | str, dict[str, object]] = {
+    **_ERRORS,
+    409: {"description": "problem+json"},
+}
+
+
+@router.post(
+    "/applications/{application_id}/new-version",
+    response_model=NewVersionCreated,
+    status_code=status.HTTP_201_CREATED,
+    responses=_NEW_VERSION_ERRORS,
+)
+async def create_new_version(
+    application_id: UUID,
+    service: ServiceDep,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    principal: PrincipalDep,
+    applicant: ApplicantDep,
+    send_magic_link: Annotated[MagicLinkSender, Depends(get_magic_link_sender)],
+    dispatcher: Annotated[ActionDispatcher, Depends(get_action_dispatcher)],
+) -> NewVersionCreated:
+    """Create the new version of a denied or returned Antrag (spec 001720).
+
+    The applicant (the magic link, the e-mail login or the logged-in creator) and a
+    person with ``application.manage`` may. The new draft gets the answers of the old
+    Antrag that fit the current form, without files and without the ``isPII`` answers
+    that the caller may not read. It names the old Antrag, and the submit of the draft
+    closes the old one. A magic link of one Antrag does not reach the new draft, so a
+    login link to the address goes out by mail then (``linkSent``).
+
+    The route answers 403 for another caller, 404 for an unknown Antrag and 409
+    ``new_version_not_allowed`` when the state offers no new version or the applicant is
+    anonymized.
+    """
+    db = service.session
+    try:
+        access = await require_app_applicant(application_id, db, principal, applicant)
+    except ForbiddenError:
+        if principal is None or not principal.has(MANAGE_PERMISSION):
+            raise
+        access = await require_app_edit(application_id, db, principal, applicant)
+    hidden = await hidden_pii_keys(db, access)
+    app, email = await service.new_version(
+        access.application_id, actor=access.actor, hidden=hidden, dispatcher=dispatcher
+    )
+    link_sent = access.applicant is not None and access.applicant.email is None
+    if link_sent:
+        pool = getattr(request.app.state, "arq_pool", None)
+        background.add_task(send_magic_link, settings, email, app.id, pool)
+    return NewVersionCreated(applicationId=app.id, linkSent=link_sent)

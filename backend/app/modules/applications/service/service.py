@@ -11,6 +11,7 @@ exactly this class. The implementation lives in the ops classes:
 * `comments.CommentOps`: internal and public comments
 * `anonymize.AnonymizeOps`: GDPR anonymization
 * `links.LinkOps`: the Vorgänger link of a Folgeantrag and the prefill
+* `new_version.NewVersionOps`: the new version of a denied or returned Antrag
 """
 
 from __future__ import annotations
@@ -21,11 +22,13 @@ from app.modules.applications.service.create import CreateOps
 from app.modules.applications.service.edits import EditOps
 from app.modules.applications.service.links import LinkOps
 from app.modules.applications.service.listing import ListingOps
+from app.modules.applications.service.new_version import NewVersionOps
 from app.modules.applications.service.on_behalf import OnBehalfOps
 from app.modules.applications.service.reads import ReadOps
 
 
 class ApplicationsService(
+    NewVersionOps,
     OnBehalfOps,
     CreateOps,
     EditOps,

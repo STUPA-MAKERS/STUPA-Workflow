@@ -26,6 +26,8 @@ class TransitionOut(FrozenCamelModel, frozen=True):
         allows_decision: The target is an accepted state of the top budget of the
             application, so a fire takes a `decision` (approval with deviations). The
             UI then opens the decision dialog.
+        to_terminal: The target is a terminal state. The applicant page asks before
+            such a transition fires, and a draft does not offer it to the applicant.
     """
 
     id: UUID
@@ -37,6 +39,7 @@ class TransitionOut(FrozenCamelModel, frozen=True):
     adds_to_agenda: bool = Field(default=False, alias="addsToAgenda")
     agenda_gremium_id: UUID | None = Field(default=None, alias="agendaGremiumId")
     allows_decision: bool = Field(default=False, alias="allowsDecision")
+    to_terminal: bool = Field(default=False, alias="toTerminal")
 
 
 class TransitionRequest(FrozenCamelModel, frozen=True):

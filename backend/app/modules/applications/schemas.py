@@ -123,12 +123,27 @@ class ApplicationCreated(FrozenCamelModel, frozen=True):
     application_id: UUID = Field(alias="applicationId")
 
 
+class NewVersionCreated(FrozenCamelModel, frozen=True):
+    """201 response of ``POST /applications/{id}/new-version``.
+
+    Attributes:
+        link_sent: The caller's session does not reach the new draft (a link of one
+            Antrag), so a login link to it went out by mail.
+    """
+
+    application_id: UUID = Field(alias="applicationId")
+    link_sent: bool = Field(default=False, alias="linkSent")
+
+
 class StateOut(FrozenCamelModel, frozen=True):
     """A flow state as the application shows it.
 
     Attributes:
         kind: State kind. The frontend shows approve and reject actions for
             ``approval``.
+        is_initial: The initial state: an Antrag in it is a draft, not submitted yet.
+        is_terminal: A terminal state.
+        is_denied: An Antrag in this state is denied.
     """
 
     id: UUID
@@ -137,6 +152,9 @@ class StateOut(FrozenCamelModel, frozen=True):
     color: str | None = None
     edit_allowed: bool = Field(alias="editAllowed")
     kind: str = "normal"
+    is_initial: bool = Field(default=False, alias="isInitial")
+    is_terminal: bool = Field(default=False, alias="isTerminal")
+    is_denied: bool = Field(default=False, alias="isDenied")
 
 
 class ApplicantOut(FrozenCamelModel, frozen=True):
@@ -529,11 +547,15 @@ class ApplicationLinksOut(FrozenCamelModel, frozen=True):
     Attributes:
         successors: The Folgeanträge, oldest first.
         events: The link changes, oldest first.
+        replaces: The Antrag that this one is a new version of ("Neue Fassung von").
+        replaced_by: The new versions of this Antrag, oldest first ("Ersetzt durch").
     """
 
     predecessor: LinkedApplicationOut | None = None
     successors: tuple[LinkedApplicationOut, ...] = ()
     events: tuple[LinkEventOut, ...] = ()
+    replaces: LinkedApplicationOut | None = None
+    replaced_by: tuple[LinkedApplicationOut, ...] = Field(default=(), alias="replacedBy")
 
 
 class PredecessorSet(FrozenStrictCamelModel, frozen=True):

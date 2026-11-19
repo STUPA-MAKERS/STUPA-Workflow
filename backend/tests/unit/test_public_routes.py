@@ -58,7 +58,8 @@ Groups of ``OPTIONAL_PRINCIPAL_ROUTES`` and who checks the caller:
   attachments, links, Vorgänger, prefill and observers: a staff session or the magic-link session
   of the applicant; the applications and files services refuse a caller with neither.
   The prefill also refuses the magic-link session, and a Vorgänger change needs the
-  edit right on both applications.
+  edit right on both applications. A new version needs the applicant or
+  ``application.manage``.
 - Attachment by id and its download: the files service applies the same read rule.
 - Markdown images: the upload refuses a caller without an upload right, the read
   needs a session of either kind.
@@ -184,6 +185,7 @@ OPTIONAL_PRINCIPAL_ROUTES: Final[frozenset[tuple[str, str]]] = frozenset(
         ("PUT", "/api/applications/{application_id}/predecessor"),
         ("DELETE", "/api/applications/{application_id}/predecessor"),
         ("GET", "/api/applications/{application_id}/prefill"),
+        ("POST", "/api/applications/{application_id}/new-version"),
         ("GET", "/api/applications/{application_id}/observers"),
         ("POST", "/api/applications/{application_id}/observers"),
         ("DELETE", "/api/applications/{application_id}/observers/{observer_id}"),

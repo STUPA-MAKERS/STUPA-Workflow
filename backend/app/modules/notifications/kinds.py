@@ -35,6 +35,8 @@ The kinds:
 - ``poll_started``: a poll of a Gremium of the user started (members with
   ``vote.cast``).
 - ``poll_reminder``: 24 h before the end of a poll that the user has not answered.
+- ``draft_reminder``: an own draft had no change for 7 days and is not submitted yet
+  (spec 001711).
 - ``appointment``: the user was invited to a Termin, or a Termin of the user moved,
   changed its place or was deleted (``appointment_invited``, ``appointment_changed``,
   ``appointment_cancelled``).
@@ -63,6 +65,7 @@ NOTIFICATION_KINDS: tuple[str, ...] = (
     "poll_started",
     "poll_reminder",
     "appointment",
+    "draft_reminder",
 )
 
 #: The kinds that are off until the person switches them on. They are the mails to

@@ -77,6 +77,7 @@ class FlowOps(ConfigServiceBase):
                         "isTerminal": s.is_terminal,
                         "isApproved": s.is_approved,
                         "isDenied": s.is_denied,
+                        "isReplacedTarget": s.is_replaced_target,
                         "kind": s.kind,
                         "config": s.config or {},
                     }
@@ -258,6 +259,7 @@ class FlowOps(ConfigServiceBase):
             is_terminal=state.is_terminal,
             is_approved=state.is_approved,
             is_denied=state.is_denied,
+            is_replaced_target=state.is_replaced_target,
             kind=state.kind,
             config=state.config,
         )
