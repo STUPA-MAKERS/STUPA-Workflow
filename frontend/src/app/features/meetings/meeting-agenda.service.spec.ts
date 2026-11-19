@@ -252,3 +252,68 @@ describe('MeetingAgendaService — the duration of a TOP', () => {
     expect(svc.savingAgenda()).toBe(false);
   });
 });
+
+/** "Nächster TOP" shows the tick of the item that the room leaves at once. */
+describe('MeetingAgendaService — the tick of "Nächster TOP"', () => {
+  let svc: MeetingAgendaService;
+  let reads: Subject<AgendaItem[]>[];
+  const row = (id: string, doneAt: string | null = null): AgendaItem => ({
+    id,
+    applicationId: null,
+    title: id,
+    body: '',
+    position: 0,
+    doneAt,
+  });
+
+  beforeEach(() => {
+    reads = [];
+    const api = {
+      listAgenda: jest.fn(() => {
+        const s = new Subject<AgendaItem[]>();
+        reads.push(s);
+        return s;
+      }),
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        MeetingAgendaService,
+        { provide: ApiClient, useValue: api },
+        { provide: ToastService, useValue: { error: jest.fn() } },
+      ],
+    });
+    svc = TestBed.inject(MeetingAgendaService);
+    svc.agenda.set([row('t-1'), row('t-2')]);
+  });
+
+  it('ticks the item at once and keeps the tick against an older read', () => {
+    svc.markDoneNow('t-1');
+    const tick = svc.agenda()[0].doneAt;
+    expect(tick).toEqual(expect.any(String));
+    svc.load('m-1', null);
+    reads[0].next([row('t-1'), row('t-2')]);
+    expect(svc.agenda()[0].doneAt).toBe(tick);
+    expect(svc.agenda()[1].doneAt).toBeNull();
+  });
+
+  it('keeps the time of an item that is ticked already, and ignores an unknown item', () => {
+    svc.agenda.set([row('t-1', '2026-10-15T16:30:00Z')]);
+    svc.markDoneNow('t-1');
+    svc.markDoneNow('t-9');
+    expect(svc.agenda()[0].doneAt).toBe('2026-10-15T16:30:00Z');
+  });
+
+  it('takes the tick back after a refusal and keeps it after a success', () => {
+    svc.markDoneNow('t-1');
+    svc.settleDone('t-2', false);
+    expect(svc.agenda()[0].doneAt).toEqual(expect.any(String));
+    svc.settleDone('t-1', false);
+    expect(svc.agenda()[0].doneAt).toBeNull();
+    svc.markDoneNow('t-1');
+    svc.settleDone('t-1', true);
+    expect(svc.agenda()[0].doneAt).toEqual(expect.any(String));
+    svc.load('m-1', null);
+    reads[0].next([row('t-1', '2026-10-15T16:30:00Z'), row('t-2')]);
+    expect(svc.agenda()[0].doneAt).toBe('2026-10-15T16:30:00Z');
+  });
+});

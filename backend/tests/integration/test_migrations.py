@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from typing import Any
 
 import pytest
 from alembic import command
@@ -1652,9 +1653,11 @@ def test_todo_link_budget_vote_gremium(alembic_cfg: Config, engine: Engine) -> N
     their indexes and widens ``ck_todo_link_one_target``. The downgrade deletes the links
     of the new kinds, drops the columns and keeps the other links.
 
-    A second run of the upgrade on the new schema changes nothing.
+    A second run of the upgrade on the new schema changes nothing. The test runs below
+    ``c4d1e2f3a5b6``, which replaces ``todo_link`` with ``link``.
     """
     new = ("vote_id", "gremium_id", "invoice_id", "expense_id")
+    command.downgrade(alembic_cfg, _BEFORE_LINK)
 
     def columns(conn: Connection) -> set[str]:
         return set(
@@ -1685,9 +1688,9 @@ def test_todo_link_budget_vote_gremium(alembic_cfg: Config, engine: Engine) -> N
     command.downgrade(alembic_cfg, "066ff25554e2")
     with engine.begin() as conn:
         assert not set(new) & columns(conn)
-    command.upgrade(alembic_cfg, "head")
+    command.upgrade(alembic_cfg, _BEFORE_LINK)
     command.downgrade(alembic_cfg, "066ff25554e2")
-    command.upgrade(alembic_cfg, "head")
+    command.upgrade(alembic_cfg, _BEFORE_LINK)
     with engine.begin() as conn:
         assert set(new) <= columns(conn)
         gremium = conn.execute(
@@ -1747,6 +1750,148 @@ def test_todo_link_budget_vote_gremium(alembic_cfg: Config, engine: Engine) -> N
     with engine.begin() as conn:
         kinds = conn.execute(text("SELECT todo_id FROM todo_link WHERE card_id = :c"), {"c": card})
         assert list(kinds.scalars()) == [other]
+    command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM gremium WHERE id = :g"), {"g": gremium})
+        conn.execute(text("DELETE FROM principal WHERE id = :w"), {"w": who})
+
+
+_BEFORE_LINK = "a4c71e2b9d05"
+
+
+def _card_world(conn: Connection) -> dict[str, uuid.UUID]:
+    """A Gremium, a person, a board with one column and two cards."""
+    tag = "mig-" + uuid.uuid4().hex[:8]
+    ids: dict[str, uuid.UUID] = {}
+    ids["gremium"] = conn.execute(
+        text("INSERT INTO gremium (name, slug) VALUES ('M', :s) RETURNING id"), {"s": tag}
+    ).scalar_one()
+    ids["who"] = conn.execute(
+        text("INSERT INTO principal (sub) VALUES (:s) RETURNING id"), {"s": tag}
+    ).scalar_one()
+    ids["board"] = conn.execute(
+        text(
+            "INSERT INTO todo_board (name, kind, gremium_id) VALUES ('M', 'gremium', :g) "
+            "RETURNING id"
+        ),
+        {"g": ids["gremium"]},
+    ).scalar_one()
+    column = conn.execute(
+        text(
+            "INSERT INTO todo_column (board_id, name, position, is_done) "
+            "VALUES (:b, 'Offen', 0, true) RETURNING id"
+        ),
+        {"b": ids["board"]},
+    ).scalar_one()
+    for name, rank in (("card", "m"), ("other", "n")):
+        ids[name] = conn.execute(
+            text(
+                "INSERT INTO todo_card (board_id, column_id, title, rank, created_by) "
+                "VALUES (:b, :c, 'K', :r, :w) RETURNING id"
+            ),
+            {"b": ids["board"], "c": column, "r": rank, "w": ids["who"]},
+        ).scalar_one()
+    return ids
+
+
+def _ordered(one: tuple[str, uuid.UUID], other: tuple[str, uuid.UUID]) -> tuple[Any, ...]:
+    def key(end: tuple[str, uuid.UUID]) -> tuple[bytes, bytes]:
+        return end[0].encode(), end[1].bytes
+
+    first, second = sorted((one, other), key=key)
+    return (*first, *second)
+
+
+def test_link_any_to_any(alembic_cfg: Config, engine: Engine) -> None:
+    """Migration c4d1e2f3a5b6 (specs 001402, 001403).
+
+    The upgrade moves each row of ``todo_link`` into ``link`` with the ends in the stored
+    order, makes one link of two rows that link the same two cards (the older row
+    wins) and drops ``todo_link``. A deleted element takes its links with it. The
+    downgrade gives back the rows with a card end, one row for two cards.
+    """
+    command.downgrade(alembic_cfg, _BEFORE_LINK)
+    with engine.begin() as conn:
+        ids = _card_world(conn)
+        card, other, gremium, who = ids["card"], ids["other"], ids["gremium"], ids["who"]
+        conn.execute(
+            text(
+                "INSERT INTO todo_link (card_id, gremium_id, created_by, created_at) "
+                "VALUES (:c, :g, :w, now())"
+            ),
+            {"c": card, "g": gremium, "w": who},
+        )
+        older = conn.execute(
+            text(
+                "INSERT INTO todo_link (card_id, todo_id, created_by, created_at) "
+                "VALUES (:c, :t, :w, now() - interval '1 day') RETURNING id"
+            ),
+            {"c": other, "t": card, "w": who},
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO todo_link (card_id, todo_id, created_by, created_at) "
+                "VALUES (:c, :t, :w, now())"
+            ),
+            {"c": card, "t": other, "w": who},
+        )
+    command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+        assert conn.execute(text("SELECT to_regclass('public.todo_link')")).scalar() is None
+        rows = conn.execute(
+            text(
+                "SELECT id, a_kind, a_id, b_kind, b_id FROM link "
+                "WHERE a_id IN (:c, :o) OR b_id IN (:c, :o)"
+            ),
+            {"c": card, "o": other},
+        ).all()
+        ends = {tuple(row[1:]) for row in rows}
+        assert ends == {
+            _ordered(("todo", card), ("gremium", gremium)),
+            _ordered(("todo", card), ("todo", other)),
+        }
+        assert older in {row[0] for row in rows}
+        with pytest.raises(IntegrityError), conn.begin_nested():
+            conn.execute(
+                text(
+                    "INSERT INTO link (a_kind, a_id, b_kind, b_id, created_by) "
+                    "VALUES ('todo', :c, 'todo', :c, :w)"
+                ),
+                {"c": card, "w": who},
+            )
+        conn.execute(text("DELETE FROM todo_card WHERE id = :o"), {"o": other})
+        left = conn.execute(
+            text("SELECT count(*) FROM link WHERE a_id = :c OR b_id = :c"), {"c": card}
+        ).scalar_one()
+        assert left == 1
+        other = conn.execute(
+            text(
+                "INSERT INTO todo_card (board_id, column_id, title, rank, created_by) "
+                "SELECT board_id, column_id, 'L', 'o', created_by FROM todo_card "
+                "WHERE id = :c RETURNING id"
+            ),
+            {"c": card},
+        ).scalar_one()
+        a, b = sorted((card, other), key=lambda u: u.bytes)
+        conn.execute(
+            text(
+                "INSERT INTO link (a_kind, a_id, b_kind, b_id, created_by) "
+                "VALUES ('todo', :a, 'todo', :b, :w), ('gremium', :g, 'meeting', :m, :w)"
+            ),
+            {"a": a, "b": b, "g": gremium, "m": uuid.uuid4(), "w": who},
+        )
+
+    command.downgrade(alembic_cfg, _BEFORE_LINK)
+    with engine.begin() as conn:
+        assert conn.execute(text("SELECT to_regclass('public.link')")).scalar() is None
+        rows = conn.execute(
+            text(
+                "SELECT card_id, gremium_id, todo_id FROM todo_link "
+                "WHERE card_id IN (:c, :o) OR todo_id IN (:c, :o)"
+            ),
+            {"c": card, "o": other},
+        ).all()
+        assert sorted(rows, key=str) == sorted([(card, gremium, None), (a, None, b)], key=str)
     command.upgrade(alembic_cfg, "head")
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM gremium WHERE id = :g"), {"g": gremium})

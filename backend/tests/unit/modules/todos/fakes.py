@@ -12,13 +12,16 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterable
 from datetime import UTC, date, datetime
-from typing import Any
+from typing import Any, NamedTuple
 
 from app.modules.auth.principal import Principal
 from app.modules.files.schemas import MessageAttachmentOut
 from app.modules.todos.access import ReadScope
+from app.modules.todos.link_store import Edge
 from app.modules.todos.links import HIDDEN, LinkRef, Resolved
 from app.modules.todos.models import (
+    LINK_KINDS,
+    Link,
     TodoBoard,
     TodoCard,
     TodoCardEvent,
@@ -26,7 +29,6 @@ from app.modules.todos.models import (
     TodoComment,
     TodoEvent,
     TodoLabel,
-    TodoLink,
 )
 from app.modules.todos.schemas import TodoLinkTarget, TodoMember
 
@@ -198,10 +200,12 @@ class FakeLinks:
         self.ok = set(readable)
         self.hits = hits or []
         self.searched: list[tuple[str, str, uuid.UUID | None]] = []
+        self.grants: bool | None = None
 
     async def resolve(
-        self, refs: Iterable[LinkRef], _principal: Principal
+        self, refs: Iterable[LinkRef], _principal: Principal, *, grants: bool = True
     ) -> dict[LinkRef, Resolved]:
+        self.grants = grants
         return {ref: self.resolved.get(ref, HIDDEN) for ref in refs}
 
     async def readable(self, kind: str, target_id: uuid.UUID, _principal: Principal) -> bool:
@@ -271,8 +275,36 @@ def label(board_id: uuid.UUID, name: str = "Wichtig", color: str = "red") -> Tod
     return TodoLabel(id=uuid.uuid4(), board_id=board_id, name=name, color=color)
 
 
-def link(card_id: uuid.UUID, **target: uuid.UUID) -> TodoLink:
-    return TodoLink(id=uuid.uuid4(), card_id=card_id, created_by=ME, created_at=NOW, **target)
+#: The old target column of a link kind, the name of the keyword of ``link``.
+_KIND_OF = {f"{kind}_id": kind for kind in LINK_KINDS} | {"todo_id": "todo"}
+
+
+class EdgeRow(NamedTuple):
+    """A row of ``link_store.edges_stmt``: an ``execute`` answer of the link queries."""
+
+    id: uuid.UUID
+    own_kind: str
+    own_id: uuid.UUID
+    kind: str
+    target_id: uuid.UUID
+    created_by: uuid.UUID
+    created_at: datetime
+
+
+def link(card_id: uuid.UUID, **target: uuid.UUID) -> EdgeRow:
+    """A link of the card as ``link_store.edges`` reads it, e.g. ``link(c, ticket_id=t)``."""
+    ((column, target_id),) = target.items()
+    return EdgeRow(uuid.uuid4(), "todo", card_id, _KIND_OF[column], target_id, ME, NOW)
+
+
+def edge(row: EdgeRow) -> Edge:
+    """The ``Edge`` of a row."""
+    return Edge(*row)
+
+
+def link_row(one: tuple[str, uuid.UUID], other: tuple[str, uuid.UUID]) -> Link:
+    """A stored link between two ends."""
+    return Link.between(one, other, ME, NOW)
 
 
 def event(

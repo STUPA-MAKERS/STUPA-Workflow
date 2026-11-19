@@ -1,6 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -14,7 +14,7 @@ import type { AccountMenuVariant } from '@stupa-makers/ui-kit/shell';
 import { createLocationMock, provideLocationMock, type LocationMock } from '../../../testing/location-mock';
 import { AppAccountMenuComponent } from './account-menu.component';
 
-@Component({ standalone: true, template: '' })
+@Component({ changeDetection: ChangeDetectionStrategy.Eager, standalone: true, template: '' })
 class StubPage {}
 
 const ACCOUNT_ROUTES = ['account/profile', 'account/notifications', 'account/grants'].map((path) => ({

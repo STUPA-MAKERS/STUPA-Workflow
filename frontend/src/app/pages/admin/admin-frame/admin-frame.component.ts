@@ -254,7 +254,6 @@ export class AdminFrameComponent {
    */
   readonly showBar = computed(() => !this.home() && !this.showNav() && this.phone());
 
-
   /**
    * One column, an area page (not the home page, not an editor that takes the full
    * width): a swipe from the left edge of a phone leads back. The editors are left out,
@@ -300,7 +299,7 @@ export class AdminFrameComponent {
   });
 
   /** The id of the navigation that shows the current page (see {@link sheetScroll}). */
-  private lastId = this.router.lastSuccessfulNavigation?.id ?? 0;
+  private lastId = this.router.lastSuccessfulNavigation()?.id ?? 0;
   /** The navigation id that Back or Forward restores, else null. */
   private restoreId: number | null = null;
 
@@ -309,7 +308,8 @@ export class AdminFrameComponent {
       if (e instanceof NavigationStart) {
         const sheet = this.page()?.nativeElement;
         if (sheet) sheetScroll.set(this.lastId, sheet.scrollTop);
-        this.restoreId = e.navigationTrigger === 'popstate' ? (e.restoredState?.navigationId ?? null) : null;
+        this.restoreId =
+          e.navigationTrigger === 'popstate' ? (e.restoredState?.navigationId ?? null) : null;
       } else if (e instanceof NavigationEnd) {
         this.lastId = e.id;
         this.path.set(pathOf(e.urlAfterRedirects));

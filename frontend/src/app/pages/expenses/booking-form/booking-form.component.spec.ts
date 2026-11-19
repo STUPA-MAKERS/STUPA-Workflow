@@ -1,6 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -16,7 +16,7 @@ import { TodosApiService } from '@core/api/todos.service';
 import { of } from 'rxjs';
 
 /** The Events of the `Veranstaltung` picker: none, and no linked Event. */
-const EVENTS_API = { writableEvents: () => of([]), linked: () => of([]) };
+const EVENTS_API = { writableEvents: () => of([]), linked: () => of([]), links: () => of({ canLink: false, links: [] }) };
 
 const TREE: BudgetTreeNode[] = [
   {
@@ -107,6 +107,7 @@ let CONFIG: { mode: 'create' | 'edit'; expense: Expense; inputs: Record<string, 
 
 /** The form inside the page state modules, as the bookings page builds them. */
 @Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
   standalone: true,
   imports: [BookingFormComponent],
   template: `

@@ -29,16 +29,13 @@
     <ng-content select="[vpnActions]" />
   </app-sheet-bar>
   <p class="sheet-line vpn__meta">
-    <app-status-text [kind]="s.kind">{{ s.key | t }}</app-status-text>
-    <span class="vpn__sep" aria-hidden="true">·</span>
+    <span class="vpn__part"><app-status-text chip [kind]="s.kind">{{ s.key | t }}</app-status-text></span>
     @if (where(); as w) {
-      <a class="vpn__app vpn__where ell" [routerLink]="['/meetings', context().meeting!.id]" [title]="w">{{ w }}</a>
-      <span class="vpn__sep" aria-hidden="true">·</span>
+      <span class="vpn__part vpn__where ell"><a class="vpn__app" [routerLink]="['/meetings', context().meeting!.id]" [title]="w">{{ w }}</a></span>
     } @else if (!v.meetingId && v.applicationId) {
-      <a class="vpn__app" [routerLink]="['/applications', v.applicationId]">{{ 'voting.panel.application' | t }}</a>
-      <span class="vpn__sep" aria-hidden="true">·</span>
+      <span class="vpn__part"><a class="vpn__app" [routerLink]="['/applications', v.applicationId]">{{ 'voting.panel.application' | t }}</a></span>
     }
-    <span class="vpn__rules">{{ rules() }}</span>
+    <span class="vpn__part vpn__rules">{{ rules() }}</span>
   </p>
 }
 

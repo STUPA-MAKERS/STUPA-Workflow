@@ -10,7 +10,10 @@ import {
   type TodoBoardSummary,
   type TodoCardDetail,
   type TodoCardTile,
+  type LinkRow,
+  type LinksOut,
   type TodoLink,
+  type TodoLinkedCard,
   type TodoMember,
 } from '../app/core/api/todos.service';
 
@@ -22,8 +25,50 @@ export const TODAY = '2026-10-16';
  */
 export const NO_LINKED_TODOS: Provider = {
   provide: TodosApiService,
-  useValue: { linked: () => of([]), boards: () => of([]), mine: () => of({ items: [], dueSoonCount: 0 }) },
+  useValue: {
+    linked: () => of([]),
+    links: () => of({ canLink: false, links: [] }),
+    boards: () => of([]),
+    mine: () => of({ items: [], dueSoonCount: 0 }),
+  },
 };
+
+/** A link row of `GET /links`; a card end carries its card. */
+export function linkRow(over: Partial<LinkRow> = {}): LinkRow {
+  return {
+    id: 'l-1',
+    kind: 'invoice',
+    targetId: 'i-1',
+    accessible: true,
+    title: 'RE-2026-17',
+    url: '/invoices?id=i-1',
+    detail: null,
+    granted: false,
+    card: null,
+    removable: false,
+    createdAt: '2026-10-01T10:00:00Z',
+    ...over,
+  };
+}
+
+/** The answer of `GET /links` with the cards first and then `rows`. */
+export function linksOf(
+  cards: readonly Partial<TodoLinkedCard>[] = [],
+  rows: readonly LinkRow[] = [],
+  canLink = false,
+): LinksOut {
+  const cardRows = cards.map((card, i) =>
+    linkRow({
+      id: `l-card-${i}`,
+      kind: 'todo',
+      targetId: card.id ?? `k-${i}`,
+      title: card.title ?? null,
+      url: null,
+      card: card as TodoLinkedCard,
+    }),
+  );
+  return { canLink, links: [...cardRows, ...rows] };
+}
 
 export function link(over: Partial<TodoLink> = {}): TodoLink {
   return {

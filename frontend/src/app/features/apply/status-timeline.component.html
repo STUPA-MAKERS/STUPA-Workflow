@@ -87,11 +87,11 @@
               }
             </app-sheet-bar>
 
-            <p class="sheet-line ad__line ad__seps">
+            <p class="sheet-line ad__line">
               <span class="ad__parts">
                 @if (app.state) {
                   <span class="ad__part">
-                    <app-status-text [kind]="stateKind()">{{ app.state.label }}</app-status-text>
+                    <app-status-text chip [kind]="stateKind()">{{ app.state.label }}</app-status-text>
                   </span>
                 }
                 @if (typeName(); as type) {
@@ -107,7 +107,7 @@
             </p>
 
             @if (actions().length) {
-              <div class="ad__transitions" role="group" [attr.aria-label]="'status.actions.title' | t">
+              <app-button-group class="ad__transitionGroup" [label]="'status.actions.title' | t">
                 @for (t of actions(); track t.id) {
                   <app-button
                     [variant]="looks().get(t.id) ?? 'tonal'"
@@ -118,7 +118,7 @@
                     {{ t.label || ('status.actions.fallback' | t) }}
                   </app-button>
                 }
-              </div>
+              </app-button-group>
             }
             @if (lockReason(); as reason) {
               <app-note class="ad__note" icon="lock" role="status">{{ reason | t }}</app-note>

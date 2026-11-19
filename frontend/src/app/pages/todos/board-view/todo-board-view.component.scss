@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use '../../../shared/ui/drag-preview' as dp;
 @use 'display' as d;
 @use 'field' as f;
@@ -36,7 +35,7 @@
   background: var(--color-surface-2);
 }
 :host-context([data-theme='dark']) .bv__col {
-  background: var(--color-surface-1);
+  background: var(--color-surface-2);
 }
 .bv__scroll {
   display: flex;
@@ -46,9 +45,6 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-}
-.bv__scroll {
-  @include fade.fade-y(var(--space-5));
 }
 .bv__head {
   display: flex;
@@ -292,4 +288,18 @@
   padding: var(--space-6) var(--space-2);
   color: var(--color-text-muted);
   text-align: center;
+}
+
+// In the rows body of a wide screen the board lies on a surface of its own, and its columns cut
+// at the round edge of that surface when they scroll sideways (spec 001442).
+:host-context(.td__body--rows) .bv:not(.bv--phone) {
+  flex: none;
+  padding: var(--space-2);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+  scroll-padding-inline: var(--space-2);
+}
+:host-context([data-very-high-contrast='on'] .td__body--rows) .bv:not(.bv--phone) {
+  border: var(--vh-edge);
+  background: var(--vh-bg);
 }

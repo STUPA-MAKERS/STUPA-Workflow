@@ -20,8 +20,8 @@ export interface PickRow {
 }
 
 /**
- * A dialog that picks one row from a list: "Mit To-Do verknüpfen" (with a search) and
- * "Auf Tagesordnung setzen" (without). The rows are radios, the first one starts picked.
+ * A dialog that picks one row from a list, with an optional search: "Auf Tagesordnung
+ * setzen" uses it without one. The rows are radios, the first one starts picked.
  * The caller reads the rows and acts on `picked`; the dialog only shows them.
  */
 @Component({

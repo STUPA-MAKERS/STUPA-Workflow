@@ -39,7 +39,6 @@ const KNOWN_NAMES: Provider = {
 
 async function setup(over: Partial<Inputs> = {}, extraProviders: Provider[] = []) {
   const bodyChange = jest.fn();
-  const finalize = jest.fn();
   const startRename = jest.fn();
   const cancelRename = jest.fn();
   const renameTop = jest.fn();
@@ -56,11 +55,11 @@ async function setup(over: Partial<Inputs> = {}, extraProviders: Provider[] = []
       revision: 0,
       ...over,
     },
-    on: { bodyChange, finalize, startRename, cancelRename, renameTop, doneChange },
+    on: { bodyChange, startRename, cancelRename, renameTop, doneChange },
     providers: [provideRouter([]), NO_LINKED_TODOS, KNOWN_NAMES, ...extraProviders],
   });
   await renderDeferred(view.fixture);
-  return { ...view, bodyChange, finalize, startRename, cancelRename, renameTop, doneChange };
+  return { ...view, bodyChange, startRename, cancelRename, renameTop, doneChange };
 }
 
 function editorOf(view: Awaited<ReturnType<typeof setup>>): MarkdownEditorComponent {
@@ -430,25 +429,13 @@ describe('TopSheetComponent', () => {
     expect(screen.queryByRole('toolbar', { name: 'Format' })).toBeNull();
   });
 
-  /** The foot of a live meeting is gone; the bar says it all. */
-  it('carries the state, the finalize and the PDFs of a closed meeting in the protocol bar', async () => {
-    const { fixture, finalize, container } = await setup({ meeting: meeting({ status: 'closed' }) });
-    const bar = screen.getByRole('status');
-    expect(bar).toHaveTextContent('Entwurf · Das Protokoll ist noch nicht versandt.');
+  /** § 001304: the protocol of a closed meeting sits in the meeting head, not on the sheet. */
+  it('shows no protocol state and no protocol action on the sheet of a closed meeting', async () => {
+    const { container } = await setup({ meeting: meeting({ status: 'closed' }) });
     expect(container.querySelector('.ts__foot')).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & senden' }));
-    expect(finalize).toHaveBeenCalled();
-    fixture.componentRef.setInput(
-      'protocol',
-      protocol({ status: 'final', isFinal: true, isLocked: true, pdfUrl: '/p.pdf', publicPdfUrl: '/pub.pdf', sentAt: '2026-10-16T08:00:00Z' }),
-    );
-    fixture.componentRef.setInput('editable', false);
-    fixture.detectChanges();
-    expect(screen.getByRole('status')).toHaveTextContent('Final · Das Protokoll ist final und wurde versandt.');
-    expect(screen.getByRole('link', { name: 'PDF intern' })).toHaveAttribute('href', '/p.pdf');
-    expect(screen.getByRole('link', { name: 'PDF öffentlich' })).toHaveAttribute('href', '/pub.pdf');
+    expect(container.querySelector('app-protocol-bar')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Finalisieren & senden' })).toBeNull();
-    expect(screen.queryByText('Gespeichert')).toBeNull();
   });
 
   /** The protocol area has no foot: the save state sits in the bar. */

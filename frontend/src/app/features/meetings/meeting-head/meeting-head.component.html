@@ -8,7 +8,7 @@
   <div class="mh__titles">
     <div class="mh__titleLine">
       <h1 class="mh__title" [title]="heading()">{{ heading() }}</h1>
-      <app-status-text class="mh__status" [kind]="statusKind()">{{ statusText() }}</app-status-text>
+      <app-status-text chip class="mh__status" [kind]="statusKind()">{{ statusText() }}</app-status-text>
     </div>
     @if (sub() !== null) {
       <span class="mh__sub">{{ sub() }}</span>
@@ -17,7 +17,7 @@
       <a class="mh__link" [routerLink]="l.to">{{ l.label }}</a>
     }
   </div>
-  <ng-container [ngTemplateOutlet]="actions" />
+  <app-button-group class="mh__actions"><ng-container [ngTemplateOutlet]="actions" /></app-button-group>
 }
 
 <ng-template #actions><ng-content /></ng-template>

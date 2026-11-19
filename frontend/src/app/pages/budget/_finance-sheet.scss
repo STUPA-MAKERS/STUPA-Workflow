@@ -1,5 +1,5 @@
 @use 'breakpoints' as bp;
-@use 'dot-parts' as dots;
+@use 'meta-chips' as chips;
 @use 'swatch';
 
 :host {
@@ -22,17 +22,11 @@
   background: var(--color-surface-1);
 }
 
-.fd__line {
-  --fd-sep: 24px;
-}
-.fd__seps {
-  overflow-x: clip;
-}
 .fd__parts {
-  @include dots.list(var(--fd-sep));
+  @include chips.list;
 }
 .fd__part {
-  @include dots.part(var(--fd-sep));
+  @include chips.chip;
 }
 .fd__amount {
   color: var(--color-text);

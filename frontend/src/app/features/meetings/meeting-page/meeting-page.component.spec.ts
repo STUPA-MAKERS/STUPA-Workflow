@@ -1,5 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { renderDeferred } from '../../../../testing/defer';
+import { linksOf } from '../../../../testing/todo-fixtures';
 import {
   HttpTestingController,
   provideHttpClientTesting,
@@ -127,6 +128,14 @@ async function openMenu(): Promise<HTMLElement> {
 }
 
 const VOTE_MENU = 'Aktionen der Abstimmung';
+
+/** Open the side sheet of the vote cards from the dock, unless it is open (spec 001460). */
+async function openVoteSheet(): Promise<HTMLElement> {
+  const open = screen.queryByRole('dialog', { name: 'Abstimmungen' });
+  if (open) return open;
+  await userEvent.click(screen.getByRole('button', { name: 'Abstimmungen' }));
+  return screen.getByRole('dialog', { name: 'Abstimmungen' });
+}
 
 /** The items of every vote card menu (⋮); each menu is opened and closed again. */
 async function voteMenuItems(): Promise<string[]> {
@@ -270,8 +279,8 @@ describe('MeetingPageComponent', () => {
       const menu = await openMenu();
       await userEvent.click(within(menu).getByRole('menuitem', { name: 'To-Dos' }));
       fixture.detectChanges();
-      const linked = http.expectOne((r) => r.url.endsWith('/api/todos/linked') && r.params.get('kind') === 'meeting');
-      linked.flush([
+      const linked = http.expectOne((r) => r.url.endsWith('/api/links') && r.params.get('kind') === 'meeting');
+      linked.flush(linksOf([
         {
           id: 'k-1',
           boardId: 'b-1',
@@ -284,12 +293,12 @@ describe('MeetingPageComponent', () => {
           event: null,
           balance: null,
         },
-      ]);
+      ]));
       http.expectOne((r) => r.url.endsWith('/api/todos/boards')).flush([{ id: 'b-1', name: 'StuPa', kind: 'gremium', gremiumId: 'g-1', canWrite: true }]);
       fixture.detectChanges();
       const sheet = await screen.findByRole('dialog', { name: 'To-Dos' });
       expect(within(sheet).getByRole('link', { name: 'Raum für die Sitzung buchen' })).toHaveAttribute('href', '/todos?card=k-1');
-      expect(within(sheet).getByRole('button', { name: 'Mit To-Do verknüpfen' })).toBeInTheDocument();
+      expect(within(sheet).getByRole('button', { name: 'Verknüpfen' })).toBeInTheDocument();
       expect(within(sheet).getByRole('button', { name: 'To-Do anlegen' })).toBeInTheDocument();
       expect(document.querySelector('.mp__agenda app-todo-linked-list[kind="meeting"]')).toBeNull();
     });
@@ -413,7 +422,7 @@ describe('MeetingPageComponent', () => {
     });
 
     /** A closed meeting has nothing for the beamer. */
-    it('moves the close into the menu on a phone; the finalize stays in the protocol bar', async () => {
+    it('moves the close into the menu on a phone, and the finalize into its protocol section', async () => {
       const { on, fixture } = await setup({}, [MEDIA.phone]);
       expect(screen.queryByRole('button', { name: 'Sitzung schließen' })).toBeNull();
       let menu = await openMenu();
@@ -421,17 +430,71 @@ describe('MeetingPageComponent', () => {
       expect(on.closeSession).toHaveBeenCalled();
       fixture.componentRef.setInput('meeting', meeting({ status: 'closed' }));
       fixture.detectChanges();
+      expect(screen.queryByRole('button', { name: 'Finalisieren & senden' })).toBeNull();
       menu = await openMenu();
-      expect(within(menu).queryByRole('menuitem', { name: 'Finalisieren & senden' })).toBeNull();
       expect(within(menu).queryByRole('menuitem', { name: 'Beamer-Ansicht' })).toBeNull();
-      await userEvent.keyboard('{Escape}');
-      await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & senden' }));
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'Finalisieren & senden' }));
       expect(on.finalize).toHaveBeenCalled();
     });
 
     it('shows no beamer for a closed meeting on a wide screen', async () => {
       await setup({ meeting: meeting({ status: 'closed' }) }, [MEDIA.wide]);
       expect(screen.queryByRole('button', { name: 'Beamer-Ansicht' })).toBeNull();
+    });
+  });
+
+  /** § 001304 (protocolHead) */
+  describe('protocolHead', () => {
+    const closed = meeting({ status: 'closed' });
+    const final = (over: Partial<Protocol> = {}) =>
+      protocol({ status: 'final', isFinal: true, isLocked: true, pdfUrl: '/p.pdf', sentAt: '2026-10-16T08:00:00Z', ...over });
+
+    it('shows the protocol state as the status of the head and the finalize as its action', async () => {
+      await setup({ meeting: closed }, [MEDIA.wide]);
+      const head = screen.getByRole('toolbar', { name: 'Sitzungssteuerung' });
+      expect(head).toHaveTextContent('Protokoll-Entwurf');
+      expect(head).not.toHaveTextContent('Geschlossen');
+      expect(within(head).getByRole('button', { name: 'Finalisieren & senden' })).toBeEnabled();
+      const menu = await openMenu();
+      expect(within(menu).getByText('Protokoll')).toBeInTheDocument();
+      expect(within(menu).getByRole('menuitem', { name: 'PDF intern' })).toBeInTheDocument();
+      expect(within(menu).getByRole('menuitem', { name: 'PDF öffentlich' })).toBeInTheDocument();
+      expect(within(menu).queryByRole('menuitem', { name: 'Finalisieren & senden' })).toBeNull();
+    });
+
+    it('shows the finalize disabled with the missing right to a writer without it', async () => {
+      await setup({ meeting: meeting({ status: 'closed', canFinalize: false }) }, [MEDIA.wide]);
+      const button = screen.getByRole('button', { name: 'Finalisieren & senden' });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute('title', expect.stringContaining('Protokoll finalisieren & senden'));
+    });
+
+    it('offers the PDF of a final protocol in the head and the rest in the menu', async () => {
+      const { fixture } = await setup({ meeting: closed, protocol: final({ publicPdfUrl: '/pub.pdf' }) }, [MEDIA.wide]);
+      const head = screen.getByRole('toolbar', { name: 'Sitzungssteuerung' });
+      expect(head).toHaveTextContent('Protokoll final');
+      expect(within(head).getByRole('link', { name: 'PDF intern' })).toHaveAttribute('href', '/p.pdf');
+      const menu = await openMenu();
+      expect(within(menu).getByRole('menuitem', { name: 'PDF öffentlich' })).toBeInTheDocument();
+      expect(within(menu).queryByRole('menuitem', { name: 'PDF intern' })).toBeNull();
+      await userEvent.keyboard('{Escape}');
+      fixture.componentRef.setInput('protocol', final({ sentAt: null }));
+      fixture.detectChanges();
+      expect(head).toHaveTextContent('Protokoll final, nicht versandt (keine Empfänger)');
+      expect(within(head).getByRole('link', { name: 'PDF' })).toHaveAttribute('href', '/p.pdf');
+    });
+
+    it('links the meeting that approved the protocol', async () => {
+      await setup(
+        {
+          meeting: closed,
+          protocol: final({ approvedAt: '2026-10-29T18:00:00Z', approvedMeetingId: 'm-2', approvedMeetingTitle: '34. Sitzung', approvedMeetingDate: '2026-10-29' }),
+        },
+        [MEDIA.wide],
+      );
+      const head = screen.getByRole('toolbar', { name: 'Sitzungssteuerung' });
+      expect(head).toHaveTextContent('Protokoll genehmigt');
+      expect(within(head).getByRole('link', { name: 'Genehmigt in 34. Sitzung · 29. Oktober 2026' })).toHaveAttribute('href', '/meetings/m-2');
     });
   });
 
@@ -535,6 +598,7 @@ describe('MeetingPageComponent', () => {
         [MEDIA.wide],
       );
       await userEvent.click(screen.getByRole('button', { name: 'Antrag Kulturfestival' }));
+      await openVoteSheet();
       await userEvent.click(screen.getByRole('button', { name: 'Abstimmung vorbereiten' }));
       expect(on.voteDialog).toHaveBeenCalledWith(AGENDA[2]);
     });
@@ -756,6 +820,7 @@ describe('MeetingPageComponent', () => {
         vote({ id: 'v-x', agendaItemId: 't-2', question: 'Anderer TOP?' }),
       ];
       const { on } = await setup({ meeting: meeting({ votes }) }, [MEDIA.wide]);
+      await openVoteSheet();
       const cards = screen.getAllByRole('heading', { level: 3 });
       expect(cards.map((h) => h.textContent)).toEqual(['Wird der Nachtragshaushalt beschlossen?', 'Vertagen?']);
       await userEvent.click(screen.getByRole('button', { name: 'Abstimmung schließen' }));
@@ -771,6 +836,7 @@ describe('MeetingPageComponent', () => {
 
     it('opens a planned vote', async () => {
       const { on } = await setup({ meeting: meeting({ votes: [vote({ status: 'draft' })] }) }, [MEDIA.wide]);
+      await openVoteSheet();
       await userEvent.click(screen.getByRole('button', { name: 'Abstimmung öffnen' }));
       expect(on.voteOpen).toHaveBeenCalledWith('v-1');
     });
@@ -778,6 +844,7 @@ describe('MeetingPageComponent', () => {
     it('changes a planned vote and repeats a closed one', async () => {
       const draft = vote({ id: 'v-1', status: 'draft' });
       const { on, fixture } = await setup({ meeting: meeting({ votes: [draft] }) }, [MEDIA.wide]);
+      await openVoteSheet();
       await chooseVoteMenu('Bearbeiten');
       expect(on.voteSource).toHaveBeenCalledWith({ mode: 'edit', vote: draft });
       const closed = vote({ id: 'v-1', status: 'closed', result: 'passed' });
@@ -809,6 +876,7 @@ describe('MeetingPageComponent', () => {
         vote({ id: 'v-x', agendaItemId: 't-2', question: 'Anderer TOP?' }),
       ];
       const { on, fixture } = await setup({ meeting: meeting({ votes }) }, [MEDIA.wide]);
+      await openVoteSheet();
       const open = screen.getByRole('button', { name: 'Abstimmung öffnen' });
       expect(open).toBeDisabled();
       expect(open).toHaveAttribute('title', 'Erst die offene Abstimmung schließen oder abbrechen.');
@@ -844,6 +912,7 @@ describe('MeetingPageComponent', () => {
 
     it('offers a decision question on a free-text item, and one vote per application item', async () => {
       const { on, fixture } = await setup({}, [MEDIA.wide]);
+      await openVoteSheet();
       await userEvent.click(screen.getByRole('button', { name: 'Beschlussfrage hinzufügen' }));
       expect(on.voteDialog).toHaveBeenCalledWith(AGENDA[0]);
       fixture.componentRef.setInput('top', AGENDA[2]);
@@ -864,6 +933,7 @@ describe('MeetingPageComponent', () => {
       const top = { ...AGENDA[0], planVersionId: 'pv-1' };
       const { fixture, http } = await setup({ top, meeting: meeting({ votes: [] }) }, [MEDIA.wide]);
       http.match((r) => r.url.endsWith('/budget-plan-versions/pv-1/readable')).forEach((r) => r.flush({ readable: true }));
+      await openVoteSheet();
       expect(screen.getByRole('button', { name: 'Abstimmung öffnen' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeNull();
       fixture.componentRef.setInput(
@@ -907,6 +977,7 @@ describe('MeetingPageComponent', () => {
     it('carries the result into the text until it is there, then goes quiet', async () => {
       const closed = vote({ status: 'closed', result: 'passed', counts: { yes: 3, no: 1, abstain: 0 }, leading: 'yes', revealed: true });
       const { on, fixture } = await setup({ meeting: meeting({ votes: [closed] }), top: item({ body: 'Aussprache.\\\n' }) }, [MEDIA.wide]);
+      await openVoteSheet();
       await userEvent.click(screen.getByRole('button', { name: 'Ins Protokoll übernehmen' }));
       const payload = on.bodyChange.mock.calls[0][0] as { itemId: string; body: string };
       expect(payload.itemId).toBe('t-1');
@@ -921,6 +992,79 @@ describe('MeetingPageComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Ins Protokoll übernehmen' }));
       const bodies = on.bodyChange.mock.calls.map((c) => (c[0] as { body: string }).body);
       expect(bodies.some((b) => b.startsWith('> [!abstimmung]'))).toBe(true);
+    });
+
+    /** Spec 001460: no column on a wide screen; the dock opens the cards in a sheet at the end. */
+    it('shows the vote cards in a side sheet at the end on a wide screen', async () => {
+      const { fixture } = await setup({ meeting: meeting({ votes: [vote({ status: 'draft' })] }) }, [MEDIA.wide]);
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('aside.mp__votes')).toBeNull();
+      expect(host.querySelector('.mp__body--votes')).toBeNull();
+      expect(screen.queryByRole('dialog', { name: 'Abstimmungen' })).toBeNull();
+      const sheet = await openVoteSheet();
+      expect(sheet).toHaveClass('ss--end');
+      expect(within(sheet).getByRole('button', { name: 'Abstimmung öffnen' })).toBeInTheDocument();
+    });
+
+    /** Spec 001460: only the minute-taker has the vote button in the dock; the others the edge tab or the menu. */
+    it('gives the dock vote button only to the minute-taker', async () => {
+      const { fixture } = await setup({ meeting: meeting({ votes: [vote({ status: 'draft' })] }) }, [MEDIA.wide]);
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('.mp__edgeTab')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Abstimmungen' })).toBeInTheDocument();
+      fixture.componentRef.setInput('meeting', meeting({ isProtokollant: false, votes: [vote({ status: 'draft' })] }));
+      fixture.detectChanges();
+      const tab = host.querySelector('.mp__edgeTab') as HTMLElement;
+      expect(tab).not.toBeNull();
+      expect(screen.getAllByRole('button', { name: 'Abstimmungen' })).toEqual([tab]);
+      await userEvent.click(tab);
+      expect(screen.getByRole('dialog', { name: 'Abstimmungen' })).toHaveClass('ss--end');
+    });
+
+    it('opens the votes from the phone menu for a person who does not keep the minutes', async () => {
+      await setup({ meeting: meeting({ isProtokollant: false, votes: [vote({ status: 'draft' })] }) }, [MEDIA.phone]);
+      expect(screen.queryByRole('button', { name: 'Abstimmungen' })).toBeNull();
+      await userEvent.click(within(await openMenu()).getByRole('menuitem', { name: 'Abstimmungen' }));
+      expect(screen.getByRole('dialog', { name: 'Abstimmungen' })).toHaveClass('ss--bottom');
+    });
+
+    /** Spec 001462: once per vote, for a person who may still vote, above the phone width. */
+    it('opens the vote sheet by itself for a voter, once, and not after the own ballot', async () => {
+      const { fixture } = await setup({ meeting: meeting({ votes: [vote({ status: 'draft' })] }) });
+      expect(screen.queryByRole('dialog', { name: 'Abstimmungen' })).toBeNull();
+      fixture.componentRef.setInput('meeting', meeting({ votes: [vote()] }));
+      fixture.detectChanges();
+      expect(await screen.findByRole('dialog', { name: 'Abstimmungen' })).toBeInTheDocument();
+      await userEvent.keyboard('{Escape}');
+      fixture.componentRef.setInput('meeting', meeting({ votes: [vote({ counts: { yes: 1 } })] }));
+      fixture.detectChanges();
+      expect(screen.queryByRole('dialog', { name: 'Abstimmungen' })).toBeNull();
+      fixture.componentRef.setInput('meeting', meeting({ votes: [vote({ id: 'v-2', myBallot: { cast: true, choice: null } })] }));
+      fixture.detectChanges();
+      expect(screen.queryByRole('dialog', { name: 'Abstimmungen' })).toBeNull();
+      fixture.componentRef.setInput('meeting', meeting({ canVote: false, votes: [vote({ id: 'v-3' })] }));
+      fixture.detectChanges();
+      expect(screen.queryByRole('dialog', { name: 'Abstimmungen' })).toBeNull();
+    });
+
+    /** Spec 001461: on a phone the open vote takes the place of the text, with a switch back. */
+    it('shows the open vote in the place of the text on a phone, with a switch to the text', async () => {
+      const { fixture, on } = await setup({ meeting: meeting({ votes: [vote()] }) }, [MEDIA.phone]);
+      const host = fixture.nativeElement as HTMLElement;
+      const sheet = host.querySelector('app-top-sheet') as HTMLElement;
+      expect(screen.queryByRole('dialog', { name: 'Abstimmungen' })).toBeNull();
+      expect(sheet.hidden).toBe(true);
+      await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
+      expect(on.castVote).toHaveBeenCalledWith({ voteId: 'v-1', choice: 'yes' });
+      await userEvent.click(screen.getByRole('radio', { name: 'Text' }));
+      expect(sheet.hidden).toBe(false);
+      expect(screen.queryByRole('button', { name: 'Ja' })).toBeNull();
+      await userEvent.click(screen.getByRole('radio', { name: 'Abstimmung' }));
+      expect(sheet.hidden).toBe(true);
+      fixture.componentRef.setInput('meeting', meeting({ votes: [vote({ status: 'closed', result: 'passed' })] }));
+      fixture.detectChanges();
+      expect(sheet.hidden).toBe(false);
+      expect(screen.queryByRole('radio', { name: 'Text' })).toBeNull();
     });
 
     it('inserts nothing without an open item and offers no insert to a reader', async () => {

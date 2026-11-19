@@ -1,4 +1,3 @@
-@use 'scroll-fade' as fade;
 @use 'field' as f;
 @use '../widths' as w;
 
@@ -49,6 +48,10 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+// The editor cuts at a round frame, like the list of a dialog (spec 000193).
+:host-context(.af--split) .mt__editor {
+  border-radius: var(--radius-field);
 }
 .mt__list {
   --li-min-height: 2.75rem;
@@ -178,7 +181,3 @@
   margin-inline-start: auto;
 }
 
-.mt__list,
-.mt__editor {
-  @include fade.fade-y(var(--space-5));
-}

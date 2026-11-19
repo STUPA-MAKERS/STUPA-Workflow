@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { Router, provideRouter, type Routes } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -26,7 +26,10 @@ const MEMBER: Principal = {
   groups: [],
 };
 
-@Component({ standalone: true, template: '<h1>Seite</h1>' })
+@Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
+  standalone: true, template: '<h1>Seite</h1>'
+})
 class StubPage {}
 
 const ROUTES: Routes = [
