@@ -27,7 +27,7 @@ Feature routes load lazily and a permission gate protects them.
 | `npm run lint` | ESLint (flat config, `@angular-eslint`) |
 | `npm run typecheck` | `tsc -p tsconfig.app.json --noEmit` (strict) |
 
-> Node 22 or newer. `npm install` fetches Angular 20 and the toolchain. You do not need `sudo`.
+> Node 22.22.3 or newer. `npm install` fetches Angular 22 and the toolchain. You do not need `sudo`.
 
 ## Project structure
 
