@@ -69,6 +69,11 @@ def test_amount_required_only_when_entering_an_approval() -> None:
         assert err.value.code == CODE_AMOUNT_REQUIRED
 
 
+async def test_no_state_is_no_approved_state() -> None:
+    """§ 001610: an application without a state never counts as approved; no query runs."""
+    assert await FlowService(None)._is_approved_state(None) is False  # type: ignore[arg-type]
+
+
 def test_period_defaults_and_refuses_a_reversed_range() -> None:
     assert period(None, None, TODAY) == (TODAY - timedelta(days=90), TODAY)
     assert period(date(2026, 1, 1), date(2026, 2, 1), TODAY) == (date(2026, 1, 1), date(2026, 2, 1))
