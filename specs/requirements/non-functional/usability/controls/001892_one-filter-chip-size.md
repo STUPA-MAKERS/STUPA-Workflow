@@ -2,7 +2,7 @@
 id: "001892"
 title: Every filter chip has the one chip look
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:
