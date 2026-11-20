@@ -23,7 +23,9 @@ entry) must ripple in that part, from its centre. Inside a popover or an open di
 layer would be under the top layer, the ripple of 001314 applies. The layer must not depend on
 `:active`. After a release the ripple must stay until 225 ms after the press and then fade. A
 touch that turns into a scroll must fade the ripple at once. A layer whose element leaves the
-page must go in the same frame.
+page must go in the same frame. When a view transition starts, the ripple must show its end (the full
+circle in the full tint), because the still picture of the transition would hold it in the
+middle of its growth. A tab must ripple as a pill.
 
 Reason: The ripple animated a custom property of the background. The browser paints that on the
 main thread, so the ripple stood still while a new page rendered, exactly when a press starts a
