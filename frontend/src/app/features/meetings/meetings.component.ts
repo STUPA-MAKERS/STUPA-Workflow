@@ -24,6 +24,7 @@ import { BreadcrumbsComponent } from '../../layout/breadcrumbs.component';
 import {
   BadgeComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   CardComponent,
   IconComponent,
   PageHeaderComponent,
@@ -84,6 +85,7 @@ import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
     TranslatePipe,
     BadgeComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     CardComponent,
     IconComponent,
     PageHeaderComponent,

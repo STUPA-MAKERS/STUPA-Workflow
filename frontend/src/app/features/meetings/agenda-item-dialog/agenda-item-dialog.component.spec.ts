@@ -412,13 +412,14 @@ describe('AgendaItemDialogComponent', () => {
     expect(cmp.freetext()).toBe('');
   });
 
-  it('resets the search when nothing matches it', async () => {
+  it('clears the search with the button of the search field when nothing matches it', async () => {
     const { http, fixture, cmp } = await setup();
     flushApps(http, fixture);
     await userEvent.type(screen.getByRole('searchbox', { name: 'Antrag suchen' }), 'Kühlschrank');
     expect(screen.getByText('Kein Antrag passt zu „Kühlschrank“')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Als Freitext anlegen' })).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    expect(screen.queryByRole('button', { name: 'Filter zurücksetzen' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Suche leeren' }));
     expect(cmp.query()).toBe('');
     expect(cmp.kind()).toBe('application');
     expect(within(screen.getByRole('radiogroup', { name: /Zuweisbare Anträge/ })).getAllByRole('radio')).toHaveLength(3);
@@ -517,6 +518,19 @@ describe('AgendaItemDialogComponent', () => {
       expect(screen.getByRole('searchbox', { name: 'To-Do suchen' })).toBeInTheDocument();
     });
 
+    it('shows the cards as select-sheet tiles with a check after the chosen one (001790)', async () => {
+      const { http, fixture } = await todoSetup();
+      flushBoard(http, fixture);
+      const group = screen.getByRole('radiogroup', { name: 'Offene To-Dos' });
+      expect(group.classList).toContain('rowgroup--bg3');
+      const radios = within(group).getAllByRole('radio');
+      await userEvent.click(radios[1]);
+      const rows = radios.map((r) => r.closest('label'));
+      expect(rows.map((r) => r?.querySelector('.aid__check') !== null)).toEqual([false, true, false]);
+      expect(rows[1]?.classList).toContain('aid__row--on');
+      expect(group.querySelector('.aid__mark')).toBeNull();
+    });
+
     /** Back on "To-Do" the list stays loaded. */
     it('puts the picked card on the agenda, non-public at once', async () => {
       const { http, fixture, added, cmp } = await todoSetup();
@@ -579,12 +593,12 @@ describe('AgendaItemDialogComponent', () => {
       expect(cmp.freetext()).toBe('Grillfest');
     });
 
-    it('resets the to-do search when nothing matches it', async () => {
+    it('clears the to-do search with the button of the search field when nothing matches it', async () => {
       const { http, fixture, cmp } = await todoSetup();
       flushBoard(http, fixture);
       await userEvent.type(screen.getByRole('searchbox', { name: 'To-Do suchen' }), 'Mensa');
       expect(screen.getByText('Kein To-Do passt zu „Mensa“')).toBeInTheDocument();
-      await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Suche leeren' }));
       expect(cmp.todoQuery()).toBe('');
       expect(cmp.kind()).toBe('todo');
       expect(within(screen.getByRole('radiogroup', { name: 'Offene To-Dos' })).getAllByRole('radio')).toHaveLength(3);

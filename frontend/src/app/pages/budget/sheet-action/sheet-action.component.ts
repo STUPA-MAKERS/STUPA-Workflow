@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, booleanAttribute, input, output } from '@angular/core';
-import { ButtonComponent, IconComponent, type IconName } from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, IconComponent, type IconName } from '@stupa-makers/ui-kit';
 
 /**
  * The main action in the head of a finance detail, such as "Bearbeiten". On a phone it is a
@@ -14,7 +14,7 @@ import { ButtonComponent, IconComponent, type IconName } from '@stupa-makers/ui-
 @Component({
   selector: 'app-sheet-action',
   standalone: true,
-  imports: [ButtonComponent, IconComponent],
+  imports: [ButtonComponent, ButtonGroupComponent, IconComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sheet-action.component.html',
   styleUrl: './sheet-action.component.scss',

@@ -21,6 +21,7 @@ import { LiveCardsComponent } from '../../features/meetings/live-cards/live-card
 import { RailStatusService } from '../../layout/rail-status.service';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   ButtonLinkComponent,
   EmptyStateComponent,
   FabComponent,
@@ -82,6 +83,7 @@ export interface ActivityDay {
   imports: [
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     ButtonLinkComponent,
     EmptyStateComponent,
     FabComponent,

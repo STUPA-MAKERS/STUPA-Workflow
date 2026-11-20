@@ -160,7 +160,7 @@
             [class.on]="overviewOpen()"
             (click)="overviewOpen.set(true)"
           >
-            <app-icon name="grid" [size]="15" />{{ 'budget.overview.button' | t }}
+            <app-icon name="grid" [size]="15" /><span class="chip__text">{{ 'budget.overview.button' | t }}</span>
           </button>
         </div>
       </div>
@@ -351,7 +351,9 @@
 
         <app-section class="bd__sec bd__sec--apps" size="lg" headingId="bd-apps" [heading]="itemsTitle()">
           @if (previewItems().length) {
-            <app-button sectionAction variant="text" size="sm" (click)="openItems()">{{ 'budget.dash.appsAll' | t }}</app-button>
+            <app-button-group ngProjectAs="[sectionAction]">
+              <app-button sectionAction variant="text" size="sm" (click)="openItems()">{{ 'budget.dash.appsAll' | t }}</app-button>
+            </app-button-group>
           }
           @if (apps() === null) {
             <app-skeleton variant="rows" [count]="3" [label]="(canSeeBookings() ? 'budget.dash.itemsLoading' : 'budget.dash.appsLoading') | t" />
@@ -389,7 +391,7 @@
         <div class="bd__chips">
           <ng-container *ngTemplateOutlet="yearChip" />
           <button type="button" class="chip" (click)="overviewOpen.set(true)">
-            <app-icon name="grid" [size]="15" />{{ 'budget.overview.button' | t }}
+            <app-icon name="grid" [size]="15" /><span class="chip__text">{{ 'budget.overview.button' | t }}</span>
           </button>
         </div>
       }
@@ -455,27 +457,31 @@
   <ng-template #actions>
     @if (phone()) {
       @if (actionSections()[0].items.length || actionSections().length > 1) {
-        <app-row-menu class="bd__more" [sections]="actionSections()" (selected)="onAction($event)" />
+        <app-button-group>
+          <app-row-menu class="bd__more" [sections]="actionSections()" (selected)="onAction($event)" />
+        </app-button-group>
       }
     } @else {
       <div class="bd__actions">
-        <!-- § 000670: the actions of a detail head are icon buttons, the rest is in the menu. -->
-        @if (canExport()) {
-          <app-button
-            variant="text"
-            [iconOnly]="true"
-            [ariaLabel]="'budget.dash.export' | t"
-            [title]="'budget.dash.export' | t"
-            [loading]="exporting()"
-            data-testid="bd-export"
-            (click)="onExport()"
-          >
-            <app-icon name="download" />
-          </app-button>
-        }
-        @if (moreSections().length) {
-          <app-row-menu class="bd__more" [sections]="moreSections()" (selected)="onAction($event)" />
-        }
+        <app-button-group>
+          <!-- § 000670: the actions of a detail head are icon buttons, the rest is in the menu. -->
+          @if (canExport()) {
+            <app-button
+              variant="text"
+              [iconOnly]="true"
+              [ariaLabel]="'budget.dash.export' | t"
+              [title]="'budget.dash.export' | t"
+              [loading]="exporting()"
+              data-testid="bd-export"
+              (click)="onExport()"
+            >
+              <app-icon name="download" />
+            </app-button>
+          }
+          @if (moreSections().length) {
+            <app-row-menu class="bd__more" [sections]="moreSections()" (selected)="onAction($event)" />
+          }
+        </app-button-group>
       </div>
     }
   </ng-template>
@@ -532,7 +538,7 @@
             [attr.aria-selected]="activeOverviewMetric() === m"
             (click)="overviewMetric.set(m)"
           >
-            {{ metricLabel(m) }}
+            <span class="chip__text">{{ metricLabel(m) }}</span>
           </button>
         }
       </div>

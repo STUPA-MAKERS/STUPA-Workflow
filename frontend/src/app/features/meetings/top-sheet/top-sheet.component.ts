@@ -23,6 +23,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import type { AgendaItem, Meeting, Protocol, Uuid } from '@core/api/models';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   EmptyStateComponent,
   IconComponent,
   type IconName,
@@ -150,6 +151,7 @@ const TOOLS: readonly FormatTool[] = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ButtonComponent,
+    ButtonGroupComponent,
     EmptyStateComponent,
     FormsModule,
     NgTemplateOutlet,

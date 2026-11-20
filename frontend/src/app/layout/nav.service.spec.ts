@@ -5,7 +5,7 @@ import { USE_MOCK_API } from '@core/api/api.config';
 import type { Principal } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { createLocationMock, provideLocationMock } from '../../testing/location-mock';
-import { ADMIN_PAGES } from '../pages/admin/admin-frame/admin-pages';
+import { ADMIN_PAGES } from '../pages/admin/admin-list/admin-pages';
 import { ADMIN_AREA_PERMISSIONS, BOTTOM_BAR_KEYS, NAV_ITEMS, NavService } from './nav.service';
 import { routes } from '../app.routes';
 
@@ -30,13 +30,16 @@ function keysFor(principal: Principal | null): string[] {
     .map((i) => i.key);
 }
 
+/** The public pages of every session (spec 001303), at the end of the main entries. */
+const PUBLIC = ['protocols', 'decisions', 'publicCalendar'];
+
 describe('NavService', () => {
   it('shows nothing to a visitor who is not signed in', () => {
     expect(keysFor(null)).toEqual([]);
   });
 
   it('shows a plain member only the personal areas', () => {
-    expect(keysFor(BASE)).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar']);
+    expect(keysFor(BASE)).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', ...PUBLIC]);
   });
 
   it('opens the budget areas with a global budget right', () => {
@@ -49,16 +52,27 @@ describe('NavService', () => {
       'budget',
       'expenses',
       'invoices',
+      ...PUBLIC,
     ]);
   });
 
   it('opens the tickets with ticket.manage, after the invoices', () => {
-    expect(keysFor({ ...BASE, permissions: ['ticket.manage'] })).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', 'tickets', 'admin']);
+    expect(keysFor({ ...BASE, permissions: ['ticket.manage'] })).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', 'tickets', ...PUBLIC, 'admin']);
     expect(NAV_ITEMS.findIndex((i) => i.key === 'tickets')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'invoices') + 1);
   });
 
+  /** § F/collaboration/graph/001420 and 001421: the entry "Graph" needs `graph.view`. */
+  it('opens the graph with graph.view, after the tickets', () => {
+    expect(keysFor({ ...BASE, permissions: ['graph.view'] })).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', 'graph', 'protocols', 'decisions', 'publicCalendar']);
+    const item = NAV_ITEMS.find((i) => i.key === 'graph');
+    expect(item).toMatchObject({ path: '/graph', labelKey: 'nav.graph', permissions: ['graph.view'], place: 'main' });
+    expect(NAV_ITEMS.findIndex((i) => i.key === 'graph')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'tickets') + 1);
+    const route = routes.flatMap((r) => [r, ...(r.children ?? [])]).find((r) => r.path === 'graph');
+    expect(route?.data).toMatchObject({ title: 'nav.graph', permission: 'graph.view' });
+  });
+
   it('opens the tickets to a reporter without ticket.manage', () => {
-    expect(keysFor({ ...BASE, has_reported_tickets: true })).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', 'tickets']);
+    expect(keysFor({ ...BASE, has_reported_tickets: true })).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', 'tickets', ...PUBLIC]);
   });
 
   it('shows the To-Dos to every session, after the tasks', () => {
@@ -119,6 +133,19 @@ describe('NavService', () => {
     expect(keys).not.toContain('meetings');
   });
 
+  /** § F/public/public-pages/001303: the public pages form the group "Öffentlich". */
+  it('groups the public pages as "Öffentlich" after the other main entries', () => {
+    const grouped = NAV_ITEMS.filter((i) => i.group === 'public');
+    expect(grouped.map((i) => [i.key, i.path])).toEqual([
+      ['protocols', '/protocols'],
+      ['decisions', '/decisions'],
+      ['publicCalendar', '/public-calendar'],
+    ]);
+    const main = NAV_ITEMS.filter((i) => i.place === 'main');
+    expect(main.slice(-3)).toEqual(grouped);
+    for (const item of grouped) expect(BOTTOM_BAR_KEYS).not.toContain(item.key);
+  });
+
   it('keeps the gremien out of the phone bar', () => {
     expect(BOTTOM_BAR_KEYS).not.toContain('gremien');
   });
@@ -136,8 +163,8 @@ describe('NavService', () => {
 
     it.each([
       ['todos', ['todos']],
-      ['calendar', ['calendar']],
-      ['meetings', ['meetings']],
+      ['calendar', ['calendar', 'publicCalendar']],
+      ['meetings', ['meetings', 'protocols', 'decisions']],
       ['voting', ['voting']],
       ['budget', ['budget', 'expenses']],
       ['invoices', ['invoices']],

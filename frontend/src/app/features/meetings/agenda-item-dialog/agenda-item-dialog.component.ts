@@ -24,6 +24,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   DialogComponent,
   EmptyStateComponent,
   IconComponent,
@@ -99,6 +100,7 @@ export interface AgendaTodoOption {
     TranslatePipe,
     DialogComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     InputComponent,
     SegmentedComponent,
@@ -378,13 +380,6 @@ export class AgendaItemDialogComponent {
   toggleFromRow(event: MouseEvent): void {
     if ((event.target as HTMLElement).closest('label, button')) return;
     this.nonPublic.update((on) => !on);
-  }
-
-  /** "Filter zurücksetzen": clears the search of the current kind. */
-  clearSearch(): void {
-    if (this.kind() === 'todo') this.todoQuery.set('');
-    else this.query.set('');
-    this.focusAfterRender('.aid__area input');
   }
 
   /**

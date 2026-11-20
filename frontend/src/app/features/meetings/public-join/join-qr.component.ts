@@ -13,6 +13,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { QrCodeComponent, formatJoinCode } from '@shared/ui/qr-code/qr-code.component';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   CopyButtonComponent,
   FocusDialogDirective,
   IconComponent,
@@ -34,7 +35,7 @@ import { JOIN_COPIED_MS } from './join-link.component';
   selector: 'app-join-qr',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FocusDialogDirective, NgTemplateOutlet, TranslatePipe, ButtonComponent, CopyButtonComponent, IconComponent, QrCodeComponent, SideSheetComponent],
+  imports: [FocusDialogDirective, NgTemplateOutlet, TranslatePipe, ButtonComponent, ButtonGroupComponent, CopyButtonComponent, IconComponent, QrCodeComponent, SideSheetComponent],
   host: { '(document:keydown.escape)': 'open.set(false)' },
   templateUrl: './join-qr.component.html',
   styleUrl: './join-qr.component.scss',

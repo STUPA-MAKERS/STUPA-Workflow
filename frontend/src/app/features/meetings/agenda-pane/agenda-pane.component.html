@@ -65,12 +65,14 @@
                 <app-badge variant="neutral">{{ 'meetings.agenda.nonPublic' | t }}</app-badge>
               }
               @if (menus()[i].length) {
-                <app-row-menu
-                  class="ap__menu"
-                  [sections]="menus()[i]"
-                  [label]="menuLabel(item)"
-                  (selected)="onAction(item, i, $event)"
-                />
+                <app-button-group>
+                  <app-row-menu
+                    class="ap__menu"
+                    [sections]="menus()[i]"
+                    [label]="menuLabel(item)"
+                    (selected)="onAction(item, i, $event)"
+                  />
+                </app-button-group>
               }
             </span>
           </app-list-item>

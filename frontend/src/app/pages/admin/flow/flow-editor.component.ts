@@ -19,6 +19,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   EmptyStateComponent,
   IconComponent,
   MEDIA,
@@ -93,6 +94,7 @@ import { TransitionListsComponent } from './transition-lists.component';
 import { ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
 import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.state';
 import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
+import { injectPanePage } from '../pane-page';
 
 /** How far one press of a scroll tongue pans the canvas, in screen px. */
 const PAN_STEP = 240;
@@ -125,7 +127,7 @@ const MIN_FIT_SCALE = 0.75;
  * no free-text eval. The header says whether the flow is valid.
  *
  * Wide (`MEDIA.wide`): the canvas and the inspector fill the free height of the window
- * (route data `adminPane`), and the inspector scrolls inside itself. Narrower, the
+ * (`injectPanePage`), and the inspector scrolls inside itself. Narrower, the
  * inspector follows the canvas.
  */
 @Component({
@@ -141,6 +143,7 @@ const MIN_FIT_SCALE = 0.75;
     FabComponent,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     VersionHistoryComponent,
     StateInspectorComponent,
     TransitionInspectorComponent,
@@ -154,7 +157,7 @@ const MIN_FIT_SCALE = 0.75;
     RowMenuComponent,
     ScrollFadeDirective,
   ],
-  host: { '[class.fe-pane]': 'wide()' },
+  host: { '[class.fe-pane]': 'wide()', '[class.pane-page]': 'wide()' },
   templateUrl: './flow-editor.component.html',
   styleUrl: './flow-editor.component.scss',
 })
@@ -297,6 +300,7 @@ export class FlowEditorComponent {
    */
   constructor() {
     inject(DestroyRef).onDestroy(() => this.stopHold());
+    injectPanePage(this.wide);
     this.loadFlow();
 
     observeElementSize(

@@ -10,23 +10,27 @@
   <div class="pe__group">
     <span class="pe__cap cap" [id]="idPrefix() + '-max-cap'">{{ 'poll.editor.maxChoices' | t }}</span>
     <div class="pe__stepper" role="group" [attr.aria-labelledby]="idPrefix() + '-max-cap'">
-      <app-button
-        variant="tonal"
-        size="sm"
-        [disabled]="maxChoices() <= 1"
-        [iconOnly]="true"
-        [ariaLabel]="'poll.editor.maxLess' | t"
-        (click)="changeMax(-1)"
-      ><app-icon name="minus" /></app-button>
+      <app-button-group>
+        <app-button
+          variant="tonal"
+          size="sm"
+          [disabled]="maxChoices() <= 1"
+          [iconOnly]="true"
+          [ariaLabel]="'poll.editor.maxLess' | t"
+          (click)="changeMax(-1)"
+        ><app-icon name="minus" /></app-button>
+      </app-button-group>
       <span class="pe__max mono" aria-live="polite">{{ maxChoices() }}</span>
-      <app-button
-        variant="tonal"
-        size="sm"
-        [disabled]="maxChoices() >= maxLimit()"
-        [iconOnly]="true"
-        [ariaLabel]="'poll.editor.maxMore' | t"
-        (click)="changeMax(1)"
-      ><app-icon name="plus" /></app-button>
+      <app-button-group>
+        <app-button
+          variant="tonal"
+          size="sm"
+          [disabled]="maxChoices() >= maxLimit()"
+          [iconOnly]="true"
+          [ariaLabel]="'poll.editor.maxMore' | t"
+          (click)="changeMax(1)"
+        ><app-icon name="plus" /></app-button>
+      </app-button-group>
     </div>
   </div>
 }
@@ -47,7 +51,9 @@
             [downLabel]="'poll.editor.down' | t: { name: text }"
             (move)="move(i, $event)"
           />
-          <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'poll.editor.remove' | t: { name: text }" (click)="remove(o.key)"><app-icon name="trash" /></app-button>
+          <app-button-group>
+            <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'poll.editor.remove' | t: { name: text }" (click)="remove(o.key)"><app-icon name="trash" /></app-button>
+          </app-button-group>
         </li>
       }
     </ol>
@@ -79,10 +85,12 @@
         [ngModelOptions]="{ standalone: true }"
         (ngModelChange)="newEnd.set($event)"
       />
-      <app-button variant="tonal" [disabled]="!canAddDate()" (click)="addDate()">
-        <app-icon name="plus" />
-        {{ 'poll.editor.add' | t }}
-      </app-button>
+      <app-button-group>
+        <app-button variant="tonal" [disabled]="!canAddDate()" (click)="addDate()">
+          <app-icon name="plus" />
+          {{ 'poll.editor.add' | t }}
+        </app-button>
+      </app-button-group>
     </div>
   } @else {
     <div class="pe__add">
@@ -95,10 +103,12 @@
         (ngModelChange)="newLabel.set($event)"
         (keydown.enter)="$event.preventDefault(); addLabel()"
       />
-      <app-button variant="tonal" [disabled]="!canAddLabel()" (click)="addLabel()">
-        <app-icon name="plus" />
-        {{ 'poll.editor.add' | t }}
-      </app-button>
+      <app-button-group>
+        <app-button variant="tonal" [disabled]="!canAddLabel()" (click)="addLabel()">
+          <app-icon name="plus" />
+          {{ 'poll.editor.add' | t }}
+        </app-button>
+      </app-button-group>
     </div>
   }
 </div>

@@ -21,9 +21,11 @@
       }
     </div>
     @if (canVerify()) {
-      <app-button variant="tonal" size="sm" [loading]="verifying()" (click)="runVerify()">
-        <app-icon name="shieldok" /> {{ 'admin.audit.verify.now' | t }}
-      </app-button>
+      <app-button-group>
+        <app-button variant="tonal" size="sm" [loading]="verifying()" (click)="runVerify()">
+          <app-icon name="shieldok" /> {{ 'admin.audit.verify.now' | t }}
+        </app-button>
+      </app-button-group>
     }
   </div>
 
@@ -115,9 +117,11 @@
                         <a class="al__open" [routerLink]="link">{{ 'admin.audit.openTarget' | t }}</a>
                       }
                       @if (isRevertable(e)) {
-                        <app-button variant="danger" size="sm" [disabled]="reverting()" (click)="askRevert(e)">
-                          {{ 'admin.audit.revert.action' | t }}
-                        </app-button>
+                        <app-button-group>
+                          <app-button variant="danger" size="sm" [disabled]="reverting()" (click)="askRevert(e)">
+                            {{ 'admin.audit.revert.action' | t }}
+                          </app-button>
+                        </app-button-group>
                       }
                     </div>
                   }
@@ -128,11 +132,7 @@
           }
         </ul>
       } @else {
-        <app-empty-state shape="table" [heading]="'admin.audit.empty' | t">
-          @if (activeFilterCount()) {
-            <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'admin.audit.filter.reset' | t }}</app-button>
-          }
-        </app-empty-state>
+        <app-empty-state shape="table" [heading]="'admin.audit.empty' | t" />
       }
 
       @if (hasMore()) {

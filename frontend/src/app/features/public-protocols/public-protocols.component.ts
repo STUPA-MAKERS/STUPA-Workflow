@@ -10,6 +10,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   DateBlockComponent,
   EmptyStateComponent,
   FilterSelectComponent,
@@ -51,6 +52,7 @@ import { dayMonthYear, parseDay, weekdayDate } from '@shared/date-format';
     RouterLink,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     DateBlockComponent,
     EmptyStateComponent,

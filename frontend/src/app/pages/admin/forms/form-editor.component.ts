@@ -20,6 +20,7 @@ import type { FieldType, FormFieldDef, I18nMap, Uuid } from '@core/api/models';
 import { langFieldLabel, resolveI18n, sameI18n, setI18n } from '@shared/forms/i18n-text';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   CheckboxComponent,
   EmptyStateComponent,
   IconComponent,
@@ -62,6 +63,7 @@ import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 import { ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
 import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.state';
 import { withoutKey } from '@shared/util/immutable';
+import { injectPanePage } from '../pane-page';
 
 /**
  * Visible order of the question types in the "add question" menu. `section` is **not** a
@@ -118,6 +120,7 @@ type QPos = QuestionPos;
     FormsModule,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     CheckboxComponent,
     SelectFieldComponent,
     IconComponent,
@@ -130,7 +133,7 @@ type QPos = QuestionPos;
     StatusTextComponent,
     ScrollFadeDirective,
   ],
-  host: { '[class.fe-pane]': 'wide()' },
+  host: { '[class.fe-pane]': 'wide()', '[class.pane-page]': 'wide()' },
   templateUrl: './form-editor.component.html',
   styleUrl: './form-editor.component.scss',
 })
@@ -317,6 +320,7 @@ export class FormEditorComponent {
   );
 
   constructor() {
+    injectPanePage(this.wide);
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((params) => {
       const id = params.get('id') ?? '';
       this.typeId.set(id);

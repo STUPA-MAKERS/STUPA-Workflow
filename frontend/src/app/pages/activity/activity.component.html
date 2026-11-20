@@ -91,10 +91,12 @@
           @if (cursor()) {
             <div class="act__sentinel" appInfiniteScroll (scrolledToEnd)="loadMore()" aria-hidden="true"></div>
             <div class="act__more">
-              <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">
-                <app-icon name="down" />
-                {{ 'activity.loadMore' | t }}
-              </app-button>
+              <app-button-group>
+                <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">
+                  <app-icon name="down" />
+                  {{ 'activity.loadMore' | t }}
+                </app-button>
+              </app-button-group>
             </div>
           }
         </div>

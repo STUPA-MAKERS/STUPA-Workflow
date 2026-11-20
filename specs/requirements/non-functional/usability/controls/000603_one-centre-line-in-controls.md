@@ -4,9 +4,10 @@ title: Text, icons and counts of a control share one centre line
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-10
+updated: 2026-11-19
 implementation:
   - frontend/vendor/ui-kit/src/lib/button/button.component.scss
+  - frontend/vendor/ui-kit/src/styles/base.scss
   - frontend/vendor/ui-kit/src/lib/filter-select/filter-select.component.scss
   - frontend/src/app/layout/language-select/language-select.component.ts
   - frontend/src/app/layout/public-header/public-header.component.html
@@ -27,7 +28,8 @@ Reason: A count plate inside the text line made the line box higher than the tex
 text and the icon moved about 1px up. The line box of a chip text puts the capitals off its
 middle by an amount that differs between browsers, so a fixed padding is right in one
 browser and wrong in another. A chip trims its text box to the capitals
-(`text-box: trim-both cap alphabetic`) where the browser supports it.
+(`text-box: trim-both cap alphabetic`) where the browser supports it. A text node cannot be
+trimmed, so every chip puts its text in a span.
 
 Test: The style spec of the kit checks the count plate and the trimmed chip text.
 Zoomed screenshot (DPR 4) of the "Kommentare" button of an application, with and without

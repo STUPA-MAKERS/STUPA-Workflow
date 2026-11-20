@@ -33,13 +33,13 @@ describe('veryHighContrastApp (§000614)', () => {
 });
 
 describe('surfaceEdges (§000605)', () => {
-  it('draws the white edge around the calendar grid, its day pane and the pane of the start page', () => {
-    expect(RULES).toMatch(/\.dash--wide \.dash__today,\s*\.cal__panel \{\s*border: var\(--vh-edge\) !important;/);
+  it('draws the white edge around the calendar grid and the pane of the start page', () => {
+    expect(RULES).toMatch(/\.dash--wide \.dash__today \{\s*border: var\(--vh-edge\) !important;/);
     expect(RULES).toMatch(/\.cal__grid::after \{[^}]*border: var\(--vh-edge\);/);
   });
 
-  it('draws the white edge around a meeting in the day pane of the calendar', () => {
-    expect(RULES).toMatch(/\.cal__panel \.cal__card \{[^}]*border: var\(--vh-edge\);/);
+  it('draws no edge around the day column of the calendar, a plain row group (001770)', () => {
+    expect(RULES).not.toMatch(/\.cal__panel/);
   });
 
   it('draws the white edge around a card and a column of a board', () => {
@@ -119,11 +119,6 @@ describe('choiceCards (§000618)', () => {
 describe('rowsAndFills (§000619, §000621)', () => {
   it('gives a day of the calendar a yellow number', () => {
     expect(RULES).toMatch(/\.cal__num:not\(\.cal__num--today\) \{\s*color: var\(--vh-hi\) !important;/);
-  });
-
-  it('fills the open page and the chosen tile of the admin frame', () => {
-    const fill = selectorsOf('  .af__item--on,', 'fill');
-    expect(fill).toContain('.ah__tile--on');
   });
 
   it('turns the text of the chosen budget node black', () => {

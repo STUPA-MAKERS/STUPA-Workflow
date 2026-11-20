@@ -50,9 +50,11 @@
             />
           }
           @if (activeFilterCount() > 0) {
-            <app-button variant="text" size="sm" (click)="reset()">
-              {{ 'tickets.list.filter.reset' | t }}
-            </app-button>
+            <app-button-group>
+              <app-button variant="text" size="sm" (click)="reset()">
+                {{ 'tickets.list.filter.reset' | t }}
+              </app-button>
+            </app-button-group>
           }
         </div>
       </app-sticky-bar>
@@ -78,11 +80,7 @@
           </div>
         } @else if (!hasRows()) {
           @if (activeFilterCount() > 0) {
-            <app-empty-state [heading]="'tickets.list.noMatch' | t">
-              <app-button variant="text" size="sm" (click)="reset()">
-                {{ 'tickets.list.filter.reset' | t }}
-              </app-button>
-            </app-empty-state>
+            <app-empty-state [heading]="'tickets.list.noMatch' | t" />
           } @else {
             <app-empty-state [heading]="'tickets.list.empty' | t" />
           }
@@ -136,9 +134,11 @@
           }
           @if (hasMore()) {
             <div class="tk__more">
-              <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">
-                {{ 'tickets.list.more' | t }}
-              </app-button>
+              <app-button-group>
+                <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">
+                  {{ 'tickets.list.more' | t }}
+                </app-button>
+              </app-button-group>
             </div>
           }
         }

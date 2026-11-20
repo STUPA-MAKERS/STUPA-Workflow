@@ -25,6 +25,7 @@ import { LiveVoteService, type LiveVoteSession } from '@core/ws/live-vote.servic
 import {
   Announcer,
   ButtonComponent,
+  ButtonGroupComponent,
   ConfirmDialogComponent,
   EmptyStateComponent,
   IconComponent,
@@ -97,6 +98,7 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
     ConfirmDialogComponent,
     RouterLink,
     ButtonComponent,
+    ButtonGroupComponent,
     EmptyStateComponent,
     IconComponent,
     RowMenuComponent,

@@ -12,6 +12,7 @@ import type { Uuid } from '@core/api/models';
 import {
   FabComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   ConfirmDialogComponent,
   CurrencyInputComponent,
   DialogComponent,
@@ -196,6 +197,7 @@ export const APPS_SHOWN = 5;
     TranslatePipe,
     SimplifyPathPipe,
     ButtonComponent,
+    ButtonGroupComponent,
     DialogComponent,
     IconComponent,
     EmptyStateComponent,

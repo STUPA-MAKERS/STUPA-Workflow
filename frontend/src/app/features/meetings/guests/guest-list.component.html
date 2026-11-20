@@ -15,7 +15,9 @@
         <div class="g__ctl">
           <app-status-text [kind]="row.status.kind">{{ row.status.key | t }}</app-status-text>
           @if (row.menu.length) {
-            <app-row-menu [sections]="row.menu" [label]="'guests.list.menu' | t: { name: row.name }" (selected)="onMenu(row, $event.id)" />
+            <app-button-group>
+              <app-row-menu [sections]="row.menu" [label]="'guests.list.menu' | t: { name: row.name }" (selected)="onMenu(row, $event.id)" />
+            </app-button-group>
           } @else {
             <span class="g__menuGap" aria-hidden="true"></span>
           }

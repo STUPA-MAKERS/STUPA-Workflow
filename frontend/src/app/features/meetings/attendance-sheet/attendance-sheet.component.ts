@@ -21,6 +21,7 @@ import type { LiveViewer } from '@core/ws/ws-messages';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   EmptyStateComponent,
   IconComponent,
   MEDIA,
@@ -140,6 +141,7 @@ const SELF_CHOICES: readonly { readonly value: Choice; readonly label: Translati
     SearchPillComponent,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     AvatarComponent,
     RowMenuComponent,

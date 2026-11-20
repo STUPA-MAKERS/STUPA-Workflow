@@ -20,6 +20,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   CheckboxComponent,
   DialogComponent,
   EmptyStateComponent,
@@ -115,6 +116,7 @@ import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-stat
     NoteComponent,
     SkeletonComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     CheckboxComponent,
     DialogComponent,
     IconComponent,

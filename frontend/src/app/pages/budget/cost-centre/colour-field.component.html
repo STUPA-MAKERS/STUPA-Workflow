@@ -32,7 +32,9 @@
       [disabled]="disabled()"
     />
     @if (value() && !disabled()) {
-      <app-button variant="text" size="sm" (click)="pick('')">{{ 'budget.tree.colorClear' | t }}</app-button>
+      <app-button-group>
+        <app-button variant="text" size="sm" (click)="pick('')">{{ 'budget.tree.colorClear' | t }}</app-button>
+      </app-button-group>
     }
   </div>
 </fieldset>

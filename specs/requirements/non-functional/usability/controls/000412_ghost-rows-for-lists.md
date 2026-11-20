@@ -2,11 +2,10 @@
 id: "000412"
 title: Ghost rows are only for lists
 kind: non-functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation:
-  - frontend/vendor/ui-kit/src/lib/empty-state/empty-state.component.ts
+updated: 2026-11-19
+replaced_by: NF/usability/controls/001360
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

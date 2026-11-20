@@ -50,6 +50,7 @@ export type NavKey =
   | 'applications'
   | 'tasks'
   | 'activity'
+  | 'graph'
   | 'todos'
   | 'calendar'
   | 'meetings'
@@ -59,6 +60,9 @@ export type NavKey =
   | 'expenses'
   | 'invoices'
   | 'tickets'
+  | 'protocols'
+  | 'decisions'
+  | 'publicCalendar'
   | 'admin';
 
 /** One entry of the navigation rail and of the phone bar. */
@@ -83,6 +87,8 @@ export interface NavItem {
   readonly feature?: FeatureKey;
   /** `end` entries sit at the foot of the rail, after the spacer. */
   readonly place: 'main' | 'end';
+  /** The collapsible group of the entry: `public` is "Öffentlich" (spec 001303). */
+  readonly group?: 'public';
 }
 
 /**
@@ -147,6 +153,17 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'expenses', path: '/expenses', labelKey: 'nav.expenses', icon: 'swap', permissions: BUDGET_PERMISSIONS, feature: 'budget', place: 'main' },
   { key: 'invoices', path: '/invoices', labelKey: 'nav.invoices', icon: 'receipt', permissions: BUDGET_PERMISSIONS, feature: 'invoices', place: 'main' },
   { key: 'tickets', path: '/tickets', labelKey: 'nav.tickets', icon: 'ticket', permissions: ['ticket.manage'], reportedTickets: true, feature: 'tickets', place: 'main' },
+  /** The graph of the elements and their relations (specs 001420, 001421). */
+  { key: 'graph', path: '/graph', labelKey: 'nav.graph', icon: 'shapes', permissions: ['graph.view'], place: 'main' },
+  /**
+   * The public pages, for a signed-in person (spec 001303): the public start page `/` holds
+   * the only other links to them, and it leads a session to the activity page. They form
+   * the group "Öffentlich" at the end of the main entries; a page shows only while its
+   * feature is on.
+   */
+  { key: 'protocols', path: '/protocols', labelKey: 'nav.public.protocols', icon: 'file', permissions: [], feature: 'meetings', place: 'main', group: 'public' },
+  { key: 'decisions', path: '/decisions', labelKey: 'nav.public.decisions', icon: 'vote', permissions: [], feature: 'meetings', place: 'main', group: 'public' },
+  { key: 'publicCalendar', path: '/public-calendar', labelKey: 'nav.public.calendar', icon: 'cal', permissions: [], feature: 'calendar', place: 'main', group: 'public' },
   { key: 'admin', path: '/admin', labelKey: 'nav.admin', icon: 'shield', permissions: ADMIN_AREA_PERMISSIONS, place: 'end' },
 ];
 

@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { BrandingService } from '@core/branding/branding.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, IconComponent, SkeletonComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, IconComponent, SkeletonComponent } from '@stupa-makers/ui-kit';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
 import { HelpService } from '../help/help.service';
@@ -26,7 +26,7 @@ import { HelpService } from '../help/help.service';
   selector: 'app-accessibility-statement',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ButtonComponent, IconComponent, SkeletonComponent, MarkdownViewComponent],
+  imports: [TranslatePipe, ButtonComponent, ButtonGroupComponent, IconComponent, SkeletonComponent, MarkdownViewComponent],
   templateUrl: './accessibility-statement.component.html',
   styleUrl: './accessibility-statement.component.scss',
 })

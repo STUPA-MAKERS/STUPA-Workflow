@@ -15,18 +15,18 @@
     background: none;
   }
   // A surface has the white edge (000605), because no shade sets it apart from the black
-  // page: on a wide screen the pane "Heute" of the start page, and the grid and
-  // the day pane of the calendar.
+  // page: on a wide screen the pane "Heute" of the start page, and the week of the
+  // calendar. The day column of the calendar is a plain row group without a surface (001770),
+  // and each day of the month is a segment with its own edge, so the month has no frame.
   // The edge is a border, so content that scrolls inside the box does not paint over it.
-  .dash--wide .dash__today,
-  .cal__panel {
+  .dash--wide .dash__today {
     border: var(--vh-edge) !important;
   }
-  // The cells of the calendar paint over an outline, so its edge is a layer on top.
-  .cal__grid {
+  // The columns of the week paint over an outline, so its edge is a layer on top.
+  app-calendar-week.cal__grid {
     position: relative;
   }
-  .cal__grid::after {
+  app-calendar-week.cal__grid::after {
     content: '';
     position: absolute;
     inset: 0;
@@ -35,11 +35,6 @@
     border-radius: inherit;
     pointer-events: none;
   }
-  // An entry in the day pane is a card of its own, so it has an edge too.
-  .cal__panel .cal__card {
-    border: var(--vh-edge);
-  }
-
   // A card of a board is a surface, so it has the white edge too. A column of a board is a
   // surface that holds the cards, so it has the edge as well.
   app-todo-card-tile,
@@ -125,9 +120,6 @@
   .hm__item {
     @include vh.text;
   }
-  .af__item:not(.af__item--on) .af__icon {
-    color: var(--vh-hi) !important;
-  }
 
   // A choice card (000618): a vote option, a vote option for a person that the voter
   // stands in for, and a card of the Antrag type.
@@ -180,12 +172,7 @@
     color: var(--vh-hi) !important;
   }
 
-  // The open page of the admin frame, its chosen tile and the chosen node of the budget
-  // tree are yellow fills (000619, 000621).
-  .af__item--on,
-  .ah__tile--on {
-    @include vh.fill;
-  }
+  // The chosen node of the budget tree has black text on its fill (000621).
   .tn--on {
     @include vh.ink(var(--vh-bg), var(--vh-bg));
   }

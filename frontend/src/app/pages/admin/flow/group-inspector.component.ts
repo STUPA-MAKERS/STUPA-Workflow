@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, InputComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, InputComponent } from '@stupa-makers/ui-kit';
 import type { FlowGroup } from '../admin.models';
 import { FlowColorComponent } from './flow-color.component';
 
@@ -10,7 +10,7 @@ import { FlowColorComponent } from './flow-color.component';
   selector: 'app-group-inspector',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, InputComponent, FlowColorComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, ButtonGroupComponent, InputComponent, FlowColorComponent],
   templateUrl: './group-inspector.component.html',
   styleUrl: './group-inspector.component.scss',
 })

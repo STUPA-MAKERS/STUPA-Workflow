@@ -394,6 +394,13 @@ export const routes: Routes = [
           import('./pages/activity/activity.component').then((m) => m.ActivityComponent),
       },
       {
+        /** The graph of the elements and their relations (spec 001420), behind `graph.view` (001421). */
+        path: 'graph',
+        data: { title: 'nav.graph', permission: 'graph.view', wide: true },
+        canActivate: [authGuard],
+        loadComponent: () => import('./pages/graph/graph.component').then((m) => m.GraphComponent),
+      },
+      {
         path: 'calendar',
         canMatch: [featureMatch('calendar')],
         data: { title: 'nav.calendar', wide: true },
@@ -416,12 +423,38 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/todos/todos.component').then((m) => m.TodosComponent),
       },
       {
+        path: 'admin/forms/:id',
+        data: {
+          title: 'admin.forms.edit',
+          permission: 'form.configure',
+          parent: ['admin', 'admin/forms'],
+          wide: true,
+        },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/forms/form-editor.component').then((m) => m.FormEditorComponent),
+      },
+      {
+        path: 'admin/flow',
+        data: {
+          title: 'admin.flow.title',
+          permission: ['flow.configure', 'admin.types'],
+          parent: ['admin'],
+          wide: true,
+        },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/flow/flow-editor.component').then(
+            (m) => m.FlowEditorComponent,
+          ),
+      },
+      {
         path: 'admin',
         data: { wide: true, frame: 'admin' },
         canActivate: [authGuard],
         loadComponent: () =>
-          import('./pages/admin/admin-frame/admin-frame.component').then(
-            (m) => m.AdminFrameComponent,
+          import('./pages/admin/admin-list/admin-list.component').then(
+            (m) => m.AdminListComponent,
           ),
         children: [
           {
@@ -488,34 +521,6 @@ export const routes: Routes = [
             canActivate: [authGuard],
             loadComponent: () =>
               import('./pages/admin/forms/forms-list.component').then((m) => m.FormsListComponent),
-          },
-          {
-            path: 'forms/:id',
-            data: {
-              title: 'admin.forms.edit',
-              permission: 'form.configure',
-              parent: ['admin', 'admin/forms'],
-              adminNav: false,
-              adminPane: true,
-            },
-            canActivate: [authGuard],
-            loadComponent: () =>
-              import('./pages/admin/forms/form-editor.component').then((m) => m.FormEditorComponent),
-          },
-          {
-            path: 'flow',
-            data: {
-              title: 'admin.flow.title',
-              permission: ['flow.configure', 'admin.types'],
-              parent: ['admin'],
-              adminNav: false,
-              adminPane: true,
-            },
-            canActivate: [authGuard],
-            loadComponent: () =>
-              import('./pages/admin/flow/flow-editor.component').then(
-                (m) => m.FlowEditorComponent,
-              ),
           },
           {
             path: 'backups',
@@ -706,8 +711,8 @@ export const routes: Routes = [
         data: { wide: true, frame: 'account' },
         canActivate: [authGuard],
         loadComponent: () =>
-          import('./pages/admin/admin-frame/admin-frame.component').then(
-            (m) => m.AdminFrameComponent,
+          import('./pages/admin/admin-list/admin-list.component').then(
+            (m) => m.AdminListComponent,
           ),
         children: [
           {

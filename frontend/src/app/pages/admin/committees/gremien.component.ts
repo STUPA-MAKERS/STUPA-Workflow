@@ -8,6 +8,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   FabComponent,
   ConfirmDialogComponent,
   EmptyStateComponent,
@@ -78,6 +79,7 @@ interface Setting {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ButtonComponent,
+    ButtonGroupComponent,
     GremiumDefaultsDialogComponent,
     LoadStateComponent,
     SectionComponent,

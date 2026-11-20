@@ -30,11 +30,13 @@
                   (checkedChange)="setActive(l, $event)"
                   >{{ 'admin.translations.active' | t }}</app-switch
                 >
-                <app-row-menu
-                  [sections]="languageMenu()"
-                  [label]="('ui.rowMenu.trigger' | t) + ': ' + l.name"
-                  (selected)="onLanguageMenu($event, l)"
-                />
+                <app-button-group>
+                  <app-row-menu
+                    [sections]="languageMenu()"
+                    [label]="('ui.rowMenu.trigger' | t) + ': ' + l.name"
+                    (selected)="onLanguageMenu($event, l)"
+                  />
+                </app-button-group>
               </span>
             </app-list-item>
           }
@@ -111,13 +113,15 @@
                 </div>
                 <span class="tr__reset">
                   @if (isChanged(key)) {
-                    <app-button
-                      variant="text"
-                      [iconOnly]="true"
-                      [ariaLabel]="'admin.translations.reset' | t: { key: key }"
-                      (click)="reset(key)"
-                      ><app-icon name="undo"
-                    /></app-button>
+                    <app-button-group>
+                      <app-button
+                        variant="text"
+                        [iconOnly]="true"
+                        [ariaLabel]="'admin.translations.reset' | t: { key: key }"
+                        (click)="reset(key)"
+                        ><app-icon name="undo"
+                      /></app-button>
+                    </app-button-group>
                   }
                 </span>
               </li>
