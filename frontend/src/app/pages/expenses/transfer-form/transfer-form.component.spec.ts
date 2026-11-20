@@ -279,7 +279,7 @@ describe('TransferFormComponent', () => {
     view.fixture.detectChanges();
     await user.click(screen.getByRole('button', { name: /^20,00\s€ umschichten$/ }));
     expect(create).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: 'Schließen' }));
+    await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
     expect(host.dialogs.transferOpen()).toBe(false);
   });
 

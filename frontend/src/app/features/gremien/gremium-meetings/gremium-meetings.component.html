@@ -20,10 +20,11 @@
   />
   @if (!phone()) {
     <span class="gmt__grow"></span>
-    <a class="gmt__link" routerLink="/meetings" [queryParams]="{ committee: gremiumId() }">
-      {{ 'gremien.detail.allMeetings' | t }}
-      <app-icon name="arrow" [size]="15" />
-    </a>
+    <app-button-group>
+      <a appButton="text" size="sm" routerLink="/meetings" [queryParams]="{ committee: gremiumId() }">{{
+        'gremien.detail.allMeetings' | t
+      }}</a>
+    </app-button-group>
   }
 </div>
 

@@ -246,7 +246,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/forms/000471](requirements/functional/applications/forms/000471_type-retention.md) | Antrag types can keep their own retention | approved |
 | [F/applications/forms/001630](requirements/functional/applications/forms/001630_cost-total-line.md) | The Kostenaufstellung shows the total cost and the requested amount | approved |
 | [F/applications/forms/001631](requirements/functional/applications/forms/001631_cost-per-person.md) | The cost line shows the amount per person | approved |
-| [F/applications/forms/001632](requirements/functional/applications/forms/001632_cost-line-in-detail.md) | The Antrag detail shows the same cost line | approved |
+| [F/applications/forms/001632](requirements/functional/applications/forms/001632_cost-line-in-detail.md) | The Antrag detail shows no cost line | approved |
 | [F/applications/forms/001640](requirements/functional/applications/forms/001640_placeholder-offer-warning.md) | The form warns about a placeholder offer | approved |
 | [F/applications/forms/001641](requirements/functional/applications/forms/001641_placeholder-warning-not-blocking.md) | A placeholder warning does not block the submit | approved |
 | [F/applications/forms/001670](requirements/functional/applications/forms/001670_form-rules.md) | A form version has rules across fields | approved |
@@ -967,8 +967,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/001790](requirements/non-functional/usability/controls/001790_pick-dialog-select-rows.md) | A pick dialog lists its choices as the select sheet does | approved |
 | [NF/usability/controls/001791](requirements/non-functional/usability/controls/001791_pick-dialog-empty-centred.md) | The empty state of a pick dialog is centred in the list area | approved |
 | [NF/usability/controls/001803](requirements/non-functional/usability/controls/001803_empty-state-face-room-above.md) | The empty-state face has room above and below | approved |
+| [NF/usability/controls/001810](requirements/non-functional/usability/controls/001810_long-press-selects-in-every-list.md) | A long press selects in every list with a multiple selection | approved |
 | [NF/usability/controls/001870](requirements/non-functional/usability/controls/001870_open-in-link-filters.md) | A link to a list page opens the list filtered to its source | approved |
+| [NF/usability/controls/001875](requirements/non-functional/usability/controls/001875_open-in-link-text-button.md) | An open-in link is a text button | approved |
 | [NF/usability/controls/001892](requirements/non-functional/usability/controls/001892_one-filter-chip-size.md) | Every filter chip has the one chip look | approved |
+| [NF/usability/controls/001920](requirements/non-functional/usability/controls/001920_row-menu-on-hover.md) | The ⋮ of a list row shows only for the row in use | approved |
 | [NF/usability/layout/000192](requirements/non-functional/usability/layout/000192_one-geometry.md) | All list and detail pages share one geometry | approved |
 | [NF/usability/layout/000193](requirements/non-functional/usability/layout/000193_scroll-edges.md) | A scroll area cuts at the edge of a surface | approved |
 | [NF/usability/layout/000194](requirements/non-functional/usability/layout/000194_phone-breakpoint.md) | The phone layout starts below 768 px | approved |
@@ -1031,6 +1034,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/001500](requirements/non-functional/usability/layout/001500_list-title-on-search-edge.md) | A wide list column has no visible title and puts its buttons beside the search | approved |
 | [NF/usability/layout/001770](requirements/non-functional/usability/layout/001770_calendar-day-row-group.md) | The entries of the picked day are a row group without a frame | approved |
 | [NF/usability/layout/001780](requirements/non-functional/usability/layout/001780_calendar-month-segments.md) | Each day of the month grid is a segment of its own | approved |
+| [NF/usability/layout/001890](requirements/non-functional/usability/layout/001890_form-head-bar.md) | A form in place of a detail has the head bar of "Antrag bearbeiten" | approved |
+| [NF/usability/layout/001891](requirements/non-functional/usability/layout/001891_form-head-cancel-inset.md) | The label of "Abbrechen" in a form head ends at the side inset | approved |
+| [NF/usability/layout/001895](requirements/non-functional/usability/layout/001895_scroll-lock-any-close-order.md) | The page scrolls again when the last overlay closes, in any order | approved |
 | [P/integrations/webhooks/000963](protocols/integrations/webhooks/000963_webhook-delivery.md) | A webhook delivery is a signed JSON POST | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |

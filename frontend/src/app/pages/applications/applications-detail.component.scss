@@ -1,5 +1,6 @@
 @use 'breakpoints' as bp;
 @use 'meta-chips' as chips;
+@use '../../shared/ui/form-bar' as fb;
 
 :host {
   display: flex;
@@ -206,25 +207,20 @@
   --ad-gutter: var(--layout-gutter);
 }
 // `--ld-sticky-top` (0 side by side) holds the bar at the top of the pane or of the page.
+// The bar of spec 001890; "Abbrechen" ends as far from the edge as the icon starts (001891).
 .ad__editBar {
+  @include fb.bar(var(--ad-gutter));
   position: sticky;
   top: var(--ld-sticky-top, 0px);
   z-index: 3;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
   min-height: var(--ad-edit-bar);
-  padding: var(--space-2) 0;
-  border-bottom: var(--border-width) solid var(--color-border);
+  margin-inline: calc(-1 * var(--ad-gutter));
 }
 .ad--split .ad__editBar {
-  margin-inline: calc(-1 * var(--space-6));
-  padding-inline: var(--space-6);
+  --ad-gutter: var(--space-6);
   background: var(--color-surface-2);
 }
 .ad--edit:not(.ad--split) .ad__editBar {
-  margin-inline: calc(-1 * var(--ad-gutter));
-  padding-inline: var(--ad-gutter);
   background: var(--color-surface-3);
 }
 .ad__editFade {
@@ -259,17 +255,13 @@
   scroll-margin-bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));
 }
 .ad__editIcon {
-  flex: none;
-  color: var(--color-text-muted);
+  @include fb.icon;
 }
 .ad__editBar app-button {
   flex: none;
 }
 .ad__editText {
-  flex: 1 1 auto;
-  min-width: 0;
-  margin: 0;
-  font-size: var(--fs-md);
+  @include fb.text;
 }
 // Room for the floating "Speichern": 56px and 16px around it.
 .ad__edit {

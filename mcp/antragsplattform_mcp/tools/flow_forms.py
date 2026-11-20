@@ -195,16 +195,21 @@ async def create_form_version(
     fields: list[S.FormFieldDef],
     activate: bool = True,
     description: dict[str, str] | None = None,
+    rules: list[dict[str, Any]] | None = None,
 ) -> dict:
     """REPLACE the whole field list with a new form version.
 
     Use this for a full rebuild only. For a small change, prefer the atomic `form_*`
-    operations. Requires form.configure.
+    operations. `rules` are the rules across fields: each has `logic` (JsonLogic over
+    the answers by key, `amount` and `costTotal`; true when the answers meet the rule),
+    `message` (`de` and `en`) and `severity` (`block` stops the submit, `warn` only
+    shows the message). Requires form.configure.
     """
     body: dict[str, Any] = {
         "fields": [dump_create(f) for f in fields],
         "activate": activate,
         **({"description": description} if description else {}),
+        **({"rules": rules} if rules else {}),
     }
     return await api().post(f"/admin/application-types/{type_id}/form-versions", json=body)
 
@@ -221,19 +226,19 @@ async def set_active_form(type_id: str, active: bool) -> dict:
     )
 
 
-async def _form_state(type_id: str) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+async def _form_state(type_id: str) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Read the fields of the latest version and what a new version keeps of it.
+
+    The kept part is the description and the rules, so an atomic field change does not
+    drop them.
+    """
     draft = await api().get(f"/admin/application-types/{type_id}/form-versions/latest")
-    return list(draft.get("fields") or []), draft.get("description")
+    kept = {k: draft[k] for k in ("description", "rules") if draft.get(k)}
+    return list(draft.get("fields") or []), kept
 
 
-async def _save_form(
-    type_id: str, fields: list[dict[str, Any]], description: dict[str, Any] | None
-) -> dict:
-    body: dict[str, Any] = {
-        "fields": fields,
-        "activate": True,
-        **({"description": description} if description else {}),
-    }
+async def _save_form(type_id: str, fields: list[dict[str, Any]], kept: dict[str, Any]) -> dict:
+    body: dict[str, Any] = {"fields": fields, "activate": True, **kept}
     result = await api().post(
         f"/admin/application-types/{type_id}/form-versions", json=body
     )
@@ -248,9 +253,9 @@ async def form_add_field(
 
     The field goes to `index`. The default appends the field. Requires form.configure.
     """
-    fields, description = await _form_state(type_id)
+    fields, kept = await _form_state(type_id)
     return await _save_form(
-        type_id, graphops.add_field(fields, dump_create(field), index), description
+        type_id, graphops.add_field(fields, dump_create(field), index), kept
     )
 
 
@@ -261,9 +266,9 @@ async def form_update_field(type_id: str, key: str, patch: S.FormFieldPatch) -> 
     The `key` addresses the field. Only the keys you give change.
     Requires form.configure.
     """
-    fields, description = await _form_state(type_id)
+    fields, kept = await _form_state(type_id)
     return await _save_form(
-        type_id, graphops.update_field(fields, key, dump_patch(patch)), description
+        type_id, graphops.update_field(fields, key, dump_patch(patch)), kept
     )
 
 
@@ -273,8 +278,8 @@ async def form_remove_field(type_id: str, key: str) -> dict:
 
     Requires form.configure.
     """
-    fields, description = await _form_state(type_id)
-    return await _save_form(type_id, graphops.remove_field(fields, key), description)
+    fields, kept = await _form_state(type_id)
+    return await _save_form(type_id, graphops.remove_field(fields, key), kept)
 
 
 @group.tool
@@ -283,8 +288,8 @@ async def form_move_field(type_id: str, key: str, index: int) -> dict:
 
     Requires form.configure.
     """
-    fields, description = await _form_state(type_id)
-    return await _save_form(type_id, graphops.move_field(fields, key, index), description)
+    fields, kept = await _form_state(type_id)
+    return await _save_form(type_id, graphops.move_field(fields, key, index), kept)
 
 
 def register(mcp: FastMCP) -> None:

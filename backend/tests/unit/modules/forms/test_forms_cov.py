@@ -337,6 +337,7 @@ def test_budget_field_options_carry_the_tree() -> None:
             "value": str(top),
             "label": {"de": "AStA (VS)", "en": "AStA (VS)"},
             "key": "VS",
+            "pathKey": "VS",
             "color": "#123456",
         },
         {
@@ -344,6 +345,7 @@ def test_budget_field_options_carry_the_tree() -> None:
             "label": {"de": "Kultur (VS-1)", "en": "Kultur (VS-1)"},
             "parentId": str(top),
             "key": "1",
+            "pathKey": "VS-1",
         },
     ]
 

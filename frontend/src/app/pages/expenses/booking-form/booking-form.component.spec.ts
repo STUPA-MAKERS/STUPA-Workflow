@@ -325,8 +325,7 @@ describe('BookingFormComponent', () => {
     expect(save).toBeEnabled();
     await user.click(save);
     expect(submit).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('button', { name: 'Abbrechen' })).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Schließen' }));
+    await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
     expect(dialogs.createOpen()).toBe(false);
   });
 
