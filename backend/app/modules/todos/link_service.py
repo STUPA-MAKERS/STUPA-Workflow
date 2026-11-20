@@ -104,7 +104,7 @@ class LinkService:
         cards = await self.todos.linked_cards(
             [e.target_id for e in found if e.kind == "todo"], principal
         )
-        can_link = await self._changes(own, principal)
+        can_link = LinkRights.may_touch(kind, principal) and await self._changes(own, principal)
         rows = [
             await self._row(edge, resolved.get(edge.target, HIDDEN), cards, can_link, principal)
             for edge in found
@@ -120,8 +120,13 @@ class LinkService:
         can_link: bool,
         principal: Principal,
     ) -> LinkRow:
-        removable = can_link or (
-            target.accessible and not target.granted and await self._changes(edge.target, principal)
+        removable = LinkRights.may_touch(edge.kind, principal) and (
+            can_link
+            or (
+                target.accessible
+                and not target.granted
+                and await self._changes(edge.target, principal)
+            )
         )
         return LinkRow(
             id=edge.id,
@@ -142,13 +147,18 @@ class LinkService:
 
         Raises:
             ValidationProblem: ``link_target_not_found`` (HTTP 422).
-            ForbiddenError: ``link_forbidden`` (HTTP 403).
+            ForbiddenError: ``link_forbidden`` (HTTP 403), also for a cost centre end
+                without a budget write right (spec 001410).
         """
         for field_name, end in (("a", one), ("b", other)):
             if not await self._reads(end, principal):
                 raise _invalid("The element was not found.", "link_target_not_found", field_name)
         if not (await self._changes(one, principal) or await self._changes(other, principal)):
             raise ForbiddenError("You may change neither element.", code="link_forbidden")
+        if not all(LinkRights.may_touch(end[0], principal) for end in (one, other)):
+            raise ForbiddenError(
+                "A cost centre link needs a budget write right.", code="link_forbidden"
+            )
 
     async def _cards(
         self, ends: Sequence[LinkEnd], principal: Principal
@@ -242,10 +252,11 @@ class LinkService:
         """Search the elements that the principal reads, without ``exclude`` and its links.
 
         A term below two characters lists the newest cards for the kind ``todo``
-        (spec 001408).
+        (spec 001408). A cost centre is a hit only for a budget write right (spec 001410).
         """
         card = exclude[1] if exclude is not None and exclude[0] == "todo" else None
-        found = await self.todos.links.search(q, kind, principal, exclude_card_id=card)
+        searched = await self.todos.links.search(q, kind, principal, exclude_card_id=card)
+        found = [t for t in searched if LinkRights.may_touch(t.kind, principal)]
         if exclude is None:
             return found
         taken = {

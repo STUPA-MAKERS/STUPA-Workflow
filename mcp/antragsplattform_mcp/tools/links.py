@@ -42,7 +42,8 @@ async def link_add(a: S.LinkEndIn, b: S.LinkEndIn) -> dict:
     """Link two elements and return the links of `a` (as `link_list`).
 
     422 `link_self` (an element with itself) or `link_target_not_found` (an end that the
-    caller does not read), 403 `link_forbidden` (the caller changes neither end), 409
+    caller does not read), 403 `link_forbidden` (the caller changes neither end, or an
+    end is a cost centre and the caller holds neither `budget.book` nor `budget.structure`), 409
     `link_exists` or `event_link_taken` (an Event card and an Antrag, Buchung or invoice
     that another Event links).
     """
