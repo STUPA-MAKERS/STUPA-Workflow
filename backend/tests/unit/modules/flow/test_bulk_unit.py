@@ -33,7 +33,14 @@ def _t(to: UUID, *, approves: bool = False, agenda: bool = False) -> SimpleNames
     )
 
 
-class _Session:
+class _Apps:
+    """The two session calls of `bulk`: `get` of an Antrag by id and `rollback`.
+
+    `bulk` writes no query of its own; the queries run in `FlowService`, and
+    `tests/integration/modules/applications/test_bulk_actions.py` runs the whole path on
+    Postgres.
+    """
+
     def __init__(self, apps: dict[UUID, Any]) -> None:
         self.apps = apps
         self.rollbacks = 0
@@ -52,7 +59,7 @@ class _Service:
         apps: dict[UUID, Any] | None = None,
         failing: set[UUID] | None = None,
     ) -> None:
-        self.session = _Session(apps or {})
+        self.session = _Apps(apps or {})
         self.offered = offered
         self.failing = failing or set()
         self.fired: list[tuple[UUID, UUID, Any]] = []
