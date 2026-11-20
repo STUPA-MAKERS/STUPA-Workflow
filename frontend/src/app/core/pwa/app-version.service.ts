@@ -76,7 +76,9 @@ const NO_TEXT_INPUTS = new Set([
  * page to it. When the service worker finds no newer version, fails or takes longer than
  * {@link SW_WAIT_MS}, the service removes the service worker before the reload, so that the
  * reload loads the new version from the network. A `VERSION_READY` of the service worker
- * after a reported server version reloads too, also within the loop guard.
+ * after a reported server version reloads too, also within the loop guard. When the focus
+ * moves into a text field during the download, the reload waits as above; a field that had
+ * the focus already when a page change started the reload does not hold it again.
  *
  * While a text field has the focus, the reload waits (§ui-kit:002151): it runs at the next page
  * change or at the next reported answer while no text field has the focus, so typed text is
@@ -150,8 +152,9 @@ export class AppVersionService {
     this.reloading = true;
     this.pending = null;
     const sw = this.updates.isEnabled;
+    const focusBefore = this.doc.activeElement;
     const found = sw ? await settle(this.updates.checkForUpdate(), SW_WAIT_MS) : undefined;
-    if (this.typing()) {
+    if (this.doc.activeElement !== focusBefore && this.typing()) {
       this.reloading = false;
       this.pending = serverVersion;
       return;
