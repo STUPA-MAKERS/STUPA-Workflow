@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -202,24 +203,31 @@ def test_the_neighbours_of_a_hit_show_up_to_the_steps() -> None:
         Relation(APP, INVOICE, "link"),
         Relation(INVOICE, LONELY, "link"),
     ]
-    hit = {"kinds": frozenset({"application"}), "start": date(2026, 1, 1), "q": "party"}
+    hit = Filters(kinds=frozenset({"application"}), start=date(2026, 1, 1), q="party")
+    links = replace(hit, relations="links")
 
-    def refs(**more: object) -> set[Ref]:
-        nodes, _ = shown(candidates, relations, Filters(**hit, relations="links", **more))
+    def refs(filters: Filters) -> set[Ref]:
+        nodes, _ = shown(candidates, relations, filters)
         return set(_refs(nodes))
 
-    assert refs(depth=0) == set()
-    assert refs(depth=0, single=True) == {APP}
-    assert refs(depth=1) == {APP, TOP}
-    assert refs(depth=2) == {APP, TOP, MEETING}
-    assert refs(depth=3) == {APP, TOP, MEETING, CARD}
+    assert refs(links) == set()
+    assert refs(replace(links, single=True)) == {APP}
+    assert refs(replace(links, depth=1)) == {APP, TOP}
+    assert refs(replace(links, depth=2)) == {APP, TOP, MEETING}
+    assert refs(replace(links, depth=3)) == {APP, TOP, MEETING, CARD}
     # A neighbour without a line is no hit: the switch does not add it.
-    assert refs(depth=1, single=True) == {APP, TOP}
+    assert refs(replace(links, depth=1, single=True)) == {APP, TOP}
     # An element that the reader does not read shows with its switch only, and a step
     # leads through it.
-    assert refs(depth=2, no_access=True) == {APP, TOP, MEETING, INVOICE, LONELY}
+    assert refs(replace(links, depth=2, no_access=True)) == {
+        APP,
+        TOP,
+        MEETING,
+        INVOICE,
+        LONELY,
+    }
 
-    every, lines = shown(candidates, relations, Filters(**hit, depth=2))  # type: ignore[arg-type]
+    every, lines = shown(candidates, relations, replace(hit, depth=2))
     assert set(_refs(every)) == {APP, TOP, MEETING, GREMIUM}
     assert _pairs(lines) == {
         frozenset((APP, TOP)),

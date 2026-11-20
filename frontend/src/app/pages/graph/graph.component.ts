@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  Renderer2,
   computed,
   effect,
   inject,
@@ -127,6 +128,7 @@ export class GraphComponent {
   protected readonly maxDepth = GRAPH_DEPTH_MAX;
 
   private readonly api = inject(GraphApiService);
+  private readonly renderer = inject(Renderer2);
   private readonly i18n = inject(I18nService);
   private readonly features = inject(FeatureService);
   private readonly route = inject(ActivatedRoute);
@@ -277,7 +279,7 @@ export class GraphComponent {
   onDepth(event: Event): void {
     const field = event.target as HTMLInputElement;
     this.setDepth(field.value.trim() === '' ? Number.NaN : Number(field.value));
-    field.value = String(this.filters().depth);
+    this.renderer.setProperty(field, 'value', String(this.filters().depth));
   }
 
   toggleSingle(): void {
