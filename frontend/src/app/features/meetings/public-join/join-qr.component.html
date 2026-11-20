@@ -62,15 +62,18 @@
       <a class="jq__url mono" [href]="l.joinUrl" target="_blank" rel="noopener">{{ l.joinUrl }}</a>
       <p class="jq__code">{{ 'guests.qr.code' | t: { code: formatCode(l.joinCode) } }}</p>
       <div class="jq__actions">
-        <app-copy-button
-          [text]="l.joinUrl"
-          [share]="true"
-          [shareTitle]="meeting().title"
-          variant="tonal"
-          [label]="'guests.qr.copy' | t"
-          [copiedLabel]="'guests.link.copied' | t"
-          [resetMs]="copiedMs"
-        />
+        <app-button-group>
+          <app-copy-button
+            class="btn-grp__seg"
+            [text]="l.joinUrl"
+            [share]="true"
+            [shareTitle]="meeting().title"
+            variant="tonal"
+            [label]="'guests.qr.copy' | t"
+            [copiedLabel]="'guests.link.copied' | t"
+            [resetMs]="copiedMs"
+          />
+        </app-button-group>
       </div>
     </div>
   </ng-template>
