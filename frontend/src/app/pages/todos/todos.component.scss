@@ -101,9 +101,9 @@
   min-width: 0;
   min-height: 0;
 }
-// The rows body scrolls by itself. The search bar then makes the head of the page one glass
+// The rows body scrolls by itself. The search bar then makes the head of the page one solid
 // surface over it, and the rows run to the bottom edge of the screen without a fade
-// (`.ld-pane--glass`, ui-kit `list-detail.scss`).
+// (`.ld-pane--head`, ui-kit `list-detail.scss`).
 .td__body--rows {
   gap: var(--space-4);
   overflow-y: auto;
@@ -125,23 +125,23 @@
     padding-bottom: calc(56px + 2 * var(--space-4));
   }
 }
-// Phone, a board in its columns: the body is the rows of the glass head (`.ld-pane__rows`),
-// but it does not scroll itself. Each column page scrolls by itself and reaches up under the
-// head and the tab line, and the tab bar carries the one glass layer of the whole head
-// (`todo-board-view`). The glass of the column would lie over the tabs and blur them, so it
-// goes, and so does its shadow, because the tab line is the edge of the head. The repeated
-// class wins over the room the kit keeps for the floating button: each page keeps its own.
+// Phone, a board in its columns: the body is the rows of the head (`.ld-pane__rows`), but it
+// does not scroll itself. Each column page scrolls by itself and reaches up under the head
+// and the tab line, and the tab bar carries the one solid layer of the whole head
+// (`todo-board-view`). The layer of the column would lie over the tabs, so it goes, and so
+// do its corners. The repeated class wins over the room the kit keeps for the floating
+// button: each page keeps its own.
 // A scroll container clips at its sides, so the body runs over the gutter of the page to
 // the screen edges, and the tab line and the pages reach them (`todo-board-view`).
 .td__body--pages {
   margin-inline: calc(-1 * var(--space-4));
   overflow-y: auto;
 }
-.td.ld-pane--glass:has(> .td__body--pages)::before,
-.td.ld-pane--glass:has(> .td__body--pages)::after {
+.td.ld-pane--head:has(> .td__body--pages)::before,
+.td.ld-pane--head:has(> .td__body--pages)::after {
   display: none;
 }
-.td.ld-pane--glass > .td__body--pages.td__body--pages.td__body--pages.td__body--pages.td__body--pages {
+.td.ld-pane--head > .td__body--pages.td__body--pages.td__body--pages.td__body--pages.td__body--pages {
   padding-bottom: 0;
 }
 .td__state {
@@ -221,28 +221,13 @@
     border-radius: 0;
     box-shadow: none;
   }
-  // The card is a dialog layer above the bottom bar, so it covers the shadow of the bar. This
-  // box lies over the bar in the layer of the card and casts the same shadow up over the card.
-  .td__barEdge {
-    position: fixed;
-    inset: auto 0 0;
-    z-index: var(--z-dialog);
-    height: var(--app-bottom-inset, 0px);
-    box-shadow: var(--shadow-md-up);
-    pointer-events: none;
-  }
-  // A bottom sheet over the card is glass, so the shadow showed through it as a stray band
-  // across the sheet. The sheet covers the bar, so the shadow goes while one is open.
-  :host-context(body:has(.ss--bottom)) .td__barEdge {
-    box-shadow: none;
-  }
-  // The bar is frosted glass in the colour of the card while the card scrolls under it,
-  // like the bar of every other phone detail.
+  // The bar has the colour of the card at rest and the bar colour while the card scrolls
+  // under it, like the bar of every other phone detail (`bar`, spec 002010).
   .td__drawer > app-list-detail-bar {
-    @include frosted(var(--color-surface), bottom);
+    @include bar(var(--color-surface));
 
-    &:not(.ld__bar--under) {
-      @include frosted-rest(var(--color-surface));
+    &.ld__bar--under {
+      @include bar(var(--color-surface), $scrolled: true);
     }
   }
 }
@@ -285,7 +270,7 @@
 // In very high contrast the board body has no frame of its own: each board has its white edge
 // (spec 001442), and a frame around them would double it.
 @include d.host-on(veryHigh) {
-  .td.ld-pane--glass > .td__body--rows.ld-pane__rows:has(> app-todo-board-view, > app-todo-board-rows) {
+  .td.ld-pane--head > .td__body--rows.ld-pane__rows:has(> app-todo-board-view, > app-todo-board-rows) {
     border: 0 !important;
     border-radius: 0 !important;
   }

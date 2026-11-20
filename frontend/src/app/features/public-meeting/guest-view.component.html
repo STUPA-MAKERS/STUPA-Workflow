@@ -3,7 +3,7 @@
   <section class="gv__vote" [attr.aria-label]="'voting.cast.heading' | t">
     <div class="gv__voteHead">
       <app-button-group>
-        <app-button variant="text" [iconOnly]="true" [ariaLabel]="'guests.vote.back' | t" (click)="openVoteId.set(null)">
+        <app-button class="btn-back" variant="text" [iconOnly]="true" [ariaLabel]="'guests.vote.back' | t" (click)="openVoteId.set(null)">
           <app-icon name="back" />
         </app-button>
       </app-button-group>

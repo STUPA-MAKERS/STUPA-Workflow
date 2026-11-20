@@ -1566,7 +1566,7 @@ describe('TodosComponent', () => {
         expect(screen.getByRole('list', { name: 'Meine To-Dos' })).toHaveTextContent('Privat');
         expect(root.querySelector('.td__body')).toHaveClass('td__body--rows');
         expect(root.querySelector('.td__body')).toHaveClass('td__body--fab');
-        // The body runs under the glass head of the column, without a fade (spec 000527).
+        // The body runs under the head of the column, without a fade (spec 000527).
         expect(root.querySelector('.td__body')).not.toHaveAttribute('appScrollFade');
         expect(root.querySelector('.td')).toHaveClass('ld-pane');
         expect(root.querySelector('.td__bar')).toHaveClass('ld-pane__filters');
@@ -1758,7 +1758,7 @@ describe('TodosComponent', () => {
 
       /**
        * The board is a pane page: on the phone it pulls the foot gap of the main column back, so
-       * the pages reach the bottom bar. A page does not fade: it runs under the glass head and
+       * the pages reach the bottom bar. A page does not fade: it runs under the head and
        * the tab line, and the bottom bar cuts it (spec 000527).
        */
       it('keeps the tab board for a gremium board and its list view', async () => {

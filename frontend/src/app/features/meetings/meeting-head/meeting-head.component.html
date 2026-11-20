@@ -3,7 +3,7 @@
   <h1 class="sr-only">{{ heading() }}</h1>
 } @else {
   <app-button-group>
-    <app-button class="mh__back" variant="text" [iconOnly]="true" [ariaLabel]="'meetings.page.back' | t" (click)="back.emit()">
+    <app-button class="mh__back btn-back" variant="text" [iconOnly]="true" [ariaLabel]="'meetings.page.back' | t" (click)="back.emit()">
       <app-icon name="back" />
     </app-button>
   </app-button-group>

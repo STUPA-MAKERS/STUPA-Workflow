@@ -3,6 +3,7 @@ import { CdkScrollable } from '@angular/cdk/scrolling';
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
   Injector,
   afterNextRender,
@@ -94,6 +95,7 @@ export interface BoardMove {
   ],
   host: {
     '[class.bv-host--natural]': '!fill()',
+    '[class.bv-host--scrolled]': 'pageScrolled()',
     '(document:focusin)': 'leaveDrag($event)',
     '(document:pointerdown)': 'leaveDrag($event)',
   },
@@ -104,6 +106,23 @@ export class TodoBoardViewComponent {
   private readonly i18n = inject(I18nService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+
+  /**
+   * A phone column page has scrolled, so cards run under the head and the tab line: the tab
+   * line then takes the bar colour (spec 002010). Scroll events do not bubble, so the host
+   * listens in the capture phase.
+   */
+  protected readonly pageScrolled = signal(false);
+
+  constructor() {
+    const el = this.host.nativeElement;
+    const onScroll = (e: Event): void => {
+      const t = e.target;
+      if (t instanceof HTMLElement && t.classList.contains('tp__page')) this.pageScrolled.set(t.scrollTop > 0);
+    };
+    el.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    inject(DestroyRef).onDestroy(() => el.removeEventListener('scroll', onScroll, { capture: true }));
+  }
 
   readonly board = input.required<TodoBoard>();
   /** The cards that pass the filters, by column id, in board order. */
