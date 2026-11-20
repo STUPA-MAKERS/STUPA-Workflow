@@ -2,7 +2,7 @@
 id: "002340"
 title: The reload to a new app version shows the new version
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:
