@@ -191,6 +191,8 @@ async function setup(
     skipTimelineFlush?: boolean;
     /** The `?item=` of a link to an agenda item. */
     item?: string;
+    /** The `?committee=` of a link from a Gremium. */
+    committee?: string;
   } = {},
 ) {
   const perms = opts.perms ?? ['admin', 'protocol.write'];
@@ -210,7 +212,12 @@ async function setup(
         provide: ActivatedRoute,
         useValue: {
           paramMap: of(convertToParamMap(id ? { id } : {})),
-          queryParamMap: of(convertToParamMap(opts.item ? { item: opts.item } : {})),
+          queryParamMap: of(
+            convertToParamMap({
+              ...(opts.item ? { item: opts.item } : {}),
+              ...(opts.committee ? { committee: opts.committee } : {}),
+            }),
+          ),
         },
       },
     ],
@@ -264,6 +271,21 @@ function flushDelegationContext(http: HttpTestingController): void {
 
 describe('MeetingsComponent', () => {
   /** The list and its header do not show, so the page header titles the notice. */
+  it('opens the list filtered to the Gremium of `?committee=` (§ 001871)', async () => {
+    const { http } = await setup({
+      id: null,
+      committee: 'g-2',
+      skipTimelineFlush: true,
+      gremien: [{ id: 'g-1', name: 'StuPa' }, { id: 'g-2', name: 'FA' }],
+    });
+    const reqs = http.match((r) => r.url.endsWith('/meetings/timeline'));
+    expect(reqs.length).toBe(2);
+    for (const r of reqs) {
+      expect(r.request.params.get('gremiumId')).toBe('g-2');
+      r.flush({ items: [], nextCursor: null });
+    }
+  });
+
   it('shows a forbidden notice without the required permissions', async () => {
     await setup({ perms: [], id: null });
     expect(screen.getByRole('alert')).toHaveTextContent(/Keine Berechtigung/i);

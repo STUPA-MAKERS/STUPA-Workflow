@@ -6,6 +6,7 @@ import {
   inject,
   input,
   output,
+  untracked,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -48,7 +49,8 @@ import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pu
 /**
  * The list view of the meeting overview (`/meetings`): one column on every screen, with no
  * detail pane, because the meeting page itself is the detail. A row opens the meeting
- * page; an old `?sel=<id>` link opens it as well.
+ * page; an old `?sel=<id>` link opens it as well. The Gremium chip and `?committee=<id>` are
+ * one state: a link from a Gremium opens the list filtered, and a pick writes the URL.
  *
  * The title, the search and the Gremium chip (they never scroll away), then the groups "Jetzt",
  * "Anstehend · <Monat>" and "Vergangen · <Monat>". A row shows the date, the title, the
@@ -108,6 +110,12 @@ export class MeetingsListComponent {
     { initialValue: null },
   );
 
+  /** `?committee=<id>` of the URL, to write the Gremium chip back only on a change. */
+  private readonly committeeParam = toSignal(
+    this.route.queryParamMap.pipe(map((q) => q.get('committee'))),
+    { initialValue: null },
+  );
+
   readonly groups = computed<readonly MeetingGroup[]>(() =>
     overviewGroups(this.timeline.upcomingItems(), this.timeline.pastItems(), this.i18n.locale()),
   );
@@ -124,6 +132,18 @@ export class MeetingsListComponent {
     effect(() => {
       const id = this.selParam();
       if (id) void this.router.navigate(['/meetings', id], { replaceUrl: true });
+    });
+    effect(() => {
+      const committee = this.timeline.gremiumFilter() || null;
+      untracked(() => {
+        if (this.selParam() || this.committeeParam() === committee) return;
+        void this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { committee },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+      });
     });
   }
 

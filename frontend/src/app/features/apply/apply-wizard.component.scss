@@ -268,7 +268,9 @@
   .wz__body {
     padding: var(--space-4);
   }
-  .wz__discard,
+  // The whole group of "Verwerfen" goes, not only its button: an empty group would still
+  // take a gap of the bar and push the buttons off the middle.
+  .wz__discard.wz__discard,
   .wz__navGap {
     display: none;
   }

@@ -1,5 +1,5 @@
 import { provideRouter } from '@angular/router';
-import { render, screen } from '@testing-library/angular';
+import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { Application } from '@core/api/models';
 import type { BudgetTreeNode, Expense, Invoice } from '../../budget/budget-tree.api';
@@ -228,6 +228,22 @@ describe('BookingDetailComponent', () => {
     expect(invLink.getAttribute('href')).toBe('/invoices?id=inv');
     expect(screen.getByText('Offen')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /900,00\s€ von 2\.890,00\s€ verbucht/ })).toBeInTheDocument();
+  });
+
+  it('keeps "Verknüpfen" in the head of "Verknüpft" when the booking has an invoice', async () => {
+    const { view } = await setup({ expense: { ...EXPENSE, invoiceId: 'inv' }, invoice: INVOICE });
+    const head = view.container.querySelector('.bd__linked') as HTMLElement;
+    const link = within(head).getByRole('button', { name: 'Verknüpfen' });
+    expect(within(head).queryByRole('button', { name: 'To-Do anlegen' })).toBeNull();
+    link.click();
+    view.detectChanges();
+    expect(view.container.querySelector('app-todo-linked-list')).not.toBeNull();
+  });
+
+  it('has no "Verknüpfen" in "Verknüpft" for a person who may not change the booking', async () => {
+    const { view } = await setup({ expense: { ...EXPENSE, invoiceId: 'inv' }, invoice: INVOICE, canManage: false });
+    const head = view.container.querySelector('.bd__linked') as HTMLElement;
+    expect(within(head).queryByRole('button', { name: 'Verknüpfen' })).toBeNull();
   });
 
   it('names a linked invoice by its number until it loads, and an application by its title', async () => {

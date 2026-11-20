@@ -20,7 +20,7 @@
   />
   @if (!phone()) {
     <span class="gmt__grow"></span>
-    <a class="gmt__link" routerLink="/meetings">
+    <a class="gmt__link" routerLink="/meetings" [queryParams]="{ committee: gremiumId() }">
       {{ 'gremien.detail.allMeetings' | t }}
       <app-icon name="arrow" [size]="15" />
     </a>

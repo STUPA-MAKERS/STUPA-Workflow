@@ -184,7 +184,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/applications/001663](requirements/functional/applications/applications/001663_change-type-timeline.md) | The timeline and the audit show the old and the new Antragsart | approved |
 | [F/applications/applications/001690](requirements/functional/applications/applications/001690_member-comment-internal.md) | A member comment is internal by default | approved |
 | [F/applications/applications/001691](requirements/functional/applications/applications/001691_comment-visibility-labels.md) | The visibility switch names who reads the comment | approved |
-| [F/applications/applications/001692](requirements/functional/applications/applications/001692_comment-visibility-visible.md) | The chosen visibility shows before sending | draft |
+| [F/applications/applications/001692](requirements/functional/applications/applications/001692_comment-visibility-visible.md) | The chosen visibility shows before sending | approved |
 | [F/applications/applications/001700](requirements/functional/applications/applications/001700_list-multi-select.md) | The Antrag list has a multiple selection | approved |
 | [F/applications/applications/001701](requirements/functional/applications/applications/001701_bulk-transition.md) | A bulk transition offers only transitions allowed for every selected Antrag | approved |
 | [F/applications/applications/001702](requirements/functional/applications/applications/001702_bulk-message.md) | A bulk message adds one public comment to each Antrag | approved |
@@ -273,6 +273,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/committees/001013](requirements/functional/collaboration/committees/001013_info-markdown.md) | The Info text is sanitized Markdown | approved |
 | [F/collaboration/committees/001014](requirements/functional/collaboration/committees/001014_info-save.md) | An Info save is versioned and audited | approved |
 | [F/collaboration/committees/001015](requirements/functional/collaboration/committees/001015_info-empty.md) | An empty Info tab shows only to its editors | approved |
+| [F/collaboration/committees/001850](requirements/functional/collaboration/committees/001850_notify-members.md) | A Gremium notifies its members | approved |
+| [F/collaboration/committees/001851](requirements/functional/collaboration/committees/001851_notify-permission.md) | Only members.notify sends a message to the members | approved |
+| [F/collaboration/committees/001852](requirements/functional/collaboration/committees/001852_notify-recipients.md) | The message goes to the members and the substitute pool | approved |
+| [F/collaboration/committees/001853](requirements/functional/collaboration/committees/001853_notify-template.md) | The members message is a mail template | approved |
+| [F/collaboration/committees/001854](requirements/functional/collaboration/committees/001854_notify-checks.md) | A members message is checked and audited | approved |
 | [F/collaboration/graph/001420](requirements/functional/collaboration/graph/001420_graph-page.md) | The page Graph shows the elements of a person and their relations | approved |
 | [F/collaboration/graph/001421](requirements/functional/collaboration/graph/001421_graph-permission.md) | The graph needs its own permission | approved |
 | [F/collaboration/graph/001422](requirements/functional/collaboration/graph/001422_graph-read-rules.md) | The graph shows only what the person reads | approved |
@@ -389,7 +394,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000141](requirements/functional/finance/budget/000141_fiscal-year-delete.md) | A fiscal year in use is not deleted | approved |
 | [F/finance/budget/000142](requirements/functional/finance/budget/000142_duplicate-booking.md) | A booking can be duplicated | approved |
 | [F/finance/budget/000143](requirements/functional/finance/budget/000143_transfer-kind.md) | A transfer is a kind in the Art filter | approved |
-| [F/finance/budget/000144](requirements/functional/finance/budget/000144_cost-centre-items.md) | The cost centre card lists Anträge and bookings | approved |
+| [F/finance/budget/000144](requirements/functional/finance/budget/000144_cost-centre-items.md) | The cost centre card lists Anträge and bookings | replaced |
 | [F/finance/budget/000145](requirements/functional/finance/budget/000145_revert-keeps-invoice.md) | A reverted booking keeps the invoice status | replaced |
 | [F/finance/budget/000146](requirements/functional/finance/budget/000146_legend.md) | The budget legend matches the drawing | approved |
 | [F/finance/budget/000246](requirements/functional/finance/budget/000246_path-key.md) | A cost centre has a stable path key | approved |
@@ -502,6 +507,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/001262](requirements/functional/finance/budget/001262_income-titel-not-available.md) | The Ist of an income Titel does not raise the Verfügbar of the Haushalt | approved |
 | [F/finance/budget/001263](requirements/functional/finance/budget/001263_income-titel-tree-row.md) | The tree row of an income Titel shows its Ansatz and the reached part | approved |
 | [F/finance/budget/001264](requirements/functional/finance/budget/001264_income-titel-section.md) | Income nodes are listed under "Einnahmen" | approved |
+| [F/finance/budget/001872](requirements/functional/finance/budget/001872_view-bookings-filtered.md) | Buchungen ansehen opens the bookings of the cost centre and the year | approved |
+| [F/finance/budget/001873](requirements/functional/finance/budget/001873_cost-centre-items-two-links.md) | The cost centre card lists Anträge and bookings and links to both lists | approved |
+| [F/finance/budget/001874](requirements/functional/finance/budget/001874_bookings-fiscal-year-filter.md) | The bookings list filters by Haushaltsjahr | approved |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
 | [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | replaced |
 | [F/finance/invoices/000262](requirements/functional/finance/invoices/000262_invoice-segments.md) | The invoice list has four segments | replaced |
@@ -652,6 +660,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/001801](requirements/functional/meetings/meetings/001801_attendance-edge-tab.md) | A tab at the end edge opens the attendance | approved |
 | [F/meetings/meetings/001802](requirements/functional/meetings/meetings/001802_vote-sheet-head-add.md) | The vote sheet has its add button in the head and an empty state | approved |
 | [F/meetings/meetings/001804](requirements/functional/meetings/meetings/001804_vote-tab-final-protocol.md) | A closed meeting keeps the vote tab | approved |
+| [F/meetings/meetings/001871](requirements/functional/meetings/meetings/001871_meetings-committee-param.md) | The meeting list reads the Gremium filter from the URL | approved |
 | [F/meetings/protocols/000115](requirements/functional/meetings/protocols/000115_keeper-permission.md) | The keeper holds protocol.write | approved |
 | [F/meetings/protocols/000116](requirements/functional/meetings/protocols/000116_finalize.md) | Finalize needs a closed meeting and protocol.finalize | approved |
 | [F/meetings/protocols/000117](requirements/functional/meetings/protocols/000117_delete-draft-only.md) | Only a draft protocol is deleted | approved |
@@ -949,6 +958,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/001351](requirements/non-functional/usability/controls/001351_selected-group-button.md) | A selected button of a group is filled and fully round | approved |
 | [NF/usability/controls/001353](requirements/non-functional/usability/controls/001353_confirm-row-button-group.md) | The buttons of a dialog footer form a button group with a filled main action | approved |
 | [NF/usability/controls/001354](requirements/non-functional/usability/controls/001354_every-button-in-a-group.md) | Every button of the app stands in a button group | approved |
+| [NF/usability/controls/001355](requirements/non-functional/usability/controls/001355_selection-bar-grey-inset.md) | The selection bar in a list is a grey surface with an inset around its actions | approved |
 | [NF/usability/controls/001360](requirements/non-functional/usability/controls/001360_empty-list-face.md) | An empty list shows a face in a ring of dots | approved |
 | [NF/usability/controls/001361](requirements/non-functional/usability/controls/001361_empty-state-face-motion.md) | The face of an empty state moves until motion is reduced | approved |
 | [NF/usability/controls/001362](requirements/non-functional/usability/controls/001362_empty-state-face-very-high-contrast.md) | The face of an empty state is white in very high contrast | approved |
@@ -958,6 +968,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/001791](requirements/non-functional/usability/controls/001791_pick-dialog-empty-centred.md) | The empty state of a pick dialog is centred in the list area | approved |
 | [NF/usability/controls/001803](requirements/non-functional/usability/controls/001803_empty-state-face-room-above.md) | The empty-state face has room above and below | approved |
 | [NF/usability/controls/001810](requirements/non-functional/usability/controls/001810_long-press-selects-in-every-list.md) | A long press selects in every list with a multiple selection | approved |
+| [NF/usability/controls/001870](requirements/non-functional/usability/controls/001870_open-in-link-filters.md) | A link to a list page opens the list filtered to its source | approved |
+| [NF/usability/controls/001892](requirements/non-functional/usability/controls/001892_one-filter-chip-size.md) | Every filter chip has the one chip look | approved |
 | [NF/usability/layout/000192](requirements/non-functional/usability/layout/000192_one-geometry.md) | All list and detail pages share one geometry | approved |
 | [NF/usability/layout/000193](requirements/non-functional/usability/layout/000193_scroll-edges.md) | A scroll area cuts at the edge of a surface | approved |
 | [NF/usability/layout/000194](requirements/non-functional/usability/layout/000194_phone-breakpoint.md) | The phone layout starts below 768 px | approved |

@@ -54,6 +54,13 @@
   border-radius: var(--radius-md);
 }
 @media (max-width: 767.98px) {
+  // The buttons stand in a button group (001354): the group fills the row and wraps, and its
+  // buttons share the width, so a long label ("Abstimmung abbrechen") does not run out of the box.
+  .mtg__voteActions > app-button-group {
+    display: flex;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+  }
   .mtg__voteActions app-button {
     flex: 1 1 auto;
   }
