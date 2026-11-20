@@ -65,7 +65,7 @@ describe('PaneFormHeadComponent', () => {
 });
 
 /**
- * Spec 001870 and 001871: the bar of a form that takes the place of a detail is the bar of
+ * Spec 001890 and 001891: the bar of a form that takes the place of a detail is the bar of
  * "Antrag bearbeiten", and the label of "Abbrechen" ends at the side inset of the icon.
  */
 describe('FormBar', () => {

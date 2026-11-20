@@ -1,6 +1,6 @@
 @use '../form-bar' as fb;
 
-// The head bar of a form that takes the place of a detail (spec 001870), like the bar of
+// The head bar of a form that takes the place of a detail (spec 001890), like the bar of
 // "Antrag bearbeiten". It sits at the top of the pane, so it takes the corners of the pane.
 :host {
   @include fb.bar(var(--space-6));

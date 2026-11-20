@@ -1,5 +1,5 @@
 ---
-id: "001870"
+id: "001890"
 title: A form in place of a detail has the head bar of "Antrag bearbeiten"
 kind: non-functional
 status: draft

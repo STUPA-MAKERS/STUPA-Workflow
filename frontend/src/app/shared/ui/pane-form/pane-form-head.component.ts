@@ -15,9 +15,9 @@ import { ButtonComponent, ButtonGroupComponent, IconComponent, ListDetailNav, ty
 
 /**
  * The head of a form that replaces a detail sheet (a booking, a transfer, an invoice, a
- * captured application). It is the bar of "Antrag bearbeiten" (spec 001870): an icon, the
+ * captured application). It is the bar of "Antrag bearbeiten" (spec 001890): an icon, the
  * title with a quiet subtitle after it, and "Abbrechen" at the end, whose label ends as far
- * from the edge as the icon starts (spec 001871). A new thing shows its own icon, an edit
+ * from the edge as the icon starts (spec 001891). A new thing shows its own icon, an edit
  * the pen.
  *
  * The host is the `header` of the page, so the page keeps its frame rules (margin,

@@ -1,5 +1,5 @@
 ---
-id: "001871"
+id: "001891"
 title: The label of "Abbrechen" in a form head ends at the side inset
 kind: non-functional
 status: draft
@@ -15,7 +15,7 @@ scope:
 
 # The label of "Abbrechen" in a form head ends at the side inset
 
-In the head bar of a form (001870), the label of "Abbrechen" must end as far from the end edge
+In the head bar of a form (001890), the label of "Abbrechen" must end as far from the end edge
 as the icon starts from the start edge. The text button has 12px around its label, so its pill
 stands 12px closer to the edge than the icon: 20px in a pane, where the icon has 32px.
 

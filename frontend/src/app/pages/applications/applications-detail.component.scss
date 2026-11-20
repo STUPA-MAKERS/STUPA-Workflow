@@ -238,7 +238,7 @@
   --ad-gutter: var(--layout-gutter);
 }
 // `--ld-sticky-top` (0 side by side) holds the bar at the top of the pane or of the page.
-// The bar of spec 001870; "Abbrechen" ends as far from the edge as the icon starts (001871).
+// The bar of spec 001890; "Abbrechen" ends as far from the edge as the icon starts (001891).
 .ad__editBar {
   @include fb.bar(var(--ad-gutter));
   position: sticky;
