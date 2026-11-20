@@ -2,7 +2,7 @@
 id: "001410"
 title: A cost centre link needs a budget write right
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 implementation:
