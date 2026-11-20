@@ -15,6 +15,7 @@
         </div>
         <div class="gr__depth" role="group" [attr.aria-label]="'graph.depth.group' | t">
           <label class="gr__depthName" for="gr-depth">{{ 'graph.depth.label' | t }}</label>
+          <app-button-group class="gr__depthGroup">
           <app-button
             variant="text"
             size="sm"
@@ -49,6 +50,7 @@
           >
             <app-icon name="plus" />
           </app-button>
+          </app-button-group>
         </div>
         <div class="gr__chips" role="group" [attr.aria-label]="'graph.filter.group' | t">
           <app-filter-select
