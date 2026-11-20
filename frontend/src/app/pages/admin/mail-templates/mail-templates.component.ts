@@ -7,6 +7,7 @@ import { setI18n } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
@@ -65,6 +66,7 @@ function sameTexts(a: Record<string, string>, b: Record<string, string>): boolea
     UpperCasePipe,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     FilterSelectComponent,
     IconComponent,
     InputComponent,

@@ -20,9 +20,11 @@
         <li class="td__action">
           <div class="td__actionHead">
             <strong class="td__actionTitle">{{ actionLabel(act.type) }}</strong>
-            <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.common.remove' | t) + ': ' + actionLabel(act.type)" [title]="'admin.common.remove' | t" (click)="actionRemove.emit(ai)">
-              <app-icon name="trash" />
-            </app-button>
+            <app-button-group>
+              <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.common.remove' | t) + ': ' + actionLabel(act.type)" [title]="'admin.common.remove' | t" (click)="actionRemove.emit(ai)">
+                <app-icon name="trash" />
+              </app-button>
+            </app-button-group>
           </div>
           @switch (act.type) {
             @case ('webhook') {
@@ -81,24 +83,28 @@
                     [value]="row.budgetId"
                     (picked)="setMapBudget(ai, act, mi, $event)"
                   />
-                  <app-button
-                    class="td__mapRemove"
-                    variant="text"
-                    size="sm"
-                    [iconOnly]="true"
-                    [ariaLabel]="'admin.flow.actMapRemove' | t"
-                    [title]="'admin.flow.actMapRemove' | t"
-                    (click)="removeMapRow(ai, act, mi)"
-                  >
-                    <app-icon name="trash" />
-                  </app-button>
+                  <app-button-group>
+                    <app-button
+                      class="td__mapRemove"
+                      variant="text"
+                      size="sm"
+                      [iconOnly]="true"
+                      [ariaLabel]="'admin.flow.actMapRemove' | t"
+                      [title]="'admin.flow.actMapRemove' | t"
+                      (click)="removeMapRow(ai, act, mi)"
+                    >
+                      <app-icon name="trash" />
+                    </app-button>
+                  </app-button-group>
                 </div>
               } @empty {
                 <p class="ins__hint">{{ 'admin.flow.actMapEmpty' | t }}</p>
               }
-              <app-button class="td__inlineAdd" variant="text" size="sm" [disabled]="hasBlankMapRow(act)" (click)="addMapRow(ai, act)">
-                <app-icon name="plus" /> {{ 'admin.flow.actMapAdd' | t }}
-              </app-button>
+              <app-button-group>
+                <app-button class="td__inlineAdd" variant="text" size="sm" [disabled]="hasBlankMapRow(act)" (click)="addMapRow(ai, act)">
+                  <app-icon name="plus" /> {{ 'admin.flow.actMapAdd' | t }}
+                </app-button>
+              </app-button-group>
             }
             @case ('assignBudget') {
               <app-input
@@ -137,14 +143,18 @@
                       <app-input type="email" [ariaLabel]="'admin.flow.recipientKind.email' | t" [placeholder]="'admin.flow.actEmailPh' | t" [ngModel]="r.ref ?? ''" (ngModelChange)="recipientRefChange.emit({ ai, ri, ref: $event })" />
                     }
                   }
-                  <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [title]="'admin.common.remove' | t" (click)="recipientRemove.emit({ ai, ri })">
-                    <app-icon name="x" />
-                  </app-button>
+                  <app-button-group>
+                    <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [title]="'admin.common.remove' | t" (click)="recipientRemove.emit({ ai, ri })">
+                      <app-icon name="x" />
+                    </app-button>
+                  </app-button-group>
                 </div>
               }
-              <app-button class="td__inlineAdd" variant="text" size="sm" (click)="recipientAdd.emit(ai)">
-                <app-icon name="plus" /> {{ 'admin.flow.addRecipient' | t }}
-              </app-button>
+              <app-button-group>
+                <app-button class="td__inlineAdd" variant="text" size="sm" (click)="recipientAdd.emit(ai)">
+                  <app-icon name="plus" /> {{ 'admin.flow.addRecipient' | t }}
+                </app-button>
+              </app-button-group>
             }
           }
         </li>
@@ -163,8 +173,10 @@
       [ngModel]="pendingAction()"
       (ngModelChange)="pendingAction.set($event)"
     />
-    <app-button variant="tonal" size="sm" [disabled]="!pendingAction()" (click)="addPending()">
-      {{ 'admin.common.add' | t }}
-    </app-button>
+    <app-button-group>
+      <app-button variant="tonal" size="sm" [disabled]="!pendingAction()" (click)="addPending()">
+        {{ 'admin.common.add' | t }}
+      </app-button>
+    </app-button-group>
   </div>
 </section>

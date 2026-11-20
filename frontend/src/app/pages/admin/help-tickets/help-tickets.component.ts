@@ -20,6 +20,7 @@ import type { LoadState } from '@shared/forms/settings-form';
 import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
@@ -86,6 +87,7 @@ export function isHttpUrl(text: string): boolean {
     BreadcrumbsComponent,
     FilterSelectComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     InputComponent,
     LoadStateComponent,
     SwitchComponent,

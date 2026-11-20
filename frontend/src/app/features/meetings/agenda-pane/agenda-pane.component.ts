@@ -23,6 +23,7 @@ import { TodosApiService, type LinkEnd, type TodoCardDetail, type TodoLinkTarget
 import {
   BadgeComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   ConfirmDialogComponent,
   DialogComponent,
   EmptyStateComponent,
@@ -104,6 +105,7 @@ export interface AgendaMove {
     TopBadgeComponent,
     ConfirmDialogComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     DialogComponent,
     InputComponent,
     EmptyStateComponent,

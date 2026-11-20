@@ -136,7 +136,7 @@ describe('CalendarSubscribeComponent', () => {
     fixture.detectChanges();
     expect(api.rotateCalendar).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('dialog')).toHaveTextContent('https://x/api/calendar/NEW.ics');
-    expect(screen.queryByRole('group')).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Neue URL erzeugen' })).toBeNull();
   });
 
   it('creates the first link from the empty state, once at a time', async () => {

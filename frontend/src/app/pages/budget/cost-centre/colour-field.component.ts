@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, model, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ButtonComponent, InputComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, InputComponent } from '@stupa-makers/ui-kit';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { PALETTE } from '../budget-color.util';
 
@@ -21,7 +21,7 @@ export function isColour(text: string): boolean {
   selector: 'app-colour-field',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, InputComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, ButtonGroupComponent, InputComponent],
   templateUrl: './colour-field.component.html',
   styleUrl: './colour-field.component.scss',
 })

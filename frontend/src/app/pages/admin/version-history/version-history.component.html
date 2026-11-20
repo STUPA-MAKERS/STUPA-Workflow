@@ -23,28 +23,30 @@
                 <span class="vh__actor ell" [appTruncated]="actor(rev)" #cut="appTruncated" [attr.title]="cut.truncated() ? actor(rev) : null">{{ actor(rev) }}</span>
               </span>
               <span class="vh__actions">
-                <app-button
-                  class="vh__toggle"
-                  variant="text"
-                  size="sm"
-                  [ariaExpanded]="openDiffId() === rev.id"
-                  [ariaControls]="'vh-diff-' + rev.id"
-                  (click)="toggleDiff(rev)"
-                >
-                  <span>{{ 'admin.config.history.viewDiff' | t }}</span>
-                  <app-icon [name]="openDiffId() === rev.id ? 'up' : 'down'" [size]="14" />
-                </app-button>
-                @if (!rev.isCurrent) {
+                <app-button-group>
                   <app-button
-                    variant="tonal"
+                    class="vh__toggle"
+                    variant="text"
                     size="sm"
-                    [disabled]="restoring()"
-                    [ariaLabel]="('admin.config.history.restore' | t) + ': ' + ('admin.config.history.version' | t: { version: rev.version })"
-                    (click)="askRestore(rev)"
+                    [ariaExpanded]="openDiffId() === rev.id"
+                    [ariaControls]="'vh-diff-' + rev.id"
+                    (click)="toggleDiff(rev)"
                   >
-                    {{ 'admin.config.history.restore' | t }}
+                    <span>{{ 'admin.config.history.viewDiff' | t }}</span>
+                    <app-icon [name]="openDiffId() === rev.id ? 'up' : 'down'" [size]="14" />
                   </app-button>
-                }
+                  @if (!rev.isCurrent) {
+                    <app-button
+                      variant="tonal"
+                      size="sm"
+                      [disabled]="restoring()"
+                      [ariaLabel]="('admin.config.history.restore' | t) + ': ' + ('admin.config.history.version' | t: { version: rev.version })"
+                      (click)="askRestore(rev)"
+                    >
+                      {{ 'admin.config.history.restore' | t }}
+                    </app-button>
+                  }
+                </app-button-group>
               </span>
             </div>
             @if (openDiffId() === rev.id) {

@@ -26,10 +26,12 @@
               {{ 'participant.delegation.substitutesOnly' | t }}
             }
           </p>
-          <app-button class="dc__setup" variant="tonal" (click)="openDialog()">
-            <app-icon name="repeat" />
-            {{ 'delegation.card.setup' | t }}
-          </app-button>
+          <app-button-group>
+            <app-button class="dc__setup" variant="tonal" (click)="openDialog()">
+              <app-icon name="repeat" />
+              {{ 'delegation.card.setup' | t }}
+            </app-button>
+          </app-button-group>
         } @else if (deadlineRow()) {
           <p class="dc__small">{{ 'delegation.card.deadlinePassed' | t }}</p>
         }
@@ -52,9 +54,11 @@
                   <span class="dc__sub">{{ 'delegation.card.deadline' | t: { date: (c.deadline | ldate: 'weekdayShort') } }}</span>
                 }
               </span>
-              <app-button variant="tonal" size="sm" (click)="openDialog()">
-                {{ 'delegation.card.setup' | t }}
-              </app-button>
+              <app-button-group>
+                <app-button variant="tonal" size="sm" (click)="openDialog()">
+                  {{ 'delegation.card.setup' | t }}
+                </app-button>
+              </app-button-group>
             </li>
           } @else if (deadlineRow()) {
             <li class="dc__row dc__muted">{{ 'delegation.card.deadlinePassed' | t }}</li>
@@ -97,9 +101,11 @@
       }
     </span>
     @if (d.revocable) {
-      <app-button variant="danger" size="sm" [loading]="busy()" (click)="revoke(d)">
-        {{ 'delegation.card.revoke' | t }}
-      </app-button>
+      <app-button-group>
+        <app-button variant="danger" size="sm" [loading]="busy()" (click)="revoke(d)">
+          {{ 'delegation.card.revoke' | t }}
+        </app-button>
+      </app-button-group>
     }
   </div>
 </ng-template>

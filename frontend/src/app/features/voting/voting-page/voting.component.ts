@@ -28,6 +28,7 @@ import type { Meeting, Uuid, Vote, VoteKind, VoteListItem, VoteStatus } from '@c
 import {
   Announcer,
   ButtonComponent,
+  ButtonGroupComponent,
   EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
@@ -190,6 +191,7 @@ function whenSource(
     RouterOutlet,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     EmptyStateComponent,
     FilterSelectComponent,

@@ -28,12 +28,14 @@
                   <app-status-text status kind="muted" [title]="'admin.roles.fixedHint' | t">{{ 'admin.roles.fixed' | t }}</app-status-text>
                 }
                 @if (!isFixed(r)) {
-                  <app-row-menu
-                    trail
-                    [sections]="rowMenu()"
-                    [label]="('ui.rowMenu.trigger' | t) + ': ' + (roleLabel(r) | capitalize)"
-                    (selected)="askDelete(r)"
-                  />
+                  <app-button-group ngProjectAs="[trail]">
+                    <app-row-menu
+                      trail
+                      [sections]="rowMenu()"
+                      [label]="('ui.rowMenu.trigger' | t) + ': ' + (roleLabel(r) | capitalize)"
+                      (selected)="askDelete(r)"
+                    />
+                  </app-button-group>
                 }
               @if (isOpen(r)) {
                 <div class="ar__body">

@@ -13,10 +13,12 @@
     <section class="as__report" aria-labelledby="as-report">
       <h2 class="as__reportTitle" id="as-report">{{ 'a11yStatement.report.title' | t }}</h2>
       <p class="as__reportBody">{{ 'a11yStatement.report.body' | t }}</p>
-      <app-button variant="fill" (click)="report()">
-        <app-icon name="eye" [size]="18" />
-        {{ 'a11yStatement.report.action' | t }}
-      </app-button>
+      <app-button-group [main]="true">
+        <app-button variant="fill" (click)="report()">
+          <app-icon name="eye" [size]="18" />
+          {{ 'a11yStatement.report.action' | t }}
+        </app-button>
+      </app-button-group>
     </section>
   }
 </article>

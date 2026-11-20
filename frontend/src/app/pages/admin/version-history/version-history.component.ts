@@ -13,6 +13,7 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   ConfigDiffComponent,
   ConfirmDialogComponent,
   EmptyStateComponent,
@@ -51,6 +52,7 @@ import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-stat
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     ConfigDiffComponent,
     ConfirmDialogComponent,
     IconComponent,

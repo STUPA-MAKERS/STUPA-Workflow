@@ -29,13 +29,15 @@
       filled
     />
     @if (!phone()) {
-      <app-button
-        variant="text"
-        [iconOnly]="true"
-        [ariaLabel]="'gremien.members.export' | t"
-        [disabled]="loading() || !groups().length"
-        (click)="exportCsv()"
-      ><app-icon name="download" /></app-button>
+      <app-button-group>
+        <app-button
+          variant="text"
+          [iconOnly]="true"
+          [ariaLabel]="'gremien.members.export' | t"
+          [disabled]="loading() || !groups().length"
+          (click)="exportCsv()"
+        ><app-icon name="download" /></app-button>
+      </app-button-group>
     }
   </div>
 </div>

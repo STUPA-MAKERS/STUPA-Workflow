@@ -3,7 +3,9 @@
   <div class="vc__head">
     <h3 class="vc__q">{{ v.question || ('meetings.vote.untitled' | t) }}</h3>
     @if (menu().length > 0) {
-      <app-row-menu class="vc__menu" [label]="'meetings.vote.menu' | t" [sections]="menu()" (selected)="onMenu($event)" />
+      <app-button-group>
+        <app-row-menu class="vc__menu" [label]="'meetings.vote.menu' | t" [sections]="menu()" (selected)="onMenu($event)" />
+      </app-button-group>
     }
   </div>
   @if (headStatus() || repeated() || ruleLine()) {
@@ -86,11 +88,11 @@
       (castFailed)="onBallotFailed($event)"
     />
   } @else if (v.status === 'open' && canVote() && !hasVoted()) {
-    <div class="vc__ballot" role="group" [attr.aria-label]="'meetings.dock.yourVote' | t">
+    <app-button-group class="vc__ballot" [label]="'meetings.dock.yourVote' | t">
       @for (opt of options(); track opt) {
         <app-button variant="outlined" [block]="true" [loading]="casting() === v.id" (click)="cast.emit({ voteId: v.id, choice: opt })">{{ optionLabel(opt) }}</app-button>
       }
-    </div>
+    </app-button-group>
   }
 
   @if (guestResult(); as gr) {
@@ -126,12 +128,16 @@
   @switch (primary()) {
     @case ('close') {
       <div class="vc__actions">
-        <app-button variant="danger" [block]="true" (click)="close.emit(v.id)">{{ 'meetings.vote.close' | t }}</app-button>
+        <app-button-group>
+          <app-button variant="danger" [block]="true" (click)="close.emit(v.id)">{{ 'meetings.vote.close' | t }}</app-button>
+        </app-button-group>
       </div>
     }
     @case ('open') {
       <div class="vc__actions">
-        <app-button variant="fill" [block]="true" [disabled]="otherOpen()" [title]="(otherOpen() ? 'meetings.vote.openBlocked' : 'meetings.vote.open') | t" (click)="open.emit(v.id)">{{ 'meetings.vote.open' | t }}</app-button>
+        <app-button-group [main]="true">
+          <app-button variant="fill" [block]="true" [disabled]="otherOpen()" [title]="(otherOpen() ? 'meetings.vote.openBlocked' : 'meetings.vote.open') | t" (click)="open.emit(v.id)">{{ 'meetings.vote.open' | t }}</app-button>
+        </app-button-group>
       </div>
       @if (otherOpen()) {
         <p class="vc__hint">{{ 'meetings.vote.openBlocked' | t }}</p>
@@ -139,10 +145,12 @@
     }
     @case ('insert') {
       <div class="vc__actions">
-        <app-button variant="fill" [block]="true" (click)="insertResult.emit(v)">
-          <app-icon name="fileplus" />
-          {{ 'meetings.dock.insertResult' | t }}
-        </app-button>
+        <app-button-group [main]="true">
+          <app-button variant="fill" [block]="true" (click)="insertResult.emit(v)">
+            <app-icon name="fileplus" />
+            {{ 'meetings.dock.insertResult' | t }}
+          </app-button>
+        </app-button-group>
       </div>
     }
   }

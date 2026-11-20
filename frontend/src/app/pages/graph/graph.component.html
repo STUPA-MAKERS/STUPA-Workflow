@@ -73,10 +73,12 @@
             {{ 'graph.filter.noAccess' | t }}
           </button>
           @if (filtered()) {
-            <app-button variant="text" size="sm" data-testid="gr-reset" (click)="reset()">
-              <app-icon name="reset" />
-              {{ 'graph.filter.reset' | t }}
-            </app-button>
+            <app-button-group>
+              <app-button variant="text" size="sm" data-testid="gr-reset" (click)="reset()">
+                <app-icon name="reset" />
+                {{ 'graph.filter.reset' | t }}
+              </app-button>
+            </app-button-group>
           }
         </div>
       </div>
@@ -102,10 +104,12 @@
             <p class="gr__growing gr__pill" role="status">{{ 'graph.growing' | t }}</p>
           } @else {
             <div class="gr__more gr__pill">
-              <app-button variant="text" size="sm" data-testid="gr-more" (click)="loadMore()">
-                <app-icon name="down" />
-                {{ 'graph.loadMore' | t }}
-              </app-button>
+              <app-button-group>
+                <app-button variant="text" size="sm" data-testid="gr-more" (click)="loadMore()">
+                  <app-icon name="down" />
+                  {{ 'graph.loadMore' | t }}
+                </app-button>
+              </app-button-group>
             </div>
           }
         </div>

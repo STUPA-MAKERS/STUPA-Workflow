@@ -38,12 +38,14 @@
                 >{{ 'admin.webhook.active' | t }}</app-switch
               >
               @if (canManage()) {
-                <app-row-menu
-                  trail
-                  [sections]="rowMenu()"
-                  [label]="('ui.rowMenu.trigger' | t) + ': ' + (h.name || h.url)"
-                  (selected)="askDelete(h)"
-                />
+                <app-button-group ngProjectAs="[trail]">
+                  <app-row-menu
+                    trail
+                    [sections]="rowMenu()"
+                    [label]="('ui.rowMenu.trigger' | t) + ': ' + (h.name || h.url)"
+                    (selected)="askDelete(h)"
+                  />
+                </app-button-group>
               }
               @if (canManage()) {
                 <app-section class="wh__status" [level]="2" [heading]="'admin.webhook.delivery.title' | t">

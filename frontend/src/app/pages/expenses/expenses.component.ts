@@ -25,6 +25,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   CheckboxComponent,
   ConfirmDialogComponent,
   downloadBlob,
@@ -150,6 +151,7 @@ const SORTS: readonly {
     BookingFormComponent,
     BulkPanelComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     CheckboxComponent,
     CostCentreSelectComponent,
     EmptyStateComponent,

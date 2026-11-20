@@ -11,12 +11,14 @@
         </p>
       }
       <div class="done__actions">
-        @if (applicationId()) {
-          <a appButton="fill" [routerLink]="['/applications', applicationId()]">
-            {{ 'apply.submitted.link' | t }}
-          </a>
-        }
-        <a appButton="text" routerLink="/">{{ 'apply.confirm.home' | t }}</a>
+        <app-button-group>
+          @if (applicationId()) {
+            <a appButton="fill" [routerLink]="['/applications', applicationId()]">
+              {{ 'apply.submitted.link' | t }}
+            </a>
+          }
+          <a appButton="text" routerLink="/">{{ 'apply.confirm.home' | t }}</a>
+        </app-button-group>
       </div>
     </article>
   } @else {
@@ -46,7 +48,9 @@
         <p class="done__meta">{{ 'apply.confirm.hint' | t }}</p>
       </div>
       <div class="done__actions">
-        <a appButton="outlined" routerLink="/">{{ 'apply.confirm.home' | t }}</a>
+        <app-button-group>
+          <a appButton="outlined" routerLink="/">{{ 'apply.confirm.home' | t }}</a>
+        </app-button-group>
       </div>
     </article>
   }

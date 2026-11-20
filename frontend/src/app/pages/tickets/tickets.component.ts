@@ -32,6 +32,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
@@ -126,6 +127,7 @@ function statusOrder(status: TicketStatusFilter): readonly TicketStatus[] {
     TranslatePipe,
     AvatarComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     EmptyStateComponent,
     FilterSelectComponent,
     IconComponent,

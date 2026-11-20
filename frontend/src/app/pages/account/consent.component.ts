@@ -8,6 +8,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   CheckboxComponent,
   ChipGroupComponent,
   IconComponent,
@@ -39,6 +40,7 @@ import { scopeDesc, scopeLabel } from './scope-labels';
   imports: [
     ChipGroupComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     CheckboxComponent,
     FormsModule,
     IconComponent,
