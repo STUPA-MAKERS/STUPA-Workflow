@@ -1,6 +1,6 @@
 ---
 id: "001803"
-title: The empty-state face has more room above than below
+title: The empty-state face has room above and below
 kind: non-functional
 status: draft
 owner: frederikbeimgraben
@@ -14,10 +14,10 @@ scope:
   - frontend/vendor/ui-kit
 ---
 
-# The empty-state face has more room above than below
+# The empty-state face has room above and below
 
-The face of an empty state (spec 001360) must have 3rem of room above it and 1rem below its
-hint. A page must not add more room above an empty state, so the room is not doubled (for
+The face of an empty state (spec 001360) must have 3rem of room above it and 3rem below its
+hint. A page must not add more room around an empty state, so the room is not doubled (for
 example in the day list of the Kalender).
 
 Reason: In a tall tile or a sheet the face stuck to the head of the surface.
