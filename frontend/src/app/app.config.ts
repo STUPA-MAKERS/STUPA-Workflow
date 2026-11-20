@@ -5,7 +5,7 @@ import {
   isDevMode,
   provideAppInitializer,
   provideBrowserGlobalErrorListeners,
-  provideZoneChangeDetection,
+  provideZonelessChangeDetection,
 } from '@angular/core';
 import { provideHttpClient, withInterceptors, withXhr } from '@angular/common/http';
 import {
@@ -69,13 +69,17 @@ import { provideServiceWorker } from '@angular/service-worker';
  * inside the interceptor stays as defense in depth. The mock loads on its first request
  * (`lazyMockApiInterceptor`), so it is not part of the initial bundle.
  *
+ * Change detection runs without zone.js (spec 002002): a signal, a template event, the
+ * async pipe or `markForCheck` schedules it. A scroll event, a timer or an animation frame
+ * outside them costs no check of the app, so the scroll handlers of the lists stay cheap.
+ *
  * The person avatars of the kit load the Gravatar image through the API proxy. The service
  * worker (`ngsw-config.json`) caches the app shell and the assets, not `/api`.
  */
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
-    provideZoneChangeDetection({ eventCoalescing: true }),
+    provideZonelessChangeDetection(),
     provideRouter(
       routes,
       withComponentInputBinding(),
