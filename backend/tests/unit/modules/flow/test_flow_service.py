@@ -81,6 +81,7 @@ def _app(state_id: object, flow_id: object) -> SimpleNamespace:
         data={},
         budget_id=None,
         vote_gremium_id=None,
+        replaces_id=None,
     )
 
 
@@ -715,11 +716,13 @@ async def test_list_states_returns_flow_states() -> None:
     app = _app(uuid4(), flow_id)
     s1 = SimpleNamespace(
         id=uuid4(), key="draft", label_i18n={"de": "Entwurf"}, color=None,
-        edit_allowed=True, kind="normal", is_approved=False,
+        edit_allowed=True, kind="normal", is_initial=True, is_terminal=False, is_denied=False,
+        is_approved=False,
     )
     s2 = SimpleNamespace(
         id=uuid4(), key="done", label_i18n={}, color="#111",
-        edit_allowed=False, kind="normal", is_approved=True,
+        edit_allowed=False, kind="normal", is_initial=False, is_terminal=True, is_denied=False,
+        is_approved=True,
     )
     db = fake_session(result(app), result(s1, s2))
     out = await FlowService(db).list_states(app.id)
@@ -763,9 +766,11 @@ async def test_available_flags_the_agenda_only_into_a_vote_state() -> None:
     plain = _transition(flow_id=flow_id, from_id=draft, to_id=voting)
     db = fake_session(result(app), result(to_vote, to_done, plain))
     vote_state = SimpleNamespace(
-        id=voting, kind="vote", is_approved=False, config={"gremiumId": str(gid)}
+        id=voting, kind="vote", is_approved=False, is_terminal=False, config={"gremiumId": str(gid)}
     )
-    done_state = SimpleNamespace(id=done, kind="normal", is_approved=False, config={})
+    done_state = SimpleNamespace(
+        id=done, kind="normal", is_approved=False, is_terminal=True, config={}
+    )
     db.get_results = [vote_state, done_state, vote_state]
 
     out = {t.id: t for t in await FlowService(db).available_transitions(app.id, _principal())}

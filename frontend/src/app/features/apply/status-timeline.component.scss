@@ -146,6 +146,27 @@
 .ad__note {
   margin-top: var(--space-2);
 }
+/* The note centres a 32px sm button on its 20px text line, 6px from its top and bottom
+   edge. The end edge takes the same 6px (16px padding less 10px), so the button sits
+   concentric in the note; a fill button keeps its start padding. */
+.ad__draftSubmit.ad__draftSubmit {
+  margin-inline: 0 calc(6px - var(--space-4));
+}
+.ad__replaced {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+}
+.ad__replacedLink {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-accent-text);
+  font-weight: var(--fw-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .ad__cols {
   display: flex;
   flex-wrap: wrap;

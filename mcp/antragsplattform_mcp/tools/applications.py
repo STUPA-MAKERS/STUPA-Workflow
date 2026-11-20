@@ -42,8 +42,15 @@ async def list_applications(
     return await api().get(
         "/applications",
         params=params(
-            state=states or None, gremium=gremium, type=type, q=q,
-            sort=sort, order=order, limit=limit, offset=offset, archived=archived,
+            state=states or None,
+            gremium=gremium,
+            type=type,
+            q=q,
+            sort=sort,
+            order=order,
+            limit=limit,
+            offset=offset,
+            archived=archived,
         ),
     )
 
@@ -112,8 +119,11 @@ async def create_application(
     return await api().post(
         "/applications",
         json=params(
-            typeId=type_id, data=data, applicantEmail=applicant_email,
-            applicantName=applicant_name, lang=lang,
+            typeId=type_id,
+            data=data,
+            applicantEmail=applicant_email,
+            applicantName=applicant_name,
+            lang=lang,
         ),
     )
 
@@ -163,9 +173,14 @@ async def create_application_on_behalf(
     return await api().post(
         "/applications/on-behalf",
         json=params(
-            typeId=type_id, data=data, applicantPrincipalId=applicant_principal_id,
-            applicantName=applicant_name, applicantEmail=applicant_email,
-            receivedOn=received_on, intake=intake, lang=lang,
+            typeId=type_id,
+            data=data,
+            applicantPrincipalId=applicant_principal_id,
+            applicantName=applicant_name,
+            applicantEmail=applicant_email,
+            receivedOn=received_on,
+            intake=intake,
+            lang=lang,
         ),
     )
 
@@ -517,9 +532,7 @@ async def add_application_observer(application_id: str, email: str) -> dict:
     applicant address gives 422 `observer_is_applicant`, an address that observes
     already 409 `observer_exists`.
     """
-    return await api().post(
-        f"/applications/{application_id}/observers", json={"email": email}
-    )
+    return await api().post(f"/applications/{application_id}/observers", json={"email": email})
 
 
 @group.tool
@@ -536,9 +549,7 @@ async def get_application_links(application_id: str) -> dict:
 
 
 @group.tool
-async def set_application_predecessor(
-    application_id: str, predecessor_id: str | None
-) -> dict:
+async def set_application_predecessor(application_id: str, predecessor_id: str | None) -> dict:
     """Set, change or remove (`None`) the Vorgänger of an application.
 
     The caller needs the edit right on the application and on the Vorgänger. The
@@ -609,3 +620,57 @@ async def export_applications_xlsx(
 def register(mcp: FastMCP) -> None:
     """Register the applications tool group."""
     group.register(mcp)
+
+
+@group.tool
+async def create_application_new_version(application_id: str) -> dict:
+    """Create the new version ("Neue Fassung") of a denied or returned application.
+
+    The new draft has the type, the applicant and the answers of the old application
+    (no files) and names it. Submitting the draft closes the old application in the
+    state that the flow marks as the target for replaced applications. Only the
+    applicant and a holder of `application.manage` may; a state that offers no new
+    version answers 409 `new_version_not_allowed`. Returns `applicationId`.
+    """
+    return await api().post(f"/applications/{application_id}/new-version")
+
+
+@group.tool
+async def list_bulk_transitions(application_ids: list[str]) -> list[dict]:
+    """List the target states that every given application reaches by a transition.
+
+    Needs `application.manage` and `application.transition`, at most 100 ids. A target
+    with `approves` lists the requested amount of each application, which the bulk
+    fire approves. A transition onto an agenda is not offered.
+    """
+    return await api().post(
+        "/bulk/applications/transitions", json={"applicationIds": application_ids}
+    )
+
+
+@group.tool
+async def fire_bulk_transition(
+    application_ids: list[str], to_state_id: str, note: str | None = None
+) -> dict:
+    """Move every given application into `to_state_id`, each on its own.
+
+    Read the targets from `list_bulk_transitions`. The result lists each application
+    with `ok`, or with the code and the text of its error; one error does not stop the
+    others. An approved target approves each application with its requested amount.
+    """
+    return await api().post(
+        "/bulk/applications/transition",
+        json=params(applicationIds=application_ids, toStateId=to_state_id, note=note),
+    )
+
+
+@group.tool
+async def send_bulk_message(application_ids: list[str], body: str) -> dict:
+    """Add the same public comment to each given application (at most 100).
+
+    Each applicant reads the comment and gets the normal comment mail. The result lists
+    each application with `ok`, or with the code and the text of its error.
+    """
+    return await api().post(
+        "/bulk/applications/comments", json={"applicationIds": application_ids, "body": body}
+    )

@@ -172,9 +172,22 @@
           </span>
         </p>
 
-        @if (canTransition() && !application.observer && transitions().length) {
+        @for (r of links()?.replacedBy ?? []; track r.id) {
+          <p class="sheet-line ad__replaced" data-testid="replaced-by">
+            <app-icon name="right" [size]="16" />
+            <span>{{ 'status.replacedBy' | t }}</span>
+            <a class="ad__replacedLink" [routerLink]="['/applications', r.id]">{{ r.title || ('applications.list.untitled' | t) }}</a>
+          </p>
+        }
+        @if (application.state?.isInitial) {
+          <app-note class="ad__archived" icon="info" role="status" data-testid="draft-note">{{ 'status.draft.note' | t }}</app-note>
+        }
+
+        @if (canTransition() && !application.observer && transitionsLoading()) {
+          <ng-container *ngTemplateOutlet="transitionsSkel" />
+        } @else if (offersNewVersion() || (canTransition() && !application.observer && transitions().length)) {
           <app-button-group class="ad__transitionGroup" [label]="'applications.transitions.title' | t">
-            @for (t of transitions(); track t.id) {
+            @for (t of canTransition() && !application.observer ? transitions() : []; track t.id) {
               <app-button
                 [variant]="looks().get(t.id) ?? 'tonal'"
                 [loading]="firing() === t.id"
@@ -187,9 +200,15 @@
                 {{ t.label || ('applications.transitions.fallback' | t) }}
               </app-button>
             }
+            @if (offersNewVersion()) {
+              <app-button
+                variant="tonal"
+                data-testid="new-version"
+                [loading]="creatingVersion()"
+                (click)="createNewVersion()"
+              ><app-icon name="copy" />{{ 'status.newVersion.action' | t }}</app-button>
+            }
           </app-button-group>
-        } @else if (canTransition() && !application.observer && transitionsLoading()) {
-          <ng-container *ngTemplateOutlet="transitionsSkel" />
         }
 
         @if (application.archivedAt) {
@@ -257,6 +276,7 @@
           [draftKey]="'application.' + application.id"
           [messages]="chatMessages()"
           [visibilityOptions]="chatVisibilities()"
+          [visibilityGuard]="chatVisibilityGuard"
           [canAttach]="canAttach()"
           [canPost]="!observer()"
           [mentionables]="mentionables()"

@@ -566,7 +566,9 @@ describe('ApplicationsDetailComponent', () => {
     req.flush([]);
     detectChanges();
     expect(cmp.transitionsLoading()).toBe(false);
-    expect(container.querySelector('.ad__head .ad__transitions, .ad__head .ad__transitionGroup')).toBeNull();
+    // Only "Neue Fassung" (001720) stays: the state allows edits and is not the start.
+    expect(container.querySelectorAll('.ad__head .ad__transitionGroup app-button')).toHaveLength(1);
+    expect(container.querySelector('[data-testid="new-version"]')).not.toBeNull();
     flushAttachments(http);
     http.verify();
   });

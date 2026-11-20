@@ -104,6 +104,18 @@ describe('MyApplicationsComponent', () => {
     expect(document.querySelectorAll('.ma__dot')).toHaveLength(2);
   });
 
+  it('says that a draft is not submitted yet (001710)', async () => {
+    const draft = {
+      ...LIST.items[0],
+      id: 'a6',
+      state: { ...LIST.items[0].state!, key: 'entwurf', label: { de: 'Entwurf' }, isInitial: true },
+    };
+    const { fixture } = await setup({ list: () => of({ ...LIST, items: [draft] } as ApplicantApplications) });
+    expect(await screen.findByText('Noch nicht eingereicht')).toBeInTheDocument();
+    expect(screen.queryByText('Entwurf')).toBeNull();
+    expect(fixture.componentInstance.rows()[0].stateKind).toBe('warn');
+  });
+
   it('names an Antrag without a title and keeps an amount that is no number', async () => {
     const odd = { ...LIST.items[0], id: 'a3', title: '  ', amount: 'k. A.', currency: null };
     const { fixture } = await setup({ list: () => of({ ...LIST, items: [odd] } as ApplicantApplications) });

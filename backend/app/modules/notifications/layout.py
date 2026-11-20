@@ -121,6 +121,10 @@ _REASONS: dict[str, dict[str, str]] = {
         "de": "Sie erhalten diese E-Mail, weil Sie zu einem Board hinzugefügt wurden.",
         "en": "You are receiving this email because you were added to a board.",
     },
+    "draft_reminder": {
+        "de": "Sie erhalten diese E-Mail, weil Ihr Antrag noch nicht eingereicht ist.",
+        "en": "You are receiving this email because your application is not submitted yet.",
+    },
     "poll_started": {
         "de": "Sie erhalten diese E-Mail, weil Sie in diesem Gremium abstimmen dürfen.",
         "en": "You are receiving this email because you vote in this committee.",

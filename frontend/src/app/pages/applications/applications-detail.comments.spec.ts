@@ -253,7 +253,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     const sheet = screen.getByRole('dialog', { name: 'Kommentare' });
     expect(sheet).toHaveAttribute('aria-modal', 'true');
     expect(within(sheet).getByText('Bitte Kostenplan ergänzen.')).toBeInTheDocument();
-    expect(within(sheet).getByRole('radio', { name: 'Intern' })).toBeInTheDocument();
+    expect(within(sheet).getByRole('radio', { name: 'Intern (nur Gremien)' })).toBeChecked();
     fireEvent.keyDown(sheet, { key: 'Escape' });
     detectChanges();
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -354,11 +354,12 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
       people,
     );
     const box = input() as HTMLTextAreaElement;
+    const group = screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
+    await userEvent.click(within(group).getByRole('radio', { name: 'Öffentlich (Antragsteller:in liest mit und bekommt eine Mail)' }));
     fireEvent.input(box, { target: { value: 'Hallo @sel', selectionStart: 10 } });
     detectChanges();
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
-    const group = screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
-    await userEvent.click(within(group).getByRole('radio', { name: 'Intern' }));
+    await userEvent.click(within(group).getByRole('radio', { name: 'Intern (nur Gremien)' }));
     fireEvent.input(box, { target: { value: 'Hallo @sel', selectionStart: 10 } });
     detectChanges();
     const list = screen.getByRole('listbox', { name: 'Personen erwähnen' });
@@ -415,19 +416,37 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     ctx.http.expectNone(url('/mentionable'));
   });
 
-  /** Both kinds exist, and the internal comment carries its mark. */
-  it('posts an internal comment when the toggle says so and keeps the choice', async () => {
+  /** Both kinds exist, and the internal comment carries its mark (001690). */
+  it('starts each comment of a member as internal', async () => {
     const { http, type, detectChanges } = await loaded();
     const group = screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
-    expect(within(group).getByRole('radio', { name: 'Öffentlich' })).toHaveAttribute('aria-checked', 'true');
-    await userEvent.click(within(group).getByRole('radio', { name: 'Intern' }));
+    expect(within(group).getByRole('radio', { name: 'Intern (nur Gremien)' })).toBeChecked();
+    expect(screen.getByTestId('chat-vis-hint')).toHaveTextContent('Intern');
+    expect(document.querySelector('.chat__box--internal')).not.toBeNull();
     type('Nur für uns');
     const post = http.expectOne(url('/comments'));
     expect(post.request.body).toEqual({ body: 'Nur für uns', visibility: 'internal' });
     post.flush({ ...OWN, body: 'Nur für uns' });
     detectChanges();
-    expect(within(group).getByRole('radio', { name: 'Intern' })).toHaveAttribute('aria-checked', 'true');
     expect(document.querySelector('.chat__mark--internal')).toHaveTextContent('Intern');
+    http.verify();
+  });
+
+  /** A public comment shows its reader and its frame, and the next one starts internal again. */
+  it('shows a public choice before the send and resets it after the send', async () => {
+    const { http, type, detectChanges } = await loaded();
+    const group = screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
+    await userEvent.click(within(group).getByRole('radio', { name: 'Öffentlich (Antragsteller:in liest mit und bekommt eine Mail)' }));
+    detectChanges();
+    expect(screen.getByTestId('chat-vis-hint')).toHaveTextContent('Öffentlich · Mail');
+    expect(document.querySelector('.chat__box--public')).not.toBeNull();
+    type('An alle');
+    const post = http.expectOne(url('/comments'));
+    expect(post.request.body).toEqual({ body: 'An alle', visibility: 'public' });
+    post.flush({ ...OWN, body: 'An alle', visibility: 'public' });
+    detectChanges();
+    expect(within(group).getByRole('radio', { name: 'Intern (nur Gremien)' })).toBeChecked();
+    expect(document.querySelector('.chat__box--public')).toBeNull();
     http.verify();
   });
 
@@ -462,7 +481,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     fireEvent.keyDown(input(), { key: 'Enter' });
     detectChanges();
     const post = http.expectOne(url('/comments'));
-    expect(post.request.body).toEqual({ body: '', visibility: 'public', attachmentIds: ['d1'], draftToken: 'tok' });
+    expect(post.request.body).toEqual({ body: '', visibility: 'internal', attachmentIds: ['d1'], draftToken: 'tok' });
     expect(screen.getByText('In Prüfung')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'angebot.pdf entfernen' })).not.toBeInTheDocument();
     post.flush({

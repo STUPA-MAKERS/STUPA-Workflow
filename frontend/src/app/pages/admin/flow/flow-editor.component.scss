@@ -564,3 +564,8 @@
     padding: var(--space-4);
   }
 }
+
+// The warning on a withdrawal of a draft (001712).
+.fe__warn {
+  margin-block: var(--space-2);
+}

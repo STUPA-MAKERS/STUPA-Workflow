@@ -128,11 +128,13 @@ def _transition_out(
     gremium_id: UUID | None,
     *,
     allows_decision: bool = False,
+    to_terminal: bool = False,
     requires_amount: bool = False,
 ) -> TransitionOut:
     """Map a transition to its API shape.
 
     `allows_decision` tells that the target is an approved state: a fire then takes a
+    `decision`. `to_terminal` tells that the target is a terminal state.
     `decision`. `requires_amount` tells that the decision must name the approved
     amount (`amount_required`).
 
@@ -153,6 +155,7 @@ def _transition_out(
         addsToAgenda=gremium_id is not None,
         agendaGremiumId=gremium_id,
         allowsDecision=allows_decision,
+        toTerminal=to_terminal,
         requiresAmount=requires_amount,
     )
 
@@ -338,6 +341,7 @@ class FlowService:
             transition,
             await self._agenda_gremium(transition, target, app.budget_id),
             allows_decision=target is not None and target.is_approved,
+            to_terminal=target is not None and target.is_terminal,
             requires_amount=await self._amount_required(transition.from_state_id, target, app),
         )
 
@@ -661,6 +665,85 @@ class FlowService:
         )
         return tuple(v.id for v in votes)
 
+    async def _close_replaced(
+        self, app: Application, left_state_id: UUID, *, actor: str
+    ) -> tuple[UUID, ...]:
+        """Close the Antrag that a submitted new version replaces (spec 001722).
+
+        A new version names the old Antrag in ``replaces_id``. When the new version
+        leaves the initial state, it is submitted, and the old Antrag moves into the
+        state of its flow with ``is_replaced_target``, with the note "Ersetzt durch
+        <number>". The old Antrag stays as it is when it is already terminal, when its
+        flow has no such state, or when a concurrent change moved it first. The move
+        cancels the votes of the old Antrag and writes a ``status_change`` audit entry,
+        in the open transaction.
+
+        Returns:
+            The ids of the cancelled votes of the old Antrag.
+        """
+        left = await self._load_state(left_state_id) if app.replaces_id is not None else None
+        old = (
+            await self.session.get(Application, app.replaces_id)
+            if app.replaces_id is not None and left is not None and left.is_initial
+            else None
+        )
+        old_state = (
+            await self._load_state(old.current_state_id)
+            if old is not None and old.current_state_id is not None
+            else None
+        )
+        target = (
+            await self.session.scalar(
+                select(State).where(
+                    State.flow_version_id == old.flow_version_id,
+                    State.is_replaced_target.is_(True),
+                )
+            )
+            if old is not None and old_state is not None and not old_state.is_terminal
+            else None
+        )
+        if old is None or old_state is None or target is None:
+            return ()
+        moved = cast(
+            "CursorResult[Any]",
+            await self.session.execute(
+                update(Application)
+                .where(Application.id == old.id, Application.current_state_id == old_state.id)
+                .values(current_state_id=target.id, vote_gremium_id=None)
+            ),
+        )
+        if moved.rowcount != 1:
+            return ()
+        event = StatusEvent(
+            application_id=old.id,
+            from_state_id=old_state.id,
+            to_state_id=target.id,
+            transition_id=None,
+            actor=actor,
+            note=f"Ersetzt durch {str(app.id)[:8].upper()}",
+        )
+        self.session.add(event)
+        await self.session.flush()
+        cancelled = await self._cancel_votes(
+            old.id, actor=actor, left_state_id=old_state.id, entered_state_id=target.id
+        )
+        await AuditService(self.session).record(
+            actor=actor,
+            action=AuditAction.STATUS_CHANGE,
+            target_type="application",
+            target_id=str(old.id),
+            data={
+                "fromStateId": str(old_state.id),
+                "toStateId": str(target.id),
+                "transitionId": None,
+                "statusEventId": str(event.id),
+                "manual": False,
+                "hasNote": True,
+                "replacedBy": str(app.id),
+            },
+        )
+        return cancelled
+
     async def _publish_cancelled(self, vote_ids: tuple[UUID, ...]) -> None:
         """Send `vote_cancelled` for each cancelled vote, after the commit.
 
@@ -876,6 +959,7 @@ class FlowService:
             if transition.branch is None
             else ()
         )
+        replaced = await self._close_replaced(app, from_state_id, actor=principal.sub)
 
         await AuditService(self.session).record(
             actor=principal.sub,
@@ -912,7 +996,7 @@ class FlowService:
             to_state_id=to_state_id,
             status_event_id=status_event_id,
             agenda_added=meeting_id is not None,
-            cancelled_vote_ids=cancelled,
+            cancelled_vote_ids=(*cancelled, *replaced),
         )
 
     async def after_commit(self, staged: StagedFire) -> TransitionResult:
@@ -1181,6 +1265,9 @@ class FlowService:
                 color=s.color,
                 editAllowed=s.edit_allowed,
                 kind=s.kind,
+                isInitial=s.is_initial,
+                isTerminal=s.is_terminal,
+                isDenied=s.is_denied,
                 isApproved=s.is_approved,
             )
             for s in states

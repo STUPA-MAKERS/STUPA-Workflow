@@ -28,6 +28,7 @@ import type {
   ApplicationComment,
   ApplicationVersion,
   EffectiveForm,
+  LinkedApplication,
   ProblemDetail,
   TimelineEntry,
   Transition,
@@ -210,6 +211,29 @@ export class StatusTimelineComponent {
   readonly actions = signal<Transition[]>([]);
   /** Id of the currently firing transition (button spinner / lock). */
   readonly firing = signal<string | null>(null);
+  /** The new versions of this Antrag (001721): the head shows "Ersetzt durch". */
+  readonly replacedBy = signal<readonly LinkedApplication[]>([]);
+  /** A transition into a terminal state waits for its confirmation (001712). */
+  readonly confirmAction = signal<Transition | null>(null);
+  /** "Neue Fassung" is running (001720). */
+  readonly creatingVersion = signal(false);
+
+  /** The Antrag is in the initial state of the flow: a draft (001710). */
+  readonly isDraft = computed(() => Boolean(this.application()?.state?.isInitial));
+  /** A draft offers no transition into a terminal state to the applicant (001712). */
+  private readonly offered = computed(() =>
+    this.isDraft() ? this.actions().filter((t) => !t.toTerminal) : this.actions(),
+  );
+  /** "Einreichen" of a draft: the first transition out of the initial state (001710). */
+  readonly submitAction = computed(() => (this.isDraft() ? (this.offered()[0] ?? null) : null));
+  /** The transition buttons of the head, without the one of the draft note. */
+  readonly shownActions = computed(() => this.offered().filter((t) => t !== this.submitAction()));
+  /** A denied Antrag, or one sent back for changes, offers a new version (001720). */
+  readonly offersNewVersion = computed(() => {
+    const state = this.application()?.state;
+    if (!state || this.observer()) return false;
+    return Boolean(state.isDenied) || (state.editAllowed && !state.isInitial);
+  });
 
   readonly commentsOpen = signal(false);
   private readonly filesPanel = viewChild(AttachmentsPanelComponent);
@@ -485,8 +509,10 @@ export class StatusTimelineComponent {
       comments: this.api.comments(appId),
       actions: this.api.applicantTransitions(appId).pipe(catchError(() => of([]))),
       versions: this.api.versions(appId).pipe(catchError(() => of([]))),
+      links: this.api.applicationLinks(appId, { quiet: true }).pipe(catchError(() => of(null))),
     }).subscribe({
-      next: ({ application, timeline, comments, actions, versions }) => {
+      next: ({ application, timeline, comments, actions, versions, links }) => {
+        this.replacedBy.set(links?.replacedBy ?? []);
         this.application.set(application);
         this.timeline.set(timeline);
         this.comments.set(comments);
@@ -562,6 +588,47 @@ export class StatusTimelineComponent {
       actorLabel(info, comment.author, (key, params) => this.i18n.translate(key, params), named) ??
       this.i18n.translate('applications.comments.author.committee')
     );
+  }
+
+  /** A transition into a terminal state asks first (001712); the others fire at once. */
+  onAction(t: Transition): void {
+    if (t.toTerminal) {
+      this.confirmAction.set(t);
+      return;
+    }
+    this.fireAction(t);
+  }
+
+  /** The confirmation of a transition into a terminal state. */
+  confirmFire(): void {
+    const t = this.confirmAction();
+    this.confirmAction.set(null);
+    if (t) this.fireAction(t);
+  }
+
+  /**
+   * "Neue Fassung" (001720): the server creates the draft. A session bound to this one
+   * Antrag cannot open the new one, so the server mails a link instead.
+   */
+  createNewVersion(): void {
+    const app = this.application();
+    if (!app || this.creatingVersion()) return;
+    this.creatingVersion.set(true);
+    this.api.newVersion(app.id).subscribe({
+      next: (res) => {
+        this.creatingVersion.set(false);
+        if (res.linkSent) {
+          this.toast.success(this.i18n.translate('status.newVersion.linkSent'));
+          return;
+        }
+        this.page?.reload();
+        void this.router.navigate(['/my-applications', res.applicationId]);
+      },
+      error: () => {
+        this.creatingVersion.set(false);
+        this.toast.error(this.i18n.translate('status.newVersion.failed'));
+      },
+    });
   }
 
   /** Fire an applicant transition (actorIsApplicant gate) and reload. */

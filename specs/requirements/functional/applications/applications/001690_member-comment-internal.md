@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - frontend/src/app/shared/ui/chat/chat.component.ts
+  - frontend/src/app/pages/applications/applications-detail.component.ts
 scope:
   - backend/app/modules/applications
   - frontend/src/app/pages/applications

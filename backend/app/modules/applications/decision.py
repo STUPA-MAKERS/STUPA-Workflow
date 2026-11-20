@@ -152,9 +152,7 @@ def amount_required(*, entering: bool, was_approved: bool, requested: Decimal | 
 
 def required_amount_problem() -> ValidationProblem:
     """Build the 422 `approved_amount_required`."""
-    return _amount_problem(
-        CODE_AMOUNT_REQUIRED, "An approval must name the approved amount."
-    )
+    return _amount_problem(CODE_AMOUNT_REQUIRED, "An approval must name the approved amount.")
 
 
 def check_amount_given(required: bool, decision: DecisionIn | None) -> None:

@@ -5,6 +5,7 @@ import {
   setStateGremiumSource,
   setStateKind,
   setStateOutcome,
+  setStateReplacedTarget,
 } from './flow-graph-ops.util';
 
 const graph = (over: Partial<FlowGraph> = {}): FlowGraph => ({
@@ -25,6 +26,16 @@ describe('flow-graph-ops.util', () => {
     expect(flags(setStateOutcome(approved, 'a', 'approved', false))).toEqual([false, false]);
     expect(flags(setStateKind(approved, 'a', 'vote'))).toEqual([false, false]);
     expect(flags(setStateKind(approved, 'a', 'normal'))).toEqual([true, false]);
+  });
+
+  /** 001722: one target for replaced Anträge, terminal and denied. */
+  it('keeps one target for replaced Anträge and makes it terminal and denied', () => {
+    const two = graph({ states: [{ key: 'a', label: { de: 'A' } }, { key: 'b', label: { de: 'B' } }] });
+    const a = setStateReplacedTarget(two, 'a', true);
+    expect(a.states[0]).toMatchObject({ isReplacedTarget: true, isTerminal: true, isDenied: true, isApproved: false });
+    const b = setStateReplacedTarget(a, 'b', true);
+    expect(b.states.map((s) => !!s.isReplacedTarget)).toEqual([false, true]);
+    expect(setStateReplacedTarget(b, 'b', false).states[1].isReplacedTarget).toBe(false);
   });
 
   it('sets the gremium source on a state without a config', () => {

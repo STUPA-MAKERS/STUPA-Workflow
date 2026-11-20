@@ -75,6 +75,7 @@ import type {
   ChatRef,
   ChatSend,
   ChatVisibility,
+  ChatVisibilityGuard,
 } from './chat.models';
 import { CHAT_MAX_FILES, buildItems, chatFileUrl, dayKey, isPending, newCount } from './chat.util';
 
@@ -246,6 +247,12 @@ export class ChatComponent {
   readonly loading = input(false);
   /** The visibilities the composer offers. Empty: no toggle. */
   readonly visibilityOptions = input<readonly ChatVisibility[]>([]);
+  /**
+   * Null: the plain switch. Set: the options are radio rows with the readers in the label, the
+   * choice shows next to the send button, a public draft has a frame, and a new message starts
+   * with the first option again.
+   */
+  readonly visibilityGuard = input<ChatVisibilityGuard | null>(null);
   /** Names the thread in the browser storage (draft, last seen). */
   readonly draftKey = input.required<string>();
   readonly placeholder = input<TranslationKey>('chat.placeholder');
@@ -342,6 +349,17 @@ export class ChatComponent {
       label: this.i18n.translate(v === 'internal' ? 'chat.internal' : 'chat.public'),
     })),
   );
+
+  /** The guarded switch shows: a guard and two options. */
+  protected readonly guarded = computed(
+    () => this.visibilityGuard() !== null && this.visibilityOptions().length > 1,
+  );
+  /** The text next to the send button: the chosen visibility of the guarded switch. */
+  protected readonly visibilityHint = computed<TranslationKey | null>(() => {
+    const guard = this.visibilityGuard();
+    const vis = this.visibility();
+    return guard && vis && this.guarded() ? guard.hints[vis] : null;
+  });
 
   /** Mark visibilities only where both kinds exist in the thread. */
   private readonly marked = computed(() => {
@@ -664,6 +682,7 @@ export class ChatComponent {
     this.send.emit(req);
     this.drafts.clear();
     this.onDraft('');
+    if (this.guarded()) this.visibility.set(this.visibilityOptions()[0] ?? null);
     this.scrollToEnd();
   }
 

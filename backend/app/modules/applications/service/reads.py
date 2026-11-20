@@ -203,16 +203,20 @@ class ReadOps(ApplicationsServiceBase):
             set() if applicant_view else {_uuid(d.get("meetingId")) for d in stored if d} - {None}
         )
         gremien = (
-            (await self.session.execute(
-                select(Gremium.id, Gremium.name).where(Gremium.id.in_(gremium_ids))
-            )).all()
+            (
+                await self.session.execute(
+                    select(Gremium.id, Gremium.name).where(Gremium.id.in_(gremium_ids))
+                )
+            ).all()
             if gremium_ids
             else []
         )
         meetings = (
-            (await self.session.execute(
-                select(Meeting.id, Meeting.title).where(Meeting.id.in_(meeting_ids))
-            )).all()
+            (
+                await self.session.execute(
+                    select(Meeting.id, Meeting.title).where(Meeting.id.in_(meeting_ids))
+                )
+            ).all()
             if meeting_ids
             else []
         )

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Literal, get_args
 from uuid import UUID
 
@@ -9,7 +10,7 @@ from pydantic import Field, model_validator
 
 from app.modules.applications.decision import DecisionIn
 from app.shared.i18n import I18nMap
-from app.shared.schemas import FrozenCamelModel
+from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
 
 class TransitionOut(FrozenCamelModel, frozen=True):
@@ -27,6 +28,8 @@ class TransitionOut(FrozenCamelModel, frozen=True):
         allows_decision: The target is an accepted state of the top budget of the
             application, so a fire takes a `decision` (approval with deviations). The
             UI then opens the decision dialog.
+        to_terminal: The target is a terminal state. The applicant page asks before
+            such a transition fires, and a draft does not offer it to the applicant.
         requires_amount: The fire must name the approved amount (spec 001610): the
             target is an approved state, the current state is not, and the
             application has an amount. The dialog then shows the amount without the
@@ -42,6 +45,7 @@ class TransitionOut(FrozenCamelModel, frozen=True):
     adds_to_agenda: bool = Field(default=False, alias="addsToAgenda")
     agenda_gremium_id: UUID | None = Field(default=None, alias="agendaGremiumId")
     allows_decision: bool = Field(default=False, alias="allowsDecision")
+    to_terminal: bool = Field(default=False, alias="toTerminal")
     requires_amount: bool = Field(default=False, alias="requiresAmount")
 
 
@@ -111,3 +115,58 @@ class TransitionResult(FrozenCamelModel, frozen=True):
     new_state_id: UUID = Field(alias="newStateId")
     status_event_id: UUID = Field(alias="statusEventId")
     dispatched_actions: list[str] = Field(default_factory=list, alias="dispatchedActions")
+
+
+#: The most Anträge that one bulk action takes (spec 001700).
+BULK_MAX = 100
+
+
+class BulkSelection(FrozenStrictCamelModel, frozen=True):
+    """The Anträge of a bulk action: 1 to `BULK_MAX` distinct ids."""
+
+    application_ids: list[UUID] = Field(alias="applicationIds", min_length=1, max_length=BULK_MAX)
+
+
+class BulkTransitionRequest(BulkSelection, frozen=True):
+    """`POST /bulk/applications/transition`: move every selected Antrag into one state."""
+
+    to_state_id: UUID = Field(alias="toStateId")
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class BulkAmountOut(FrozenCamelModel, frozen=True):
+    """The requested amount of one Antrag, which a bulk approval approves."""
+
+    application_id: UUID = Field(alias="applicationId")
+    title: str | None = None
+    amount: Decimal | None = None
+
+
+class BulkTransitionOption(FrozenCamelModel, frozen=True):
+    """A transition target that every selected Antrag reaches by a manual transition.
+
+    Attributes:
+        approves: The target is an approved state. The fire then approves each Antrag
+            with its requested amount, and ``amounts`` lists them.
+    """
+
+    to_state_id: UUID = Field(alias="toStateId")
+    label: I18nMap
+    color: str | None = None
+    approves: bool = False
+    amounts: tuple[BulkAmountOut, ...] = ()
+
+
+class BulkItemResult(FrozenCamelModel, frozen=True):
+    """The outcome of a bulk action at one Antrag: done, or the error text and code."""
+
+    application_id: UUID = Field(alias="applicationId")
+    ok: bool
+    code: str | None = None
+    error: str | None = None
+
+
+class BulkResult(FrozenCamelModel, frozen=True):
+    """The outcome of a bulk action, one entry per Antrag in the order of the request."""
+
+    results: tuple[BulkItemResult, ...]

@@ -20,6 +20,7 @@ import {
   mapApplicationLinks,
   mapApplicationListItem,
   mapApplicationType,
+  mapBulkOption,
   mapAttachment,
   mapComment,
   mapMeeting,
@@ -34,6 +35,10 @@ import {
   toApplicationCreateBody,
 } from './mappers';
 import type {
+  BulkItemResult,
+  BulkTransitionOption,
+  BulkTransitionOptionWire,
+  NewVersionCreated,
   AmendAmountBody,
   AmendAmountResult,
   ForcedEvent,
@@ -469,6 +474,41 @@ export class ApiClient {
     return this.http.get<ApplicationPrefill>(`${this.base}/applications/${id}/prefill`, {
       context: skipLoading(),
     });
+  }
+
+  /** POST /applications/{id}/new-version — create the new version of an Antrag (001720). */
+  newVersion(id: Uuid): Observable<NewVersionCreated> {
+    return this.http.post<NewVersionCreated>(`${this.base}/applications/${id}/new-version`, {});
+  }
+
+  /** POST /bulk/applications/transitions — the targets that every Antrag reaches (001701). */
+  bulkTransitions(ids: readonly Uuid[]): Observable<BulkTransitionOption[]> {
+    const lang = this.i18n.uiLocale();
+    return this.http
+      .post<BulkTransitionOptionWire[]>(`${this.base}/bulk/applications/transitions`, {
+        applicationIds: ids,
+      })
+      .pipe(map((list) => list.map((w) => mapBulkOption(w, lang))));
+  }
+
+  /** POST /bulk/applications/transition — move every Antrag into one state (001701). */
+  fireBulkTransition(ids: readonly Uuid[], toStateId: Uuid): Observable<readonly BulkItemResult[]> {
+    return this.http
+      .post<{ results: readonly BulkItemResult[] }>(`${this.base}/bulk/applications/transition`, {
+        applicationIds: ids,
+        toStateId,
+      })
+      .pipe(map((res) => res.results));
+  }
+
+  /** POST /bulk/applications/comments — one public comment on each Antrag (001702). */
+  bulkComment(ids: readonly Uuid[], body: string): Observable<readonly BulkItemResult[]> {
+    return this.http
+      .post<{ results: readonly BulkItemResult[] }>(`${this.base}/bulk/applications/comments`, {
+        applicationIds: ids,
+        body,
+      })
+      .pipe(map((res) => res.results));
   }
 
   /** POST /applications/{id}/erasure-request — file a GDPR Art. 17 erasure request. */

@@ -12,7 +12,9 @@ import { runAxe } from '../../../../testing/a11y';
 import { AltchaService } from '../../../features/apply/altcha.service';
 import { ChatDrafts } from './chat-drafts';
 import { ChatComponent, SCAN_BACKOFF, chatUploadError } from './chat.component';
-import type { ChatEvent, ChatMessage, ChatVisibility } from './chat.models';
+import { TestBed } from '@angular/core/testing';
+import { I18nService } from '@core/i18n/i18n.service';
+import type { ChatEvent, ChatMessage, ChatVisibility, ChatVisibilityGuard } from './chat.models';
 import type { ChatPerson } from './chat-mentions';
 
 /** A time today, so the day separator reads "Heute". */
@@ -55,6 +57,7 @@ interface SetupOpts {
   events?: ChatEvent[];
   canPost?: boolean;
   visibilityOptions?: ChatVisibility[];
+  visibilityGuard?: ChatVisibilityGuard | null;
   draftKey?: string;
   phone?: boolean;
   /** A phone width with a mouse or a keyboard (a narrow or zoomed desktop window). */
@@ -104,6 +107,7 @@ async function setup(opts: SetupOpts = {}) {
       events: opts.events ?? [],
       canPost: opts.canPost ?? true,
       visibilityOptions: opts.visibilityOptions ?? [],
+      visibilityGuard: opts.visibilityGuard ?? null,
       draftKey: opts.draftKey ?? 't1',
       canAttach: opts.canAttach ?? false,
       loading: opts.loading ?? false,
@@ -512,6 +516,62 @@ describe('ChatComponent', () => {
       expect(within(group).getByRole('radio', { name: 'Intern' })).toHaveAttribute('aria-checked', 'true');
       cmp.setVisibility('other');
       expect(cmp.visibility()).toBeNull();
+    });
+
+    describe('with a guarded visibility switch', () => {
+      const GUARD: ChatVisibilityGuard = {
+        labels: { internal: 'applications.comments.vis.internal', public: 'applications.comments.vis.public' },
+        hints: { internal: 'applications.comments.hint.internal', public: 'applications.comments.hint.public' },
+      };
+      const INT = 'Intern (nur Gremien)';
+      const PUB = 'Öffentlich (Antragsteller:in liest mit und bekommt eine Mail)';
+
+      it('names the readers of each choice in German and in English', async () => {
+        const { view } = await setup({ visibilityOptions: ['internal', 'public'], visibilityGuard: GUARD });
+        const group = screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
+        expect(within(group).getByRole('radio', { name: INT })).toBeChecked();
+        expect(within(group).getByRole('radio', { name: PUB })).not.toBeChecked();
+        const i18n = TestBed.inject(I18nService);
+        i18n.setLocale('en');
+        view.fixture.detectChanges();
+        try {
+          expect(within(group).getByRole('radio', { name: 'Internal (committees only)' })).toBeChecked();
+          expect(
+            within(group).getByRole('radio', { name: 'Public (the applicant reads it and gets an e-mail)' }),
+          ).toBeInTheDocument();
+        } finally {
+          i18n.setLocale('de');
+        }
+      });
+
+      it('shows the choice next to the send button with a frame of its own', async () => {
+        const { user, view } = await setup({ visibilityOptions: ['internal', 'public'], visibilityGuard: GUARD });
+        expect(screen.getByTestId('chat-vis-hint')).toHaveTextContent('Intern');
+        expect(view.container.querySelector('.chat__box--internal')).not.toBeNull();
+        expect(view.container.querySelector('.chat__box--public')).toBeNull();
+        await user.click(screen.getByRole('radio', { name: PUB }));
+        expect(screen.getByTestId('chat-vis-hint')).toHaveTextContent('Öffentlich · Mail');
+        expect(view.container.querySelector('.chat__box--public')).not.toBeNull();
+        expect(view.container.querySelector('.chat__box--internal')).toBeNull();
+      });
+
+      it('starts the next message with the first choice again', async () => {
+        const { user, input, send } = await setup({
+          visibilityOptions: ['internal', 'public'],
+          visibilityGuard: GUARD,
+        });
+        await user.click(screen.getByRole('radio', { name: PUB }));
+        fireEvent.input(input(), { target: { value: 'An alle' } });
+        fireEvent.keyDown(input(), { key: 'Enter' });
+        expect(send).toHaveBeenCalledWith({ body: 'An alle', visibility: 'public' });
+        expect(screen.getByRole('radio', { name: INT })).toBeChecked();
+      });
+
+      it('shows no switch and no hint with one choice', async () => {
+        await setup({ visibilityOptions: ['public'], visibilityGuard: GUARD });
+        expect(screen.queryByRole('radiogroup')).toBeNull();
+        expect(screen.queryByTestId('chat-vis-hint')).toBeNull();
+      });
     });
 
     it('sends the only visibility without a toggle', async () => {

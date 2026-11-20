@@ -45,6 +45,11 @@ export interface StateDef {
   readonly isApproved?: boolean;
   /** An Antrag in this state counts as denied (spec 000571). Never on a vote state. */
   readonly isDenied?: boolean;
+  /**
+   * "Ziel für ersetzte Anträge" (001722): the old Antrag moves here when its new version is
+   * submitted. At most one state; it is terminal and denied.
+   */
+  readonly isReplacedTarget?: boolean;
   /** State kind. Absent ⇒ `normal`. */
   readonly kind?: StateKind | null;
   /** Kind-specific configuration. */

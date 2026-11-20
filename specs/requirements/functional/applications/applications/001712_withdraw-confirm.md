@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - frontend/src/app/features/apply/status-timeline.component.ts
+  - frontend/src/app/pages/admin/flow-graph.util.ts
 scope:
   - backend/app/modules/applications
   - frontend/src/app/pages/applications

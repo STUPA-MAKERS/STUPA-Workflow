@@ -55,7 +55,7 @@ import {
 import { applyServerErrors, clearServerErrors } from '@shared/forms/server-errors';
 import { AnswerViewComponent } from '@shared/forms/answer-view/answer-view.component';
 import { PredecessorFieldComponent } from '../../features/apply/predecessor-field/predecessor-field.component';
-import { ChatComponent, ChatDrafts, ChatOutbox, appendOnce, withScanStates, draftDropper, filesRefused, sendErrorKey, toChatAttachments, HistoryComponent, flowColorKind, chatPeople, type ChatEdit, type ChatPerson, type ChatMessage, type ChatRef, type ChatSend, type ChatVisibility, type HistoryChange, type HistoryEntry } from '@shared/ui';
+import { ChatComponent, ChatDrafts, ChatOutbox, appendOnce, withScanStates, draftDropper, filesRefused, sendErrorKey, toChatAttachments, HistoryComponent, flowColorKind, chatPeople, type ChatEdit, type ChatPerson, type ChatMessage, type ChatRef, type ChatSend, type ChatVisibility, type ChatVisibilityGuard, type HistoryChange, type HistoryEntry } from '@shared/ui';
 import {
   ButtonComponent,
   ButtonGroupComponent,
@@ -138,6 +138,12 @@ const NO_FILES = new Set<string>();
 /** The tabs of the detail when the list and the detail do not sit side by side. */
 type DetailTab = 'app' | 'history' | 'files';
 
+/** The comment switch: who reads each choice, and the short text next to the send button. */
+const COMMENT_VISIBILITY_GUARD: ChatVisibilityGuard = {
+  labels: { internal: 'applications.comments.vis.internal', public: 'applications.comments.vis.public' },
+  hints: { internal: 'applications.comments.hint.internal', public: 'applications.comments.hint.public' },
+};
+
 /** A link to the comments: `#comments`, or `#comment-<id>` for one comment. */
 const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
 
@@ -161,8 +167,10 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
  * screen, from the bottom on a phone. The header action "Kommentare" with the count
  * opens it. A link with `#comments` or `#comment-<id>` opens it too, and scrolls to that
  * comment. A comment is internal or public. The composer offers
- * the internal visibility only with `application.manage`. Without it, a new comment is
- * public. The author edits and deletes an own comment; the visibility stays as written.
+ * the internal visibility only with `application.manage`, and there each new comment starts
+ * internal, because a wrong public comment mails the applicant at once. The switch names who
+ * reads the comment, and the choice shows next to the send button. Without the permission, a
+ * new comment is public. The author edits and deletes an own comment; the visibility stays as written.
  *
  * RBAC here only gates the UX. The server decides.
  *
@@ -304,10 +312,12 @@ export class ApplicationsDetailComponent {
     () => new Map(this.formFields().map((f) => [f.key, f])),
   );
 
-  /** The composer offers the internal visibility only with `application.manage`. */
+  /** The composer offers the internal visibility only with `application.manage`, first. */
   readonly chatVisibilities = computed<ChatVisibility[]>(() =>
-    this.canManage() ? ['public', 'internal'] : [],
+    this.canManage() ? ['internal', 'public'] : [],
   );
+  /** The switch names the readers of each choice and shows the choice before the send. */
+  readonly chatVisibilityGuard: ChatVisibilityGuard = COMMENT_VISIBILITY_GUARD;
   /** Optimistic send: a new comment shows at once, the server answer replaces it. */
   private readonly outbox = new ChatOutbox<ApplicationComment>(
     (req) => this.api.addComment(this.id, req.body, req.visibility ?? 'public', req, req.mentions),
@@ -542,8 +552,39 @@ export class ApplicationsDetailComponent {
     return [
       ...(l.predecessor ? [row(l.predecessor, t('applications.predecessor.field'))] : []),
       ...l.successors.map((s) => row(s, t('applications.predecessor.successor'))),
+      ...(l.replaces ? [row(l.replaces, t('applications.links.replaces'))] : []),
+      ...(l.replacedBy ?? []).map((s) => row(s, t('status.replacedBy'))),
     ];
   });
+
+  /**
+   * A denied Antrag, or one sent back for changes, offers a new version to a person with
+   * `application.manage` (001720).
+   */
+  readonly offersNewVersion = computed(() => {
+    const app = this.app();
+    const state = app?.state;
+    if (!state || !this.canManage() || app.observer) return false;
+    return Boolean(state.isDenied) || (state.editAllowed && !state.isInitial);
+  });
+  /** "Neue Fassung" is running. */
+  readonly creatingVersion = signal(false);
+
+  /** Create the new version (001720) and open it. */
+  createNewVersion(): void {
+    if (this.creatingVersion()) return;
+    this.creatingVersion.set(true);
+    this.api.newVersion(this.id).subscribe({
+      next: (res) => {
+        this.creatingVersion.set(false);
+        void this.router.navigate(['/applications', res.applicationId]);
+      },
+      error: () => {
+        this.creatingVersion.set(false);
+        this.toast.error(this.i18n.translate('status.newVersion.failed'));
+      },
+    });
+  }
   readonly archiving = signal(false);
 
   /**

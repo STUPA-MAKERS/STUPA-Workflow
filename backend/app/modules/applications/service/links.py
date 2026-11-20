@@ -279,6 +279,24 @@ class LinkOps(ApplicationsServiceBase):
             ).all()
         )
 
+    async def replaces_of(self, application_id: UUID) -> UUID | None:
+        """Return the Antrag that this one is a new version of, or None."""
+        return await self.session.scalar(
+            select(Application.replaces_id).where(Application.id == application_id)
+        )
+
+    async def replaced_by_of(self, application_id: UUID) -> list[UUID]:
+        """Return the new versions of an Antrag, oldest first."""
+        return list(
+            (
+                await self.session.scalars(
+                    select(Application.id)
+                    .where(Application.replaces_id == application_id)
+                    .order_by(Application.created_at)
+                )
+            ).all()
+        )
+
     async def link_events(self, application_id: UUID) -> list[ApplicationLinkEvent]:
         """Return the link history of an application, oldest first."""
         return list(

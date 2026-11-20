@@ -29,7 +29,7 @@ BUDGET = {"gremiumSource": "budget"}
 def _state(kind: str = "vote", config: Any = None, state_id: UUID | None = None) -> Any:
     return SimpleNamespace(
         id=state_id or uuid4(), kind=kind, config=config if config is not None else {},
-        flow_version_id=None, is_approved=False,
+        flow_version_id=None, is_approved=False, is_initial=False, is_terminal=False,
     )
 
 
@@ -146,7 +146,7 @@ def _app(state_id: object, *, budget_id: UUID | None = None) -> Any:
     return SimpleNamespace(
         id=uuid4(), current_state_id=state_id, flow_version_id=uuid4(),
         type_id=uuid4(), form_version_id=uuid4(), data={}, budget_id=budget_id,
-        vote_gremium_id=None,
+        vote_gremium_id=None, replaces_id=None,
     )
 
 
