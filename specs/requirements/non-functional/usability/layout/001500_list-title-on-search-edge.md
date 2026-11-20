@@ -32,7 +32,8 @@ On a phone the title line stays as it is.
 
 This applies to every list column with a pane header (Anträge, Meine Anträge, Sitzungen,
 Abstimmungen, Rechnungen, Buchungen, Tickets, Aktivität, Gremien, Aufgaben, Verwaltung). The
-desktop calendar is no list column and keeps its title.
+desktop calendar is no list column; it hides its title too and puts its buttons in its tools row
+(001771).
 
 Reason: The title stood 16px right of the search bar and the chips below it, and it repeated the
 name of the active item of the navigation. Without it, the column starts with the search, and the
