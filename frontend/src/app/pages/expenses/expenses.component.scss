@@ -51,11 +51,6 @@
 .exp__rows {
   @include lp.stack;
 }
-.exp__row--checked {
-  --li-bg: var(--color-selected);
-  --li-hover: var(--color-selected);
-  --li-color: var(--color-on-selected);
-}
 .exp__dot {
   margin-inline: 6px;
   color: var(--color-text-subtle);

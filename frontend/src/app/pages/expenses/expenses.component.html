@@ -228,7 +228,7 @@
                     <app-list-item
                       role="listitem"
                       class="exp__row"
-                      [class.exp__row--checked]="selecting() && isSelected(e.id)"
+                      [checked]="selecting() && isSelected(e.id)"
                       [title]="e.description"
                       [link]="selecting() ? null : []"
                       [linkQueryParams]="{ id: e.id, transfer: null }"
