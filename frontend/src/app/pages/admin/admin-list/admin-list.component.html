@@ -27,7 +27,7 @@
             <ng-container *ngTemplateOutlet="pages; context: { $implicit: g }" />
           }
         } @empty {
-          <app-empty-state role="status" [heading]="'admin.frame.noMatch' | t" />
+          <app-empty-state icon="searchOff" role="status" [heading]="'admin.frame.noMatch' | t" />
         }
       </div>
     </nav>

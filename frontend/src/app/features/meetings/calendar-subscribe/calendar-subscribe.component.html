@@ -53,7 +53,7 @@
       </app-button-group>
     </div>
   } @else {
-    <app-empty-state rows="1" [heading]="'account.calendar.none' | t">
+    <app-empty-state icon="cal" rows="1" [heading]="'account.calendar.none' | t">
       <app-button-group>
         <app-button variant="tonal" size="sm" [loading]="busy()" (click)="rotate()">
           <app-icon name="link" />

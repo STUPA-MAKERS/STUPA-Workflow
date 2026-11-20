@@ -136,7 +136,7 @@
           }
         </ul>
         } @else {
-          <app-empty-state shape="person" rows="3" [heading]="(query() ? 'meetings.dock.noMember' : 'meetings.attendance.empty') | t" />
+          <app-empty-state [icon]="query() ? 'searchOff' : 'users'" shape="person" rows="3" [heading]="(query() ? 'meetings.dock.noMember' : 'meetings.attendance.empty') | t" />
         }
 
         @if (meetingDelegations().length) {
@@ -179,7 +179,7 @@
                   }
                 </ul>
               } @else {
-                <app-empty-state shape="person" rows="2" [heading]="'meetings.viewers.empty' | t" />
+                <app-empty-state icon="eye" shape="person" rows="2" [heading]="'meetings.viewers.empty' | t" />
               }
             </div>
           </section>

@@ -132,7 +132,7 @@
           }
         </ul>
       } @else {
-        <app-empty-state shape="table" [heading]="'admin.audit.empty' | t" />
+        <app-empty-state [icon]="activeFilterCount() ? 'searchOff' : 'audit'" shape="table" [heading]="'admin.audit.empty' | t" />
       }
 
       @if (hasMore()) {

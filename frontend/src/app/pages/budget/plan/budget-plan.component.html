@@ -108,7 +108,7 @@
               }
             }
             @if (query().trim() && !listRows().length) {
-              <app-empty-state rows="1" [heading]="'budget.dash.searchNone' | t" />
+              <app-empty-state icon="searchOff" rows="1" [heading]="'budget.dash.searchNone' | t" />
             }
           </nav>
         </div>
@@ -323,7 +323,7 @@
       } @else if (sideRows.length) {
         <ng-container *ngTemplateOutlet="table; context: { $implicit: sideRows, nested: true }" />
       } @else {
-        <app-empty-state rows="1" [heading]="(query().trim() ? 'budget.dash.searchNone' : 'budget.plan.noLines') | t" />
+        <app-empty-state [icon]="query().trim() ? 'searchOff' : 'pie'" rows="1" [heading]="(query().trim() ? 'budget.dash.searchNone' : 'budget.plan.noLines') | t" />
       }
     </app-section>
   }
