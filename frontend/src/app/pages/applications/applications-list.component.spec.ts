@@ -1046,6 +1046,18 @@ describe('ApplicationsListComponent', () => {
       harness.detectChanges();
       expect(screen.queryByRole('button', { name: 'Antrag stellen' })).not.toBeInTheDocument();
     });
+    it('shows only the icon of Antrag stellen beside Antrag erfassen on a phone', async () => {
+      const original = window.matchMedia;
+      window.matchMedia = ((q: string) => ({ ...original(q), matches: q === '(max-width: 767.98px)' })) as typeof window.matchMedia;
+      try {
+        await start('/applications', { perms: [...ALL, 'application.create_on_behalf'] });
+        const apply = screen.getByRole('button', { name: 'Antrag stellen' });
+        expect(apply).toHaveClass('btn--icon');
+        expect(screen.getByRole('button', { name: 'Antrag erfassen' })).not.toHaveClass('btn--icon');
+      } finally {
+        window.matchMedia = original;
+      }
+    });
   });
 
   describe('Antrag erfassen', () => {
