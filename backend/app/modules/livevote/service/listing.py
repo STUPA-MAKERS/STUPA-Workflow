@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime
 from typing import Literal
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, and_, or_, select
+from sqlalchemy import ColumnElement, and_, exists, or_, select
 
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.policy import expand, gremium_ids_with
@@ -133,6 +133,17 @@ class ListingOps(PermissionOps, VoteReadOps):
             return ()
         delegated = await self._delegated_meeting_ids(principal.sub)
         return (or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated)),)
+
+    async def any_live(self, principal: Principal) -> bool:
+        """Tell whether a meeting that ``principal`` can read in the timeline runs now.
+
+        The dot of the navigation reads it (spec 002001), with the visibility of the
+        timeline, so the dot shows only when the timeline shows a live meeting.
+        """
+        filters = await self._visibility(principal)
+        return bool(
+            await self.session.scalar(select(exists().where(Meeting.status == "live", *filters)))
+        )
 
     async def list_timeline(
         self,

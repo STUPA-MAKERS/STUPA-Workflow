@@ -1,5 +1,5 @@
 /**
- * The EN catalog is a lazy chunk. `setup-jest.ts` registers it for every other spec, so
+ * The DE and EN catalogs are lazy chunks. `setup-jest.ts` registers it for every other spec, so
  * these tests load a fresh copy of the module to see the state before the first load.
  */
 type Module = typeof import('./translations');
@@ -15,9 +15,15 @@ function fresh(): Module {
 describe('loadCatalog', () => {
   afterEach(() => jest.dontMock('./translations.en'));
 
-  it('starts with DE only and fills EN from its chunk', async () => {
+  it('starts empty and fills DE and EN from their chunks, DE into the object others hold', async () => {
     const mod = fresh();
+    expect(mod.isCatalogLoaded('de')).toBe(false);
+    expect(mod.de['action.login']).toBeUndefined();
+    const held = mod.de;
+    await mod.loadCatalog('de');
     expect(mod.isCatalogLoaded('de')).toBe(true);
+    expect(held['action.login']).toBe('Anmelden');
+    expect(mod.CATALOG.de).toBe(held);
     expect(mod.isCatalogLoaded('en')).toBe(false);
     expect(mod.CATALOG.en['action.login']).toBeUndefined();
 
@@ -29,6 +35,7 @@ describe('loadCatalog', () => {
 
   it('resolves at once for a loaded locale', async () => {
     const mod = fresh();
+    await mod.loadCatalog('de');
     await expect(mod.loadCatalog('de')).resolves.toBeUndefined();
     expect(mod.CATALOG.de['action.login']).toBe('Anmelden');
   });

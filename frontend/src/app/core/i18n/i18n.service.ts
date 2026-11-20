@@ -144,12 +144,13 @@ export class I18nService {
   }
 
   /**
-   * Load the overrides, the extra languages and the catalog of the active locale. The app
+   * Load the overrides, the extra languages, the DE catalog (the fallback of every locale) and
+   * the catalog of the active locale. The app
    * initializer waits for it, so the first paint is in the right language. A failed load
    * resolves too: the app then shows the built-in texts, and DE for an extra language.
    */
   async ready(): Promise<void> {
-    await Promise.all([this.loadBundle(), this.load(this.locale())]);
+    await Promise.all([this.loadBundle(), this.load(DEFAULT_LOCALE), this.load(this.locale())]);
     await this.load(this.locale());
   }
 

@@ -456,3 +456,31 @@ async def test_a_token_without_a_row_reads_nothing(
         assert page.seen_at is None
         await svc.mark_seen(ghost, _at(0))
         assert await svc.has_new(ghost) is False
+
+
+async def test_the_navigation_marks_come_in_one_read(
+    api: Api, maker: async_sessionmaker[AsyncSession]
+) -> None:
+    """Spec 002001: open to-dos, a live meeting of my Gremium and the activity dot, in one read."""
+    alice, alice_id = await add_person(maker, "Alice")
+    _, bob_id = await add_person(maker, "Bob")
+    gremium_id, board_id = await add_gremium(maker)
+    foreign_id, _ = await add_gremium(maker, "AStA")
+    await add_member(maker, gremium_id, alice_id, "todo.write")
+    card_id = await _card(maker, board_id, bob_id)
+    async with maker() as session:
+        session.add(TodoAssignee(card_id=card_id, principal_id=alice_id))
+        session.add(Meeting(gremium_id=foreign_id, title="Fremd", status="live"))
+        await session.commit()
+
+    api.login(alice)
+    client = TestClient(api.app)
+    body = client.get("/api/navigation/status").json()
+    assert body == {"tasks": 1, "tickets": None, "live": False, "activity": False}
+
+    async with maker() as session:
+        session.add(Meeting(gremium_id=gremium_id, title="Sitzung", status="live"))
+        session.add(TodoComment(card_id=card_id, author_id=bob_id, body="neu", created_at=_at(1)))
+        await session.commit()
+    body = client.get("/api/navigation/status").json()
+    assert body == {"tasks": 1, "tickets": None, "live": True, "activity": True}

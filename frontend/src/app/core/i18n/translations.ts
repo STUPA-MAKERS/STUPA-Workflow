@@ -1,19 +1,21 @@
 /** UI string catalog. DE is the reference. A missing EN key falls back to DE. */
 
-import deCatalog from './catalog/de.json';
+import type deCatalog from './catalog/de.json';
 
 export type Locale = 'de' | 'en';
 
 export const SUPPORTED_LOCALES: readonly Locale[] = ['de', 'en'] as const;
 export const DEFAULT_LOCALE: Locale = 'de';
 
-export type TranslationKey = keyof typeof de;
+export type TranslationKey = keyof typeof deCatalog;
 
 /** The shape of `I18nService.translate`, for pure helpers that take the translator as an argument. */
 export type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
 /**
- * The DE catalog, the reference for every key.
+ * The DE catalog, the reference for every key. It starts empty: `loadCatalog('de')` fills
+ * this same object from its lazy chunk (`translations.de.ts`), so a module that holds it
+ * reads the texts once the app initializer is done.
  *
  * The texts live in `catalog/de.json` and `catalog/en.json`, the only copy of them. The
  * api container mounts the same directory, because the server refuses an override with an
@@ -37,24 +39,27 @@ export type Translate = (key: TranslationKey, params?: Record<string, string | n
  *   attempt per webhook.
  * - `admin.form.groupStep` names a question group. One group container is one wizard step.
  */
-export const de = deCatalog;
+export const de = {} as Record<TranslationKey, string>;
 
 /**
- * The catalog of every locale. DE is bundled with the app, because it is the reference and
- * the fallback of every other locale. EN starts empty and `loadCatalog` fills it.
+ * The catalog of every locale. DE is the reference and the fallback of every other locale;
+ * the app loads it before the first paint. Both start empty and `loadCatalog` fills them.
  */
 export const CATALOG: Record<Locale, Partial<Record<TranslationKey, string>>> = { de, en: {} };
 
-const LOADED = new Set<Locale>(['de']);
+const LOADED = new Set<Locale>();
 
 /** True when the strings of `locale` are in {@link CATALOG}. */
 export function isCatalogLoaded(locale: Locale): boolean {
   return LOADED.has(locale);
 }
 
-/** Put the strings of `locale` into {@link CATALOG}. */
+/**
+ * Put the strings of `locale` into {@link CATALOG}. They go into the object of the locale
+ * itself, because other modules hold it ({@link de}).
+ */
 export function registerCatalog(locale: Locale, table: Partial<Record<TranslationKey, string>>): void {
-  CATALOG[locale] = table;
+  Object.assign(CATALOG[locale], table);
   LOADED.add(locale);
 }
 
@@ -64,6 +69,11 @@ export function registerCatalog(locale: Locale, table: Partial<Record<Translatio
  */
 export async function loadCatalog(locale: Locale): Promise<void> {
   if (LOADED.has(locale)) return;
+  if (locale === 'de') {
+    const { deTable } = await import('./translations.de');
+    registerCatalog('de', deTable);
+    return;
+  }
   const { en } = await import('./translations.en');
   registerCatalog('en', en);
 }

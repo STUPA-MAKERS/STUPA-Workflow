@@ -71,6 +71,8 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     "ticket.manage or own report, MeetingRules.assert_can_read)",
     ("GET", "/api/activity/status"): "ActivityService sources, as GET /api/activity",
     ("POST", "/api/activity/seen"): _SELF,
+    ("GET", "/api/navigation/status"): "the gate of each mark: list_tasks, TodoService.mine, "
+    "ticket.manage, MeetingService.any_live (timeline visibility), ActivityService.has_new",
     ("GET", "/api/auth/me"): _SELF,
     ("GET", "/api/auth/me/profile"): _SELF,
     ("GET", "/api/budget-plan-versions/{version_id}/plan"): _BUDGET_NODE,
