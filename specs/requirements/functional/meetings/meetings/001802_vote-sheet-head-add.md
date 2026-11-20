@@ -2,7 +2,7 @@
 id: "001802"
 title: The vote sheet has its add button in the head and an empty state
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
 tests:

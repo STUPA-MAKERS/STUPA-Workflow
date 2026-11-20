@@ -2,7 +2,7 @@
 id: "001803"
 title: The empty-state face has room above and below
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:
