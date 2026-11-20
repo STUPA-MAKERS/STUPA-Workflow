@@ -854,6 +854,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/performance/loading/002003](requirements/non-functional/performance/loading/002003_lazy-editor-and-texts.md) | The Markdown editor and the DE texts load in chunks of their own | approved |
 | [NF/performance/loading/002004](requirements/non-functional/performance/loading/002004_api-workers.md) | The API serves requests in four processes | approved |
 | [NF/performance/rendering/002002](requirements/non-functional/performance/rendering/002002_zoneless.md) | The app runs its change detection without zone.js | approved |
+| [NF/performance/rendering/002160](requirements/non-functional/performance/rendering/002160_scroll-without-check.md) | A scroll event runs no change detection | draft |
+| [NF/performance/rendering/002161](requirements/non-functional/performance/rendering/002161_reads-before-writes.md) | Layout reads wait for the render and come before the writes of a frame | draft |
 | [NF/privacy/personal-data/000185](requirements/non-functional/privacy/personal-data/000185_no-raw-ids.md) | The UI shows no raw IDs | approved |
 | [NF/privacy/personal-data/000186](requirements/non-functional/privacy/personal-data/000186_no-plain-ip.md) | The login audit has no plain IP address | approved |
 | [NF/privacy/personal-data/000187](requirements/non-functional/privacy/personal-data/000187_guest-pseudonyms.md) | Guests get pseudonyms | replaced |
@@ -1001,6 +1003,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/001977](requirements/non-functional/usability/controls/001977_link-picker-like-global-search.md) | The link picker looks like the global search | approved |
 | [NF/usability/controls/001981](requirements/non-functional/usability/controls/001981_no-open-in-row-menu.md) | The ⋮ of a list row has no "Öffnen" | approved |
 | [NF/usability/controls/002012](requirements/non-functional/usability/controls/002012_round-back-button.md) | Every back button of a head is a round tonal button | approved |
+| [NF/usability/controls/002163](requirements/non-functional/usability/controls/002163_bar-pill-at-press.md) | The pill of the navigation bar moves at the press | draft |
+| [NF/usability/controls/002164](requirements/non-functional/usability/controls/002164_ripple-own-layer.md) | The ripple runs on its own composited layer | draft |
 | [NF/usability/layout/000192](requirements/non-functional/usability/layout/000192_one-geometry.md) | All list and detail pages share one geometry | approved |
 | [NF/usability/layout/000193](requirements/non-functional/usability/layout/000193_scroll-edges.md) | A scroll area cuts at the edge of a surface | approved |
 | [NF/usability/layout/000194](requirements/non-functional/usability/layout/000194_phone-breakpoint.md) | The phone layout starts below 768 px | approved |
@@ -1071,6 +1075,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/001946](requirements/non-functional/usability/layout/001946_calendar-chips-below-search.md) | The Kalender filter chips stand in a row of their own below the search | approved |
 | [NF/usability/layout/002010](requirements/non-functional/usability/layout/002010_solid-bars.md) | Bars and heads are solid, and only floating boxes are glass | approved |
 | [NF/usability/layout/002011](requirements/non-functional/usability/layout/002011_bar-edge-visible.md) | No resting surface at the edge of a bar has the colour of the bar | approved |
+| [NF/usability/layout/002162](requirements/non-functional/usability/layout/002162_section-switch-at-once.md) | A switch between sections shows the new section at once | draft |
 | [P/integrations/webhooks/000963](protocols/integrations/webhooks/000963_webhook-delivery.md) | A webhook delivery is a signed JSON POST | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |

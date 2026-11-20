@@ -7,7 +7,6 @@
     aria-live="polite"
     tabindex="0"
     [attr.aria-label]="'chat.log' | t"
-    (scroll)="onScroll()"
   >
     @if (loading()) {
       <app-skeleton class="chat__skel skel-in" variant="bubbles" [count]="5" [label]="'chat.loading' | t" />
