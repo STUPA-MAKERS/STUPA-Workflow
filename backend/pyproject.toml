@@ -48,7 +48,7 @@ dependencies = [
     # ZUGFeRD/Factur-X import (#invoices): read the embedded CII XML from invoice PDFs.
     # Pure Python, loads lazily, only on the import path. The code uses pypdf directly
     # through our own attachment extractor, because the while loop in pycheval has a bug.
-    "pycheval>=0.3,<0.4",
+    "pycheval>=0.3,<0.5",
     "pypdf>=6.0",
     # iCal subscription (#ics): RFC5545 feed of the meetings of the user. Loads lazily,
     # only on the feed path. Pure Python package.
