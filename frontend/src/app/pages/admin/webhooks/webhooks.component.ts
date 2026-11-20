@@ -30,6 +30,7 @@ import {
   PageHeaderComponent,
   SectionComponent,
   ErrorTextComponent,
+  FactsComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { type StatusView, webhookDeliveryStatus } from '@shared/status-kind.util';
@@ -104,6 +105,7 @@ function withMember(set: ReadonlySet<string>, id: string, on: boolean): Readonly
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FactsComponent,
     ErrorTextComponent,
     LoadStateComponent,
     SectionComponent,

@@ -79,7 +79,7 @@
       </app-section>
 
       <app-section class="fd__sec id__secData" [heading]="'invoices.detail.data' | t">
-        <dl class="fd__card fd__grid">
+        <dl appFacts [card]="true">
           <div>
             <dt>{{ 'invoices.field.number' | t }}</dt>
             <dd class="mono fd__wrap">{{ i.number || '—' }}</dd>

@@ -35,7 +35,7 @@
                   />
                 </app-button-group>
                 <app-section class="wh__status" [level]="2" [heading]="'admin.calendars.fetch.title' | t">
-                  <dl class="kv wh__grid">
+                  <dl appFacts class="wh__grid">
                     <div>
                       <dt>{{ 'admin.calendars.fetch.state' | t }}</dt>
                       <dd>
@@ -54,7 +54,7 @@
                       <dt>{{ 'admin.calendars.fetch.entries' | t }}</dt>
                       <dd class="mono">{{ c.entryCount }}</dd>
                     </div>
-                    <div class="kv__wide">
+                    <div class="facts__wide">
                       <dt>{{ 'admin.calendars.fetch.reason' | t }}</dt>
                       <dd>{{ reasonLabel(c.lastError) }}</dd>
                     </div>

@@ -2,7 +2,7 @@
 <app-dialog [open]="open() && !!e" [title]="title()" [closeLabel]="'action.close' | t" (closed)="closed.emit()">
   @if (e) {
     <div class="apv">
-      <dl class="apv__facts">
+      <dl appFacts layout="rows">
         <div>
           <dt>{{ 'calendar.detail.when' | t }}</dt>
           <dd class="mono">{{ when() }}</dd>

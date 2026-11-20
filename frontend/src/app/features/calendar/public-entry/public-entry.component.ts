@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import type { PublicAppointment, PublicMeeting } from '@core/api/calendar.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, ButtonGroupComponent, DialogComponent, IconComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, DialogComponent, IconComponent, FactsComponent } from '@stupa-makers/ui-kit';
 import { spanText } from '../calendar.util';
 
 /** An entry of the public calendar with its public fields: a Termin or a meeting. */
@@ -22,7 +22,7 @@ export type PublicEntry =
   selector: 'app-public-entry',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonComponent, ButtonGroupComponent, DialogComponent, IconComponent, TranslatePipe],
+  imports: [FactsComponent, ButtonComponent, ButtonGroupComponent, DialogComponent, IconComponent, TranslatePipe],
   templateUrl: './public-entry.component.html',
   styleUrls: ['../appointment-detail/appointment-detail.component.scss', './public-entry.component.scss'],
 })

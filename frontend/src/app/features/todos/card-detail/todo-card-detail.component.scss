@@ -145,22 +145,12 @@
 }
 
 .cd__fields {
-  display: grid;
-  grid-template-columns: minmax(5.25rem, max-content) minmax(0, 1fr);
-  gap: var(--space-3) var(--space-5);
-  margin: 0;
+  --facts-label: minmax(5.25rem, max-content);
+  --facts-gap: var(--space-3) var(--space-5);
 }
-.cd__field {
-  display: contents;
-}
-.cd__field dt {
+.cd__fields dt {
   padding-top: 7px;
-  color: var(--color-text-muted);
   font-size: var(--fs-small);
-}
-.cd__field dd {
-  margin: 0;
-  min-width: 0;
 }
 .cd__chips {
   display: flex;
@@ -493,8 +483,8 @@ button.cd__linkOpen {
 }
 // At 360px a person chip with a first and a last name and the "+" fit on one line.
 :host(.cd--phone) .cd__fields {
-  grid-template-columns: max-content minmax(0, 1fr);
-  column-gap: var(--space-4);
+  --facts-label: max-content;
+  --facts-gap: var(--space-3) var(--space-4);
 }
 .cd__chat--sheet {
   flex: 1 1 auto;

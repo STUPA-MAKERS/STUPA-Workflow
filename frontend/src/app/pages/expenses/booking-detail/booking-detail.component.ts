@@ -5,7 +5,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ButtonComponent, ButtonGroupComponent, EmptyStateComponent, IconComponent, MetaLineComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, SectionComponent, SegBarComponent, SheetBarComponent, SheetBarTitleDirective, SkeletonComponent, StatusTextComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, EmptyStateComponent, IconComponent, MetaLineComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, SectionComponent, SegBarComponent, SheetBarComponent, SheetBarTitleDirective, SkeletonComponent, StatusTextComponent, FactsComponent } from '@stupa-makers/ui-kit';
 import { flowColorKind, invoiceStatus } from '@shared/ui';
 import { simplifyPathKey } from '@shared/budget-path';
 import type { BudgetTreeNode, Expense, Invoice } from '../../budget/budget-tree.api';
@@ -40,6 +40,7 @@ import { RowChevronComponent } from '../../../shared/ui/row-chevron/row-chevron.
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FactsComponent,
     RowChevronComponent,
     MetaLineComponent,
     SectionComponent,

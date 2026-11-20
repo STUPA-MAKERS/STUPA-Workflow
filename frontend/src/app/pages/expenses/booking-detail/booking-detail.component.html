@@ -48,7 +48,7 @@
   <div class="fd__cols">
     <div class="fd__col">
       <app-section class="fd__sec bd__pay" [heading]="'expenses.detail.payment' | t">
-        <dl class="fd__card fd__grid">
+        <dl appFacts [card]="true">
           <div>
             <dt>{{ 'expenses.field.paymentDate' | t }}</dt>
             <dd class="mono">{{ e.paymentDate ? (e.paymentDate | ldate: 'mediumDate') : '—' }}</dd>
@@ -121,7 +121,7 @@
 
     <div class="fd__col">
       <app-section class="fd__sec bd__details" [heading]="'expenses.detail.details' | t">
-        <dl class="fd__card fd__stack">
+        <dl appFacts [card]="true" class="fd__stack">
           <div>
             <dt>{{ 'expenses.detail.costCentreFy' | t }}</dt>
             <dd class="fd__ccLine"><app-meta-line>

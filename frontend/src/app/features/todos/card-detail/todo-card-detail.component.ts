@@ -77,6 +77,7 @@ import {
   ToastService,
   SectionComponent,
   ConfirmDialogComponent,
+  FactsComponent,
 } from '@stupa-makers/ui-kit';
 import { TodoAgendaDialogComponent } from '../agenda-dialog/todo-agenda-dialog.component';
 import { TodoDueChipComponent } from '../due-chip/todo-due-chip.component';
@@ -158,6 +159,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FactsComponent,
     LoadErrorComponent,
     ConfirmDialogComponent,
     SectionComponent,
