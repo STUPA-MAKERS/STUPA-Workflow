@@ -140,7 +140,7 @@ describe('AdminCdVariantsComponent', () => {
     expect(await screen.findByText('Noch keine Dokument-Varianten angelegt.')).toBeInTheDocument();
   });
 
-  /** § 000576 and § S/frontend/angular/000632: a failed read is a toast with a retry, not a note. */
+  /** §ui-kit:000576 and §ui-kit:S/frontend/angular/000632: a failed read is a toast with a retry, not a note. */
   it('names a failed list request in a toast with a retry, over the empty state', async () => {
     const api = makeApi({ listCdVariants: jest.fn(() => httpError(500)) });
     const { c, container } = await setup(api);

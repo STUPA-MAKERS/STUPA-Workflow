@@ -29,7 +29,7 @@ without a mail queue, `sent_at` must stay empty. The public protocols page must 
 `finalized_at` as the date of the finalization.
 
 The meeting head must show a final protocol as "Protokoll final" only with `sent_at`. Without
-it, the head must say that the protocol was not sent, because there are no recipients (001304).
+it, the head must say that the protocol was not sent, because there are no recipients (ui-kit:001304).
 
 A protocol that was final before this rule keeps its `sent_at` and gets the same value as
 `finalized_at`.

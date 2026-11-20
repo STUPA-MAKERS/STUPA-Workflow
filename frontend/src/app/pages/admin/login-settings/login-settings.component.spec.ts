@@ -91,7 +91,7 @@ describe('LoginSettingsComponent', () => {
     expect(api.putLoginSettings).not.toHaveBeenCalled();
   });
 
-  /** § 000635 */
+  /** §ui-kit:000635 */
   it('"Verwerfen" sets the fields back and hides with "Speichern"', async () => {
     const { c, fixture } = await setup();
     const before = pwaField().value;

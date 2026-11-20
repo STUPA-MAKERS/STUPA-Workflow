@@ -149,7 +149,7 @@ export class GroupMappingsComponent {
     membership: true,
     role: true,
   });
-  /** The sections whose last read failed (§ 000576). */
+  /** The sections whose last read failed (§ui-kit:000576). */
   private readonly failed = signal<Record<MappingKind, boolean>>({
     global: false,
     membership: false,

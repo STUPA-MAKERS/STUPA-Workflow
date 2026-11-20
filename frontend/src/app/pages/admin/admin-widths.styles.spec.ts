@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 /**
- * § 000637: a stylesheet of Verwaltung takes its container widths from `_widths.scss`. It
+ * §ui-kit:000637: a stylesheet of Verwaltung takes its container widths from `_widths.scss`. It
  * writes no `@container` rule by itself.
  */
 const ROOT = __dirname;

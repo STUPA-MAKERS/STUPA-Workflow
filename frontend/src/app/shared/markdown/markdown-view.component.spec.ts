@@ -73,7 +73,7 @@ describe('MarkdownViewComponent', () => {
     expect(fireEvent.click(link)).toBe(false);
   });
 
-  /** § NF/accessibility/conformance/000493 */
+  /** §ui-kit:NF/accessibility/conformance/000493 */
   it('has no axe violations for text, lists, links, tables and an image', async () => {
     const { container } = await render(MarkdownViewComponent, {
       inputs: {

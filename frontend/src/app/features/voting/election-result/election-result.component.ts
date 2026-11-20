@@ -54,7 +54,7 @@ import {
  * The meeting card, the vote page and the beamer use it. The beamer never gets the
  * actions (`canManage` stays off). In the meeting card (`inCard`) the card states the
  * result: the bars come without the result heading, and a pending lot shows only the
- * tags and the button (§ 001006).
+ * tags and the button (§ui-kit:001006).
  *
  * One button serves both steps, so the focus stays on it and the second click of a double click
  * does not confirm.
@@ -103,7 +103,7 @@ export class ElectionResultComponent {
   readonly canNextRound = input(false);
   /**
    * The meeting card: no result heading above the bars and no banner text for the lot,
-   * because the status line of the card states the result once (§ 001006).
+   * because the status line of the card states the result once (§ui-kit:001006).
    */
   readonly inCard = input(false);
 

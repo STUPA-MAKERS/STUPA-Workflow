@@ -25,14 +25,14 @@ function sources(dir: string): string[] {
   });
 }
 
-describe('veryHighContrastApp (§000614)', () => {
+describe('veryHighContrastApp (§ui-kit:000614)', () => {
   it('the global stylesheet loads the rules, inside the setting', () => {
     expect(GLOBAL).toContain("@use './app/shared/ui/very-high-contrast';");
     expect(RULES).toMatch(/@include d\.on\(veryHigh\) \{/);
   });
 });
 
-describe('surfaceEdges (§000605)', () => {
+describe('surfaceEdges (§ui-kit:000605)', () => {
   it('draws the white edge around the calendar grid and the pane of the start page', () => {
     expect(RULES).toMatch(/\.dash--wide \.dash__today \{\s*border: var\(--vh-edge\) !important;/);
     expect(RULES).toMatch(/\.cal__grid::after \{[^}]*border: var\(--vh-edge\);/);
@@ -65,7 +65,7 @@ describe('surfaceEdges (§000605)', () => {
   });
 });
 
-describe('boardPicker (§000617)', () => {
+describe('boardPicker (§ui-kit:000617)', () => {
   it('draws the picker as a menu: white edge, yellow rows, the open board filled', () => {
     expect(RULES).toMatch(
       /\.bp__pop \{\s*border: var\(--vh-edge\) !important;[^}]*--pop-edge: none !important;/,
@@ -82,7 +82,7 @@ describe('boardPicker (§000617)', () => {
   });
 });
 
-describe('protocolBand (§000605, §000614)', () => {
+describe('protocolBand (§ui-kit:000605, §ui-kit:000614)', () => {
   it('gives the band of the protocol white ink on its black surface, the edge, and filled buttons of one height', () => {
     expect(RULES).toMatch(/\n {2}\.pb \{\s*@include vh\.ink\(var\(--vh-fg\)\);\s*border: var\(--vh-edge\);/);
     const filled = selectorsOf('  .pb__pdf,', 'fill');
@@ -91,13 +91,13 @@ describe('protocolBand (§000605, §000614)', () => {
   });
 });
 
-describe('menuRows (§000617)', () => {
+describe('menuRows (§ui-kit:000617)', () => {
   it('gives the rows of the help menu yellow text', () => {
     expect(selectorsOf('  .hm__item {', 'text')).toContain('.hm__item');
   });
 });
 
-describe('choiceCards (§000618)', () => {
+describe('choiceCards (§ui-kit:000618)', () => {
   it('gives a vote option, an option for a represented person and a type card the yellow edge', () => {
     const edge = selectorsOf('  .choice,', 'edge');
     for (const card of ['.choice', '.pchoice', '.wz__type']) expect(edge).toContain(card);
@@ -116,7 +116,7 @@ describe('choiceCards (§000618)', () => {
   });
 });
 
-describe('rowsAndFills (§000619, §000621)', () => {
+describe('rowsAndFills (§ui-kit:000619, §ui-kit:000621)', () => {
   it('gives a day of the calendar a yellow number', () => {
     expect(RULES).toMatch(/\.cal__num:not\(\.cal__num--today\) \{\s*color: var\(--vh-hi\) !important;/);
   });
@@ -126,7 +126,7 @@ describe('rowsAndFills (§000619, §000621)', () => {
   });
 });
 
-describe('copyBoxes (§000739)', () => {
+describe('copyBoxes (§ui-kit:000739)', () => {
   it('fills the address of a calendar subscription and the boxes of the MCP setup', () => {
     const fill = selectorsOf('  .cs__url,', 'fill');
     expect(fill).toContain('.gr__cmd');
@@ -134,14 +134,14 @@ describe('copyBoxes (§000739)', () => {
   });
 });
 
-describe('permissionChips (§000615, §000620)', () => {
+describe('permissionChips (§ui-kit:000615, §ui-kit:000620)', () => {
   it('fills a granted permission and gives the others the edge', () => {
     expect(selectorsOf('  .rm__chip--on {', 'fill')).toContain('.rm__chip--on');
     expect(selectorsOf('  .rm__chip:not(', 'edge')).toContain('.rm__chip:not(.rm__chip--on, .rm__chip--off)');
   });
 });
 
-describe('scriptsReadMotionSetting (§000623)', () => {
+describe('scriptsReadMotionSetting (§ui-kit:000623)', () => {
   const files = sources(APP);
 
   it('no script of the app reads the system motion setting itself', () => {

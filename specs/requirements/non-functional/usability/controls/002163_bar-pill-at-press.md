@@ -2,7 +2,7 @@
 id: "002163"
 title: The pill of the navigation bar moves at the press
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:

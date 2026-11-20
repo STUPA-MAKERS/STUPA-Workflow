@@ -141,7 +141,7 @@ describe('GraphComponent', () => {
   it('draws the first page and names the drawing for a screen reader', async () => {
     const { calls, el, router } = await start('/graph', [() => of(FULL)]);
     expect(calls).toEqual([{ filters: FRESH, cursor: null }]);
-    // § 001425: no title shows, and the filters are in the layer over the drawing.
+    // §ui-kit:001425: no title shows, and the filters are in the layer over the drawing.
     expect(el.querySelector('#gr-title')).toHaveTextContent('Graph');
     expect(el.querySelector('#gr-title')).toHaveClass('sr-only');
     expect(el.querySelector('.gr__float .gr__bar [role="search"]')).not.toBeNull();
@@ -154,7 +154,7 @@ describe('GraphComponent', () => {
     ).toBeInTheDocument();
     const meeting = screen.getByRole('button', { name: 'Sitzung: Sondersitzung' });
     expect(meeting).toHaveAttribute('data-kind', 'meeting');
-    // § 001428: a node names its neighbours for a screen reader.
+    // §ui-kit:001428: a node names its neighbours for a screen reader.
     expect(meeting).toHaveAccessibleDescription(
       'Verbunden mit: TOP 1: Haushalt, Flyer drucken, Antrag Sommerfest, Rechnung (kein Zugriff)',
     );
@@ -177,7 +177,7 @@ describe('GraphComponent', () => {
     expect(cmp.kindOptions().map((o) => o.label)).toContain('TOP');
   });
 
-  /** § F/collaboration/graph/001426: the build-up, page by page, until 300 nodes show. */
+  /** §ui-kit:F/collaboration/graph/001426: the build-up, page by page, until 300 nodes show. */
   it('loads the pages by itself until 300 nodes show, then "Mehr laden" loads on', async () => {
     const first = cards(0, 60, '60');
     const { calls, cmp, settle } = await start(
@@ -270,7 +270,7 @@ describe('GraphComponent', () => {
     expect(screen.queryByText('Noch keine Verknüpfungen')).toBeNull();
   });
 
-  /** § F/collaboration/graph/001425: the filters are in the query of the URL, the server applies them. */
+  /** §ui-kit:F/collaboration/graph/001425: the filters are in the query of the URL, the server applies them. */
   it('reads the filters from the URL and resets them', async () => {
     const { calls, cmp, settle, router } = await start(
       '/graph?kinds=meeting,todo&from=2026-01-01&to=2026-12-31&rel=links&q=Haushalt&single=1&noaccess=1',
@@ -422,7 +422,7 @@ describe('GraphComponent', () => {
     expect(calls).toHaveLength(count);
   });
 
-  /** § F/collaboration/graph/001429: a press chooses a node: the panel, the dimmed nodes and "Öffnen". */
+  /** §ui-kit:F/collaboration/graph/001429: a press chooses a node: the panel, the dimmed nodes and "Öffnen". */
   it('shows the panel of the pressed node with "Öffnen" and dims the other nodes', async () => {
     const { settle, cmp, el } = await start('/graph', [() => of(FULL)]);
     expect(el.querySelector('.gr__panel')).toBeNull();
@@ -484,7 +484,7 @@ describe('GraphComponent', () => {
     expect(cmp.selected()).toBeNull();
   });
 
-  /** § F/collaboration/graph/001429: on a phone the chosen element shows in a sheet. */
+  /** §ui-kit:F/collaboration/graph/001429: on a phone the chosen element shows in a sheet. */
   it('shows the chosen element in a sheet on a phone', async () => {
     const restore = matchMediaQueries(MEDIA.phone);
     try {

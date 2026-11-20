@@ -2,7 +2,7 @@
 id: "002164"
 title: The ripple runs on its own composited layer
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:

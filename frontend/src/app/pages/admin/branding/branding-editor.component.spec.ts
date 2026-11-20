@@ -111,7 +111,7 @@ describe('BrandingEditorComponent', () => {
     expect(screen.queryByRole('textbox', { name: 'Voller Name (Browser-Tab)' })).toBeNull();
     expect(screen.queryByText('Vorschau', { selector: 'summary *' })).toBeNull();
     expect(container.querySelector('details')).toBeNull();
-    // § 000672: the language picker stands in the page head.
+    // §ui-kit:000672: the language picker stands in the page head.
     expect(container.querySelector('app-page-header app-content-lang-switch')).not.toBeNull();
     expect(container.querySelectorAll('app-content-lang-switch')).toHaveLength(1);
   });
@@ -162,7 +162,7 @@ describe('BrandingEditorComponent', () => {
     }
   });
 
-  /** § 000635 */
+  /** §ui-kit:000635 */
   it('"Verwerfen" sets the fields back and hides with "Speichern"', async () => {
     const { api, fixture } = await setupWithStub({});
     const field = (): HTMLInputElement => screen.getByRole('textbox', { name: 'Kurzname (PWA)' });

@@ -15,7 +15,7 @@ describe('LoadMoreComponent', () => {
     expect(container.querySelector('.lm__sentinel')).toHaveAttribute('aria-hidden', 'true');
   });
 
-  /** § NF/accessibility/conformance/000493 */
+  /** §ui-kit:NF/accessibility/conformance/000493 */
   it.each([false, true])('has no axe violations (loading %s)', async (loading) => {
     const { container } = await render(`<app-load-more label="Mehr laden" [loading]="loading" />`, {
       imports: [LoadMoreComponent],

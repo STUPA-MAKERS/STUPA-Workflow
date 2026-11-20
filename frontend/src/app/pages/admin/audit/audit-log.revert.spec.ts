@@ -215,7 +215,7 @@ describe('AuditLogComponent — config diff + revert', () => {
     expect(c.diffOf(c.entries()[0])).toEqual(DIFF);
   });
 
-  /** § 000632 */
+  /** §ui-kit:000632 */
   it('a failed diff shows the error state, and the retry reads it again', async () => {
     const { c, api } = await setup();
     (api.getConfigRevisionDiff as jest.Mock).mockReturnValueOnce(throwError(() => new Error('x')));

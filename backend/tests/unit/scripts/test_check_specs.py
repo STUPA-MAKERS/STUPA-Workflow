@@ -25,7 +25,7 @@ check_specs = _load()
 
 def test_a_section_sign_before_a_rule_is_found() -> None:
     """§S/specs/format/000032: a spec refers to a rule without the § sign."""
-    body = "See (§F/meetings/voting/000024) and § 000744 and §000026."
+    body = "See (§F/meetings/voting/000024) and §ui-kit:000744 and §000026."
     assert len(check_specs.spec_section_refs(body)) == 3
 
 

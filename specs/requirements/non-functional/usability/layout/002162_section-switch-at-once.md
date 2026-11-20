@@ -2,7 +2,7 @@
 id: "002162"
 title: A switch between sections shows the new section at once
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:

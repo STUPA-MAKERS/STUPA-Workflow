@@ -47,7 +47,7 @@ const SURFACES: readonly (readonly [string, string])[] = [
   ['features/apply/altcha.component.scss', '.altcha__btn'],
 ];
 
-describe('highlightedFields (§000598)', () => {
+describe('highlightedFields (§ui-kit:000598)', () => {
   it.each(SURFACES)('%s %s includes the highlight surface', (file, selector) => {
     const body = rule(readFileSync(join(APP, file), 'utf8'), selector);
     expect(body).toMatch(/@include f\.highlight-surface;/);

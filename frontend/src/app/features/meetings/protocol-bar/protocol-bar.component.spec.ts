@@ -52,7 +52,7 @@ async function setup(m: Meeting, p: Protocol, opts: { session?: boolean; compact
   return { ...view, finalize, session, api, files, labels, select };
 }
 
-/** § 001304: the protocol part of the meeting head. */
+/** §ui-kit:001304: the protocol part of the meeting head. */
 describe('ProtocolBarComponent', () => {
   it('offers the finalize of a draft to a holder of the right as the one head action', async () => {
     const { finalize, labels } = await setup(closed(), protocol());
@@ -252,7 +252,7 @@ describe('ProtocolBarComponent', () => {
     });
   });
 
-  /** § 001304: the PDF items of the menu open the file viewer, with the title of the meeting. */
+  /** §ui-kit:001304: the PDF items of the menu open the file viewer, with the title of the meeting. */
   describe('PDF items', () => {
     const opened = (files: { open: jest.Mock }) => files.open.mock.calls.map(([f]) => (f as { url: string }).url);
 

@@ -24,7 +24,7 @@ have the actions `Verknüpfen` and `To-Do anlegen` as icon buttons. When nothing
 sheet must show the empty state `Nichts mit dieser Sitzung verknüpft`. The agenda column must not
 show these links, because a long agenda pushes them out of sight.
 
-The sheet of the open item (spec 001800) is `Verknüpft mit TOP`, so that the two entries of the
+The sheet of the open item (spec ui-kit:001800) is `Verknüpft mit TOP`, so that the two entries of the
 menu have different names.
 
 The detail of a Gremium must have a tab `To-Dos`. The tab must show the open cards of the board

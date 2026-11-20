@@ -131,7 +131,7 @@ describe('calendar.util', () => {
       expect(singleDay([span, one], '2026-11-11').map((e) => e.id)).toEqual(['one']);
     });
 
-    /** § 000726: an entry over several days is one bar in the grid and one row at each day. */
+    /** §ui-kit:000726: an entry over several days is one bar in the grid and one row at each day. */
     it('makes one bar of a three-day entry and a row at each of its days', () => {
       const bars = weekBars([span, one], WEEK);
       expect(bars).toEqual([{ entry: span, from: 2, to: 5, lane: 0, openStart: false, openEnd: false }]);
@@ -194,7 +194,7 @@ describe('calendar.util', () => {
       expect(hoursOf('08:15')).toBe(8.25);
     });
 
-    /** § 000728: an all-day entry and a due card are above the hours. */
+    /** §ui-kit:000728: an all-day entry and a due card are above the hours. */
     it('puts untimed entries above the hours', () => {
       const card = entry('card', { kind: 'card' });
       const days = entry('days', { startsOn: '2026-11-10', endsOn: '2026-11-12' });
@@ -202,7 +202,7 @@ describe('calendar.util', () => {
       expect(dayBlocks([timed, card, days], '2026-11-11', 8, 21).map((b) => b.entry.id)).toEqual(['timed']);
     });
 
-    /** § 000744: a timed entry over several days is a block on each of its days. */
+    /** §ui-kit:000744: a timed entry over several days is a block on each of its days. */
     it('cuts a timed entry over several days into one block per day', () => {
       const span = entry('span', {
         startsOn: '2026-11-10',
@@ -258,7 +258,7 @@ describe('calendar.util', () => {
       ]);
     });
 
-    /** § 000745: a block that starts 45 minutes later lies on the earlier block. */
+    /** §ui-kit:000745: a block that starts 45 minutes later lies on the earlier block. */
     it('lays a later entry on the earlier one', () => {
       const other = entry('other', { startTime: '14:45:00', endTime: '15:15:00' });
       const [first, second] = dayBlocks([other, timed], '2026-11-11', 8, 21);
@@ -292,7 +292,7 @@ describe('calendar.util', () => {
       ]);
     });
 
-    /** § 000746: the view opens at 08:00, or at the first entry of the week when that is earlier. */
+    /** §ui-kit:000746: the view opens at 08:00, or at the first entry of the week when that is earlier. */
     it('opens the week at 08:00 or at an earlier entry of the week', () => {
       const week = ['2026-11-10', '2026-11-11'];
       expect(openHour([], week)).toBe(8);

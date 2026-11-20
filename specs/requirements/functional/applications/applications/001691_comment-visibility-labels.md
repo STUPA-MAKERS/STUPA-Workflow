@@ -15,14 +15,11 @@ scope:
 
 # The visibility switch names who reads the comment
 
-The visibility switch of the comment field must have these two options:
+The visibility switch of the comment field (ui-kit:002283) must have these two options:
 
 - `Intern` (`Internal`),
 - `Öffentlich` (`Public`).
 
-The labels have no explanation in brackets.
-
-Reason: The switch is a segment selector, and a long label wraps onto two lines in it. The
-solid frame of a public draft (001692) shows that the applicant reads the comment.
+Reason: The solid frame of a public draft (001692) shows that the applicant reads the comment.
 
 Test: A frontend unit test checks the two labels in German and in English.

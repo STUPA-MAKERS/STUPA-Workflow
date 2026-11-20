@@ -124,7 +124,7 @@ export class AdminRolesComponent {
   /** True until the first answer, so the table does not claim there are no roles. */
   protected readonly loading = signal(true);
 
-  /** The read of the roles failed (§ 000576). */
+  /** The read of the roles failed (§ui-kit:000576). */
   protected readonly loadError = signal(false);
   protected readonly loadState = loadStateOf(this.loading, this.loadError);
 
@@ -243,7 +243,7 @@ export class AdminRolesComponent {
   );
   protected readonly rolesDirty = computed(() => this.dirtyRoles().length > 0);
 
-  /** "Verwerfen": every role goes back to its stored name and rights (§ 000635). */
+  /** "Verwerfen": every role goes back to its stored name and rights (§ui-kit:000635). */
   protected discardRoles(): void {
     const saved = this.savedRoles();
     this.roles.update((list) => list.map((r) => saved.get(r.id) ?? r));

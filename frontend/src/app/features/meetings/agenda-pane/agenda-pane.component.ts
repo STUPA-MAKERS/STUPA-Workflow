@@ -144,7 +144,7 @@ export class AgendaPaneComponent {
   private readonly renameInput = viewChild<ElementRef<HTMLInputElement>>('renameInput');
   /**
    * The rename field takes the focus when it opens. The `autofocus` attribute works only on
-   * page load, and the template lint refuses it (§ NF/accessibility/conformance/000492).
+   * page load, and the template lint refuses it (§ui-kit:NF/accessibility/conformance/000492).
    */
   private readonly focusRename = effect(() => this.renameInput()?.nativeElement.focus());
   /**

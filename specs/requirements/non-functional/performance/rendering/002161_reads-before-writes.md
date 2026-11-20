@@ -2,7 +2,7 @@
 id: "002161"
 title: Layout reads wait for the render and come before the writes of a frame
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:

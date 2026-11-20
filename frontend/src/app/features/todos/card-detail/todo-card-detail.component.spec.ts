@@ -750,7 +750,7 @@ describe('TodoCardDetailComponent', () => {
     expect(api.addLink).toHaveBeenCalledWith('k-1', 'ticket', 't-1');
     fireEvent.click(screen.getByRole('button', { name: 'Verknüpfung mit Lerncafé entfernen' }));
     expect(api.removeLink).toHaveBeenCalledTimes(2);
-    // § 000669: the action of the section is an icon button with its text as name.
+    // §ui-kit:000669: the action of the section is an icon button with its text as name.
     const linkButton = screen.getByRole('button', { name: 'Verknüpfen' });
     expect(linkButton.textContent?.trim()).toBe('');
     fireEvent.click(linkButton);

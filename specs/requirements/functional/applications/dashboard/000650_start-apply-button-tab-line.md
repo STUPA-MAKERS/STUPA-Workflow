@@ -16,7 +16,7 @@ On every width above the phone width, the start page must show "Antrag stellen" 
 button at the end of the tab line of the work list, after the link of the tab. The button must use the look of the
 button "Live beitreten" of the sheet "Heute". Above the phone width the start page must not show a floating
 button. The tab line must keep its height. On the phone, "Antrag stellen" stays the floating
-button (000198).
+button (ui-kit:000198).
 
 Reason: The floating button stood at the foot of the list column. There it was in the middle
 of the window and covered the last rows of the table. The tab line has free room, and a button

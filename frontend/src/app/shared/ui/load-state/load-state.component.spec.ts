@@ -41,7 +41,7 @@ describe('LoadStateComponent', () => {
     expect(screen.queryByText('Inhalt')).toBeNull();
   });
 
-  /** § 000576: a failed read shows a toast with a retry, and no note in the page. */
+  /** §ui-kit:000576: a failed read shows a toast with a retry, and no note in the page. */
   it('names a failed read in an error toast with a retry, not in a note', async () => {
     const retry = jest.fn();
     const { container } = await render(
@@ -73,7 +73,7 @@ describe('LoadStateComponent', () => {
     expect(container.querySelector('app-load-state')?.textContent?.trim()).toBe('');
   });
 
-  /** § 000576: a list keeps its content, or its empty state, under the error toast. */
+  /** §ui-kit:000576: a list keeps its content, or its empty state, under the error toast. */
   it('keeps the content in the error state when the page asks for it', async () => {
     await render(
       `<app-load-state state="error" errorText="Laden fehlgeschlagen." [keepContent]="true">

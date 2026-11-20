@@ -79,7 +79,7 @@ describe('AdminTranslationsComponent', () => {
     expect(inst.reference('action.save')).toBe('Save');
   });
 
-  /** § 000576 and § S/frontend/angular/000632: a failed read is a toast with a retry, not a note. */
+  /** §ui-kit:000576 and §ui-kit:S/frontend/angular/000632: a failed read is a toast with a retry, not a note. */
   it('names a failed read in a toast with a retry', async () => {
     const api = makeApi({ languages: jest.fn(() => throwError(() => new Error('x'))) });
     const { container } = await setup(api);

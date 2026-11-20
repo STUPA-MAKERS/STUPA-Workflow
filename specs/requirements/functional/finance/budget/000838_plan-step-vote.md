@@ -59,7 +59,7 @@ able to add the waiting plan as a TOP, while the meeting is `planned` or `live` 
 The action that adds a TOP must offer the waiting plans of this Gremium beside its Anträge,
 each with its budget, fiscal year, version and step. The TOP must link the version, show
 the plan as its first row with a link to the plan for a person who can read the plan
-(000800), and take these four names as its title, which can change (000101). A version
+(000800), and take these four names as its title, which can change (ui-kit:000101). A version
 must be on the agenda of a meeting only once. A plan that does not wait for this Gremium
 must answer 409 `plan_step_not_waiting`.
 

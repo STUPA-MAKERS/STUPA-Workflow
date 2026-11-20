@@ -29,7 +29,7 @@ function clickedLinks(): { href: string; download: string; target: string }[] {
 describe('FileOpenService', () => {
   afterEach(() => jest.restoreAllMocks());
 
-  it('§F/administration/files/001080: opens a PDF in the viewer with its inline preview', () => {
+  it('§ui-kit:F/administration/files/001080: opens a PDF in the viewer with its inline preview', () => {
     const files = service();
     files.open({ name: 'Antrag.pdf', url: '/api/applications/a1/pdf', kind: 'pdf' });
     expect(files.shown()).toEqual({
@@ -40,13 +40,13 @@ describe('FileOpenService', () => {
     expect(files.shown()).toBeNull();
   });
 
-  it('§F/administration/files/001080: opens a raster image by its type, also on a phone', () => {
+  it('§ui-kit:F/administration/files/001080: opens a raster image by its type, also on a phone', () => {
     const files = service(true);
     files.open({ name: 'logo', url: '/api/admin/cd-variant-logos/l1/file', mime: 'image/png' });
     expect(files.shown()?.item.url).toBe('/api/admin/cd-variant-logos/l1/file?inline=1');
   });
 
-  it('§F/administration/files/001080: downloads a type that the viewer cannot show', () => {
+  it('§ui-kit:F/administration/files/001080: downloads a type that the viewer cannot show', () => {
     const files = service();
     const links = clickedLinks();
     expect(files.canView({ name: 'liste.xlsx', url: '/api/x' })).toBe(false);
@@ -56,7 +56,7 @@ describe('FileOpenService', () => {
     expect(links).toEqual([{ href: '/api/y', download: '', target: '' }]);
   });
 
-  it('§NF/usability/layout/001081: opens a PDF on a coarse pointer in a new tab', () => {
+  it('§ui-kit:NF/usability/layout/001081: opens a PDF on a coarse pointer in a new tab', () => {
     const files = service(true);
     const links = clickedLinks();
     files.open({ name: 'Protokoll.pdf', url: '/api/protocols/p1/pdf?variant=public', kind: 'pdf' });
@@ -64,7 +64,7 @@ describe('FileOpenService', () => {
     expect(links).toEqual([{ href: '/api/protocols/p1/pdf?variant=public&inline=1', download: '', target: '_blank' }]);
   });
 
-  it('§F/administration/files/001080: a click with a modifier keeps the default of the browser', () => {
+  it('§ui-kit:F/administration/files/001080: a click with a modifier keeps the default of the browser', () => {
     const files = service();
     const file = { name: 'a.pdf', url: '/api/a', kind: 'pdf' as const };
     const ctrl = new MouseEvent('click', { button: 0, ctrlKey: true, cancelable: true });

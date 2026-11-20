@@ -451,7 +451,7 @@ export class TodosComponent implements OnDestroy {
   /** The entry of the shown board in the board list: known before the board loads. */
   readonly summary = computed(() => this.boards().find((b) => b.id === this.boardId()) ?? null);
 
-  /** The search placeholder with the number of open to-dos (§ 000661). */
+  /** The search placeholder with the number of open to-dos (§ui-kit:000661). */
   readonly searchPlaceholder = computed(() =>
     searchPlaceholder(
       this.i18n,

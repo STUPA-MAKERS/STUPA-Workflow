@@ -17,7 +17,7 @@ scope:
 
 The ⋮ menu in the head of the invoice detail must have the entry "Buchung anlegen" for a person
 who books. The entry must open the dialog "Neue Buchung" with this invoice preselected, like the
-entry in the row menu of the invoice list. This entry is an exception to 000671.
+entry in the row menu of the invoice list. This entry is an exception to ui-kit:000671.
 
 Reason: On a phone the section "Buchungen" is far below the head. The person looks for the
 action in the menu of the invoice.

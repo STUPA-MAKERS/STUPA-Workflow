@@ -53,7 +53,7 @@ import { problemDetail } from '@core/api/problem';
  * One vote of the open agenda item, as a card beside the sheet.
  *
  * The card reads: the question with the menu (⋮), one status line, one muted rule line,
- * the counts, and at most one button, the next step of the vote (§ 001006, § 001007).
+ * the counts, and at most one button, the next step of the vote (§ui-kit:001006, §ui-kit:001007).
  * The status line of a closed vote says only its result ("Angenommen", "Los steht aus"),
  * never "Abstimmung geschlossen". Every action that is not the next step is in the menu.
  *
@@ -294,7 +294,7 @@ export class VoteCardComponent {
     );
   });
 
-  /** The one button below the counts: the next step of the vote, or `null` (§ 001007). */
+  /** The one button below the counts: the next step of the vote, or `null` (§ui-kit:001007). */
   protected readonly primary = computed<'close' | 'open' | 'insert' | null>(() => {
     const v = this.vote();
     if (v.status === 'open' && this.canManage() && this.canRun()) return 'close';

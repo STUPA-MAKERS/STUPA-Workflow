@@ -5,7 +5,7 @@ import { API_BASE_URL } from './api.config';
 import { ServerReachabilityService, isUnreachableStatus } from './server-reachability.service';
 
 /**
- * Reports each API answer to {@link ServerReachabilityService} (§ 000578): an error with no
+ * Reports each API answer to {@link ServerReachabilityService} (§ui-kit:000578): an error with no
  * status, 502, 503 or 504 may mean that the server is not there, every other answer (also a
  * 4xx or a 500) means that it is. Requests to other hosts are not reported. It sits inside the
  * cache interceptor, so a cached answer does not count.

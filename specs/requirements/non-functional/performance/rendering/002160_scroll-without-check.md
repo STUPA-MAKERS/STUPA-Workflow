@@ -2,7 +2,7 @@
 id: "002160"
 title: A scroll event runs no change detection
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:

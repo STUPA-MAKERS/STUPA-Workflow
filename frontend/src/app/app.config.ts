@@ -54,7 +54,7 @@ import { provideServiceWorker } from '@angular/service-worker';
  * for it and the first paint is not German.
  *
  * Interceptor order: loading (outermost, measures the full duration) → cache → app version
- * (a header `X-App-Version` that is not the own build reloads the app, § 002151) → reachability
+ * (a header `X-App-Version` that is not the own build reloads the app, §ui-kit:002151) → reachability
  * (a 502/503/504 or no answer starts the "Server nicht erreichbar" check) → auth
  * (credentials and bearer) → mock response. The cache sits inside the loading interceptor,
  * because a served-from-cache answer still counts as a completed request for the loading

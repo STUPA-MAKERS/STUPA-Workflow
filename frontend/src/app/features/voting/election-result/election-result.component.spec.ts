@@ -145,7 +145,7 @@ describe('ElectionResultComponent', () => {
     expect(toasts()).toContain('Das Los ist gezogen.');
   });
 
-  /** The meeting card states the result itself (§ 001006). */
+  /** The meeting card states the result itself (§ui-kit:001006). */
   it('leaves the result heading and the lot banner to the meeting card', async () => {
     const tie: ElectionResult = {
       counts: { c1: 2, c2: 2, c3: 0, c4: 0 },

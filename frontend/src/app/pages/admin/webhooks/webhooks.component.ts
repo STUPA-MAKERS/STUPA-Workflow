@@ -141,7 +141,7 @@ export class WebhooksComponent {
    * request is still out, which asserts there is nothing when nothing has arrived yet.
    */
   protected readonly loading = signal(true);
-  /** The read of the webhooks failed (§ 000576). */
+  /** The read of the webhooks failed (§ui-kit:000576). */
   protected readonly loadError = signal(false);
   protected readonly loadState = loadStateOf(this.loading, this.loadError);
 

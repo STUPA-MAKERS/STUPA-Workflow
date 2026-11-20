@@ -228,7 +228,7 @@ export class BrandingEditorComponent {
     this.saved = JSON.stringify(branding);
   }
 
-  /** "Verwerfen": every field goes back to the stored value (§ 000635). */
+  /** "Verwerfen": every field goes back to the stored value (§ui-kit:000635). */
   protected discard(): void {
     this.draft.set(JSON.parse(this.saved) as Branding);
     this.markSaved(this.editRev());

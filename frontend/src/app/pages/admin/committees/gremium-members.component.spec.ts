@@ -170,7 +170,7 @@ describe('GremiumMembersComponent', () => {
     expect(screen.getByRole('heading', { name: 'Stellvertretungen' })).toBeInTheDocument();
   });
 
-  /** § 000576: the toast names the error, the list shows its empty placeholder. */
+  /** §ui-kit:000576: the toast names the error, the list shows its empty placeholder. */
   it('names a failed load in a toast and shows the empty placeholder', async () => {
     const { api, fixture } = await setup({
       api: makeApi({ listGremiumMemberships: jest.fn(() => throwError(() => ({ status: 403 }))) }),
