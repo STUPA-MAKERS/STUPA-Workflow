@@ -266,11 +266,20 @@ describe('BudgetDashboardComponent', () => {
      * The year, the overview and the search are outside the scrolling list. The pane sits on the
      * page, so the search field keeps its own surface.
      */
+    /** 001500: the kit hides the title of a column whose filter bar is its direct child. */
+    it('puts the filters of the tree in the filter bar of the column', async () => {
+      const view = await setup();
+      const pane = view.container.querySelector('.bd__pane') as HTMLElement;
+      expect(pane.querySelector(':scope > app-page-header + .ld-pane__filters > app-search-pill')).toBeTruthy();
+      expect(pane.querySelector(':scope > .ld-pane__filters .bd__chips')).toBeTruthy();
+      expect(pane.querySelector(':scope > .bd__tree')).toBeTruthy();
+      expect(pane.querySelector('.bd__paneBody')).toBeNull();
+    });
+
     it('scrolls only the tree and fades an end only where more rows are', async () => {
       const view = await setup();
       const tree = view.container.querySelector('.bd__pane .bd__tree') as HTMLElement;
       expect(tree.querySelector('app-search-pill, .chip')).toBeNull();
-      expect(view.container.querySelector('.bd__pane .bd__paneBody')).not.toHaveClass('bd__paneBody--side');
       const geometry = (scrollHeight: number, scrollTop: number) => {
         Object.defineProperty(tree, 'scrollHeight', { value: scrollHeight, configurable: true });
         Object.defineProperty(tree, 'clientHeight', { value: 300, configurable: true });

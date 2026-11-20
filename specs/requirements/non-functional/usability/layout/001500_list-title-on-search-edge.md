@@ -4,12 +4,16 @@ title: A wide list column has no visible title and puts its buttons beside the s
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-19
+updated: 2026-11-20
 tests:
   - "frontend/vendor/ui-kit/src/styles/styles.spec.ts:WideListHead"
+  - "frontend/src/app/pages/budget/budget-dashboard.component.spec.ts:puts the filters of the tree in the filter bar of the column"
 implementation:
   - frontend/vendor/ui-kit/src/styles/list-detail.scss
   - frontend/vendor/ui-kit/src/lib/page-header/page-header.component.ts
+  - frontend/src/app/pages/budget/budget-dashboard.component.html
+  - frontend/src/app/pages/budget/budget-dashboard.component.scss
+  - frontend/src/app/pages/budget/plan/budget-plan.component.html
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit
@@ -30,8 +34,13 @@ its title line on a wide screen, because nothing else names the page there.
 
 On a phone the title line stays as it is.
 
+Haushalt shows no visible title on any screen wider than a phone, also when it shows only an
+error or an empty state, and also on a narrow screen where the tree is in a sheet. Its heading
+stays in the page for a screen reader.
+
 This applies to every list column with a pane header (Anträge, Meine Anträge, Sitzungen,
-Abstimmungen, Rechnungen, Buchungen, Tickets, Aktivität, Gremien, Aufgaben, Verwaltung). The
+Abstimmungen, Rechnungen, Buchungen, Tickets, Aktivität, Gremien, Aufgaben, Verwaltung, and the
+tree column of Haushalt and of its plan view). The
 desktop calendar is no list column; it hides its title too and puts its buttons in its tools row
 (001771).
 

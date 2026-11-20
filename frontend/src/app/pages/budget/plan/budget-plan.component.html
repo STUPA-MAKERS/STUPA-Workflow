@@ -8,40 +8,40 @@
     @if (wide()) {
       <section class="ld-pane ld-pane--fill bd__pane" aria-hidden="true">
         <app-page-header [pane]="true" [title]="'nav.budget' | t" />
-        <div class="bd__paneBody">
+        <div class="ld-pane__filters">
           <span class="skel-box bd__skSeg"></span>
           <span class="skel-box bd__skSearch"></span>
           <div class="bd__chips">
             <span class="skel-box bd__skChip"></span>
           </div>
-          <div class="bd__tree">
-            <div class="tn">
-              <span class="tn__chev"></span>
-              <div class="tn__main">
-                <span class="tn__line">
-                  <span class="tn__name"><span class="skel-text bp__skRoot"></span></span>
-                  <span class="tn__amt"><span class="skel-text bd__skAmt"></span></span>
-                </span>
-              </div>
+        </div>
+        <div class="bd__tree">
+          <div class="tn">
+            <span class="tn__chev"></span>
+            <div class="tn__main">
+              <span class="tn__line">
+                <span class="tn__name"><span class="skel-text bp__skRoot"></span></span>
+                <span class="tn__amt"><span class="skel-text bd__skAmt"></span></span>
+              </span>
             </div>
-            @for (group of skeletonGroups(); track group.heading) {
-              <p class="bp__group">
-                <span>{{ group.heading }}</span>
-                <span class="skel-text bd__skAmt"></span>
-              </p>
-              @for (w of group.rows; track $index) {
-                <div class="tn" style="--tn-depth: 1">
-                  <span class="tn__chev"></span>
-                  <div class="tn__main">
-                    <span class="tn__line">
-                      <span class="tn__name"><span class="skel-text" [style.width.%]="w"></span></span>
-                      <span class="tn__amt"><span class="skel-text bd__skAmt"></span></span>
-                    </span>
-                  </div>
-                </div>
-              }
-            }
           </div>
+          @for (group of skeletonGroups(); track group.heading) {
+            <p class="bp__group">
+              <span>{{ group.heading }}</span>
+              <span class="skel-text bd__skAmt"></span>
+            </p>
+            @for (w of group.rows; track $index) {
+              <div class="tn" style="--tn-depth: 1">
+                <span class="tn__chev"></span>
+                <div class="tn__main">
+                  <span class="tn__line">
+                    <span class="tn__name"><span class="skel-text" [style.width.%]="w"></span></span>
+                    <span class="tn__amt"><span class="skel-text bd__skAmt"></span></span>
+                  </span>
+                </div>
+              </div>
+            }
+          }
         </div>
       </section>
     } @else {
@@ -86,42 +86,42 @@
     @if (wide()) {
       <section class="ld-pane ld-pane--fill bd__pane" [attr.aria-label]="'budget.dash.tree' | t">
         <app-page-header [pane]="true" [title]="'nav.budget' | t" />
-        <div class="bd__paneBody">
+        <div class="ld-pane__filters">
           <ng-container *ngTemplateOutlet="modes" />
           <app-search-pill size="lg" [placeholder]="'budget.dash.search' | t" [(value)]="query" />
           <div class="bd__chips">
             <ng-container *ngTemplateOutlet="pickers" />
           </div>
-          <nav class="bd__tree bp__tree" appScrollFade="y" [attr.aria-label]="'budget.dash.tree' | t">
-            <div class="tn" [class.tn--on]="!sel()">
-              <span class="tn__chev" aria-hidden="true"></span>
-              <button type="button" class="tn__main" [attr.aria-current]="sel() ? null : 'true'" (click)="selectId('')">
-                <span class="tn__line">
-                  <span class="tn__name tn__name--root ell">{{ top()?.name }}</span>
-                  @if (plan()) {
-                    <span class="tn__amt mono">{{ money(expenseTotal()) }}</span>
-                  }
-                </span>
-              </button>
-            </div>
-            @for (group of plan() ? groups() : []; track group.side) {
-              <p class="bp__group">
-                <span>{{ group.heading }}</span>
-                @if (group.total !== null) {
-                  <span class="mono">{{ money(group.total) }}</span>
+        </div>
+        <nav class="bd__tree bp__tree" appScrollFade="y" [attr.aria-label]="'budget.dash.tree' | t">
+          <div class="tn" [class.tn--on]="!sel()">
+            <span class="tn__chev" aria-hidden="true"></span>
+            <button type="button" class="tn__main" [attr.aria-current]="sel() ? null : 'true'" (click)="selectId('')">
+              <span class="tn__line">
+                <span class="tn__name tn__name--root ell">{{ top()?.name }}</span>
+                @if (plan()) {
+                  <span class="tn__amt mono">{{ money(expenseTotal()) }}</span>
                 }
-              </p>
-              @for (row of treeRows(); track row.id) {
-                @if (groupOf(row) === group.side) {
-                  <ng-container *ngTemplateOutlet="treeRow; context: { $implicit: row }" />
-                }
+              </span>
+            </button>
+          </div>
+          @for (group of plan() ? groups() : []; track group.side) {
+            <p class="bp__group">
+              <span>{{ group.heading }}</span>
+              @if (group.total !== null) {
+                <span class="mono">{{ money(group.total) }}</span>
+              }
+            </p>
+            @for (row of treeRows(); track row.id) {
+              @if (groupOf(row) === group.side) {
+                <ng-container *ngTemplateOutlet="treeRow; context: { $implicit: row }" />
               }
             }
-            @if (query().trim() && !listRows().length) {
-              <app-empty-state icon="searchOff" rows="1" [heading]="'budget.dash.searchNone' | t" />
-            }
-          </nav>
-        </div>
+          }
+          @if (query().trim() && !listRows().length) {
+            <app-empty-state icon="searchOff" rows="1" [heading]="'budget.dash.searchNone' | t" />
+          }
+        </nav>
       </section>
     } @else {
       <div class="bd__top">
