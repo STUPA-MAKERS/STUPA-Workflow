@@ -35,7 +35,9 @@ that sticks and the bar of a public page.
 At rest such a head must have the colour of the surface it sits on. While content is under it
 (the page or the rows have scrolled), the head must take the bar colour (surface 3, the colour
 of the navigation bar). A head and a tab line or a group head that stick right under it must
-take the bar colour together, so they read as one head.
+take the bar colour together, so they read as one head. On a wide screen the head of a list
+column, its search bar and a pinned group head keep the page colour in every state, and the
+rows cut at the lower edge of the head with round inner corners (000193).
 
 The navigation bar and the heads must not cast a shadow. The step in colour marks the edge. In
 the very high contrast mode (000605) every surface is black, so a scrolled head must end in the
