@@ -81,7 +81,7 @@
             <p class="fe__pv-desc">{{ resolved(description()) }}</p>
           }
           @if (groups().length === 0) {
-            <app-empty-state rows="3" [heading]="'admin.forms.empty' | t" />
+            <app-empty-state icon="form" rows="3" [heading]="'admin.forms.empty' | t" />
           }
           @for (group of groups(); track $index; let gi = $index) {
             <section class="fe__pv-group">
@@ -220,7 +220,7 @@
             <p class="fe__alert" role="alert">{{ issue | t }}</p>
           }
           @if (groups().length === 0) {
-            <app-empty-state [heading]="'admin.forms.empty' | t" />
+            <app-empty-state icon="form" [heading]="'admin.forms.empty' | t" />
           }
           @if (currentGroup(); as group) {
             @let gi = groupIndex();
@@ -237,7 +237,7 @@
             </section>
 
             @if (group.fields.length === 0) {
-              <app-empty-state rows="1" [heading]="'admin.form.groupEmpty' | t" />
+              <app-empty-state icon="form" rows="1" [heading]="'admin.form.groupEmpty' | t" />
             }
 
             @for (field of group.fields; track $index; let qi = $index) {

@@ -5,7 +5,7 @@
     </ng-template>
     <ng-template #content>
       @if (revisions().length === 0) {
-      <app-empty-state rows="1" [heading]="'admin.config.history.empty' | t" />
+      <app-empty-state icon="history" rows="1" [heading]="'admin.config.history.empty' | t" />
     } @else {
       <ol class="rowgroup vh__list">
         @for (rev of revisions(); track rev.id) {

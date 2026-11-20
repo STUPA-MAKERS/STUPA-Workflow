@@ -90,7 +90,7 @@
                       }
                     </ul>
                   } @else {
-                    <app-empty-state shape="file" rows="1" [heading]="'admin.cdVariants.noLogos' | t" />
+                    <app-empty-state icon="image" shape="file" rows="1" [heading]="'admin.cdVariants.noLogos' | t" />
                   }
                   <app-button-group>
                     <app-button class="cdv__add" variant="text" size="sm" (click)="openLogoDialog(v)">
@@ -103,7 +103,7 @@
           }
         </ul>
       } @else {
-        <app-empty-state [heading]="'admin.cdVariants.empty' | t" />
+        <app-empty-state icon="palette" [heading]="'admin.cdVariants.empty' | t" />
       }
     </ng-template>
   </app-load-state>

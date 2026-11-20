@@ -75,7 +75,7 @@
     } @else if (loading() && grants().length === 0) {
       <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
     } @else if (grants().length === 0) {
-      <app-empty-state rows="3" [heading]="'account.grants.empty' | t" />
+      <app-empty-state icon="key" rows="3" [heading]="'account.grants.empty' | t" />
     } @else {
       <ul class="rowgroup gr__list" [attr.aria-label]="'account.grants.active' | t" [attr.aria-busy]="loading()">
         @for (g of grants(); track g.id) {

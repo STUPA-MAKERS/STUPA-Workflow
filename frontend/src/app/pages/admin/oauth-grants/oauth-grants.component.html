@@ -75,7 +75,7 @@
           }
         </ul>
       } @else {
-        <app-empty-state [heading]="'admin.oauthGrants.empty' | t" />
+        <app-empty-state icon="key" [heading]="'admin.oauthGrants.empty' | t" />
       }
 
       @if (total() > 0) {

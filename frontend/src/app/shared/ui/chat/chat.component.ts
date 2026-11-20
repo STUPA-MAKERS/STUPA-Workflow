@@ -343,23 +343,19 @@ export class ChatComponent {
   private stick = true;
   protected readonly atBottom = signal(true);
 
-  protected readonly segmentOptions = computed<SegmentedOption[]>(() =>
-    this.visibilityOptions().map((v) => ({
+  /** The visibility switch; with a guard it names who reads the comment (001691). */
+  protected readonly segmentOptions = computed<SegmentedOption[]>(() => {
+    const labels = this.visibilityGuard()?.labels;
+    return this.visibilityOptions().map((v) => ({
       value: v,
-      label: this.i18n.translate(v === 'internal' ? 'chat.internal' : 'chat.public'),
-    })),
-  );
+      label: this.i18n.translate(labels?.[v] ?? (v === 'internal' ? 'chat.internal' : 'chat.public')),
+    }));
+  });
 
   /** The guarded switch shows: a guard and two options. */
   protected readonly guarded = computed(
     () => this.visibilityGuard() !== null && this.visibilityOptions().length > 1,
   );
-  /** The text next to the send button: the chosen visibility of the guarded switch. */
-  protected readonly visibilityHint = computed<TranslationKey | null>(() => {
-    const guard = this.visibilityGuard();
-    const vis = this.visibility();
-    return guard && vis && this.guarded() ? guard.hints[vis] : null;
-  });
 
   /** Mark visibilities only where both kinds exist in the thread. */
   private readonly marked = computed(() => {

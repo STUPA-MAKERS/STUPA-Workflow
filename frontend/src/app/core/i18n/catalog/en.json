@@ -795,8 +795,6 @@
   "applications.comments.placeholder": "Write a comment …",
   "applications.comments.vis.internal": "Internal (committees only)",
   "applications.comments.vis.public": "Public (the applicant reads it and gets an e-mail)",
-  "applications.comments.hint.internal": "Internal",
-  "applications.comments.hint.public": "Public · e-mail",
   "applications.comments.author.committee": "Committee",
   "applications.comments.author.applicant": "Applicant",
   "actor.deleted": "Former account",
