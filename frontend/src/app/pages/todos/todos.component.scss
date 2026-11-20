@@ -28,7 +28,7 @@
 // end of the filter line, as high as the board picker at its start. The line is as high as
 // the search bar, so the buttons move down by half the difference, onto the line of the picker.
 @include bp.not-phone {
-  .td.ld-pane > app-page-header.ph--pane.ph--pane {
+  .td.ld-pane.ld-pane > app-page-header {
     --ph-pane-h: var(--control-height);
     translate: 0 calc((2.75rem - var(--control-height)) / 2);
   }

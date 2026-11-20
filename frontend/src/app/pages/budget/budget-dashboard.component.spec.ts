@@ -1066,11 +1066,13 @@ describe('BudgetDashboardComponent', () => {
       view.http.match(() => true);
     });
 
-    it('names the sheet after the path and puts the actions beside the title', async () => {
+    /** 001500: no visible title beyond a phone; the actions end the line of the chips. */
+    it('names the sheet after the path and puts the actions at the end of the chips', async () => {
       const view = await setup({ wide: false });
       const article = view.container.querySelector('article.bd__sheet');
       expect(article?.getAttribute('aria-label')).toBe('VS-Mittel');
-      expect(view.container.querySelector('.bd__topRow .bd__actions')).toBeTruthy();
+      expect(view.container.querySelector('.bd__chips > .bd__chipActions .bd__actions')).toBeTruthy();
+      expect(view.container.querySelector('.bd__topRow .bd__actions')).toBeNull();
       expect(view.container.querySelector('app-sheet-bar')).toBeNull();
     });
   });
