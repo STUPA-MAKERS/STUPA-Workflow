@@ -1129,7 +1129,8 @@ describe('ApplyWizardComponent', () => {
       const s = await setup({ form: RULES, loggedIn: true });
       await toReviewSignedIn(s, () => userEvent.type(field(/Summe/), '100'));
       expect(s.comp.ruleMessages()).toEqual({ block: ['Ab 500 €.'], warn: ['Besser ab 1000 €.'] });
-      expect(screen.getByText('Ab 500 €.')).toBeInTheDocument();
+      // The note shows in the details step and in the review step.
+      expect(screen.getAllByText('Ab 500 €.')).toHaveLength(2);
       expect(s.comp.canSubmit()).toBe(false);
       s.comp.submit();
       expect(s.create).not.toHaveBeenCalled();
