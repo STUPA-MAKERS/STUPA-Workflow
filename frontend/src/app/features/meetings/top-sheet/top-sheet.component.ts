@@ -232,10 +232,13 @@ export class TopSheetComponent {
 
   readonly tools = TOOLS;
   /**
-   * The format tools as connected button groups (spec 001354): the text (heading, bold,
-   * italic) and the blocks (list, quote, blackout). The insert tools are a third group.
+   * The format tools as connected button groups (spec 001354): the inline marks (bold, italic,
+   * blackout) and the blocks (heading, list, quote). The insert tools are a third group.
    */
-  readonly toolGroups: readonly (readonly FormatTool[])[] = [TOOLS.slice(0, 3), TOOLS.slice(3)];
+  readonly toolGroups: readonly (readonly FormatTool[])[] = [
+    TOOLS.filter((t) => ['bold', 'italic', 'blackout'].includes(t.format)),
+    TOOLS.filter((t) => ['heading', 'bulletList', 'blockquote'].includes(t.format)),
+  ];
 
   /**
    * The item whose rename started from this heading. The agenda pane shows its own field
