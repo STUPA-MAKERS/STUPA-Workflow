@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { NavigationEnd, Router } from '@angular/router';
 import { SwUpdate } from '@angular/service-worker';
 import { PAGE_RELOAD } from '@stupa-makers/ui-kit/pwa';
-import { Subject } from 'rxjs';
+import { Subject, throwError } from 'rxjs';
 import { appVersionInterceptor } from './app-version.interceptor';
 import { APP_BUILD, AppVersionService, RELOAD_GUARD_MS, RELOAD_KEY } from './app-version.service';
 
@@ -164,5 +164,102 @@ describe('AppVersionService', () => {
     answer(s, 'bbb');
     await flush();
     expect(s.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs the build dev by default', () => {
+    TestBed.configureTestingModule({});
+    expect(TestBed.inject(APP_BUILD)).toBe('dev');
+  });
+
+  it('does not read the header of a request to another host', async () => {
+    const s = setup();
+    s.http.get('https://example.org/x').subscribe();
+    s.ctrl.expectOne('https://example.org/x').flush({}, { headers: { 'X-App-Version': 'bbb' } });
+    await flush();
+    expect(s.reload).not.toHaveBeenCalled();
+  });
+
+  it('ignores an error that is not an HTTP answer', async () => {
+    const s = setup();
+    s.http.get('/api/applications').subscribe({ error: () => undefined });
+    s.ctrl.expectOne('/api/applications').error(new ProgressEvent('error'));
+    await flush();
+    expect(s.reload).not.toHaveBeenCalled();
+  });
+
+  it('does not wait for a checkbox, but waits for an editable element', async () => {
+    const s = setup();
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    document.body.appendChild(box);
+    box.focus();
+    answer(s, 'bbb');
+    await flush();
+    expect(s.reload).toHaveBeenCalledTimes(1);
+
+    TestBed.resetTestingModule();
+    sessionStorage.clear();
+    const t = setup();
+    const div = document.createElement('div');
+    div.contentEditable = 'true';
+    Object.defineProperty(div, 'isContentEditable', { value: true });
+    div.tabIndex = 0;
+    document.body.appendChild(div);
+    div.focus();
+    answer(t, 'bbb');
+    await flush();
+    expect(t.reload).not.toHaveBeenCalled();
+  });
+
+  it('reloads when the storage holds no valid entry or throws', async () => {
+    sessionStorage.setItem(RELOAD_KEY, '{broken');
+    const s = setup();
+    const spy = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('quota');
+    });
+    answer(s, 'bbb');
+    await flush();
+    spy.mockRestore();
+    expect(s.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts once, ignores a page change without a waiting reload and reloads only once', async () => {
+    const s = setup();
+    TestBed.inject(AppVersionService).init();
+    s.events.next(new NavigationEnd(1, '/a', '/a'));
+    await flush();
+    expect(s.reload).not.toHaveBeenCalled();
+    answer(s, 'bbb');
+    answer(s, 'ccc');
+    await flush();
+    expect(s.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not wait when no element has the focus', async () => {
+    const s = setup();
+    const spy = jest.spyOn(document, 'activeElement', 'get').mockReturnValue(null);
+    answer(s, 'bbb');
+    spy.mockRestore();
+    await flush();
+    expect(s.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes an error that is not an HTTP answer through', async () => {
+    const reload = jest.fn();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(
+          withInterceptors([appVersionInterceptor, () => throwError(() => new Error('boom'))]),
+        ),
+        { provide: PAGE_RELOAD, useValue: reload },
+        { provide: SwUpdate, useValue: { isEnabled: false } },
+        { provide: Router, useValue: { events: new Subject<unknown>() } },
+      ],
+    });
+    const err = jest.fn();
+    TestBed.inject(HttpClient).get('/api/x').subscribe({ error: err });
+    await flush();
+    expect(err).toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
   });
 });
