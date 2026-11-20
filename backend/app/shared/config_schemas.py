@@ -159,6 +159,8 @@ class FieldOption(FrozenStrictCamelModel, frozen=True):
             center, or None for a top-level one. Only the server sets it, together with
             ``key`` and ``color``, so the client can show the options as a tree.
         key: For ``budget_select``, the path segment of the cost center.
+        path_key: For ``budget_select``, the path key of the cost center (``VS-80004``).
+            The root of a field (``rootPath``) names a cost center by it.
         color: For ``budget_select``, the own display color of the cost center, or None.
     """
 
@@ -166,6 +168,7 @@ class FieldOption(FrozenStrictCamelModel, frozen=True):
     label: I18nMap
     parent_id: str | None = Field(default=None, alias="parentId")
     key: str | None = None
+    path_key: str | None = Field(default=None, alias="pathKey")
     color: str | None = None
 
 
@@ -180,6 +183,12 @@ class FieldValidation(FrozenStrictCamelModel, frozen=True):
         allow_no_offers: For ``positions``, allow the per-position opt-out of offers.
             The opt-out is a checkbox with a mandatory reason, and the position then
             needs only one offer. Unset means allowed.
+        participants: For ``number``, the field holds the number of participants. The
+            cost line of the form divides the requested amount by it (spec 001631). A form
+            has at most one such field.
+        root_path: For ``budget_select``, the path key of the Kostenstelle whose subtree
+            the picker offers (spec 001680). The node itself is not offered. A path key
+            stays the same across fiscal years, while the id of a Kostenstelle does not.
     """
 
     min: float | None = None
@@ -195,6 +204,8 @@ class FieldValidation(FrozenStrictCamelModel, frozen=True):
     max_positions: int | None = Field(default=None, alias="maxPositions", ge=1)
     max_offers: int | None = Field(default=None, alias="maxOffers", ge=1)
     allow_no_offers: bool | None = Field(default=None, alias="allowNoOffers")
+    participants: bool | None = None
+    root_path: str | None = Field(default=None, alias="rootPath", min_length=1, max_length=200)
 
     @field_validator("pattern")
     @classmethod
@@ -259,6 +270,43 @@ class FormFieldDef(FrozenStrictCamelModel, frozen=True):
         if self.type == "computed" and self.compute is None:
             raise ValueError("compute is required for type 'computed'")
         return self
+
+
+#: How a form rule acts when its expression is not true: ``block`` stops the submit,
+#: ``warn`` only shows the message (spec 001671).
+RuleSeverity = Literal["block", "warn"]
+
+
+class FormRule(FrozenStrictCamelModel, frozen=True):
+    """A rule of a form version across several fields (spec 001670).
+
+    ``logic`` is a JsonLogic expression over the answers by field key, ``amount`` (the
+    amount of the Antrag) and ``costTotal`` (the sum of the preferred offers). The answers
+    meet the rule when the expression gives ``true``. ``message`` is the text that the
+    form shows when they do not, in German and in English.
+    """
+
+    logic: dict[str, Any]
+    message: I18nMap
+    severity: RuleSeverity = "block"
+
+    @field_validator("logic")
+    @classmethod
+    def _check_logic(cls, v: dict[str, Any]) -> dict[str, Any]:
+        """Reject an expression with an operator that is not allowed (spec 000285)."""
+        try:
+            validate_jsonlogic(v)
+        except JsonLogicError as exc:
+            raise ValueError(str(exc)) from exc
+        return v
+
+    @field_validator("message")
+    @classmethod
+    def _check_message(cls, v: I18nMap) -> I18nMap:
+        """Require the message in German and in English."""
+        if not all((v.get(lang) or "").strip() for lang in ("de", "en")):
+            raise ValueError("a rule needs its message in German and in English")
+        return v
 
 
 StateKind = Literal["normal", "vote"]

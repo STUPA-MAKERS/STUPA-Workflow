@@ -79,11 +79,10 @@ export function toFormlyFields(
   lang: Lang,
   extraContext: Readonly<Record<string, unknown>> = {},
 ): FormlyFieldConfig[] {
-  const costKeys = positionsKeys(fields);
   return fields.map((f) =>
     f.type === 'section'
       ? sectionHeading(f, lang)
-      : mapField(f, lang, extraContext, costKeys),
+      : mapField(f, lang, extraContext, fields),
   );
 }
 
@@ -121,13 +120,12 @@ export function toFormlySections(
   const omit: ReadonlySet<string> = new Set(options.omitKeys ?? []);
   const keep = (f: FormFieldDef) => !omit.has(f.key) && f.type !== 'section';
   const all = sections.flatMap((s) => s.fields);
-  const costKeys = positionsKeys(all);
   const title = all.find((f) => f.key === 'title' && keep(f));
   const head = title
-    ? [{ ...mapField(title, lang, extraContext, costKeys), className: 'fe-full' }]
+    ? [{ ...mapField(title, lang, extraContext, all), className: 'fe-full' }]
     : [];
   const editField = (f: FormFieldDef): FormlyFieldConfig => ({
-    ...mapField(f, lang, extraContext, costKeys),
+    ...mapField(f, lang, extraContext, all),
     ...(f.type === 'multiselect' ? { type: 'multiselect' } : {}),
     className: FULL_WIDTH_TYPES.has(f.type) ? 'fe-full' : 'fe-half',
   });
@@ -251,10 +249,19 @@ function choiceProps(f: FormFieldDef, lang: Lang): Readonly<Record<string, unkno
   };
 }
 
-/** The `positions` limits that the form sets. */
-function positionsProps(f: FormFieldDef): Readonly<Record<string, unknown>> {
+/**
+ * The `positions` limits that the form sets. The last `positions` field of the form also
+ * gets the fields of the form (`costFields`) and `costLine`: it shows the line with the
+ * total cost, the requested amount and the amount per person (specs 001630, 001631).
+ */
+function positionsProps(
+  f: FormFieldDef,
+  all: readonly FormFieldDef[],
+): Readonly<Record<string, unknown>> {
   const v = f.validation;
+  const last = all.filter((x) => x.type === 'positions').at(-1);
   return {
+    ...(last?.key === f.key ? { costLine: true, costFields: all } : {}),
     ...(v?.minOffers !== undefined ? { minOffers: v.minOffers } : {}),
     ...(v?.minPositions !== undefined ? { minPositions: v.minPositions } : {}),
     ...(v?.allowNoOffers !== undefined ? { allowNoOffers: v.allowNoOffers } : {}),
@@ -266,6 +273,7 @@ function displayProps(
   f: FormFieldDef,
   lang: Lang,
   help: string | undefined,
+  all: readonly FormFieldDef[],
 ): Readonly<Record<string, unknown>> {
   switch (f.type) {
     case 'markdown':
@@ -277,7 +285,7 @@ function displayProps(
         text: CATALOG[baseLocale(lang)]?.['forms.table.pending'] ?? de['forms.table.pending'],
       };
     case 'positions':
-      return positionsProps(f);
+      return positionsProps(f, all);
     default:
       return {};
   }
@@ -292,8 +300,9 @@ function mapField(
   f: FormFieldDef,
   lang: Lang,
   extraContext: Readonly<Record<string, unknown>>,
-  costKeys: readonly string[] = [],
+  all: readonly FormFieldDef[] = [],
 ): FormlyFieldConfig {
+  const costKeys = positionsKeys(all);
   const text = fieldLabel(f, lang);
   const help =
     f.type === 'markdown'
@@ -310,7 +319,7 @@ function mapField(
     ...(FORMLY_TYPE[f.type] === 'input' ? { type: INPUT_HTML_TYPE[f.type] ?? 'text' } : {}),
     ...choiceProps(f, lang),
     ...validationProps(f),
-    ...displayProps(f, lang, help),
+    ...displayProps(f, lang, help, all),
   };
   const expressions = buildExpressions(f, extraContext);
   const config: FormlyFieldConfig = {

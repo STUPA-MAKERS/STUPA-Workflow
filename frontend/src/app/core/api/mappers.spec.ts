@@ -4,6 +4,7 @@ import {
   mapApplicationListItem,
   mapApplicationType,
   mapAttachment,
+  mapBulkOption,
   mapComment,
   mapMeeting,
   mapMeetingPage,
@@ -1046,5 +1047,52 @@ describe('messageFiles', () => {
     expect(messageFiles({ attachmentIds: [], draftToken: 'tok' })).toEqual({});
     expect(messageFiles({ attachmentIds: ['a'] })).toEqual({ attachmentIds: ['a'], draftToken: null });
     expect(messageFiles({ attachmentIds: ['a'], draftToken: 'tok' })).toEqual({ attachmentIds: ['a'], draftToken: 'tok' });
+  });
+});
+
+describe('mapper flag branches', () => {
+  it('keeps the terminal and denied flags of a state', () => {
+    expect(mapState({ ...STATE, isTerminal: true, isDenied: true }, 'de')).toMatchObject({
+      isTerminal: true,
+      isDenied: true,
+    });
+  });
+
+  it('keeps a transition into a terminal state', () => {
+    const wire = {
+      id: 'tr1',
+      fromStateId: 's1',
+      toStateId: 's2',
+      label: { de: 'Ablehnen' },
+      toTerminal: true,
+    } as TransitionOutWire;
+    expect(mapTransition(wire, 'de').toTerminal).toBe(true);
+  });
+
+  it('sends the predecessor of a new application', () => {
+    const input: NewApplication = {
+      typeId: 't1',
+      data: {},
+      applicantEmail: 'a@b.de',
+      lang: 'de',
+      predecessorId: 'p1',
+    };
+    expect(toApplicationCreateBody(input).predecessorId).toBe('p1');
+  });
+
+  it('maps a bulk target with its colour and amounts', () => {
+    expect(
+      mapBulkOption(
+        { toStateId: 's2', label: { de: 'Genehmigt' }, color: '#0a0', approves: true, amounts: [] },
+        'de',
+      ),
+    ).toEqual({ toStateId: 's2', label: 'Genehmigt', color: '#0a0', approves: true, amounts: [] });
+    expect(mapBulkOption({ toStateId: 's2', label: { de: 'X' } }, 'de')).toEqual({
+      toStateId: 's2',
+      label: 'X',
+      color: null,
+      approves: false,
+      amounts: [],
+    });
   });
 });

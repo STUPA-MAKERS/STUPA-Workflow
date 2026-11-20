@@ -56,11 +56,15 @@ async def reapply_snapshot(
         case entities.ENTITY_FORM:
             from app.modules.admin.service.forms import FormVersionWriter
             from app.modules.forms.schemas import FormVersionCreate
-            from app.shared.config_schemas import FormFieldDef
+            from app.shared.config_schemas import FormFieldDef, FormRule
 
             fields = [FormFieldDef.model_validate(f) for f in snapshot.get("fields", []) or []]
+            rules = [FormRule.model_validate(r) for r in snapshot.get("rules", []) or []]
             payload = FormVersionCreate(
-                fields=fields, activate=True, description=snapshot.get("description")
+                fields=fields,
+                activate=True,
+                description=snapshot.get("description"),
+                rules=rules,
             )
             await FormVersionWriter(session).create_form_version(
                 UUID(entity_id), payload, actor, action=action, extra_data=extra_data

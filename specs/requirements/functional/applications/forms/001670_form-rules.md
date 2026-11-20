@@ -5,7 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - backend/app/shared/config_schemas.py
+  - backend/app/modules/forms/service.py
+  - backend/app/modules/admin/service/forms.py
+  - frontend/src/app/pages/admin/forms/form-editor.component.ts
 scope:
   - backend/app/modules/forms
   - frontend/src/app/features/apply

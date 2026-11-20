@@ -354,6 +354,8 @@ export class ApplicationsDetailComponent {
   private readonly linkedComment = signal<string | null>(null);
   private readonly injector = inject(Injector);
   private readonly filesPanel = viewChild(AttachmentsPanelComponent);
+  /** The files of the application, for the files of each cost position (spec 001730). */
+  protected readonly positionFiles = computed(() => this.filesPanel()?.attachments() ?? []);
   /**
    * Files dropped anywhere on the application become its attachments. Not while another
    * application loads, and not while the comments are open: the chat takes its own drop.

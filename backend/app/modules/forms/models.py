@@ -46,6 +46,8 @@ class FormVersion(UUIDPkMixin, CreatedAtMixin, Base):
     created_by: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     #: Multilingual Markdown description of the form.
     description_i18n: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    #: The rules across fields (`FormRule`, spec 001670), in their order.
+    rules: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, server_default="[]")
 
     __table_args__ = (
         UniqueConstraint("application_type_id", "version"),

@@ -62,6 +62,7 @@ class FormVersionWriter(FormsService):
             version=next_version,
             active=payload.activate,
             description_i18n=payload.description,
+            rules=[r.model_dump(by_alias=True) for r in payload.rules],
         )
         if payload.activate:
             await self.session.execute(
@@ -90,6 +91,7 @@ class FormVersionWriter(FormsService):
             snapshot={
                 "fields": [f.model_dump(by_alias=True) for f in payload.fields],
                 "description": payload.description,
+                "rules": [r.model_dump(by_alias=True) for r in payload.rules],
             },
             actor=actor,
             action=action,
@@ -103,6 +105,7 @@ class FormVersionWriter(FormsService):
             active=payload.activate,
             fields=payload.fields,
             description=payload.description,
+            rules=payload.rules,
         )
 
     async def _next_version(self, type_id: UUID) -> int:
