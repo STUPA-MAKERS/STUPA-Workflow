@@ -27,7 +27,8 @@ _EXAMPLE = (
 
 #: Keys in the template that the API deliberately does not read.
 #: The postgres and ALTCHA images and the compose interpolation read their keys, and
-#: the typst service reads its own (``typst/typst_service/app.py``, ``compiler.py``). No
+#: the typst service reads its own (``typst/typst_service/app.py``, ``compiler.py``), and
+#: the start command of the api container reads ``API_WORKERS`` (``backend/Dockerfile``). No
 #: "documented but dead" key is listed on purpose: a key an operator can set that
 #: changes nothing is worse than no key at all, so such a key leaves the template.
 _NOT_READ_BY_THE_API = {
@@ -42,6 +43,7 @@ _NOT_READ_BY_THE_API = {
     "TYPST_MAX_ASSET_BYTES": "typst service",
     "TYPST_COMPILE_TIMEOUT_S": "typst service",
     "TYPST_MAX_CONCURRENCY": "typst service",
+    "API_WORKERS": "api container command (backend/Dockerfile CMD)",
 }
 
 _KEY_RE = re.compile(r"^\s*(?:#\s*)?([A-Z][A-Z0-9_]*)=", re.MULTILINE)
