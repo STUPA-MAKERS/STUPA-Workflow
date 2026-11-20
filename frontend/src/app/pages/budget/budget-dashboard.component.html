@@ -496,8 +496,8 @@
   <ng-template #modes>
     @if (planTop()) {
       <app-segmented
-        width="equal"
-        size="control"
+        width="fill"
+        size="lg"
         [ariaLabel]="'budget.view.label' | t"
         [options]="modeOptions()"
         value="run"
