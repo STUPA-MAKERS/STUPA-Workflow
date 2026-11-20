@@ -1,5 +1,5 @@
 /**
- * No class without a use (§ S/frontend/angular/000636).
+ * No class without a use (§ui-kit:S/frontend/angular/000636).
  *
  * A layout that a shared component replaced leaves its classes behind in the stylesheet of
  * the page. They read as if the page still had a look of its own, and they hide which rules

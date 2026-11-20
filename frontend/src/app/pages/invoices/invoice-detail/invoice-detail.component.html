@@ -47,7 +47,7 @@
         <span class="fd__part"><span class="mono fd__amount">{{ money(i.grossAmount) }}</span></span>
       </span>
     </p>
-    <!-- "Buchung anlegen" stands in the head of the section "Buchungen" and in the head menu (§ 000671, 001292). -->
+    <!-- "Buchung anlegen" stands in the head of the section "Buchungen" and in the head menu (§ui-kit:000671, 001292). -->
     @if (canManage() && i.status === 'open') {
       <div class="fd__actions">
         <app-button-group [main]="true">

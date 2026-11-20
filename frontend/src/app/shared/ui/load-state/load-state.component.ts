@@ -10,7 +10,7 @@ import {
 
 /**
  * The state of a list page from its two signals: `loading` while the read runs, then `error`
- * after a failed read, else `ok` (§ S/frontend/angular/000632).
+ * after a failed read, else `ok` (§ui-kit:S/frontend/angular/000632).
  */
 export function loadStateOf(loading: Signal<boolean>, failed: Signal<boolean>): Signal<LoadState> {
   return computed(() => (loading() ? 'loading' : failed() ? 'error' : 'ok'));
@@ -23,7 +23,7 @@ export function loadStateOf(loading: Signal<boolean>, failed: Signal<boolean>): 
  * - `forbidden`: a warning note with `forbiddenText`. Without the text it shows nothing,
  *   for a section that hides itself without the right.
  * - `error`: an error toast with `errorText` and "Erneut versuchen", which emits `retry`
- *   (`app-load-error`, § 000576). The content area stays empty. With `keepContent` the
+ *   (`app-load-error`, §ui-kit:000576). The content area stays empty. With `keepContent` the
  *   `#content` template shows too: a list keeps the rows it had, or shows its empty state.
  * - `ok`: the `#content` template.
  *
@@ -55,7 +55,7 @@ export class LoadStateComponent {
   readonly errorText = input.required<string>();
   /**
    * Show `#content` in the `error` state too. For a list, which keeps the rows that it showed
-   * before the error and shows its empty state without them (§ 000576). A form that needs the
+   * before the error and shows its empty state without them (§ui-kit:000576). A form that needs the
    * data to build its fields leaves it off.
    */
   readonly keepContent = input(false);

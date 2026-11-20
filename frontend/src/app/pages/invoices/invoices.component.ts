@@ -113,7 +113,7 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
  * a booking can reference one invoice, so one invoice can serve many bookings.
  *
  * The list: title with the import; the search and the chips (the status chip Alle /
- * Eingang / Verbucht / Bezahlt first, § 000667, then invoice date, due date, amount); the drop
+ * Eingang / Verbucht / Bezahlt first, §ui-kit:000667, then invoice date, due date, amount); the drop
  * zone; the rows by month. The detail: the open invoice (`?id=`, also the target of the
  * global search), or the form of a new, an imported or an edited invoice.
  *
@@ -263,7 +263,7 @@ export class InvoicesComponent implements InvoiceFormHost {
    */
   readonly reloading = signal(false);
   readonly loadingMore = signal(false);
-  /** The search placeholder with the number of invoices (§ 000661). */
+  /** The search placeholder with the number of invoices (§ui-kit:000661). */
   readonly searchPlaceholder = computed(() =>
     searchPlaceholder(
       this.i18n,

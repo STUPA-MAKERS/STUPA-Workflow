@@ -18,7 +18,7 @@ scope:
 In the view Planung the detail of the top-level Kostenstelle must show the steps (000806),
 the sums (000807) and the tables (000808). The detail of a different Kostenstelle must show
 its Ansatz, the Ansatz and the Ist of the year before, the Erläuterung, the Vermerke and a
-table of its child Kostenstellen. The head of the detail must follow 000670.
+table of its child Kostenstellen. The head of the detail must follow ui-kit:000670.
 
 Reason: The detail pane uses the full width for the plan, and a line needs room for its
 Erläuterung.

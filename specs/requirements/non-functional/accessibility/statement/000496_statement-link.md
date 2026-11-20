@@ -4,7 +4,7 @@ title: Every page links to the accessibility statement
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-11
+updated: 2026-11-20
 tests:
   - "frontend/src/app/features/help/help-menu/help-menu.component.spec.ts:HelpMenuComponent"
   - "frontend/src/app/layout/site-footer/site-footer.component.spec.ts:SiteFooterComponent"
@@ -17,8 +17,6 @@ scope:
 
 # Every page links to the accessibility statement
 
-The accessibility menu (000647) must link to `/accessibility` on every page, with and without a
-login. The footer and the help menu must not link to it, because one link in one known place is
-enough and a second one in the footer is easy to miss on pages without a footer (000199).
+The statement route of the framework config (ui-kit:002287) must be `/accessibility`.
 
 Reason: The law requires that a user can find the statement from every page.

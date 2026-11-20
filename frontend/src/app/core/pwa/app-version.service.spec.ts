@@ -68,7 +68,7 @@ describe('AppVersionService', () => {
     document.body.innerHTML = '';
   });
 
-  /** § 002151: another server version activates the update and reloads at once. */
+  /** §ui-kit:002151: another server version activates the update and reloads at once. */
   it('reloads through the service worker when the header names another build', async () => {
     const s = setup();
     answer(s, 'bbb');
@@ -78,7 +78,7 @@ describe('AppVersionService', () => {
     expect(s.reload).toHaveBeenCalledTimes(1);
   });
 
-  /** § 002151: an error answer carries the header too. */
+  /** §ui-kit:002151: an error answer carries the header too. */
   it('reloads on the header of an error answer', async () => {
     const s = setup('aaa', false);
     answer(s, 'bbb', 404);
@@ -99,7 +99,7 @@ describe('AppVersionService', () => {
     expect(d.reload).not.toHaveBeenCalled();
   });
 
-  /** § 002151: a focused text field holds the reload until the next page change. */
+  /** §ui-kit:002151: a focused text field holds the reload until the next page change. */
   it('waits while a text field has the focus and reloads at the next page change', async () => {
     const s = setup();
     const input = document.createElement('input');
@@ -113,7 +113,7 @@ describe('AppVersionService', () => {
     expect(s.reload).toHaveBeenCalledTimes(1);
   });
 
-  /** § 002151: the next answer while no text field has the focus reloads. */
+  /** §ui-kit:002151: the next answer while no text field has the focus reloads. */
   it('reloads at the next answer after the focus left the field', async () => {
     const s = setup();
     const area = document.createElement('textarea');
@@ -128,7 +128,7 @@ describe('AppVersionService', () => {
     expect(s.reload).toHaveBeenCalledTimes(1);
   });
 
-  /** § 002152: the same server version reloads only once within the guard time. */
+  /** §ui-kit:002152: the same server version reloads only once within the guard time. */
   it('does not reload a second time for the same server version', async () => {
     sessionStorage.setItem(RELOAD_KEY, JSON.stringify({ version: 'bbb', at: Date.now() }));
     const s = setup();

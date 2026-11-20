@@ -200,7 +200,7 @@ export class UsersComponent {
    * the list does not jump on every key press.
    */
   protected readonly loading = signal(true);
-  /** The last read of the list failed (§ 000576). */
+  /** The last read of the list failed (§ui-kit:000576). */
   protected readonly loadError = signal(false);
   protected readonly loadState = loadStateOf(this.loading, this.loadError);
 

@@ -1,7 +1,7 @@
 <section class="mt admin-page">
   <app-page-header [flush]="true" [title]="'admin.mailTemplates.title' | t">
     <app-breadcrumbs crumbs />
-    <!-- § 000672: the language of the template stands at the end of the page head. -->
+    <!-- §ui-kit:000672: the language of the template stands at the end of the page head. -->
     <div actions class="mt__headTools">
       @if (dirty()) {
         <app-button variant="text" [disabled]="saving()" (click)="discard()">{{ 'action.discard' | t }}</app-button>

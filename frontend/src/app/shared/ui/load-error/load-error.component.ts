@@ -13,7 +13,7 @@ import { ServerReachabilityService } from '@core/api/server-reachability.service
 import { I18nService } from '@core/i18n/i18n.service';
 
 /**
- * The load error of a page or a pane (§ 000576, § 000577, § 000579). It renders nothing in
+ * The load error of a page or a pane (§ui-kit:000576, §ui-kit:000577, §ui-kit:000579). It renders nothing in
  * the page: while it is in the page, an error toast with `message` and the action "Erneut
  * versuchen" shows. The toast does not close by its time, because it holds the only retry
  * of the page. It closes on the action, on a swipe or its close button, and when the

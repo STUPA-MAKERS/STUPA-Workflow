@@ -1052,7 +1052,7 @@ export class FlowEditorComponent {
   }
 
   /**
-   * Read the flow; also the retry of the load error (§ 000576) and "Verwerfen" (§ 000635),
+   * Read the flow; also the retry of the load error (§ui-kit:000576) and "Verwerfen" (§ui-kit:000635),
    * which reads the stored flow again.
    */
   protected loadFlow(): void {

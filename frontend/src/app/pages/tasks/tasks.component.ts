@@ -227,7 +227,7 @@ export class TasksComponent {
     ),
   );
 
-  /** The search placeholder with the number of tasks (§ 000661). */
+  /** The search placeholder with the number of tasks (§ui-kit:000661). */
   readonly searchPlaceholder = computed(() =>
     searchPlaceholder(
       this.i18n,

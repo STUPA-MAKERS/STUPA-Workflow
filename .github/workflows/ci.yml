@@ -81,8 +81,11 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: backend/pyproject.toml
-      # Checks the format of every spec, the index and every § reference in the code.
+      # Checks the format of every spec, the index and every § reference in the code. The kit
+      # specs come from the submodule: one number space, `§ui-kit:` references (ui-kit:002211, 002212).
       - run: python3 scripts/check_specs.py
+        env:
+          PARTNER_SPECS: frontend/vendor/ui-kit/specs
       # The UML views in specs/uml are current and well formed (specs 000679-000684). The
       # script imports the backend models and reads its import graph.
       - run: pip install -e 'backend[dev]'

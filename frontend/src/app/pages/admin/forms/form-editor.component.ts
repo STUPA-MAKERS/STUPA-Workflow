@@ -371,7 +371,7 @@ export class FormEditorComponent {
     });
   }
 
-  /** "Verwerfen": read the stored form and type again (§ 000635). */
+  /** "Verwerfen": read the stored form and type again (§ui-kit:000635). */
   protected discard(): void {
     const id = this.typeId();
     if (id) this.load(id);

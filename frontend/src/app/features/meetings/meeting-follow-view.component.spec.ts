@@ -456,7 +456,7 @@ describe('MeetingFollowViewComponent', () => {
       expect(within(dock).getByText('3 TOPs')).toBeInTheDocument();
     });
 
-    /** § 000101: the row of the Antrag stands above the title, as on the page of the lead. */
+    /** §ui-kit:000101: the row of the Antrag stands above the title, as on the page of the lead. */
     it('shows the row of the Antrag above the sheet, not below the title', async () => {
       const { context, container } = await setup({
         meeting: member({ status: 'closed', closedAt: '2026-10-15T19:12:00Z', currentAgendaItemId: 't-3' }),
@@ -569,7 +569,7 @@ describe('MeetingFollowViewComponent', () => {
       expect(screen.getByText(/^Lea Hoffmann stellt den Antrag vor\./)).toBeInTheDocument();
     });
 
-    /** § 000101: the row of the Antrag stands above the title of the phone. */
+    /** §ui-kit:000101: the row of the Antrag stands above the title of the phone. */
     it('shows the row of the Antrag above the title of the item', async () => {
       const { context, container } = await setup({
         meeting: member({ status: 'closed', closedAt: '2026-10-15T19:12:00Z', currentAgendaItemId: 't-3' }),

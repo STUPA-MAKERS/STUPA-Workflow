@@ -429,7 +429,7 @@ describe('TopSheetComponent', () => {
     expect(screen.queryByRole('toolbar', { name: 'Format' })).toBeNull();
   });
 
-  /** § 001304: the protocol of a closed meeting sits in the meeting head, not on the sheet. */
+  /** §ui-kit:001304: the protocol of a closed meeting sits in the meeting head, not on the sheet. */
   it('shows no protocol state and no protocol action on the sheet of a closed meeting', async () => {
     const { container } = await setup({ meeting: meeting({ status: 'closed' }) });
     expect(container.querySelector('.ts__foot')).toBeNull();

@@ -75,7 +75,7 @@ export interface GremiumRow {
  *   or the initials, the role and the number of members, and the next meeting ("Läuft",
  *   a date or "keine geplant").
  * - Right: the child route `/committees/:id` with the open gremium (`GremiumDetailComponent`).
- *   The page opens no gremium by itself (§ 000664).
+ *   The page opens no gremium by itself (§ui-kit:000664).
  * - One pane at a time (narrow, phone): the list, then the gremium with a way back.
  *
  * The search filters the loaded list in the browser: the list is short and complete.

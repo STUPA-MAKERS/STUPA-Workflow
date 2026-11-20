@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * § 000631: a settings row is a child of the shared settings row group. The stylesheet of
+ * §ui-kit:000631: a settings row is a child of the shared settings row group. The stylesheet of
  * the page sets no height, surface or corners for the row.
  */
 const PAGES = [

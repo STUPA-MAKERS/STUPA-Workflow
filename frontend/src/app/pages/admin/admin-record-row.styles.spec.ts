@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * § 000634: a record row of Verwaltung has the anatomy of the shared record row. The page
+ * §ui-kit:000634: a record row of Verwaltung has the anatomy of the shared record row. The page
  * sets no inset and no height for the row and no font for its title.
  */
 const LISTS = [

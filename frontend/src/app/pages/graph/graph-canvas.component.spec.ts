@@ -87,7 +87,7 @@ describe('GraphCanvasComponent', () => {
     localStorage.clear();
   });
 
-  /** § F/collaboration/graph/001427: with reduced motion the layout runs to its end before the paint. */
+  /** §ui-kit:F/collaboration/graph/001427: with reduced motion the layout runs to its end before the paint. */
   it('shows the final layout at once with reduced motion', async () => {
     const f = frames();
     const { cmp, container, surface } = await setup();
@@ -98,7 +98,7 @@ describe('GraphCanvasComponent', () => {
     expect(container.querySelectorAll('.gc__node')).toHaveLength(3);
   });
 
-  /** § F/collaboration/graph/001426: the layout settles frame by frame, and the nodes keep their place. */
+  /** §ui-kit:F/collaboration/graph/001426: the layout settles frame by frame, and the nodes keep their place. */
   it('settles over frames and keeps the nodes that show when new nodes arrive', async () => {
     const f = frames();
     const { cmp, fixture, surface, button } = await setup({ reduce: false, nodes: [node('a'), node('b')], lines: [line('a', 'b')] });
@@ -144,7 +144,7 @@ describe('GraphCanvasComponent', () => {
     expect(container.querySelector('.gc__lines')).toHaveAttribute('aria-hidden', 'true');
   });
 
-  /** § F/collaboration/graph/001428: one group with a label; § 001430: the icon and the kind. */
+  /** §ui-kit:F/collaboration/graph/001428: one group with a label; §ui-kit:001430: the icon and the kind. */
   it('names the drawing and each node, and marks an element without access', async () => {
     const { container, button } = await setup();
     expect(screen.getByRole('group', { name: 'Graph mit 3 Elementen' })).toBeInTheDocument();
@@ -157,7 +157,7 @@ describe('GraphCanvasComponent', () => {
     expect(container.querySelector('.gc')).toHaveClass('gc--labels');
   });
 
-  /** § F/collaboration/graph/001429: a press chooses, the other nodes dim. */
+  /** §ui-kit:F/collaboration/graph/001429: a press chooses, the other nodes dim. */
   it('emits the pressed node and dims the nodes that are no neighbours', async () => {
     const { chosen, button, fixture, container } = await setup({ nodes: [...NODES, node('d')] });
     button('a').click();
@@ -178,7 +178,7 @@ describe('GraphCanvasComponent', () => {
     expect(lines[1]).toHaveClass('gc__line--dim');
   });
 
-  /** § F/collaboration/graph/001428: Tab reaches one node, the arrow keys move to the nearest one. */
+  /** §ui-kit:F/collaboration/graph/001428: Tab reaches one node, the arrow keys move to the nearest one. */
   it('has one tab stop and moves the focus with the arrow keys', async () => {
     const { cmp, button, fixture } = await setup({ nodes: [node('a'), node('b'), node('c')], lines: [] });
     expect(button('a')).toHaveAttribute('tabindex', '0');
@@ -227,7 +227,7 @@ describe('GraphCanvasComponent', () => {
     expect(cmp.tabStop()).toBeNull();
   });
 
-  /** § F/collaboration/graph/001429: a press on the empty drawing ends the choice, a drag moves the view. */
+  /** §ui-kit:F/collaboration/graph/001429: a press on the empty drawing ends the choice, a drag moves the view. */
   it('ends the choice with a press on the empty drawing and moves the view with a drag', async () => {
     const { cmp, chosen, surface, button } = await setup();
     cmp.onDown(pointer(surface, 1, 100, 100));
@@ -253,7 +253,7 @@ describe('GraphCanvasComponent', () => {
     expect(cmp.view()).toEqual({ x: start.x + 60, y: start.y + 30, zoom: start.zoom });
   });
 
-  /** § F/collaboration/graph/001433: a drag on a node moves the node, and it stays there. */
+  /** §ui-kit:F/collaboration/graph/001433: a drag on a node moves the node, and it stays there. */
   it('moves a node with a drag and holds it where the person lets go', async () => {
     const { cmp, chosen, surface, button, fixture } = await setup();
     const capture = jest.fn();
@@ -306,7 +306,7 @@ describe('GraphCanvasComponent', () => {
     cmp.onUp(pointer(surface, 1, 300, 300, 'pointerup'));
   });
 
-  /** § F/collaboration/graph/001433: Alt and an arrow key move the node without a pointer. */
+  /** §ui-kit:F/collaboration/graph/001433: Alt and an arrow key move the node without a pointer. */
   it('moves a node with Alt and an arrow key', async () => {
     const { cmp, button } = await setup();
     const at = cmp.bodies().find((b) => b.id === 'a') as Body;
@@ -369,7 +369,7 @@ describe('GraphCanvasComponent', () => {
     screen.getByRole('button', { name: 'Verkleinern' }).click();
     fixture.detectChanges();
     expect(cmp.view().zoom).toBeLessThan(LABEL_ZOOM);
-    // § 001430: the titles hide when they are too small to read.
+    // §ui-kit:001430: the titles hide when they are too small to read.
     expect(container.querySelector('.gc')).not.toHaveClass('gc--labels');
     expect(screen.getByRole('group', { name: 'Ansicht der Zeichnung' })).toBeInTheDocument();
   });

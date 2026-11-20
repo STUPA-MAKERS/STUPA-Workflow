@@ -211,7 +211,7 @@ describe('AdminRolesComponent', () => {
     expect(screen.getByRole('button', { name: 'Rolle anlegen' })).toBeInTheDocument();
   });
 
-  /** § 000635 */
+  /** §ui-kit:000635 */
   it('"Verwerfen" sets the rights back and hides with "Speichern"', async () => {
     const { fixture, inst, api } = await setup();
     const before = inst.roles().find((r: Role) => r.id === 'r-member').permissions;
@@ -388,7 +388,7 @@ describe('AdminRolesComponent', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  /** § 000576 and § S/frontend/angular/000632: a failed read is a toast with a retry. */
+  /** §ui-kit:000576 and §ui-kit:S/frontend/angular/000632: a failed read is a toast with a retry. */
   it('names a failed read in a toast with a retry', async () => {
     const api = makeApi();
     api.listRoles.mockReturnValueOnce(throwError(() => new Error('boom')));

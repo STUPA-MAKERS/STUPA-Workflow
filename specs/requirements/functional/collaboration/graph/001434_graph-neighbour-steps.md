@@ -20,7 +20,7 @@ scope:
 # The graph shows the neighbours of the hits up to a count of steps
 
 A hit is a node that passes the filters "Art" and "Zeitraum" and the search
-(F/collaboration/graph/001425). The page must have a number field "Schritte" (`Steps`) with a
+(ui-kit:F/collaboration/graph/001425). The page must have a number field "Schritte" (`Steps`) with a
 count from 0 to 5. The graph must show each hit, and each node that is at most this count of
 lines away from a hit. Such a neighbour must show also when it does not pass the kind, the
 period or the search. With 0 only the hits show.

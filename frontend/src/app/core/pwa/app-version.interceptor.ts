@@ -6,7 +6,7 @@ import { APP_VERSION_HEADER, AppVersionService } from './app-version.service';
 
 /**
  * Reports the header `X-App-Version` of each API answer, also of an error answer, to
- * {@link AppVersionService} (§ 002151). Requests to other hosts are not reported. It sits
+ * {@link AppVersionService} (§ui-kit:002151). Requests to other hosts are not reported. It sits
  * inside the cache interceptor, so a cached answer with an old header does not count.
  */
 export const appVersionInterceptor: HttpInterceptorFn = (req, next) => {

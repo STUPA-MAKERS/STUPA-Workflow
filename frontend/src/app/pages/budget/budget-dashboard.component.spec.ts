@@ -1206,7 +1206,7 @@ describe('BudgetDashboardComponent', () => {
     expect(container.querySelector('[aria-busy="true"]')).toBeNull();
   });
 
-  it('§NF/performance/loading/000893: the skeleton has the two columns of the sheet and no amount', async () => {
+  it('§ui-kit:NF/performance/loading/000893: the skeleton has the two columns of the sheet and no amount', async () => {
     const { http, fixture, container } = await bare();
     fixture.detectChanges();
     const busy = container.querySelector('[aria-busy="true"]') as HTMLElement;

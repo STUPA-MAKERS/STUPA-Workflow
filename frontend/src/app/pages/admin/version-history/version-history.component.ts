@@ -66,7 +66,7 @@ export class VersionHistoryComponent {
 
   protected readonly revisions = signal<ConfigRevision[]>([]);
   protected readonly loading = signal(false);
-  /** The read of the versions failed (§ 000576). */
+  /** The read of the versions failed (§ui-kit:000576). */
   protected readonly loadError = signal(false);
   protected readonly loadState = loadStateOf(this.loading, this.loadError);
   /** The read of the open diff failed. */

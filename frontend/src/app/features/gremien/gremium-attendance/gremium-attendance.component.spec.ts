@@ -441,7 +441,7 @@ describe('GremiumAttendanceComponent', () => {
     });
   });
 
-  describe('emptyMonth (§F/meetings/meetings/000610)', () => {
+  describe('emptyMonth (§ui-kit:F/meetings/meetings/000610)', () => {
     it('shows a month without a meeting as a narrow column with a dash in every row', async () => {
       const view = await setup();
       restore = view.restore;
@@ -457,7 +457,7 @@ describe('GremiumAttendanceComponent', () => {
     });
   });
 
-  describe('cellBadges (§F/meetings/meetings/000611)', () => {
+  describe('cellBadges (§ui-kit:F/meetings/meetings/000611)', () => {
     it('puts "nE" and "nV" inside the cell and in the legend, and mutes a cell without a presence', async () => {
       const data = attendance();
       const none = attendance({

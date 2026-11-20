@@ -127,12 +127,12 @@ export function laneCount(bars: readonly Bar[]): number {
   return bars.reduce((max, b) => Math.max(max, b.lane + 1), 0);
 }
 
-/** The entry is a block in the hour grid: it has a start time (§ 000744). */
+/** The entry is a block in the hour grid: it has a start time (§ui-kit:000744). */
 export function isTimed(e: CalendarEntry): boolean {
   return e.startTime !== null;
 }
 
-/** The entries of a day for the row above the hours (§ 000728). */
+/** The entries of a day for the row above the hours (§ui-kit:000728). */
 export function allDayOf(entries: readonly CalendarEntry[], iso: string): readonly CalendarEntry[] {
   return onDay(entries, iso).filter((e) => !isTimed(e));
 }
@@ -148,7 +148,7 @@ export const MIN_BLOCK = 0.4;
 export const SHORT_BLOCK = 0.75;
 /**
  * A block that starts this many hours after the block to its left may cover it: the time
- * and the first line of the title of the earlier block stay free (§ 000745).
+ * and the first line of the title of the earlier block stay free (§ui-kit:000745).
  */
 export const OVERLAP_HEAD = 0.75;
 /** A block that lies on another starts this many percent of the column after it. */
@@ -166,7 +166,7 @@ export interface Block {
   readonly width: number;
   /** The lane of the block. A block of a higher lane lies above the blocks to its left. */
   readonly lane: number;
-  /** The block covers a part of a block to its left (§ 000745). */
+  /** The block covers a part of a block to its left (§ui-kit:000745). */
   readonly over: boolean;
   readonly short: boolean;
   /** The lines of the title that fit below the time. */
@@ -186,11 +186,11 @@ function partEnd(e: CalendarEntry, iso: string, from: number, lastHour: number):
 /**
  * The blocks of a day. An entry over several days has one block on each of its days: from
  * its start time to the last hour, the whole day, and from the first hour to its end time
- * (§ 000744). Entries that overlap take lanes: each takes the first lane that is free at
+ * (§ui-kit:000744). Entries that overlap take lanes: each takes the first lane that is free at
  * its start, and a chain of overlapping blocks divides the column by its number of lanes.
  * A block grows to the right over the lanes that are free. A block whose neighbour to the
  * right starts `OVERLAP_HEAD` later reaches to the end of the column below that neighbour,
- * so the later block lies on the earlier one (§ 000745). A block that starts that much
+ * so the later block lies on the earlier one (§ui-kit:000745). A block that starts that much
  * later than every block to its left starts `OVERLAP_INDENT` after them, not at its lane,
  * so it keeps most of the width. Two blocks that start together stay side by side,
  * because the one above would hide the title of the other.
@@ -256,7 +256,7 @@ export function dayBlocks(
   });
 }
 
-/** The week view shows the whole day, 00:00 to 24:00 (§ 000746). */
+/** The week view shows the whole day, 00:00 to 24:00 (§ui-kit:000746). */
 export const DAY_HOURS = 24;
 /** The hour at the top of the week view when it opens. */
 export const OPEN_HOUR = 8;

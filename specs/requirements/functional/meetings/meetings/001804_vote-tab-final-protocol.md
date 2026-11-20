@@ -15,10 +15,10 @@ scope:
 
 # A closed meeting keeps the vote tab
 
-Above the phone width the tab "Abstimmungen" at the end edge (spec 001460) must show for every
+Above the phone width the tab "Abstimmungen" at the end edge (spec ui-kit:001460) must show for every
 open item, also when the item has no vote and also in a closed meeting with a final protocol.
 In a closed meeting it shows for the minute-taker too. The sheet then shows the votes read-only
-or the empty state "Keine Abstimmungen" (spec 001802).
+or the empty state "Keine Abstimmungen" (spec ui-kit:001802).
 
 Reason: The votes of a finished meeting are looked up later, and the tab is the one place where
 they open.

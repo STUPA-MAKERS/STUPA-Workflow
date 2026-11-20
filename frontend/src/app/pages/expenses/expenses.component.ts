@@ -329,7 +329,7 @@ export class ExpensesComponent implements OnDestroy {
   /** The value of the "Art" chip: "transfer" while the transfers show, else the kind. */
   readonly kindValue = computed(() => (this.tab() === 'transfers' ? 'transfer' : this.kind()));
 
-  /** The search placeholder with the number of bookings (§ 000661). */
+  /** The search placeholder with the number of bookings (§ui-kit:000661). */
   readonly searchPlaceholder = computed(() =>
     searchPlaceholder(
       this.i18n,

@@ -436,7 +436,7 @@ describe('TicketsComponent', () => {
     expect(cmp.selectedId()).toBe('t42');
   });
 
-  /** § 000675: a phone list row ends with its last text, not with an arrow. */
+  /** §ui-kit:000675: a phone list row ends with its last text, not with an arrow. */
   it('ends a phone row without an arrow, and keeps the arrow on a one-pane tablet', async () => {
     const tablet = await start('/tickets');
     expect((tablet.harness.routeNativeElement as HTMLElement).querySelector('app-row-chevron')).not.toBeNull();

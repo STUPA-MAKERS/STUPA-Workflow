@@ -153,7 +153,7 @@ describe('Formly field types', () => {
     [FormlyDateRangeType, { key: 'v', type: 'daterange', props: { label: 'Zeitraum' } }],
   ];
 
-  /** § NF/accessibility/conformance/000493: each type, plain and as a touched required field. */
+  /** §ui-kit:NF/accessibility/conformance/000493: each type, plain and as a touched required field. */
   describe.each(TYPES)('%p', (type, field) => {
     it.each([false, true])('has no axe violations (required and touched: %s)', async (invalid) => {
       const props = { ...field.props, required: invalid };

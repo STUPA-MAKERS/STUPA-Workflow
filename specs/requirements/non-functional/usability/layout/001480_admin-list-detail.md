@@ -26,9 +26,9 @@ for these areas: no own split, no own sheet, no own bar, no own swipe back and n
 memory of the sheet.
 
 On a wide screen, the list and the open page sit side by side. The open page scrolls inside a
-round frame 24px inside the sheet (000193), and a sticky bar of the page has the colour of the
+round frame 24px inside the sheet (ui-kit:000193), and a sticky bar of the page has the colour of the
 sheet. Without an open page, the detail
-shows the empty pane (000665). One pane at a time, `/admin` and `/account` show the list, and a
+shows the empty pane (ui-kit:000665). One pane at a time, `/admin` and `/account` show the list, and a
 page shows with the bar of `app-list-detail`, which names the page (`barTitle`) and leads back
 to the list.
 

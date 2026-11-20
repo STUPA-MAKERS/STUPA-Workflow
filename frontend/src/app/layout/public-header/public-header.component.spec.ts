@@ -73,7 +73,7 @@ describe('PublicHeaderComponent', () => {
     expect(screen.queryByRole('link', { name: 'Anmelden' })).not.toBeInTheDocument();
   });
 
-  /** §001356 the two menus and the sign-in are one button group, each menu a segment of it. */
+  /** §ui-kit:001356 the two menus and the sign-in are one button group, each menu a segment of it. */
   it('puts both menus and the sign-in in one button group', async () => {
     const { container } = await setup();
     const groups = container.querySelectorAll('app-button-group');
@@ -87,7 +87,7 @@ describe('PublicHeaderComponent', () => {
     expect(groups[0].querySelector('a[href="/login"]')).not.toBeNull();
   });
 
-  /** §000593 "Dunkles Design" has one switch, in the menu "Barrierefreiheit". */
+  /** §ui-kit:000593 "Dunkles Design" has one switch, in the menu "Barrierefreiheit". */
   it('has no theme button of its own', async () => {
     await setup();
     expect(screen.queryByRole('button', { name: 'Erscheinungsbild wechseln' })).toBeNull();

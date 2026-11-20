@@ -17,6 +17,6 @@ scope:
 
 The page must have one filter chip "Art" with a multiple choice of the kinds of item: Anträge,
 To-Dos, Tickets and Sitzungen. A kind whose feature is off must not be a choice. No kind
-selected must show all kinds. The chip must not show a count (000207).
+selected must show all kinds. The chip must not show a count (ui-kit:000207).
 
 Reason: A person who looks for the answer on an Antrag does not read through card moves.
