@@ -320,10 +320,13 @@ async def test_the_route_reads_the_graph_of_the_caller(
 
     api.login(admin)
     with TestClient(api.app) as client:
-        resp = client.get("/api/graph", params={"kinds": ["meeting", "agenda_item"]})
+        resp = client.get("/api/graph", params={"kinds": ["meeting", "agenda_item"], "depth": 0})
         assert resp.status_code == 200, resp.text
         body = resp.json()
         assert {n["kind"] for n in body["nodes"]} == {"meeting", "agenda_item"}
+        # Spec 001434: without ``depth`` the neighbours of the hits show, two steps away.
+        near = client.get("/api/graph", params={"kinds": ["meeting", "agenda_item"]})
+        assert {n["kind"] for n in near.json()["nodes"]} > {"meeting", "agenda_item"}
         assert body["edges"] == [
             {
                 "a": {"kind": "meeting", "id": str(ids["meeting"])},
