@@ -311,11 +311,12 @@ async def list_bulk_transitions(
     service: ServiceDep,
     principal: BulkPrincipalDep,
 ) -> list[BulkTransitionOption]:
-    """List the targets that every selected Antrag reaches by a manual transition.
+    """List every target status that at least one selected Antrag reaches (spec 001704).
 
-    A target in an approved state lists the requested amount of each Antrag, which the
-    fire approves. An Antrag that the caller cannot read leaves an empty list. A
-    transition onto an agenda is not offered, because it needs a meeting per Antrag.
+    Each option names the Anträge that reach it; the fire skips the others. A target in
+    an approved state lists the requested amount of each of these Anträge, which the fire
+    approves. An Antrag that the caller cannot read reaches no target. A transition onto
+    an agenda is not offered, because it needs a meeting per Antrag.
     """
     return await bulk_options(service, payload.application_ids, principal)
 

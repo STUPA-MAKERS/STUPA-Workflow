@@ -1086,13 +1086,24 @@ describe('mapper flag branches', () => {
         { toStateId: 's2', label: { de: 'Genehmigt' }, color: '#0a0', approves: true, amounts: [] },
         'de',
       ),
-    ).toEqual({ toStateId: 's2', label: 'Genehmigt', color: '#0a0', approves: true, amounts: [] });
+    ).toEqual({
+      toStateId: 's2',
+      label: 'Genehmigt',
+      color: '#0a0',
+      approves: true,
+      amounts: [],
+      applicationIds: [],
+    });
     expect(mapBulkOption({ toStateId: 's2', label: { de: 'X' } }, 'de')).toEqual({
       toStateId: 's2',
       label: 'X',
       color: null,
       approves: false,
       amounts: [],
+      applicationIds: [],
     });
+    expect(
+      mapBulkOption({ toStateId: 's3', label: { de: 'Y' }, applicationIds: ['a-1'] }, 'de').applicationIds,
+    ).toEqual(['a-1']);
   });
 });

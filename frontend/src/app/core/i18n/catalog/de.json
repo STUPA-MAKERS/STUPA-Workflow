@@ -582,14 +582,14 @@
   "applications.bulk.selectedCount": "{count} ausgewählt",
   "applications.bulk.max": "höchstens {max}",
   "applications.bulk.selectRow": "„{title}“ auswählen",
-  "applications.bulk.transition": "Übergang auslösen",
+  "applications.bulk.transition": "Status setzen",
   "applications.bulk.message": "Mitteilung senden",
   "applications.bulk.count": "{count} Anträge",
   "applications.bulk.pick": "Neuer Status",
-  "applications.bulk.none": "Kein Übergang passt zu allen gewählten Anträgen",
+  "applications.bulk.none": "Kein Status passt zu den gewählten Anträgen",
   "applications.bulk.amounts": "Bewilligt wird der beantragte Betrag",
   "applications.bulk.body": "Mitteilung an die Antragsteller:innen",
-  "applications.bulk.fire": "Auslösen",
+  "applications.bulk.fire": "Status setzen",
   "applications.bulk.send": "Senden",
   "applications.bulk.ok": "Erledigt",
   "applications.bulk.summary": "{ok} von {count} erledigt",
@@ -4891,5 +4891,7 @@
   "invoices.bulk.deleteMax": "Löschen: max. {max}",
   "invoices.bulk.deleteMaxBlocked": "Sammel-Löschen gilt für höchstens {max} Rechnungen — Auswahl verkleinern.",
   "invoices.bulk.deleteAllBlocked": "Sammel-Löschen ist bei „Alle auswählen“ gesperrt — Zeilen gezielt auswählen.",
-  "invoices.bulk.failed": "Sammelaktion fehlgeschlagen."
+  "invoices.bulk.failed": "Sammelaktion fehlgeschlagen.",
+  "applications.bulk.skippedHead": "Übersprungen",
+  "applications.bulk.skipped": "Übersprungen: Status nicht erlaubt"
 }

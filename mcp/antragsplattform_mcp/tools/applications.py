@@ -637,11 +637,13 @@ async def create_application_new_version(application_id: str) -> dict:
 
 @group.tool
 async def list_bulk_transitions(application_ids: list[str]) -> list[dict]:
-    """List the target states that every given application reaches by a transition.
+    """List the target states that at least one given application reaches.
 
-    Needs `application.manage` and `application.transition`, at most 100 ids. A target
-    with `approves` lists the requested amount of each application, which the bulk
-    fire approves. A transition onto an agenda is not offered.
+    Needs `application.manage` and `application.transition`, at most 100 ids. Each
+    target lists in `applicationIds` the applications that reach it; the bulk fire skips
+    the others. A target with `approves` lists the requested amount of each of these
+    applications, which the bulk fire approves. A transition onto an agenda is not
+    offered.
     """
     return await api().post(
         "/bulk/applications/transitions", json={"applicationIds": application_ids}

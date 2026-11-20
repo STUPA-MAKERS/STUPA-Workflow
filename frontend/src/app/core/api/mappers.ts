@@ -456,5 +456,6 @@ export function mapBulkOption(wire: BulkTransitionOptionWire, lang: string): Bul
     color: wire.color ?? null,
     approves: wire.approves === true,
     amounts: wire.amounts ?? [],
+    applicationIds: wire.applicationIds ?? [],
   };
 }

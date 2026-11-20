@@ -1065,6 +1065,8 @@ export interface BulkTransitionOptionWire {
   readonly color?: string | null;
   readonly approves?: boolean;
   readonly amounts?: readonly BulkAmount[];
+  /** The selected Anträge that reach the target (001704); the fire skips the others. */
+  readonly applicationIds?: readonly Uuid[];
 }
 
 /** A bulk target, frontend view: the label resolved to the locale. */
@@ -1074,6 +1076,7 @@ export interface BulkTransitionOption {
   readonly color: string | null;
   readonly approves: boolean;
   readonly amounts: readonly BulkAmount[];
+  readonly applicationIds: readonly Uuid[];
 }
 
 /** The outcome of a bulk action at one Antrag (001703). */

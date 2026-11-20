@@ -19,6 +19,7 @@ const APPROVE: BulkTransitionOption = {
     { applicationId: 'a-2', title: '  ', amount: null },
     { applicationId: 'a-9', title: null, amount: 'abc' },
   ],
+  applicationIds: ['a-1', 'a-2'],
 };
 
 interface Api {
@@ -49,7 +50,7 @@ async function setup(
   return { view, cmp, api: full };
 }
 
-describe('BulkDialogComponent (001700-001703)', () => {
+describe('BulkDialogComponent (001700-001704)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('lists the amounts with title and money fallbacks', async () => {
@@ -63,6 +64,27 @@ describe('BulkDialogComponent (001700-001703)', () => {
     expect(amounts[1].amount).toBe('');
     expect(amounts[2].amount).toBe('abc');
     expect(screen.getByTestId('bulk-amounts')).toBeTruthy();
+  });
+
+  /** § 001704: a status that only some Anträge reach says how many and names the others. */
+  it('names the Anträge that the chosen status skips', async () => {
+    const half: BulkTransitionOption = {
+      toStateId: 's-back',
+      label: 'Zurückgestellt',
+      color: null,
+      approves: false,
+      amounts: [],
+      applicationIds: ['a-1'],
+    };
+    const { cmp, view } = await setup('transition', {
+      bulkTransitions: jest.fn(() => of([APPROVE, half])),
+    });
+    expect(cmp.skipped()).toEqual([]);
+    cmp.pick.set('s-back');
+    view.fixture.detectChanges();
+    expect(cmp.skipped().map((t) => t.title)).toEqual(['Flyer']);
+    expect(screen.getByTestId('bulk-skipped').textContent).toContain('Flyer');
+    expect(screen.getByRole('dialog', { name: /Status setzen/ })).toBeTruthy();
   });
 
   it('shows the error when the targets do not load', async () => {
@@ -107,6 +129,7 @@ describe('BulkDialogComponent (001700-001703)', () => {
       { applicationId: 'a-1', ok: true },
       { applicationId: 'a-2', ok: false, error: 'Übergang nicht verfügbar' },
       { applicationId: 'a-9', ok: false },
+      { applicationId: 'a-3', ok: false, code: 'transition_not_available', error: 'x' },
     ];
     const { cmp, api, view } = await setup('transition', {
       fireBulkTransition: jest.fn(() => of(results)),
@@ -123,6 +146,7 @@ describe('BulkDialogComponent (001700-001703)', () => {
     expect(cmp.okCount()).toBe(1);
     expect(cmp.results()?.map((r) => r.text)[1]).toBe('Übergang nicht verfügbar');
     expect(cmp.results()?.[2].text).not.toBe('');
+    expect(cmp.results()?.[3].text).toBe('Übersprungen: Status nicht erlaubt');
     expect(cmp.canConfirm()).toBe(false);
     cmp.close();
     expect(cmp.open()).toBe(false);
