@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/angular';
+import { fireEvent, render, screen, within } from '@testing-library/angular';
 import { of, throwError } from 'rxjs';
 import { TodosApiService, type TodoLinkTarget } from '@core/api/todos.service';
 import { AuthService } from '@core/auth/auth.service';
@@ -248,12 +248,16 @@ describe('TodoLinkPickerComponent', () => {
     expect(screen.getByRole('dialog')).toBe(again);
   });
 
-    it('uses the bottom sheet on the phone', async () => {
+    it('floats like the global search on the phone too, with a × as the close button (spec 001977)', async () => {
     asPhone(MEDIA.phone);
-    const { open, container } = await setup();
+    const { open, fixture, container } = await setup();
     await open();
-    expect(container.querySelector('.lp--sheet')).not.toBeNull();
-    expect(container.querySelector('.lp__close')).toBeNull();
+    const panel = screen.getByRole('dialog', { name: 'Verknüpfen' });
+    expect(container.querySelector('app-side-sheet')).toBeNull();
+    expect(panel.closest('.lp-layer')?.parentElement).toBe(document.body);
+    expect(panel.querySelector('.lp__esc')).toBeNull();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Schließen' }));
+    expect(fixture.componentInstance.open()).toBe(false);
   });
 
   /** Spec 000758: the picker offers no kind of a feature that is off. */

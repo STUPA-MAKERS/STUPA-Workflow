@@ -35,7 +35,6 @@ import {
   liveSearch,
   MEDIA,
   mediaQuery,
-  SideSheetComponent,
   trapTab,
 } from '@stupa-makers/ui-kit';
 import { LINK_ICON, linkSub } from '../todos.util';
@@ -89,20 +88,17 @@ export function linkKey(kind: TodoLinkKind, id: Uuid): string {
  * Sitzungen und TOPs, Abstimmungen, Gremien, Rechnungen, Buchungen, Kostenstellen, Tickets, To-Dos), a
  * linked target carries a check mark. A pick of a linked target takes the link off again.
  *
- * Desktop: a panel that floats over the whole page, like the search palette, with a
- * scrim; a click on the scrim, Escape or the × closes it, and the focus goes back to
- * where it was. The panel is rendered at the end of `<body>`, because a dialog or a
- * drawer around the picker clips and transforms its content. Phone: the shared bottom
- * sheet.
- *
- * On desktop the panel renders at the end of <body>, because a dialog or a drawer around the picker
- * clips and transforms its content.
+ * A panel that floats over the whole page and looks like the global search (spec 001977),
+ * on a phone too, with a scrim; a click on the scrim, Escape or the close button ("Esc",
+ * on a phone ×) closes it, and the focus goes back to where it was. The panel is rendered
+ * at the end of `<body>`, because a dialog or a drawer around the picker clips and
+ * transforms its content.
  */
 @Component({
   selector: 'app-todo-link-picker',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, TranslatePipe, EmptyStateComponent, IconComponent, SideSheetComponent],
+  imports: [NgTemplateOutlet, TranslatePipe, EmptyStateComponent, IconComponent],
   templateUrl: './todo-link-picker.component.html',
   styleUrl: './todo-link-picker.component.scss',
 })
@@ -190,13 +186,13 @@ export class TodoLinkPickerComponent {
         this.kind.set('all');
         this.search.clear();
         this.failed.set(false);
-        if (!this.phone()) this.returnFocus = this.document.activeElement as HTMLElement | null;
+        this.returnFocus = this.document.activeElement as HTMLElement | null;
         queueMicrotask(() => this.panelRoot().querySelector<HTMLInputElement>('.lp__field')?.focus());
       });
     });
     effect(() => {
       const pop = this.pop();
-      const floating = this.open() && !this.phone();
+      const floating = this.open();
       untracked(() => {
         if (!floating) this.detach();
         else if (pop) this.attach(pop);
@@ -208,7 +204,7 @@ export class TodoLinkPickerComponent {
     });
   }
 
-  /** The root of the open view: the sheet on a phone, the floating panel on a desktop. */
+  /** The root of the open view: the floating panel. */
   private panelRoot(): ParentNode {
     return this.host ?? (this.viewContainer.element.nativeElement as HTMLElement);
   }
