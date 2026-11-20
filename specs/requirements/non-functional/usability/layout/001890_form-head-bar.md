@@ -2,7 +2,7 @@
 id: "001890"
 title: A form in place of a detail has the head bar of "Antrag bearbeiten"
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:

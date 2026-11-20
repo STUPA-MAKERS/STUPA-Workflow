@@ -2,7 +2,7 @@
 id: "001891"
 title: The label of "Abbrechen" in a form head ends at the side inset
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:
