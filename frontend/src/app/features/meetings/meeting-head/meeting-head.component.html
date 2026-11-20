@@ -2,9 +2,11 @@
   <app-list-detail-bar class="mh__bar" [label]="'meetings.page.back' | t" [title]="heading()" (back)="back.emit()" />
   <h1 class="sr-only">{{ heading() }}</h1>
 } @else {
-  <app-button class="mh__back" variant="text" [iconOnly]="true" [ariaLabel]="'meetings.page.back' | t" (click)="back.emit()">
-    <app-icon name="back" />
-  </app-button>
+  <app-button-group>
+    <app-button class="mh__back" variant="text" [iconOnly]="true" [ariaLabel]="'meetings.page.back' | t" (click)="back.emit()">
+      <app-icon name="back" />
+    </app-button>
+  </app-button-group>
   <div class="mh__titles">
     <div class="mh__titleLine">
       <h1 class="mh__title" [title]="heading()">{{ heading() }}</h1>

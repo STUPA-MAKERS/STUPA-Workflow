@@ -5,6 +5,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   CurrencyInputComponent,
   DatepickerComponent,
   FabComponent,
@@ -65,6 +66,7 @@ interface LegFree {
     ScrollFadeDirective,
     PaneFormHeadComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     BudgetYearSelectComponent,
     CostCentreSelectComponent,
     CurrencyInputComponent,

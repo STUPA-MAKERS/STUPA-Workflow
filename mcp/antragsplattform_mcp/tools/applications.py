@@ -457,6 +457,43 @@ async def change_approved_amount(
 
 
 @group.tool
+async def preview_application_type_change(application_id: str, type_id: str) -> dict:
+    """Show what a change of the Antragsart of an application to `type_id` does.
+
+    The answer lists the fields whose values move (`carried`), the required fields of the
+    new form that stay empty (`missing`) and the values that only the old version keeps
+    (`dropped`). With a missing field it lists the transitions back to the applicant
+    (`transitions`); `possible` is false when none fits. Requires the right to change
+    the type of an application.
+    """
+    return await api().get(
+        f"/applications/{application_id}/type-change", params=params(typeId=type_id)
+    )
+
+
+@group.tool
+async def change_application_type(
+    application_id: str,
+    type_id: str,
+    transition_id: str | None = None,
+    note: str | None = None,
+) -> dict:
+    """Change the Antragsart of a submitted application.
+
+    The change writes a new version in the form of the new type; the old version keeps
+    every value. When `preview_application_type_change` lists a missing field, pass one
+    of its `transitions` as `transition_id`: the change then sends the application back
+    to the applicant, the note names the missing fields, and `note` adds a message. Else
+    leave `transition_id` empty. 409 in the initial state or without a transition back.
+    Ask the user before you change the type.
+    """
+    return await api().post(
+        f"/applications/{application_id}/type-change",
+        json={"typeId": type_id, "transitionId": transition_id, "note": note},
+    )
+
+
+@group.tool
 async def request_application_erasure(application_id: str) -> dict:
     """File a privacy erasure request (Art. 17 GDPR) for an application.
 

@@ -39,19 +39,21 @@
           }
         </ul>
         @if (members().length > preview) {
-          <app-button
-            class="gmm__more"
-            variant="text"
-            size="sm"
-            [ariaExpanded]="showAll()"
-            (click)="showAll.set(!showAll())"
-          >
-            {{
-              showAll()
-                ? ('admin.gremien.showLess' | t)
-                : ('admin.gremien.showAll' | t: { count: members().length })
-            }}
-          </app-button>
+          <app-button-group>
+            <app-button
+              class="gmm__more"
+              variant="text"
+              size="sm"
+              [ariaExpanded]="showAll()"
+              (click)="showAll.set(!showAll())"
+            >
+              {{
+                showAll()
+                  ? ('admin.gremien.showLess' | t)
+                  : ('admin.gremien.showAll' | t: { count: members().length })
+              }}
+            </app-button>
+          </app-button-group>
         }
         }
       </ng-template>

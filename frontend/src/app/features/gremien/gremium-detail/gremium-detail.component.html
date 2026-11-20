@@ -43,21 +43,23 @@
 
       @if (canPlan() || showNext()) {
         <div class="gd__actions">
-          @if (canPlan()) {
-            <app-button variant="fill" [class.gd__grow]="phone()" (click)="createOpen.set(true)">
-              <app-icon name="plus" />
-              {{ 'gremien.detail.plan' | t }}
-            </app-button>
-          }
-          @if (showNext()) {
-            <app-button
-              [variant]="canPlan() ? 'tonal' : 'fill'"
-              [class.gd__grow]="phone()"
-              (click)="openNext()"
-            >
-              {{ (g.live ? 'gremien.detail.live' : 'gremien.detail.next') | t }}
-            </app-button>
-          }
+          <app-button-group [main]="true">
+            @if (canPlan()) {
+              <app-button variant="fill" [class.gd__grow]="phone()" (click)="createOpen.set(true)">
+                <app-icon name="plus" />
+                {{ 'gremien.detail.plan' | t }}
+              </app-button>
+            }
+            @if (showNext()) {
+              <app-button
+                [variant]="canPlan() ? 'tonal' : 'fill'"
+                [class.gd__grow]="phone()"
+                (click)="openNext()"
+              >
+                {{ (g.live ? 'gremien.detail.live' : 'gremien.detail.next') | t }}
+              </app-button>
+            }
+          </app-button-group>
         </div>
       }
     </header>

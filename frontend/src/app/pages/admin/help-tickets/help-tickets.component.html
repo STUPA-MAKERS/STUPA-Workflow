@@ -105,16 +105,18 @@
                       </span>
                     </span>
                   </span>
-                  <app-button
-                    variant="tonal"
-                    size="sm"
-                    [loading]="unblocking() === b.id"
-                    [disabled]="unblocking() !== null"
-                    [ariaLabel]="'admin.helpTickets.unblockNamed' | t: { name: senderName(b) }"
-                    (click)="unblock(b)"
-                  >
-                    {{ 'admin.helpTickets.unblock' | t }}
-                  </app-button>
+                  <app-button-group>
+                    <app-button
+                      variant="tonal"
+                      size="sm"
+                      [loading]="unblocking() === b.id"
+                      [disabled]="unblocking() !== null"
+                      [ariaLabel]="'admin.helpTickets.unblockNamed' | t: { name: senderName(b) }"
+                      (click)="unblock(b)"
+                    >
+                      {{ 'admin.helpTickets.unblock' | t }}
+                    </app-button>
+                  </app-button-group>
                 </li>
               }
             </ul>

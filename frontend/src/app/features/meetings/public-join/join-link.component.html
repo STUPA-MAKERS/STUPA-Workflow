@@ -28,19 +28,23 @@
             [resetMs]="copiedMs"
           />
           @if (canRotate()) {
-            <app-button size="sm" variant="text" [loading]="rotating()" (click)="confirming.set(true)">
-              <app-icon name="repeat" />
-              {{ 'guests.link.rotate' | t }}
-            </app-button>
+            <app-button-group>
+              <app-button size="sm" variant="text" [loading]="rotating()" (click)="confirming.set(true)">
+                <app-icon name="repeat" />
+                {{ 'guests.link.rotate' | t }}
+              </app-button>
+            </app-button-group>
           }
         </div>
       }
     }
   </div>
   @if (variant() === 'sheet') {
-    <app-button class="jl__large" size="sm" variant="text" (click)="showLarge.emit()">
-      <app-icon name="grid" />
-      {{ 'guests.sheet.showLarge' | t }}
-    </app-button>
+    <app-button-group>
+      <app-button class="jl__large" size="sm" variant="text" (click)="showLarge.emit()">
+        <app-icon name="grid" />
+        {{ 'guests.sheet.showLarge' | t }}
+      </app-button>
+    </app-button-group>
   }
 </div>

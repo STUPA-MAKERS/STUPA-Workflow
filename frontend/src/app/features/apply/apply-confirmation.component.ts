@@ -7,7 +7,7 @@ import { BrandingService } from '@core/branding/branding.service';
 import { submittedMarkdown } from '@core/branding/submitted-texts';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonLinkComponent, IconComponent, NoteComponent, StatusTextComponent } from '@stupa-makers/ui-kit';
+import { ButtonLinkComponent, IconComponent, NoteComponent, StatusTextComponent, ButtonGroupComponent } from '@stupa-makers/ui-kit';
 import { renderMarkdown } from '../meetings/meetings.util';
 import { shortRef } from './apply.util';
 
@@ -43,7 +43,7 @@ import { shortRef } from './apply.util';
   selector: 'app-apply-confirmation',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslatePipe, ButtonLinkComponent, IconComponent, NoteComponent, StatusTextComponent],
+  imports: [ButtonGroupComponent, RouterLink, TranslatePipe, ButtonLinkComponent, IconComponent, NoteComponent, StatusTextComponent],
   templateUrl: './apply-confirmation.component.html',
   styleUrl: './apply-confirmation.component.scss',
 })

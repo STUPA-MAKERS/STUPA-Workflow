@@ -12,6 +12,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   IconComponent,
   InputComponent,
   SelectFieldComponent,
@@ -45,6 +46,7 @@ type ValueKind = 'none' | 'role' | 'committee' | 'compare' | 'text';
     TranslatePipe,
     SelectFieldComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     InputComponent,
   ],

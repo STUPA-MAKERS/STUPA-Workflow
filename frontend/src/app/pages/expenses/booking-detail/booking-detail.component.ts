@@ -7,6 +7,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   EmptyStateComponent,
   IconComponent,
   RowMenuComponent,
@@ -62,6 +63,7 @@ import { formatMoney } from '@shared/format-money';
     SheetBarComponent,
     SheetBarTitleDirective,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     LocalizedDatePipe,
     RouterLink,

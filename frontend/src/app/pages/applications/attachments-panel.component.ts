@@ -19,6 +19,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import type { Attachment, ScanState, Uuid } from '@core/api/models';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   CheckboxComponent,
   ConfirmDialogComponent,
   DropOverlayComponent,
@@ -80,6 +81,7 @@ import { formatBytes } from './applications.util';
     FormsModule,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     CheckboxComponent,
     ConfirmDialogComponent,
     FileViewerComponent,

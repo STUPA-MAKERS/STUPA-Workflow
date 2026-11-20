@@ -1,10 +1,24 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import type { Meeting, Protocol, Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { longDate } from '@shared/date-format';
-import { ButtonComponent, ButtonLinkComponent, ConfirmDialogComponent, IconComponent } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  ButtonLinkComponent,
+  ConfirmDialogComponent,
+  IconComponent,
+} from '@stupa-makers/ui-kit';
 import { FileOpenService } from '@shared/viewer/file-open.service';
 import { MeetingSessionService } from '../meeting-session.service';
 import { type ProtocolAction, protocolActions, protocolMenuItems } from './protocol-actions.util';
@@ -36,6 +50,11 @@ import { ProtocolApprovalDialogComponent } from '../protocol-approval-dialog/pro
  *   protocol page, or published again).
  *
  * The finalize is a step of its own after the close; a live meeting has no protocol actions.
+ *
+ * The head action is a segment of the button group of the meeting head (spec 001354): the
+ * host carries `btn-grp__seg`, so the action and the ⋮ menu after it form one group, and
+ * `btn-grp--main`, so "Finalisieren & senden" keeps its accent fill. Without an action the
+ * host carries neither class and leaves no gap in the shape.
  */
 @Component({
   selector: 'app-protocol-bar',
@@ -49,6 +68,10 @@ import { ProtocolApprovalDialogComponent } from '../protocol-approval-dialog/pro
     IconComponent,
     ProtocolApprovalDialogComponent,
   ],
+  host: {
+    '[class.btn-grp__seg]': 'hasAction()',
+    '[class.btn-grp--main]': 'hasAction()',
+  },
   templateUrl: './protocol-bar.component.html',
   styleUrl: './protocol-bar.component.scss',
 })
@@ -65,12 +88,18 @@ export class ProtocolBarComponent {
   private readonly session = inject(MeetingSessionService, { optional: true });
 
   /** What the viewer can do (spec 001304): shared with the session menu of the page. */
-  private readonly actions = computed(() => protocolActions(this.meeting(), this.protocol(), this.session !== null));
+  private readonly actions = computed(() =>
+    protocolActions(this.meeting(), this.protocol(), this.session !== null),
+  );
   protected readonly publication = computed(() => this.actions().publication);
   protected readonly canFinalize = computed(() => this.actions().canFinalize);
   protected readonly needsRight = computed(() => this.actions().needsRight);
   protected readonly finalPdf = computed(() => this.actions().finalPdf);
   private readonly draftPdf = computed(() => this.actions().draftPdf);
+  /** The head shows an action: not on a phone, and only when there is one. */
+  protected readonly hasAction = computed(
+    () => !this.compact() && (this.canFinalize() || this.needsRight() || this.finalPdf() !== null),
+  );
 
   private readonly i18n = inject(I18nService);
   private readonly files = inject(FileOpenService);
@@ -100,7 +129,11 @@ export class ProtocolBarComponent {
   }
 
   private pdfFile(url: string, label: TranslationKey) {
-    return { name: `${this.meeting().title} · ${this.i18n.translate(label)}`, url, kind: 'pdf' as const };
+    return {
+      name: `${this.meeting().title} · ${this.i18n.translate(label)}`,
+      url,
+      kind: 'pdf' as const,
+    };
   }
 
   /** The confirmation of "Zurück in Entwurf" is open. */
@@ -138,7 +171,9 @@ export class ProtocolBarComponent {
 
   /** The "Protokoll" section of the session menu, as the page builds it. */
   readonly menuItems = computed(() =>
-    protocolMenuItems(this.actions(), this.protocol(), this.compact(), (key) => this.i18n.translate(key)),
+    protocolMenuItems(this.actions(), this.protocol(), this.compact(), (key) =>
+      this.i18n.translate(key),
+    ),
   );
 
   /** Runs an item of the "Protokoll" section. Returns false for an id of another section. */
@@ -154,11 +189,13 @@ export class ProtocolBarComponent {
         return true;
       }
       case 'protocol.pdfPublic':
-        if (p.publicPdfUrl) this.files.open(this.pdfFile(p.publicPdfUrl, 'meetings.protocolBar.pdfPublic'));
+        if (p.publicPdfUrl)
+          this.files.open(this.pdfFile(p.publicPdfUrl, 'meetings.protocolBar.pdfPublic'));
         return true;
       case 'protocol.draftPdf': {
         const draft = this.draftPdf();
-        if (draft) this.files.open(this.pdfFile(draft.internal, 'meetings.protocolBar.pdfInternal'));
+        if (draft)
+          this.files.open(this.pdfFile(draft.internal, 'meetings.protocolBar.pdfInternal'));
         return true;
       }
       case 'protocol.draftPdfPublic': {

@@ -180,41 +180,47 @@
 
     <footer class="wz__nav">
       @if (effForm()) {
-        <app-button class="wz__discard" variant="danger" (click)="confirmDiscard.set(true)">
-          {{ 'apply.nav.discard' | t }}
-        </app-button>
+        <app-button-group>
+          <app-button class="wz__discard" variant="danger" (click)="confirmDiscard.set(true)">
+            {{ 'apply.nav.discard' | t }}
+          </app-button>
+        </app-button-group>
       }
       <span class="wz__navGap"></span>
-      @if (activeIndex() > 0) {
-        <app-button variant="text" [block]="phone()" (click)="prev()">{{ 'apply.nav.back' | t }}</app-button>
-      }
-      @if (currentStep() === 'review') {
-        <app-button
-          variant="fill"
-          [block]="phone()"
-          [disabled]="!canSubmit()"
-          [loading]="submitting()"
-          (click)="submit()"
-        >
-          {{ 'apply.nav.submit' | t }}
-        </app-button>
-      } @else {
-        <app-button
-          variant="fill"
-          [block]="phone()"
-          [disabled]="(currentStep() === 'type' && !effForm()) || loadingForm()"
-          (click)="next()"
-        >
-          {{ 'apply.nav.next' | t }}
-        </app-button>
-      }
+      <app-button-group [main]="true">
+        @if (activeIndex() > 0) {
+          <app-button variant="text" [block]="phone()" (click)="prev()">{{ 'apply.nav.back' | t }}</app-button>
+        }
+        @if (currentStep() === 'review') {
+          <app-button
+            variant="fill"
+            [block]="phone()"
+            [disabled]="!canSubmit()"
+            [loading]="submitting()"
+            (click)="submit()"
+          >
+            {{ 'apply.nav.submit' | t }}
+          </app-button>
+        } @else {
+          <app-button
+            variant="fill"
+            [block]="phone()"
+            [disabled]="(currentStep() === 'type' && !effForm()) || loadingForm()"
+            (click)="next()"
+          >
+            {{ 'apply.nav.next' | t }}
+          </app-button>
+        }
+      </app-button-group>
     </footer>
   </section>
 
   @if (effForm()) {
-    <app-button class="wz__discardPhone" variant="danger" (click)="confirmDiscard.set(true)">
-      {{ 'apply.nav.discard' | t }}
-    </app-button>
+    <app-button-group>
+      <app-button class="wz__discardPhone" variant="danger" (click)="confirmDiscard.set(true)">
+        {{ 'apply.nav.discard' | t }}
+      </app-button>
+    </app-button-group>
   }
 </div>
 

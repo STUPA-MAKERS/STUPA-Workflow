@@ -691,6 +691,49 @@ export interface VersionOutWire {
   /** The resolved editor. The UI renders this and never the raw `changedBy`. */
   readonly changedByInfo?: ActorInfo | null;
   readonly at: IsoDateTime;
+  /** The change of the Antragsart that wrote this version. */
+  readonly typeChange?: VersionTypeChange | null;
+}
+
+/** `VersionTypeChangeOut`: the old and the new Antragsart of a version (spec 001663). */
+export interface VersionTypeChange {
+  readonly fromTypeId?: Uuid | null;
+  readonly fromType?: I18nMap | null;
+  readonly toTypeId?: Uuid | null;
+  readonly toType?: I18nMap | null;
+  /** The labels of the old form for the fields that the new form does not have. */
+  readonly fieldLabels?: Readonly<Record<string, I18nMap>>;
+}
+
+/** `TypeChangeFieldOut`: one field of a change of the Antragsart. */
+export interface TypeChangeField {
+  readonly key: string;
+  readonly label: I18nMap;
+}
+
+/** `TypeChangeTransitionOut`: a transition back to the applicant (spec 001661). */
+export interface TypeChangeTransition {
+  readonly id: Uuid;
+  readonly label: I18nMap;
+  readonly toStateId: Uuid;
+  readonly toStateLabel: I18nMap;
+}
+
+/** `TypeChangePreviewOut`: what a change of the Antragsart does (spec 001661). */
+export interface TypeChangePreview {
+  readonly typeId: Uuid;
+  readonly carried: readonly TypeChangeField[];
+  readonly missing: readonly TypeChangeField[];
+  readonly dropped: readonly TypeChangeField[];
+  readonly transitions: readonly TypeChangeTransition[];
+  readonly possible: boolean;
+}
+
+/** `TypeChangeIn`: the body of the change of the Antragsart. */
+export interface TypeChangeBody {
+  readonly typeId: Uuid;
+  readonly transitionId?: Uuid | null;
+  readonly note?: string | null;
 }
 
 /**
@@ -1095,6 +1138,8 @@ export interface ApplicationVersion {
   readonly changedBy: string | null;
   readonly changedByInfo?: ActorInfo | null;
   readonly at: IsoDateTime;
+  /** The change of the Antragsart that wrote this version. */
+  readonly typeChange?: VersionTypeChange | null;
 }
 
 /**

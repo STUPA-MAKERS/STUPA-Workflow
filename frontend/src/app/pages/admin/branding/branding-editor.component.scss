@@ -222,7 +222,7 @@
   .br__link > .br__area + .br__area {
     grid-column: 1;
   }
-  .br__link > app-button {
+  .br__link > app-button-group {
     grid-column: 2;
     grid-row: 1 / span 2;
   }

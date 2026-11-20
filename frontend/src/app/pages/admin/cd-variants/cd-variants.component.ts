@@ -16,6 +16,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import {
   FabComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   ConfirmDialogComponent,
   DialogComponent,
   EmptyStateComponent,
@@ -121,6 +122,7 @@ function emptyForm(): VariantForm {
     FormsModule,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     DialogComponent,
     IconComponent,
     InputComponent,

@@ -18,7 +18,9 @@
 @if (!phone() || m.status !== 'planned' || topIndex() >= 0) {
   <div #bar class="sd" [class.sd--tight]="tight()">
     @if ((phone() || compact()) && formatting() && formatTools(); as tools) {
-      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.dock.formatBack' | t" (click)="formatting.set(false)"><app-icon name="back" /></app-button>
+      <app-button-group>
+        <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.dock.formatBack' | t" (click)="formatting.set(false)"><app-icon name="back" /></app-button>
+      </app-button-group>
       <div class="sd__format" role="toolbar" [attr.aria-label]="'meetings.editor.toolbar' | t">
         <ng-container [ngTemplateOutlet]="tools" />
       </div>
@@ -44,7 +46,9 @@
       }
     } @else {
       <div class="sd__nav">
-        <app-button variant="text" [iconOnly]="true" [disabled]="!hasPrev()" [ariaLabel]="'meetings.dock.prev' | t" (click)="step.emit(-1)"><app-icon name="left" /></app-button>
+        <app-button-group>
+          <app-button variant="text" [iconOnly]="true" [disabled]="!hasPrev()" [ariaLabel]="'meetings.dock.prev' | t" (click)="step.emit(-1)"><app-icon name="left" /></app-button>
+        </app-button-group>
         <span class="sd__pos">
           <span class="sd__small">{{ 'meetings.dock.top' | t }}</span>
           <span class="sd__strong num">
@@ -55,7 +59,9 @@
             }
           </span>
         </span>
-        <app-button class="sd__next" variant="text" [iconOnly]="true" [disabled]="!hasNext()" [ariaLabel]="'meetings.dock.next' | t" (click)="step.emit(1)"><app-icon name="right" /></app-button>
+        <app-button-group>
+          <app-button class="sd__next" variant="text" [iconOnly]="true" [disabled]="!hasNext()" [ariaLabel]="'meetings.dock.next' | t" (click)="step.emit(1)"><app-icon name="right" /></app-button>
+        </app-button-group>
       </div>
       @if (phone()) {
         <ng-container [ngTemplateOutlet]="phoneTools" />
@@ -68,7 +74,9 @@
       <div class="sd__mid">
         @if (nowElsewhere(); as now) {
           <span class="sd__now">{{ 'meetings.dock.nowRunning' | t: { top: now.label } }}</span>
-          <app-button size="sm" variant="tonal" (click)="jumpNow.emit(now.item.id)">{{ 'meetings.dock.backToNow' | t }}</app-button>
+          <app-button-group>
+            <app-button size="sm" variant="tonal" (click)="jumpNow.emit(now.item.id)">{{ 'meetings.dock.backToNow' | t }}</app-button>
+          </app-button-group>
         } @else if (!phone() && myVote(); as choice) {
           <span class="sd__vote">
             <app-icon name="vote" [size]="18" />
@@ -99,70 +107,9 @@
 
 <!-- On a phone: "Erledigt", the attendance and the view switch as icon buttons. -->
 <ng-template #phoneTools>
-  <div class="sd__tools">
-    @if (formatTools()) {
-      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.editor.toolbar' | t" (click)="formatting.set(true)"><app-icon name="letters" /></app-button>
-    }
-    @if (done() !== null) {
-      <app-button
-        [variant]="done() ? 'tonal' : 'text'"
-        [iconOnly]="true"
-        [ariaPressed]="done()"
-        [ariaLabel]="'meetings.agenda.done' | t"
-        (click)="doneChange.emit(!done())"
-      ><app-icon name="check" /></app-button>
-    }
-    <span class="sd__tool">
-      <app-button
-        [variant]="panel() === 'attendance' ? 'tonal' : 'text'"
-        [iconOnly]="true"
-        [ariaLabel]="'meetings.attendance.title' | t"
-        (click)="togglePanel('attendance')"
-      ><app-icon name="users" /></app-button>
-      @if (guestChip(); as g) {
-        @if (g.pending > 0) {
-          <span class="sd__badge sd__badge--tool num" [attr.aria-label]="'guests.dock.pending' | t: { n: g.pending }">{{ g.pending }}</span>
-        }
-      }
-    </span>
-    @if (votes() !== null) {
-      <span class="sd__tool">
-        <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.vote.count' | t" (click)="openVotes.emit()"><app-icon name="vote" /></app-button>
-        @if (votes()) {
-          <span class="sd__badge sd__badge--tool num" [class.sd__badge--quiet]="!openVote()" aria-hidden="true">{{ votes() }}</span>
-        }
-      </span>
-    }
-    @if (modeToggle()) {
-      <app-button
-        [variant]="mode() === 'raw' ? 'tonal' : 'text'"
-        [iconOnly]="true"
-        [ariaPressed]="mode() === 'raw'"
-        [ariaLabel]="'meetings.editor.modeRaw' | t"
-        (click)="toggleMode()"
-      ><app-icon name="code" /></app-button>
-    }
-  </div>
-</ng-template>
-
-<!-- On a wider screen: the format tools of the text (behind "Aa" when the row is too narrow), "Erledigt", the view switch and the
-     icon buttons of the page (QR code, beamer), the icon buttons of the phone dock with the
-     format tools in the row. -->
-<ng-template #deskTools>
-  @if (formatTools() || done() !== null || modeToggle() || votes() !== null || extraTools()) {
-    <span class="sd__vr" aria-hidden="true"></span>
-    <div class="sd__tools">
-      @if (formatTools(); as tools) {
-        @if (compact()) {
-          <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.editor.toolbar' | t" (click)="formatting.set(true)"><app-icon name="letters" /></app-button>
-        } @else {
-          <div class="sd__format" role="toolbar" [attr.aria-label]="'meetings.editor.toolbar' | t">
-            <ng-container [ngTemplateOutlet]="tools" />
-          </div>
-          @if (done() !== null || modeToggle() || votes() !== null || extraTools()) {
-            <span class="sd__vr" aria-hidden="true"></span>
-          }
-        }
+  <app-button-group class="sd__tools">
+      @if (formatTools()) {
+        <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.editor.toolbar' | t" (click)="formatting.set(true)"><app-icon name="letters" /></app-button>
       }
       @if (done() !== null) {
         <app-button
@@ -173,7 +120,29 @@
           (click)="doneChange.emit(!done())"
         ><app-icon name="check" /></app-button>
       }
-      @if (modeToggle()) {
+    <span class="sd__tool btn-grp__seg">
+        <app-button
+          [variant]="panel() === 'attendance' ? 'tonal' : 'text'"
+          [ariaPressed]="panel() === 'attendance'"
+          [iconOnly]="true"
+          [ariaLabel]="'meetings.attendance.title' | t"
+          (click)="togglePanel('attendance')"
+        ><app-icon name="users" /></app-button>
+      @if (guestChip(); as g) {
+        @if (g.pending > 0) {
+          <span class="sd__badge sd__badge--tool num" [attr.aria-label]="'guests.dock.pending' | t: { n: g.pending }">{{ g.pending }}</span>
+        }
+      }
+    </span>
+    @if (votes() !== null) {
+      <span class="sd__tool btn-grp__seg">
+          <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.vote.count' | t" (click)="openVotes.emit()"><app-icon name="vote" /></app-button>
+        @if (votes()) {
+          <span class="sd__badge sd__badge--tool num" [class.sd__badge--quiet]="!openVote()" aria-hidden="true">{{ votes() }}</span>
+        }
+      </span>
+    }
+    @if (modeToggle()) {
         <app-button
           [variant]="mode() === 'raw' ? 'tonal' : 'text'"
           [iconOnly]="true"
@@ -181,10 +150,50 @@
           [ariaLabel]="'meetings.editor.modeRaw' | t"
           (click)="toggleMode()"
         ><app-icon name="code" /></app-button>
+    }
+  </app-button-group>
+</ng-template>
+
+<!-- On a wider screen: the format tools of the text (behind "Aa" when the row is too narrow), "Erledigt", the view switch and the
+     icon buttons of the page (QR code, beamer), the icon buttons of the phone dock with the
+     format tools in the row. -->
+<ng-template #deskTools>
+  @if (formatTools() || done() !== null || modeToggle() || votes() !== null || extraTools()) {
+    <span class="sd__vr" aria-hidden="true"></span>
+    <app-button-group class="sd__tools">
+      @if (formatTools(); as tools) {
+        @if (compact()) {
+            <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.editor.toolbar' | t" (click)="formatting.set(true)"><app-icon name="letters" /></app-button>
+        } @else {
+          <div class="sd__format" role="toolbar" [attr.aria-label]="'meetings.editor.toolbar' | t">
+            <ng-container [ngTemplateOutlet]="tools" />
+          </div>
+          @if (done() !== null || modeToggle() || votes() !== null || extraTools()) {
+            <span class="sd__vr" aria-hidden="true"></span>
+          }
+        }
       }
+        @if (done() !== null) {
+          <app-button
+            [variant]="done() ? 'tonal' : 'text'"
+            [iconOnly]="true"
+            [ariaPressed]="done()"
+            [ariaLabel]="'meetings.agenda.done' | t"
+            (click)="doneChange.emit(!done())"
+          ><app-icon name="check" /></app-button>
+        }
+        @if (modeToggle()) {
+          <app-button
+            [variant]="mode() === 'raw' ? 'tonal' : 'text'"
+            [iconOnly]="true"
+            [ariaPressed]="mode() === 'raw'"
+            [ariaLabel]="'meetings.editor.modeRaw' | t"
+            (click)="toggleMode()"
+          ><app-icon name="code" /></app-button>
+        }
       @if (votes() !== null) {
-        <span class="sd__tool">
-          <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.vote.count' | t" (click)="openVotes.emit()"><app-icon name="vote" /></app-button>
+        <span class="sd__tool btn-grp__seg">
+            <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.vote.count' | t" (click)="openVotes.emit()"><app-icon name="vote" /></app-button>
           @if (votes()) {
             <span class="sd__badge sd__badge--tool num" [class.sd__badge--quiet]="!openVote()" aria-hidden="true">{{ votes() }}</span>
           }
@@ -193,7 +202,7 @@
       @if (extraTools(); as tpl) {
         <ng-container [ngTemplateOutlet]="tpl" />
       }
-    </div>
+    </app-button-group>
   }
 </ng-template>
 

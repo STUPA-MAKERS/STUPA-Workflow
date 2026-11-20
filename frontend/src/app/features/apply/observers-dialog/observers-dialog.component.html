@@ -17,11 +17,13 @@
               <app-avatar size="sm" [name]="o.email" [decorative]="true" />
               <span class="od__mail" [title]="o.email">{{ o.email }}</span>
             </span>
-            <app-row-menu
-              [sections]="menu(o)"
-              [label]="'observers.menu' | t: { email: o.email }"
-              (selected)="remove($event)"
-            />
+            <app-button-group>
+              <app-row-menu
+                [sections]="menu(o)"
+                [label]="'observers.menu' | t: { email: o.email }"
+                (selected)="remove($event)"
+              />
+            </app-button-group>
           </li>
         }
       </ul>
@@ -39,9 +41,11 @@
           [ngModel]="text()"
           (ngModelChange)="onText($event)"
         />
-        <app-button type="submit" variant="tonal" [loading]="saving()" [disabled]="!text().trim()">
-          <app-icon name="plus" /> {{ 'observers.add' | t }}
-        </app-button>
+        <app-button-group>
+          <app-button type="submit" variant="tonal" [loading]="saving()" [disabled]="!text().trim()">
+            <app-icon name="plus" /> {{ 'observers.add' | t }}
+          </app-button>
+        </app-button-group>
       </form>
     }
   </div>

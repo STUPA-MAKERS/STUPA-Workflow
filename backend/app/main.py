@@ -71,6 +71,7 @@ from app.modules.flow.router import router as flow_router
 from app.modules.forms.router import get_budget_options
 from app.modules.forms.router import router as forms_router
 from app.modules.forms.service import BudgetOptions
+from app.modules.graph.router import router as graph_router
 from app.modules.gremien_overview.router import router as gremien_tab_router
 from app.modules.livevote.broker import RedisBroker
 from app.modules.livevote.locks import RedisLocker
@@ -159,6 +160,7 @@ api_router.include_router(erasure_request_router)
 api_router.include_router(backup_router)
 api_router.include_router(search_router)
 api_router.include_router(activity_router)
+api_router.include_router(graph_router)
 api_router.include_router(tickets_router)
 api_router.include_router(todos_router)
 api_router.include_router(links_router)

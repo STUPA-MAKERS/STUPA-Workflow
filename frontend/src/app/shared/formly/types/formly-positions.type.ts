@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, type OnInit, inject, signal } from '@angular/core';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
-import { ButtonComponent, IconComponent, SwitchComponent, parseMoney } from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, IconComponent, SwitchComponent, parseMoney } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { formatMoney } from '@shared/format-money';
@@ -53,7 +53,7 @@ let nextUid = 0;
   selector: 'app-formly-positions',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonComponent, IconComponent, SwitchComponent],
+  imports: [ButtonComponent, ButtonGroupComponent, IconComponent, SwitchComponent],
   templateUrl: './formly-positions.type.html',
   styleUrl: './formly-positions.type.scss',
 })

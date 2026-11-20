@@ -27,9 +27,11 @@
               </span>
               <app-status-text [kind]="state(m.status).kind">{{ state(m.status).key | t }}</app-status-text>
               @if (m.lateExcuseUntil) {
-                <app-button class="gad__excuse" variant="tonal" size="sm" (click)="askExcuse(m)">
-                  {{ 'meetings.lateExcuse.title' | t }}
-                </app-button>
+                <app-button-group>
+                  <app-button class="gad__excuse" variant="tonal" size="sm" (click)="askExcuse(m)">
+                    {{ 'meetings.lateExcuse.title' | t }}
+                  </app-button>
+                </app-button-group>
               }
             </li>
           }

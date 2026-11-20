@@ -20,6 +20,7 @@ import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component'
 import { voteResultStatus } from '@shared/status-kind.util';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   EmptyStateComponent,
   IconComponent,
   MEDIA,
@@ -63,6 +64,7 @@ interface AgendaRow {
     EmptyStateComponent,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     MarkdownViewComponent,
     NoteComponent,

@@ -12,9 +12,11 @@
         />
         <span class="ge__combText">{{ combinatorText() }}</span>
         @if (op() !== 'not') {
-          <app-button variant="text" size="sm" (click)="addChild()">
-            <app-icon name="plus" /> {{ 'admin.flow.guardAddChild' | t }}
-          </app-button>
+          <app-button-group>
+            <app-button variant="text" size="sm" (click)="addChild()">
+              <app-icon name="plus" /> {{ 'admin.flow.guardAddChild' | t }}
+            </app-button>
+          </app-button-group>
         }
       </div>
       <div class="ge__children">
@@ -28,9 +30,11 @@
               (guardChange)="setChild($index, $event)"
             />
             @if (op() !== 'not') {
-              <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.flow.guardRemove' | t" [title]="'admin.flow.guardRemove' | t" (click)="removeChild($index)">
-                <app-icon name="x" />
-              </app-button>
+              <app-button-group>
+                <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.flow.guardRemove' | t" [title]="'admin.flow.guardRemove' | t" (click)="removeChild($index)">
+                  <app-icon name="x" />
+                </app-button>
+              </app-button-group>
             }
           </div>
         }

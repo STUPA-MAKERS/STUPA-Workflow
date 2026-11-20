@@ -20,6 +20,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   haptic,
   IconComponent,
   LongPressDirective,
@@ -94,6 +95,7 @@ export interface BoardMove {
     FormsModule,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     LongPressDirective,
     RowMenuComponent,

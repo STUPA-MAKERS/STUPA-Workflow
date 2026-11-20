@@ -74,6 +74,8 @@ Backend domain modules (`backend/app/modules/<module>`):
   gate of its own module
 - **be-tickets** — help-menu tickets: one-way public report (ALTCHA when signed out),
   `ticket.manage` work routes, notes, events, retention cron
+- **be-graph** — the graph page: `GET /api/graph` (elements and relations as nodes and edges,
+  paged), permission `graph.view`, read rules through the link resolver
 - **be-todos** — to-do boards (gremium, personal, team): RBAC `todo.write`/`todo.configure`,
   lexorank moves, ETag, links with per-kind read checks, ticket and agenda coupling, mails
 

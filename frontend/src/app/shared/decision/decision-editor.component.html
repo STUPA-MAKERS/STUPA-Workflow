@@ -43,13 +43,15 @@
                 [downLabel]="'decision.conditionDown' | t: { n: i + 1 }"
                 (move)="moveCondition(i, $event)"
               />
-              <app-button
-                variant="text"
-                size="sm"
-                [iconOnly]="true"
-                [ariaLabel]="'decision.conditionRemove' | t: { n: i + 1 }"
-                (click)="removeCondition(i)"
-              ><app-icon name="x" /></app-button>
+              <app-button-group>
+                <app-button
+                  variant="text"
+                  size="sm"
+                  [iconOnly]="true"
+                  [ariaLabel]="'decision.conditionRemove' | t: { n: i + 1 }"
+                  (click)="removeCondition(i)"
+                ><app-icon name="x" /></app-button>
+              </app-button-group>
             </span>
           </div>
         }

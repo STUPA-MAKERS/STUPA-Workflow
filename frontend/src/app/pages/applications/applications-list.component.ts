@@ -32,6 +32,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   ConfirmDialogComponent,
   CurrencyInputComponent,
   DatepickerComponent,
@@ -173,6 +174,7 @@ type FilterSheet = 'more' | null;
     RouterOutlet,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     CurrencyInputComponent,
     DatepickerComponent,
     EmptyStateComponent,

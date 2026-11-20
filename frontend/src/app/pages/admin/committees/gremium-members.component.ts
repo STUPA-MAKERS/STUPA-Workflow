@@ -17,6 +17,7 @@ import { PageFrameService } from '../../../layout/page-frame.service';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   CapitalizePipe,
   EmptyStateComponent,
   NoteComponent,
@@ -69,6 +70,7 @@ export const MEMBER_PREVIEW = 7;
     LoadStateComponent,
     SectionComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     EmptyStateComponent,
     RouterLink,
     TranslatePipe,
