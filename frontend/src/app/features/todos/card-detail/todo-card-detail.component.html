@@ -58,10 +58,11 @@
           <h2 appSheetBarTitle id="cd-title" class="sheet-title cd__title">{{ card.title }}</h2>
         }
         @if (mode() === 'pane' && !phone() && boardLink(); as link) {
-          <a class="cd__boardLink" [routerLink]="link" [queryParams]="{ card: card.id }">
-            {{ 'todos.card.openInBoard' | t }}
-            <app-icon name="arrow" [size]="16" />
-          </a>
+          <app-button-group class="cd__boardLink">
+            <a appButton="text" size="sm" [routerLink]="link" [queryParams]="{ card: card.id }">{{
+              'todos.card.openInBoard' | t
+            }}</a>
+          </app-button-group>
         }
         @if (!phone() && mode() === 'drawer') {
           <app-button variant="text" [iconOnly]="true" [ariaLabel]="'todos.card.copyLink' | t" (click)="copyLink()">
