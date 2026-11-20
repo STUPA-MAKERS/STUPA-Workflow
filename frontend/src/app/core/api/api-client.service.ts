@@ -34,6 +34,11 @@ import {
   toApplicationCreateBody,
 } from './mappers';
 import type {
+  AmendAmountBody,
+  AmendAmountResult,
+  ForcedEvent,
+  ForcedReport,
+  OutsideDecisionBody,
   ApplicantCandidate,
   OnBehalfApplication,
   CalendarFeed,
@@ -594,6 +599,51 @@ export class ApiClient {
    *  override bypasses guards and transitions. Needs `application.force_status`. */
   forceStatus(id: Uuid, req: ForceStatusBody): Observable<TransitionResult> {
     return this.http.post<TransitionResult>(`${this.base}/applications/${id}/force-status`, req);
+  }
+
+  /** POST /applications/{id}/outside-decision — record a decision that a Gremium made in
+   *  a meeting without a vote on the platform. Needs `application.record_decision`. */
+  recordOutsideDecision(id: Uuid, req: OutsideDecisionBody): Observable<TransitionResult> {
+    return this.http.post<TransitionResult>(
+      `${this.base}/applications/${id}/outside-decision`,
+      req,
+    );
+  }
+
+  /** POST /applications/{id}/approved-amount — change the approved amount of an
+   *  approved application. Needs `application.amend_decision`. */
+  amendApprovedAmount(id: Uuid, req: AmendAmountBody): Observable<AmendAmountResult> {
+    return this.http.post<AmendAmountResult>(
+      `${this.base}/applications/${id}/approved-amount`,
+      req,
+    );
+  }
+
+  /** GET /committees — every Gremium by id and name, the master data of a picker. */
+  committeeNames(): Observable<{ id: Uuid; name: string }[]> {
+    return this.http.get<{ id: Uuid; name: string }[]>(`${this.base}/committees`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** GET /admin/forced-status — the forced status changes per reason and per path. */
+  forcedReport(range: { from?: string; to?: string } = {}): Observable<ForcedReport> {
+    return this.http.get<ForcedReport>(`${this.base}/admin/forced-status`, {
+      params: httpParams(range),
+    });
+  }
+
+  /** GET /admin/forced-status/events — the forced changes behind one count. */
+  forcedEvents(filter: {
+    from?: string;
+    to?: string;
+    reason?: string;
+    fromKey?: string;
+    toKey?: string;
+  }): Observable<ForcedEvent[]> {
+    return this.http.get<ForcedEvent[]>(`${this.base}/admin/forced-status/events`, {
+      params: httpParams(filter),
+    });
   }
 
   /** What a change of the Antragsart to `typeId` carries, misses and drops (spec 001661). */

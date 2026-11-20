@@ -527,15 +527,19 @@ export class ApplicationsListComponent {
     return item.title?.trim() || this.i18n.translate('applications.list.untitled');
   }
 
-  /** The amount in the currency of the row, or null without an amount. */
-  /** The approved amount as money when it deviates from the requested one, else null. */
+  /**
+   * The approved amount as money when it deviates from the requested one, else null. A
+   * state without the flag `Bewilligt` shows no approved amount (spec 001612).
+   */
   private approvedMoney(item: ApplicationListItem): string | null {
     const approved = item.approvedAmount;
+    if (!item.state?.isApproved) return null;
     if (approved === null || approved === undefined || item.amount === null) return null;
     if (Number(approved) === Number(item.amount)) return null;
     return this.money({ ...item, amount: approved });
   }
 
+  /** The amount in the currency of the row, or null without an amount. */
   private money(item: ApplicationListItem): string | null {
     if (item.amount === null) return null;
     return formatMoney(item.amount, this.i18n.formatLocale(), { currency: item.currency }) || item.amount;

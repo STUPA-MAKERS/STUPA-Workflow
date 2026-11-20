@@ -1116,12 +1116,15 @@ describe('ApplicationsListComponent', () => {
       cmp.onDecisionDone();
     });
 
+    /** Spec 001612: only a state with the flag `Bewilligt` shows the approved amount. */
     it('shows the approved amount over the struck requested one', async () => {
+      const approved = { ...SUBMITTED, id: 's9', key: 'approved', isApproved: true };
       const { harness } = await start('/applications', {
         rows: [
-          row({ amount: '1250.00', approvedAmount: '900.00' }),
-          row({ id: 'app-2', amount: '480.00', approvedAmount: '480.00' }),
-          row({ id: 'app-3', amount: null, approvedAmount: '1.00' }),
+          row({ amount: '1250.00', approvedAmount: '900.00', state: approved }),
+          row({ id: 'app-2', amount: '480.00', approvedAmount: '480.00', state: approved }),
+          row({ id: 'app-3', amount: null, approvedAmount: '1.00', state: approved }),
+          row({ id: 'app-4', amount: '700.00', approvedAmount: '600.00' }),
         ],
       });
       harness.detectChanges();

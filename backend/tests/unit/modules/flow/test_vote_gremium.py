@@ -253,7 +253,9 @@ async def test_force_status_into_a_budget_vote_without_gremium_409(
     target.flow_version_id = app.flow_version_id
     db = fake_session(result(app), result(target))
     with pytest.raises(ConflictError) as err:
-        await FlowService(db).force_status(app.id, target.id, _principal(), note="x")
+        await FlowService(db).force_status(
+            app.id, target.id, _principal(), reason="other", note="x"
+        )
     assert err.value.code == "no_vote_gremium"
 
 

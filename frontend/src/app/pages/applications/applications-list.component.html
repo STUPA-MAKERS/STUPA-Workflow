@@ -345,6 +345,8 @@
 <app-force-status-dialog
   [applicationId]="forceFor()?.id ?? null"
   [currentStateId]="forceFor()?.state?.id ?? null"
+  [requested]="forceFor()?.amount ?? null"
+  [currency]="forceFor()?.currency ?? 'EUR'"
   [(open)]="forceOpen"
   (done)="onForced()"
 />

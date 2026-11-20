@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 from uuid import UUID
 
@@ -17,7 +18,9 @@ from app.modules.applications.models import (
 )
 from app.modules.applications.schemas import (
     ActorOut,
+    AmountChangeOut,
     ApplicationOut,
+    OutsideDecisionOut,
     StateOut,
     TimelineDecisionOut,
     TimelineEventOut,
@@ -161,7 +164,11 @@ class ReadOps(ApplicationsServiceBase):
             magic_link_view=magic_link_view,
         )
         decisions = await decisions_by_event(self.session, application_id)
-        return [
+        names = await self._outside_names(
+            [getattr(ev, "outside_decision", None) for ev, _ in rows],
+            applicant_view=applicant_view,
+        )
+        events = [
             _event_out(
                 app,
                 ev,
@@ -170,9 +177,144 @@ class ReadOps(ApplicationsServiceBase):
                 actors.get(ev.actor) if ev.actor else None,
                 decisions.get(ev.id) if decisions else None,
                 applicant_view=applicant_view,
+                outside=_outside_out(
+                    getattr(ev, "outside_decision", None), names, applicant_view=applicant_view
+                ),
             )
             for ev, label in rows
         ]
+        changes = await self._amount_changes(
+            app, applicant_view=applicant_view, magic_link_view=magic_link_view
+        )
+        return sorted([*events, *changes], key=lambda e: e.at)
+
+    async def _outside_names(
+        self, stored: list[dict[str, Any] | None], *, applicant_view: bool
+    ) -> dict[str, str]:
+        """Resolve the Gremium and meeting names of the outside decisions in one batch.
+
+        The applicant view resolves no meeting, because it shows no meeting link.
+        """
+        from app.modules.gremien.models import Gremium
+        from app.modules.meetings.models import Meeting
+
+        gremium_ids = {_uuid(d.get("gremiumId")) for d in stored if d} - {None}
+        meeting_ids = (
+            set() if applicant_view else {_uuid(d.get("meetingId")) for d in stored if d} - {None}
+        )
+        gremien = (
+            (await self.session.execute(
+                select(Gremium.id, Gremium.name).where(Gremium.id.in_(gremium_ids))
+            )).all()
+            if gremium_ids
+            else []
+        )
+        meetings = (
+            (await self.session.execute(
+                select(Meeting.id, Meeting.title).where(Meeting.id.in_(meeting_ids))
+            )).all()
+            if meeting_ids
+            else []
+        )
+        return {str(i): n for i, n in [*gremien, *meetings] if n}
+
+    async def _amount_changes(
+        self, app: Application, *, applicant_view: bool, magic_link_view: bool
+    ) -> list[TimelineEventOut]:
+        """Build the entries of the later changes of the approved amount (spec 001621)."""
+        from app.modules.gremien.models import Gremium
+
+        rows = (
+            await self.session.execute(
+                select(ApplicationDecision, Gremium.name)
+                .outerjoin(Gremium, Gremium.id == ApplicationDecision.basis_gremium_id)
+                .where(
+                    ApplicationDecision.application_id == app.id,
+                    ApplicationDecision.amend_reason.is_not(None),
+                )
+            )
+        ).all()
+        if not rows or app.current_state_id is None:
+            return []
+        actors = await self._resolve_actors(
+            app,
+            (row.decided_by for row, _ in rows),
+            applicant_view=applicant_view,
+            magic_link_view=magic_link_view,
+        )
+        current = app.current_state_id
+        state = await self._state_out_resolved(await self._get_state(current))
+        return [
+            _amount_change_out(
+                current,
+                row,
+                gremium_name,
+                state,
+                actors.get(row.decided_by) if row.decided_by else None,
+                applicant_view=applicant_view,
+            )
+            for row, gremium_name in rows
+        ]
+
+
+def _uuid(value: object) -> UUID | None:
+    """Parse a stored id; another value gives None."""
+    try:
+        return UUID(str(value)) if value else None
+    except ValueError:
+        return None
+
+
+def _outside_out(
+    stored: dict[str, Any] | None, names: dict[str, str], *, applicant_view: bool
+) -> OutsideDecisionOut | None:
+    """Build the outside decision of an event from its stored shape, or None."""
+    if not stored:
+        return None
+    gremium_id = _uuid(stored.get("gremiumId"))
+    meeting_id = None if applicant_view else _uuid(stored.get("meetingId"))
+    return OutsideDecisionOut(
+        result="passed" if stored.get("result") == "passed" else "failed",
+        meetingDate=date.fromisoformat(str(stored.get("meetingDate"))),
+        gremiumId=gremium_id,
+        gremiumName=names.get(str(gremium_id)) if gremium_id else None,
+        yes=stored.get("yes"),
+        no=stored.get("no"),
+        abstain=stored.get("abstain"),
+        meetingId=meeting_id,
+        meetingTitle=names.get(str(meeting_id)) if meeting_id else None,
+    )
+
+
+def _amount_change_out(
+    current: UUID,
+    row: ApplicationDecision,
+    gremium_name: str | None,
+    state: StateOut | None,
+    info: ActorOut | None,
+    *,
+    applicant_view: bool,
+) -> TimelineEventOut:
+    """Build the timeline entry of a later change of the approved amount.
+
+    The entry changes no state, so both state ids name the current state.
+    """
+    return TimelineEventOut(
+        fromStateId=current,
+        toStateId=current,
+        toState=state,
+        actor=info.legacy(row.decided_by) if info and row.decided_by else None,
+        actorInfo=info,
+        at=row.decided_at,
+        kind="amountChange",
+        amountChange=AmountChangeOut(
+            previousAmount=row.previous_amount,
+            approvedAmount=row.approved_amount,
+            reason=None if applicant_view else row.amend_reason,
+            decisionDate=row.basis_date,
+            gremiumName=gremium_name,
+        ),
+    )
 
 
 def _event_out(
@@ -184,6 +326,7 @@ def _event_out(
     decision: ApplicationDecision | None,
     *,
     applicant_view: bool,
+    outside: OutsideDecisionOut | None = None,
 ) -> TimelineEventOut:
     """Build one event of the timeline from its row and its resolved parts."""
     from_vote = (ev.note or "").startswith("vote:")
@@ -206,4 +349,7 @@ def _event_out(
         )
         if decision is not None
         else None,
+        forced=bool(getattr(ev, "forced", False)),
+        forceReason=None if applicant_view else getattr(ev, "force_reason", None),
+        outsideDecision=outside,
     )

@@ -1,0 +1,36 @@
+.odd {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+
+.odd__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.odd__cap {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+}
+
+.odd__pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--space-3);
+}
+
+.odd__counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.odd__error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--fs-small);
+}

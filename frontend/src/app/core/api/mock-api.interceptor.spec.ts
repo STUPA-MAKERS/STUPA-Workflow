@@ -758,6 +758,83 @@ describe('mockApiInterceptor', () => {
         expect((await get<Row>(`/api/applications/${second}`)).state.key).toBe('submitted');
       });
 
+      /** Specs 001600, 001610, 001620, 001650: the new decision routes of the demo. */
+      it('records an outside decision, changes the approved amount and forces with a reason', async () => {
+        type Detail = { state: { key: string; isApproved?: boolean }; decision: Record<string, unknown> | null };
+        type Event = Record<string, unknown>;
+        const voting = 'a1000000-0000-0000-0000-000000000001';
+        const asked = 'a1000000-0000-0000-0000-000000000004';
+        const transitions = await get<{ id: string; requiresAmount: boolean }[]>(`/api/applications/${asked}/transitions`);
+        expect(transitions.filter((t) => t.requiresAmount)).toHaveLength(1);
+        await firstValueFrom(
+          http.post(`/api/applications/${voting}/outside-decision`, {
+            result: 'passed',
+            meetingDate: '2026-11-18',
+            gremiumId: 'g1',
+            yes: 5,
+            meetingId: 'm1',
+            decision: { approvedAmount: '1000.00', conditions: [] },
+          }),
+        );
+        const passed = await get<Detail>(`/api/applications/${voting}`);
+        expect(passed.state).toMatchObject({ key: 'approved', isApproved: true });
+        expect(passed.decision).toMatchObject({ approvedAmount: '1000.00' });
+        const outside = (await get<Event[]>(`/api/applications/${voting}/timeline`)).pop();
+        expect(outside).toMatchObject({ note: 'outside:passed', outsideDecision: { yes: 5, meetingTitle: '34. Sitzung' } });
+
+        await firstValueFrom(
+          http.post(`/api/applications/${voting}/approved-amount`, {
+            approvedAmount: '1100.00',
+            reason: 'Mehrkosten Druck',
+            decisionDate: '2026-11-18',
+            gremiumId: 'g1',
+          }),
+        );
+        const change = (await get<Event[]>(`/api/applications/${voting}/timeline`)).pop();
+        expect(change).toMatchObject({ kind: 'amountChange', amountChange: { previousAmount: '1000.00', approvedAmount: '1100.00' } });
+
+        const rejectedRow = 'a1000000-0000-0000-0000-000000000003';
+        await firstValueFrom(
+          http.post(`/api/applications/${rejectedRow}/outside-decision`, {
+            result: 'failed',
+            meetingDate: '2026-11-18',
+            gremiumId: 'g1',
+          }),
+        );
+        expect((await get<Detail>(`/api/applications/${rejectedRow}`)).state.key).toBe('rejected');
+        await expect(
+          firstValueFrom(http.post(`/api/applications/${second}/outside-decision`, { result: 'passed' })),
+        ).rejects.toMatchObject({ status: 409 });
+        await expect(
+          firstValueFrom(http.post(`/api/applications/${second}/approved-amount`, { approvedAmount: '1.00' })),
+        ).rejects.toMatchObject({ status: 409 });
+
+        await firstValueFrom(
+          http.post(`/api/applications/${second}/force-status`, {
+            stateId: '66666666-6666-6666-6666-666666666662',
+            reason: 'other',
+            note: 'Einzelfall laut Vorstand',
+          }),
+        );
+        const forced = (await get<Event[]>(`/api/applications/${second}/timeline`)).pop();
+        expect(forced).toMatchObject({ forced: true, forceReason: 'other' });
+        await firstValueFrom(http.post(`/api/applications/${second}/force-status`, { stateId: 'nope' }));
+      });
+
+      it('serves the forced-status report and the Gremien', async () => {
+        const report = await get<{ byReason: unknown[]; to: string }>(
+          '/api/admin/forced-status',
+          new HttpParams().set('to', '2026-11-19'),
+        );
+        expect(report.byReason).toHaveLength(3);
+        expect(report.to).toBe('2026-11-19');
+        expect((await get<{ to: string }>('/api/admin/forced-status')).to).toBe('2026-11-19');
+        const all = await get<unknown[]>('/api/admin/forced-status/events');
+        const some = await get<unknown[]>('/api/admin/forced-status/events', new HttpParams().set('reason', 'none'));
+        expect(all.length).toBeGreaterThan(some.length);
+        expect(await get<unknown[]>('/api/committees')).toHaveLength(2);
+      });
+
       it('answers 404 for an unknown demo id', async () => {
         await expect(
           get('/api/applications/a1000000-0000-0000-0000-000000009999'),

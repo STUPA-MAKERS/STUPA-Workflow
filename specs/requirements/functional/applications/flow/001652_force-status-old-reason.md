@@ -5,7 +5,8 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - backend/app/modules/flow/forced_report.py
 scope:
   - backend/app/modules/flow
   - backend/app/modules/admin

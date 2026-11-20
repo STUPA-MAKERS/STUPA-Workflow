@@ -5,7 +5,8 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - backend/app/modules/voting/service/close.py
 scope:
   - backend/app/modules/applications
   - frontend/src/app/pages/applications

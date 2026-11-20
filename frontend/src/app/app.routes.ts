@@ -666,6 +666,15 @@ export const routes: Routes = [
               import('./pages/admin/audit/audit-log.component').then((m) => m.AuditLogComponent),
           },
           {
+            path: 'forced-status',
+            data: { title: 'admin.forced.title', permission: 'audit.read', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/forced-status/forced-status.component').then(
+                (m) => m.ForcedStatusComponent,
+              ),
+          },
+          {
             path: 'delegations',
             canMatch: [featureMatch('meetings')],
             data: { title: 'admin.deleg.title', permission: 'admin.delegations', parent: ['admin'] },

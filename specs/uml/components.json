@@ -231,7 +231,7 @@
       "to": "files"
     },
     {
-      "count": 26,
+      "count": 27,
       "from": "applications",
       "to": "flow"
     },
@@ -241,22 +241,22 @@
       "to": "forms"
     },
     {
-      "count": 8,
+      "count": 12,
       "from": "applications",
       "to": "gremien"
     },
     {
-      "count": 6,
+      "count": 7,
       "from": "applications",
       "to": "meetings"
     },
     {
-      "count": 30,
+      "count": 36,
       "from": "applications",
       "to": "notifications"
     },
     {
-      "count": 55,
+      "count": 62,
       "from": "applications",
       "to": "shared"
     },
@@ -686,7 +686,7 @@
       "to": "application_types"
     },
     {
-      "count": 17,
+      "count": 19,
       "from": "flow",
       "to": "applications"
     },
@@ -696,7 +696,7 @@
       "to": "audit"
     },
     {
-      "count": 7,
+      "count": 8,
       "from": "flow",
       "to": "auth"
     },
@@ -716,12 +716,12 @@
       "to": "forms"
     },
     {
-      "count": 3,
+      "count": 4,
       "from": "flow",
       "to": "gremien"
     },
     {
-      "count": 7,
+      "count": 8,
       "from": "flow",
       "to": "meetings"
     },
@@ -731,7 +731,7 @@
       "to": "notifications"
     },
     {
-      "count": 19,
+      "count": 25,
       "from": "flow",
       "to": "shared"
     },
@@ -1391,7 +1391,7 @@
       "to": "delegations"
     },
     {
-      "count": 8,
+      "count": 9,
       "from": "voting",
       "to": "flow"
     },

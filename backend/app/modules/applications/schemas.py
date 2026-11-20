@@ -129,6 +129,8 @@ class StateOut(FrozenCamelModel, frozen=True):
     Attributes:
         kind: State kind. The frontend shows approve and reject actions for
             ``approval``.
+        is_approved: The state carries the flag ``Bewilligt`` (spec 000571). The list,
+            the detail and the export show the approved amount only then (spec 001612).
     """
 
     id: UUID
@@ -137,6 +139,7 @@ class StateOut(FrozenCamelModel, frozen=True):
     color: str | None = None
     edit_allowed: bool = Field(alias="editAllowed")
     kind: str = "normal"
+    is_approved: bool = Field(default=False, alias="isApproved")
 
 
 class ApplicantOut(FrozenCamelModel, frozen=True):
@@ -374,6 +377,37 @@ class CaptureOut(FrozenCamelModel, frozen=True):
     intake: str | None = None
 
 
+class OutsideDecisionOut(FrozenCamelModel, frozen=True):
+    """A decision made outside the platform, as the timeline shows it (spec 001602).
+
+    The applicant view leaves out the meeting link, because the applicant cannot open
+    a meeting.
+    """
+
+    result: Literal["passed", "failed"]
+    meeting_date: date = Field(alias="meetingDate")
+    gremium_id: UUID | None = Field(default=None, alias="gremiumId")
+    gremium_name: str | None = Field(default=None, alias="gremiumName")
+    yes: int | None = None
+    no: int | None = None
+    abstain: int | None = None
+    meeting_id: UUID | None = Field(default=None, alias="meetingId")
+    meeting_title: str | None = Field(default=None, alias="meetingTitle")
+
+
+class AmountChangeOut(FrozenCamelModel, frozen=True):
+    """A later change of the approved amount, as the timeline shows it (spec 001621).
+
+    The applicant view leaves out the reason, because it is an internal note.
+    """
+
+    previous_amount: Decimal | None = Field(default=None, alias="previousAmount")
+    approved_amount: Decimal | None = Field(default=None, alias="approvedAmount")
+    reason: str | None = None
+    decision_date: date | None = Field(default=None, alias="decisionDate")
+    gremium_name: str | None = Field(default=None, alias="gremiumName")
+
+
 class TimelineEventOut(FrozenCamelModel, frozen=True):
     """One status change of the timeline.
 
@@ -392,6 +426,14 @@ class TimelineEventOut(FrozenCamelModel, frozen=True):
             the status that the vote decided.
         decision: The decision that this status change carried (approved amount,
             number of conditions), else null.
+        kind: ``status`` for a status change, ``amountChange`` for a later change of
+            the approved amount. Such an entry changes no state: ``fromStateId`` and
+            ``toStateId`` both name the current state.
+        forced: A person forced this state. ``forceReason`` names the reason key, null
+            for an old forced change and in the applicant view.
+        outside_decision: The decision made outside the platform that fired this
+            branch, else null.
+        amount_change: The change of the approved amount of an ``amountChange`` entry.
     """
 
     from_state_id: UUID | None = Field(default=None, alias="fromStateId")
@@ -405,6 +447,11 @@ class TimelineEventOut(FrozenCamelModel, frozen=True):
     vote_id: UUID | None = Field(default=None, alias="voteId")
     vote_deleted: bool = Field(default=False, alias="voteDeleted")
     decision: TimelineDecisionOut | None = None
+    kind: Literal["status", "amountChange"] = "status"
+    forced: bool = False
+    force_reason: str | None = Field(default=None, alias="forceReason")
+    outside_decision: OutsideDecisionOut | None = Field(default=None, alias="outsideDecision")
+    amount_change: AmountChangeOut | None = Field(default=None, alias="amountChange")
 
 
 class VersionOut(FrozenCamelModel, frozen=True):

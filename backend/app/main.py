@@ -39,6 +39,7 @@ from app.modules.admin.router import public_router as site_config_public_router
 from app.modules.admin.router import router as admin_router
 from app.modules.antiabuse.router import router as antiabuse_router
 from app.modules.application_types.router import router as application_types_router
+from app.modules.applications.amend_router import router as application_amend_router
 from app.modules.applications.email_login import resolve_session as resolve_email_session
 from app.modules.applications.links_router import router as application_links_router
 from app.modules.applications.login_router import router as applicant_login_router
@@ -64,6 +65,7 @@ from app.modules.delegations.router import router as delegations_router
 from app.modules.documents.router import router as application_pdf_router
 from app.modules.files.storage import build_object_storage
 from app.modules.flow.dispatch import ActionDispatcher, build_worker_dispatcher
+from app.modules.flow.forced_router import router as forced_status_router
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.flow.router import router as flow_router
 from app.modules.forms.router import get_budget_options
@@ -124,9 +126,11 @@ api_router.include_router(form_versions_router)
 api_router.include_router(application_types_router)
 api_router.include_router(applications_router)
 api_router.include_router(application_links_router)
+api_router.include_router(application_amend_router)
 api_router.include_router(application_observers_router)
 api_router.include_router(application_pdf_router)
 api_router.include_router(flow_router)
+api_router.include_router(forced_status_router)
 api_router.include_router(voting_router)
 api_router.include_router(vote_open_router)
 api_router.include_router(livevote_router)

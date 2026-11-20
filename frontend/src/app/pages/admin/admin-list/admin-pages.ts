@@ -64,6 +64,7 @@ export const ADMIN_PAGES: readonly AdminPage[] = [
   { link: 'calendars', title: 'admin.nav.calendars', desc: 'admin.nav.calendarsDesc', icon: 'cal', group: 'gremien', permissions: ['admin.calendars'], feature: 'calendar' },
   { link: 'forms', title: 'admin.nav.forms', desc: 'admin.nav.formsDesc', icon: 'form', group: 'applications', permissions: ['form.configure'] },
   { link: 'flow', title: 'admin.nav.flow', desc: 'admin.nav.flowDesc', icon: 'flow', group: 'applications', permissions: ['flow.configure', 'admin.types'] },
+  { link: 'forced-status', title: 'admin.nav.forced', desc: 'admin.nav.forcedDesc', icon: 'bolt', group: 'applications', permissions: ['audit.read'] },
   { link: 'deadlines', title: 'admin.nav.deadlines', desc: 'admin.nav.deadlinesDesc', icon: 'clock', group: 'applications', permissions: ['admin.deadlines'] },
   { link: 'budgets', title: 'admin.nav.budgets', desc: 'admin.nav.budgetsDesc', icon: 'euro', group: 'finance', permissions: ['budget.structure'], feature: 'budget' },
   { link: 'branding', title: 'admin.nav.branding', desc: 'admin.nav.brandingDesc', icon: 'palette', group: 'appearance', permissions: ['admin.site'] },

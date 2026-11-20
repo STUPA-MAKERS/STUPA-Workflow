@@ -68,6 +68,7 @@ export function mapState(
     color: wire.color ?? null,
     editAllowed: wire.editAllowed,
     kind: wire.kind ?? 'normal',
+    isApproved: wire.isApproved === true,
   };
 }
 
@@ -149,6 +150,11 @@ export function mapTimelineEvent(wire: TimelineEventOutWire, lang: string): Time
     voteId: wire.voteId ?? null,
     voteDeleted: wire.voteDeleted ?? false,
     decision: wire.decision ?? null,
+    kind: wire.kind ?? 'status',
+    forced: wire.forced === true,
+    forceReason: wire.forceReason ?? null,
+    outsideDecision: wire.outsideDecision ?? null,
+    amountChange: wire.amountChange ?? null,
   };
 }
 
@@ -202,6 +208,7 @@ export function mapTransition(wire: TransitionOutWire, lang: string): Transition
     addsToAgenda: wire.addsToAgenda === true,
     agendaGremiumId: wire.agendaGremiumId ?? null,
     allowsDecision: wire.allowsDecision === true,
+    requiresAmount: wire.requiresAmount === true,
   };
 }
 
