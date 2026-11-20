@@ -435,7 +435,7 @@ describe('BudgetPlanComponent', () => {
       expect(view.container.querySelector('app-load-error')).not.toBeNull();
     });
 
-    it('§NF/performance/loading/000893: the first load shows the pane and the plan sheet as a skeleton', async () => {
+    it('§ui-kit:NF/performance/loading/000893: the first load shows the pane and the plan sheet as a skeleton', async () => {
       setViewport(true);
       const view = await render(BudgetPlanComponent, {
         providers: [
@@ -458,7 +458,7 @@ describe('BudgetPlanComponent', () => {
       expect(page.querySelector('app-skeleton')).toBeNull();
     });
 
-    it('§NF/performance/loading/000893: a plan read keeps the tree and shows the plan skeleton in the sheet', async () => {
+    it('§ui-kit:NF/performance/loading/000893: a plan read keeps the tree and shows the plan skeleton in the sheet', async () => {
       const view = await setup();
       const pending = new Subject<BudgetPlan>();
       view.api.plan.mockReturnValueOnce(pending);
@@ -1150,7 +1150,7 @@ describe('BudgetPlanComponent', () => {
       expect(field()).toHaveClass('bp__field--wide');
     });
 
-    it('§F/finance/budget/001020: the sum of a parent beside the fields has the width of a field, with cents and the € apart', async () => {
+    it('§ui-kit:F/finance/budget/001020: the sum of a parent beside the fields has the width of a field, with cents and the € apart', async () => {
       const large = plan([version({ lines: [line('fees', '10000000'), line('staff', '70'), line('wages', '60'), line('grants', '30')] })]);
       const view = await setup({ plans: { 'fy-26': large } });
       const sum = view.container.querySelector('.bp__sum') as HTMLElement;
@@ -1330,7 +1330,7 @@ describe('BudgetPlanComponent', () => {
       expect(view.success).toHaveBeenCalledWith('Die Version ist wieder ein Entwurf.');
     });
 
-    it('§F/finance/budget/000875 §F/administration/files/001080: a reader opens the PDF in the viewer and loads the XLSX', async () => {
+    it('§F/finance/budget/000875 §ui-kit:F/administration/files/001080: a reader opens the PDF in the viewer and loads the XLSX', async () => {
       const view = await setup({ perms: ['budget.view'] });
       const open = jest.spyOn(TestBed.inject(FileOpenService), 'open').mockImplementation(() => undefined);
       await choose('Als PDF öffnen');

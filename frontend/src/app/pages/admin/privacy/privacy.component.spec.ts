@@ -433,7 +433,7 @@ describe('PrivacyComponent', () => {
     expect(toast.success).toHaveBeenCalled();
   });
 
-  /** § 000635 */
+  /** §ui-kit:000635 */
   it('"Verwerfen" sets the retention back and hides with "Speichern"', async () => {
     const { fixture, api } = await setup();
     const field = screen.getByDisplayValue('24');

@@ -39,7 +39,7 @@ describe('ImageThumbComponent', () => {
     expect(view.fixture.nativeElement.querySelector('.thumb__icon')).not.toBeNull();
   });
 
-  /** § NF/accessibility/conformance/000493 */
+  /** §ui-kit:NF/accessibility/conformance/000493 */
   it('has no axe violations with the image and with the fallback icon', async () => {
     const view = await render(ImageThumbComponent, { inputs: { src: '/x?inline=1', alt: 'Foto' } });
     expect(await runAxe(view.container)).toHaveNoViolations();

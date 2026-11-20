@@ -24,7 +24,7 @@ Each person who can read a meeting must be able to download the PDF of its draft
 two variants: the internal one and the public one. Each page of this PDF must have the
 watermark "Entwurf" (000925). The download must not store a PDF and must not change the
 protocol. The download must be refused while the meeting is live. The session menu
-must show the two links while the protocol is a draft (001304).
+must show the two links while the protocol is a draft (ui-kit:001304).
 
 Reason: The members and the keeper must see the internal and the public result before the
 finalization, because a finalized protocol goes to the members by mail and changes only on the way back to

@@ -4,7 +4,7 @@ title: Attachments can be dropped
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-06
+updated: 2026-11-20
 implementation:
   - frontend/vendor/ui-kit/src/lib/file-drop/file-drop.directive.ts
   - frontend/vendor/ui-kit/src/lib/file-drop/drop-overlay.component.ts
@@ -15,4 +15,5 @@ scope:
 
 # Attachments can be dropped
 
-Every attachment target must accept drag and drop through `appFileDrop` and `app-drop-overlay`.
+Every attachment target must use the drop zone of the kit (ui-kit:002281). The upload and the
+checks of the files stay with the server.

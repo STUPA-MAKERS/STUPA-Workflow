@@ -37,13 +37,13 @@ interface WeekColumn {
 }
 
 /**
- * The week view of the desktop Kalender (§ 000728): the seven days from Monday to Sunday
+ * The week view of the desktop Kalender (§ui-kit:000728): the seven days from Monday to Sunday
  * as columns with an hour axis. A timed entry is a block from its start to its end, and
- * a timed entry over several days has one block on each of its days (§ 000744). An
+ * a timed entry over several days has one block on each of its days (§ui-kit:000744). An
  * all-day entry and a due card are in the row above the hours.
  *
  * The axis shows the whole day, 00:00 to 24:00, so a block over several days ends at
- * midnight and not at the last hour of a shorter axis (§ 000746). The view opens at
+ * midnight and not at the last hour of a shorter axis (§ui-kit:000746). The view opens at
  * 08:00, or at the first entry of the week when that is earlier. A press on the head of
  * a day picks the day, a press on an entry opens it.
  */

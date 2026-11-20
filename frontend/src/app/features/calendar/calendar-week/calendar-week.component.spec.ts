@@ -48,7 +48,7 @@ describe('CalendarWeekComponent', () => {
     expect(await runAxe(view.container)).toHaveNoViolations();
   });
 
-  /** § 000728: a timed Termin is a block in the column of its day, a due card is above the hours. */
+  /** §ui-kit:000728: a timed Termin is a block in the column of its day, a due card is above the hours. */
   it('draws a timed Termin as a block at its time and a due card in the all-day row', async () => {
     const view = await setup();
     const block = within(view.column(2)).getByRole('button', { name: '14:00 – 15:30 Jour fixe' });
@@ -98,7 +98,7 @@ describe('CalendarWeekComponent', () => {
   });
 });
 
-describe('spanBlocks (§000744)', () => {
+describe('spanBlocks (§ui-kit:000744)', () => {
   const SPAN = calendarEntry('span', {
     title: 'Klausur',
     startsOn: '2026-11-10',
@@ -130,7 +130,7 @@ describe('spanBlocks (§000744)', () => {
   });
 });
 
-describe('overlap (§000745)', () => {
+describe('overlap (§ui-kit:000745)', () => {
   it('lays a later entry on the earlier one and keeps the earlier one at the width of the day', async () => {
     await render(CalendarWeekComponent, {
       inputs: {
@@ -152,7 +152,7 @@ describe('overlap (§000745)', () => {
   });
 });
 
-describe('wholeDay (§000746)', () => {
+describe('wholeDay (§ui-kit:000746)', () => {
   const height = jest.spyOn(HTMLElement.prototype, 'scrollHeight', 'get');
 
   beforeEach(() => height.mockReturnValue(2400));
@@ -194,7 +194,7 @@ describe('wholeDay (§000746)', () => {
   });
 });
 
-describe('wholeDay head (§000746)', () => {
+describe('wholeDay head (§ui-kit:000746)', () => {
   it('keeps the time and the title of a long block in view', () => {
     const scss = readFileSync(join(__dirname, 'calendar-week.component.scss'), 'utf8');
     const rule = /\.cw__block:not\(\.cw__block--short\)\s*\{[\s\S]*?\n\}/.exec(scss)?.[0] ?? '';
@@ -203,7 +203,7 @@ describe('wholeDay head (§000746)', () => {
   });
 });
 
-describe('dayLinesOnPull (§000743)', () => {
+describe('dayLinesOnPull (§ui-kit:000743)', () => {
   const scss = readFileSync(join(__dirname, 'calendar-week.component.scss'), 'utf8');
   const scroll = /\.cw__scroll\s*\{[^}]*\}/.exec(scss)?.[0] ?? '';
 

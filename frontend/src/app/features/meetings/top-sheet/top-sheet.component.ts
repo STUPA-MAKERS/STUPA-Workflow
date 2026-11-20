@@ -203,7 +203,7 @@ export class TopSheetComponent {
   /**
    * Show the linked list (the application and the to-dos) below the title. The meeting
    * page and the participant view turn it off and show the list above the sheet, so it
-   * stands above the title for every reader (§ 000101).
+   * stands above the title for every reader (§ui-kit:000101).
    */
   readonly linked = input(true);
   /**

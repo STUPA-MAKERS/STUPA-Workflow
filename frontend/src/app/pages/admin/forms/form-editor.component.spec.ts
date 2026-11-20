@@ -138,7 +138,7 @@ describe('FormEditorComponent', () => {
    * With nothing changed the page shows no "Speichern", but the save itself still works. A
    * markerless single group serializes back to exactly the original flat fields.
    */
-  /** § 000635 */
+  /** §ui-kit:000635 */
   it('"Verwerfen" reads the stored form again and hides with "Speichern"', async () => {
     const { c, fixture, createFormVersion } = await setup(
       draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }], { de: 'Hallo', en: '' }),
@@ -1082,7 +1082,7 @@ describe('FormEditorComponent — layout of the redesign', () => {
     expect(c.groupIndex()).toBe(0);
   });
 
-  /** § 000635 */
+  /** §ui-kit:000635 */
   it('the phone header menu holds "Verwerfen" while the form has changes', async () => {
     const { c, api } = await setup(draft(TWO_GROUPS, { de: 'Hallo', en: '' }));
     const getFormDraft = api['getFormDraft'] as jest.Mock;

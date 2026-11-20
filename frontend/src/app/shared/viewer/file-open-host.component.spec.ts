@@ -5,7 +5,7 @@ import { FileOpenHostComponent } from './file-open-host.component';
 import { FileOpenService } from './file-open.service';
 
 describe('FileOpenHostComponent', () => {
-  it('§F/administration/files/001080: shows the opened file with its download link, without axe violations', async () => {
+  it('§ui-kit:F/administration/files/001080: shows the opened file with its download link, without axe violations', async () => {
     const { container, fixture } = await render(FileOpenHostComponent);
     TestBed.inject(FileOpenService).open({ name: 'Foto.jpg', url: '/api/f/1/file', mime: 'image/jpeg' });
     fixture.detectChanges();

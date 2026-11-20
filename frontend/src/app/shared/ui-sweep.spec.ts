@@ -15,7 +15,7 @@ const DE = de as Record<string, string>;
 const EN = en as Record<string, string>;
 const APP = join(__dirname, '..');
 
-describe('createFormNames (§000666)', () => {
+describe('createFormNames (§ui-kit:000666)', () => {
   /** The floating button, then the title of the form or dialog that it opens. */
   it.each([
     ['fab.expense', 'expenses.add'],
@@ -37,7 +37,7 @@ describe('createFormNames (§000666)', () => {
   });
 });
 
-describe('searchPlaceholder (§000661)', () => {
+describe('searchPlaceholder (§ui-kit:000661)', () => {
   const i18n = {
     translate: (key: string, params?: Record<string, unknown>) =>
       (DE[key] ?? key).replace('{count}', String(params?.['count'] ?? '')),
@@ -76,14 +76,14 @@ describe('ticketsInAdmin (§000676)', () => {
   });
 });
 
-describe('phoneDetailTabs (§000673)', () => {
+describe('phoneDetailTabs (§ui-kit:000673)', () => {
   it('the ticket detail does not stretch its tabs, so they are packed at the start', () => {
     const css = readFileSync(join(APP, 'pages/tickets/ticket-detail.component.scss'), 'utf8');
     expect(css).not.toMatch(/\.td__tabs[^{]*\.tabs__tab/);
   });
 });
 
-describe('loginTitle (§000677)', () => {
+describe('loginTitle (§ui-kit:000677)', () => {
   it('the title of the login page sets no size of its own, so it has the size of "Antrag stellen"', () => {
     const login = readFileSync(join(APP, 'pages/login/login.component.scss'), 'utf8');
     const apply = readFileSync(join(APP, 'features/apply/apply-wizard.component.scss'), 'utf8');

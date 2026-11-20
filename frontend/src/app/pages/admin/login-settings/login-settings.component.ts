@@ -110,7 +110,7 @@ export class LoginSettingsComponent {
     this.form.patch(change);
   }
 
-  /** "Verwerfen": back to the stored values (§ 000635). */
+  /** "Verwerfen": back to the stored values (§ui-kit:000635). */
   protected discard(): void {
     this.form.reset();
   }

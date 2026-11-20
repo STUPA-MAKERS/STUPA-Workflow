@@ -45,7 +45,7 @@ describe('graph layout', () => {
     expect(near.get('d')).toBeUndefined();
   });
 
-  /** § F/collaboration/graph/001426: a new node appears next to a neighbour that already shows. */
+  /** §ui-kit:F/collaboration/graph/001426: a new node appears next to a neighbour that already shows. */
   it('places a new node beside a neighbour and keeps the bodies that exist', () => {
     const old = body('a', 400, -300);
     const placed = place([old], ['a', 'b', 'c'], adjacency([{ a: 'a', b: 'b' }]));
@@ -88,7 +88,7 @@ describe('graph layout', () => {
     expect(Math.abs(moved[0].vx)).toBeLessThanOrEqual(42);
   });
 
-  /** § F/collaboration/graph/001427: the layout runs to its end in one go. */
+  /** §ui-kit:F/collaboration/graph/001427: the layout runs to its end in one go. */
   it('settles to a layout at rest with the lines near their length', () => {
     const near = adjacency([{ a: 'a', b: 'b' }]);
     const rested = settle(place([], ['a', 'b'], near), near);
@@ -99,7 +99,7 @@ describe('graph layout', () => {
     expect(ALPHA_MIN).toBeLessThan(ALPHA_START);
   });
 
-  /** § F/collaboration/graph/001433: a node that the person put somewhere stays there. */
+  /** §ui-kit:F/collaboration/graph/001433: a node that the person put somewhere stays there. */
   it('holds a node at its place while the others move', () => {
     const bodies = hold([body('a', 0, 0), body('b', 5, 0)], 'a', 40, 30);
     expect(find(bodies, 'a')).toEqual({ id: 'a', x: 40, y: 30, vx: 0, vy: 0, fixed: true });
@@ -143,7 +143,7 @@ describe('graph layout', () => {
     expect(clampZoom(1)).toBe(1);
   });
 
-  /** § F/collaboration/graph/001428: the arrow keys move to the nearest node in that direction. */
+  /** §ui-kit:F/collaboration/graph/001428: the arrow keys move to the nearest node in that direction. */
   it('finds the nearest node in a direction', () => {
     const bodies = [
       body('mid', 0, 0),

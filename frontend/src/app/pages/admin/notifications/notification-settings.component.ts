@@ -81,7 +81,7 @@ export class NotificationSettingsComponent {
     this.load();
   }
 
-  /** Reads the settings, again after a failed read (§ 000576). */
+  /** Reads the settings, again after a failed read (§ui-kit:000576). */
   load(): void {
     this.loading.set(true);
     this.error.set(null);
@@ -99,7 +99,7 @@ export class NotificationSettingsComponent {
     });
   }
 
-  /** "Verwerfen": back to the stored values (§ 000635). */
+  /** "Verwerfen": back to the stored values (§ui-kit:000635). */
   discard(): void {
     this.settings.set(this.saved());
     this.dirty.set(false);

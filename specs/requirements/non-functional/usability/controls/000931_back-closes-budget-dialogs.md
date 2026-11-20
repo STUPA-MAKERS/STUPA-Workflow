@@ -1,10 +1,10 @@
 ---
 id: "000931"
-title: Back closes the dialogs of the Haushalt
+title: The dialogs of the Haushalt close on Back
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-14
+updated: 2026-11-20
 tests:
   - "frontend/src/app/shared/util/close-on-back.spec.ts:closeOnBack"
 implementation:
@@ -17,15 +17,9 @@ scope:
   - frontend/src/app/shared/util
 ---
 
-# Back closes the dialogs of the Haushalt
+# The dialogs of the Haushalt close on Back
 
-The dialogs "Haushalt bearbeiten" and "Kostenstelle anlegen" must each be an entry in the
-history of the browser while they are open. "Back" must close the open dialog and must keep
-the page behind it. A close by a button must take the entry away again.
+The dialogs "Haushalt bearbeiten" and "Kostenstelle anlegen" must be kit dialogs, so that Back
+closes them (ui-kit:002290).
 
-Reason: On a phone "back" is the usual way to close what lies on top. Without an entry the
-step back leaves the page, and the person loses the place and what the dialog held.
-
-Test: The test opens a dialog state, reads the new entry in the history, goes back and
-reads that the dialog closed. It closes by a button and reads that nothing else closed, and
-it reads that a page that went no longer listens.
+Reason: A person who edits the Haushalt on a phone must not lose the page by a step back.

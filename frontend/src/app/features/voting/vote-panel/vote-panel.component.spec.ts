@@ -229,7 +229,7 @@ describe('VotePanelComponent', () => {
     expect(fixture.nativeElement).toHaveClass('vpn--phone');
     const title = screen.getByRole('heading', { level: 1 });
     expect(title).toHaveTextContent('Soll der Antrag gefördert werden?');
-    // § 000674: the title sits in the sheet bar, which hands it to the detail bar.
+    // §ui-kit:000674: the title sits in the sheet bar, which hands it to the detail bar.
     expect(title.closest('app-sheet-bar')).not.toBeNull();
     const meta = fixture.nativeElement.querySelector('.vpn__meta') as HTMLElement;
     expect(meta).toHaveClass('sheet-line');

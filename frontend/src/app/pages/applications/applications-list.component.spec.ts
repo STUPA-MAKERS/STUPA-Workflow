@@ -1335,7 +1335,7 @@ describe('ApplicationsListComponent', () => {
       http.verify();
     });
 
-    /** § NF/usability/controls/001981: no ⋮ without an action of the menu. */
+    /** §ui-kit:NF/usability/controls/001981: no ⋮ without an action of the menu. */
     it('draws no row menu without a right for one of its actions', async () => {
       await start('/applications', { perms: ['application.read'] });
       expect(screen.queryByRole('button', { name: /^Aktionen für/ })).not.toBeInTheDocument();

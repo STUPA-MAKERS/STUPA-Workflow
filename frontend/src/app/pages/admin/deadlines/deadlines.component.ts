@@ -44,7 +44,7 @@ export class AdminDeadlinesComponent {
   protected readonly settingsSaving = computed(() => this.dirtySections().some((s) => s?.saving()));
   protected readonly settingsValid = computed(() => this.dirtySections().every((s) => s?.valid()));
 
-  /** "Verwerfen": every settings section goes back to its stored values (§ 000635). */
+  /** "Verwerfen": every settings section goes back to its stored values (§ui-kit:000635). */
   protected discardSettings(): void {
     this.dirtySections().forEach((s) => s?.discard());
   }

@@ -377,7 +377,7 @@ describe('WebhooksComponent', () => {
     expect(screen.getAllByRole('button', { name: /^Zustellstatus/ })).toHaveLength(2);
   });
 
-  /** § 000576 and § S/frontend/angular/000632: a failed read is a toast with a retry. */
+  /** §ui-kit:000576 and §ui-kit:S/frontend/angular/000632: a failed read is a toast with a retry. */
   it('names a failed read in a toast with a retry, and shows the empty state under it', async () => {
     const { fixture, api } = await setup([], { listError: true });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

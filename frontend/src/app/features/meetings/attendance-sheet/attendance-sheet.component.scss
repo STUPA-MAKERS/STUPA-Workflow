@@ -112,7 +112,7 @@
   gap: var(--space-1);
   margin-inline-start: auto;
 }
-// The status of a member is a segmented control in the look of the kit (§ 000561): a pill
+// The status of a member is a segmented control in the look of the kit (§ui-kit:000561): a pill
 // track without a border and without dividers, the chosen segment a pill inside it. It is
 // not the kit component, because a blocked option stays in the tab order and names its
 // reason. The elements carry the kit classes `seg` and `seg__opt` too, so the global rules

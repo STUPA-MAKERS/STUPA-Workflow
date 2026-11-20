@@ -1,14 +1,14 @@
 import { TestBed } from '@angular/core/testing';
 import { type Toast, ToastService } from '@stupa-makers/ui-kit';
 
-/** The open load error toast of `app-load-error` (§ 000576): a danger toast with a retry. */
+/** The open load error toast of `app-load-error` (§ui-kit:000576): a danger toast with a retry. */
 function findToast(): Toast | undefined {
   return TestBed.inject(ToastService)
     .toasts()
     .find((t) => t.variant === 'danger' && t.action === 'Erneut versuchen');
 }
 
-/** The messages of the open error toasts (§ 000633: a failed request shows as a toast). */
+/** The messages of the open error toasts (§ui-kit:000633: a failed request shows as a toast). */
 export function errorToasts(): string[] {
   return TestBed.inject(ToastService)
     .toasts()

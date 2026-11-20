@@ -187,7 +187,7 @@ export class AdminTranslationsComponent {
     })),
   ]);
 
-  /** The texts of the three chips (§ 000663): the name, then the name and the value. */
+  /** The texts of the three chips (§ui-kit:000663): the name, then the name and the value. */
   protected readonly localeText = computed(() =>
     filterChipText(
       this.i18n.translate('admin.translations.locale'),

@@ -165,12 +165,12 @@
   background: var(--color-surface-3) padding-box;
 }
 // A block that lies on an earlier block has an edge in the colour of the grid, so the two
-// stay apart (§ 000745).
+// stay apart (§ui-kit:000745).
 .cw__block--over {
   border-color: var(--color-surface-1);
 }
 // The time and the title stay in view while their block goes on above the scroll area
-// (§ 000746): a block from midnight has its head far above 08:00. `overflow: clip` cuts
+// (§ui-kit:000746): a block from midnight has its head far above 08:00. `overflow: clip` cuts
 // the block as `hidden` does, but makes no scroll container, so the head sticks to the
 // scroll area of the grid.
 .cw__block:not(.cw__block--short) {

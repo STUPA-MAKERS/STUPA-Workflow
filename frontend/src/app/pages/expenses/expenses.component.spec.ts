@@ -1528,7 +1528,7 @@ describe('ExpensesComponent (invoice detail)', () => {
     }
   });
 
-  /** §F/administration/files/001080: the receipt opens in the file viewer; a null fileName falls back to 'Beleg.pdf'. */
+  /** §ui-kit:F/administration/files/001080: the receipt opens in the file viewer; a null fileName falls back to 'Beleg.pdf'. */
   it('openInvoiceFile opens the receipt in the file viewer (fileName fallback)', () => {
     const { cmp } = build();
     const open = jest.spyOn(TestBed.inject(FileOpenService), 'open').mockImplementation(() => undefined);

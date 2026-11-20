@@ -18,10 +18,10 @@ export const APP_BUILD = new InjectionToken<string>('APP_BUILD', {
 /** The build ID that never reloads: a local build or `ng serve`. */
 export const DEV_BUILD = 'dev';
 
-/** The session storage key of the last reload, for the loop guard (§ 002152). */
+/** The session storage key of the last reload, for the loop guard (§ui-kit:002152). */
 export const RELOAD_KEY = 'appVersionReload';
 
-/** How long the app does not reload a second time for the same server version (§ 002152). */
+/** How long the app does not reload a second time for the same server version (§ui-kit:002152). */
 export const RELOAD_GUARD_MS = 10 * 60 * 1000;
 
 /** The longest wait for the service worker before the reload runs anyway. */
@@ -42,18 +42,18 @@ const NO_TEXT_INPUTS = new Set([
 ]);
 
 /**
- * The reload of the app when the server serves another frontend build (§ 002151).
+ * The reload of the app when the server serves another frontend build (§ui-kit:002151).
  *
  * `appVersionInterceptor` reports the header `X-App-Version` of each API answer. When the
  * value is not the build ID of the running app, the service loads the new version through
  * the service worker (`checkForUpdate`, `activateUpdate`) and reloads the page at once.
  * The app shows no update notice.
  *
- * While a text field has the focus, the reload waits (§ 002151): it runs at the next page
+ * While a text field has the focus, the reload waits (§ui-kit:002151): it runs at the next page
  * change or at the next reported answer while no text field has the focus, so typed text is
  * not lost.
  *
- * The loop guard (§ 002152): before a reload, the service writes the server version and the
+ * The loop guard (§ui-kit:002152): before a reload, the service writes the server version and the
  * time into the session storage. When the next answer after the reload still reports that
  * version within {@link RELOAD_GUARD_MS}, the service does not reload again. A missing
  * header or the build ID `dev` never reloads.

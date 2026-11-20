@@ -4,7 +4,7 @@ title: An admin accent colour keeps the contrast
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-08
+updated: 2026-11-20
 tests:
   - "frontend/src/app/pages/admin/branding/branding-editor.component.spec.ts:BrandingEditorComponent"
 implementation:
@@ -18,7 +18,7 @@ scope:
 
 # An admin accent colour keeps the contrast
 
-The branding page must refuse an accent colour that gives less than 4.5:1 for text on the
-accent or for the accent on the surfaces. The check must use both themes.
+The branding page must refuse an accent colour that the accent check of the kit refuses
+(ui-kit:002286).
 
 Reason: An admin sets the accent colour, so the tokens alone cannot keep WCAG 1.4.3.

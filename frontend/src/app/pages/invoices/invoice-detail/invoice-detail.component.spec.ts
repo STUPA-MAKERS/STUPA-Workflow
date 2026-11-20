@@ -164,7 +164,7 @@ describe('InvoiceDetailComponent', () => {
     const { edit, remove, markPaid, createBooking, openFile, user } = await setup();
     await user.click(screen.getByRole('button', { name: 'Als bezahlt markieren' }));
     expect(markPaid).toHaveBeenCalled();
-    // § 000671: exactly one button "Buchung anlegen", in the head of the section "Buchungen".
+    // §ui-kit:000671: exactly one button "Buchung anlegen", in the head of the section "Buchungen".
     expect(screen.getAllByRole('button', { name: 'Buchung anlegen' })).toHaveLength(1);
     await user.click(screen.getByRole('button', { name: 'Buchung anlegen' }));
     expect(createBooking).toHaveBeenCalledTimes(1);

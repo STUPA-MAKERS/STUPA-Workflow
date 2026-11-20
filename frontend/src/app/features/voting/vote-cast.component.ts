@@ -81,7 +81,7 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  *   the beamer for a person who may run the meeting. A vote without a meeting links its
  *   application, and a draft of it can be deleted.
  * - A phone uses the detail bar of the list/detail layout like every other detail
- *   (§ 000674): the back arrow, the menu and, after a scroll, the title. The meeting line
+ *   (§ui-kit:000674): the back arrow, the menu and, after a scroll, the title. The meeting line
  *   stands in the status line below the title. The button bar of the ballot is pinned at
  *   the bottom.
  * - The route reuses the component from one vote to the next, so the pane loads again
@@ -308,7 +308,7 @@ export class VoteCastComponent implements OnDestroy {
   }
 
   /**
-   * The live connection is lost and the client tries again (§ 000678). Not while the
+   * The live connection is lost and the client tries again (§ui-kit:000678). Not while the
    * server or the network is away: then the bar "Server nicht erreichbar" says so.
    */
   readonly connectionLost = computed(

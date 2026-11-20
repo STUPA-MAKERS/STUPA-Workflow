@@ -92,7 +92,7 @@ export class MailTemplatesComponent {
   readonly draft = signal<MailTemplate | null>(null);
   /** The list has not arrived yet. */
   readonly loading = signal(true);
-  /** The read of the templates failed (§ 000576). */
+  /** The read of the templates failed (§ui-kit:000576). */
   protected readonly loadError = signal(false);
   protected readonly loadState = loadStateOf(this.loading, this.loadError);
   readonly lang = signal<Lang>('de');
@@ -175,7 +175,7 @@ export class MailTemplatesComponent {
     });
   }
 
-  /** "Verwerfen": the open template goes back to its stored texts (§ 000635). */
+  /** "Verwerfen": the open template goes back to its stored texts (§ui-kit:000635). */
   discard(): void {
     const key = this.selectedKey();
     if (key) this.select(key);

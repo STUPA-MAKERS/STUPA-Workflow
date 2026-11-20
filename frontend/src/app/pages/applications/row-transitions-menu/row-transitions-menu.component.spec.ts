@@ -134,7 +134,7 @@ describe('RowTransitionsMenuComponent', () => {
     expect(screen.getByRole('menuitem', { name: 'Aus Archiv holen' })).toBeInTheDocument();
   });
 
-  /** § NF/usability/controls/001981: the menu has no "Öffnen"; a press on the row opens it. */
+  /** §ui-kit:NF/usability/controls/001981: the menu has no "Öffnen"; a press on the row opens it. */
   it('shows the empty note when the transitions are the only right and there are none', async () => {
     const { http, trigger, detectChanges } = await setup(['application.transition']);
     await userEvent.click(trigger);

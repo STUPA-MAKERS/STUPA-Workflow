@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Check the spec files in `specs/` and keep the index in `specs/README.md` current.
 
+The app and ui-kit share one number space (ui-kit:002211). When `PARTNER_SPECS` names a checkout
+of the `specs/` folder of ui-kit, the script also checks the numbers against it and resolves
+the references with a repository name (ui-kit:002212).
+
 The script checks the rules for specs (`specs/style/specs/`): the file name, the
 place in the tree, the front matter (also `implementation`), the heading, the labels, `must` in the rule
 text, the scope paths, `replaced_by`, unique numbers, the index, and every `§`
@@ -17,6 +21,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -62,8 +67,10 @@ TEST_ENTRY = re.compile(r"^[^:\s]+\.(py|ts):[A-Za-z_][A-Za-z0-9_.]*$")
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 LABEL = re.compile(r"^(Reason|Test):", re.MULTILINE)
 MUST = re.compile(r"\bmust\b")
-SECTION_REF = re.compile(r"§ ?((?:F|NF|S|P)/[a-z0-9/-]+/[0-9]{6})")
-SPEC_SECTION_REF = re.compile(r"§ ?(?:(?:F|NF|S|P)/[a-z0-9/-]+/)?[0-9]{6}\b")
+SECTION_REF = re.compile(r"§ ?(?:([A-Za-z0-9-]+):)?((?:F|NF|S|P)/[a-z0-9/-]+/[0-9]{6})")
+REPO = "STUPA-Workflow"
+PARTNER = "ui-kit"
+SPEC_SECTION_REF = re.compile(r"§ ?(?:[A-Za-z0-9-]+:)?(?:(?:F|NF|S|P)/[a-z0-9/-]+/)?[0-9]{6}\b")
 INLINE_CODE = re.compile(r"`[^`\n]*`")
 BASE_REF = "origin/development"
 CODE_DIRS = ["backend/app", "backend/worker", "backend/tests", "frontend/src", "mcp", "typst"]
@@ -365,16 +372,29 @@ def _readme(specs: list[Spec]) -> str:
     return f"{head}\n{_index(specs)}"
 
 
-def _section_refs(ids: dict[str, Spec]) -> list[str]:
-    """Return the `§` references in the code that name no spec (000032)."""
+def _section_refs(ids: dict[str, Spec], partner: set[str] | None) -> list[str]:
+    """Return the `§` references in the code that name no spec (000032, ui-kit:002212).
+
+    A reference without a repository name, or with `STUPA-Workflow:`, must name a spec of the app. A
+    reference with `ui-kit:` must name a spec of the kit; it is checked only when
+    `PARTNER_SPECS` is set. Any other repository name is an error.
+    """
     errors: list[str] = []
     for folder in CODE_DIRS:
         for path in (ROOT / folder).rglob("*"):
             if path.suffix not in CODE_SUFFIXES or "node_modules" in path.parts:
                 continue
-            for ref in SECTION_REF.findall(path.read_text(encoding="utf-8", errors="ignore")):
-                if ref not in ids:
-                    errors.append(f"{path.relative_to(ROOT)}: §{ref} names no spec (000032)")
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            for repo, ref in SECTION_REF.findall(text):
+                rel = path.relative_to(ROOT)
+                if repo in ("", REPO):
+                    if ref not in ids:
+                        errors.append(f"{rel}: §{ref} names no spec (000032)")
+                elif repo == PARTNER:
+                    if partner is not None and ref not in partner:
+                        errors.append(f"{rel}: §{repo}:{ref} names no spec of {PARTNER} (ui-kit:002212)")
+                else:
+                    errors.append(f"{rel}: §{repo}:{ref} names an unknown repository (ui-kit:002212)")
     return errors
 
 
@@ -401,6 +421,25 @@ def base_collisions(
         for number, path in sorted(local.items())
         if number in base and number not in fork and base[number] != path
     ]
+
+
+def _partner_ids() -> tuple[set[str], dict[str, str]] | None:
+    """Return the full IDs and number to path of the kit specs, or None without PARTNER_SPECS."""
+    folder = os.environ.get("PARTNER_SPECS")
+    if not folder:
+        return None
+    base = Path(folder)
+    ids: set[str] = set()
+    numbers: dict[str, str] = {}
+    for path in sorted(base.rglob("*.md")):
+        rel = path.relative_to(base)
+        kind = _kind_of(rel)
+        if kind is None or not FILE_NAME.match(path.name) or len(kind[2].parts) != 3:
+            continue
+        below = kind[2]
+        ids.add(f"{kind[0]}/{below.parts[0]}/{below.parts[1]}/{path.name[:6]}")
+        numbers[path.name[:6]] = rel.as_posix()
+    return ids, numbers
 
 
 def _git_numbers(ref: str) -> dict[str, str] | None:
@@ -454,12 +493,19 @@ def main(argv: list[str]) -> int:
             for ref in spec_section_refs(spec.body)
         ]
     errors += _base_errors(numbers)
+    partner = _partner_ids()
+    if partner is not None:
+        errors += [
+            f"{numbers[n]}: number {n} is {PARTNER}:{path}; numbers are shared (ui-kit:002211)"
+            for n, path in sorted(partner[1].items())
+            if n in numbers and numbers[n].as_posix() != path
+        ]
     if "--write" in argv:
         README.write_text(_readme(specs), encoding="utf-8")
     elif README.read_text(encoding="utf-8") != _readme(specs):
         errors.append("README.md: index or tree is not current; run with --write (000013)")
     errors += _orphan_schemas(specs)
-    errors += _section_refs(ids)
+    errors += _section_refs(ids, partner[0] if partner else None)
     for error in errors:
         print(error)
     print(f"{len(specs)} specs, {len(errors)} errors")

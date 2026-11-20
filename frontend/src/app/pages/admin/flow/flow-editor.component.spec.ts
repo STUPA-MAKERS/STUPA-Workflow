@@ -212,7 +212,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(graph.layout?.positions).toBeDefined();
   });
 
-  /** § 000635 */
+  /** §ui-kit:000635 */
   it('"Verwerfen" reads the stored flow again and hides with "Speichern"', async () => {
     const { fixture, createGlobalFlowVersion } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

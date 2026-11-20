@@ -113,7 +113,7 @@ describe('MeetingHeadComponent', () => {
     expect(scss).toContain('font-size: var(--mh-status-size, var(--fs-small))');
   });
 
-  /** § 001305 (statusChip) */
+  /** §ui-kit:001305 (statusChip) */
   it('draws the status beside the title as a chip centred on the title line', () => {
     const html = readFileSync(join(__dirname, 'meeting-head.component.html'), 'utf8');
     const scss = readFileSync(join(__dirname, 'meeting-head.component.scss'), 'utf8');

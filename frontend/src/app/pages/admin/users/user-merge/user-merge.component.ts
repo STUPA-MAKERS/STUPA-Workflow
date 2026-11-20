@@ -162,7 +162,7 @@ export class UserMergeComponent {
   protected readonly previewError = signal<TranslationKey>('admin.users.merge.previewFailed');
   /**
    * The load state of the preview. A refusal with a known code is a data state and shows as
-   * a note (§ 000633), so only a failed request is an error here.
+   * a note (§ui-kit:000633), so only a failed request is an error here.
    */
   protected readonly previewState = computed<LoadState>(() =>
     this.loadingPreview()
@@ -287,7 +287,7 @@ export class UserMergeComponent {
     this.understood.set(false);
   }
 
-  /** The retry of the failed account list (§ 000576). */
+  /** The retry of the failed account list (§ui-kit:000576). */
   protected retrySearch(): void {
     this.searched.set(false);
     this.searchFailed.set(false);

@@ -50,7 +50,7 @@ describe('NotificationSettingsComponent', () => {
     });
   });
 
-  /** § 000635 */
+  /** §ui-kit:000635 */
   it('"Verwerfen" sets the fields back and hides with "Speichern"', async () => {
     const { fixture } = await setup();
     const field = screen.getByLabelText<HTMLInputElement>(/Erinnern nach/);

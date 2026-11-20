@@ -12,7 +12,7 @@ export interface SearchTexts {
 }
 
 /**
- * The placeholder of the search field of a list page (§ 000661): "N … durchsuchen" with the
+ * The placeholder of the search field of a list page (§ui-kit:000661): "N … durchsuchen" with the
  * number of items in the list and the singular for one item. While the first answer is out
  * (`pending`) the text has no count, so that it does not say "0 … durchsuchen" too early.
  */

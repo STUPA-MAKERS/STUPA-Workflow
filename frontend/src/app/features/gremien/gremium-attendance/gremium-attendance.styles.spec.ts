@@ -23,7 +23,7 @@ function block(setting: string): string {
   return CSS.slice(start, end);
 }
 
-describe('rowGroupLook (§NF/usability/layout/000609)', () => {
+describe('rowGroupLook (§ui-kit:NF/usability/layout/000609)', () => {
   it('draws no box, no bar and no cell lines', () => {
     expect(rule(CSS, '.gat__frame')).not.toMatch(/background|border-radius/);
     expect(CSS).not.toMatch(/border-top:/);
@@ -50,7 +50,7 @@ describe('rowGroupLook (§NF/usability/layout/000609)', () => {
   });
 });
 
-describe('veryHighContrast (§NF/accessibility/settings/000612)', () => {
+describe('veryHighContrast (§ui-kit:NF/accessibility/settings/000612)', () => {
   it('paints a cell and the sort button black on yellow with the black edge', () => {
     const fields = block('fields');
     expect(fields).toMatch(/button\.gat__cell,\n {2}\.gat__sortBtn \{[^}]*background: var\(--field-bg\);[^}]*color: var\(--field-text\);[^}]*box-shadow: var\(--field-edge\);/);

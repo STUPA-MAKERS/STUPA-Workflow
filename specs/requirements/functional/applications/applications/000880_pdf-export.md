@@ -17,8 +17,8 @@ scope:
 
 # An Antrag downloads as PDF
 
-The three-dot menu of the Antrag detail page must have the action "Als PDF öffnen" (001082). The
-action must open `GET /api/applications/{id}/pdf` in the file viewer (001080). Each person who can read the Antrag
+The three-dot menu of the Antrag detail page must have the action "Als PDF öffnen" (ui-kit:001082). The
+action must open `GET /api/applications/{id}/pdf` in the file viewer (ui-kit:001080). Each person who can read the Antrag
 must be able to download it: a reader with `application.read`, an applicant, an observer and
 the creator. The PDF must show the current version of the Antrag. The download must stream
 through the API and never use a presigned URL (000178).

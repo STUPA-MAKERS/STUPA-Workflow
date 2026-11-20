@@ -162,7 +162,7 @@ describe('status kinds', () => {
     });
   });
 
-  /** § 001304 (protocolStatus) */
+  /** §ui-kit:001304 (protocolStatus) */
   describe('protocolStatus', () => {
     const p = { status: 'draft' as const, isFinal: false, sentAt: null, approvedAt: null };
     it.each([

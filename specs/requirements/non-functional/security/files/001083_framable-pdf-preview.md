@@ -17,7 +17,7 @@ scope:
 
 # A file that the viewer shows has a sandboxed inline preview
 
-Every route that serves a PDF or a raster image for 001080 must accept `?inline=true`. With it,
+Every route that serves a PDF or a raster image for ui-kit:001080 must accept `?inline=true`. With it,
 the route must answer `Content-Disposition: inline`, `X-Frame-Options: SAMEORIGIN` and the CSP
 `default-src 'none'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'; sandbox`.
 Without it, the route must answer as before. The route must check the access of the caller in

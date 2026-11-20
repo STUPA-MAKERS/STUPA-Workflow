@@ -40,7 +40,7 @@ import { SiteFooterComponent } from './site-footer/site-footer.component';
  * - The public frame has the public header and the branded footer; the rail frame has
  *   the footer only on a route with `footer: true`.
  * - The report dialog shows in every frame, the search palette only in the rail frame. The
- *   app shows no update notice: `AppVersionService` reloads on a new build (§ 002151).
+ *   app shows no update notice: `AppVersionService` reloads on a new build (§ui-kit:002151).
  *
  * There is ONE router outlet for every frame (in the kit shell), so a change of frame
  * (sign-in, the beamer) never destroys and recreates the page.

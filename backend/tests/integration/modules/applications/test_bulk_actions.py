@@ -2,7 +2,7 @@
 
 § 001701 the options are the targets that every selected Antrag reaches, and the fire
 checks each Antrag again. § 001702 a bulk message adds one public comment and one mail
-per Antrag. § 001703 each Antrag runs on its own, and the result names each outcome.
+per Antrag. §ui-kit:001703 each Antrag runs on its own, and the result names each outcome.
 """
 
 from __future__ import annotations
@@ -101,7 +101,7 @@ async def test_a_bulk_transition_runs_per_antrag(
     maker: async_sessionmaker[AsyncSession],
     seed: GuestSeed,
 ) -> None:
-    """§ 001701, § 001703, § 001704: an Antrag that moved before is skipped on its own."""
+    """§ 001701, §ui-kit:001703, § 001704: an Antrag that moved before is skipped on its own."""
     ids = [await _create(maker, seed, n) for n in range(3)]
     client = _client(migrated, settings, monkeypatch, _MANAGER)
     body = {"applicationIds": [str(i) for i in ids]}

@@ -26,7 +26,7 @@ describe('QrCodeComponent', () => {
     expect(formatJoinCode(null)).toBe('');
   });
 
-  /** § NF/accessibility/conformance/000493 */
+  /** §ui-kit:NF/accessibility/conformance/000493 */
   it('has no axe violations', async () => {
     const { container } = await render(QrCodeComponent, { inputs: { qr, label: 'QR-Code für die Sitzung' } });
     expect(await runAxe(container)).toHaveNoViolations();

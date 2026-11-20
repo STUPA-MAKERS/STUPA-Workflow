@@ -381,7 +381,7 @@ describe('VotingComponent', () => {
   });
 
   describe('states', () => {
-    /** § 000576: a toast and the empty placeholder, no rows. */
+    /** §ui-kit:000576: a toast and the empty placeholder, no rows. */
     it('shows an error toast and the empty placeholder when the request fails', async () => {
       await start('/voting', { listError: true });
       expect(loadErrorToast()).toContain('Die Abstimmungen konnten nicht geladen werden.');
@@ -640,7 +640,7 @@ describe('VotingComponent', () => {
       expect(listVotes).toHaveBeenCalledWith(expect.objectContaining({ offset: 0, limit: 30 }));
     });
 
-    /** § 000674: the vote detail has the detail bar of the layout like every other detail. */
+    /** §ui-kit:000674: the vote detail has the detail bar of the layout like every other detail. */
     it('phone: the layout shows its detail bar with "Zur Liste"', async () => {
       const restore = matchMediaQueries(MEDIA.phone);
       try {

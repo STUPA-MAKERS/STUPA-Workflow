@@ -126,7 +126,7 @@ describe('VoteCardComponent', () => {
       expect(screen.getByText('0 %')).toBeInTheDocument();
     });
 
-    /** An open vote is part of the record, so there is no delete (§ 001007). */
+    /** An open vote is part of the record, so there is no delete (§ui-kit:001007). */
     it('closes with the one button and cancels from the menu, both as danger', async () => {
       const { on, container } = await setup();
       const close = screen.getByRole('button', { name: 'Abstimmung schließen' });
@@ -213,7 +213,7 @@ describe('VoteCardComponent', () => {
       expect(screen.getByText('Abgelehnt')).toBeInTheDocument();
     });
 
-    /** The pending lot is the next step; the insert waits in the menu (§ 001006, § 001007). */
+    /** The pending lot is the next step; the insert waits in the menu (§ui-kit:001006, §ui-kit:001007). */
     it('states a pending lot once and makes "Los ziehen" the one button', async () => {
       const tie = vote({
         status: 'closed',

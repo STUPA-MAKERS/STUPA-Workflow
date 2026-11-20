@@ -285,7 +285,7 @@ describe('UsersComponent', () => {
     });
   });
 
-  /** § 000576 and § S/frontend/angular/000632: a failed read is a toast with a retry. */
+  /** §ui-kit:000576 and §ui-kit:S/frontend/angular/000632: a failed read is a toast with a retry. */
   it('search error path shows a toast with a retry', async () => {
     const api = makeApi({ listPrincipals: jest.fn(() => throwError(() => new Error('x'))) });
     await setup(api);

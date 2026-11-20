@@ -422,7 +422,7 @@ def test_poll_footer_comes_from_the_number_of_answers() -> None:
 
 
 def test_blackout_bar_and_internal_mark() -> None:
-    """§000687 and §000689: `%%%%` is a black bar, `%%Name%%` is plain text."""
+    """§000687 and §ui-kit:000689: `%%%%` is a black bar, `%%Name%%` is plain text."""
     (block,) = conv("Es spricht %%%% und %%Lena Hoffmann%%.")
     inline = block["c"]
     assert {"t": "bar"} in inline  # pyright: ignore[reportOperatorIssue]
@@ -512,7 +512,7 @@ def test_a_signature_row_is_a_field_row_with_its_signer() -> None:
 
 
 def test_blackout_block_keeps_its_content_in_the_internal_variant() -> None:
-    """§000965 §000689: the fence lines go, the content prints as normal Markdown."""
+    """§000965 §ui-kit:000689: the fence lines go, the content prints as normal Markdown."""
     blocks = conv("Vorher.\n%%\nGeheim %%Anna%%\n\n- Punkt\n%%\nDanach.")
     assert [b["t"] for b in blocks] == ["par", "par", "list", "par"]
     assert texts(blocks[1]) == "Geheim Anna"

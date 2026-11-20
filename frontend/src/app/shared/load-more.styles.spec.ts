@@ -13,7 +13,7 @@ function loadIcons(html: string): readonly string[] {
   return [...html.matchAll(/class="[a-z-]+__more"[^]*?<app-icon name="([a-z-]+)"/g)].map((m) => m[1]);
 }
 
-describe('loadMoreButtons (§000741)', () => {
+describe('loadMoreButtons (§ui-kit:000741)', () => {
   it('every load button of the Kalender and of the Sitzungen has a chevron', () => {
     const [calendar, meetings] = LISTS.map((path) => loadIcons(readFileSync(join(FEATURES, `${path}.html`), 'utf8')));
     expect(calendar).toEqual(['up', 'down']);

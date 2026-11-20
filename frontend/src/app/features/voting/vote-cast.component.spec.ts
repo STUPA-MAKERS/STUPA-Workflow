@@ -475,7 +475,7 @@ describe('VoteCastComponent', () => {
     afterEach(() => restore());
 
     /**
-     * § 000674: the detail bar of the list/detail layout is the head. The view has no
+     * §ui-kit:000674: the detail bar of the list/detail layout is the head. The view has no
      * header of its own, and the meeting line stands in the status line below the title.
      */
     it('has no header of its own and names the meeting in the status line', async () => {
@@ -899,7 +899,7 @@ describe('VoteCastComponent', () => {
       expect(document.querySelector('app-vote-bars')).toBeInTheDocument();
     });
 
-    /** § 000678: a toast that stays while the connection is lost, and no line in the page. */
+    /** §ui-kit:000678: a toast that stays while the connection is lost, and no line in the page. */
     it('shows a lost connection as a toast that stays until the connection is back', async () => {
       jest.useFakeTimers();
       try {

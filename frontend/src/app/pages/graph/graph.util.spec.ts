@@ -49,7 +49,7 @@ describe('graph util', () => {
     expect(AUTO_NODES).toBe(300);
   });
 
-  /** § F/collaboration/graph/001426: the nodes that already show keep their identity. */
+  /** §ui-kit:F/collaboration/graph/001426: the nodes that already show keep their identity. */
   it('adds a page and keeps the nodes and the lines that already show', () => {
     const first = merged(EMPTY_GRAPH, page([m, t], [edge(m, t, 'builtin'), edge(m, t, 'builtin')]));
     expect(first.nodes).toEqual([m, t]);
@@ -75,7 +75,7 @@ describe('graph util', () => {
   const TODAY = '2026-03-10';
   const FRESH = defaultFilters(TODAY);
 
-  /** § F/collaboration/graph/001425: a fresh page shows the last 30 days and only the links of persons. */
+  /** §ui-kit:F/collaboration/graph/001425: a fresh page shows the last 30 days and only the links of persons. */
   it('starts with the last 30 days and the links of persons', () => {
     expect(localDay(new Date(2026, 2, 5, 23, 59))).toBe('2026-03-05');
     expect(daysBefore(TODAY, 30)).toBe('2026-02-08');
@@ -103,7 +103,7 @@ describe('graph util', () => {
     }
   });
 
-  /** § F/collaboration/graph/001425: the filters are in the query of the URL. */
+  /** §ui-kit:F/collaboration/graph/001425: the filters are in the query of the URL. */
   it('reads the filters from the query', () => {
     expect(filtersOf(convertToParamMap({}), TODAY)).toEqual(FRESH);
     const query = convertToParamMap({

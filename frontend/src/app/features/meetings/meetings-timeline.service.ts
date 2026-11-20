@@ -94,7 +94,7 @@ export class MeetingsTimelineService {
   /** The Gremium chip shows only when there is more than one Gremium to pick. */
   readonly showGremiumFilter = computed(() => this.filterGremien().length > 1);
   /**
-   * The text of the Gremium chip (§ 000663): "Gremium" without a choice, "Gremium: Name" with
+   * The text of the Gremium chip (§ui-kit:000663): "Gremium" without a choice, "Gremium: Name" with
    * one. An unknown value (a Gremium that left the list) reads as no choice.
    */
   readonly gremiumFilterLabel = computed(() => {

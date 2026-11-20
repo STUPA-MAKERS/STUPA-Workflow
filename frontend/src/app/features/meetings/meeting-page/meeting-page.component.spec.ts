@@ -443,7 +443,7 @@ describe('MeetingPageComponent', () => {
     });
   });
 
-  /** § 001304 (protocolHead) */
+  /** §ui-kit:001304 (protocolHead) */
   describe('protocolHead', () => {
     const closed = meeting({ status: 'closed' });
     const final = (over: Partial<Protocol> = {}) =>

@@ -373,7 +373,7 @@ export class GremiumDialogComponent {
     this.save();
   }
 
-  /** Read the counts of the question; also the retry of the load error (§ 000576). */
+  /** Read the counts of the question; also the retry of the load error (§ui-kit:000576). */
   protected loadPreview(): void {
     const g = this.gremium();
     if (!g) return;
