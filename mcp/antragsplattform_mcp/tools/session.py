@@ -99,6 +99,17 @@ async def get_activity_status() -> dict:
 
 
 @group.tool
+async def get_navigation_status() -> dict:
+    """Read the marks of the navigation in one call.
+
+    ``tasks`` counts the applications to act on plus the open to-dos of the caller,
+    ``tickets`` the new tickets (``null`` without ``ticket.manage``), ``live`` tells whether
+    a readable meeting runs, ``activity`` whether an event of another person waits.
+    """
+    return await api().get("/navigation/status")
+
+
+@group.tool
 async def mark_activity_seen(at: str) -> dict:
     """Mark the activity page as seen up to ``at`` (the ``readAt`` of a step).
 

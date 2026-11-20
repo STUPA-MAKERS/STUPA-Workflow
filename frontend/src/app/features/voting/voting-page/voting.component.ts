@@ -53,7 +53,6 @@ import {
 } from '@stupa-makers/ui-kit';
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { meetingVoteStatus, type StatusView } from '@shared/status-kind.util';
-import { LIVE_MAX_PAGES, LIVE_PAGE_LIMIT } from '../../../layout/rail-status.service';
 import { VotingPageService, visibleTicks } from './voting-page.service';
 import { closedStatus } from '../election.util';
 import { voteSubject } from '../vote-announce.util';
@@ -151,6 +150,15 @@ function whenSource(
 }
 
 /**
+ * The upcoming timeline sorts by the planned date, not by the status, so a live meeting
+ * that started early or has no date can sort after planned ones. The page reads up to
+ * {@link LIVE_MAX_PAGES} pages of {@link LIVE_PAGE_LIMIT} to find every live meeting.
+ */
+const LIVE_PAGE_LIMIT = 50;
+/** The most pages one search for live meetings reads; a guard against an endless cursor. */
+const LIVE_MAX_PAGES = 4;
+
+/**
  * "Abstimmungen" (`/voting`): the votes
  * of the person as a list beside the open vote, like the applications and the tasks.
  *
@@ -175,6 +183,7 @@ function whenSource(
  * - Side by side it is a pane page (`styles.scss`): the panes fill the free height and
  *   scroll by themselves.
  */
+
 @Component({
   selector: 'app-voting',
   host: { '[class.pane-page]': 'split()' },
@@ -598,7 +607,7 @@ export class VotingComponent implements OnDestroy {
     this.followRunning();
   }
 
-  /** Follow every live meeting of the upcoming timeline (as the rail finds them). */
+  /** Follow every live meeting of the upcoming timeline. */
   private followRunning(): void {
     const page = (cursor: string | null) =>
       this.api.listMeetingsTimeline({ direction: 'upcoming', limit: LIVE_PAGE_LIMIT, cursor });

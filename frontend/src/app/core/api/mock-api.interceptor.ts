@@ -1708,6 +1708,7 @@ const MOCK_NEW_USER: Principal = {
 export function mockNewUserGet(p: string): unknown {
   if (p.endsWith('/auth/me')) return MOCK_NEW_USER;
   if (p.endsWith('/applications/tasks') || p.endsWith('/delegations')) return [];
+  if (p.endsWith('/navigation/status')) return { tasks: 0, tickets: null, live: false, activity: false };
   if (/(^|\/)api\/(applications|votes)$/.test(p)) return { items: [], total: 0, limit: 25, offset: 0 };
   if (p.endsWith('/meetings/timeline')) return { items: [], nextCursor: null };
   return undefined;
@@ -2061,6 +2062,9 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (bookings) return bookings.pipe(mergeMap((body) => ok(body)));
     if (p.endsWith('/search')) return ok(mockSearch(req.params.get('q') ?? ''));
     if (p.endsWith('/applications/tasks')) return ok([...MOCK_TASKS]);
+    if (p.endsWith('/navigation/status')) {
+      return ok({ tasks: MOCK_TASKS.length, tickets: null, live: false, activity: false });
+    }
     if (/\/delegations\/votes\/[^/]+\/status$/.test(p)) {
       return ok({ blocked: false, delegatedToName: null, exercising: true, delegatedByName: 'Erika Beispiel', delegatedByNames: ['Erika Beispiel'] });
     }

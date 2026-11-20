@@ -129,7 +129,14 @@ export const cacheInterceptor: HttpInterceptorFn = (req, next) => {
     cache.writeStarts();
     const ended = (): void => cache.invalidate(path);
     return next(req).pipe(
-      tap({ next: (event) => event instanceof HttpResponse && ended(), error: ended }),
+      tap({
+        next: (event) => {
+          if (!(event instanceof HttpResponse)) return;
+          ended();
+          cache.written.next(path);
+        },
+        error: ended,
+      }),
       finalize(() => cache.writeEnds()),
     );
   }

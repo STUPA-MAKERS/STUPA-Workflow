@@ -3,6 +3,8 @@
 * ``GET /api/activity`` — one step of the events of the items of the caller.
 * ``GET /api/activity/status`` — whether an event of another person waits.
 * ``POST /api/activity/seen`` — the time up to which the caller has seen the page.
+* ``GET /api/navigation/status`` — the four marks of the navigation in one read
+  (spec 002001, `navigation.py`).
 
 The routes hold no authorization beyond a session or a token. Each source inside the
 service reuses the read rule of its own module (spec 001272), so the page shows only what
@@ -16,7 +18,14 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Query, status
 
 from app.deps import DbSession, require_principal
-from app.modules.activity.schemas import ActivityPage, ActivitySeen, ActivityStatus, ItemKind
+from app.modules.activity.navigation import navigation_status
+from app.modules.activity.schemas import (
+    ActivityPage,
+    ActivitySeen,
+    ActivityStatus,
+    ItemKind,
+    NavigationStatus,
+)
 from app.modules.activity.service import ActivityService
 from app.modules.auth.principal import Principal
 from app.shared.errors import ProblemDetail
@@ -59,6 +68,16 @@ async def list_activity(
 async def activity_status(session: DbSession, principal: Reader) -> ActivityStatus:
     """Tell whether an event of another person waits after the last visit (spec 001275)."""
     return ActivityStatus(hasNew=await ActivityService(session).has_new(principal))
+
+
+@router.get(
+    "/navigation/status",
+    response_model=NavigationStatus,
+    responses={401: _PROBLEM},
+)
+async def read_navigation_status(session: DbSession, principal: Reader) -> NavigationStatus:
+    """Read the marks of the navigation in one request (spec 002001)."""
+    return await navigation_status(session, principal)
 
 
 @router.post(

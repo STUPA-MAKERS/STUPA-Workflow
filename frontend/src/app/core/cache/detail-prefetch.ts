@@ -107,14 +107,14 @@ export function prefetchDetails<T>(spec: DetailPrefetch<T>): void {
     if (spec.when && !spec.when()) return;
     untracked(() => {
       const now = Date.now();
-      for (const item of items.slice(0, ROWS)) {
+      items.slice(0, ROWS).forEach((item) => {
         const key = spec.key(item);
-        if (fresh(firstAt, key, now) || fresh(allAt, key, now)) continue;
+        if (fresh(firstAt, key, now) || fresh(allAt, key, now)) return;
         const first = readsOf(item)[0];
-        if (!first) continue;
+        if (!first) return;
         firstAt.set(key, now);
         queue.push(() => first);
-      }
+      });
       pump();
     });
   });
@@ -137,12 +137,12 @@ export function prefetchDetails<T>(spec: DetailPrefetch<T>): void {
     pump();
   };
   const events = ['pointerover', 'pointerdown', 'focusin'] as const;
-  for (const type of events) host.addEventListener(type, intent, { passive: true });
+  events.forEach((type) => host.addEventListener(type, intent, { passive: true }));
 
   inject(DestroyRef).onDestroy(() => {
     stopped = true;
     queue.length = 0;
-    for (const type of events) host.removeEventListener(type, intent);
+    events.forEach((type) => host.removeEventListener(type, intent));
     for (const sub of running) sub.unsubscribe();
     running.clear();
   });
