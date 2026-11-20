@@ -139,10 +139,6 @@
 .fd__swatch {
   @include swatch.mark;
 }
-.fd__dot {
-  margin-inline: 6px;
-  color: var(--color-text-subtle);
-}
 .fd__ccLine {
   --ccl-gap: 8px;
 }

@@ -48,10 +48,6 @@
 .ma__rows {
   @include lp.stack;
 }
-.ma__dot {
-  margin-inline: 6px;
-  color: var(--color-text-subtle);
-}
 .ma__trail {
   display: flex;
   align-items: center;

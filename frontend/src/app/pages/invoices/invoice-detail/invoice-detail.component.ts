@@ -3,21 +3,7 @@ import { RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import {
-  ButtonComponent,
-  ButtonGroupComponent,
-  EmptyStateComponent,
-  IconComponent,
-  NoteComponent,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-  SegBarComponent,
-  SheetBarComponent,
-  SheetBarTitleDirective,
-  StatusTextComponent,
-  SectionComponent,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, EmptyStateComponent, IconComponent, MetaLineComponent, NoteComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, SectionComponent, SegBarComponent, SheetBarComponent, SheetBarTitleDirective, StatusTextComponent } from '@stupa-makers/ui-kit';
 import {
   invoiceStatus,
 } from '@shared/ui';
@@ -46,7 +32,7 @@ import { formatMoney } from '@shared/format-money';
   selector: 'app-invoice-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
+  imports: [MetaLineComponent, 
     SectionComponent,
     NoteComponent,
     EmptyStateComponent,

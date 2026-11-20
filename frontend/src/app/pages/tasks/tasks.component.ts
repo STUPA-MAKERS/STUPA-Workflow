@@ -18,29 +18,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate, TranslationKey } from '@core/i18n/translations';
 import type { ApplicationListItem, ApplicationType, IsoDateTime, Uuid } from '@core/api/models';
 import { TodosApiService, type TodoMineItem } from '@core/api/todos.service';
-import {
-  EmptyStateComponent,
-  FilterSelectComponent,
-  type FilterSelectOption,
-  filterChipText,
-  IconComponent,
-  ListDetailLayoutComponent,
-  ListGroupComponent,
-  ListItemComponent,
-  liveSearch,
-  ScrollFadeDirective,
-  SearchPillComponent,
-  SkeletonComponent,
-  type StatusKind,
-  StatusTextComponent,
-  StickyBarComponent,
-  PageHeaderComponent,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-  MEDIA,
-  mediaQuery,
-} from '@stupa-makers/ui-kit';
+import { EmptyStateComponent, filterChipText, FilterSelectComponent, type FilterSelectOption, IconComponent, ListDetailLayoutComponent, ListGroupComponent, ListItemComponent, liveSearch, MEDIA, mediaQuery, MetaLineComponent, PageHeaderComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, ScrollFadeDirective, SearchPillComponent, SkeletonComponent, type StatusKind, StatusTextComponent, StickyBarComponent } from '@stupa-makers/ui-kit';
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import {
   flowColorKind,
@@ -122,7 +100,7 @@ interface TaskRow {
   selector: 'app-tasks',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
+  imports: [MetaLineComponent, 
     RowMenuComponent,
     PullRefreshDirective,
     LoadErrorComponent,

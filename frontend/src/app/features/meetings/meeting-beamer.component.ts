@@ -13,7 +13,7 @@ import type {
   VoteResult,
 } from '@core/api/models';
 import { QrCodeComponent, formatJoinCode } from '@shared/ui/qr-code/qr-code.component';
-import { IconComponent, SegBarComponent, StatusTextComponent } from '@stupa-makers/ui-kit';
+import { IconComponent, MetaLineComponent, SegBarComponent, StatusTextComponent } from '@stupa-makers/ui-kit';
 import { VoteBarsComponent } from '../voting/vote-bars.component';
 import { ElectionResultComponent } from '../voting/election-result/election-result.component';
 import { electionCaption, electionResultLine, electionStatus } from '../voting/election.util';
@@ -108,7 +108,7 @@ interface BeamerText {
   selector: 'app-meeting-beamer',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
+  imports: [MetaLineComponent, 
     TranslatePipe,
     IconComponent,
     QrCodeComponent,

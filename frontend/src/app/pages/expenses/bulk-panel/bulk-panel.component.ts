@@ -16,6 +16,7 @@ import {
   ButtonGroupComponent,
   IconComponent,
   InputComponent,
+  MetaLineComponent,
   SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
@@ -45,7 +46,7 @@ import { formatMoney } from '@shared/format-money';
   selector: 'app-bulk-panel',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
+  imports: [MetaLineComponent, 
     SectionComponent,
     SumRowComponent,
     BookingRowComponent,

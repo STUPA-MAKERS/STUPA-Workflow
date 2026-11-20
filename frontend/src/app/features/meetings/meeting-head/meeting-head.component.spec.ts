@@ -88,7 +88,7 @@ describe('MeetingHeadComponent', () => {
       const bar = container.querySelector('app-list-detail-bar')!;
       expect(bar).toHaveClass('ld__bar--condensed');
       expect(bar.querySelector('.ld__barTitle')).toHaveTextContent('12. Sitzung');
-      expect(bar.querySelector('.ld__barSub')).toHaveTextContent('Läuft·seit 18:04');
+      expect(bar.querySelector('.ld__barSub')).toHaveTextContent('Läuft seit 18:04');
       expect(bar.querySelector('.ld__barActions')).toHaveTextContent('Menü');
       expect(screen.getByRole('heading', { level: 1, name: '12. Sitzung' })).toHaveClass('sr-only');
       expect(container.querySelector('.mh__titles')).toBeNull();

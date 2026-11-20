@@ -92,9 +92,6 @@
   text-align: center;
   overflow-wrap: anywhere;
 }
-.chat__dot {
-  padding: 0 6px;
-}
 .chat__empty {
   margin-block: auto;
 }
@@ -349,9 +346,6 @@
   padding-left: 2px;
   color: var(--color-text-muted);
   font-size: var(--fs-small);
-}
-.chat__meta .chat__dot {
-  padding: 0;
 }
 .chat__failed {
   display: inline-flex;

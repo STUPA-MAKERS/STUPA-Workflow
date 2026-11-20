@@ -18,20 +18,7 @@ import type { TodoBoard, TodoCardMove, TodoCardTile, TodoColumn, TodoLabel } fro
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import {
-  ButtonComponent,
-  ButtonGroupComponent,
-  haptic,
-  IconComponent,
-  LongPressDirective,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-  ScrollFadeDirective,
-  type TabItem,
-  TabPageDirective,
-  TabPagerComponent,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, haptic, IconComponent, LongPressDirective, MetaLineComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, ScrollFadeDirective, type TabItem, TabPageDirective, TabPagerComponent } from '@stupa-makers/ui-kit';
 import { TodoCardTileComponent } from '../../../features/todos/card-tile/todo-card-tile.component';
 import type { TileMenuRequest } from '../../../features/todos/move-sheet/todo-move-sheet.component';
 import {
@@ -87,7 +74,7 @@ export interface BoardMove {
   selector: 'app-todo-board-view',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
+  imports: [MetaLineComponent, 
     CdkDrag,
     CdkDropList,
     CdkDropListGroup,

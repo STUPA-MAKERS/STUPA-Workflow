@@ -514,7 +514,7 @@ describe('ChatComponent', () => {
     );
     expect(metas).toEqual([
       'bearbeitet',
-      '09:01·bearbeitet',
+      '09:01 bearbeitet',
       'wird gesendet …',
       'Nicht gesendet Erneut senden Bearbeiten Verwerfen',
     ]);

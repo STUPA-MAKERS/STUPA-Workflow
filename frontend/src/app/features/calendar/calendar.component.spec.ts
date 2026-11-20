@@ -693,7 +693,7 @@ describe('CalendarComponent (phone)', () => {
     expect(screen.getAllByText('Klausurtagung')).toHaveLength(3);
     const row = screen.getByText('Jour fixe').closest('[role="listitem"]') as HTMLElement;
     expect(row.querySelector('.cal__sub')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-      'Termin·14:00 – 15:30·Haushaltsausschuss·Zusage',
+      'Termin 14:00 – 15:30 Haushaltsausschuss Zusage',
     );
     expect(await runAxe(view.container)).toHaveNoViolations();
   });

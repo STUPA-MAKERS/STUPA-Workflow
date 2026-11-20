@@ -30,39 +30,7 @@ import type {
 } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
-import {
-  ButtonComponent,
-  ButtonGroupComponent,
-  CheckboxComponent,
-  ConfirmDialogComponent,
-  CurrencyInputComponent,
-  DatepickerComponent,
-  EmptyStateComponent,
-  FilterSelectComponent,
-  IconComponent,
-  InfiniteScrollDirective,
-  ListDetailLayoutComponent,
-  ListGroupComponent,
-  ListItemComponent,
-  LongPressDirective,
-  MEDIA,
-  mediaQuery,
-  RowMenuComponent,
-  type RowMenuItem,
-  SelectionBarComponent,
-  type RowMenuSection,
-  type RowSwipeAction,
-  ScrollFadeDirective,
-  SearchPillComponent,
-  SideSheetComponent,
-  SkeletonComponent,
-  type StatusKind,
-  StatusTextComponent,
-  StickyBarComponent,
-  ToastService,
-  FabComponent,
-  PageHeaderComponent,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, CheckboxComponent, ConfirmDialogComponent, CurrencyInputComponent, DatepickerComponent, EmptyStateComponent, FabComponent, FilterSelectComponent, IconComponent, InfiniteScrollDirective, ListDetailLayoutComponent, ListGroupComponent, ListItemComponent, LongPressDirective, MEDIA, mediaQuery, MetaLineComponent, PageHeaderComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, type RowSwipeAction, ScrollFadeDirective, SearchPillComponent, SelectionBarComponent, SideSheetComponent, SkeletonComponent, type StatusKind, StatusTextComponent, StickyBarComponent, ToastService } from '@stupa-makers/ui-kit';
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { flowColorKind } from '@shared/ui';
 import { exportDownload } from '@shared/download.util';
@@ -167,7 +135,7 @@ type FilterSheet = 'more' | null;
   host: { '[class.pane-page]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
+  imports: [MetaLineComponent, 
     PullRefreshDirective,
     InfiniteScrollDirective,
     AmountComponent,

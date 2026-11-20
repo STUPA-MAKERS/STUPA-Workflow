@@ -93,14 +93,14 @@
         <div class="pm__head">
           <span class="pm__eyebrow">{{ 'guests.page.eyebrow' | t }}</span>
           <h1 class="pm__title">{{ h.title }}</h1>
-          <span class="pm__meta">
+          <span class="pm__meta"><app-meta-line>
             @if (status(); as s) {
               <app-status-text [kind]="s.kind">{{ s.key | t }}</app-status-text>
             }
             @if (metaLine()) {
-              <span class="pm__sep" aria-hidden="true">·</span><span>{{ metaLine() }}</span>
+              <span>{{ metaLine() }}</span>
             }
-          </span>
+          </app-meta-line></span>
         </div>
         <p class="pm__intro">{{ introKey() | t }}</p>
         <form class="pm__form" (submit)="$event.preventDefault(); join()">
@@ -181,14 +181,14 @@
 <ng-template #meetingCard>
   @if (h) {
     <div class="pm__card">
-      <span class="pm__cardMeta">
+      <span class="pm__cardMeta"><app-meta-line>
         @if (status(); as s) {
           <app-status-text [kind]="s.kind">{{ s.key | t }}</app-status-text>
         }
         @if (metaLine()) {
-          <span class="pm__sep" aria-hidden="true">·</span><span>{{ metaLine() }}</span>
+          <span>{{ metaLine() }}</span>
         }
-      </span>
+      </app-meta-line></span>
       <strong class="pm__cardTitle">{{ h.title }}</strong>
     </div>
   }

@@ -99,9 +99,6 @@
   line-height: 1.5;
   color: var(--color-text-muted);
 }
-.bm__sep {
-  color: var(--color-text-subtle);
-}
 .bm__warn {
   color: var(--color-warning);
   font-weight: var(--fw-semibold);
@@ -276,9 +273,6 @@
   .bm__foot {
     flex-direction: column;
     gap: 0;
-  }
-  .bm__foot .bm__sep {
-    display: none;
   }
   .bm__idleWrap--join {
     grid-template-columns: minmax(0, 1fr);

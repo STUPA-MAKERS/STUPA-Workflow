@@ -22,18 +22,7 @@ import { SiteFooterComponent } from '../../layout/site-footer/site-footer.compon
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { meetingStatus } from '@shared/status-kind.util';
-import {
-  AvatarComponent,
-  ButtonComponent,
-  ButtonGroupComponent,
-  IconComponent,
-  InputComponent,
-  NoteComponent,
-  nowSignal,
-  RowMenuComponent,
-  type RowMenuSection,
-  StatusTextComponent,
-} from '@stupa-makers/ui-kit';
+import { AvatarComponent, ButtonComponent, ButtonGroupComponent, IconComponent, InputComponent, MetaLineComponent, NoteComponent, nowSignal, RowMenuComponent, type RowMenuSection, StatusTextComponent } from '@stupa-makers/ui-kit';
 import { GuestSessionService } from './guest-session.service';
 import { GuestViewComponent } from './guest-view.component';
 import { clock, weekdayDate } from '@shared/date-format';
@@ -64,7 +53,7 @@ export function normalizeJoinCode(raw: string): string {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [GuestSessionService],
-  imports: [
+  imports: [MetaLineComponent, 
     NgTemplateOutlet,
     FormsModule,
     TranslatePipe,

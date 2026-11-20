@@ -113,14 +113,11 @@
         </div>
 
         @if (col.isDone && (more(col) > 0 || board().archivedCount)) {
-          <p class="bv__doneFoot">
+          <p class="bv__doneFoot"><app-meta-line>
             @if (more(col) > 0) {
               <button type="button" class="bv__link" (click)="expand(col)">
                 {{ 'todos.board.more' | t: { n: more(col) } }}
               </button>
-            }
-            @if (more(col) > 0 && board().archivedCount) {
-              <span aria-hidden="true">·</span>
             }
             @if (board().archivedCount) {
               <button type="button" class="bv__link" (click)="archive.emit()">
@@ -128,7 +125,7 @@
                 <app-icon name="right" [size]="15" />
               </button>
             }
-          </p>
+          </app-meta-line></p>
         }
 
         @if (canWrite() && !col.isDone) {

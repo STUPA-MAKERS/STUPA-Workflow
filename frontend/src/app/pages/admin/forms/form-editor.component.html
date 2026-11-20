@@ -178,13 +178,12 @@
                           <span class="sr-only">{{ 'admin.common.errors' | t }}</span>
                         }
                       </span>
-                      <span class="fe__rowSub">
+                      <span class="fe__rowSub"><app-meta-line>
                         @if (field.key) {
                           <span class="mono ell">{{ field.key }}</span>
-                          <span aria-hidden="true">·</span>
                         }
                         <span class="ell">{{ typeLabel(field.type) }}</span>
-                      </span>
+                      </app-meta-line></span>
                     </button>
                   </li>
                 }

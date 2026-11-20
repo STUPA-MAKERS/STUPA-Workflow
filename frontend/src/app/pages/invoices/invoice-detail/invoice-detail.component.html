@@ -146,17 +146,16 @@
                 <a class="fd__link" routerLink="/expenses" [queryParams]="{ id: bookingTarget(b) }">
                   <span class="fd__linkBody">
                     <span class="fd__linkTitle">{{ b.description }}</span>
-                    <span class="fd__linkMeta">
+                    <span class="fd__linkMeta"><app-meta-line>
                       <span>{{ (b.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</span>
-                      <span class="fd__dot" aria-hidden="true">·</span>
                       @if (c.color) {
                         <span class="fd__swatch" aria-hidden="true" [style.background]="c.color"></span>
                       }
                       <span class="fd__linkCc" [title]="c.name">{{ c.name }}</span>
                       @if (day(b.paymentDate); as d) {
-                        <span class="fd__dot" aria-hidden="true">·</span><span class="mono">{{ d }}</span>
+                        <span class="mono">{{ d }}</span>
                       }
-                    </span>
+                    </app-meta-line></span>
                   </span>
                   <span class="mono fd__linkAmount">{{ signed(b) }}</span>
                   <app-icon class="fd__chev" name="right" [size]="17" />

@@ -23,42 +23,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { searchPlaceholder } from '@shared/util/search-placeholder';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import {
-  ButtonComponent,
-  ButtonGroupComponent,
-  CheckboxComponent,
-  ConfirmDialogComponent,
-  downloadBlob,
-  EmptyStateComponent,
-  FilterSelectComponent,
-  type FilterSelectOption,
-  filterChipText,
-  IconComponent,
-  InfiniteScrollDirective,
-  ListDetailLayoutComponent,
-  ListGroupComponent,
-  ListItemComponent,
-  LongPressDirective,
-  MEDIA,
-  mediaQuery,
-  RangeChipComponent,
-  type RangeValue,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-  type RowSwipeAction,
-  ScrollFadeDirective,
-  SearchPillComponent,
-  SelectionBarComponent,
-  SideSheetComponent,
-  SkeletonComponent,
-  StatusTextComponent,
-  StickyBarComponent,
-  ToastService,
-  DetailNoneComponent,
-  FabComponent,
-  PageHeaderComponent,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, CheckboxComponent, ConfirmDialogComponent, DetailNoneComponent, downloadBlob, EmptyStateComponent, FabComponent, filterChipText, FilterSelectComponent, type FilterSelectOption, IconComponent, InfiniteScrollDirective, ListDetailLayoutComponent, ListGroupComponent, ListItemComponent, LongPressDirective, MEDIA, mediaQuery, MetaLineComponent, PageHeaderComponent, RangeChipComponent, type RangeValue, RowMenuComponent, type RowMenuItem, type RowMenuSection, type RowSwipeAction, ScrollFadeDirective, SearchPillComponent, SelectionBarComponent, SideSheetComponent, SkeletonComponent, StatusTextComponent, StickyBarComponent, ToastService } from '@stupa-makers/ui-kit';
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { CostCentreSelectComponent } from '../budget/cost-centre-select/cost-centre-select.component';
 import {
@@ -140,7 +105,7 @@ const SORTS: readonly {
   host: { '[class.pane-page]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
+  imports: [MetaLineComponent, 
     PullRefreshDirective,
     InfiniteScrollDirective,
     CostCentreLabelComponent,

@@ -5,6 +5,10 @@ import { BudgetItemListComponent } from './budget-item-list.component';
 import type { BudgetItem } from './budget-items';
 import { itemApp, itemBooking } from './budget-items.fixtures';
 
+/** The dots of the meta lines: one between two parts (001961). */
+const dots = (root: ParentNode = document) =>
+  [...root.querySelectorAll('.ml__parts')].reduce((n, l) => n + Math.max(0, l.children.length - 1), 0);
+
 async function setup(items: BudgetItem[], names = new Map([['b-800', { name: 'Werkstatt' }]])) {
   localStorage.setItem('ap.locale', 'de');
   const view = await render(BudgetItemListComponent, {
@@ -51,7 +55,7 @@ describe('BudgetItemListComponent', () => {
     ]);
     expect(rows[0].querySelector('.li__title')?.textContent?.trim()).toBe('Ohne Titel');
     expect(rows[0].querySelector('app-status-text')).toBeNull();
-    expect(rows[0].querySelector('.bil__dot')).toBeNull();
+    expect(dots(rows[0])).toBe(0);
     expect(rows[0].textContent).toContain('—');
     expect(rows[1].querySelector('app-status-text')).toBeNull();
     expect(rows[1].textContent).not.toContain('Werkstatt');

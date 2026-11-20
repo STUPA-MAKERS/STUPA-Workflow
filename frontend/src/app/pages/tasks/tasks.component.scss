@@ -32,10 +32,6 @@
   @include lp.stack;
 }
 
-.tasks__dot {
-  margin-inline: 6px;
-  color: var(--color-text-subtle);
-}
 
 .tasks__trail {
   display: flex;

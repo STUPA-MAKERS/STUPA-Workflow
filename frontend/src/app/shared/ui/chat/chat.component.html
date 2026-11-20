@@ -22,9 +22,9 @@
             <span class="chat__sepText">{{ 'chat.newCount' | t: { count: item.count } }}</span>
           </div>
         } @else if (item.kind === 'event') {
-          <p class="chat__event">
-            {{ item.text }}<span class="chat__dot" aria-hidden="true">·</span><time [attr.datetime]="item.at">{{ time(item.at) }}</time>
-          </p>
+          <p class="chat__event"><app-meta-line>
+            <span>{{ item.text }}</span><time [attr.datetime]="item.at">{{ time(item.at) }}</time>
+          </app-meta-line></p>
         } @else {
           @let m = item.msg;
           <div
@@ -154,17 +154,14 @@
                   </button>
                 </span>
               } @else if (item.tail || m.editedAt) {
-                <span class="chat__meta">
+                <span class="chat__meta"><app-meta-line>
                   @if (item.tail) {
                     <time [attr.datetime]="m.at">{{ time(m.at) }}</time>
-                  }
-                  @if (item.tail && m.editedAt) {
-                    <span class="chat__dot" aria-hidden="true">·</span>
                   }
                   @if (m.editedAt) {
                     <span>{{ 'chat.edited' | t }}</span>
                   }
-                </span>
+                </app-meta-line></span>
               }
             </div>
           </div>

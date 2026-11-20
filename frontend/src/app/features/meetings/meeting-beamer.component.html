@@ -50,15 +50,13 @@
     <div class="bm__bottom">
       <div class="bm__bottomText">
         @if (v.status === 'open') {
-          <p class="bm__foot">
+          <p class="bm__foot"><app-meta-line>
             <app-status-text kind="accent">{{ 'meetings.voteStatus.open' | t }}</app-status-text>
-            <span class="bm__sep" aria-hidden="true">·</span>
             <span>{{ tx.rules }}</span>
             @if (tx.quorumWarning; as warn) {
-              <span class="bm__sep" aria-hidden="true">·</span>
               <span class="bm__warn">{{ warn }}</span>
             }
-          </p>
+          </app-meta-line></p>
         } @else {
           <p class="bm__outcome" role="status" [class.bm__outcome--stack]="!!tx.composition">
             @if (v.poll) {

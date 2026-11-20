@@ -81,11 +81,10 @@
           }
           <div class="att__meta">
             <span class="att__name ell" [title]="att.filename">{{ att.filename }}</span>
-            <span class="att__sub">
+            <span class="att__sub"><app-meta-line>
               <span class="num">{{ size(att) }}</span>
-              <span class="att__dot" aria-hidden="true">·</span>
               <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
-            </span>
+            </app-meta-line></span>
           </div>
           <div class="att__actions">
             <app-button-group>

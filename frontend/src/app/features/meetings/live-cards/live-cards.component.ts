@@ -8,7 +8,7 @@ import { FeatureService } from '@core/features/feature.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { clock, shortTime } from '@shared/date-format';
-import { DateBlockComponent, IconComponent, SegBarComponent, StatusTextComponent } from '@stupa-makers/ui-kit';
+import { DateBlockComponent, IconComponent, MetaLineComponent, SegBarComponent, StatusTextComponent } from '@stupa-makers/ui-kit';
 
 /** Meetings the timeline loads. The live ones come first, so a few are enough. */
 const TIMELINE_LIMIT = 8;
@@ -37,7 +37,7 @@ export interface LiveCard {
   selector: 'app-live-cards',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslatePipe, DateBlockComponent, IconComponent, SegBarComponent, StatusTextComponent],
+  imports: [MetaLineComponent, RouterLink, TranslatePipe, DateBlockComponent, IconComponent, SegBarComponent, StatusTextComponent],
   templateUrl: './live-cards.component.html',
   styleUrl: './live-cards.component.scss',
 })

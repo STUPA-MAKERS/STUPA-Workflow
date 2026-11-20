@@ -90,17 +90,14 @@
                     [link]="['/tasks', row.item.id]"
                     [selected]="row.item.id === selectedId()"
                   >
-                    <span sub>
+                    <span sub><app-meta-line>
                       @if (row.stateLabel) {
                         <app-status-text [kind]="row.stateKind">{{ row.stateLabel }}</app-status-text>
-                      }
-                      @if (row.stateLabel && row.typeLabel) {
-                        <span class="tasks__dot" aria-hidden="true">·</span>
                       }
                       @if (row.typeLabel) {
                         <span>{{ row.typeLabel }}</span>
                       }
-                    </span>
+                    </app-meta-line></span>
                     <span trail class="tasks__trail">
                       <span class="tasks__facts">
                         @if (row.amount) {

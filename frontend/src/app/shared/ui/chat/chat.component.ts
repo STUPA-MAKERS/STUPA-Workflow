@@ -19,31 +19,7 @@ import {
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
-import {
-  AvatarComponent,
-  ButtonComponent,
-  ButtonGroupComponent,
-  ChipComponent,
-  ConfirmDialogComponent,
-  copyText,
-  DropOverlayComponent,
-  EmptyStateComponent,
-  FileDragTracker,
-  FileViewerComponent,
-  type FileViewerItem,
-  IconComponent,
-  isFileDrag,
-  MEDIA,
-  mediaQuery,
-  PressSelectDirective,
-  ScrollFadeDirective,
-  SegmentedComponent,
-  type SegmentedOption,
-  SideSheetComponent,
-  SkeletonComponent,
-  StatusTextComponent,
-  ToastService,
-} from '@stupa-makers/ui-kit';
+import { AvatarComponent, ButtonComponent, ButtonGroupComponent, ChipComponent, ConfirmDialogComponent, copyText, DropOverlayComponent, EmptyStateComponent, FileDragTracker, FileViewerComponent, type FileViewerItem, IconComponent, isFileDrag, MEDIA, mediaQuery, MetaLineComponent, PressSelectDirective, ScrollFadeDirective, SegmentedComponent, type SegmentedOption, SideSheetComponent, SkeletonComponent, StatusTextComponent, ToastService } from '@stupa-makers/ui-kit';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { PersonRef } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -186,7 +162,7 @@ function writeStore(key: string, value: string | null): void {
   selector: 'app-chat',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
+  imports: [MetaLineComponent, 
     ChipComponent,
     ConfirmDialogComponent,
     DropOverlayComponent,

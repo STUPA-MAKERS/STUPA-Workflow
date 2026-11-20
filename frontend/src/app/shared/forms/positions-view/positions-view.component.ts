@@ -1,8 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
-import {
-  IconComponent,
-  StatusTextComponent,
-} from '@stupa-makers/ui-kit';
+import { IconComponent, MetaLineComponent, StatusTextComponent } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { formatMoney } from '../../format-money';
@@ -63,7 +60,7 @@ let nextId = 0;
   selector: 'app-positions-view',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconComponent, StatusTextComponent, TranslatePipe],
+  imports: [MetaLineComponent, IconComponent, StatusTextComponent, TranslatePipe],
   templateUrl: './positions-view.component.html',
   styleUrl: './positions-view.component.scss',
 })
