@@ -13,14 +13,33 @@ describe('RowChevronComponent', () => {
   });
 
   it('takes another size', async () => {
-    const { container } = await render(`<app-row-chevron [size]="16" />`, { imports: [RowChevronComponent] });
-    expect((container.querySelector('app-icon') as HTMLElement).style.getPropertyValue('--icon-size')).toBe('16px');
+    const { container } = await render(`<app-row-chevron [size]="16" />`, {
+      imports: [RowChevronComponent],
+    });
+    expect(
+      (container.querySelector('app-icon') as HTMLElement).style.getPropertyValue('--icon-size'),
+    ).toBe('16px');
   });
 
   it('is quiet and pulls into the end padding of the row', () => {
     const scss = readFileSync(join(__dirname, 'row-chevron.component.scss'), 'utf8');
     expect(scss).toContain('margin-inline-end: calc(-1 * var(--space-2))');
     expect(scss).toContain('color: var(--color-text-muted)');
+  });
+
+  it('points down for a row that opens in place and turns while it is open (001962)', async () => {
+    const { container, rerender } = await render(`<app-row-chevron [open]="open" />`, {
+      imports: [RowChevronComponent],
+      componentProperties: { open: false },
+    });
+    const host = container.querySelector('app-row-chevron') as HTMLElement;
+    expect(host.querySelector('svg')).toHaveAttribute('data-icon', 'down');
+    expect(host).toHaveClass('rch--expand');
+    expect(host).not.toHaveClass('rch--open');
+    await rerender({ componentProperties: { open: true } });
+    expect(host).toHaveClass('rch--open');
+    const scss = readFileSync(join(__dirname, 'row-chevron.component.scss'), 'utf8');
+    expect(scss).toMatch(/:host\(\.rch--open\) \{\s*transform: rotate\(180deg\);/);
   });
 
   /** § NF/accessibility/conformance/000493 */

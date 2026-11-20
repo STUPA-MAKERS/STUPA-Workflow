@@ -33,6 +33,7 @@ import { applicationReads } from '../applications/application-reads';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import { RowChevronComponent } from '../../shared/ui/row-chevron/row-chevron.component';
 
 /** "Anzeigen": both groups, or one of them. */
 export type TasksShow = 'all' | 'applications' | 'todos';
@@ -100,7 +101,7 @@ interface TaskRow {
   selector: 'app-tasks',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MetaLineComponent, 
+  imports: [RowChevronComponent, MetaLineComponent, 
     RowMenuComponent,
     PullRefreshDirective,
     LoadErrorComponent,

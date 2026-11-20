@@ -23,7 +23,7 @@
             [attr.aria-expanded]="false"
             (click)="toggleOpen(pi)"
           >
-            <app-icon class="pos__chev" name="down" [size]="18" />
+            <app-row-chevron [open]="false" [size]="18" />
             <span class="pos__sumText">
               <span class="pos__sumName">{{ p.label || t('forms.positions.untitled') }}</span>
               <span class="pos__sumSub">{{ summary(p) }}</span>
@@ -52,7 +52,7 @@
             [attr.aria-label]="t('forms.positions.collapse')"
             (click)="toggleOpen(pi)"
           >
-            <app-icon class="pos__chev pos__chev--open" name="down" [size]="18" />
+            <app-row-chevron [open]="true" [size]="18" />
           </button>
           <label class="pf pos__grow" [class.pf--invalid]="titleInvalid(p)">
             <span class="pf__label">{{ t('forms.positions.position') }}</span>

@@ -52,12 +52,7 @@
                           [attr.aria-controls]="open ? valuesId : null"
                           (click)="toggle(key)"
                         >
-                          <app-icon
-                            class="hist__chev"
-                            [class.hist__chev--open]="open"
-                            name="down"
-                            [size]="16"
-                          />
+                          <app-row-chevron [open]="open" [size]="16" />
                           {{ (open ? 'ui.history.hideValues' : 'ui.history.showValues') | t }}
                         </button>
                         @if (open) {

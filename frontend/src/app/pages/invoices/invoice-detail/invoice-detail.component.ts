@@ -18,6 +18,7 @@ import { bookedOn } from '../invoice-figures';
 import { TodoLinkedListComponent } from '../../../features/todos/linked-list/todo-linked-list.component';
 import { dayMonth, daysUntil } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
+import { RowChevronComponent } from '../../../shared/ui/row-chevron/row-chevron.component';
 
 /**
  * The detail of an invoice:
@@ -32,7 +33,7 @@ import { formatMoney } from '@shared/format-money';
   selector: 'app-invoice-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MetaLineComponent, 
+  imports: [RowChevronComponent, MetaLineComponent, 
     SectionComponent,
     NoteComponent,
     EmptyStateComponent,

@@ -45,7 +45,7 @@
                         {{ 'admin.users.col.lastLogin' | t }}:
                         {{ c.lastLogin ? (c.lastLogin | ldate: 'mediumDate') : ('admin.users.never' | t) }}
                       </span>
-                      <app-icon trail class="um__chev" name="right" [size]="18" />
+                      <app-row-chevron trail />
                     </app-list-item>
                   </li>
                 } @empty {

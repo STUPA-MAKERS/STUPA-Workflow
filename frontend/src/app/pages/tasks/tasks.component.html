@@ -108,7 +108,7 @@
                         }}</span>
                       </span>
                       @if (!split()) {
-                        <app-icon class="tasks__chev" name="right" [size]="17" />
+                        <app-row-chevron class="tasks__chev" />
                       }
                     </span>
                   </app-list-item>
@@ -145,7 +145,7 @@
                           {{ row.due ?? ('todos.due.none' | t) }}
                         </span>
                         @if (!split()) {
-                          <app-icon class="tasks__chev" name="right" [size]="17" />
+                          <app-row-chevron class="tasks__chev" />
                         }
                       </span>
                     </app-list-item>

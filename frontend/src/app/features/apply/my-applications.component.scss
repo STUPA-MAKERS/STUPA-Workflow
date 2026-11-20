@@ -53,10 +53,6 @@
   align-items: center;
   gap: var(--space-1);
 }
-.ma__chev {
-  display: inline-flex;
-  color: var(--color-text-muted);
-}
 .ma__detail {
   @include lp.detail;
 }

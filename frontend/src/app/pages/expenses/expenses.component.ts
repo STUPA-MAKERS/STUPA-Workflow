@@ -61,6 +61,7 @@ import { TodosApiService } from '@core/api/todos.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
+import { RowChevronComponent } from '../../shared/ui/row-chevron/row-chevron.component';
 
 /** The two views of the page. Bookings are the default. */
 export type ExpensesTab = 'bookings' | 'transfers';
@@ -105,7 +106,7 @@ const SORTS: readonly {
   host: { '[class.pane-page]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MetaLineComponent, 
+  imports: [RowChevronComponent, MetaLineComponent, 
     PullRefreshDirective,
     InfiniteScrollDirective,
     CostCentreLabelComponent,

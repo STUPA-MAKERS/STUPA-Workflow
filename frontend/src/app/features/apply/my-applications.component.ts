@@ -22,6 +22,7 @@ import { AmountComponent } from '@shared/ui/amount/amount.component';
 import { EmptyStateComponent, IconComponent, ListDetailLayoutComponent, ListGroupComponent, ListItemComponent, MetaLineComponent, PageHeaderComponent, ScrollFadeDirective, SearchPillComponent, SkeletonComponent, type StatusKind, StatusTextComponent, StickyBarComponent } from '@stupa-makers/ui-kit';
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { MY_APPLICATIONS_PAGE, type MyApplicationsPage } from './my-applications-page';
+import { RowChevronComponent } from '../../shared/ui/row-chevron/row-chevron.component';
 
 /** One row of the list, in the shape of the rows of the list "Anträge". */
 interface MyRow {
@@ -53,7 +54,7 @@ interface MyRow {
   providers: [{ provide: MY_APPLICATIONS_PAGE, useExisting: forwardRef(() => MyApplicationsComponent) }],
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MetaLineComponent, 
+  imports: [RowChevronComponent, MetaLineComponent, 
     RouterOutlet,
     TranslatePipe,
     AmountComponent,

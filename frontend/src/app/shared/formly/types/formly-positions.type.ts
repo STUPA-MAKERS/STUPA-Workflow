@@ -23,6 +23,7 @@ import { formatMoney } from '@shared/format-money';
 import { withEntry, withoutEntry } from '@shared/util/immutable';
 import { type CostLine, costLine, placeholderReasons } from '@shared/forms/form-rules';
 import { POSITION_FILES, newPositionId } from '@shared/forms/position-files';
+import { RowChevronComponent } from '../../ui/row-chevron/row-chevron.component';
 
 /** A comparison offer within a cost position. */
 interface Offer {
@@ -87,7 +88,7 @@ let nextUid = 0;
   selector: 'app-formly-positions',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
+  imports: [RowChevronComponent, 
     ButtonComponent,
     ButtonGroupComponent,
     IconComponent,

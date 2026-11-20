@@ -25,6 +25,7 @@ import { BookingRowComponent } from '../../budget/booking-row/booking-row.compon
 import { SumRowComponent } from '../../budget/booking-row/sum-row.component';
 import { dayMonth } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
+import { RowChevronComponent } from '../../../shared/ui/row-chevron/row-chevron.component';
 
 /**
  * The detail of a booking:
@@ -38,7 +39,7 @@ import { formatMoney } from '@shared/format-money';
   selector: 'app-booking-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MetaLineComponent, 
+  imports: [RowChevronComponent, MetaLineComponent, 
     SectionComponent,
     SumRowComponent,
     BookingRowComponent,

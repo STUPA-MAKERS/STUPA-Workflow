@@ -1,5 +1,3 @@
-@use 'display' as d;
-
 :host {
   display: block;
   min-width: 0;
@@ -133,18 +131,6 @@
 .hist__more:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 1px;
-}
-.hist__chev {
-  flex: none;
-  transition: transform var(--motion-fast) var(--ease-standard);
-}
-.hist__chev--open {
-  transform: rotate(180deg);
-}
-@include d.host-on(motion) {
-  .hist__chev {
-    transition: none;
-  }
 }
 .hist__values {
   display: flex;

@@ -174,9 +174,7 @@
                       <span trail class="exp__trail">
                         <span class="mono exp__amount">{{ money(t.amount) }}</span>
                         @if (!split()) {
-                          <span class="exp__chev" aria-hidden="true">
-                            <app-icon name="right" [size]="17" />
-                          </span>
+                          <app-row-chevron />
                         }
                       </span>
                       @if (canChange(t.fiscalYearId)) {
@@ -272,9 +270,7 @@
                           signed(e)
                         }}</span>
                         @if (!selecting() && !split()) {
-                          <span class="exp__chev" aria-hidden="true">
-                            <app-icon name="right" [size]="17" />
-                          </span>
+                          <app-row-chevron />
                         }
                       </span>
                       @if (menu.length) {

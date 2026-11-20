@@ -59,6 +59,7 @@ import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.direc
 import { withEntry, withoutKey } from '@shared/util/immutable';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import { RowChevronComponent } from '../../shared/ui/row-chevron/row-chevron.component';
 
 /**
  * One filter of the list.
@@ -135,7 +136,7 @@ type FilterSheet = 'more' | null;
   host: { '[class.pane-page]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MetaLineComponent, 
+  imports: [RowChevronComponent, MetaLineComponent, 
     PullRefreshDirective,
     InfiniteScrollDirective,
     AmountComponent,

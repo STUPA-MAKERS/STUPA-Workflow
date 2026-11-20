@@ -209,9 +209,7 @@
                     <span trail class="inv__trail">
                       <span class="mono inv__amount">{{ money(i.grossAmount) }}</span>
                       @if (!selecting() && !split()) {
-                        <span class="inv__chev" aria-hidden="true">
-                          <app-icon name="right" [size]="17" />
-                        </span>
+                        <app-row-chevron />
                       }
                     </span>
                     @if (menu.length) {

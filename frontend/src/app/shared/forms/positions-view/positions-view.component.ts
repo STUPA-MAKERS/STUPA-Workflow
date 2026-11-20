@@ -13,6 +13,7 @@ import {
   type CostPosition,
   type PositionOffer,
 } from '../positions';
+import { RowChevronComponent } from '../../ui/row-chevron/row-chevron.component';
 
 /** A file of a position as the view lists it. */
 export interface PositionFile {
@@ -60,7 +61,7 @@ let nextId = 0;
   selector: 'app-positions-view',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MetaLineComponent, IconComponent, StatusTextComponent, TranslatePipe],
+  imports: [RowChevronComponent, MetaLineComponent, IconComponent, StatusTextComponent, TranslatePipe],
   templateUrl: './positions-view.component.html',
   styleUrl: './positions-view.component.scss',
 })

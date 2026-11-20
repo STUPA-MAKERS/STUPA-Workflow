@@ -249,9 +249,7 @@
                       <span trail class="apps__trail">
                         <app-amount [amount]="row.amount" [approved]="row.approved" layout="stack" />
                         @if (!split()) {
-                          <span class="apps__chev" aria-hidden="true">
-                            <app-icon name="right" [size]="17" />
-                          </span>
+                          <app-row-chevron class="apps__chev" />
                         }
                       </span>
                       <app-row-transitions-menu

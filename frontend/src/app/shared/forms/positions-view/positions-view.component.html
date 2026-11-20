@@ -19,7 +19,7 @@
           [attr.aria-controls]="isOpen(i) ? id + '-' + i : null"
           (click)="toggle(i)"
         >
-          <app-icon class="pv__chev" [class.pv__chev--open]="isOpen(i)" name="down" [size]="18" />
+          <app-row-chevron [open]="isOpen(i)" [size]="18" />
           <span class="pv__text">
             <span class="pv__name">{{ p.label || ('forms.positions.untitled' | t) }}</span>
             <span class="pv__sub"><app-meta-line>
