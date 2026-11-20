@@ -388,6 +388,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/todos/001077](requirements/functional/collaboration/todos/001077_gremium-board-entries.md) | A board of a Gremium takes more Gremien and persons | approved |
 | [F/collaboration/todos/001078](requirements/functional/collaboration/todos/001078_board-rights.md) | Board rights depend on the board kind and its entries | approved |
 | [F/collaboration/todos/001380](requirements/functional/collaboration/todos/001380_move-sheet-select-rows.md) | The move sheet lists the columns as the select sheet does | approved |
+| [F/collaboration/todos/001967](requirements/functional/collaboration/todos/001967_column-menu-corner.md) | The menu of a board column stands in its top right corner | approved |
 | [F/finance/budget/000138](requirements/functional/finance/budget/000138_cost-centre-picker.md) | The cost centre pickers are fixed | approved |
 | [F/finance/budget/000139](requirements/functional/finance/budget/000139_close-fiscal-year.md) | A fiscal year closes and reopens | approved |
 | [F/finance/budget/000140](requirements/functional/finance/budget/000140_default-fiscal-year.md) | The default fiscal year holds today | approved |

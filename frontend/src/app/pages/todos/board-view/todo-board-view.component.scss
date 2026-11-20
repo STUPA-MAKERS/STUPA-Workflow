@@ -76,11 +76,13 @@
   font-size: 0.75rem;
   font-weight: var(--fw-medium);
 }
+// The tag of the done column and the menu stand at the end of the head (001967). The menu sits in
+// a button group, so the group is the flex item that takes the free room.
 .bv__doneTag,
-.bv__menu {
+.bv__head > app-button-group {
   margin-inline-start: auto;
 }
-.bv__doneTag + .bv__menu {
+.bv__doneTag + app-button-group {
   margin-inline-start: 0;
 }
 
