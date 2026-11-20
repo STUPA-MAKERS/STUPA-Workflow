@@ -52,6 +52,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.applications.decision import (
     DecisionIn,
     DecisionSwap,
+    amount_required,
+    check_amount_given,
     check_approved_amount,
     check_decision_target,
     record_decision,
@@ -122,12 +124,17 @@ def agenda_gremium_id(actions: object) -> UUID | None:
 
 
 def _transition_out(
-    t: Transition, gremium_id: UUID | None, *, allows_decision: bool = False
+    t: Transition,
+    gremium_id: UUID | None,
+    *,
+    allows_decision: bool = False,
+    requires_amount: bool = False,
 ) -> TransitionOut:
     """Map a transition to its API shape.
 
     `allows_decision` tells that the target is an approved state: a fire then takes a
-    `decision`.
+    `decision`. `requires_amount` tells that the decision must name the approved
+    amount (`amount_required`).
 
     `gremium_id` is the agenda Gremium (`FlowService._agenda_gremium`). It is set only
     when the transition carries an `addToNextSession` action, its target is a vote
@@ -146,6 +153,7 @@ def _transition_out(
         addsToAgenda=gremium_id is not None,
         agendaGremiumId=gremium_id,
         allowsDecision=allows_decision,
+        requiresAmount=requires_amount,
     )
 
 
@@ -230,6 +238,29 @@ class FlowService:
             await self.session.execute(select(State).where(State.id == state_id))
         ).scalar_one_or_none()
 
+    async def _is_approved_state(self, state_id: UUID | None) -> bool:
+        """Tell whether `state_id` names an approved state (spec 000571)."""
+        if state_id is None:
+            return False
+        approved = await self.session.scalar(select(State.is_approved).where(State.id == state_id))
+        return bool(approved)
+
+    async def _amount_required(
+        self, from_state_id: UUID | None, target: State | None, app: Application
+    ) -> bool:
+        """Tell whether a move into `target` must name the approved amount (spec 001610).
+
+        The read of the left state and of the requested amount runs only for an approved
+        target.
+        """
+        if target is None or not target.is_approved:
+            return False
+        return amount_required(
+            entering=True,
+            was_approved=await self._is_approved_state(from_state_id),
+            requested=app.amount,
+        )
+
     async def _agenda_gremium(
         self, transition: Transition, target: State | None, budget_id: UUID | None
     ) -> UUID | None:
@@ -307,6 +338,7 @@ class FlowService:
             transition,
             await self._agenda_gremium(transition, target, app.budget_id),
             allows_decision=target is not None and target.is_approved,
+            requires_amount=await self._amount_required(transition.from_state_id, target, app),
         )
 
     async def _outgoing(self, app: Application) -> list[Transition]:
@@ -712,13 +744,20 @@ class FlowService:
         rollback_on_conflict: bool = True,
         vote_id: UUID | None = None,
         decision: DecisionIn | None = None,
+        outside_decision: dict[str, Any] | None = None,
     ) -> StagedFire:
         """Write a transition into the open transaction, without a commit.
 
         `fire` documents the arguments. `vote_id` goes into the status event (the vote
         whose close fires a branch). `rollback_on_conflict=False` leaves a lost race
         to the caller: the voting close runs this in a SAVEPOINT, and a full rollback
-        there would also drop the staged vote close.
+        there would also drop the staged vote close. `outside_decision` marks the fire
+        of a branch by a decision that a Gremium made outside the platform: the status
+        event stores it, and the audit entry holds `outsideDecision: true`.
+
+        A manual move into an approved state from a state that is not approved must name
+        the approved amount (422 `approved_amount_required`, spec 001610). The
+        applicant never names one, so the rule leaves the applicant path out.
 
         A user never fires a branch transition directly, because that would set the vote outcome
         without a vote. Only the vote outcome fires it, through `stage_branch` with
@@ -780,6 +819,11 @@ class FlowService:
         if not eval_guard(transition.guard, ctx):
             raise ConflictError("Transition guard not satisfied.", code="guard_failed")
         target = await self.session.get(State, transition.to_state_id)
+        if manual and not as_applicant:
+            check_amount_given(
+                await self._amount_required(transition.from_state_id, target, app),
+                decision,
+            )
         vote_gremium = await self._entry_snapshot(app, transition.from_state_id, target)
         if meeting_id is not None:
             await self._check_agenda_meeting(
@@ -816,6 +860,7 @@ class FlowService:
             actor=principal.sub,
             note=note,
             vote_id=vote_id,
+            outside_decision=outside_decision,
         )
         self.session.add(event)
         await self.session.flush()
@@ -844,6 +889,7 @@ class FlowService:
                 "statusEventId": str(status_event_id),
                 "manual": manual,
                 "hasNote": note is not None,
+                **({"outsideDecision": True} if outside_decision is not None else {}),
             },
         )
         if decision is not None:
@@ -1135,6 +1181,7 @@ class FlowService:
                 color=s.color,
                 editAllowed=s.edit_allowed,
                 kind=s.kind,
+                isApproved=s.is_approved,
             )
             for s in states
         ]
@@ -1145,10 +1192,20 @@ class FlowService:
         target_state_id: UUID,
         principal: Principal,
         *,
-        note: str,
+        reason: str,
+        note: str | None = None,
+        decision: DecisionIn | None = None,
         allow_unconfirmed: bool = True,
     ) -> TransitionResult:
         """Force an application directly into `target_state_id` and bypass the flow.
+
+        A forced move into an approved state from a state that is not approved must name
+        the approved amount (spec 001653), as a manual approval does (spec 001610). The
+        decision counts only for an approved target; any other target drops it.
+
+        `reason` is the key of the reason (spec 001650) and `note` the optional text.
+        The status event stores both and the mark `forced`; the audit entry holds the
+        key and whether a note exists, never the text.
 
         This is the `application.force_status` override. It uses no transition, no guard
         and no `from_state` adjacency check. It mirrors the direct state flip of
@@ -1188,6 +1245,12 @@ class FlowService:
             raise ConflictError(
                 "Application is already in the target state.", code="already_in_state"
             )
+        approval = decision if target.is_approved else None
+        if target.is_approved:
+            check_amount_given(await self._amount_required(from_state_id, target, app), approval)
+        if approval is not None:
+            check_approved_amount(app.amount, approval.approved_amount)
+        old_approved = app.approved_amount if approval is not None else None
         vote_gremium = await self._entry_snapshot(app, from_state_id, target)
         result = cast(
             "CursorResult[Any]",
@@ -1213,6 +1276,8 @@ class FlowService:
             transition_id=None,
             actor=principal.sub,
             note=note,
+            forced=True,
+            force_reason=reason,
         )
         self.session.add(event)
         await self.session.flush()
@@ -1234,10 +1299,21 @@ class FlowService:
                 "transitionId": None,
                 "statusEventId": str(status_event_id),
                 "manual": True,
-                "hasNote": True,
+                "hasNote": note is not None,
                 "forced": True,
+                "forceReason": reason,
             },
         )
+        if approval is not None:
+            await record_decision(
+                self.session,
+                app,
+                approval,
+                actor=principal.sub,
+                decided_by=principal.sub,
+                old_approved=old_approved,
+                status_event_id=status_event_id,
+            )
         await self.session.commit()
         await self._publish_cancelled(cancelled)
         return TransitionResult(

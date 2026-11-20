@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - backend/migrations/versions/c5e19a7d3b42_decisions_outside_and_amend.py
+  - backend/app/modules/flow/router.py
 scope:
   - backend/app/modules/flow
   - backend/app/modules/admin

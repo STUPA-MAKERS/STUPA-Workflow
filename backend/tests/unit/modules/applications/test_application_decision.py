@@ -127,6 +127,10 @@ def _row(**kw: Any) -> ApplicationDecision:
         "status_event_id": None,
         "decided_at": NOW,
         "superseded_at": None,
+        "basis_gremium_id": None,
+        "amend_reason": None,
+        "previous_amount": None,
+        "basis_date": None,
     }
     base.update(kw)
     return cast("ApplicationDecision", SimpleNamespace(**base))
@@ -260,6 +264,7 @@ async def test_record_decision_supersedes_adds_and_audits(
         "conditionCount": 2,
         "voteId": str(vote_id),
         "statusEventId": str(event_id),
+        "amended": False,
     }
 
 

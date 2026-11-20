@@ -44,7 +44,7 @@ async function setup(transition: Transition | null = APPROVE, open = true) {
 describe('DecisionDialogComponent', () => {
   it('fires as requested while the switch is off', async () => {
     const { http, done, toast, confirm, container } = await setup();
-    expect(screen.getByRole('dialog', { name: 'Bewilligen' })).toHaveAccessibleDescription('Erstsemester-Hütte');
+    expect(screen.getByRole('dialog', { name: 'Bewilligen' })).not.toHaveAccessibleDescription('Erstsemester-Hütte');
     expect(screen.queryByLabelText('Förderbetrag')).toBeNull();
     expect(await runAxe(container)).toHaveNoViolations();
     await userEvent.click(confirm());

@@ -14,6 +14,7 @@ from typing import Any
 
 from sqlalchemy import (
     CHAR,
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -295,6 +296,9 @@ class StatusEvent(UUIDPkMixin, Base):
     vote_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("vote.id", ondelete="SET NULL"), nullable=True
     )
+    forced: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    force_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    outside_decision: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (
         Index("ix_status_event_application_id_at", "application_id", "at"),
@@ -321,6 +325,13 @@ class ApplicationDecision(UUIDPkMixin, Base):
             NULL when a passed vote could not fire its branch.
         decided_by: The OIDC ``sub`` of the person who fired the transition. NULL for a
             vote.
+        amend_reason: The reason of a later change of the approved amount. Set only on
+            such a change, which has no status event: the state stays.
+        previous_amount: The approved amount before the change, for the timeline.
+        basis_date: The date of the decision that allows the change.
+        basis_gremium_id: The Gremium of that decision. No foreign key, because the
+            row is history: a deleted Gremium leaves the id, and the name read gives
+            nothing.
     """
 
     __tablename__ = "application_decision"
@@ -339,6 +350,10 @@ class ApplicationDecision(UUIDPkMixin, Base):
     decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     decided_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    amend_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    previous_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    basis_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    basis_gremium_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
 
     __table_args__ = (
         Index("ix_application_decision_application_id", "application_id"),

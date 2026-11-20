@@ -273,9 +273,11 @@ async def fire_transition(
     `meeting_id` the server picks the next planned meeting after the step.
 
     A transition with `allowsDecision` (into an accepted state of the cost center)
-    takes a decision: `approved_amount` (decimal string, greater than 0 and not above
-    the requested amount; omit it for "as requested") and `conditions` (at most 20).
-    Any other transition answers 422 `decision_not_allowed` to a decision.
+    takes a decision: `approved_amount` (decimal string, at least 0 and not above
+    the requested amount) and `conditions` (at most 20). A transition with
+    `requiresAmount` needs `approved_amount` (422 `approved_amount_required`); confirm
+    the amount with the user, the requested amount is the usual value. Any other
+    transition answers 422 `decision_not_allowed` to a decision.
     """
     decision = (
         params(approvedAmount=approved_amount, conditions=conditions)
@@ -349,17 +351,108 @@ async def list_application_flow_states(application_id: str) -> list:
 
 
 @group.tool
-async def force_application_status(application_id: str, state_id: str, note: str) -> dict:
+async def force_application_status(
+    application_id: str,
+    state_id: str,
+    reason: Literal["outside_decision", "applicant_error", "error_correction", "other"],
+    note: str | None = None,
+    approved_amount: str | None = None,
+    conditions: list[str] | None = None,
+) -> dict:
     """Put an application directly into a state, past the transitions and their guards.
 
-    Requires the right to force a status. `note` (required) says why; the audit log
-    records it. 409 when the application has no current state, already sits in the
-    target state, or a concurrent change moved it first. Prefer `fire_transition`, and
-    ask the user before you force a status.
+    Requires the right to force a status. `reason` (required) names why:
+    `outside_decision` (a Gremium decided outside the platform), `applicant_error`,
+    `error_correction` or `other`; `other` needs a `note` of at least 10 characters.
+    The audit log records it. 409 when the application has no current state, already
+    sits in the target state, or a concurrent change moved it first. Prefer
+    `fire_transition` or `record_outside_decision`, and ask the user before you force
+    a status.
+
+    A move into an approved state (`isApproved` in `list_application_flow_states`) from
+    one that is not approved needs `approved_amount` (decimal string; 422
+    `approved_amount_required`); confirm it with the user. `conditions` are optional.
+    Any other target ignores the decision.
     """
+    decision = (
+        params(approvedAmount=approved_amount, conditions=conditions)
+        if approved_amount is not None or conditions is not None
+        else None
+    )
     return await api().post(
         f"/applications/{application_id}/force-status",
-        json={"stateId": state_id, "note": note},
+        json=params(stateId=state_id, reason=reason, note=note, decision=decision),
+    )
+
+
+@group.tool
+async def record_outside_decision(
+    application_id: str,
+    result: Literal["passed", "failed"],
+    meeting_date: str,
+    gremium_id: str,
+    yes: int | None = None,
+    no: int | None = None,
+    abstain: int | None = None,
+    meeting_id: str | None = None,
+    approved_amount: str | None = None,
+    conditions: list[str] | None = None,
+) -> dict:
+    """Record a decision that a Gremium made in a meeting without a vote on the platform.
+
+    Only for an application in a vote state. Requires the right to record decisions.
+    `passed` fires the pass branch, `failed` the fail branch, with their actions and
+    mails; open votes of the application are cancelled. `meeting_date` is an ISO date,
+    not later than today. `yes`/`no`/`abstain` and `meeting_id` (a meeting of the
+    platform) are optional. A pass into an approved state needs `approved_amount`
+    (decimal string, not above the requested amount); `conditions` are optional.
+    Ask the user before you record a decision.
+    """
+    decision = (
+        params(approvedAmount=approved_amount, conditions=conditions)
+        if approved_amount is not None or conditions is not None
+        else None
+    )
+    return await api().post(
+        f"/applications/{application_id}/outside-decision",
+        json=params(
+            result=result,
+            meetingDate=meeting_date,
+            gremiumId=gremium_id,
+            yes=yes,
+            no=no,
+            abstain=abstain,
+            meetingId=meeting_id,
+            decision=decision,
+        ),
+    )
+
+
+@group.tool
+async def change_approved_amount(
+    application_id: str,
+    approved_amount: str,
+    reason: str,
+    decision_date: str,
+    gremium_id: str,
+) -> dict:
+    """Change the approved amount of an approved application; the state stays.
+
+    Requires the right to change approved amounts. `approved_amount` is a decimal
+    string, at least 0; it may be above the requested amount (tell the user). `reason`
+    holds 10 to 2000 characters. `decision_date` (ISO date, not later than today) and
+    `gremium_id` name the decision that allows the change. The applicant gets a mail
+    with the old and the new amount. 409 `application_not_approved` outside an
+    approved state. Ask the user before you change an amount.
+    """
+    return await api().post(
+        f"/applications/{application_id}/approved-amount",
+        json={
+            "approvedAmount": approved_amount,
+            "reason": reason,
+            "decisionDate": decision_date,
+            "gremiumId": gremium_id,
+        },
     )
 
 

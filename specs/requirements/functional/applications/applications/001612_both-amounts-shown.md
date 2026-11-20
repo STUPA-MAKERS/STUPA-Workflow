@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - backend/app/shared/xlsx.py
+  - frontend/src/app/pages/applications/applications-list.component.ts
+  - frontend/src/app/pages/applications/applications-detail.component.ts
 scope:
   - backend/app/modules/applications
   - frontend/src/app/pages/applications

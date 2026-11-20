@@ -220,6 +220,8 @@ export interface StateOutWire {
   readonly editAllowed: boolean;
   /** State kind: normal|vote. */
   readonly kind?: string;
+  /** The state carries the flag `Bewilligt`: the approved amount shows only then. */
+  readonly isApproved?: boolean;
 }
 
 /** `ApplicantOut`. It holds PII. The backend fills it only for an authorized reader. */
@@ -551,6 +553,42 @@ export interface TimelineEventOutWire {
   readonly voteDeleted?: boolean;
   /** The decision that this status change carried. */
   readonly decision?: TimelineDecision | null;
+  /** `amountChange`: a later change of the approved amount; the state stays. */
+  readonly kind?: TimelineKind;
+  /** A person forced this state. */
+  readonly forced?: boolean;
+  /** The reason key of a forced state; null for an old one and for the applicant. */
+  readonly forceReason?: string | null;
+  /** The decision made outside the platform that fired this branch. */
+  readonly outsideDecision?: OutsideDecision | null;
+  /** The change of the approved amount of an `amountChange` entry. */
+  readonly amountChange?: AmountChange | null;
+}
+
+export type TimelineKind = 'status' | 'amountChange';
+
+/** A decision of a Gremium made in a meeting without a vote on the platform. */
+export interface OutsideDecision {
+  readonly result: 'passed' | 'failed';
+  readonly meetingDate: string;
+  readonly gremiumId?: Uuid | null;
+  readonly gremiumName?: string | null;
+  readonly yes?: number | null;
+  readonly no?: number | null;
+  readonly abstain?: number | null;
+  /** The meeting of the platform; null in the applicant view. */
+  readonly meetingId?: Uuid | null;
+  readonly meetingTitle?: string | null;
+}
+
+/** A later change of the approved amount, for the timeline. */
+export interface AmountChange {
+  readonly previousAmount?: string | null;
+  readonly approvedAmount?: string | null;
+  /** The reason; null in the applicant view. */
+  readonly reason?: string | null;
+  readonly decisionDate?: string | null;
+  readonly gremiumName?: string | null;
 }
 
 export type CommentVisibility = 'internal' | 'public';
@@ -614,6 +652,8 @@ export interface TransitionOutWire {
   readonly agendaGremiumId?: Uuid | null;
   /** The target is an accepted state of the cost center, so a fire takes a decision. */
   readonly allowsDecision?: boolean;
+  /** The fire must name the approved amount (a move into an approved state). */
+  readonly requiresAmount?: boolean;
 }
 
 /** A field change in the version diff (`FieldChange`). */
@@ -775,12 +815,79 @@ export interface TransitionRequestBody {
   readonly decision?: DecisionProposal | null;
 }
 
+/** The reasons of a forced status; the report counts per key. */
+export const FORCE_REASONS = [
+  'outside_decision',
+  'applicant_error',
+  'error_correction',
+  'other',
+] as const;
+export type ForceReason = (typeof FORCE_REASONS)[number];
+
 /** `POST /applications/{id}/force-status`. A privileged direct status override.
- *  `note` holds the reason and is mandatory. The change skips the flow. The audit
- *  log records it. */
+ *  `reason` is mandatory; `other` needs a `note` of at least 10 characters. The change
+ *  skips the flow. The audit log records it. */
 export interface ForceStatusBody {
   readonly stateId: Uuid;
-  readonly note: string;
+  readonly reason: ForceReason;
+  readonly note?: string | null;
+  /** The approved amount of a move into an approved state (spec 001653). */
+  readonly decision?: DecisionProposal | null;
+}
+
+/** `POST /applications/{id}/outside-decision`: a decision made in a meeting. */
+export interface OutsideDecisionBody {
+  readonly result: 'passed' | 'failed';
+  readonly meetingDate: string;
+  readonly gremiumId: Uuid;
+  readonly yes?: number | null;
+  readonly no?: number | null;
+  readonly abstain?: number | null;
+  readonly meetingId?: Uuid | null;
+  readonly decision?: DecisionProposal | null;
+}
+
+/** `POST /applications/{id}/approved-amount`: a later change of the approved amount. */
+export interface AmendAmountBody {
+  readonly approvedAmount: string;
+  readonly reason: string;
+  readonly decisionDate: string;
+  readonly gremiumId: Uuid;
+}
+
+/** The answer of a change of the approved amount. */
+export interface AmendAmountResult {
+  readonly previousAmount: string | null;
+  readonly approvedAmount: string;
+  readonly decidedAt: IsoDateTime;
+}
+
+/** `GET /admin/forced-status`: the counts of the forced status changes. */
+export interface ForcedReport {
+  readonly from: string;
+  readonly to: string;
+  readonly total: number;
+  readonly byReason: readonly { readonly reason: string; readonly count: number }[];
+  readonly byPath: readonly ForcedPathCount[];
+}
+
+export interface ForcedPathCount {
+  readonly fromKey: string | null;
+  readonly fromLabel: I18nMap | null;
+  readonly toKey: string;
+  readonly toLabel: I18nMap | null;
+  readonly count: number;
+}
+
+/** `GET /admin/forced-status/events`: one forced status change behind a count. */
+export interface ForcedEvent {
+  readonly applicationId: Uuid;
+  readonly title: string | null;
+  readonly at: IsoDateTime;
+  readonly reason: string;
+  readonly note: string | null;
+  readonly fromLabel: I18nMap | null;
+  readonly toLabel: I18nMap | null;
 }
 
 /** `TransitionResult`. The 200 response of a transition that succeeded. */
@@ -800,6 +907,8 @@ export interface ApplicationState {
   readonly editAllowed: boolean;
   /** State kind: normal|vote. */
   readonly kind: string;
+  /** The state carries the flag `Bewilligt`. */
+  readonly isApproved?: boolean;
 }
 
 export interface Applicant {
@@ -928,6 +1037,11 @@ export interface TimelineEntry {
   readonly voteDeleted: boolean;
   /** The decision that this status change carried. */
   readonly decision?: TimelineDecision | null;
+  readonly kind?: TimelineKind;
+  readonly forced?: boolean;
+  readonly forceReason?: string | null;
+  readonly outsideDecision?: OutsideDecision | null;
+  readonly amountChange?: AmountChange | null;
 }
 
 /** Comment, frontend view. `isPublic` comes from `visibility`. */
@@ -989,6 +1103,8 @@ export interface Transition {
    * menu then open the decision dialog, which can approve with deviations.
    */
   readonly allowsDecision?: boolean;
+  /** The dialog must ask for the approved amount, without the switch. */
+  readonly requiresAmount?: boolean;
 }
 
 /** A changed field cell, frontend view. The `key` comes out of the diff map. */

@@ -77,6 +77,7 @@ def test_all_sent_keys_are_catalogued() -> None:
         "task_reminder",
         "comment_applicant",
         "comment_team",
+        "approved_amount_changed",
         "meeting_created",
         "delegation_granted",
         "delegation_revoked",

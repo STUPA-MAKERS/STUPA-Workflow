@@ -84,7 +84,7 @@ async def test_force_status_cancels_open_and_draft_votes(session: AsyncSession) 
     publisher = RecordingPublisher()
 
     await FlowService(session, publisher=publisher).force_status(  # type: ignore[arg-type]
-        flow.app_id, flow.states["approved"], manager(), note="admin override"
+        flow.app_id, flow.states["approved"], manager(), reason="other", note="admin override"
     )
 
     for vote_id in (running, draft):
@@ -132,7 +132,7 @@ async def test_draft_for_another_state_survives_a_force(session: AsyncSession) -
     publisher = RecordingPublisher()
 
     await FlowService(session, publisher=publisher).force_status(  # type: ignore[arg-type]
-        flow.app_id, flow.states["approved"], manager(), note="admin override"
+        flow.app_id, flow.states["approved"], manager(), reason="other", note="admin override"
     )
 
     assert await _status(session, draft) == ("draft", None)
