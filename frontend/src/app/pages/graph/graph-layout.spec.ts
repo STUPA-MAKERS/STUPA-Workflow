@@ -11,6 +11,7 @@ import {
   clampZoom,
   fit,
   hashUnit,
+  hold,
   keep,
   nearestIn,
   place,
@@ -96,6 +97,17 @@ describe('graph layout', () => {
     expect(distance(rested[0], rested[1])).toBeLessThan(LINK_LENGTH * 3);
     expect(SETTLE_STEPS).toBeGreaterThan(10);
     expect(ALPHA_MIN).toBeLessThan(ALPHA_START);
+  });
+
+  /** § F/collaboration/graph/001433: a node that the person put somewhere stays there. */
+  it('holds a node at its place while the others move', () => {
+    const bodies = hold([body('a', 0, 0), body('b', 5, 0)], 'a', 40, 30);
+    expect(find(bodies, 'a')).toEqual({ id: 'a', x: 40, y: 30, vx: 0, vy: 0, fixed: true });
+    expect(find(bodies, 'b')).toEqual(body('b', 5, 0));
+    const after = settle(bodies, adjacency([{ a: 'a', b: 'b' }]));
+    expect(find(after, 'a')).toEqual({ id: 'a', x: 40, y: 30, vx: 0, vy: 0, fixed: true });
+    expect(find(after, 'b')).not.toEqual(body('b', 5, 0));
+    expect(Math.abs(distance(find(after, 'a'), find(after, 'b')) - LINK_LENGTH)).toBeLessThan(LINK_LENGTH);
   });
 
   it('only stops the nodes when alpha is below the rest value', () => {

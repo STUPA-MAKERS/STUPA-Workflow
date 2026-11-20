@@ -5,8 +5,11 @@ import {
   EMPTY_GRAPH,
   KIND_FEATURE,
   NO_FILTERS,
+  daysBefore,
+  defaultFilters,
   filtersOf,
   isFiltered,
+  localDay,
   merged,
   neighbours,
   nodeKey,
@@ -68,26 +71,39 @@ describe('graph util', () => {
     expect(near.get('todo:9')).toBeUndefined();
   });
 
-  it('knows when a filter or a switch is set', () => {
-    expect(isFiltered(NO_FILTERS)).toBe(false);
-    expect(isFiltered({ ...NO_FILTERS, q: '  ' })).toBe(false);
+  const TODAY = '2026-03-10';
+  const FRESH = defaultFilters(TODAY);
+
+  /** § F/collaboration/graph/001425: a fresh page shows the last 30 days and only the links of persons. */
+  it('starts with the last 30 days and the links of persons', () => {
+    expect(localDay(new Date(2026, 2, 5, 23, 59))).toBe('2026-03-05');
+    expect(daysBefore(TODAY, 30)).toBe('2026-02-08');
+    expect(daysBefore('2026-01-10', 30)).toBe('2025-12-11');
+    expect(FRESH).toEqual({ ...NO_FILTERS, from: '2026-02-08', relations: 'links' });
+  });
+
+  it('knows when a filter or a switch differs from the fresh page', () => {
+    expect(isFiltered(FRESH, TODAY)).toBe(false);
+    expect(isFiltered({ ...FRESH, q: '  ' }, TODAY)).toBe(false);
     for (const change of [
       { kinds: ['todo'] as const },
       { from: '2026-01-01' },
+      { from: '' },
       { to: '2026-12-31' },
       { gremiumId: 'g1' },
-      { relations: 'links' as const },
+      { relations: 'all' as const },
+      { relations: 'builtin' as const },
       { q: 'x' },
       { single: true },
       { noAccess: true },
     ]) {
-      expect(isFiltered({ ...NO_FILTERS, ...change })).toBe(true);
+      expect(isFiltered({ ...FRESH, ...change }, TODAY)).toBe(true);
     }
   });
 
   /** § F/collaboration/graph/001425: the filters are in the query of the URL. */
   it('reads the filters from the query', () => {
-    expect(filtersOf(convertToParamMap({}))).toEqual(NO_FILTERS);
+    expect(filtersOf(convertToParamMap({}), TODAY)).toEqual(FRESH);
     const query = convertToParamMap({
       kinds: 'todo,bogus,meeting',
       from: '2026-01-01',
@@ -98,7 +114,7 @@ describe('graph util', () => {
       single: '1',
       noaccess: '1',
     });
-    expect(filtersOf(query)).toEqual({
+    expect(filtersOf(query, TODAY)).toEqual({
       kinds: ['meeting', 'todo'],
       from: '2026-01-01',
       to: '2026-12-31',
@@ -108,51 +124,54 @@ describe('graph util', () => {
       single: true,
       noAccess: true,
     });
+    // `all` stands for every day and for every relation; an end alone has no start.
+    expect(filtersOf(convertToParamMap({ period: 'all', rel: 'all' }), TODAY)).toEqual(NO_FILTERS);
+    expect(filtersOf(convertToParamMap({ to: '2026-12-31' }), TODAY)).toEqual({ ...FRESH, from: '', to: '2026-12-31' });
   });
 
   it('drops unknown values of the query', () => {
-    const filters = filtersOf(convertToParamMap({ from: 'gestern', to: '2026-1-1', rel: 'none', single: 'true' }));
-    expect(filters).toEqual(NO_FILTERS);
+    const filters = filtersOf(
+      convertToParamMap({ from: 'gestern', to: '2026-1-1', period: 'some', rel: 'none', single: 'true' }),
+      TODAY,
+    );
+    expect(filters).toEqual(FRESH);
   });
 
   it('writes the filters to the query and back', () => {
-    expect(queryOf(NO_FILTERS)).toEqual({
-      kinds: null,
-      from: null,
-      to: null,
-      gremium: null,
-      rel: null,
-      q: null,
-      single: null,
-      noaccess: null,
-    });
+    const none = { kinds: null, from: null, to: null, period: null, gremium: null, rel: null, q: null, single: null, noaccess: null };
+    expect(queryOf(FRESH, TODAY)).toEqual(none);
+    expect(queryOf(NO_FILTERS, TODAY)).toEqual({ ...none, period: 'all', rel: 'all' });
     const filters = {
       kinds: ['meeting', 'todo'] as const,
       from: '2026-01-01',
       to: '2026-12-31',
       gremiumId: 'g1',
-      relations: 'links' as const,
+      relations: 'builtin' as const,
       q: ' Haushalt ',
       single: true,
       noAccess: true,
     };
-    const query = queryOf(filters);
+    const query = queryOf(filters, TODAY);
     expect(query).toEqual({
       kinds: 'meeting,todo',
       from: '2026-01-01',
       to: '2026-12-31',
+      period: null,
       gremium: 'g1',
-      rel: 'links',
+      rel: 'builtin',
       q: 'Haushalt',
       single: '1',
       noaccess: '1',
     });
-    expect(filtersOf(convertToParamMap(query))).toEqual({ ...filters, q: 'Haushalt' });
+    expect(filtersOf(convertToParamMap(query), TODAY)).toEqual({ ...filters, q: 'Haushalt' });
+    // The start of the fresh page with an end is a period of its own.
+    expect(queryOf({ ...FRESH, to: '2026-03-01' }, TODAY)).toEqual({ ...none, from: '2026-02-08', to: '2026-03-01' });
   });
 
   it('compares two sets of filters by what the server gets', () => {
     expect(sameFilters(NO_FILTERS, { ...NO_FILTERS, q: ' ' })).toBe(true);
     expect(sameFilters(NO_FILTERS, { ...NO_FILTERS, single: true })).toBe(false);
+    expect(sameFilters({ ...NO_FILTERS, kinds: ['todo', 'meeting'] }, { ...NO_FILTERS, kinds: ['meeting', 'todo'] })).toBe(true);
   });
 
   /** § F/collaboration/graph/001432: the kinds of a feature. */
