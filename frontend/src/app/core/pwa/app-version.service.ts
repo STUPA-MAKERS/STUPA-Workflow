@@ -1,9 +1,9 @@
 import { DOCUMENT } from '@angular/common';
 import { DestroyRef, Injectable, InjectionToken, inject } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
-import { SwUpdate } from '@angular/service-worker';
+import { SwUpdate, type VersionReadyEvent } from '@angular/service-worker';
 import { PAGE_RELOAD } from '@stupa-makers/ui-kit/pwa';
-import { Subscription, filter, firstValueFrom, from, race, timer } from 'rxjs';
+import { Subscription, filter, firstValueFrom, from, map, race, timer } from 'rxjs';
 import { APP_BUILD_ID } from './build-id';
 
 /** The response header with the build ID of the frontend that the server serves (§ 002150). */
@@ -24,8 +24,31 @@ export const RELOAD_KEY = 'appVersionReload';
 /** How long the app does not reload a second time for the same server version (§ui-kit:002152). */
 export const RELOAD_GUARD_MS = 10 * 60 * 1000;
 
-/** The longest wait for the service worker before the reload runs anyway. */
-export const SW_WAIT_MS = 15_000;
+/**
+ * The longest wait for the download of the new version by the service worker (§002340). The
+ * service worker fetches the changed files one after the other, which on a phone can take
+ * longer than a few seconds.
+ */
+export const SW_WAIT_MS = 60_000;
+
+/** The longest wait for the switch of the service worker version or for its removal. */
+export const SW_SWITCH_MS = 5_000;
+
+/**
+ * Removes every service worker registration of the page (§002340). A reload after the
+ * removal loads the app from the network. A token, so that a test can replace it.
+ */
+export const SW_UNREGISTER = new InjectionToken<() => Promise<unknown>>('SW_UNREGISTER', {
+  providedIn: 'root',
+  factory: () => {
+    const sw = inject(DOCUMENT).defaultView?.navigator.serviceWorker;
+    return async () => {
+      if (!sw) return;
+      const registrations = await sw.getRegistrations();
+      await Promise.all(registrations.map((r) => r.unregister()));
+    };
+  },
+});
 
 /** The input types that take no typed text, so their focus does not hold the reload. */
 const NO_TEXT_INPUTS = new Set([
@@ -46,8 +69,14 @@ const NO_TEXT_INPUTS = new Set([
  *
  * `appVersionInterceptor` reports the header `X-App-Version` of each API answer. When the
  * value is not the build ID of the running app, the service loads the new version through
- * the service worker (`checkForUpdate`, `activateUpdate`) and reloads the page at once.
- * The app shows no update notice.
+ * the service worker and reloads the page at once. The app shows no update notice.
+ *
+ * The reload waits until the service worker has the new version (§002340): `checkForUpdate`
+ * ends only after the download of all changed files, then `activateUpdate` switches the
+ * page to it. When the service worker finds no newer version, fails or takes longer than
+ * {@link SW_WAIT_MS}, the service removes the service worker before the reload, so that the
+ * reload loads the new version from the network. A `VERSION_READY` of the service worker
+ * after a reported server version reloads too, also within the loop guard.
  *
  * While a text field has the focus, the reload waits (§ui-kit:002151): it runs at the next page
  * change or at the next reported answer while no text field has the focus, so typed text is
@@ -68,11 +97,14 @@ export class AppVersionService {
   private readonly doc = inject(DOCUMENT);
   private readonly router = inject(Router);
   private readonly build = inject(APP_BUILD);
+  private readonly unregister = inject(SW_UNREGISTER);
   private readonly subscriptions = new Subscription();
   private started = false;
   private reloading = false;
   /** The server version of a reload that waits for the end of typing. */
   private pending: string | null = null;
+  /** The last reported server version that is not the build of the running app. */
+  private seen: string | null = null;
 
   constructor() {
     inject(DestroyRef).onDestroy(() => this.subscriptions.unsubscribe());
@@ -84,6 +116,15 @@ export class AppVersionService {
     this.started = true;
     if (this.updates.isEnabled) {
       this.subscriptions.add(this.updates.unrecoverable.subscribe(() => this.reloadPage()));
+      this.subscriptions.add(
+        this.updates.versionUpdates
+          .pipe(filter((e): e is VersionReadyEvent => e.type === 'VERSION_READY'))
+          .subscribe(() => {
+            if (this.seen === null) return;
+            if (this.typing()) this.pending = this.seen;
+            else void this.reload(this.seen);
+          }),
+      );
     }
     this.subscriptions.add(
       this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe(() => {
@@ -95,6 +136,7 @@ export class AppVersionService {
   /** Takes the version header of one API answer. */
   report(serverVersion: string | null): void {
     if (!serverVersion || this.build === DEV_BUILD || serverVersion === this.build) return;
+    this.seen = serverVersion;
     if (this.triedBefore(serverVersion)) return;
     if (this.typing()) {
       this.pending = serverVersion;
@@ -107,15 +149,18 @@ export class AppVersionService {
     if (this.reloading) return;
     this.reloading = true;
     this.pending = null;
+    const sw = this.updates.isEnabled;
+    const found = sw ? await settle(this.updates.checkForUpdate(), SW_WAIT_MS) : undefined;
+    if (this.typing()) {
+      this.reloading = false;
+      this.pending = serverVersion;
+      return;
+    }
     this.remember(serverVersion);
-    if (this.updates.isEnabled) {
-      await withTimeout(
-        (async () => {
-          await this.updates.checkForUpdate();
-          await this.updates.activateUpdate();
-        })(),
-        SW_WAIT_MS,
-      ).catch(() => undefined);
+    if (sw) {
+      const switched =
+        found === undefined ? undefined : await settle(this.updates.activateUpdate(), SW_SWITCH_MS);
+      if (found !== true && switched !== true) await settle(this.unregister(), SW_SWITCH_MS);
     }
     this.reloadPage();
   }
@@ -161,7 +206,12 @@ export class AppVersionService {
   }
 }
 
-/** Resolves when `work` ends or after `ms`, whichever comes first. The timer ends with it. */
-function withTimeout(work: Promise<unknown>, ms: number): Promise<unknown> {
-  return firstValueFrom(race(from(work), timer(ms)));
+/**
+ * The value of `work`, or `undefined` when it fails or does not end within `ms`. The timer
+ * ends with it.
+ */
+function settle<T>(work: Promise<T>, ms: number): Promise<T | undefined> {
+  return firstValueFrom(race(from(work), timer(ms).pipe(map(() => undefined)))).catch(
+    () => undefined,
+  );
 }
