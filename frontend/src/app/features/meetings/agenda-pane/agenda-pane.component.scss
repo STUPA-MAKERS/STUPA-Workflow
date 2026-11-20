@@ -232,6 +232,20 @@
   border-radius: 6px;
   background: var(--color-surface-1);
 }
+// The ⋮ fills its box, which is the segment, so it has no tonal pill of a button group of
+// its own: plain like the plus of the add segment.
+:host-context(.mp__agenda) .ap__menu ::ng-deep .rm__trigger {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background-color: transparent;
+  color: var(--color-text);
+}
+@media (hover: hover) {
+  :host-context(.mp__agenda) .ap__menu ::ng-deep .rm__trigger:hover:not(:disabled) {
+    background-color: var(--color-surface-2);
+  }
+}
 // The hover rule of a row widens the menu to its own size, so a hover keeps the box width.
 @media (hover: hover) {
   :host-context(.mp__agenda) .ap__row:hover .ap__menu {
@@ -280,6 +294,11 @@
 }
 :host-context([data-very-high-contrast='on'] .mp__agenda) .ap__head:not(:has(~ .ap__list)) .ap__add {
   border-radius: 6px var(--radius-2xl) var(--radius-2xl) 6px !important;
+}
+:host-context([data-very-high-contrast='on'] .mp__agenda) .ap__menu ::ng-deep .rm__trigger {
+  background-color: var(--vh-bg) !important;
+  color: var(--vh-hi) !important;
+  box-shadow: none !important;
 }
 :host-context([data-very-high-contrast='on'] .mp__agenda) .ap__add::before,
 :host-context([data-very-high-contrast='on'] .mp__agenda) .ap__add::after {
