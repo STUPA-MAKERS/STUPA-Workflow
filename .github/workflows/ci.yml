@@ -10,7 +10,7 @@
 # - pip-audit moved to its own workflow (deps-audit.yml): weekly plus main pushes.
 # - All backend jobs cache pip (setup-python). This saves about 45 s per job.
 # - e2e, restore-smoke and real-stack-smoke stay opt-in (label, dispatch or variable).
-# - axe runs the axe sweep of e2e on every frontend change; it is a gate (spec 000491).
+# - axe runs the axe sweep of e2e on every frontend change; it is a gate (spec ui-kit:000491).
 name: ci
 
 on:
@@ -428,7 +428,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-  # axe on every route in both themes (spec 000491), against the real stack. Unlike the
+  # axe on every route in both themes (spec ui-kit:000491), against the real stack. Unlike the
   # full e2e run it is not opt-in: an accessibility regression fails the PR. It runs only
   # e2e/06-axe.spec.ts, so it stays a few minutes.
   axe:

@@ -1,5 +1,5 @@
 /**
- * Every route of the app for the axe sweep (§ NF/accessibility/conformance/000491).
+ * Every route of the app for the axe sweep (§ui-kit:NF/accessibility/conformance/000491).
  *
  * `path` is the route path as `app.routes.ts` writes it, so the jest contract
  * `src/app/axe-routes.contract.spec.ts` can prove that each route is here. A `:param` takes
