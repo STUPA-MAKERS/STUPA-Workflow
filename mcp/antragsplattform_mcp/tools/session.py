@@ -135,7 +135,8 @@ async def graph_read(
         date_from: Only hits with their date on or after this day (``YYYY-MM-DD``).
         date_to: Only hits with their date on or before this day.
         relations: ``all`` (default), ``links`` or ``builtin``.
-        q: Only hits with the term in their title.
+        q: Only hits with the term in their title. A hit of the search shows also
+            without a relation.
         depth: Add the neighbours of the hits, up to this count of lines away (0 to 5,
             default 2). A neighbour shows also when it does not pass the filters.
         single: Add the elements without a relation.

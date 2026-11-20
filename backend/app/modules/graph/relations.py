@@ -107,7 +107,7 @@ def _id_reads() -> Mapping[str, Select[Any]]:
 
 
 async def all_refs(session: AsyncSession, kinds: Collection[str]) -> frozenset[Ref]:
-    """Every element of ``kinds``, for the switch "Auch ohne Verknüpfung" (spec 001423)."""
+    """Every element of ``kinds``: the nodes without a relation (specs 001423, 001434)."""
     found = [
         (kind, (await session.scalars(stmt)).all())
         for kind, stmt in _id_reads().items()
