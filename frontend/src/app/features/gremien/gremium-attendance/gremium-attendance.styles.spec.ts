@@ -38,8 +38,9 @@ describe('rowGroupLook (§NF/usability/layout/000609)', () => {
     expect(rule(CSS, 'tbody tr:last-child .gat__td:last-child')).toMatch(/border-end-end-radius: var\(--radius-lg\);/);
   });
 
-  it('sets the column titles in small capitals', () => {
-    expect(CSS).toMatch(/\.gat__th--name,\n\.gat__month,\n\.gat__sortBtn \{[^}]*text-transform: uppercase;/);
+  it('sets the column titles in small semibold sentence case (001964)', () => {
+    expect(CSS).toMatch(/\.gat__th--name,\n\.gat__month,\n\.gat__sortBtn \{[^}]*font-size: var\(--fs-small\);/);
+    expect(CSS).not.toContain('uppercase');
   });
 
   it('makes a count cell a pill of at most 6 rem', () => {
