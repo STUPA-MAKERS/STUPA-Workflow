@@ -128,7 +128,7 @@ export class TodoLinkPickerComponent {
    */
   readonly chips = KIND_CHIPS.filter((chip) => {
     const feature = chip.value === 'all' ? undefined : LINK_FEATURE[chip.value];
-    const allowed = chip.value !== 'budget' || this.auth.canAny(...BUDGET_WRITE);
+    const allowed = chip.value !== 'budget' || BUDGET_WRITE.some((p) => this.auth.can(p));
     return allowed && (feature === undefined || this.features.isOn(feature));
   });
   readonly kind = signal<PickerKind>('all');

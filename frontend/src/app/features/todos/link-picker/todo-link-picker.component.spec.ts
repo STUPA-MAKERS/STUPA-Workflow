@@ -23,7 +23,7 @@ async function setup(opts: { fail?: boolean; linked?: string[]; budgetWrite?: bo
       { provide: TodosApiService, useValue: { linkTargets } },
       ...(opts.budgetWrite === undefined
         ? []
-        : [{ provide: AuthService, useValue: { canAny: () => opts.budgetWrite } }]),
+        : [{ provide: AuthService, useValue: { can: () => opts.budgetWrite } }]),
     ],
   });
   const open = async () => {
