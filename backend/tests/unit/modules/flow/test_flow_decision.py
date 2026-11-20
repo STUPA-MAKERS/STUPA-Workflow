@@ -147,8 +147,8 @@ async def test_available_flags_transitions_into_approved_states() -> None:
     to_gone = _transition(flow_id=flow_id, from_id=draft, to_id=uuid4())
     db = fake_session(result(app), result(to_ok, to_no, to_gone))
     db.get_results = [
-        SimpleNamespace(id=ok_id, key="approved", kind="normal", config={}, is_approved=True),
-        SimpleNamespace(id=no_id, key="review", kind="normal", config={}, is_approved=False),
+        SimpleNamespace(id=ok_id, key="approved", kind="normal", config={}, is_approved=True, is_terminal=True),
+        SimpleNamespace(id=no_id, key="review", kind="normal", config={}, is_approved=False, is_terminal=False),
         None,
     ]
     out = {t.id: t for t in await FlowService(db).available_transitions(app.id, _principal())}

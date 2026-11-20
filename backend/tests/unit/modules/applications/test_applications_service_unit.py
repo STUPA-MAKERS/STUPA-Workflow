@@ -147,6 +147,9 @@ def test_resolve_state_colors_overrides_stored_color() -> None:
         color=None,
         edit_allowed=False,
         kind="normal",
+        is_initial=False,
+        is_terminal=False,
+        is_denied=False,
     )
     out = asyncio.run(svc._state_out_resolved(stored))  # type: ignore[arg-type]
     assert out is not None
@@ -163,6 +166,9 @@ def test_resolve_state_colors_falls_back_to_stored() -> None:
         color="#abcdef",
         edit_allowed=True,
         kind="normal",
+        is_initial=False,
+        is_terminal=False,
+        is_denied=False,
     )
     out = asyncio.run(svc._state_out_resolved(stored))  # type: ignore[arg-type]
     assert out is not None
@@ -181,6 +187,9 @@ def test_state_out_maps_fields() -> None:
         color="#4a90d9",
         edit_allowed=True,
         kind="normal",
+        is_initial=False,
+        is_terminal=False,
+        is_denied=False,
     )
     out = _state_out(state)  # type: ignore[arg-type]
     assert out is not None

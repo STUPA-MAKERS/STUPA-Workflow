@@ -214,6 +214,9 @@ def _state(**over: Any) -> _Obj:
         "edit_allowed": True,
         "kind": "normal",
         "config": {},
+        "is_initial": False,
+        "is_terminal": False,
+        "is_denied": False,
     }
     base.update(over)
     return _Obj(**base)

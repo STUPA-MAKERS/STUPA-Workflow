@@ -651,7 +651,7 @@ class FlowService:
         Returns:
             The ids of the cancelled votes of the old Antrag.
         """
-        left = await self._load_state(left_state_id)
+        left = await self._load_state(left_state_id) if app.replaces_id is not None else None
         old = (
             await self.session.get(Application, app.replaces_id)
             if app.replaces_id is not None and left is not None and left.is_initial
