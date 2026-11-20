@@ -65,7 +65,7 @@ async function setup(over: Partial<Inputs> = {}, canTodo?: boolean) {
       canTodo === undefined
         ? [{ provide: TodosApiService, useValue: {} }]
         : [
-            { provide: AuthService, useValue: { canInGremium: jest.fn(() => canTodo) } },
+            { provide: AuthService, useValue: { can: () => false, canInGremium: jest.fn(() => canTodo) } },
             {
               provide: TodosApiService,
               useValue: {
