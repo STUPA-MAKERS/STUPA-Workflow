@@ -1,10 +1,11 @@
-// Without linked cards or actions the host holds no section, only the link picker (which
-// shows as a dialog) and comment nodes, so it takes no space, no gap and no margin.
+// Without linked cards, actions or an empty state the host holds no section, only the link picker
+// (which shows as a dialog) and comment nodes, so it takes no space, no gap and no margin. The
+// empty state of a sheet (`emptyHeading`, spec 001800) keeps the host shown.
 :host {
   display: block;
   min-width: 0;
 }
-:host(:not(:has(> .tl))) {
+:host(:not(:has(> .tl, > app-empty-state))) {
   display: none;
 }
 .tl {
