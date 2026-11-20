@@ -1,12 +1,28 @@
-.pfh__titles {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+@use '../form-bar' as fb;
+
+// The head bar of a form that takes the place of a detail (spec 001870), like the bar of
+// "Antrag bearbeiten". It sits at the top of the pane, so it takes the corners of the pane.
+:host {
+  @include fb.bar(var(--space-6));
+  flex: none;
+  border-start-start-radius: inherit;
+  border-start-end-radius: inherit;
+  background: var(--color-surface-2);
+}
+.pfh__icon {
+  @include fb.icon;
+}
+.pfh__text {
+  @include fb.text;
 }
 .pfh__subtitle {
-  overflow-wrap: anywhere;
+  color: var(--color-text-muted);
+}
+.pfh__subtitle::before {
+  content: ' · ' / '';
+}
+:host app-button {
+  flex: none;
 }
 
 // Docked in the bar of the one-view layout: the bar shows the title, the head stays for
@@ -15,6 +31,7 @@
   position: absolute;
   width: 1px;
   height: 1px;
+  min-height: 0;
   margin: -1px;
   padding: 0;
   overflow: hidden;

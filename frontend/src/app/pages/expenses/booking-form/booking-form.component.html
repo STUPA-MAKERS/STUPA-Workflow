@@ -13,6 +13,7 @@
     <header
       class="mf__head"
       appPaneFormHead
+      [icon]="mode() === 'create' ? 'swap' : 'edit'"
       [heading]="(mode() === 'create' ? 'expenses.add' : 'expenses.edit') | t"
       [headingId]="'bf-title-' + mode()"
       (closed)="close()"

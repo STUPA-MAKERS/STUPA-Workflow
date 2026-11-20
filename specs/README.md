@@ -1016,6 +1016,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/001500](requirements/non-functional/usability/layout/001500_list-title-on-search-edge.md) | A wide list column has no visible title and puts its buttons beside the search | approved |
 | [NF/usability/layout/001770](requirements/non-functional/usability/layout/001770_calendar-day-row-group.md) | The entries of the picked day are a row group without a frame | approved |
 | [NF/usability/layout/001780](requirements/non-functional/usability/layout/001780_calendar-month-segments.md) | Each day of the month grid is a segment of its own | approved |
+| [NF/usability/layout/001870](requirements/non-functional/usability/layout/001870_form-head-bar.md) | A form in place of a detail has the head bar of "Antrag bearbeiten" | draft |
+| [NF/usability/layout/001871](requirements/non-functional/usability/layout/001871_form-head-cancel-inset.md) | The label of "Abbrechen" in a form head ends at the side inset | draft |
 | [P/integrations/webhooks/000963](protocols/integrations/webhooks/000963_webhook-delivery.md) | A webhook delivery is a signed JSON POST | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |
