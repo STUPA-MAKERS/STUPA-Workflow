@@ -93,6 +93,7 @@ export const AUDIT_ACTIONS = [
   'application_create_on_behalf',
   'guest_application_discard',
   'application_update',
+  'application_type_change',
   'application_archive',
   'application_unarchive',
   'application_decision',

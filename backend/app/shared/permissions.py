@@ -30,6 +30,9 @@ Keys that need a note:
   a guest. The application belongs to the applicant; the holder shows only in the
   history and the audit log. Global. Grant it deliberately, because the applicant
   search of the dialog exposes the names and e-mail addresses of ALL active accounts.
+- `application.change_type`: change the Antragsart of a submitted application. The
+  change writes a new version in the form of the new type and can send the application
+  back to the applicant. Global.
 - `meeting.view_all`: additive global read of every meeting (timeline, list, detail,
   agenda, protocol, vote results). The holder never writes and never votes.
 - `meeting.delete_finalized`: delete a meeting with a finalized protocol, separate
@@ -111,6 +114,7 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "application.delete",
     "application.archive",
     "application.create_on_behalf",
+    "application.change_type",
     "form.configure",
     "flow.configure",
     "meeting.view_all",

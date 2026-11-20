@@ -122,6 +122,7 @@ const MOCK_PRINCIPAL: Principal = {
     'application.delete',
     'application.force_status',
     'application.create_on_behalf',
+    'application.change_type',
     'admin.site',
     'admin.gremien',
     'admin.types',
@@ -1609,7 +1610,7 @@ function mockStartPlannedHandover(fromItem: string | null | undefined, toItem: s
 
 /** The paths of the demo applications in `mock-applications.ts` (id prefix `a1000000-`). */
 const DEMO_APPLICATION_PATH =
-  /\/applications\/a1000000-[^/]+(\/(transitions|attachments|flow-states|form|timeline|versions|transition|archive|force-status))?$/;
+  /\/applications\/a1000000-[^/]+(\/(transitions|attachments|flow-states|form|timeline|versions|transition|archive|force-status|type-change))?$/;
 
 /** The Gremium of the demo applications; its planned meetings serve the agenda dialog. */
 const DEMO_GREMIUM = 'g0000000-0000-0000-0000-000000000001';

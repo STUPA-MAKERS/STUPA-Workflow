@@ -249,6 +249,7 @@ export function mapVersion(wire: VersionOutWire): ApplicationVersion {
     changedBy: wire.changedBy ?? null,
     changedByInfo: wire.changedByInfo ?? null,
     at: wire.at,
+    typeChange: wire.typeChange ?? null,
   };
 }
 
