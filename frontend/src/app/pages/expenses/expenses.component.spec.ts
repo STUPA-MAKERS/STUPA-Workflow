@@ -1877,7 +1877,7 @@ describe('ExpensesComponent (batch/bulk)', () => {
     expect(nav).toHaveBeenLastCalledWith(
       [],
       expect.objectContaining({
-        queryParams: { budget: null, kind: null, q: null, view: null, new: null, invoice: null },
+        queryParams: { budget: null, fiscalYear: null, kind: null, q: null, view: null, new: null, invoice: null },
         queryParamsHandling: 'merge',
         replaceUrl: true,
       }),
@@ -1891,6 +1891,7 @@ describe('ExpensesComponent (batch/bulk)', () => {
       expect.objectContaining({
         queryParams: {
           budget: 'b-1',
+          fiscalYear: null,
           kind: 'income',
           q: 'flyer',
           view: null,
