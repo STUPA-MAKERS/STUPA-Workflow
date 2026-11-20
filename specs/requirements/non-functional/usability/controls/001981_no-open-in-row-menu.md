@@ -2,7 +2,7 @@
 id: "001981"
 title: The ⋮ of a list row has no "Öffnen"
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:
