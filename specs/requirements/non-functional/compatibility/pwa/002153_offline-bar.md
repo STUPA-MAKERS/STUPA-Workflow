@@ -2,7 +2,7 @@
 id: "002153"
 title: The app shows the offline bar
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:

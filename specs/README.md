@@ -838,10 +838,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/compatibility/pwa/000411](requirements/non-functional/compatibility/pwa/000411_status-bar-theme.md) | The status bar follows the theme | approved |
 | [NF/compatibility/pwa/000578](requirements/non-functional/compatibility/pwa/000578_server-unreachable-bar.md) | The offline bar shows when the server is unreachable | approved |
 | [NF/compatibility/pwa/000579](requirements/non-functional/compatibility/pwa/000579_reload-after-unreachable.md) | An unreachable server shows no error toast, and the page loads again | approved |
-| [NF/compatibility/pwa/002150](requirements/non-functional/compatibility/pwa/002150_app-version-header.md) | Every answer of the server carries the app version | draft |
-| [NF/compatibility/pwa/002151](requirements/non-functional/compatibility/pwa/002151_reload-on-new-version.md) | A new app version reloads the app at once | draft |
-| [NF/compatibility/pwa/002152](requirements/non-functional/compatibility/pwa/002152_reload-loop-guard.md) | The app reloads only once for the same server version | draft |
-| [NF/compatibility/pwa/002153](requirements/non-functional/compatibility/pwa/002153_offline-bar.md) | The app shows the offline bar | draft |
+| [NF/compatibility/pwa/002150](requirements/non-functional/compatibility/pwa/002150_app-version-header.md) | Every answer of the server carries the app version | approved |
+| [NF/compatibility/pwa/002151](requirements/non-functional/compatibility/pwa/002151_reload-on-new-version.md) | A new app version reloads the app at once | approved |
+| [NF/compatibility/pwa/002152](requirements/non-functional/compatibility/pwa/002152_reload-loop-guard.md) | The app reloads only once for the same server version | approved |
+| [NF/compatibility/pwa/002153](requirements/non-functional/compatibility/pwa/002153_offline-bar.md) | The app shows the offline bar | approved |
 | [NF/performance/loading/000189](requirements/non-functional/performance/loading/000189_load-bar.md) | The load bar shows only for slow foreground reads | approved |
 | [NF/performance/loading/000190](requirements/non-functional/performance/loading/000190_batch-reads.md) | A list reads its rows in one request | approved |
 | [NF/performance/loading/000191](requirements/non-functional/performance/loading/000191_search-as-you-type.md) | Search runs as you type | approved |

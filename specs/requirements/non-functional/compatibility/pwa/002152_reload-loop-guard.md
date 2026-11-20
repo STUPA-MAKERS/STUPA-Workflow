@@ -2,7 +2,7 @@
 id: "002152"
 title: The app reloads only once for the same server version
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:

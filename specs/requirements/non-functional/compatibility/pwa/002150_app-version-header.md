@@ -2,7 +2,7 @@
 id: "002150"
 title: Every answer of the server carries the app version
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:

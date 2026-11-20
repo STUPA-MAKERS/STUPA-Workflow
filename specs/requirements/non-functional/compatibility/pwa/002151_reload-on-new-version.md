@@ -2,7 +2,7 @@
 id: "002151"
 title: A new app version reloads the app at once
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:
