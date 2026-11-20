@@ -39,3 +39,9 @@
   color: var(--color-text-muted);
   font-size: var(--fs-small);
 }
+
+// The head bar of the pane (spec 001811): it spans the pane, over the side padding of
+// `fd--split`, like the head of a form.
+.bp__head {
+  margin-inline: calc(var(--space-6) * -1);
+}

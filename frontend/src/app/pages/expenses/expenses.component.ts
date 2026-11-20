@@ -391,8 +391,8 @@ export class ExpensesComponent implements OnDestroy {
     ];
   });
 
-  /** The page actions in the ⋮ menu of the header. On a phone the sort and the export
-   *  join them. */
+  /** The page actions in the ⋮ menu of the header. On a phone the sort, the export and
+   *  "Mehrere auswählen" join them; a wider screen has a button for each (spec 001811). */
   readonly headerMenu = computed<RowMenuSection[]>(() => {
     const manage = this.canManage();
     const bookings = this.tab() === 'bookings';
@@ -408,7 +408,7 @@ export class ExpensesComponent implements OnDestroy {
     };
     const items: RowMenuItem[] = [
       ...(manage ? [transfer] : []),
-      ...(manage && bookings ? [select] : []),
+      ...(manage && bookings && this.phone() ? [select] : []),
     ];
     return [
       ...(items.length ? [{ items }] : []),

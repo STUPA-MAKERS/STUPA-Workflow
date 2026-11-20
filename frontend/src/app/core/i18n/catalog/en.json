@@ -4873,5 +4873,21 @@
   "admin.forced.noState": "No state",
   "admin.forced.loadError": "The list could not be loaded.",
   "admin.forced.empty": "No forced status changes in the period",
-  "admin.mailTemplates.key.approved_amount_changed": "Approved amount changed"
+  "admin.mailTemplates.key.approved_amount_changed": "Approved amount changed",
+  "invoices.bulk.start": "Select several",
+  "invoices.bulk.pick": "Select",
+  "invoices.bulk.stop": "End selection",
+  "invoices.bulk.selectAll": "Select all",
+  "invoices.bulk.selectedCount": "{count} selected",
+  "invoices.bulk.selectRow": "Select “{name}”",
+  "invoices.bulk.markPaid": "Mark as paid",
+  "invoices.bulk.paidDone": "{count} invoice(s) marked as paid.",
+  "invoices.bulk.delete": "Delete",
+  "invoices.bulk.deleteTitle": "Delete invoices?",
+  "invoices.bulk.deleteBody": "{count} selected invoice(s) will be deleted. This cannot be undone.",
+  "invoices.bulk.deleteDone": "{count} invoice(s) deleted.",
+  "invoices.bulk.deleteMax": "Delete: max. {max}",
+  "invoices.bulk.deleteMaxBlocked": "Bulk delete takes at most {max} invoices — shorten the selection.",
+  "invoices.bulk.deleteAllBlocked": "Bulk delete is locked for “select all” — pick rows individually.",
+  "invoices.bulk.failed": "Bulk action failed."
 }

@@ -253,7 +253,7 @@ describe('TodoLinkPickerComponent', () => {
     const { open, container } = await setup();
     await open();
     expect(container.querySelector('.lp--sheet')).not.toBeNull();
-    expect(container.querySelector('.lp__x')).toBeNull();
+    expect(container.querySelector('.lp__close')).toBeNull();
   });
 
   /** Spec 000758: the picker offers no kind of a feature that is off. */

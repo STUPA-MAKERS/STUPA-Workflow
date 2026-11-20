@@ -1,6 +1,6 @@
 @if (info(); as i) {
   @if (empty()) {
-    <app-empty-state icon="info" [heading]="'gremien.info.empty' | t">
+    <app-empty-state icon="alignLeft" [heading]="'gremien.info.empty' | t">
       <app-button-group>
         <app-button variant="tonal" (click)="editOpen.set(true)">
           <app-icon name="edit" />
