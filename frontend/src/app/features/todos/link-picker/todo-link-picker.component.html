@@ -1,6 +1,6 @@
 <ng-template #body>
   <div class="lp__search">
-    <app-icon class="lp__glass" name="search" [size]="phone() ? 17 : 22" />
+    <app-icon class="lp__glass" name="search" [size]="22" />
     <input
       #field
       class="lp__field"
@@ -14,18 +14,20 @@
       (input)="search.set($any($event.target).value)"
       (keydown.enter)="search.flush()"
     />
-    @if (!phone()) {
-      <!-- The key of the global search: "Esc" closes the dialog (spec 001977). -->
-      <button
-        type="button"
-        class="lp__close"
-        [attr.aria-label]="'action.close' | t"
-        [title]="'action.close' | t"
-        (click)="close()"
-      >
+    <!-- The close button of the global search: the key "Esc", on a phone a × (spec 001977). -->
+    <button
+      type="button"
+      class="lp__close"
+      [attr.aria-label]="'action.close' | t"
+      [title]="'action.close' | t"
+      (click)="close()"
+    >
+      @if (phone()) {
+        <app-icon name="x" [size]="20" />
+      } @else {
         <span class="kbd lp__esc" aria-hidden="true">{{ escLabel }}</span>
-      </button>
-    }
+      }
+    </button>
   </div>
   <div class="lp__chips" role="group" [attr.aria-label]="'todos.picker.kind' | t">
     @for (chip of chips; track chip.value) {
@@ -78,14 +80,6 @@
     }
   </div>
 </ng-template>
-
-@if (phone()) {
-  <app-side-sheet side="bottom" [heading]="'todos.picker.title' | t" [(open)]="open">
-    <div class="lp lp--sheet">
-      <ng-container *ngTemplateOutlet="body" />
-    </div>
-  </app-side-sheet>
-}
 
 <ng-template #pop>
   <div class="lp__scrim" aria-hidden="true" animate.enter="motion-fade-in" (click)="close()"></div>

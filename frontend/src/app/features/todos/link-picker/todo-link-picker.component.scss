@@ -1,6 +1,7 @@
 @use 'field' as f;
 @use 'frosted' as *;
 @use 'press';
+@use 'breakpoints' as bp;
 :host {
   display: contents;
 }
@@ -34,6 +35,13 @@
   color: var(--color-text);
   box-shadow: var(--shadow-elevated);
   @include frosted-pop(var(--color-glass-1), 85%, 20px, 1.3);
+}
+/* On a phone the panel stands at the top of the screen, as the global search does. */
+@include bp.phone {
+  .lp--pop {
+    top: calc(var(--space-4) + var(--app-top-safe-area, 0px));
+    max-height: calc(100dvh - 2 * var(--space-4) - var(--app-top-safe-area, 0px));
+  }
 }
 .lp--pop > * {
   @include glass-content;
