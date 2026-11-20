@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:
-  - "frontend/src/app/pane-page.styles.spec.ts:pane page styles (001930)"
+  - "frontend/src/app/pane-page.styles.spec.ts:panePages"
 implementation:
   - frontend/src/app/pages/activity/activity.component.scss
 scope:
