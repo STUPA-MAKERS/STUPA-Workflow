@@ -110,7 +110,7 @@ export class TodoBoardViewComponent {
   /**
    * A phone column page has scrolled, so cards run under the head and the tab line: the tab
    * line then takes the bar colour (spec 002010). Scroll events do not bubble, so the host
-   * listens in the capture phase.
+   * listens in the capture phase. A page of the pager is the scroller with the role tabpanel.
    */
   protected readonly pageScrolled = signal(false);
 
@@ -118,7 +118,7 @@ export class TodoBoardViewComponent {
     const el = this.host.nativeElement;
     const onScroll = (e: Event): void => {
       const t = e.target;
-      if (t instanceof HTMLElement && t.classList.contains('tp__page')) this.pageScrolled.set(t.scrollTop > 0);
+      if (t instanceof HTMLElement && t.getAttribute('role') === 'tabpanel') this.pageScrolled.set(t.scrollTop > 0);
     };
     el.addEventListener('scroll', onScroll, { capture: true, passive: true });
     inject(DestroyRef).onDestroy(() => el.removeEventListener('scroll', onScroll, { capture: true }));
