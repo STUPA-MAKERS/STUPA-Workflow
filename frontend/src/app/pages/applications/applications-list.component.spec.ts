@@ -493,7 +493,7 @@ describe('ApplicationsListComponent', () => {
       await settle();
       const results = screen.getByTestId('bulk-results');
       expect(within(results).getByText('Erledigt')).toBeInTheDocument();
-      expect(within(results).getByText('Übergang nicht verfügbar')).toBeInTheDocument();
+      expect(within(results).getByText('Übersprungen: Status nicht erlaubt')).toBeInTheDocument();
     });
 
     it('sends one message to every selected Antrag', async () => {
