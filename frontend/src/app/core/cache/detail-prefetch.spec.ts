@@ -6,7 +6,11 @@ import { LoadingService, loadingInterceptor } from '@stupa-makers/ui-kit';
 import { cacheInterceptor, detailContext } from './cache.interceptor';
 import { prefetchDetails, provideDetailPrefetch } from './detail-prefetch';
 
-@Component({ changeDetection: ChangeDetectionStrategy.Eager, standalone: true, template: '' })
+@Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
+  standalone: true,
+  template: `@for (id of rows(); track id) {<a [attr.href]="'/things/' + id + '?tab=x'" [id]="'row-' + id">{{ id }}</a>}`,
+})
 class ListHost {
   private readonly http = inject(HttpClient);
   readonly rows = signal<string[]>([]);
@@ -15,7 +19,7 @@ class ListHost {
     prefetchDetails({
       items: this.rows,
       key: (id) => id,
-      reads: (id) => [this.read(id)],
+      reads: (id) => [this.read(id), this.http.get(`/api/things/${id}/more`, { context: detailContext() })],
       when: this.allowed,
     });
   }
@@ -43,14 +47,22 @@ describe('prefetchDetails', () => {
   const pending = () => mock.match(() => true);
   const tick = () => new Promise((resolve) => setTimeout(resolve));
 
+  const row = (fixture: { nativeElement: HTMLElement }, id: string) =>
+    fixture.nativeElement.querySelector(`#row-${id}`) as HTMLElement;
+  const press = (el: HTMLElement, type: string, pointerType = 'touch') => {
+    const event = new Event(type, { bubbles: true }) as Event & { pointerType: string };
+    Object.defineProperty(event, 'pointerType', { value: pointerType });
+    el.dispatchEvent(event);
+  };
+
   /**
-   * On the click the read ahead comes first, and the read behind it adds nothing when it is the
-   * same. A detail read never runs the bar, because the detail paints the kept answer meanwhile.
+   * Without a sign of intent only the first read of the top five rows runs, four at a time and
+   * quietly; a click paints from it, and the read behind it adds nothing when it is the same.
    */
-  it('reads the shown rows ahead four at a time, quietly, and a click paints from them', async () => {
+  it('reads the first read of the top five rows ahead, quietly, and a click paints from it', async () => {
     const { fixture, host, loading } = setup();
     const inc = jest.spyOn(loading, 'inc');
-    host.rows.set(['a', 'b', 'c', 'd', 'e']);
+    host.rows.set(['a', 'b', 'c', 'd', 'e', 'f']);
     fixture.detectChanges();
     const first = pending();
     expect(first.map((r) => r.request.url)).toEqual(['/api/things/a', '/api/things/b', '/api/things/c', '/api/things/d']);
@@ -60,16 +72,44 @@ describe('prefetchDetails', () => {
     const rest = pending();
     expect(rest.map((r) => r.request.url)).toEqual(['/api/things/e']);
     rest[0].flush({ id: 'e' });
+    await tick();
+    expect(pending()).toHaveLength(0);
 
     const seen: unknown[] = [];
     host.read('b').subscribe((b) => seen.push(b));
     expect(seen).toEqual([{ id: 'b' }]);
     mock.expectOne('/api/things/b').flush({ id: 'b' });
     expect(seen).toEqual([{ id: 'b' }]);
-    host.read('c').subscribe((b) => seen.push(b));
-    mock.expectOne('/api/things/c').flush({ id: 'c', changed: true });
-    expect(seen).toEqual([{ id: 'b' }, { id: 'c' }, { id: 'c', changed: true }]);
     expect(inc).not.toHaveBeenCalled();
+  });
+
+  it('reads all reads of a row on a press, the focus or a mouse over its link, once while fresh', async () => {
+    const { fixture, host } = setup();
+    host.rows.set(['a', 'b', 'c', 'd', 'e', 'f', 'g']);
+    fixture.detectChanges();
+    pending().forEach((r) => r.flush({}));
+    await tick();
+    pending().forEach((r) => r.flush({}));
+    await tick();
+
+    press(row(fixture, 'f'), 'pointerdown');
+    const f = pending();
+    expect(f.map((r) => r.request.url)).toEqual(['/api/things/f', '/api/things/f/more']);
+    f.forEach((r) => r.flush({}));
+    await tick();
+    press(row(fixture, 'f'), 'pointerdown');
+    expect(pending()).toHaveLength(0);
+
+    press(row(fixture, 'a'), 'focusin');
+    const a = pending();
+    expect(a.map((r) => r.request.url)).toEqual(['/api/things/a/more']);
+    a.forEach((r) => r.flush({}));
+    await tick();
+
+    press(row(fixture, 'g'), 'pointerover', 'touch');
+    expect(pending()).toHaveLength(0);
+    press(row(fixture, 'g'), 'pointerover', 'mouse');
+    expect(pending().map((r) => r.request.url)).toEqual(['/api/things/g', '/api/things/g/more']);
   });
 
   it('joins a read ahead still in flight instead of reading twice', () => {
@@ -87,6 +127,8 @@ describe('prefetchDetails', () => {
     host.allowed.set(false);
     host.rows.set(['a']);
     fixture.detectChanges();
+    expect(pending()).toHaveLength(0);
+    press(row(fixture, 'a'), 'pointerdown');
     expect(pending()).toHaveLength(0);
     host.allowed.set(true);
     fixture.detectChanges();
