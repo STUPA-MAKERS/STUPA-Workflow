@@ -453,7 +453,7 @@
 </div>
 
 <ng-template #emptyList let-key>
-  <app-empty-state [heading]="key | t" />
+  <app-empty-state [icon]="activeFilterCount() > 0 ? 'searchOff' : 'swap'" [heading]="key | t" />
 </ng-template>
 
 <ng-template #bulkIcons>

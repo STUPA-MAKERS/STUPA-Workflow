@@ -30,7 +30,7 @@
       @if (loadingFirst()) {
         <app-skeleton variant="rows" [count]="6" [label]="'budget.dash.itemsLoading' | t" />
       } @else if (!items().length) {
-        <app-empty-state rows="3" [heading]="'budget.dash.itemsNone' | t" />
+        <app-empty-state icon="swap" rows="3" [heading]="'budget.dash.itemsNone' | t" />
       } @else {
         <app-budget-item-list [items]="items()" [names]="names()" />
         @if (error()) {

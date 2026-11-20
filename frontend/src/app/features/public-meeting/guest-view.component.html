@@ -128,7 +128,7 @@
               <h3 class="gv__protoHead">{{ 'meetings.agenda.top' | t: { n: item.position } }} · {{ item.title }}</h3>
               <app-markdown-view [src]="item.body ?? ''" [imageSrc]="null" [documentSrc]="null" />
             } @empty {
-              <app-empty-state shape="text" rows="3" [heading]="'guests.view.protocolEmpty' | t" />
+              <app-empty-state icon="file" shape="text" rows="3" [heading]="'guests.view.protocolEmpty' | t" />
             }
           </section>
       </ng-template>

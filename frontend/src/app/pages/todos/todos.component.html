@@ -167,9 +167,9 @@
         />
         <span class="sr-only" role="status">{{ 'todos.loading' | t }}</span>
       } @else if (allEmpty()) {
-        <app-empty-state shape="card" fill [heading]="'todos.all.empty' | t" />
+        <app-empty-state icon="circleok" shape="card" fill [heading]="'todos.all.empty' | t" />
       } @else if (noMatch()) {
-        <app-empty-state shape="card" fill [heading]="'todos.noMatch' | t" />
+        <app-empty-state icon="searchOff" shape="card" fill [heading]="'todos.noMatch' | t" />
       }
       <app-todo-board-rows
         animate.enter="motion-fade-in"
@@ -203,7 +203,7 @@
       </div>
     } @else if (board(); as b) {
       @if (noMatch()) {
-        <app-empty-state shape="card" fill [heading]="'todos.noMatch' | t" />
+        <app-empty-state icon="searchOff" shape="card" fill [heading]="'todos.noMatch' | t" />
       } @else if (view() === 'list') {
         <app-todo-list-view
           animate.enter="motion-fade-in"

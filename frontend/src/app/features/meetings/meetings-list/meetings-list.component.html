@@ -70,7 +70,7 @@
           </section>
         }
         @if (timeline.searchEmpty()) {
-          <app-empty-state shape="date" [heading]="'meetings.list.searchEmpty' | t" />
+          <app-empty-state icon="searchOff" shape="date" [heading]="'meetings.list.searchEmpty' | t" />
         }
         @if (timeline.searchHasMore() || timeline.loadingSearch()) {
           <div class="mtl__more">
@@ -83,7 +83,7 @@
           </div>
         }
       } @else if (!groups().length) {
-        <app-empty-state shape="date"
+        <app-empty-state icon="users" shape="date"
           [heading]="'meetings.overview.empty' | t"
           [body]="(canCreate() ? 'meetings.overview.emptyCreate' : 'meetings.overview.emptyBody') | t"
         />
@@ -93,7 +93,7 @@
       } @else {
         <div class="mtl__groups" animate.enter="motion-fade-in" [class.skel-stale]="timeline.reloadingList()" [attr.inert]="timeline.reloadingList() ? '' : null">
         @if (!hasUpcoming()) {
-          <app-empty-state shape="date" class="mtl__upcoming" rows="1" [heading]="'meetings.list.noUpcoming' | t" />
+          <app-empty-state icon="users" shape="date" class="mtl__upcoming" rows="1" [heading]="'meetings.list.noUpcoming' | t" />
         }
         @for (g of groups(); track g.key) {
           <app-list-group [label]="groupLabel(g)">
