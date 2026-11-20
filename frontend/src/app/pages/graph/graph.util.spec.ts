@@ -82,7 +82,7 @@ describe('graph util', () => {
     expect(daysBefore('2026-01-10', 30)).toBe('2025-12-11');
     expect(DEFAULT_KINDS).not.toContain('budget');
     expect(DEFAULT_KINDS).toHaveLength(10);
-    expect(FRESH).toEqual({ ...NO_FILTERS, kinds: DEFAULT_KINDS, from: '2026-02-08' });
+    expect(FRESH).toEqual({ ...NO_FILTERS, kinds: DEFAULT_KINDS, from: '2026-02-08', relations: 'links' });
   });
 
   it('knows when a filter or a switch differs from the fresh page', () => {
@@ -95,7 +95,8 @@ describe('graph util', () => {
       { from: '' },
       { to: '2026-12-31' },
       { gremiumId: 'g1' },
-      { relations: 'links' as const },
+      { relations: 'all' as const },
+      { relations: 'builtin' as const },
       { q: 'x' },
       { single: true },
       { noAccess: true },
@@ -128,7 +129,7 @@ describe('graph util', () => {
       noAccess: true,
     });
     // `all` stands for every kind and for every day; an end alone has no start.
-    expect(filtersOf(convertToParamMap({ kinds: 'all', period: 'all' }), TODAY)).toEqual(NO_FILTERS);
+    expect(filtersOf(convertToParamMap({ kinds: 'all', period: 'all', rel: 'all' }), TODAY)).toEqual(NO_FILTERS);
     expect(filtersOf(convertToParamMap({ to: '2026-12-31' }), TODAY)).toEqual({ ...FRESH, from: '', to: '2026-12-31' });
   });
 
@@ -143,13 +144,13 @@ describe('graph util', () => {
   it('writes the filters to the query and back', () => {
     const none = { kinds: null, from: null, to: null, period: null, gremium: null, rel: null, q: null, single: null, noaccess: null };
     expect(queryOf(FRESH, TODAY)).toEqual(none);
-    expect(queryOf(NO_FILTERS, TODAY)).toEqual({ ...none, kinds: 'all', period: 'all' });
+    expect(queryOf(NO_FILTERS, TODAY)).toEqual({ ...none, kinds: 'all', period: 'all', rel: 'all' });
     const filters = {
       kinds: ['meeting', 'todo'] as const,
       from: '2026-01-01',
       to: '2026-12-31',
       gremiumId: 'g1',
-      relations: 'links' as const,
+      relations: 'builtin' as const,
       q: ' Haushalt ',
       single: true,
       noAccess: true,
@@ -161,7 +162,7 @@ describe('graph util', () => {
       to: '2026-12-31',
       period: null,
       gremium: 'g1',
-      rel: 'links',
+      rel: 'builtin',
       q: 'Haushalt',
       single: '1',
       noaccess: '1',

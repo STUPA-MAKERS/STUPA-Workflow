@@ -112,9 +112,9 @@ export function daysBefore(day: string, days: number): string {
   return new Date(Date.parse(`${day}T00:00:00Z`) - days * 86_400_000).toISOString().slice(0, 10);
 }
 
-/** The filters of a fresh page: the last 30 days, without the cost centres (spec 001425). */
+/** The filters of a fresh page: the last 30 days, no cost centres, only the links of persons (spec 001425). */
 export function defaultFilters(today: string): GraphFilters {
-  return { ...NO_FILTERS, kinds: DEFAULT_KINDS, from: daysBefore(today, DEFAULT_DAYS) };
+  return { ...NO_FILTERS, kinds: DEFAULT_KINDS, from: daysBefore(today, DEFAULT_DAYS), relations: 'links' };
 }
 
 function plain(f: GraphFilters): string {
@@ -154,7 +154,7 @@ export function filtersOf(query: ParamMap, today: string): GraphFilters {
     from: own ? from : fresh.from,
     to,
     gremiumId: query.get('gremium') ?? '',
-    relations: relations !== null && GRAPH_RELATIONS.includes(relations) ? relations : 'all',
+    relations: relations !== null && GRAPH_RELATIONS.includes(relations) ? relations : fresh.relations,
     q: query.get('q') ?? '',
     single: query.get('single') === '1',
     noAccess: query.get('noaccess') === '1',
@@ -172,7 +172,7 @@ export function queryOf(f: GraphFilters, today: string): Readonly<Record<string,
     to: f.to || null,
     period: f.from === '' && f.to === '' ? ALL : null,
     gremium: f.gremiumId || null,
-    rel: f.relations === 'all' ? null : f.relations,
+    rel: f.relations === fresh.relations ? null : f.relations,
     q: f.q.trim() || null,
     single: f.single ? '1' : null,
     noaccess: f.noAccess ? '1' : null,
