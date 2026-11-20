@@ -241,7 +241,8 @@ describe('GraphComponent', () => {
     const { cmp, el, calls } = await start('/graph', [() => NEVER]);
     expect(cmp.loading()).toBe(true);
     expect(el.querySelector('.gr__body')).toHaveAttribute('aria-busy', 'true');
-    expect(el.querySelector('app-skeleton')).not.toBeNull();
+    expect(el.querySelectorAll('.gr__skel .gr__skelNode')).toHaveLength(6);
+    expect(el.querySelectorAll('.gr__skelTools .skel-btn')).toHaveLength(3);
     expect(el.querySelector('app-graph-canvas')).toBeNull();
     cmp.loadMore();
     expect(calls).toHaveLength(1);

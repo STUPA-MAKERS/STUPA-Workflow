@@ -40,8 +40,50 @@
 .gr__body:has(.gr__canvas) {
   padding: 0;
 }
+// The skeleton is the canvas: it fills the body as `app-graph-canvas` does.
 .gr__skel {
-  @include lp.stack;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.gr__skelLines {
+  position: absolute;
+  top: calc(50% - 100px);
+  left: calc(50% - 100px);
+  width: 200px;
+  height: 200px;
+  overflow: visible;
+}
+.gr__skelLine {
+  stroke: color-mix(in srgb, var(--color-text) 12%, transparent);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+// A node of `app-graph-canvas`: a 36px dot with its title under it.
+.gr__skelNode {
+  position: absolute;
+  top: calc(50% + var(--y) - 18px);
+  left: calc(50% + var(--x) - 18px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 36px;
+}
+.gr__skelDot {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+.gr__skelName {
+  flex: none;
+  font-size: var(--fs-small);
+}
+.gr__skelTools {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
 }
 .gr__canvas {
   position: absolute;

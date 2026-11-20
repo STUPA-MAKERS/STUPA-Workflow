@@ -3,10 +3,18 @@
     <header class="sheet-head ad__head" aria-hidden="true">
       <app-sheet-bar [bleed]="split()">
         <h2 appSheetBarTitle class="sheet-title ad__title skel-in"><span class="skel-text ad__skelTitle"></span></h2>
-        <span class="ad__skelIcon ad__skelComments skel-in"><span class="skel-box"></span></span>
-        <span class="ad__skelIcon skel-in"><span class="skel-box"></span></span>
+        <span class="skel-grp skel-in">
+          <span class="skel-box skel-btn skel-btn--label ad__skelComments"></span>
+          <span class="skel-box skel-btn"></span>
+          <span class="skel-box skel-btn"></span>
+        </span>
       </app-sheet-bar>
-      <p class="sheet-line ad__line skel-in"><span class="skel-text skel-text--muted ad__skelLine"></span></p>
+      <p class="sheet-line ad__line skel-in">
+        <span class="skel-chips">
+          <span class="skel-box skel-chip" style="--skel-w: 5.5rem"></span>
+          <span class="skel-box skel-chip" style="--skel-w: 6.5rem"></span>
+        </span>
+      </p>
       @if (canTransition()) {
         <ng-container *ngTemplateOutlet="transitionsSkel" />
       }
@@ -600,9 +608,9 @@
 />
 
 <ng-template #transitionsSkel>
-  <div class="ad__transitions skel-in" aria-hidden="true">
-    <span class="skel-box ad__skelButton"></span>
-    <span class="skel-box ad__skelButton ad__skelButton--short"></span>
+  <div class="skel-grp ad__transitionGroup skel-in" aria-hidden="true">
+    <span class="skel-box skel-btn skel-btn--label" style="--skel-w: 8.5rem"></span>
+    <span class="skel-box skel-btn skel-btn--label" style="--skel-w: 5rem"></span>
   </div>
 </ng-template>
 

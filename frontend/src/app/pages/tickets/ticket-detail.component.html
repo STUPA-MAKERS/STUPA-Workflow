@@ -8,14 +8,27 @@
             <span class="skel-text td__skelTitle td__skelTitle--second"></span>
           }
         </h2>
-        <span class="td__skelIcon skel-in"><span class="skel-box"></span></span>
-        <span class="td__skelIcon skel-in"><span class="skel-box"></span></span>
+        <span class="skel-grp skel-in">
+          <span class="skel-box skel-btn"></span>
+          <span class="skel-box skel-btn"></span>
+        </span>
       </app-sheet-bar>
-      <p class="sheet-line td__line skel-in"><span><span class="skel-text skel-text--muted td__skelLine"></span></span></p>
+      <p class="sheet-line td__line skel-in">
+        <span class="skel-chips">
+          <span class="skel-box skel-chip" style="--skel-w: 3.5rem"></span>
+          <span class="skel-box skel-chip" style="--skel-w: 4.5rem"></span>
+          <span class="skel-box skel-chip" style="--skel-w: 4.25rem"></span>
+          @if (manager) {
+            <span class="skel-box skel-chip" style="--skel-w: 4rem"></span>
+          }
+        </span>
+      </p>
       @if (manager) {
         <div class="td__actions skel-in">
-          <span class="td__act"><span class="skel-box td__skelButton"></span></span>
-          <span class="td__act"><span class="skel-box td__skelButton td__skelButton--short"></span></span>
+          <span class="skel-grp" [class.skel-grp--block]="!split()">
+            <span class="skel-box skel-btn skel-btn--label" style="--skel-w: 5.5rem"></span>
+            <span class="skel-box skel-btn skel-btn--label" style="--skel-w: 5rem"></span>
+          </span>
         </div>
       }
     </header>

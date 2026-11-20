@@ -180,6 +180,8 @@ export class GremiumDetailComponent {
    * The sub-tabs that this platform has (spec 000758): "Sitzungen" and "Anwesenheit" need
    * `Sitzungen`, "Beschlüsse" needs `Abstimmungen`, "To-Dos" needs `Boards`.
    */
+  /** The widths of the tab labels in the skeleton: Info, Sitzungen, Mitglieder, Anwesenheit, Beschlüsse. */
+  protected readonly skelTabs = ['2rem', '4rem', '4.5rem', '5.5rem', '4.5rem'] as const;
   readonly shownTabs = computed<readonly GremiumTab[]>(() => {
     const on: Record<GremiumTab, boolean> = {
       info: infoTabShown(this.info()),

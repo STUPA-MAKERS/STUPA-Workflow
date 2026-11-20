@@ -42,7 +42,6 @@ import {
   type RangeValue,
   SearchPillComponent,
   SideSheetComponent,
-  SkeletonComponent,
   mediaQuery,
 } from '@stupa-makers/ui-kit';
 import { LINK_ICON, LINK_KIND_LABEL, linkSub, splitUrl } from '../../features/todos/todos.util';
@@ -106,13 +105,22 @@ export interface GraphRow {
     RouterLink,
     SearchPillComponent,
       SideSheetComponent,
-    SkeletonComponent,
     TranslatePipe,
   ],
   templateUrl: './graph.component.html',
   styleUrl: './graph.component.scss',
 })
 export class GraphComponent {
+  /** The nodes of the skeleton: a centre and its neighbours, in px from the middle. */
+  protected readonly skelNodes = [
+    { x: 0, y: 0, w: 4 },
+    { x: -70, y: -50, w: 6 },
+    { x: 60, y: -65, w: 5 },
+    { x: 85, y: 30, w: 6.5 },
+    { x: -15, y: 80, w: 5.5 },
+    { x: -90, y: 40, w: 4.5 },
+  ] as const;
+
   private readonly api = inject(GraphApiService);
   private readonly gremienApi = inject(GremienApiService);
   private readonly i18n = inject(I18nService);
