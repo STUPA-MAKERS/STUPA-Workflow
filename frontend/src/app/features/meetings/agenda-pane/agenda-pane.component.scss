@@ -241,9 +241,24 @@
   background-color: transparent;
   color: var(--color-text);
 }
+// The hover keeps the text colour: the hover of a button group would turn the ⋮ into the
+// dark ink of the tonal surface, which vanishes on the plain box.
 @media (hover: hover) {
   :host-context(.mp__agenda) .ap__menu ::ng-deep .rm__trigger:hover:not(:disabled) {
     background-color: var(--color-surface-2);
+    color: var(--color-text);
+  }
+  // The ⋮ shows only while the pointer is on its TOP, while the TOP holds the keyboard focus,
+  // and while its menu is open (001443). The box stays, so the TOPs keep their shape. A touch
+  // screen has no hover, so there the ⋮ always shows.
+  :host-context(.mp__agenda) .ap__menu ::ng-deep .rm__trigger {
+    opacity: 0;
+    transition: opacity var(--motion-fast) var(--ease-standard);
+  }
+  :host-context(.mp__agenda) .ap__row:hover .ap__menu ::ng-deep .rm__trigger,
+  :host-context(.mp__agenda) .ap__row:focus-within .ap__menu ::ng-deep .rm__trigger,
+  :host-context(.mp__agenda) .ap__menu ::ng-deep .rm__trigger[aria-expanded='true'] {
+    opacity: 1;
   }
 }
 // The hover rule of a row widens the menu to its own size, so a hover keeps the box width.
