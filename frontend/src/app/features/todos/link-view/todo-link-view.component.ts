@@ -16,6 +16,7 @@ import {
   NoteComponent,
   SectionComponent,
   SideSheetComponent,
+  FactsComponent,
 } from '@stupa-makers/ui-kit';
 import { LINK_ICON, linkSub, VOTE_RESULT_LABEL, VOTE_STATUS_LABEL } from '../todos.util';
 
@@ -60,7 +61,7 @@ const ROWS_HEADING: Partial<Record<TodoLink['kind'], TranslationKey>> = {
   selector: 'app-todo-link-view',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, IconComponent, MarkdownViewComponent, NoteComponent, SectionComponent, SideSheetComponent],
+  imports: [FactsComponent, TranslatePipe, IconComponent, MarkdownViewComponent, NoteComponent, SectionComponent, SideSheetComponent],
   templateUrl: './todo-link-view.component.html',
   styleUrl: './todo-link-view.component.scss',
 })

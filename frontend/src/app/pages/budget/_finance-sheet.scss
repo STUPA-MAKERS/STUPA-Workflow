@@ -125,9 +125,7 @@
   gap: var(--space-3) var(--space-4);
 }
 .fd__stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+  --facts-cols: minmax(0, 1fr);
 }
 .fd__wrap,
 .fd__note {

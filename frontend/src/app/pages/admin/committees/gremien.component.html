@@ -48,9 +48,9 @@
             @if (isOpen(g)) {
               <div class="grem__body">
                 <app-section class="grem__settings" [level]="2" [heading]="'admin.gremien.settings' | t">
-                  <dl class="kv grem__grid">
+                  <dl appFacts class="grem__grid">
                     @for (s of settings(g); track s.label) {
-                      <div [class.kv__wide]="s.copyable">
+                      <div [class.facts__wide]="s.copyable">
                         <dt>{{ s.label }}</dt>
                         <dd [class.grem__copy]="s.copyable">{{ s.value }}</dd>
                       </div>

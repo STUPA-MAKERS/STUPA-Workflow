@@ -16,6 +16,7 @@ import {
   SegmentedComponent,
   StatusTextComponent,
   ToastService,
+  FactsComponent,
 } from '@stupa-makers/ui-kit';
 import { CALENDAR_NOW } from '../calendar-grid.util';
 import { answerKey, answerKind, hasEnded, spanText } from '../calendar.util';
@@ -34,6 +35,7 @@ import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-lis
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FactsComponent,
     AvatarComponent,
     ButtonComponent,
     ChipComponent,

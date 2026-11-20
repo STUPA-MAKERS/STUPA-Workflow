@@ -50,7 +50,7 @@
               @if (canManage()) {
                 <app-section class="wh__status" [level]="2" [heading]="'admin.webhook.delivery.title' | t">
                   @if (s) {
-                    <dl class="kv wh__grid">
+                    <dl appFacts class="wh__grid">
                       <div>
                         <dt>{{ 'admin.webhook.delivery.state' | t }}</dt>
                         @let st = deliveryStatus(s.lastState);
@@ -72,7 +72,7 @@
                         <dt>{{ 'admin.webhook.delivery.lastAt' | t }}</dt>
                         <dd class="mono">{{ s.lastAt ? (s.lastAt | ldate: 'short') : '—' }}</dd>
                       </div>
-                      <div class="kv__wide">
+                      <div class="facts__wide">
                         <dt>{{ 'admin.webhook.delivery.reason' | t }}</dt>
                         <dd>{{ reasonLabel(s.reasonClass) }}</dd>
                       </div>

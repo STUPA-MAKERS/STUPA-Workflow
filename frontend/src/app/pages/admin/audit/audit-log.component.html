@@ -77,7 +77,7 @@
               >
               @if (isOpen(e.id)) {
                 <div class="al__details" [id]="'al-detail-' + e.id">
-                  <dl class="al__meta">
+                  <dl appFacts layout="rows" class="al__meta">
                     <dt>{{ 'admin.audit.detail.action' | t }}</dt>
                     <dd>{{ actionLabel(e.action) }}</dd>
                     @if (e.targetType || e.targetId) {

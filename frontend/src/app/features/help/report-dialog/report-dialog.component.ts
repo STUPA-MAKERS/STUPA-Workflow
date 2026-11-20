@@ -42,6 +42,7 @@ import {
   TextareaComponent,
   ToastService,
   ErrorTextComponent,
+  FactsComponent,
 } from '@stupa-makers/ui-kit';
 import { scanStatus } from '@shared/status-kind.util';
 import { AltchaComponent } from '../../apply/altcha.component';
@@ -98,6 +99,7 @@ const KIND_LABEL: Record<TicketKind, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FactsComponent,
     ErrorTextComponent,
     TextareaComponent,
     ChipComponent,

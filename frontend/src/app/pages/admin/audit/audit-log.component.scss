@@ -83,17 +83,9 @@
   gap: var(--space-4);
 }
 .al__meta {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: var(--space-2) var(--space-6);
-  margin: 0;
+  --facts-label: max-content;
+  --facts-gap: var(--space-2) var(--space-6);
   font-size: var(--fs-sm);
-}
-.al__meta dt {
-  color: var(--color-text-muted);
-}
-.al__meta dd {
-  margin: 0;
 }
 .al__wrap {
   overflow-wrap: anywhere;

@@ -31,6 +31,7 @@ import {
   SkeletonComponent,
   StatusTextComponent,
   ToastService,
+  FactsComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminOptionsService } from '../admin-options.service';
@@ -116,6 +117,7 @@ function withSaved(
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FactsComponent,
     FormsModule,
     TranslatePipe,
     LocalizedDatePipe,

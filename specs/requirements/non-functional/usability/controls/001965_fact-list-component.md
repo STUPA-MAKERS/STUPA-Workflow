@@ -2,10 +2,12 @@
 id: "001965"
 title: A list of facts comes from one kit component
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
-implementation: null
+implementation:
+  - frontend/vendor/ui-kit/src/lib/facts
+  - frontend/src/app/facts.templates.spec.ts
 scope:
   - frontend/src/app/
 ---
@@ -13,7 +15,7 @@ scope:
 # A list of facts comes from one kit component
 
 A list of facts (a label and a value, `<dl>` with `<dt>` and `<dd>`: the fields of a booking,
-the time and place of a Termin, the settings of a Gremium) must be an `app-facts` of the kit.
+the time and place of a Termin, the settings of a Gremium) must be a `<dl appFacts>` (`FactsComponent`) of the kit.
 An app template must not style its own `<dl>`.
 
 `app-facts` has two layouts:
@@ -27,8 +29,10 @@ An app template must not style its own `<dl>`.
 A fact that needs the whole width is `wide`. A value wraps anywhere, so an id or an address is
 never cut.
 
-Not covered: the tally of a vote (`vc__counts`, `mtg__tally`) and the figures of the Haushalt
-(`bd__figs`), which are numbers with their own visual weight, not facts.
+Not covered: the tally of a vote (`vc__counts`, `mtg__tally`), the figures of the Haushalt and
+of a booking (`bd__figs`, `fd__figs`), the amounts of an invoice with their sum (`id__amounts`)
+and the field groups of a type change (`tcd__fields`), which are numbers or lists with their own
+visual weight, not facts.
 
 Reason: 19 templates draw a fact list with five different styles (`.kv`, `apv__facts`,
 `fd__card fd__grid`, `cd__fields`, `rd__ctxList` and others). The label size, the label colour

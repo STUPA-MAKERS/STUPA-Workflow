@@ -88,7 +88,7 @@
                 </app-button-group>
               }
               @if (openIds().has(p.id)) {
-                <dl class="kv au__kv">
+                <dl appFacts class="au__kv">
                   <div>
                     <dt>{{ 'admin.users.col.roles' | t }}</dt>
                     <dd>{{ roleText(p) || ('admin.users.noRoles' | t) }}</dd>
@@ -104,7 +104,7 @@
                       <dd>{{ p.lastLogin ? (p.lastLogin | ldate: 'medium') : ('admin.users.never' | t) }}</dd>
                     }
                   </div>
-                  <div class="kv__wide">
+                  <div class="facts__wide">
                     <dt>{{ 'admin.users.col.groups' | t }}</dt>
                     <dd class="au__tags">
                       @for (g of p.oidcGroups; track g) {

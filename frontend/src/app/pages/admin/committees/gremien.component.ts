@@ -22,6 +22,7 @@ import {
   ToastService,
   PageHeaderComponent,
   SectionComponent,
+  FactsComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { problemCode } from '@core/api/problem';
@@ -78,6 +79,7 @@ interface Setting {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FactsComponent,
     ButtonComponent,
     ButtonGroupComponent,
     GremiumDefaultsDialogComponent,

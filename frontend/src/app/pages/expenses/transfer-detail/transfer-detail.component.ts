@@ -12,6 +12,7 @@ import {
   SheetBarComponent,
   SheetBarTitleDirective,
   SectionComponent,
+  FactsComponent,
 } from '@stupa-makers/ui-kit';
 import type { BudgetTransfer } from '../../budget/budget-tree.api';
 import {
@@ -31,7 +32,7 @@ import { formatMoney } from '@shared/format-money';
   selector: 'app-transfer-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SectionComponent, ButtonComponent, TransferLegComponent, NoteComponent, SheetBarComponent, SheetBarTitleDirective, IconComponent, LocalizedDatePipe, RowMenuComponent, TranslatePipe],
+  imports: [FactsComponent, SectionComponent, ButtonComponent, TransferLegComponent, NoteComponent, SheetBarComponent, SheetBarTitleDirective, IconComponent, LocalizedDatePipe, RowMenuComponent, TranslatePipe],
   templateUrl: './transfer-detail.component.html',
   styleUrl: './transfer-detail.component.scss',
 })

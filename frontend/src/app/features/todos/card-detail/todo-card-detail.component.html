@@ -222,7 +222,7 @@
 </ng-template>
 
 <ng-template #details let-card>
-  <dl class="cd__fields">
+  <dl appFacts layout="rows" class="cd__fields">
     <div class="cd__field">
       <dt>{{ 'todos.card.column' | t }}</dt>
       <dd>
@@ -808,7 +808,7 @@
 </ng-template>
 
 <ng-template #detailsSkel>
-  <dl class="cd__fields">
+  <dl appFacts layout="rows" class="cd__fields">
     <div class="cd__field">
       <dt>{{ 'todos.card.column' | t }}</dt>
       <dd class="cd__chips skel-in"><span class="skel-box cd__skelChip"></span></dd>

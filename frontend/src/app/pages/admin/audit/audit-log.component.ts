@@ -1,6 +1,6 @@
 import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
 import { LoadMoreComponent } from '@shared/ui/load-more/load-more.component';
-import { ButtonGroupComponent, MetaLineComponent, PageHeaderComponent, StickyBarComponent as _Sb } from '@stupa-makers/ui-kit';
+import { ButtonGroupComponent, MetaLineComponent, PageHeaderComponent, StickyBarComponent as _Sb, FactsComponent } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import {
   ChangeDetectionStrategy,
@@ -258,6 +258,7 @@ type VerifyState =
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FactsComponent,
     MetaLineComponent,
     LoadStateComponent,
     ExpandRowComponent,

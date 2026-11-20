@@ -135,24 +135,11 @@
   transform: none;
 }
 .rd__ctxList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  --facts-label: 4rem;
+  --facts-gap: var(--space-1) var(--space-3);
   margin: var(--space-2) 0 0;
   padding-inline-start: var(--space-5);
   font-size: var(--fs-small);
-}
-.rd__ctxRow {
-  display: grid;
-  grid-template-columns: 4rem minmax(0, 1fr);
-  gap: var(--space-3);
-}
-.rd__ctxRow dt {
-  color: var(--color-text-muted);
-}
-.rd__ctxRow dd {
-  margin: 0;
-  overflow-wrap: anywhere;
 }
 
 .rd__sent {
