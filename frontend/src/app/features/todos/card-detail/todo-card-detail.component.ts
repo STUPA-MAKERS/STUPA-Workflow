@@ -53,6 +53,7 @@ import { chatPeople } from '@shared/ui/chat/chat-mentions';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   ChipComponent,
   EmptyStateComponent,
   FilterSelectComponent,
@@ -166,6 +167,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     TranslatePipe,
     AvatarComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     ChatComponent,
     EmptyStateComponent,
     FilterSelectComponent,

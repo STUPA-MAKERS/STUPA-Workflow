@@ -11,28 +11,30 @@
         <li class="ab__row">
           <app-icon class="ab__icon" name="kanban" [size]="18" />
           <span class="ab__name">{{ board.name }}</span>
-          @if (board.canConfigure) {
-            <app-button
-              variant="text"
-              size="sm"
-              [disabled]="busy() !== null"
-              [loading]="busy() === board.id && deleting() === null"
-              (click)="restore(board)"
-            >
-              {{ 'todos.archivedBoards.restore' | t }}
-            </app-button>
-          }
-          @if (admin()) {
-            <app-button
-              variant="danger"
-              size="sm"
-              [disabled]="busy() !== null"
-              [ariaLabel]="'todos.archivedBoards.deleteOf' | t: { name: board.name }"
-              (click)="deleting.set(board)"
-            >
-              {{ 'todos.archivedBoards.delete' | t }}
-            </app-button>
-          }
+          <app-button-group>
+            @if (board.canConfigure) {
+              <app-button
+                variant="text"
+                size="sm"
+                [disabled]="busy() !== null"
+                [loading]="busy() === board.id && deleting() === null"
+                (click)="restore(board)"
+              >
+                {{ 'todos.archivedBoards.restore' | t }}
+              </app-button>
+            }
+            @if (admin()) {
+              <app-button
+                variant="danger"
+                size="sm"
+                [disabled]="busy() !== null"
+                [ariaLabel]="'todos.archivedBoards.deleteOf' | t: { name: board.name }"
+                (click)="deleting.set(board)"
+              >
+                {{ 'todos.archivedBoards.delete' | t }}
+              </app-button>
+            }
+          </app-button-group>
         </li>
       }
     </ul>

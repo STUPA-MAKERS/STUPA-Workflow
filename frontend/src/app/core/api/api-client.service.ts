@@ -119,6 +119,8 @@ import type {
   TransitionOutWire,
   TransitionRequestBody,
   TransitionResult,
+  TypeChangeBody,
+  TypeChangePreview,
   Uuid,
   VersionOutWire,
   CircularCreateBody,
@@ -632,6 +634,22 @@ export class ApiClient {
    *  override bypasses guards and transitions. Needs `application.force_status`. */
   forceStatus(id: Uuid, req: ForceStatusBody): Observable<TransitionResult> {
     return this.http.post<TransitionResult>(`${this.base}/applications/${id}/force-status`, req);
+  }
+
+  /** What a change of the Antragsart to `typeId` carries, misses and drops (spec 001661). */
+  typeChangePreview(id: Uuid, typeId: Uuid): Observable<TypeChangePreview> {
+    return this.http.get<TypeChangePreview>(`${this.base}/applications/${id}/type-change`, {
+      params: { typeId },
+      context: skipLoading(),
+    });
+  }
+
+  /** Change the Antragsart of an application (`application.change_type`, spec 001660). */
+  changeType(id: Uuid, body: TypeChangeBody): Observable<Application> {
+    const lang = this.i18n.uiLocale();
+    return this.http
+      .post<ApplicationOutWire>(`${this.base}/applications/${id}/type-change`, body)
+      .pipe(map((wire) => mapApplication(wire, lang)));
   }
 
   /** Transitions the magic-link applicant may fire (actorIsApplicant gate). */

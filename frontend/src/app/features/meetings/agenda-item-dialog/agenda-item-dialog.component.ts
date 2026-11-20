@@ -24,6 +24,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   DialogComponent,
   EmptyStateComponent,
   IconComponent,
@@ -99,6 +100,7 @@ export interface AgendaTodoOption {
     TranslatePipe,
     DialogComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     InputComponent,
     SegmentedComponent,

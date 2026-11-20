@@ -78,12 +78,14 @@
                 }}</app-status-text>
               }
               @if (!p.mergedIntoId) {
-                <app-row-menu
-                  trail
-                  [sections]="menuFor(p)"
-                  [label]="('admin.users.moreActions' | t) + ': ' + userLabel(p)"
-                  (selected)="onMenu($event, p)"
-                />
+                <app-button-group ngProjectAs="[trail]">
+                  <app-row-menu
+                    trail
+                    [sections]="menuFor(p)"
+                    [label]="('admin.users.moreActions' | t) + ': ' + userLabel(p)"
+                    (selected)="onMenu($event, p)"
+                  />
+                </app-button-group>
               }
               @if (openIds().has(p.id)) {
                 <dl class="kv au__kv">

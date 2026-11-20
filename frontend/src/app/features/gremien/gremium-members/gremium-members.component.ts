@@ -15,6 +15,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   downloadBlob,
   EmptyStateComponent,
   FilterSelectComponent,
@@ -59,6 +60,7 @@ export interface MemberRow {
     LoadErrorComponent,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     AvatarComponent,
     EmptyStateComponent,

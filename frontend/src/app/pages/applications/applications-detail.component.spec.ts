@@ -1493,6 +1493,31 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
+  /** § 001663: a version that changed the Antragsart names both types and the old labels. */
+  it('shows a change of the Antragsart with both types and the old field labels', async () => {
+    const fields: FormFieldDef[] = [{ key: 'title', type: 'text', label: { de: 'Titel' } }];
+    const { http, cmp } = await setupWithFields(fields, {}, {}, [
+      VERSIONS[0],
+      {
+        ...VERSIONS[1],
+        diff: { added: {}, removed: { iban: 'DE89', alt: 'x' }, changed: {} },
+        typeChange: {
+          fromTypeId: 't1',
+          fromType: { de: 'Finanzantrag' },
+          toTypeId: 't2',
+          toType: null,
+          fieldLabels: { iban: { de: 'IBAN' } },
+        },
+      },
+    ]);
+    flushAttachments(http);
+    const entry = cmp.historyEntries().find((e) => e.icon === 'swap');
+    expect(entry?.title).toBe('Antragsart geändert · Version 2');
+    expect(entry?.body).toBe('Finanzantrag → —');
+    expect(entry?.changes?.map((c) => c.label)).toEqual(['IBAN', 'alt']);
+    http.verify();
+  });
+
   it('derives the author name', async () => {
     const { cmp } = await setup();
     expect(cmp['authorName']({ author: 'Mia Müller' } as ApplicationComment)).toBe('Mia Müller');

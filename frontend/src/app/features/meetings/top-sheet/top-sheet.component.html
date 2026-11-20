@@ -156,15 +156,17 @@
         <span class="ts__spacer"></span>
         <ng-container [ngTemplateOutlet]="saveTpl" />
         @if (editable()) {
-          <app-button
-            class="ts__done"
-            variant="outlined"
-            [ariaPressed]="!!t.doneAt"
-            (click)="doneChange.emit({ item: t, done: !t.doneAt })"
-          >
-            <app-icon name="check" />
-            {{ 'meetings.agenda.done' | t }}
-          </app-button>
+          <app-button-group>
+            <app-button
+              class="ts__done"
+              variant="outlined"
+              [ariaPressed]="!!t.doneAt"
+              (click)="doneChange.emit({ item: t, done: !t.doneAt })"
+            >
+              <app-icon name="check" />
+              {{ 'meetings.agenda.done' | t }}
+            </app-button>
+          </app-button-group>
         }
         <app-segmented
           class="ts__mode"

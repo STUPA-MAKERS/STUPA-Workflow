@@ -34,11 +34,13 @@
         </ng-template>
         <ng-template appCell="actions" let-r>
           @if ($any(r).status === 'open') {
-            <app-row-menu
-              [label]="('admin.common.actions' | t) + ': ' + ($any(r).email || subjectLabel($any(r).subjectType))"
-              [sections]="rowMenu()"
-              (selected)="onRowMenu($any(r), $event)"
-            />
+            <app-button-group>
+              <app-row-menu
+                [label]="('admin.common.actions' | t) + ': ' + ($any(r).email || subjectLabel($any(r).subjectType))"
+                [sections]="rowMenu()"
+                (selected)="onRowMenu($any(r), $event)"
+              />
+            </app-button-group>
           }
         </ng-template>
       </app-data-table>
@@ -58,9 +60,11 @@
           name="auskunftEmail"
         />
         <div>
-          <app-button type="submit" variant="tonal" [disabled]="!auskunftEmail().trim()">
-            <app-icon name="download" /> {{ 'admin.privacy.auskunftExport' | t }}
-          </app-button>
+          <app-button-group>
+            <app-button type="submit" variant="tonal" [disabled]="!auskunftEmail().trim()">
+              <app-icon name="download" /> {{ 'admin.privacy.auskunftExport' | t }}
+            </app-button>
+          </app-button-group>
         </div>
       </form>
     </app-section>
@@ -76,7 +80,9 @@
                 <span class="pv__mail mono pv__muted">{{ p.email }}</span>
               }
             </span>
-            <app-button variant="text" size="sm" (click)="clearPerson()">{{ 'admin.privacy.personChange' | t }}</app-button>
+            <app-button-group>
+              <app-button variant="text" size="sm" (click)="clearPerson()">{{ 'admin.privacy.personChange' | t }}</app-button>
+            </app-button-group>
           </div>
         } @else {
           <app-search-pill
@@ -107,9 +113,11 @@
           }
         }
         <div>
-          <app-button type="submit" variant="danger" [disabled]="!person()">
-            {{ 'admin.privacy.principalErase' | t }}
-          </app-button>
+          <app-button-group>
+            <app-button type="submit" variant="danger" [disabled]="!person()">
+              {{ 'admin.privacy.principalErase' | t }}
+            </app-button>
+          </app-button-group>
         </div>
       </form>
     </app-section>

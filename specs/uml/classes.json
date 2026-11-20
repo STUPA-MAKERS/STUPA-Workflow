@@ -862,6 +862,27 @@
       "to": "Application"
     },
     {
+      "column": "from_type_id",
+      "from": "SubmissionVersion",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "ApplicationType"
+    },
+    {
+      "column": "to_type_id",
+      "from": "SubmissionVersion",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "ApplicationType"
+    },
+    {
+      "column": "from_form_version_id",
+      "from": "SubmissionVersion",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "FormVersion"
+    },
+    {
       "column": "application_id",
       "from": "TaskReminderLog",
       "multiplicity": "1",
@@ -6018,6 +6039,24 @@
           "nullable": true,
           "primaryKey": false,
           "type": "JSONB"
+        },
+        {
+          "name": "from_type_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "to_type_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "from_form_version_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
         },
         {
           "name": "id",

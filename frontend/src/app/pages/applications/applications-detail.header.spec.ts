@@ -407,6 +407,21 @@ describe('ApplicationsDetailComponent — header', () => {
       expect(cmp.confirmDelete()).toBe(true);
     });
 
+    it('offers "Antragsart ändern" with its permission and opens the dialog', async () => {
+      const { cmp, detectChanges } = await setup({ perms: [...ALL, 'application.change_type'] });
+      expect(cmp.menuSections().flatMap((s) => s.items.map((i) => i.id))).toEqual([
+        'force',
+        'type',
+        'observers',
+        'versions',
+        'pdf',
+        'delete',
+      ]);
+      cmp.onMenu({ id: 'type', label: '' });
+      detectChanges();
+      expect(cmp.typeDialogOpen()).toBe(true);
+    });
+
     it('scrolls to the history side by side', async () => {
       const { cmp } = await setup();
       const el = document.getElementById('ad-history')!;

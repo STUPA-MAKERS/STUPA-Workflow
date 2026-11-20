@@ -53,13 +53,15 @@
               <span class="tf__arrow" aria-hidden="true"
                 ><app-icon name="arrow" [size]="20"
               /></span>
-              <app-button class="tf__swapInline" variant="text" (click)="d.swapTransfer()">
-                <span class="mf__btn"
-                  ><app-icon name="swap" [size]="18" />{{
-                    'expenses.transfers.swapShort' | t
-                  }}</span
-                >
-              </app-button>
+              <app-button-group>
+                <app-button class="tf__swapInline" variant="text" (click)="d.swapTransfer()">
+                  <span class="mf__btn"
+                    ><app-icon name="swap" [size]="18" />{{
+                      'expenses.transfers.swapShort' | t
+                    }}</span
+                  >
+                </app-button>
+              </app-button-group>
             </div>
             <app-cost-centre-select
               leavesOnly
@@ -81,11 +83,13 @@
           @if (d.tFromId() && d.tFromId() === d.tToId()) {
             <p class="mf__error" role="alert">{{ 'expenses.transfers.samePair' | t }}</p>
           }
-          <app-button class="tf__swap" variant="text" (click)="d.swapTransfer()">
-            <span class="mf__btn"
-              ><app-icon name="swap" [size]="18" />{{ 'expenses.transfers.swap' | t }}</span
-            >
-          </app-button>
+          <app-button-group>
+            <app-button class="tf__swap" variant="text" (click)="d.swapTransfer()">
+              <span class="mf__btn"
+                ><app-icon name="swap" [size]="18" />{{ 'expenses.transfers.swap' | t }}</span
+              >
+            </app-button>
+          </app-button-group>
         } @else if (pair(); as p) {
           <div class="tf__legs">
             @for (leg of [p.from, p.to]; track $index) {

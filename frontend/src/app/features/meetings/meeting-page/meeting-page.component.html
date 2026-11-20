@@ -180,10 +180,12 @@
     <ng-container [ngTemplateOutlet]="voteCardTpl" [ngTemplateOutletContext]="{ $implicit: vote }" />
   }
   @if (canAddVote() && top(); as t) {
-    <app-button class="mp__addVote" variant="tonal" [block]="true" (click)="voteDialog.emit(t)">
-      <app-icon name="plus" />
-      {{ (t.applicationId || t.planVersionId ? addVoteKey() : 'meetings.vote.addQuestion') | t }}
-    </app-button>
+    <app-button-group>
+      <app-button class="mp__addVote" variant="tonal" [block]="true" (click)="voteDialog.emit(t)">
+        <app-icon name="plus" />
+        {{ (t.applicationId || t.planVersionId ? addVoteKey() : 'meetings.vote.addQuestion') | t }}
+      </app-button>
+    </app-button-group>
   }
 </ng-template>
 
@@ -337,8 +339,10 @@
 <ng-template #showTpl>
   <app-join-qr [meeting]="meeting()" [iconOnly]="true" [(open)]="qrOpen" />
   @if (wide() && meeting().status !== 'closed' && meeting().canManage) {
-    <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.beamer.enter' | t" (click)="toggleBeamer.emit()">
-      <app-icon name="monitor" />
-    </app-button>
+    <app-button-group>
+      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.beamer.enter' | t" (click)="toggleBeamer.emit()">
+        <app-icon name="monitor" />
+      </app-button>
+    </app-button-group>
   }
 </ng-template>

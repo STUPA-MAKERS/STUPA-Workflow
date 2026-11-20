@@ -67,16 +67,18 @@
       }
 
       <footer class="cs__actions">
-        <app-button variant="text" [disabled]="submitting()" (click)="deny()">
-          {{ 'account.consent.deny' | t }}
-        </app-button>
-        <app-button
-          variant="fill"
-          [disabled]="submitting() || !r.canUseMcp || !anySelected()"
-          (click)="approve()"
-        >
-          {{ 'account.consent.approve' | t }}
-        </app-button>
+        <app-button-group [main]="true">
+          <app-button variant="text" [disabled]="submitting()" (click)="deny()">
+            {{ 'account.consent.deny' | t }}
+          </app-button>
+          <app-button
+            variant="fill"
+            [disabled]="submitting() || !r.canUseMcp || !anySelected()"
+            (click)="approve()"
+          >
+            {{ 'account.consent.approve' | t }}
+          </app-button>
+        </app-button-group>
       </footer>
     </div>
   }

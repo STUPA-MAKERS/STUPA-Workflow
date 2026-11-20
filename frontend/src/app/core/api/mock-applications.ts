@@ -17,6 +17,7 @@ import type {
   TimelineDecision,
   TimelineEventOutWire,
   TransitionOutWire,
+  TypeChangePreview,
   TransitionResult,
   VersionOutWire,
 } from './models';
@@ -315,7 +316,97 @@ const ATTACHMENTS: readonly AttachmentOutWire[] = [
 ];
 
 const DETAIL_PATH =
-  /\/applications\/(a1000000-[^/]+)(?:\/(transitions|attachments|flow-states|form|timeline|versions))?$/;
+  /\/applications\/(a1000000-[^/]+)(?:\/(transitions|attachments|flow-states|form|timeline|versions|type-change))?$/;
+
+/** The Antragsart "Projektantrag: QSM" of the demo types: a change to it misses two fields. */
+const TYPE_QSM = '22222222-2222-2222-2222-222222222223';
+const TYPE_NAMES: Readonly<Record<string, { readonly de: string; readonly en: string }>> = {
+  [TYPE_FUND]: { de: 'Finanzantrag', en: 'Funding application' },
+  [TYPE_OTHER]: { de: 'Sonstiger Antrag', en: 'Other application' },
+  [TYPE_QSM]: { de: 'Projektantrag: QSM', en: 'Project application: QSM' },
+};
+const BACK_TRANSITION = 'tc000000-0000-0000-0000-000000000001';
+
+/** `GET …/type-change?typeId=`: the demo preview (spec 001661). */
+function typeChangePreview(d: DemoApp, typeId: string): TypeChangePreview {
+  const sendBack = typeId === TYPE_QSM;
+  const label = (de: string, en: string) => ({ de, en });
+  return {
+    typeId,
+    carried: [
+      { key: 'title', label: label('Titel', 'Title') },
+      { key: 'description', label: label('Beschreibung', 'Description') },
+      { key: 'event_date', label: label('Datum', 'Date') },
+      ...(d.amount === null ? [] : [{ key: 'costs', label: label('Kostenaufstellung', 'Costs') }]),
+    ],
+    missing: sendBack
+      ? [
+          { key: 'funding', label: label('Förderhöhe', 'Funding') },
+          { key: 'period', label: label('Projektzeitraum', 'Project period') },
+        ]
+      : [],
+    dropped: [
+      { key: 'entry_fee', label: label('Eintritt', 'Entry fee') },
+      { key: 'iban', label: label('IBAN', 'IBAN') },
+    ],
+    transitions:
+      sendBack && d.state !== 'submitted'
+        ? [
+            {
+              id: BACK_TRANSITION,
+              label: label('Zur Überarbeitung', 'Send back for changes'),
+              toStateId: STATES.submitted.id,
+              toStateLabel: STATES.submitted.label,
+            },
+          ]
+        : [],
+    possible: !sendBack || d.state !== 'submitted',
+  };
+}
+
+/** `POST …/type-change`: a new version with the old and the new type, maybe sent back. */
+function changeType(
+  d: DemoApp,
+  body: { readonly typeId?: string; readonly transitionId?: string | null; readonly note?: string | null },
+): DemoApp {
+  const typeId = body.typeId ?? d.type;
+  const before = answers(d);
+  const data = Object.fromEntries(
+    Object.entries(before).filter(([key]) => key !== 'entry_fee' && key !== 'iban'),
+  );
+  const versions = versionsOf(d);
+  const now = new Date().toISOString();
+  const version: VersionOutWire = {
+    version: versions.length + 1,
+    data,
+    diff: diffOf(before, data),
+    changedBy: 'Demo Mitglied',
+    changedByInfo: { kind: 'principal', displayName: 'Demo Mitglied' },
+    at: now,
+    typeChange: {
+      fromTypeId: d.type,
+      fromType: TYPE_NAMES[d.type] ?? null,
+      toTypeId: typeId,
+      toType: TYPE_NAMES[typeId] ?? null,
+      fieldLabels: { entry_fee: { de: 'Eintritt', en: 'Entry fee' }, iban: { de: 'IBAN', en: 'IBAN' } },
+    },
+  };
+  const changed = replaceRow(d, { type: typeId, data, versions: [...versions, version] });
+  if (!body.transitionId) return changed;
+  const event: TimelineEventOutWire = {
+    fromStateId: STATES[changed.state].id,
+    toStateId: STATES.submitted.id,
+    toState: STATES.submitted,
+    transitionLabel: { de: 'Zur Überarbeitung', en: 'Send back for changes' },
+    actor: 'Demo Mitglied',
+    actorInfo: { kind: 'principal', displayName: 'Demo Mitglied' },
+    at: now,
+    note: ['Nach dem Wechsel der Antragsart fehlen diese Pflichtangaben: Förderhöhe, Projektzeitraum.', body.note]
+      .filter(Boolean)
+      .join('\n\n'),
+  };
+  return replaceRow(changed, { events: [...(changed.events ?? []), event], state: 'submitted' });
+}
 
 /** GET of a demo path. `undefined`: not a path of this module. */
 export function mockApplicationsGet(p: string, params: HttpParams): unknown {
@@ -336,12 +427,15 @@ export function mockApplicationsGet(p: string, params: HttpParams): unknown {
       return timelineOf(d);
     case 'versions':
       return versionsOf(d);
+    case 'type-change':
+      return typeChangePreview(d, params.get('typeId') ?? '');
     default:
       return detail(d);
   }
 }
 
-const MUTATION_PATH = /\/applications\/(a1000000-[^/]+)(?:\/(transition|archive|force-status))?$/;
+const MUTATION_PATH =
+  /\/applications\/(a1000000-[^/]+)(?:\/(transition|archive|force-status|type-change))?$/;
 
 /** A write to a demo row. `undefined`: not a path of this module. */
 export function mockApplicationsWrite(method: string, p: string, body: unknown): unknown {
@@ -400,6 +494,9 @@ export function mockApplicationsWrite(method: string, p: string, body: unknown):
       dispatchedActions: [],
     };
     return result;
+  }
+  if (method === 'POST' && m[2] === 'type-change') {
+    return detail(changeType(d, (body ?? {}) as Parameters<typeof changeType>[1]));
   }
   if (method === 'POST' && m[2] === 'force-status') {
     const stateId = (body as { stateId?: string } | null)?.stateId;

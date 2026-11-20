@@ -74,10 +74,12 @@
         }
         @if (timeline.searchHasMore() || timeline.loadingSearch()) {
           <div class="mtl__more">
-            <app-button variant="text" size="sm" [loading]="timeline.loadingSearch()" (click)="timeline.loadMoreSearch()">
-              <app-icon name="down" />
-              {{ 'meetings.list.loadMore' | t }}
-            </app-button>
+            <app-button-group>
+              <app-button variant="text" size="sm" [loading]="timeline.loadingSearch()" (click)="timeline.loadMoreSearch()">
+                <app-icon name="down" />
+                {{ 'meetings.list.loadMore' | t }}
+              </app-button>
+            </app-button-group>
           </div>
         }
       } @else if (!groups().length) {
@@ -103,10 +105,12 @@
           </app-list-group>
           @if (g.kind !== 'past' && timeline.upcomingHasMore() && ($last || groups()[$index + 1].kind === 'past')) {
             <div class="mtl__more">
-              <app-button variant="text" size="sm" [loading]="timeline.loadingUpcoming()" (click)="timeline.loadMoreUpcoming()">
-                <app-icon name="down" />
-                {{ 'meetings.list.loadMore' | t }}
-              </app-button>
+              <app-button-group>
+                <app-button variant="text" size="sm" [loading]="timeline.loadingUpcoming()" (click)="timeline.loadMoreUpcoming()">
+                  <app-icon name="down" />
+                  {{ 'meetings.list.loadMore' | t }}
+                </app-button>
+              </app-button-group>
             </div>
           }
         }
@@ -125,10 +129,12 @@
 
 <ng-template #loadPast>
   <div class="mtl__more">
-    <app-button variant="text" size="sm" [loading]="timeline.loadingPast()" (click)="timeline.loadMorePast()">
-      <app-icon name="down" />
-      {{ 'meetings.list.loadPast' | t }}
-    </app-button>
+    <app-button-group>
+      <app-button variant="text" size="sm" [loading]="timeline.loadingPast()" (click)="timeline.loadMorePast()">
+        <app-icon name="down" />
+        {{ 'meetings.list.loadPast' | t }}
+      </app-button>
+    </app-button-group>
   </div>
 </ng-template>
 

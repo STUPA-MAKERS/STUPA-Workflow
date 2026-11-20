@@ -71,11 +71,13 @@
       @if (showSubs()) {
         <app-section class="fd__sec bd__subs" [heading]="'expenses.sub.title' | t">
           @if (canManage() && !e.parentExpenseId) {
-            <app-button sectionAction variant="text" size="sm" (click)="addSub.emit()">
-              <span class="fd__btn"><app-icon name="plus" />{{
-                (phone() ? 'expenses.sub.addShort' : 'expenses.sub.add') | t
-              }}</span>
-            </app-button>
+            <app-button-group ngProjectAs="[sectionAction]">
+              <app-button sectionAction variant="text" size="sm" (click)="addSub.emit()">
+                <span class="fd__btn"><app-icon name="plus" />{{
+                  (phone() ? 'expenses.sub.addShort' : 'expenses.sub.add') | t
+                }}</span>
+              </app-button>
+            </app-button-group>
           }
           @if (subLoading() && !subRows().length) {
             <app-skeleton variant="rows" [count]="2" [label]="'expenses.sub.loading' | t" />
@@ -90,11 +92,13 @@
                     }</span
                   >
                   @if (canManage()) {
-                    <app-row-menu
-                      [label]="'expenses.rowMenu' | t: { description: s.description }"
-                      [sections]="subMenu()"
-                      (selected)="onSubMenu($event, s)"
-                    />
+                    <app-button-group>
+                      <app-row-menu
+                        [label]="'expenses.rowMenu' | t: { description: s.description }"
+                        [sections]="subMenu()"
+                        (selected)="onSubMenu($event, s)"
+                      />
+                    </app-button-group>
                   }
                 </app-booking-row>
               }

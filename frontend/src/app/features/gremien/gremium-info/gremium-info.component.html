@@ -1,18 +1,22 @@
 @if (info(); as i) {
   @if (empty()) {
     <app-empty-state icon="info" [heading]="'gremien.info.empty' | t">
-      <app-button variant="tonal" (click)="editOpen.set(true)">
-        <app-icon name="edit" />
-        {{ 'gremien.info.edit' | t }}
-      </app-button>
-    </app-empty-state>
-  } @else {
-    @if (i.canEdit) {
-      <div class="gi__tools">
+      <app-button-group>
         <app-button variant="tonal" (click)="editOpen.set(true)">
           <app-icon name="edit" />
           {{ 'gremien.info.edit' | t }}
         </app-button>
+      </app-button-group>
+    </app-empty-state>
+  } @else {
+    @if (i.canEdit) {
+      <div class="gi__tools">
+        <app-button-group>
+          <app-button variant="tonal" (click)="editOpen.set(true)">
+            <app-icon name="edit" />
+            {{ 'gremien.info.edit' | t }}
+          </app-button>
+        </app-button-group>
       </div>
     }
     @if (i.bodyMd.trim()) {

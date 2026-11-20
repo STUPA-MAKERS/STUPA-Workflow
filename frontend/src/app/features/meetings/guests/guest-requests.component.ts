@@ -5,6 +5,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   IconComponent,
   MEDIA,
   mediaQuery,
@@ -25,7 +26,7 @@ const JUST_NOW_MS = 60_000;
   selector: 'app-guest-requests',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TruncatedDirective, TranslatePipe, AvatarComponent, ButtonComponent, IconComponent],
+  imports: [TruncatedDirective, TranslatePipe, AvatarComponent, ButtonComponent, ButtonGroupComponent, IconComponent],
   templateUrl: './guest-requests.component.html',
   styleUrl: './guests.scss',
 })

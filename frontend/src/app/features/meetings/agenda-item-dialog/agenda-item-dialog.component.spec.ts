@@ -518,6 +518,19 @@ describe('AgendaItemDialogComponent', () => {
       expect(screen.getByRole('searchbox', { name: 'To-Do suchen' })).toBeInTheDocument();
     });
 
+    it('shows the cards as select-sheet tiles with a check after the chosen one (001790)', async () => {
+      const { http, fixture } = await todoSetup();
+      flushBoard(http, fixture);
+      const group = screen.getByRole('radiogroup', { name: 'Offene To-Dos' });
+      expect(group.classList).toContain('rowgroup--bg3');
+      const radios = within(group).getAllByRole('radio');
+      await userEvent.click(radios[1]);
+      const rows = radios.map((r) => r.closest('label'));
+      expect(rows.map((r) => r?.querySelector('.aid__check') !== null)).toEqual([false, true, false]);
+      expect(rows[1]?.classList).toContain('aid__row--on');
+      expect(group.querySelector('.aid__mark')).toBeNull();
+    });
+
     /** Back on "To-Do" the list stays loaded. */
     it('puts the picked card on the agenda, non-public at once', async () => {
       const { http, fixture, added, cmp } = await todoSetup();

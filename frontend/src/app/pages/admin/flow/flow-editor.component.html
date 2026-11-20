@@ -15,7 +15,7 @@
       @if (phone()) {
         <app-row-menu [sections]="headerMenu()" (selected)="onHeaderMenu($event)" />
       } @else {
-        <app-button variant="text" [attr.aria-pressed]="showVersions()" (click)="toggleVersions()">
+        <app-button variant="text" [ariaPressed]="showVersions()" (click)="toggleVersions()">
           <app-icon name="history" /> {{ 'admin.flow.versions' | t }}
         </app-button>
       }
@@ -25,29 +25,35 @@
   <div class="fe__work">
     <section class="fe__sheet" [attr.aria-label]="'admin.flow.diagram' | t">
       <div class="fe__toolbar" role="toolbar" [attr.aria-label]="'admin.flow.toolbar' | t">
-        <app-button variant="text" size="sm" (click)="addState()">
-          <app-icon name="plus" /> {{ 'admin.flow.addState' | t }}
-        </app-button>
-        <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="!canUndo()" [ariaLabel]="'admin.flow.undo' | t" [title]="'admin.flow.undo' | t" (click)="undo()">
-          <app-icon name="undo" />
-        </app-button>
-        <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="!canRedo()" [ariaLabel]="'admin.flow.redo' | t" [title]="'admin.flow.redo' | t" (click)="redo()">
-          <app-icon name="redo" />
-        </app-button>
-        @if (multiCount() >= 2) {
-          <app-button variant="tonal" size="sm" (click)="createGroupFromSelection()">
-            {{ 'admin.flow.group.create' | t }} ({{ multiCount() }})
+        <app-button-group>
+          <app-button variant="text" size="sm" (click)="addState()">
+            <app-icon name="plus" /> {{ 'admin.flow.addState' | t }}
           </app-button>
-        }
+          <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="!canUndo()" [ariaLabel]="'admin.flow.undo' | t" [title]="'admin.flow.undo' | t" (click)="undo()">
+            <app-icon name="undo" />
+          </app-button>
+          <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="!canRedo()" [ariaLabel]="'admin.flow.redo' | t" [title]="'admin.flow.redo' | t" (click)="redo()">
+            <app-icon name="redo" />
+          </app-button>
+          @if (multiCount() >= 2) {
+            <app-button variant="tonal" size="sm" (click)="createGroupFromSelection()">
+              {{ 'admin.flow.group.create' | t }} ({{ multiCount() }})
+            </app-button>
+          }
+        </app-button-group>
         <span class="fe__zoom" role="group" [attr.aria-label]="'admin.flow.zoom' | t">
-          <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.flow.zoomOut' | t" [title]="'admin.flow.zoomOut' | t" (click)="zoomOut()">
-            <app-icon name="minus" />
-          </app-button>
+          <app-button-group>
+            <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.flow.zoomOut' | t" [title]="'admin.flow.zoomOut' | t" (click)="zoomOut()">
+              <app-icon name="minus" />
+            </app-button>
+          </app-button-group>
           <span class="fe__zoomValue mono" aria-live="polite">{{ 'admin.flow.zoomValue' | t: { n: zoomPercent() } }}</span>
-          <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.flow.zoomIn' | t" [title]="'admin.flow.zoomIn' | t" (click)="zoomIn()">
-            <app-icon name="plus" />
-          </app-button>
-          <app-button variant="text" size="sm" (click)="resetView()">{{ 'admin.flow.zoomReset' | t }}</app-button>
+          <app-button-group>
+            <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.flow.zoomIn' | t" [title]="'admin.flow.zoomIn' | t" (click)="zoomIn()">
+              <app-icon name="plus" />
+            </app-button>
+            <app-button variant="text" size="sm" (click)="resetView()">{{ 'admin.flow.zoomReset' | t }}</app-button>
+          </app-button-group>
         </span>
       </div>
 
@@ -248,9 +254,11 @@
 
     <aside #panel class="fe__panel" appScrollFade="y" [attr.aria-label]="'admin.flow.inspector' | t">
       <div class="fe__versions" [class.fe__hidden]="!showVersions()">
-        <app-button class="fe__back" variant="text" size="sm" (click)="showVersions.set(false)">
-          <app-icon name="back" /> {{ 'admin.flow.versionsClose' | t }}
-        </app-button>
+        <app-button-group>
+          <app-button class="fe__back" variant="text" size="sm" (click)="showVersions.set(false)">
+            <app-icon name="back" /> {{ 'admin.flow.versionsClose' | t }}
+          </app-button>
+        </app-button-group>
         <app-version-history
           entityType="flow"
           entityId="global"
@@ -283,12 +291,14 @@
           @if (stateTransitionLists(); as lists) {
             <app-transition-lists [lists]="lists" (selectTransition)="selectEdge($event)" />
           }
-          <app-button
-            variant="text"
-            size="sm"
-            [disabled]="graph().states.length < 2"
-            (click)="addTransitionFrom(s.key)"
-          ><app-icon name="plus" /> {{ 'admin.flow.addTransition' | t }}</app-button>
+          <app-button-group>
+            <app-button
+              variant="text"
+              size="sm"
+              [disabled]="graph().states.length < 2"
+              (click)="addTransitionFrom(s.key)"
+            ><app-icon name="plus" /> {{ 'admin.flow.addTransition' | t }}</app-button>
+          </app-button-group>
         } @else if (selectedTransition(); as sel) {
           <app-transition-inspector
             [transition]="sel.t"

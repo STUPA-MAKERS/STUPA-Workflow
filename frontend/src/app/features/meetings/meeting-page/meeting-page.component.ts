@@ -31,6 +31,7 @@ import type {
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   IconComponent,
   MEDIA,
   mediaQuery,
@@ -116,6 +117,7 @@ type SessionAction = 'todos' | 'open' | 'agenda' | 'settings' | 'attendance' | '
     NgTemplateOutlet,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     RowMenuComponent,
     SegmentedComponent,

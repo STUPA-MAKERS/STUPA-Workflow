@@ -113,8 +113,8 @@ describe('touch styles', () => {
   });
 
   /**
-   * Nothing shrinks on press (001314). A press state of its own paints the ripple. One `:active`
-   * rule is no press: the canvas of the flow editor shows the grab cursor.
+   * Nothing shrinks on press (001314). A press state of its own paints the ripple. An `:active` rule
+   * that shows the grab cursor is no press: the canvas of the flow editor and the graph.
    */
   it('shrinks no pressed element of the app and paints the ripple in a press state of its own', () => {
     const files = [...scssFiles(SRC)];
@@ -127,8 +127,12 @@ describe('touch styles', () => {
         const text = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
         return /:active\b/.test(text) && !text.includes('@include press.paint');
       })
-      .map((file) => relative(SRC, file));
-    expect(own).toEqual(['app/pages/admin/flow/flow-editor.component.scss']);
+      .map((file) => relative(SRC, file))
+      .sort();
+    expect(own).toEqual([
+      'app/pages/admin/flow/flow-editor.component.scss',
+      'app/pages/graph/graph-canvas.component.scss',
+    ]);
   });
 
   it('gives the app cards and the page header actions the press and the chrome text', () => {

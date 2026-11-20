@@ -177,6 +177,7 @@ type FilterSheet = 'more' | null;
     RouterOutlet,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     CurrencyInputComponent,
     DatepickerComponent,
     EmptyStateComponent,

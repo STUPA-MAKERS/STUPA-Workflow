@@ -190,6 +190,7 @@ class AuditAction(StrEnum):
     GUEST_APPLICATION_DISCARD = "guest_application_discard"
     APPLICATION_OWNER_MATCH = "application_owner_match"
     APPLICATION_UPDATE = "application_update"
+    APPLICATION_TYPE_CHANGE = "application_type_change"
     APPLICATION_ARCHIVE = "application_archive"
     APPLICATION_UNARCHIVE = "application_unarchive"
     APPLICATION_DECISION = "application_decision"

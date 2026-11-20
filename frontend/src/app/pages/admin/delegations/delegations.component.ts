@@ -18,6 +18,7 @@ import {
   ToastService,
   PageHeaderComponent,
   SectionComponent,
+  ButtonGroupComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
@@ -45,6 +46,7 @@ import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-stat
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ButtonGroupComponent,
     LoadStateComponent,
     SectionComponent,
     ConfirmDialogComponent,

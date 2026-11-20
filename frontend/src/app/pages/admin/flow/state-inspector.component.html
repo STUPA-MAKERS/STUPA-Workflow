@@ -1,8 +1,10 @@
 <div class="ins__head">
   <h2 class="cap ins__title">{{ 'admin.flow.stateInspector' | t }}</h2>
-  <app-button variant="danger" size="sm" (click)="remove.emit()">
-    <app-icon name="trash" /> {{ 'admin.flow.removeState' | t }}
-  </app-button>
+  <app-button-group>
+    <app-button variant="danger" size="sm" (click)="remove.emit()">
+      <app-icon name="trash" /> {{ 'admin.flow.removeState' | t }}
+    </app-button>
+  </app-button-group>
 </div>
 
 <app-input

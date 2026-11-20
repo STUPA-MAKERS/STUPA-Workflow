@@ -98,10 +98,12 @@
             </app-chip>
           }
           @if (!full()) {
-            <app-button variant="tonal" size="sm" [disabled]="drafts.busy()" (click)="pickFiles()">
-              <app-icon name="clip" />
-              {{ 'help.report.attach' | t }}
-            </app-button>
+            <app-button-group>
+              <app-button variant="tonal" size="sm" [disabled]="drafts.busy()" (click)="pickFiles()">
+                <app-icon name="clip" />
+                {{ 'help.report.attach' | t }}
+              </app-button>
+            </app-button-group>
           }
         </div>
         <input

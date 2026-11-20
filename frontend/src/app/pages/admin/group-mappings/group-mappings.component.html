@@ -8,10 +8,12 @@
 
   @for (sec of sections(); track sec.kind) {
     <app-section class="gm__section" [level]="2" [heading]="key(sec.kind, 'title') | t">
-      <app-button sectionAction size="sm" variant="tonal" (click)="openAdd(sec.kind)">
-        <app-icon name="plus" /> {{ 'admin.groupMappings.create' | t
-        }}<span class="sr-only">: {{ key(sec.kind, 'title') | t }}</span>
-      </app-button>
+      <app-button-group ngProjectAs="[sectionAction]">
+        <app-button sectionAction size="sm" variant="tonal" (click)="openAdd(sec.kind)">
+          <app-icon name="plus" /> {{ 'admin.groupMappings.create' | t
+          }}<span class="sr-only">: {{ key(sec.kind, 'title') | t }}</span>
+        </app-button>
+      </app-button-group>
 
       <app-load-state [state]="sec.state" [keepContent]="true" [errorText]="'admin.groupMappings.loadFailed' | t" (retry)="retry(sec.kind)">
         <ng-template #loading>
@@ -38,11 +40,13 @@
                   }
                 </span>
                 <span class="gm__actions hitrow__keep">
-                  <app-row-menu
-                    [sections]="rowMenu()"
-                    [label]="('ui.rowMenu.trigger' | t) + ': ' + r.oidcGroup"
-                    (selected)="askDelete(sec.kind, r.id)"
-                  />
+                  <app-button-group>
+                    <app-row-menu
+                      [sections]="rowMenu()"
+                      [label]="('ui.rowMenu.trigger' | t) + ': ' + r.oidcGroup"
+                      (selected)="askDelete(sec.kind, r.id)"
+                    />
+                  </app-button-group>
                 </span>
               </li>
             }

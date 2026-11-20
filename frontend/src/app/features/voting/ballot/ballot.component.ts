@@ -20,7 +20,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate } from '@core/i18n/translations';
 import { NgTemplateOutlet } from '@angular/common';
 import type { DateAnswer, ElectionConfig, MyBallot, PollConfig, ProblemDetail } from '@core/api/models';
-import { ButtonComponent, haptic, IconComponent, observeElementSize, SectionComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, haptic, IconComponent, observeElementSize, SectionComponent } from '@stupa-makers/ui-kit';
 import { voteOptionLabel } from '../../meetings/meetings-display.util';
 import {
   candidateLabel,
@@ -127,7 +127,7 @@ function castBallot(choice: BallotPick | null): MyBallot {
   selector: 'app-ballot',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SectionComponent, ButtonComponent, IconComponent, NgTemplateOutlet, TranslatePipe],
+  imports: [SectionComponent, ButtonComponent, ButtonGroupComponent, IconComponent, NgTemplateOutlet, TranslatePipe],
   host: {
     class: 'ballot',
     '[class.ballot--phone]': "layout() === 'phone'",

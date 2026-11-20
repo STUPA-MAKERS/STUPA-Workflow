@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   IconComponent,
   SelectFieldComponent,
   type SelectOption,
@@ -27,6 +28,7 @@ import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
     FormsModule,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     SelectFieldComponent,
     SwitchComponent,

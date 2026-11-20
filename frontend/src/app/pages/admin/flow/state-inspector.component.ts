@@ -5,6 +5,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   IconComponent,
   InputComponent,
   MoveButtonsComponent,
@@ -39,6 +40,7 @@ export interface GuardPriorityRow {
     FormsModule,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     InputComponent,
     SelectFieldComponent,

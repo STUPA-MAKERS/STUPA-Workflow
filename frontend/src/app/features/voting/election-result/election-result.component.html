@@ -59,23 +59,27 @@
     <div #lotActions class="er__actions">
       @if (lotArmed()) {
         <p class="er__hint">{{ 'election.lot.confirmHint' | t }}</p>
-        <app-button variant="text" (click)="cancelLot()">
-          {{ 'election.lot.cancel' | t }}
-        </app-button>
+        <app-button-group>
+          <app-button variant="text" (click)="cancelLot()">
+            {{ 'election.lot.cancel' | t }}
+          </app-button>
+        </app-button-group>
       }
-      <app-button
-        class="er__lot"
-        variant="fill"
-        [block]="inCard()"
-        [loading]="busy() === 'lot'"
-        [ariaLabel]="lotArmed() ? ('election.lot.confirm' | t) + '. ' + ('election.lot.confirmHint' | t) : ''"
-        (click)="drawLot($event)"
-      >
-        @if (inCard()) {
-          <app-icon name="swap" />
-        }
-        {{ (lotArmed() ? 'election.lot.confirm' : 'election.lot.draw') | t }}
-      </app-button>
+      <app-button-group [main]="true">
+        <app-button
+          class="er__lot"
+          variant="fill"
+          [block]="inCard()"
+          [loading]="busy() === 'lot'"
+          [ariaLabel]="lotArmed() ? ('election.lot.confirm' | t) + '. ' + ('election.lot.confirmHint' | t) : ''"
+          (click)="drawLot($event)"
+        >
+          @if (inCard()) {
+            <app-icon name="swap" />
+          }
+          {{ (lotArmed() ? 'election.lot.confirm' : 'election.lot.draw') | t }}
+        </app-button>
+      </app-button-group>
     </div>
   } @else {
     <p class="er__hint">{{ 'election.lot.waiting' | t }}</p>
@@ -92,9 +96,11 @@
 
 @if (nextRound(); as label) {
   <div class="er__next">
-    <app-button variant="fill" [block]="true" [loading]="busy() === 'next'" (click)="startNextRound()">
-      <app-icon name="repeat" />
-      {{ label | t }}
-    </app-button>
+    <app-button-group [main]="true">
+      <app-button variant="fill" [block]="true" [loading]="busy() === 'next'" (click)="startNextRound()">
+        <app-icon name="repeat" />
+        {{ label | t }}
+      </app-button>
+    </app-button-group>
   </div>
 }

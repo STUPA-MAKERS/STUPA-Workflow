@@ -206,22 +206,22 @@
       "to": "shared"
     },
     {
-      "count": 3,
+      "count": 4,
       "from": "applications",
       "to": "application_types"
     },
     {
-      "count": 18,
+      "count": 20,
       "from": "applications",
       "to": "audit"
     },
     {
-      "count": 25,
+      "count": 26,
       "from": "applications",
       "to": "auth"
     },
     {
-      "count": 10,
+      "count": 11,
       "from": "applications",
       "to": "budget"
     },
@@ -231,12 +231,12 @@
       "to": "files"
     },
     {
-      "count": 28,
+      "count": 31,
       "from": "applications",
       "to": "flow"
     },
     {
-      "count": 13,
+      "count": 16,
       "from": "applications",
       "to": "forms"
     },
@@ -256,7 +256,7 @@
       "to": "notifications"
     },
     {
-      "count": 54,
+      "count": 56,
       "from": "applications",
       "to": "shared"
     },
@@ -759,6 +759,56 @@
       "count": 9,
       "from": "forms",
       "to": "shared"
+    },
+    {
+      "count": 1,
+      "from": "graph",
+      "to": "applications"
+    },
+    {
+      "count": 2,
+      "from": "graph",
+      "to": "auth"
+    },
+    {
+      "count": 2,
+      "from": "graph",
+      "to": "budget"
+    },
+    {
+      "count": 1,
+      "from": "graph",
+      "to": "calendar"
+    },
+    {
+      "count": 1,
+      "from": "graph",
+      "to": "gremien"
+    },
+    {
+      "count": 1,
+      "from": "graph",
+      "to": "meetings"
+    },
+    {
+      "count": 3,
+      "from": "graph",
+      "to": "shared"
+    },
+    {
+      "count": 1,
+      "from": "graph",
+      "to": "tickets"
+    },
+    {
+      "count": 9,
+      "from": "graph",
+      "to": "todos"
+    },
+    {
+      "count": 1,
+      "from": "graph",
+      "to": "voting"
     },
     {
       "count": 4,
@@ -1491,6 +1541,12 @@
       "layer": 5,
       "name": "forms",
       "path": "backend/app/modules/forms"
+    },
+    {
+      "id": "graph",
+      "layer": 1,
+      "name": "graph",
+      "path": "backend/app/modules/graph"
     },
     {
       "id": "gremien",
