@@ -248,7 +248,14 @@ describe('TodoLinkPickerComponent', () => {
     expect(screen.getByRole('dialog')).toBe(again);
   });
 
-    it('floats like the global search on the phone too, with a × as the close button (spec 001977)', async () => {
+    it('names the close key ⎋ on Apple devices, as the global search does', async () => {
+    jest.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel');
+    const { open } = await setup();
+    await open();
+    expect(screen.getByRole('button', { name: 'Schließen' })).toHaveTextContent('⎋');
+  });
+
+  it('floats like the global search on the phone too, with a × as the close button (spec 001977)', async () => {
     asPhone(MEDIA.phone);
     const { open, fixture, container } = await setup();
     await open();
