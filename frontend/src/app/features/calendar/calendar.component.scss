@@ -62,6 +62,11 @@
 :host(.cal--wide) .cal__tools {
   grid-column: 1 / -1;
 }
+// The search and its chips are only as wide as the grid column (001946): the tools span both
+// columns, so the day list and the gap come off.
+:host(.cal--wide) .cal__filters {
+  max-width: calc(100% - 380px - var(--space-5));
+}
 
 .cal__tools {
   display: flex;

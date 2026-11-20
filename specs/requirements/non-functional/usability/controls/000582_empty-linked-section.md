@@ -4,7 +4,7 @@ title: An empty "Verknüpft" section shows an empty state
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-19
+updated: 2026-11-20
 tests:
   - "frontend/src/app/features/todos/card-detail/todo-card-detail.component.spec.ts:TodoCardDetailComponent"
   - "frontend/src/app/features/todos/linked-list/todo-linked-list.component.spec.ts:TodoLinkedListComponent"
@@ -18,7 +18,7 @@ scope:
 # An empty "Verknüpft" section shows an empty state
 
 When a "Verknüpft" section shows with no row, it must show `app-empty-state` with the small face
-(000205, 001360). This applies to the card detail of every card type and to
+(000205, 001360) and the link-chain icon (`link`, 001364). This applies to the card detail of every card type and to
 the linked to-dos of a vote, an invoice, a booking and a cost centre.
 
 - Card detail: the heading is "Nichts verknüpft".
