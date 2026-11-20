@@ -8,7 +8,7 @@ import { join } from 'node:path';
 const FRONTEND = join(__dirname, '..', '..');
 const read = (rel: string): string => readFileSync(join(FRONTEND, rel), 'utf8');
 
-describe('zoneless contract', () => {
+describe('zonelessContract', () => {
   it('builds without the zone.js polyfill', () => {
     const angular = JSON.parse(read('angular.json')) as {
       projects: Record<string, { architect: { build: { options: { polyfills?: string[] } } } }>;

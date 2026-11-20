@@ -6,7 +6,7 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:
-  - "frontend/src/app/zoneless.contract.spec.ts:zoneless contract"
+  - "frontend/src/app/zoneless.contract.spec.ts:zonelessContract"
 implementation:
   - frontend/src/app/app.config.ts
   - frontend/angular.json
