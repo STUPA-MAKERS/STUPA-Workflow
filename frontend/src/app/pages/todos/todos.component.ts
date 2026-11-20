@@ -248,6 +248,13 @@ export class TodosComponent implements OnDestroy {
   /** The meta-board "Alle" is shown. */
   readonly all = computed(() => this.boardId() === ALL_BOARDS);
   readonly cardId = computed(() => this.query().get('card'));
+  /**
+   * The card of the drawer. A card-only link (`/todos?card=<id>`, from a link, the activity,
+   * the search or a mail) opens no drawer yet: the page replaces it with the card's board
+   * (`/todos/<board>?card=<id>`), another route, so the page is built a second time and the
+   * drawer would slide in twice. The drawer opens once, on the board.
+   */
+  readonly drawerCard = computed(() => (this.boardId() ? this.cardId() : null));
   /** "Alle" has rows only, so it is always the board view. */
   readonly view = computed<View>(() => (!this.all() && this.query().get('view') === 'list' ? 'list' : 'board'));
 
