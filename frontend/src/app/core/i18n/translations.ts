@@ -55,12 +55,11 @@ export function isCatalogLoaded(locale: Locale): boolean {
 }
 
 /**
- * Put the strings of `locale` into {@link CATALOG}. DE goes into {@link de} itself, because
- * other modules hold that object.
+ * Put the strings of `locale` into {@link CATALOG}. They go into the object of the locale
+ * itself, because other modules hold it ({@link de}).
  */
 export function registerCatalog(locale: Locale, table: Partial<Record<TranslationKey, string>>): void {
-  if (locale === 'de') Object.assign(de, table);
-  else CATALOG[locale] = table;
+  Object.assign(CATALOG[locale], table);
   LOADED.add(locale);
 }
 

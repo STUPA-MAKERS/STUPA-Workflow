@@ -26,7 +26,7 @@
       "to": "tickets"
     },
     {
-      "count": 2,
+      "count": 3,
       "from": "activity",
       "to": "applications"
     },
@@ -36,7 +36,7 @@
       "to": "audit"
     },
     {
-      "count": 3,
+      "count": 4,
       "from": "activity",
       "to": "auth"
     },
@@ -46,27 +46,32 @@
       "to": "flow"
     },
     {
+      "count": 1,
+      "from": "activity",
+      "to": "livevote"
+    },
+    {
       "count": 2,
       "from": "activity",
       "to": "meetings"
     },
     {
-      "count": 5,
+      "count": 6,
       "from": "activity",
       "to": "shared"
     },
     {
-      "count": 1,
+      "count": 2,
       "from": "activity",
       "to": "site_config"
     },
     {
-      "count": 3,
+      "count": 5,
       "from": "activity",
       "to": "tickets"
     },
     {
-      "count": 3,
+      "count": 4,
       "from": "activity",
       "to": "todos"
     },
