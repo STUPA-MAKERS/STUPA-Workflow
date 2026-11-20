@@ -15,7 +15,7 @@ implementation:
   - backend/app/shared/permissions.py
   - backend/migrations/versions/3d95c7b1f9e6_admin_features_permission.py
   - frontend/src/app/pages/admin/features/features.component.ts
-  - frontend/src/app/pages/admin/admin-frame/admin-pages.ts
+  - frontend/src/app/pages/admin/admin-list/admin-pages.ts
 scope:
   - backend/app/modules/admin
   - frontend/src/app/pages/admin
