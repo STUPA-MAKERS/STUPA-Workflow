@@ -19,7 +19,7 @@
         @if (rows(); as list) {
           @if (list.length) {
             <div
-              class="pd__list"
+              class="pd__list rowgroup rowgroup--bg3"
               appScrollFade="y"
               role="radiogroup"
               [attr.aria-label]="listLabel()"
@@ -35,13 +35,15 @@
                     [checked]="on"
                     (change)="pick.set(r.id)"
                   />
-                  <app-icon class="pd__mark" [name]="on ? 'circleok' : 'circle'" [size]="20" />
                   <span class="pd__text">
                     <span class="pd__title ell">{{ r.title }}</span>
                     @if (r.sub) {
                       <span class="pd__sub ell">{{ r.sub }}</span>
                     }
                   </span>
+                  @if (on) {
+                    <app-icon class="pd__check" name="check" [size]="18" />
+                  }
                 </label>
               }
             </div>
