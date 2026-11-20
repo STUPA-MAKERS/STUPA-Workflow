@@ -4,7 +4,7 @@ title: An empty list shows a face in a ring of dots
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-19
+updated: 2026-11-20
 tests:
   - "frontend/vendor/ui-kit/src/lib/empty-state/empty-state.component.spec.ts:EmptyStateComponent"
 implementation:
@@ -27,8 +27,8 @@ section of a detail, a small tile and a list in a dialog. The face replaces the 
 - In the list column of a list-detail page (`.ld-pane`) the face must be large (132 px wide)
   and centred in the free height of the column.
 - Everywhere else the face must be small (88 px wide) and the block keeps its own height.
-- Below the face, the message must be a small muted hint: a crossed-out lens icon
-  (`searchOff`) and the heading on one line. The body does not show.
+- Below the face, the message must be a small muted hint: an icon (001364) and the heading on
+  one line. The body does not show.
 - The face is decoration. It must be hidden from the screen reader.
 
 A `plain` state (nothing open in a detail pane, a missing record, a page without access) shows

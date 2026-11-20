@@ -46,7 +46,7 @@
     @if (failed()) {
       <p class="lp__note lp__note--error">{{ 'todos.picker.error' | t }}</p>
     } @else if (search.applied() && !search.pending() && !groups().length) {
-      <app-empty-state
+      <app-empty-state icon="searchOff"
         class="lp__empty"
         shape="file"
         rows="3"

@@ -521,7 +521,6 @@ describe('ChatComponent', () => {
     describe('with a guarded visibility switch', () => {
       const GUARD: ChatVisibilityGuard = {
         labels: { internal: 'applications.comments.vis.internal', public: 'applications.comments.vis.public' },
-        hints: { internal: 'applications.comments.hint.internal', public: 'applications.comments.hint.public' },
       };
       const INT = 'Intern (nur Gremien)';
       const PUB = 'Öffentlich (Antragsteller:in liest mit und bekommt eine Mail)';
@@ -544,15 +543,13 @@ describe('ChatComponent', () => {
         }
       });
 
-      it('shows the choice next to the send button with a frame of its own', async () => {
+      it('frames a public draft and keeps an internal one plain', async () => {
         const { user, view } = await setup({ visibilityOptions: ['internal', 'public'], visibilityGuard: GUARD });
-        expect(screen.getByTestId('chat-vis-hint')).toHaveTextContent('Intern');
-        expect(view.container.querySelector('.chat__box--internal')).not.toBeNull();
+        expect(view.container.querySelector('app-segmented.chat__vis')).not.toBeNull();
         expect(view.container.querySelector('.chat__box--public')).toBeNull();
         await user.click(screen.getByRole('radio', { name: PUB }));
-        expect(screen.getByTestId('chat-vis-hint')).toHaveTextContent('Öffentlich · Mail');
+        expect(screen.getByRole('radio', { name: PUB })).toBeChecked();
         expect(view.container.querySelector('.chat__box--public')).not.toBeNull();
-        expect(view.container.querySelector('.chat__box--internal')).toBeNull();
       });
 
       it('starts the next message with the first choice again', async () => {
@@ -567,10 +564,10 @@ describe('ChatComponent', () => {
         expect(screen.getByRole('radio', { name: INT })).toBeChecked();
       });
 
-      it('shows no switch and no hint with one choice', async () => {
-        await setup({ visibilityOptions: ['public'], visibilityGuard: GUARD });
+      it('shows no switch and no frame with one choice', async () => {
+        const { view } = await setup({ visibilityOptions: ['public'], visibilityGuard: GUARD });
         expect(screen.queryByRole('radiogroup')).toBeNull();
-        expect(screen.queryByTestId('chat-vis-hint')).toBeNull();
+        expect(view.container.querySelector('.chat__box--public')).toBeNull();
       });
     });
 

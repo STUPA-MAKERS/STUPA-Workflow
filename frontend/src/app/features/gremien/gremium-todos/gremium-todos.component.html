@@ -8,7 +8,7 @@
       [items]="list"
     />
   } @else {
-    <app-empty-state shape="row" rows="3" [heading]="'gremien.todos.empty' | t" />
+    <app-empty-state icon="circleok" shape="row" rows="3" [heading]="'gremien.todos.empty' | t" />
   }
 } @else {
   <app-skeleton variant="rows" [count]="4" [label]="'common.loading' | t" />

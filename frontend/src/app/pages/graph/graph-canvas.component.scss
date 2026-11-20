@@ -81,6 +81,11 @@
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 3px;
 }
+// A node that a drag moves is above the others (spec 001433).
+.gc__node--held {
+  z-index: 1;
+  cursor: grabbing;
+}
 .gc__node--dim {
   opacity: 0.22;
 }

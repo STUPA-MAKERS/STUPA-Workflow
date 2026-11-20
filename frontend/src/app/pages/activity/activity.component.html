@@ -47,7 +47,7 @@
         <app-load-error [message]="'activity.loadError' | t" (retry)="retry()" />
       } @else if (!entries().length) {
         @if (filtered()) {
-          <app-empty-state icon="history" [heading]="'activity.emptyFiltered' | t" />
+          <app-empty-state icon="searchOff" [heading]="'activity.emptyFiltered' | t" />
         } @else {
           <app-empty-state icon="history" [heading]="'activity.empty' | t" [body]="'activity.emptyBody' | t" />
         }

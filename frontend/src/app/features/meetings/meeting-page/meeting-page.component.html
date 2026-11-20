@@ -176,7 +176,7 @@
   @for (vote of votes(); track vote.id) {
     <ng-container [ngTemplateOutlet]="voteCardTpl" [ngTemplateOutletContext]="{ $implicit: vote }" />
   } @empty {
-    <app-empty-state shape="row" rows="1" [heading]="'voting.list.empty' | t" />
+    <app-empty-state icon="vote" shape="row" rows="1" [heading]="'voting.list.empty' | t" />
   }
 </ng-template>
 

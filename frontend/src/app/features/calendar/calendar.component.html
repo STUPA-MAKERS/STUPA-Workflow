@@ -42,7 +42,7 @@
               </div>
             </section>
           } @else if (searched()) {
-            <app-empty-state shape="date" [heading]="'calendar.search.none' | t" />
+            <app-empty-state icon="searchOff" shape="date" [heading]="'calendar.search.none' | t" />
           }
         } @else {
           @if (error()) {
@@ -77,7 +77,7 @@
             </app-list-group>
           } @empty {
             @if (!loading() && !error()) {
-              <app-empty-state shape="date" [heading]="'calendar.list.empty' | t" />
+              <app-empty-state icon="cal" shape="date" [heading]="'calendar.list.empty' | t" />
             }
           }
           <div class="cal-list__more">
@@ -277,7 +277,7 @@
           } @else if (firstLoad()) {
             <app-skeleton class="skel-in" variant="items" [count]="3" [lead]="true" [grouped]="true" [label]="'common.loading' | t" />
           } @else if (!dayEntries().length && !loading()) {
-            <app-empty-state shape="date" rows="3" [heading]="'calendar.day.empty' | t" />
+            <app-empty-state icon="cal" shape="date" rows="3" [heading]="'calendar.day.empty' | t" />
           } @else {
             <div class="rowgroup cal__rows" role="list">
               @for (e of dayEntries(); track e.kind + e.id) {
