@@ -1606,7 +1606,7 @@ describe('InvoicesComponent (row swipe)', () => {
     const { c, container } = await setup({ queryParams: { seg: 'inbox' } });
     const menu = c.rowMenu(inv());
     expect(c.swipeRight(menu)).toEqual({ id: 'paid', label: 'Als bezahlt markieren', icon: 'check', leaves: true });
-    expect(container.querySelector('.li-sw__plate--left')).toBeNull();
+    expect(container.querySelector('.li-sw__plate--left')?.textContent).toContain('Auswählen');
     expect(container.querySelector('.li-sw__plate--right')?.textContent).toContain('Als bezahlt markieren');
     expect(c.swipeRight(c.rowMenu(inv({ status: 'paid' })))).toBeNull();
     c.segment.set('all');
@@ -1617,6 +1617,7 @@ describe('InvoicesComponent (row swipe)', () => {
     const { c } = await setup({ canManage: false });
     const none = c.rowMenu(inv());
     expect(c.swipeRight(none)).toBeNull();
+    expect(c.swipeLeft()).toBeNull();
   });
 
   it('marks paid at once, and the undo sets the invoice open again', async () => {
@@ -1659,5 +1660,120 @@ describe('InvoicesComponent (row swipe)', () => {
     lastInvoicesReq(http).flush(page([inv({ status: 'paid' })]));
     expect(error).toHaveBeenCalledTimes(2);
     expect(c.swipedAway().size).toBe(0);
+  });
+});
+
+/** Spec 001811: the invoices select like every other list. */
+describe('InvoicesComponent (multi-select)', () => {
+  afterEach(() => TestBed.inject(HttpTestingController).verify());
+
+  const two = () => [inv(), inv({ id: 'i-2', number: 'R-002', supplier: 'Druckerei', status: 'paid' })];
+
+  it('starts from the button of the head, shows check boxes and toggles a row by its click', async () => {
+    const { c, fixture, container } = await setup({ initial: two() });
+    await userEvent.click(screen.getByRole('button', { name: 'Mehrere auswählen' }));
+    fixture.detectChanges();
+    expect(c.selecting()).toBe(true);
+    expect(container.querySelectorAll('app-list-item input[type=checkbox]').length).toBe(2);
+    expect(screen.queryByRole('button', { name: 'Rechnung anlegen' })).toBeNull();
+    await userEvent.click(screen.getByRole('checkbox', { name: '„Druckerei“ auswählen' }));
+    expect(c.isSelected('i-2')).toBe(true);
+    c.onRowActivate(c.items()[0]);
+    expect(c.selectedCount()).toBe(2);
+    c.onRowActivate(c.items()[0]);
+    expect(c.isSelected('i-1')).toBe(false);
+    fixture.detectChanges();
+    const bar = screen.getByTestId('inv-selection');
+    expect(within(bar).getByRole('button', { name: 'Als bezahlt markieren' })).toBeDisabled();
+    expect(within(bar).getByRole('button', { name: 'Löschen' })).toBeEnabled();
+    c.toggleSelectAll(true);
+    expect(c.allSelected()).toBe(true);
+    expect(c.bulkDeleteReason()).toContain('Alle auswählen');
+    c.toggleSelectAll(false);
+    expect(c.selectedCount()).toBe(0);
+    c.stopSelecting();
+    expect(c.selecting()).toBe(false);
+  });
+
+  it('starts with a row on a long press or a swipe, and toggles it inside the selection', async () => {
+    const { c } = await setup({ initial: two() });
+    c.onRowSwiped({ id: 'select', label: 'Auswählen', icon: 'check' }, c.items()[0]);
+    expect(c.selecting()).toBe(true);
+    expect(c.isSelected('i-1')).toBe(true);
+    c.selectWith(c.items()[0]);
+    expect(c.isSelected('i-1')).toBe(false);
+    c.onRowActivate(c.items()[1]);
+    expect(c.isSelected('i-2')).toBe(true);
+    c.stopSelecting();
+    c.onRowActivate(c.items()[1]);
+    expect(c.selectedCount()).toBe(0);
+  });
+
+  it('offers the selection in the menu of a phone and lets no reader select', async () => {
+    const { c } = await setup();
+    expect(c.phoneMenu()[0].items.map((i: { id: string }) => i.id)).toEqual(['import', 'select']);
+    c.onHeaderMenu({ id: 'select', label: '' });
+    expect(c.selecting()).toBe(true);
+    TestBed.resetTestingModule();
+    const reader = await setup({ canManage: false });
+    reader.c.startSelecting();
+    reader.c.selectWith(reader.c.items()[0]);
+    expect(reader.c.selecting()).toBe(false);
+  });
+
+  it('marks the selected open invoices paid, one after the other', async () => {
+    const { c, http, toast } = await setup({ initial: [...two(), inv({ id: 'i-3' })] });
+    const ok = jest.spyOn(toast, 'success');
+    c.startSelecting();
+    c.toggleSelect('i-1', true);
+    c.toggleSelect('i-2', true);
+    c.toggleSelect('i-3', true);
+    c.runBulkPaid();
+    c.runBulkPaid();
+    const first = http.expectOne((r) => r.url.endsWith('/api/invoices/i-1') && r.method === 'PATCH');
+    expect(first.request.body).toEqual({ status: 'paid' });
+    first.flush(inv({ status: 'paid' }));
+    http.expectOne((r) => r.url.endsWith('/api/invoices/i-3') && r.method === 'PATCH').flush(inv({ id: 'i-3', status: 'paid' }));
+    lastInvoicesReq(http).flush(page([]));
+    expect(ok).toHaveBeenCalledWith('2 Rechnung(en) als bezahlt markiert.');
+    expect(c.selecting()).toBe(false);
+    c.runBulkPaid();
+    http.expectNone((r) => r.method === 'PATCH');
+  });
+
+  it('deletes after the confirmation, within the cap, and stops at the first failure', async () => {
+    const { c, http, toast } = await setup({ initial: [...two(), inv({ id: 'i-3' })] });
+    const err = jest.spyOn(toast, 'error');
+    c.askBulkDelete();
+    expect(c.bulkConfirm()).toBe(false);
+    c.startSelecting();
+    c.toggleSelect('i-1', true);
+    c.toggleSelect('i-2', true);
+    c.askBulkDelete();
+    expect(c.bulkConfirm()).toBe(true);
+    c.runBulkDelete();
+    http.expectOne((r) => r.url.endsWith('/api/invoices/i-1') && r.method === 'DELETE').flush(null, {
+      status: 500,
+      statusText: 'x',
+    });
+    lastInvoicesReq(http).flush(page(two()));
+    expect(err).toHaveBeenCalledWith('Sammelaktion fehlgeschlagen.');
+    expect(c.bulkConfirm()).toBe(false);
+    c.runBulkDelete();
+    http.expectNone((r) => r.method === 'DELETE');
+  });
+
+  it('turns the delete off past five rows and says why', async () => {
+    const rows = Array.from({ length: 7 }, (_, n) => inv({ id: `i-${n}` }));
+    const { c } = await setup({ initial: rows });
+    c.startSelecting();
+    rows.slice(0, 6).forEach((r) => c.toggleSelect(r.id, true));
+    expect(c.selectionLabel()).toBe('6 ausgewählt · Löschen: max. 5');
+    expect(c.bulkDeleteReason()).toContain('höchstens 5 Rechnungen');
+    c.askBulkDelete();
+    expect(c.bulkConfirm()).toBe(false);
+    c.toggleSelect('i-0', false);
+    expect(c.selectionLabel()).toBe('5 ausgewählt');
+    expect(c.bulkDeleteReason()).toBeNull();
   });
 });

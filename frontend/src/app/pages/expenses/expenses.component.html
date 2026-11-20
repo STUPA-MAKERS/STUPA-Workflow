@@ -14,6 +14,16 @@
                 (click)="onExport()"
               ><app-icon name="download" /></app-button>
             }
+            @if (canManage() && tab() === 'bookings') {
+              <app-button
+                variant="text"
+                [iconOnly]="true"
+                data-testid="exp-select"
+                [ariaLabel]="'expenses.bulk.start' | t"
+                [title]="'expenses.bulk.start' | t"
+                (click)="startSelecting()"
+              ><app-icon name="boxok" /></app-button>
+            }
             @if (tab() === 'bookings') {
               <app-row-menu
                 icon="sort"
@@ -107,15 +117,7 @@
             (selectAll)="toggleSelectAll($event)"
             (cleared)="stopSelecting()"
           >
-            @if (split()) {
-              <app-button-group>
-                <app-button variant="text" size="sm" (click)="toggleSelectAll(true)">{{
-                  'expenses.bulk.selectAll' | t
-                }}</app-button>
-              </app-button-group>
-            } @else {
-              <ng-container *ngTemplateOutlet="bulkIcons" />
-            }
+            <ng-container *ngTemplateOutlet="bulkIcons" />
           </app-selection-bar>
         }
         @if (tab() === 'transfers' ? transferReloading() : reloading()) {
