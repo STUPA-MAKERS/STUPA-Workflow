@@ -388,6 +388,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/todos/001077](requirements/functional/collaboration/todos/001077_gremium-board-entries.md) | A board of a Gremium takes more Gremien and persons | approved |
 | [F/collaboration/todos/001078](requirements/functional/collaboration/todos/001078_board-rights.md) | Board rights depend on the board kind and its entries | approved |
 | [F/collaboration/todos/001380](requirements/functional/collaboration/todos/001380_move-sheet-select-rows.md) | The move sheet lists the columns as the select sheet does | approved |
+| [F/collaboration/todos/001967](requirements/functional/collaboration/todos/001967_column-menu-corner.md) | The menu of a board column stands in its top right corner | approved |
 | [F/finance/budget/000138](requirements/functional/finance/budget/000138_cost-centre-picker.md) | The cost centre pickers are fixed | approved |
 | [F/finance/budget/000139](requirements/functional/finance/budget/000139_close-fiscal-year.md) | A fiscal year closes and reopens | approved |
 | [F/finance/budget/000140](requirements/functional/finance/budget/000140_default-fiscal-year.md) | The default fiscal year holds today | approved |
@@ -1040,6 +1041,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/001891](requirements/non-functional/usability/layout/001891_form-head-cancel-inset.md) | The label of "Abbrechen" in a form head ends at the side inset | approved |
 | [NF/usability/layout/001895](requirements/non-functional/usability/layout/001895_scroll-lock-any-close-order.md) | The page scrolls again when the last overlay closes, in any order | approved |
 | [NF/usability/layout/001930](requirements/non-functional/usability/layout/001930_pane-page-rail-stays.md) | A pane page scrolls inside itself, so the rail stays in place | approved |
+| [NF/usability/layout/001931](requirements/non-functional/usability/layout/001931_wide-list-head-solid.md) | The head of a wide list column stays solid, also on a fast scroll | approved |
+| [NF/usability/layout/001946](requirements/non-functional/usability/layout/001946_calendar-chips-below-search.md) | The Kalender filter chips stand in a row of their own below the search | approved |
 | [P/integrations/webhooks/000963](protocols/integrations/webhooks/000963_webhook-delivery.md) | A webhook delivery is a signed JSON POST | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |

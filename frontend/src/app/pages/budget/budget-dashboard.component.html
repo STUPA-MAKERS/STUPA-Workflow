@@ -11,7 +11,7 @@
     @if (wide()) {
       <section class="ld-pane ld-pane--fill bd__pane" aria-hidden="true">
         <app-page-header [pane]="true" [title]="'nav.budget' | t" />
-        <div class="bd__paneBody">
+        <div class="ld-pane__filters">
           @if (planTop()) {
             <span class="skel-box bd__skSeg"></span>
           }
@@ -20,20 +20,20 @@
             <span class="skel-box bd__skChip"></span>
             <span class="skel-box bd__skChip"></span>
           </div>
-          <div class="bd__tree">
-            @for (row of skeletonRows; track $index) {
-              <div class="tn" [style.--tn-depth]="row.depth">
-                <span class="tn__chev"></span>
-                <div class="tn__main">
-                  <span class="tn__line">
-                    <span class="tn__name"><span class="skel-text" [style.width.%]="row.width"></span></span>
-                    <span class="tn__amt"><span class="skel-text bd__skAmt"></span></span>
-                  </span>
-                  <span class="skel-box bd__skBar"></span>
-                </div>
+        </div>
+        <div class="bd__tree">
+          @for (row of skeletonRows; track $index) {
+            <div class="tn" [style.--tn-depth]="row.depth">
+              <span class="tn__chev"></span>
+              <div class="tn__main">
+                <span class="tn__line">
+                  <span class="tn__name"><span class="skel-text" [style.width.%]="row.width"></span></span>
+                  <span class="tn__amt"><span class="skel-text bd__skAmt"></span></span>
+                </span>
+                <span class="skel-box bd__skBar"></span>
               </div>
-            }
-          </div>
+            </div>
+          }
         </div>
       </section>
     } @else {
@@ -139,13 +139,25 @@
     @if (wide()) {
       <section class="ld-pane ld-pane--fill bd__pane" [attr.aria-label]="'budget.dash.tree' | t">
         <app-page-header [pane]="true" [title]="'nav.budget' | t" />
-        <ng-container *ngTemplateOutlet="treePane" />
+        <div class="ld-pane__filters">
+          <ng-container *ngTemplateOutlet="modes" />
+          <app-search-pill size="lg" [placeholder]="'budget.dash.search' | t" [(value)]="query" />
+          <div class="bd__chips">
+            <ng-container *ngTemplateOutlet="yearChip" />
+            <button type="button" class="chip" (click)="overviewOpen.set(true)">
+              <app-icon name="grid" [size]="15" /><span class="chip__text">{{ 'budget.overview.button' | t }}</span>
+            </button>
+          </div>
+        </div>
+        <ng-container *ngTemplateOutlet="tree" />
       </section>
     } @else {
       <div class="bd__top">
         <div class="bd__topRow">
           <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
-          <ng-container *ngTemplateOutlet="actions" />
+          @if (phone()) {
+            <ng-container *ngTemplateOutlet="actions" />
+          }
         </div>
         <ng-container *ngTemplateOutlet="modes" />
         <div class="bd__chips">
@@ -171,6 +183,9 @@
           >
             <app-icon name="grid" [size]="15" /><span class="chip__text">{{ 'budget.overview.button' | t }}</span>
           </button>
+          @if (!phone()) {
+            <div class="bd__chipActions"><ng-container *ngTemplateOutlet="actions" /></div>
+          }
         </div>
       </div>
     }
@@ -398,76 +413,69 @@
   }
 
   <ng-template #treePane>
-    <div class="bd__paneBody" [class.bd__paneBody--side]="!wide()">
-      @if (wide()) {
-        <ng-container *ngTemplateOutlet="modes" />
-      }
-      <app-search-pill [size]="wide() ? 'lg' : 'md'" [placeholder]="'budget.dash.search' | t" [(value)]="query" />
-      @if (wide()) {
-        <div class="bd__chips">
-          <ng-container *ngTemplateOutlet="yearChip" />
-          <button type="button" class="chip" (click)="overviewOpen.set(true)">
-            <app-icon name="grid" [size]="15" /><span class="chip__text">{{ 'budget.overview.button' | t }}</span>
-          </button>
-        </div>
-      }
-      <nav
-        class="bd__tree"
-        appScrollFade="y"
-        [attr.aria-label]="'budget.dash.tree' | t"
-        (focusin)="revealRow($event)"
-      >
-        @for (row of treeRows(); track row.node.id) {
-          <div
-            class="tn"
-            [class.tn--on]="row.node.id === selectedKsId()"
-            [style.--tn-depth]="row.depth"
-            [style.--color-accent]="row.color"
-          >
-            @if (row.hasChildren) {
-              <button
-                type="button"
-                class="tn__chev"
-                [attr.aria-expanded]="row.expanded"
-                [attr.aria-label]="(row.expanded ? 'budget.dash.collapse' : 'budget.dash.expand') | t: { name: row.node.name }"
-                [disabled]="!!query().trim()"
-                (click)="toggle(row.node.id)"
-              >
-                <app-icon [name]="row.expanded ? 'down' : 'right'" [size]="17" />
-              </button>
-            } @else {
-              <span class="tn__chev" aria-hidden="true"></span>
-            }
+    <div class="bd__paneBody bd__paneBody--side">
+      <app-search-pill size="md" [placeholder]="'budget.dash.search' | t" [(value)]="query" />
+      <ng-container *ngTemplateOutlet="tree" />
+    </div>
+  </ng-template>
+
+  <ng-template #tree>
+    <nav
+      class="bd__tree"
+      appScrollFade="y"
+      [attr.aria-label]="'budget.dash.tree' | t"
+      (focusin)="revealRow($event)"
+    >
+      @for (row of treeRows(); track row.node.id) {
+        <div
+          class="tn"
+          [class.tn--on]="row.node.id === selectedKsId()"
+          [style.--tn-depth]="row.depth"
+          [style.--color-accent]="row.color"
+        >
+          @if (row.hasChildren) {
             <button
               type="button"
-              class="tn__main"
-              [attr.aria-current]="row.node.id === selectedKsId() ? 'true' : null"
-              [title]="row.node.name + ' · ' + (row.node.pathKey | simplifyPath)"
-              (click)="selectKs(row.node.id)"
+              class="tn__chev"
+              [attr.aria-expanded]="row.expanded"
+              [attr.aria-label]="(row.expanded ? 'budget.dash.collapse' : 'budget.dash.expand') | t: { name: row.node.name }"
+              [disabled]="!!query().trim()"
+              (click)="toggle(row.node.id)"
             >
-              <span class="tn__line">
-                @if (row.swatch) {
-                  <span class="tn__swatch" [style.background]="row.color" aria-hidden="true"></span>
-                }
-                <span class="tn__name ell" [class.tn__name--root]="row.depth === 0">{{ row.node.name }}</span>
-                @if (!row.node.active) {
-                  <app-status-text kind="muted">{{ 'budget.cc.inactive' | t }}</app-status-text>
-                }
-                <span class="tn__amt mono">{{ moneyShort(row.allocated, row.node.currency) }}</span>
-              </span>
-              <app-seg-bar
-                size="thin"
-                [segments]="row.segments"
-                [total]="row.total"
-                [label]="(row.income ? 'budget.dash.treeBarIncome' : 'budget.dash.treeBar') | t: { percent: row.percent ?? 0 }"
-              />
+              <app-icon [name]="row.expanded ? 'down' : 'right'" [size]="17" />
             </button>
-          </div>
-        } @empty {
-          <app-empty-state icon="searchOff" rows="1" [heading]="'budget.dash.searchNone' | t" />
-        }
-      </nav>
-    </div>
+          } @else {
+            <span class="tn__chev" aria-hidden="true"></span>
+          }
+          <button
+            type="button"
+            class="tn__main"
+            [attr.aria-current]="row.node.id === selectedKsId() ? 'true' : null"
+            [title]="row.node.name + ' · ' + (row.node.pathKey | simplifyPath)"
+            (click)="selectKs(row.node.id)"
+          >
+            <span class="tn__line">
+              @if (row.swatch) {
+                <span class="tn__swatch" [style.background]="row.color" aria-hidden="true"></span>
+              }
+              <span class="tn__name ell" [class.tn__name--root]="row.depth === 0">{{ row.node.name }}</span>
+              @if (!row.node.active) {
+                <app-status-text kind="muted">{{ 'budget.cc.inactive' | t }}</app-status-text>
+              }
+              <span class="tn__amt mono">{{ moneyShort(row.allocated, row.node.currency) }}</span>
+            </span>
+            <app-seg-bar
+              size="thin"
+              [segments]="row.segments"
+              [total]="row.total"
+              [label]="(row.income ? 'budget.dash.treeBarIncome' : 'budget.dash.treeBar') | t: { percent: row.percent ?? 0 }"
+            />
+          </button>
+        </div>
+      } @empty {
+        <app-empty-state icon="searchOff" rows="1" [heading]="'budget.dash.searchNone' | t" />
+      }
+    </nav>
   </ng-template>
 
   <ng-template #actions>
