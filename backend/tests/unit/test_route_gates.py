@@ -128,6 +128,9 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("PUT", "/api/committees/{gremium_id}/info"): (
         "require_gremium + info.save_info (policy.holds_gremium_permission info.write)"
     ),
+    ("POST", "/api/committees/{gremium_id}/notify"): (
+        "require_gremium + notify.notify_members (policy.holds_gremium_permission members.notify)"
+    ),
     ("GET", "/api/committees/{gremium_id}/logo"): "policy.can_view_gremium",
     ("GET", "/api/committees/{gremium_id}/meeting-defaults"): _MEETING_MANAGE,
     ("GET", "/api/committees/{gremium_id}/meeting-members"): _MEETING_MANAGE,
