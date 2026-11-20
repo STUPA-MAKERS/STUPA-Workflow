@@ -28,11 +28,10 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate, TranslationKey } from '@core/i18n/translations';
 import {
   reducedMotion,
-  ButtonComponent,
-  ButtonGroupComponent,
   EmptyStateComponent,
   focusableIn,
   IconComponent,
+  isApplePlatform,
   liveSearch,
   MEDIA,
   mediaQuery,
@@ -103,7 +102,7 @@ export function linkKey(kind: TodoLinkKind, id: Uuid): string {
   selector: 'app-todo-link-picker',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, TranslatePipe, ButtonComponent, ButtonGroupComponent, EmptyStateComponent, IconComponent, SideSheetComponent],
+  imports: [NgTemplateOutlet, TranslatePipe, EmptyStateComponent, IconComponent, SideSheetComponent],
   templateUrl: './todo-link-picker.component.html',
   styleUrl: './todo-link-picker.component.scss',
 })
@@ -122,6 +121,8 @@ export class TodoLinkPickerComponent {
   readonly picked = output<TodoLinkTarget>();
 
   readonly phone = mediaQuery(MEDIA.phone);
+  /** The label of the Esc key, as in the global search. */
+  protected readonly escLabel = isApplePlatform() ? '⎋' : 'Esc';
   /**
    * The chips of the kinds that this platform has (spec 000758). A cost centre needs a budget
    * write right (spec 001410).
