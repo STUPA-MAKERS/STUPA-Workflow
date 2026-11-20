@@ -7,6 +7,13 @@ import { runAxe } from '../../../../testing/a11y';
 import { MEDIA } from '@stupa-makers/ui-kit';
 import { MeetingHeadComponent } from './meeting-head.component';
 
+/** The text of `el` with a space between the parts of each meta line (the dots are CSS). */
+function spaced(el: Element | null | undefined): string {
+  const copy = el?.cloneNode(true) as Element | undefined;
+  copy?.querySelectorAll('.ml__parts > *').forEach((part) => part.before(' '));
+  return (copy?.textContent ?? '').replace(/\s+/g, ' ').trim();
+}
+
 describe('MeetingHeadComponent', () => {
   it('shows back, the title with its status and the sub line, then the page controls', async () => {
     const back = jest.fn();
@@ -88,7 +95,7 @@ describe('MeetingHeadComponent', () => {
       const bar = container.querySelector('app-list-detail-bar')!;
       expect(bar).toHaveClass('ld__bar--condensed');
       expect(bar.querySelector('.ld__barTitle')).toHaveTextContent('12. Sitzung');
-      expect(bar.querySelector('.ld__barSub')).toHaveTextContent('Läuft seit 18:04');
+      expect(spaced(bar.querySelector('.ld__barSub'))).toBe('Läuft seit 18:04');
       expect(bar.querySelector('.ld__barActions')).toHaveTextContent('Menü');
       expect(screen.getByRole('heading', { level: 1, name: '12. Sitzung' })).toHaveClass('sr-only');
       expect(container.querySelector('.mh__titles')).toBeNull();
