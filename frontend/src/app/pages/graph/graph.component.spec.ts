@@ -286,8 +286,8 @@ describe('GraphComponent', () => {
       noAccess: true,
     });
     expect(cmp.searchText()).toBe('Haushalt');
-    expect(cmp.gremiumText()).toBe('StuPa');
-    expect(cmp.relationsText()).toBe('Nur Verknüpfungen');
+    expect(cmp.gremiumText()).toBe('Gremium: StuPa');
+    expect(cmp.relationsText()).toBe('Beziehungen: Nur Verknüpfungen');
     expect(screen.getByTestId('gr-single')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('gr-no-access')).toHaveAttribute('aria-pressed', 'true');
 
@@ -329,7 +329,7 @@ describe('GraphComponent', () => {
     cmp.setRelations('unknown');
     await settle();
     expect(last(calls).filters.relations).toBe('all');
-    expect(cmp.relationsText()).toBe('Alle Beziehungen');
+    expect(cmp.relationsText()).toBe('Beziehungen');
 
     screen.getByTestId('gr-single').click();
     await settle();

@@ -152,15 +152,21 @@ export class GraphComponent {
     { value: '', label: this.i18n.translate('graph.filter.allGremien') },
     ...this.gremien().map((g) => ({ value: g.id, label: g.name })),
   ]);
-  readonly gremiumText = computed(
-    () => this.gremien().find((g) => g.id === this.filters().gremiumId)?.name ?? this.i18n.translate('graph.filter.gremium'),
-  );
+  /** The chip text (spec 000663): the name, then name and value. */
+  readonly gremiumText = computed(() => {
+    const name = this.i18n.translate('graph.filter.gremium');
+    const hit = this.gremien().find((g) => g.id === this.filters().gremiumId);
+    return hit ? `${name}: ${hit.name}` : name;
+  });
   readonly relationOptions = computed(() =>
     GRAPH_RELATIONS.map((r) => ({ value: r, label: this.i18n.translate(`graph.relations.${r}` as TranslationKey) })),
   );
-  readonly relationsText = computed(() =>
-    this.i18n.translate(`graph.relations.${this.filters().relations}` as TranslationKey),
-  );
+  readonly relationsText = computed(() => {
+    const name = this.i18n.translate('graph.filter.relations');
+    const relations = this.filters().relations;
+    if (relations === NO_FILTERS.relations) return name;
+    return `${name}: ${this.i18n.translate(`graph.relations.${relations}` as TranslationKey)}`;
+  });
 
   readonly phone = mediaQuery(MEDIA.phone);
   /** Where the drawing shows a chosen node: beside the panel, on a phone above the sheet. */
