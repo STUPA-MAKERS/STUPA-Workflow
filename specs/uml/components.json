@@ -831,12 +831,12 @@
       "to": "applications"
     },
     {
-      "count": 4,
+      "count": 6,
       "from": "gremien_overview",
       "to": "audit"
     },
     {
-      "count": 8,
+      "count": 11,
       "from": "gremien_overview",
       "to": "auth"
     },
@@ -846,7 +846,7 @@
       "to": "delegations"
     },
     {
-      "count": 6,
+      "count": 7,
       "from": "gremien_overview",
       "to": "gremien"
     },
@@ -856,7 +856,12 @@
       "to": "meetings"
     },
     {
-      "count": 8,
+      "count": 6,
+      "from": "gremien_overview",
+      "to": "notifications"
+    },
+    {
+      "count": 10,
       "from": "gremien_overview",
       "to": "shared"
     },

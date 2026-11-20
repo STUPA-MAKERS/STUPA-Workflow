@@ -68,7 +68,11 @@ export class MeetingsTimelineService {
   readonly loadingUpcoming = signal(false);
   readonly loadingPast = signal(false);
 
-  /** Gremium filter of the overview ('' = all). */
+  /**
+   * Gremium filter of the overview ('' = all). `?committee=<id>` sets it when the list
+   * opens, and the list writes it back into the URL (§ 001861). An id that is not among
+   * `filterGremien` drops, because no chip could show it.
+   */
   readonly gremiumFilter = signal<string>('');
   /** Gremien with at least one readable meeting. The backend provides the list. */
   readonly filterGremien = signal<{ id: string; name: string }[]>([]);
@@ -133,6 +137,8 @@ export class MeetingsTimelineService {
         next: (gs) => {
           this.filterGremien.set(gs);
           this.filterGremienLoaded.set(true);
+          const id = this.gremiumFilter();
+          if (id && !gs.some((g) => g.id === id)) this.selectGremiumFilter('');
         },
         error: () => {
           this.filterGremien.set([]);
