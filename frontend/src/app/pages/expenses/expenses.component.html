@@ -4,16 +4,6 @@
       <app-page-header [pane]="true" titleId="exp-title" [title]="'expenses.title' | t">
         <ng-container ngProjectAs="[actions]">
           @if (!phone()) {
-            @if (canExport() && tab() === 'bookings') {
-              <app-button
-                variant="text"
-                [iconOnly]="true"
-                [loading]="exporting()"
-                [ariaLabel]="'expenses.export' | t"
-                [title]="'expenses.export' | t"
-                (click)="onExport()"
-              ><app-icon name="download" /></app-button>
-            }
             @if (canManage() && tab() === 'bookings') {
               <app-button
                 variant="text"
@@ -21,7 +11,8 @@
                 data-testid="exp-select"
                 [ariaLabel]="'expenses.bulk.start' | t"
                 [title]="'expenses.bulk.start' | t"
-                (click)="startSelecting()"
+                [ariaPressed]="selecting()"
+                (click)="toggleSelecting()"
               ><app-icon name="boxok" /></app-button>
             }
             @if (tab() === 'bookings') {
@@ -35,6 +26,7 @@
           }
           @if (headerMenu().length) {
             <app-row-menu
+              data-testid="exp-more"
               [label]="'expenses.moreActions' | t"
               [sections]="headerMenu()"
               (selected)="onHeaderMenu($event)"

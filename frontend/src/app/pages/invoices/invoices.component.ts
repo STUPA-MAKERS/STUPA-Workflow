@@ -193,14 +193,15 @@ export class InvoicesComponent implements InvoiceFormHost {
   /** The status as coloured text. */
   readonly invoiceStatus = invoiceStatus;
 
+  /** The ⋮ menu of a wider screen: the import (spec 001812). */
+  readonly moreMenu = computed<RowMenuSection[]>(() => [
+    { items: [{ id: 'import', label: this.i18n.translate('invoices.import'), icon: 'upload' }] },
+  ]);
+
   /** The page actions that do not fit the title row of a phone. */
   readonly phoneMenu = computed<RowMenuSection[]>(() => [
-    {
-      items: [
-        { id: 'import', label: this.i18n.translate('invoices.import'), icon: 'upload' },
-        { id: 'select', label: this.i18n.translate('invoices.bulk.start'), icon: 'check' },
-      ],
-    },
+    ...this.moreMenu(),
+    { items: [{ id: 'select', label: this.i18n.translate('invoices.bulk.start'), icon: 'check' }] },
     refreshMenuSection((key) => this.i18n.translate(key)),
   ]);
 
@@ -1000,6 +1001,12 @@ export class InvoicesComponent implements InvoiceFormHost {
   startSelecting(): void {
     if (!this.canManage()) return;
     this.selecting.set(true);
+  }
+
+  /** The head button "Mehrere auswählen" is a toggle: a second press ends the selection (spec 001811). */
+  toggleSelecting(): void {
+    if (this.selecting()) this.stopSelecting();
+    else this.startSelecting();
   }
 
   stopSelecting(): void {

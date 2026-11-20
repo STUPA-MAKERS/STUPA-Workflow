@@ -1175,12 +1175,9 @@ export class BudgetDashboardComponent {
     return [{ items }, ...this.structureItems()];
   }
 
-  /** The ⋮ menu of the head on a wide screen (§ 000670): what is no icon button. */
+  /** The ⋮ menu of the head on a wide screen: the same actions, the export among them (spec 001812). */
   moreSections(): RowMenuSection[] {
-    const bookings: RowMenuSection[] = this.canSeeBookings()
-      ? [{ items: [{ id: 'bookings', label: this.i18n.translate('budget.usage.viewExpenses'), icon: 'receipt' }] }]
-      : [];
-    return [...bookings, ...this.structureItems()];
+    return this.actionSections().filter((section) => section.items.length);
   }
 
   onAction(item: RowMenuItem): void {

@@ -19,19 +19,18 @@
               <app-button
                 variant="text"
                 [iconOnly]="true"
-                [loading]="importing()"
-                [ariaLabel]="'invoices.import' | t"
-                [title]="'invoices.import' | t"
-                (click)="fileInput.click()"
-              ><app-icon name="upload" /></app-button>
-              <app-button
-                variant="text"
-                [iconOnly]="true"
                 data-testid="inv-select"
                 [ariaLabel]="'invoices.bulk.start' | t"
                 [title]="'invoices.bulk.start' | t"
-                (click)="startSelecting()"
+                [ariaPressed]="selecting()"
+                (click)="toggleSelecting()"
               ><app-icon name="boxok" /></app-button>
+              <app-row-menu
+                data-testid="inv-more"
+                [label]="'invoices.moreActions' | t"
+                [sections]="moreMenu()"
+                (selected)="onHeaderMenu($event)"
+              />
             }
           }
         </ng-container>

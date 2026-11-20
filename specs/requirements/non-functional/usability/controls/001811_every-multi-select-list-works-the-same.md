@@ -24,8 +24,9 @@ scope:
 The Anträge, the Buchungen and the Rechnungen have a multiple selection. It must work the
 same in each of these lists:
 
-1. The head of the list has the icon button `Mehrere auswählen` (icon `boxok`). On a phone
-   the entry is in the menu of the head.
+1. The head of the list has the icon button `Mehrere auswählen` (icon `boxok`). It is a
+   toggle: while the selection is on, it shows the pressed state (`aria-pressed="true"`),
+   and a second press ends the selection. On a phone the entry is in the menu of the head.
 2. A long press on a row starts the selection with that row (spec 001810). On a phone the
    swipe to the left does the same.
 3. In the selection each row shows a checkbox, and a click on a row toggles it. The row

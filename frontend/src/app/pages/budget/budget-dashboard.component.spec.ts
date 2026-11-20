@@ -498,12 +498,14 @@ describe('BudgetDashboardComponent', () => {
       expect(view.container.querySelectorAll('#bd-title')).toHaveLength(1);
       expect(view.container.querySelector('.sheet-bar__kicker')).toBeNull();
       const actions = bar.querySelector(':scope > .sheet-bar__actions > .bd__actions') as HTMLElement;
-      // § 000670: one icon button for the export, "Buchungen ansehen" in the ⋮ menu, no text button.
-      const exportButton = within(actions).getByRole('button', { name: /Exportieren/ });
-      expect(exportButton.textContent?.trim()).toBe('');
+      // Spec 001812: the export and "Buchungen ansehen" sit in the ⋮ menu, no button of their own.
+      expect(within(actions).queryByRole('button', { name: /Exportieren/ })).toBeNull();
       expect(within(actions).queryByRole('button', { name: 'Buchungen ansehen' })).toBeNull();
       expect(actions.querySelector('app-row-menu')).not.toBeNull();
-      expect(view.fixture.componentInstance.moreSections()[0].items.map((i) => i.label)).toEqual(['Buchungen ansehen']);
+      expect(view.fixture.componentInstance.moreSections()[0].items.map((i) => i.label)).toEqual([
+        'Exportieren',
+        'Buchungen ansehen',
+      ]);
       expect(view.container.querySelector('.bd__sheetBody')?.firstElementChild).toHaveClass('bd__figs');
     });
 
@@ -569,7 +571,7 @@ describe('BudgetDashboardComponent', () => {
       jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
       jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
       const { c, http } = await setup();
-      screen.getByRole('button', { name: /Exportieren/ }).click();
+      c.onAction({ id: 'export', label: '' });
       expect(c.exporting()).toBe(true);
       c.onExport();
       const req = http.expectOne((r) => r.url.includes('/budget/export.xlsx'));

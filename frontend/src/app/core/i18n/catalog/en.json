@@ -190,6 +190,7 @@
   "expenses.title": "Bookings",
   "expenses.add": "Create booking",
   "expenses.export": "Export",
+  "expenses.exportAction": "Export",
   "expenses.exportError": "The export failed.",
   "expenses.transferFrom": "From cost centre",
   "expenses.transferTo": "To cost centre",
@@ -4893,5 +4894,6 @@
   "invoices.bulk.deleteAllBlocked": "Bulk delete is locked for “select all” — pick rows individually.",
   "invoices.bulk.failed": "Bulk action failed.",
   "applications.bulk.skippedHead": "Skipped",
-  "applications.bulk.skipped": "Skipped: status not allowed"
+  "applications.bulk.skipped": "Skipped: status not allowed",
+  "applications.list.more": "More actions"
 }

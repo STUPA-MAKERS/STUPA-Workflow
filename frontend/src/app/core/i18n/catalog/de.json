@@ -187,6 +187,7 @@
   "expenses.title": "Buchungen",
   "expenses.add": "Buchung anlegen",
   "expenses.export": "Export",
+  "expenses.exportAction": "Exportieren",
   "expenses.exportError": "Der Export ist fehlgeschlagen.",
   "expenses.transferFrom": "Von Kostenstelle",
   "expenses.transferTo": "Zu Kostenstelle",
@@ -4893,5 +4894,6 @@
   "invoices.bulk.deleteAllBlocked": "Sammel-Löschen ist bei „Alle auswählen“ gesperrt — Zeilen gezielt auswählen.",
   "invoices.bulk.failed": "Sammelaktion fehlgeschlagen.",
   "applications.bulk.skippedHead": "Übersprungen",
-  "applications.bulk.skipped": "Übersprungen: Status nicht erlaubt"
+  "applications.bulk.skipped": "Übersprungen: Status nicht erlaubt",
+  "applications.list.more": "Weitere Aktionen"
 }

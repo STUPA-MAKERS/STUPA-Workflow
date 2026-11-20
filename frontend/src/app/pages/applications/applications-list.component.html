@@ -10,23 +10,6 @@
               (selected)="onHeaderMenu($event)"
             />
           } @else {
-            @if (exportShown()) {
-              <app-button
-                variant="text"
-                [iconOnly]="true"
-                [loading]="exporting()"
-                [ariaLabel]="'applications.list.export' | t"
-                (click)="onExport()"
-              >
-                <app-icon name="download" />
-              </app-button>
-            }
-            <app-row-menu
-              icon="sort"
-              [label]="'applications.list.sort.title' | t"
-              [sections]="sortSections()"
-              (selected)="onHeaderMenu($event)"
-            />
             @if (selectSections().length) {
               <app-button
                 variant="text"
@@ -34,8 +17,23 @@
                 data-testid="apps-select"
                 [ariaLabel]="'applications.bulk.start' | t"
                 [title]="'applications.bulk.start' | t"
-                (click)="selecting.set(true)"
+                [ariaPressed]="selecting()"
+                (click)="toggleSelecting()"
               ><app-icon name="boxok" /></app-button>
+            }
+            <app-row-menu
+              icon="sort"
+              [label]="'applications.list.sort.title' | t"
+              [sections]="sortSections()"
+              (selected)="onHeaderMenu($event)"
+            />
+            @if (moreSections().length) {
+              <app-row-menu
+                data-testid="apps-more"
+                [label]="'applications.list.more' | t"
+                [sections]="moreSections()"
+                (selected)="onHeaderMenu($event)"
+              />
             }
           }
         </ng-container>

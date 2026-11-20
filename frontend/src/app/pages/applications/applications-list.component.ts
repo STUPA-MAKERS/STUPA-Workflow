@@ -478,20 +478,26 @@ export class ApplicationsListComponent {
     return [{ label: this.i18n.translate('applications.list.sort.title'), items: sorts }];
   });
 
+  /** The ⋮ menu of a wider screen: the export (spec 001812). */
+  readonly moreSections = computed<RowMenuSection[]>(() =>
+    this.exportShown()
+      ? [
+          {
+            items: [
+              { id: 'export', label: this.i18n.translate('applications.list.export'), icon: 'download' },
+            ],
+          },
+        ]
+      : [],
+  );
+
   /** Phone: the sort orders, the export and "Aktualisieren" in one "more" menu of the header. */
-  readonly phoneMenuSections = computed<RowMenuSection[]>(() => {
-    const exportItem: RowMenuItem = {
-      id: 'export',
-      label: this.i18n.translate('applications.list.export'),
-      icon: 'download',
-    };
-    return [
-      ...this.sortSections(),
-      ...(this.exportShown() ? [{ items: [exportItem] }] : []),
-      ...this.selectSections(),
-      refreshMenuSection((key) => this.i18n.translate(key)),
-    ];
-  });
+  readonly phoneMenuSections = computed<RowMenuSection[]>(() => [
+    ...this.sortSections(),
+    ...this.moreSections(),
+    ...this.selectSections(),
+    refreshMenuSection((key) => this.i18n.translate(key)),
+  ]);
 
   /** "Mehrere auswählen" for a person with `application.manage` (001700). */
   readonly selectSections = computed<RowMenuSection[]>(() =>
@@ -756,6 +762,12 @@ export class ApplicationsListComponent {
         this.changed(item.id, 'updated');
       },
     });
+  }
+
+  /** The head button "Mehrere auswählen" is a toggle: a second press ends the selection (spec 001811). */
+  toggleSelecting(): void {
+    if (this.selecting()) this.stopSelecting();
+    else this.selecting.set(true);
   }
 
   /** A swipe of a phone carried out an item of the row menu. */
