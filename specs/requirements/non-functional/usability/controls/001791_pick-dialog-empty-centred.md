@@ -2,7 +2,7 @@
 id: "001791"
 title: The empty state of a pick dialog is centred in the list area
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 implementation:
