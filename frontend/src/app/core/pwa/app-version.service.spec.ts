@@ -6,28 +6,39 @@ import { SwUpdate } from '@angular/service-worker';
 import { PAGE_RELOAD } from '@stupa-makers/ui-kit/pwa';
 import { Subject, throwError } from 'rxjs';
 import { appVersionInterceptor } from './app-version.interceptor';
-import { APP_BUILD, AppVersionService, RELOAD_GUARD_MS, RELOAD_KEY } from './app-version.service';
+import {
+  APP_BUILD,
+  AppVersionService,
+  RELOAD_GUARD_MS,
+  RELOAD_KEY,
+  SW_UNREGISTER,
+  SW_WAIT_MS,
+} from './app-version.service';
 
 interface Setup {
   http: HttpClient;
   ctrl: HttpTestingController;
   reload: jest.Mock;
+  unregister: jest.Mock;
   sw: {
     isEnabled: boolean;
     checkForUpdate: jest.Mock;
     activateUpdate: jest.Mock;
     unrecoverable: Subject<unknown>;
+    versionUpdates: Subject<unknown>;
   };
   events: Subject<unknown>;
 }
 
 function setup(build = 'aaa', swEnabled = true): Setup {
   const reload = jest.fn();
+  const unregister = jest.fn().mockResolvedValue(undefined);
   const sw = {
     isEnabled: swEnabled,
     checkForUpdate: jest.fn().mockResolvedValue(true),
     activateUpdate: jest.fn().mockResolvedValue(true),
     unrecoverable: new Subject<unknown>(),
+    versionUpdates: new Subject<unknown>(),
   };
   const events = new Subject<unknown>();
   TestBed.configureTestingModule({
@@ -36,6 +47,7 @@ function setup(build = 'aaa', swEnabled = true): Setup {
       provideHttpClientTesting(),
       { provide: APP_BUILD, useValue: build },
       { provide: PAGE_RELOAD, useValue: reload },
+      { provide: SW_UNREGISTER, useValue: unregister },
       { provide: SwUpdate, useValue: sw },
       { provide: Router, useValue: { events } },
     ],
@@ -45,6 +57,7 @@ function setup(build = 'aaa', swEnabled = true): Setup {
     http: TestBed.inject(HttpClient),
     ctrl: TestBed.inject(HttpTestingController),
     reload,
+    unregister,
     sw,
     events,
   };
@@ -75,6 +88,7 @@ describe('AppVersionService', () => {
     await flush();
     expect(s.sw.checkForUpdate).toHaveBeenCalled();
     expect(s.sw.activateUpdate).toHaveBeenCalled();
+    expect(s.unregister).not.toHaveBeenCalled();
     expect(s.reload).toHaveBeenCalledTimes(1);
   });
 
@@ -158,12 +172,158 @@ describe('AppVersionService', () => {
     expect(s.reload).toHaveBeenCalledTimes(1);
   });
 
-  it('reloads even when the service worker update fails', async () => {
+  /** §002340: a failed update removes the service worker, so the reload uses the network. */
+  it('removes the service worker and reloads when the update fails', async () => {
     const s = setup();
     s.sw.checkForUpdate.mockRejectedValue(new Error('offline'));
     answer(s, 'bbb');
     await flush();
+    expect(s.sw.activateUpdate).not.toHaveBeenCalled();
+    expect(s.unregister).toHaveBeenCalledTimes(1);
     expect(s.reload).toHaveBeenCalledTimes(1);
+  });
+
+  /** §002340: the reload waits until the service worker has downloaded the new version. */
+  it('reloads only after the service worker has the new version', async () => {
+    const s = setup();
+    let done: (v: boolean) => void = () => undefined;
+    s.sw.checkForUpdate.mockReturnValue(new Promise<boolean>((r) => (done = r)));
+    answer(s, 'bbb');
+    await flush();
+    expect(s.sw.activateUpdate).not.toHaveBeenCalled();
+    expect(s.reload).not.toHaveBeenCalled();
+    done(true);
+    await flush();
+    expect(s.sw.activateUpdate).toHaveBeenCalled();
+    expect(s.unregister).not.toHaveBeenCalled();
+    expect(s.reload).toHaveBeenCalledTimes(1);
+  });
+
+  /** §002340: a version that the service worker already holds is switched to, not removed. */
+  it('switches to a version that the service worker already holds', async () => {
+    const s = setup();
+    s.sw.checkForUpdate.mockResolvedValue(false);
+    answer(s, 'bbb');
+    await flush();
+    expect(s.unregister).not.toHaveBeenCalled();
+    expect(s.reload).toHaveBeenCalledTimes(1);
+  });
+
+  /** §002340: no newer version in the service worker: the reload goes to the network. */
+  it('removes the service worker when it has no newer version', async () => {
+    const s = setup();
+    s.sw.checkForUpdate.mockResolvedValue(false);
+    s.sw.activateUpdate.mockResolvedValue(false);
+    answer(s, 'bbb');
+    await flush();
+    expect(s.unregister).toHaveBeenCalledTimes(1);
+    expect(s.reload).toHaveBeenCalledTimes(1);
+  });
+
+  /** §002340: a download that takes too long removes the service worker and reloads. */
+  it('removes the service worker when the download takes too long', async () => {
+    jest.useFakeTimers();
+    try {
+      const s = setup();
+      s.sw.checkForUpdate.mockReturnValue(new Promise<boolean>(() => undefined));
+      answer(s, 'bbb');
+      await jest.advanceTimersByTimeAsync(SW_WAIT_MS - 1);
+      expect(s.reload).not.toHaveBeenCalled();
+      await jest.advanceTimersByTimeAsync(1);
+      expect(s.sw.activateUpdate).not.toHaveBeenCalled();
+      expect(s.unregister).toHaveBeenCalledTimes(1);
+      expect(s.reload).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  /** §002340: typing that starts during the download holds the reload. */
+  it('holds the reload when typing starts during the download', async () => {
+    const s = setup();
+    let done: (v: boolean) => void = () => undefined;
+    s.sw.checkForUpdate.mockReturnValue(new Promise<boolean>((r) => (done = r)));
+    answer(s, 'bbb');
+    await flush();
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.focus();
+    done(true);
+    await flush();
+    expect(s.sw.activateUpdate).not.toHaveBeenCalled();
+    expect(s.reload).not.toHaveBeenCalled();
+    input.blur();
+    s.sw.checkForUpdate.mockResolvedValue(false);
+    s.events.next(new NavigationEnd(1, '/a', '/a'));
+    await flush();
+    expect(s.sw.activateUpdate).toHaveBeenCalled();
+    expect(s.reload).toHaveBeenCalledTimes(1);
+  });
+
+  /** §002340: a ready version reloads after a reported server version, also within the guard. */
+  it('reloads when the service worker reports a ready version', async () => {
+    sessionStorage.setItem(RELOAD_KEY, JSON.stringify({ version: 'bbb', at: Date.now() }));
+    const s = setup();
+    s.sw.versionUpdates.next({ type: 'VERSION_READY' });
+    await flush();
+    expect(s.reload).not.toHaveBeenCalled();
+    answer(s, 'bbb');
+    await flush();
+    expect(s.reload).not.toHaveBeenCalled();
+    s.sw.versionUpdates.next({ type: 'VERSION_DETECTED' });
+    await flush();
+    expect(s.reload).not.toHaveBeenCalled();
+    s.sw.versionUpdates.next({ type: 'VERSION_READY' });
+    await flush();
+    expect(s.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('holds a ready version while a text field has the focus', async () => {
+    sessionStorage.setItem(RELOAD_KEY, JSON.stringify({ version: 'bbb', at: Date.now() }));
+    const s = setup();
+    answer(s, 'bbb');
+    const area = document.createElement('textarea');
+    document.body.appendChild(area);
+    area.focus();
+    s.sw.versionUpdates.next({ type: 'VERSION_READY' });
+    await flush();
+    expect(s.reload).not.toHaveBeenCalled();
+    area.blur();
+    s.events.next(new NavigationEnd(1, '/a', '/a'));
+    await flush();
+    expect(s.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('removes every service worker registration by default', async () => {
+    const regs = [{ unregister: jest.fn() }, { unregister: jest.fn() }];
+    const nav = navigator as unknown as { serviceWorker?: unknown };
+    const before = Object.getOwnPropertyDescriptor(nav, 'serviceWorker');
+    Object.defineProperty(nav, 'serviceWorker', {
+      configurable: true,
+      value: { getRegistrations: jest.fn().mockResolvedValue(regs) },
+    });
+    try {
+      TestBed.configureTestingModule({});
+      await TestBed.inject(SW_UNREGISTER)();
+      expect(regs[0].unregister).toHaveBeenCalled();
+      expect(regs[1].unregister).toHaveBeenCalled();
+    } finally {
+      if (before) Object.defineProperty(nav, 'serviceWorker', before);
+      else delete nav.serviceWorker;
+    }
+  });
+
+  it('removes nothing without service worker support', async () => {
+    const nav = navigator as unknown as { serviceWorker?: unknown };
+    const before = Object.getOwnPropertyDescriptor(nav, 'serviceWorker');
+    Object.defineProperty(nav, 'serviceWorker', { configurable: true, value: undefined });
+    try {
+      TestBed.configureTestingModule({});
+      await expect(TestBed.inject(SW_UNREGISTER)()).resolves.toBeUndefined();
+    } finally {
+      if (before) Object.defineProperty(nav, 'serviceWorker', before);
+      else delete nav.serviceWorker;
+    }
   });
 
   it('runs the build dev by default', () => {
