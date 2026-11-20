@@ -2,7 +2,7 @@
 id: "002070"
 title: A vote card on a glass sheet is opaque in the light theme
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 implementation:
