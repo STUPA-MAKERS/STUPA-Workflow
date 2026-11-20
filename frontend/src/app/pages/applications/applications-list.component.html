@@ -278,13 +278,23 @@
         }
       </div>
 
-      @if (canCapture() && !capturing()) {
-        <app-fab
-          data-testid="apps-capture"
-          [label]="'applications.capture.title' | t"
-          [contained]="split()"
-          (activate)="openCapture()"
-        />
+      @if (!capturing()) {
+        <app-fab-group [contained]="split()">
+          <app-fab
+            data-testid="apps-apply"
+            icon="send"
+            [label]="'fab.application' | t"
+            [tone]="canCapture() ? 'neutral' : 'accent'"
+            link="/apply"
+          />
+          @if (canCapture()) {
+            <app-fab
+              data-testid="apps-capture"
+              [label]="'applications.capture.title' | t"
+              (activate)="openCapture()"
+            />
+          }
+        </app-fab-group>
       }
     </section>
 

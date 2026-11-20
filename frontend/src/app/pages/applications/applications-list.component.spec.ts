@@ -1025,6 +1025,29 @@ describe('ApplicationsListComponent', () => {
     });
   });
 
+  describe('Antrag stellen', () => {
+    it('shows Antrag stellen alone with the accent surface without the capture permission', async () => {
+      const { router } = await start();
+      const fabs = Array.from(document.querySelectorAll('app-fab-group app-fab'));
+      expect(fabs).toHaveLength(1);
+      expect(fabs[0]).not.toHaveClass('fab--neutral');
+      await userEvent.click(screen.getByRole('button', { name: 'Antrag stellen' }));
+      await new Promise((r) => setTimeout(r));
+      expect(router.url).toBe('/apply');
+    });
+
+    it('puts Antrag erfassen at the end and Antrag stellen beside it in neutral', async () => {
+      const { cmp, harness } = await start('/applications', { perms: [...ALL, 'application.create_on_behalf'] });
+      const fabs = Array.from(document.querySelectorAll('app-fab-group app-fab'));
+      expect(fabs.map((f) => f.textContent?.trim())).toEqual(['Antrag stellen', 'Antrag erfassen']);
+      expect(fabs[0]).toHaveClass('fab--neutral');
+      expect(fabs[1]).not.toHaveClass('fab--neutral');
+      cmp.openCapture();
+      harness.detectChanges();
+      expect(screen.queryByRole('button', { name: 'Antrag stellen' })).not.toBeInTheDocument();
+    });
+  });
+
   describe('Antrag erfassen', () => {
     const CAPTURE = [...ALL, 'application.create_on_behalf'];
 
