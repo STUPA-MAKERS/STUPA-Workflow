@@ -207,7 +207,7 @@
           <h2 class="sr-only">{{ current()?.name }}</h2>
         }
 
-        <dl class="bd__figs">
+        <dl #figs class="bd__figs" [style.--fig-min]="figMin()" [style.--fig-cols]="figCols()">
           @for (f of figureList(); track f.key) {
             <div class="bd__fig" [class.bd__fig--main]="f.main">
               <dt class="bd__figLabel">{{ f.label }}</dt>

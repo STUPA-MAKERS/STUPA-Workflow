@@ -1513,6 +1513,14 @@ describe('BudgetDashboardComponent income Titel', () => {
     expect(within(view.container.querySelector('.bd__figs') as HTMLElement).getByText('Einnahmen (Ist)')).toBeTruthy();
   });
 
+  it('gives every column of the figure grid the width of the longest amount, so the rows line up', async () => {
+    const view = await incomeSetup();
+    // The longest amount ("100,00 €", 8 characters) is below the floor of 10 characters; jsdom measures no width.
+    expect(view.c.figMin()).toBe('8.75rem');
+    const figs = view.container.querySelector('.bd__figs') as HTMLElement;
+    expect(figs.style.getPropertyValue('--fig-min')).toBe('8.75rem');
+  });
+
   it('§F/finance/budget/001263: the tree row of an income Titel shows its Ansatz and the reached part', async () => {
     const view = await incomeSetup();
     const row = view.c.treeRows().find((r: { node: { id: string } }) => r.node.id === 'b-1');
