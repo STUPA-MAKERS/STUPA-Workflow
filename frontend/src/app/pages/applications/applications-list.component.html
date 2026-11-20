@@ -10,7 +10,7 @@
               (selected)="onHeaderMenu($event)"
             />
           } @else {
-            @if (selectSections().length) {
+            @if (canBulk()) {
               <app-button
                 variant="text"
                 [iconOnly]="true"

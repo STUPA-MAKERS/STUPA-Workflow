@@ -534,7 +534,7 @@ describe('BudgetDashboardComponent', () => {
     it('opens the bookings of the cost centre and the year from the menu (§ 001872)', async () => {
       const view = await setup({ apps: [app({ applicationId: 'a-1' })] });
       const nav = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-      view.fixture.componentInstance.onAction(view.fixture.componentInstance.moreSections()[0].items[0]);
+      view.fixture.componentInstance.onAction({ id: 'bookings', label: '' });
       expect(nav).toHaveBeenCalledWith(['/expenses'], { queryParams: { budget: 'b-vs', fiscalYear: 'fy-1' } });
     });
 
@@ -1710,7 +1710,11 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       expect(screen.queryByRole('heading', { name: 'Kostenstelle' })).toBeNull();
       expect(screen.getByRole('heading', { name: 'Auslastung' })).toBeInTheDocument();
       await userEvent.click(within(view.container.querySelector('.bd__head') as HTMLElement).getByRole('button', { name: 'Weitere Aktionen' }));
-      expect((await screen.findAllByRole('menuitem')).map((i) => i.textContent?.trim())).toEqual(['Buchungen ansehen', 'Kostenstelle löschen']);
+      expect((await screen.findAllByRole('menuitem')).map((i) => i.textContent?.trim())).toEqual([
+        'Exportieren',
+        'Buchungen ansehen',
+        'Kostenstelle löschen',
+      ]);
     });
 
     it('§F/finance/budget/000877: locks the key and the name of a Kostenstelle in a budget with a Haushaltsplan', async () => {
