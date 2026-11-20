@@ -52,7 +52,11 @@ async def _offered(
     """Return the bulk transitions of one Antrag by target, the first one per target."""
     await resolve_app_read(service.session, application_id, principal, None)
     found = await service.available_transitions(application_id, principal, allow_unconfirmed=False)
-    return {t.to_state_id: t for t in reversed(found) if not t.adds_to_agenda}
+    bulk = [t for t in found if not t.adds_to_agenda]
+    return {
+        target: next(t for t in bulk if t.to_state_id == target)
+        for target in dict.fromkeys(t.to_state_id for t in bulk)
+    }
 
 
 async def _offered_or_none(
