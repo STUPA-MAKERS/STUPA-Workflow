@@ -30,8 +30,8 @@ import type {
 } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
-import { ButtonComponent, ButtonGroupComponent, CheckboxComponent, ConfirmDialogComponent, CurrencyInputComponent, DatepickerComponent, EmptyStateComponent, FabComponent, FilterSelectComponent, IconComponent, InfiniteScrollDirective, ListDetailLayoutComponent, ListGroupComponent, ListItemComponent, LongPressDirective, MEDIA, mediaQuery, MetaLineComponent, PageHeaderComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, type RowSwipeAction, ScrollFadeDirective, SearchPillComponent, SelectionBarComponent, SideSheetComponent, SkeletonComponent, type StatusKind, StatusTextComponent, StickyBarComponent, ToastService } from '@stupa-makers/ui-kit';
-import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
+import { ButtonComponent, ButtonGroupComponent, CheckboxComponent, ConfirmDialogComponent, CurrencyInputComponent, DatepickerComponent, EmptyStateComponent, FabComponent, FabGroupComponent, FilterSelectComponent, IconComponent, InfiniteScrollDirective, ListDetailLayoutComponent, ListGroupComponent, ListItemComponent, LongPressDirective, MEDIA, mediaQuery, MetaLineComponent, PageHeaderComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, type RowSwipeAction, ScrollFadeDirective, SearchPillComponent, SelectionBarComponent, SideSheetComponent, SkeletonComponent, type StatusKind, StatusTextComponent, StickyBarComponent, ToastService } from '@stupa-makers/ui-kit';
+import { FabLinkDirective, injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { flowColorKind } from '@shared/ui';
 import { exportDownload } from '@shared/download.util';
 import { RailStatusService } from '../../layout/rail-status.service';
@@ -155,6 +155,8 @@ type FilterSheet = 'more' | null;
     DatepickerComponent,
     EmptyStateComponent,
     FabComponent,
+    FabGroupComponent,
+    FabLinkDirective,
     FilterSelectComponent,
     IconComponent,
     ListDetailLayoutComponent,
