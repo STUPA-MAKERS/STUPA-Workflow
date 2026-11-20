@@ -12,6 +12,7 @@
     <header
       class="ff__head"
       appPaneFormHead
+      [icon]="mode() === 'create' ? 'receipt' : 'edit'"
       [heading]="title() | t"
       [headingId]="'if-title-' + mode()"
       [subtitle]="subtitle()"
