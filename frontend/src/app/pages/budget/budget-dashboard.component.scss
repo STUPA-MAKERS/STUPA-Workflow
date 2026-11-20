@@ -23,6 +23,26 @@
   font-weight: var(--fw-semibold);
   letter-spacing: -0.01em;
 }
+// Beyond a phone the page shows no title, the same as the other tabs (001500): the
+// navigation already names it. The heading stays for a screen reader. Its buttons stand at the
+// end of the line of the chips (`.bd__chipActions`). A title row that holds
+// only the title takes no room, and its heading stays in the page.
+@include bp.not-phone {
+  .bd__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .bd__topRow:not(:has(> :not(.bd__title))) {
+    display: contents;
+  }
+}
 
 :host:has(> .bd__empty) {
   flex: 1 0 auto;
@@ -98,6 +118,10 @@
 .bd__more {
   flex: none;
   align-self: center;
+}
+.bd__chipActions {
+  flex: none;
+  margin-inline-start: auto;
 }
 .bd__chips {
   display: flex;
