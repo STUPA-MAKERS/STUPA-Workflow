@@ -20,7 +20,6 @@ const FIELDS: readonly (readonly [string, string])[] = [
   ['pages/budget/cost-centre-select/cost-centre-select.component.scss', '.ccs__search'],
   ['pages/admin/mail-templates/mail-templates.component.scss', '.mt__area'],
   ['pages/admin/branding/branding-editor.component.scss', '.br__area'],
-  ['pages/applications/force-status-dialog/force-status-dialog.component.scss', 'textarea'],
 ];
 
 /** The declarations of every rule whose selector line is this selector. */

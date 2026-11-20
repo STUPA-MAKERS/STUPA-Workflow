@@ -124,16 +124,17 @@ describe('AmendAmountDialogComponent', () => {
   });
 
   it.each([
-    [409, true],
-    [403, false],
-    [500, false],
-  ])('reports a %s answer', async (status, closes) => {
+    [409, true, { code: 'x' }],
+    [403, false, { code: 'x' }],
+    [422, false, { code: 'x' }],
+    [500, false, null],
+  ])('reports a %s answer', async (status, closes, body) => {
     const { http, host, cmp, toast, openIt, fill } = await setup();
     const error = jest.spyOn(toast, 'error');
     openIt();
     fill();
     cmp.submit();
-    http.expectOne(URL).flush({ code: 'x' }, { status, statusText: 'x' });
+    http.expectOne(URL).flush(body, { status, statusText: 'x' });
     expect(error).toHaveBeenCalledTimes(1);
     expect(host.open()).toBe(!closes);
     cmp.close();

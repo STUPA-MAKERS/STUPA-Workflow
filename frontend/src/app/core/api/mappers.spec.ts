@@ -61,6 +61,7 @@ describe('mapState', () => {
       color: '#4a90d9',
       editAllowed: true,
       kind: 'normal',
+      isApproved: false,
     });
   });
 
@@ -94,7 +95,7 @@ describe('mapApplication', () => {
     expect(view).toEqual({
       id: 'a1',
       typeId: 't1',
-      state: { id: 's1', key: 'submitted', label: 'Eingereicht', color: '#4a90d9', editAllowed: true, kind: 'normal' },
+      state: { id: 's1', key: 'submitted', label: 'Eingereicht', color: '#4a90d9', editAllowed: true, kind: 'normal', isApproved: false },
       gremiumId: 'g1',
       budgetId: 'c1',
       fiscalYearId: 'fy1',
@@ -229,7 +230,7 @@ describe('mapTimelineEvent', () => {
     const view = mapTimelineEvent(wire, 'en');
     expect(view).toEqual({
       toStateId: 's1',
-      toState: { id: 's1', key: 'submitted', label: 'Submitted', color: '#4a90d9', editAllowed: true, kind: 'normal' },
+      toState: { id: 's1', key: 'submitted', label: 'Submitted', color: '#4a90d9', editAllowed: true, kind: 'normal', isApproved: false },
       label: 'Submitted',
       transitionLabel: null,
       actor: 'Referat',
@@ -239,6 +240,11 @@ describe('mapTimelineEvent', () => {
       voteId: null,
       voteDeleted: false,
       decision: null,
+      kind: 'status',
+      forced: false,
+      forceReason: null,
+      outsideDecision: null,
+      amountChange: null,
     });
   });
 
@@ -413,6 +419,7 @@ describe('mapTransition', () => {
       addsToAgenda: false,
       agendaGremiumId: null,
       allowsDecision: false,
+      requiresAmount: false,
     });
   });
 

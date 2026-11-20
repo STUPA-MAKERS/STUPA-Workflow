@@ -31,23 +31,26 @@
     </div>
   </app-sticky-bar>
 
-  @if (loading() && !events().length) {
-    <app-skeleton variant="rows" [count]="5" [label]="'common.loading' | t" />
-  } @else if (failed()) {
-    <app-empty-state [heading]="'admin.forced.loadError' | t" />
-  } @else if (!events().length) {
-    <app-empty-state [heading]="(filtered() ? 'admin.forced.emptyFiltered' : 'admin.forced.empty') | t" />
-  } @else {
-    <div class="rowgroup" role="list" [attr.aria-label]="'admin.forced.title' | t">
-      @for (e of events(); track e.applicationId + e.at) {
-        <app-list-item
-          role="listitem"
-          [title]="titleOf(e)"
-          [link]="['/applications', e.applicationId]"
-          [subWrap]="true"
-          [sub]="(e.at | ldate: 'medium') + ' · ' + pathOf(e) + ' · ' + reasonLabel(e.reason) + (e.note ? ' · ' + e.note : '')"
-        />
+  <app-load-state [state]="loadState()" [errorText]="'admin.forced.loadError' | t" (retry)="load()">
+    <ng-template #loading>
+      <app-skeleton variant="rows" [count]="5" [label]="'common.loading' | t" />
+    </ng-template>
+    <ng-template #content>
+      @if (!events().length) {
+        <app-empty-state [heading]="(filtered() ? 'admin.forced.emptyFiltered' : 'admin.forced.empty') | t" />
+      } @else {
+        <div class="rowgroup" role="list" [attr.aria-label]="'admin.forced.title' | t">
+          @for (e of events(); track e.applicationId + e.at) {
+            <app-list-item
+              role="listitem"
+              [title]="titleOf(e)"
+              [link]="['/applications', e.applicationId]"
+              [subWrap]="true"
+              [sub]="(e.at | ldate: 'medium') + ' · ' + pathOf(e) + ' · ' + reasonLabel(e.reason) + (e.note ? ' · ' + e.note : '')"
+            />
+          }
+        </div>
       }
-    </div>
-  }
+    </ng-template>
+  </app-load-state>
 </section>

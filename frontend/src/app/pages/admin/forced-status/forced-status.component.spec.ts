@@ -4,6 +4,7 @@ import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import { USE_MOCK_API } from '@core/api/api.config';
 import type { ForcedEvent, ForcedReport } from '@core/api/models';
+import { loadErrorToast, retryLoadError } from '../../../../testing/load-error';
 import { ForcedStatusComponent, defaultFrom, pathValue } from './forced-status.component';
 
 const REPORT: ForcedReport = {
@@ -111,6 +112,41 @@ describe('ForcedStatusComponent', () => {
     detectChanges();
     expect(cmp.failed()).toBe(true);
     expect(cmp.paths()).toEqual([]);
-    expect(screen.getByText('Die Liste konnte nicht geladen werden.')).toBeInTheDocument();
+    expect(cmp.loadState()).toBe('error');
+    expect(loadErrorToast()).toBe('Die Liste konnte nicht geladen werden.');
+    retryLoadError();
+    http.expectOne(isEvents).flush([]);
+    expect(cmp.loadState()).toBe('ok');
+  });
+
+  it('keeps only the answer of the last load and falls back to the default period', async () => {
+    const { http, cmp } = await setup();
+    http.expectOne(isReport).flush(REPORT);
+    http.expectOne(isEvents).flush([]);
+    cmp.setReason('legacy');
+    cmp.setReason('none');
+    const [stale, fresh] = http.match(isEvents);
+    fresh.flush(EVENTS);
+    stale.flush([]);
+    expect(cmp.events()).toEqual(EVENTS);
+    cmp.setReason('legacy');
+    cmp.setReason('');
+    const [staleErr, last] = http.match(isEvents);
+    last.flush([]);
+    staleErr.flush({}, { status: 500, statusText: 'x' });
+    expect(cmp.failed()).toBe(false);
+    cmp.setRange({ from: '', to: '' });
+    expect(cmp.from()).toBe(defaultFrom(cmp.to()));
+    http.expectOne(isReport).flush(REPORT);
+    http.expectOne(isEvents).flush([]);
+    expect(cmp.titleOf(EVENTS[1])).toBe('Drucker');
+    cmp.setPath('agenda>approved');
+    http.expectOne(isEvents).flush([]);
+    expect(cmp.filtered()).toBe(true);
+    cmp.setPath([]);
+    http.expectOne(isEvents).flush([]);
+    cmp.setReason([]);
+    http.expectOne(isEvents).flush([]);
+    expect(cmp.filtered()).toBe(false);
   });
 });

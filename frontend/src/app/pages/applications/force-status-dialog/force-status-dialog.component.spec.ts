@@ -146,6 +146,7 @@ describe('ForceStatusDialogComponent', () => {
   it.each([
     [403, 'Für diese Aktion fehlt die Berechtigung.'],
     [409, 'conflict'],
+    [422, 'amount'],
     [500, 'error'],
   ])('reports a %s answer and stays open', async (status) => {
     const { http, host, cmp, toast, openIt } = await setup();

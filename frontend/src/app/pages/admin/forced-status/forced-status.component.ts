@@ -7,6 +7,8 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { isoDay, localToday } from '@shared/date-format';
 import { i18nLabel } from '@shared/forms/i18n-text';
+import type { LoadState } from '@shared/forms/settings-form';
+import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
 import {
   EmptyStateComponent,
   FilterSelectComponent,
@@ -51,6 +53,7 @@ export function pathValue(fromKey: string | null, toKey: string): string {
     EmptyStateComponent,
     FilterSelectComponent,
     ListItemComponent,
+    LoadStateComponent,
     PageHeaderComponent,
     RangeChipComponent,
     SkeletonComponent,
@@ -88,6 +91,10 @@ export class ForcedStatusComponent {
     () => this.pathOptions().find((o) => o.value === this.path())?.label ?? null,
   );
   readonly filtered = computed(() => !!this.reason() || !!this.path());
+  /** The first load shows skeleton rows; a reload keeps the list. */
+  readonly loadState = computed<LoadState>(() =>
+    this.failed() ? 'error' : this.loading() && !this.events().length ? 'loading' : 'ok',
+  );
 
   private seq = 0;
 
@@ -125,8 +132,8 @@ export class ForcedStatusComponent {
     this.load();
   }
 
-  private range(): { from?: string; to?: string } {
-    return { from: this.from() || undefined, to: this.to() || undefined };
+  private range(): { from: string; to: string } {
+    return { from: this.from(), to: this.to() };
   }
 
   private loadPaths(): void {
