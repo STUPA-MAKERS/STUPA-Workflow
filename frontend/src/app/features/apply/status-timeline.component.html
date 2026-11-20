@@ -120,6 +120,7 @@
                   <app-button-group noteAction class="ad__draftSubmit" [main]="true">
                   <app-button
                     variant="fill"
+                    size="sm"
                     [loading]="firing() === submit.id"
                     [disabled]="firing() !== null && firing() !== submit.id"
                     (click)="onAction(submit)"
