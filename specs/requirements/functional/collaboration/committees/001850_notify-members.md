@@ -2,10 +2,18 @@
 id: "001850"
 title: A Gremium notifies its members
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
-implementation: null
+tests:
+  - "backend/tests/integration/modules/gremien/test_gremium_notify.py:test_manager_notifies_every_active_member"
+  - "frontend/src/app/features/gremien/gremium-detail/gremium-detail.component.spec.ts:GremiumDetailComponent"
+implementation:
+  - backend/app/modules/gremien_overview/notify.py
+  - backend/app/modules/gremien_overview/router.py
+  - frontend/src/app/features/gremien/gremium-detail/gremium-detail.component.ts
+  - frontend/src/app/features/gremien/gremium-notify-dialog/gremium-notify-dialog.component.ts
+  - mcp/antragsplattform_mcp/tools/committees.py
 scope:
   - backend/app/modules/gremien
   - backend/app/modules/gremien_overview

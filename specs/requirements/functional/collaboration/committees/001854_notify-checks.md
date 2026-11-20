@@ -2,10 +2,17 @@
 id: "001854"
 title: A members message is checked and audited
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
-implementation: null
+tests:
+  - "backend/tests/integration/modules/gremien/test_gremium_notify.py:test_limits_give_422"
+  - "frontend/src/app/features/gremien/gremium-notify-dialog/gremium-notify-dialog.component.spec.ts:GremiumNotifyDialogComponent"
+implementation:
+  - backend/app/modules/gremien_overview/schemas.py
+  - backend/app/modules/gremien_overview/notify.py
+  - backend/app/modules/audit/actions.py
+  - frontend/src/app/features/gremien/gremium-notify-dialog/gremium-notify-dialog.component.ts
 scope:
   - backend/app/modules/gremien_overview
   - backend/app/modules/audit

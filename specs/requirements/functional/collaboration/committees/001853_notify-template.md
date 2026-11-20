@@ -2,10 +2,14 @@
 id: "001853"
 title: The members message is a mail template
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
-implementation: null
+tests:
+  - "backend/tests/integration/modules/gremien/test_gremium_notify.py:test_manager_notifies_every_active_member"
+implementation:
+  - backend/app/modules/notifications/texts/committees.py
+  - backend/app/modules/notifications/templates_catalogue.py
 scope:
   - backend/app/modules/gremien_overview
   - backend/app/modules/notifications

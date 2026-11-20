@@ -2,10 +2,14 @@
 id: "001852"
 title: The message goes to the members and the substitute pool
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
-implementation: null
+tests:
+  - "backend/tests/integration/modules/gremien/test_gremium_notify.py:test_manager_notifies_every_active_member"
+implementation:
+  - backend/app/modules/gremien_overview/notify.py
+  - backend/app/modules/notifications/mail.py
 scope:
   - backend/app/modules/gremien_overview
   - backend/app/modules/notifications

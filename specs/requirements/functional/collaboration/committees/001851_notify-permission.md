@@ -2,10 +2,17 @@
 id: "001851"
 title: Only members.notify sends a message to the members
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
-implementation: null
+tests:
+  - "backend/tests/integration/modules/gremien/test_gremium_notify.py:test_only_members_notify_sends"
+implementation:
+  - backend/app/modules/gremien/gremium_roles.py
+  - backend/app/modules/gremien_overview/notify.py
+  - backend/app/modules/auth/oauth.py
+  - backend/migrations/versions/c4e8a1f07b52_members_notify.py
+  - frontend/src/app/pages/admin/admin.models.ts
 scope:
   - backend/app/modules/gremien
   - backend/app/modules/gremien_overview

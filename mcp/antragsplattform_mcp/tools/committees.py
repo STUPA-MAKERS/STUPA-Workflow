@@ -156,6 +156,19 @@ async def set_gremium_info(
 
 
 @group.tool
+async def notify_gremium_members(gremium_id: str, subject: str, message: str) -> dict:
+    """Mail a message to every member and pool substitute of a Gremium, the sender included.
+
+    Requires `members.notify` in the Gremium. The subject holds 1 to 200 characters, the
+    message 1 to 10000 characters of plain text. The Reply-To of the mail is the caller.
+    The answer is `{"recipients": n}`.
+    """
+    return await api().post(
+        f"/committees/{gremium_id}/notify", json={"subject": subject, "message": message}
+    )
+
+
+@group.tool
 async def gremium_meeting_defaults(gremium_id: str) -> dict:
     """What a new meeting of the Gremium allows (guests vote, quorum); session.manage."""
     return await api().get(f"/committees/{gremium_id}/meeting-defaults")

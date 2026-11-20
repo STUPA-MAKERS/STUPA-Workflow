@@ -187,7 +187,7 @@ def build_email_message(msg: MailMessage, settings: Settings) -> EmailMessage:
     email["To"] = ", ".join(msg.to)
     email["Subject"] = msg.subject
     if msg.reply_to:
-        email["Reply-To"] = msg.reply_to
+        email.add_header("Reply-To", msg.reply_to)
     email.set_content(msg.text)
     if msg.html:
         email.add_alternative(msg.html, subtype="html")
