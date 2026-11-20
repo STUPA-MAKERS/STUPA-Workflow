@@ -244,8 +244,9 @@
 // counted from the top edge of the screen), each page reaches up to that edge under the head
 // and the tab line, and keeps the room of both above its first card. The tab bar is one
 // solid layer from the edge of the screen down to the tab line, so the head and the tab line
-// are one surface: the page colour at rest, the bar colour once a page has scrolled
-// (`bv-host--scrolled`, spec 002010), as the head over the rows of "Meine To-Dos".
+// are one surface: in the page colour, and once a page has scrolled (`bv-host--scrolled`,
+// spec 002010) the tab line has the edge of very high contrast, as the head over the rows of
+// "Meine To-Dos".
 :host-context(.td__body--pages) .bv__tabPager {
   --bv-tabs: calc(44px + var(--border-width));
   --bv-under: calc(var(--ld-pane-top, 0px) + var(--bv-tabs));
@@ -277,9 +278,6 @@
 }
 :host(.bv-host--scrolled) .bv__tabPager ::ng-deep > .tp__bar.tp__bar {
   box-shadow: var(--bar-edge, none);
-}
-:host(.bv-host--scrolled) .bv__tabPager ::ng-deep > .tp__bar.tp__bar::before {
-  background: var(--color-bar);
 }
 .bv__phoneCards {
   display: flex;

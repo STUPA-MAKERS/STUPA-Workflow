@@ -16,8 +16,8 @@
   height: calc(64px + var(--app-top-safe-area, 0px));
   padding: var(--app-top-safe-area, 0px) max(6px, var(--app-right-safe-area, 0px)) 0
     max(18px, var(--app-left-safe-area, 0px));
-  // Solid like the bar of every phone detail (`bar`, spec 002010): the page colour at rest,
-  // the bar colour while the page scrolls under it, and no rule.
+  // Solid like the bar of every phone detail (`bar`, spec 002010): the page colour at rest
+  // and while the page scrolls under it, and no rule.
   @include bar(var(--color-bg));
 }
 .pm__bar--under {

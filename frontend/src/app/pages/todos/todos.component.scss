@@ -221,8 +221,7 @@
     border-radius: 0;
     box-shadow: none;
   }
-  // The bar has the colour of the card at rest and the bar colour while the card scrolls
-  // under it, like the bar of every other phone detail (`bar`, spec 002010).
+  // The bar has the colour of the card at rest and while the card scrolls under it, like the bar of every other phone detail (`bar`, spec 002010).
   .td__drawer > app-list-detail-bar {
     @include bar(var(--color-surface));
 

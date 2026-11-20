@@ -285,6 +285,7 @@
             icon="form"
             [label]="'fab.application' | t"
             [tone]="canCapture() ? 'neutral' : 'accent'"
+            [iconOnly]="canCapture() && phone()"
             link="/apply"
           />
           @if (canCapture()) {
