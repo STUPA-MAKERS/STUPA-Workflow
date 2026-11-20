@@ -336,32 +336,60 @@
      the text, so the tool applies at the cursor. -->
 <ng-template #formatTpl>
   @if (sheet(); as ts) {
-    @for (tool of ts.tools; track tool.format) {
-      <button
-        type="button"
-        class="mp__tool"
-        [class.mp__tool--on]="ts.activeFormats().has(tool.format)"
-        [attr.aria-pressed]="ts.activeFormats().has(tool.format)"
-        [attr.aria-label]="tool.label | t"
+    @for (group of ts.toolGroups; track $index) {
+      <app-button-group>
+        @for (tool of group; track tool.format) {
+          <app-button
+            variant="tonal"
+            [iconOnly]="true"
+            [ariaPressed]="ts.activeFormats().has(tool.format)"
+            [ariaLabel]="tool.label | t"
+            [title]="tool.label | t"
+            (pointerdown)="$event.preventDefault()"
+            (mousedown)="$event.preventDefault()"
+            (click)="ts.toggleFormat(tool.format)"
+          ><app-icon [name]="tool.icon" /></app-button>
+        }
+      </app-button-group>
+    }
+    <app-button-group>
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="'meetings.editor.table' | t"
+        [title]="'meetings.editor.table' | t"
         (pointerdown)="$event.preventDefault()"
         (mousedown)="$event.preventDefault()"
-        (click)="ts.toggleFormat(tool.format)"
-      >
-        <app-icon [name]="tool.icon" [size]="20" />
-      </button>
-    }
-    <button type="button" class="mp__tool" [attr.aria-label]="'meetings.editor.table' | t" (pointerdown)="$event.preventDefault()" (mousedown)="$event.preventDefault()" (click)="ts.insertTable()">
-      <app-icon name="table" [size]="20" />
-    </button>
-    <button type="button" class="mp__tool" [attr.aria-label]="'meetings.editor.image' | t" (pointerdown)="$event.preventDefault()" (mousedown)="$event.preventDefault()" (click)="ts.insertImage()">
-      <app-icon name="image" [size]="20" />
-    </button>
-    <button type="button" class="mp__tool" [attr.aria-label]="'meetings.editor.document' | t" (pointerdown)="$event.preventDefault()" (mousedown)="$event.preventDefault()" (click)="ts.insertDocument()">
-      <app-icon name="file" [size]="20" />
-    </button>
-    <button type="button" class="mp__tool" [attr.aria-label]="'meetings.editor.timeNote' | t" (pointerdown)="$event.preventDefault()" (mousedown)="$event.preventDefault()" (click)="ts.insertTimeNote()">
-      <app-icon name="clock" [size]="20" />
-    </button>
+        (click)="ts.insertTable()"
+      ><app-icon name="table" /></app-button>
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="'meetings.editor.image' | t"
+        [title]="'meetings.editor.image' | t"
+        (pointerdown)="$event.preventDefault()"
+        (mousedown)="$event.preventDefault()"
+        (click)="ts.insertImage()"
+      ><app-icon name="image" /></app-button>
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="'meetings.editor.document' | t"
+        [title]="'meetings.editor.document' | t"
+        (pointerdown)="$event.preventDefault()"
+        (mousedown)="$event.preventDefault()"
+        (click)="ts.insertDocument()"
+      ><app-icon name="file" /></app-button>
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="'meetings.editor.timeNote' | t"
+        [title]="'meetings.editor.timeNote' | t"
+        (pointerdown)="$event.preventDefault()"
+        (mousedown)="$event.preventDefault()"
+        (click)="ts.insertTimeNote()"
+      ><app-icon name="clock" /></app-button>
+    </app-button-group>
   }
 </ng-template>
 
@@ -396,12 +424,14 @@
 
 <!-- The QR code and the beamer as icon buttons of the dock on a wider screen. -->
 <ng-template #showTpl>
-  <app-join-qr [meeting]="meeting()" [iconOnly]="true" [(open)]="qrOpen" />
-  @if (wide() && meeting().status !== 'closed' && meeting().canManage) {
-    <app-button-group>
+  <ng-container btnGrpContent>
+    @if (meeting().publicJoin && meeting().canManage && meeting().status !== 'closed') {
+      <app-join-qr [meeting]="meeting()" [iconOnly]="true" [(open)]="qrOpen" />
+    }
+    @if (wide() && meeting().status !== 'closed' && meeting().canManage) {
       <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.beamer.enter' | t" (click)="toggleBeamer.emit()">
         <app-icon name="monitor" />
       </app-button>
-    </app-button-group>
-  }
+    }
+  </ng-container>
 </ng-template>
