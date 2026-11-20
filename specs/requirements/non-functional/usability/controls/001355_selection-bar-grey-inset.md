@@ -2,7 +2,7 @@
 id: "001355"
 title: The selection bar in a list is a grey surface with an inset around its actions
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 implementation:
