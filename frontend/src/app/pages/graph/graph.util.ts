@@ -6,6 +6,8 @@
 import type { ParamMap } from '@angular/router';
 import type { FeatureKey } from '@core/features/feature.service';
 import {
+  GRAPH_DEPTH_DEFAULT,
+  GRAPH_DEPTH_MAX,
   GRAPH_KINDS,
   GRAPH_RELATIONS,
   type GraphEdge,
@@ -87,9 +89,9 @@ export const NO_FILTERS: GraphFilters = {
   kinds: [],
   from: '',
   to: '',
-  gremiumId: '',
   relations: 'all',
   q: '',
+  depth: GRAPH_DEPTH_DEFAULT,
   single: false,
   noAccess: false,
 };
@@ -129,6 +131,11 @@ export function isFiltered(f: GraphFilters, today: string): boolean {
   return !sameFilters(f, defaultFilters(today));
 }
 
+/** A count of steps in its range (spec 001434); a value that is no number means the default. */
+export function depthOf(value: number): number {
+  return Number.isFinite(value) ? Math.min(GRAPH_DEPTH_MAX, Math.max(0, Math.trunc(value))) : GRAPH_DEPTH_DEFAULT;
+}
+
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 function day(value: string | null): string {
@@ -150,9 +157,9 @@ export function filtersOf(query: ParamMap, today: string): GraphFilters {
     kinds: GRAPH_KINDS.filter((k) => kinds.includes(k)),
     from: own ? from : fresh.from,
     to,
-    gremiumId: query.get('gremium') ?? '',
     relations: relations !== null && GRAPH_RELATIONS.includes(relations) ? relations : fresh.relations,
     q: query.get('q') ?? '',
+    depth: depthOf(Number(query.get('depth') ?? Number.NaN)),
     single: query.get('single') === '1',
     noAccess: query.get('noaccess') === '1',
   };
@@ -167,9 +174,9 @@ export function queryOf(f: GraphFilters, today: string): Readonly<Record<string,
     from: freshPeriod ? null : f.from || null,
     to: f.to || null,
     period: f.from === '' && f.to === '' ? ALL : null,
-    gremium: f.gremiumId || null,
     rel: f.relations === fresh.relations ? null : f.relations,
     q: f.q.trim() || null,
+    depth: f.depth === GRAPH_DEPTH_DEFAULT ? null : String(f.depth),
     single: f.single ? '1' : null,
     noaccess: f.noAccess ? '1' : null,
   };

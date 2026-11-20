@@ -9,9 +9,9 @@ const NONE: GraphFilters = {
   kinds: [],
   from: '',
   to: '',
-  gremiumId: '',
   relations: 'all',
   q: '',
+  depth: 2,
   single: false,
   noAccess: false,
 };
@@ -46,9 +46,9 @@ describe('GraphApiService', () => {
           kinds: ['meeting', 'todo'],
           from: '2026-01-01',
           to: '2026-12-31',
-          gremiumId: 'g1',
           relations: 'links',
           q: ' Haushalt ',
+          depth: 4,
           single: true,
           noAccess: true,
         },
@@ -60,9 +60,9 @@ describe('GraphApiService', () => {
     expect(params.getAll('kinds')).toEqual(['meeting', 'todo']);
     expect(params.get('from')).toBe('2026-01-01');
     expect(params.get('to')).toBe('2026-12-31');
-    expect(params.get('gremiumId')).toBe('g1');
     expect(params.get('relations')).toBe('links');
     expect(params.get('q')).toBe('Haushalt');
+    expect(params.get('depth')).toBe('4');
     expect(params.get('single')).toBe('true');
     expect(params.get('noAccess')).toBe('true');
     expect(params.get('cursor')).toBe('60');

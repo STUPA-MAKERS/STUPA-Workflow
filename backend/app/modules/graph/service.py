@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import replace
+from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -58,21 +59,23 @@ def card_opened(relations: Iterable[Relation], resolved: Mapping[Ref, Resolved])
 def node_of(
     ref: Ref,
     found: Resolved,
-    fact: reads.Fact | None,
+    when: date | None,
     *,
+    known: bool,
     budget_reader: bool,
     opened: frozenset[Ref],
 ) -> Node:
-    """One candidate node from the resolved element and its facts.
+    """One candidate node from the resolved element and its date.
+
+    ``known`` tells that the element still has its row; without it the node is hidden.
 
     The resolver names a cost centre to every person, because a card shows the cost
     centre of its link. In the graph a person without the budget read right gets a cost
     centre only through a card that the person reads, and then as a granted node.
     """
     by_card = ref[0] == "budget" and not budget_reader
-    if not found.accessible or (by_card and ref not in opened) or fact is None:
+    if not found.accessible or (by_card and ref not in opened) or not known:
         return Node(ref=ref, accessible=False)
-    when, gremien = fact
     return Node(
         ref=ref,
         accessible=True,
@@ -81,7 +84,6 @@ def node_of(
         detail=found.detail,
         granted=found.granted or by_card,
         date=when,
-        gremien=gremien,
     )
 
 
@@ -123,19 +125,29 @@ class GraphService:
         session = self.links.session
         on = frozenset(await link_kinds_on(session))
         kinds = on if filters.kinds is None else on & filters.kinds
+        # A neighbour of a hit shows with every kind (spec 001434), so the relations of
+        # every kind are read unless only the hits show.
+        scope = kinds if filters.depth == 0 else on
         relations = (
-            *await reads.link_relations(session, kinds),
-            *await reads.builtin_relations(session, kinds),
+            *await reads.link_relations(session, scope),
+            *await reads.builtin_relations(session, scope),
         )
         ends = frozenset(ref for r in relations for ref in (r.a, r.b))
         refs = ends | (await reads.all_refs(session, kinds) if filters.single else frozenset())
         resolved = await self.links.resolve(refs, principal)
         readable = grouped(ref for ref, found in resolved.items() if found.accessible)
-        facts = await reads.facts(session, readable)
+        dates = await reads.dates(session, readable)
         opened = card_opened(relations, resolved)
         budget_reader = has_budget_read(principal)
         candidates = {
-            ref: node_of(ref, found, facts.get(ref), budget_reader=budget_reader, opened=opened)
+            ref: node_of(
+                ref,
+                found,
+                dates.get(ref),
+                known=ref in dates,
+                budget_reader=budget_reader,
+                opened=opened,
+            )
             for ref, found in resolved.items()
         }
         nodes, lines = shown(candidates, relations, replace(filters, kinds=kinds))

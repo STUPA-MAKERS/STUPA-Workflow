@@ -168,10 +168,6 @@ async def test_the_graph_shows_links_and_builtin_relations(
     links_only = await _page(maker, admin, Filters(relations="links"))
     assert _refs(links_only) == {app, ("invoice", invoice), ("vote", ids["vote"])}
 
-    in_gremium = await _page(maker, admin, Filters(gremium=ids["gremium"]))
-    assert ("budget", ids["budget"]) not in _refs(in_gremium)
-    assert {meeting, item, ("gremium", ids["gremium"])} <= _refs(in_gremium)
-
     spring = await _page(
         maker, admin, Filters(start=date(2020, 2, 1), end=date(2020, 3, 31), single=True)
     )
@@ -227,7 +223,7 @@ async def test_a_reader_sees_only_what_the_kind_or_a_card_opens(
     assert (await _page(maker, stranger, Filters(no_access=True, single=True))).nodes == ()
 
 
-async def test_a_termin_a_ticket_and_a_card_take_their_dates_and_gremien(
+async def test_a_termin_a_ticket_and_a_card_take_their_dates(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
     """Spec 001425: the start of a Termin, the due date of a card, the creation of a ticket."""
@@ -276,14 +272,18 @@ async def test_a_termin_a_ticket_and_a_card_take_their_dates_and_gremien(
     assert by_ref[ticket_ref].date is not None
     assert (frozenset((termin_ref, ("gremium", other_id))), "builtin") in _lines(page)
 
-    sport = await _page(maker, admin, Filters(gremium=other_id))
-    assert _refs(sport) == {termin_ref, ("gremium", other_id)}
-
     july = await _page(maker, admin, Filters(start=date(2020, 7, 2), end=date(2020, 7, 31)))
     assert _refs(july) == set()
 
-    found = await _page(maker, admin, Filters(q="sommer"))
+    found = await _page(maker, admin, Filters(q="sommer", depth=1))
     assert _refs(found) == {termin_ref, card, ("gremium", gremium_id), ("gremium", other_id)}
+
+    # Spec 001434: a neighbour shows also when it does not pass the filters.
+    assert _refs(await _page(maker, admin, Filters(q="sommer"))) == set()
+    two = await _page(maker, admin, Filters(q="sommer", depth=2))
+    assert _refs(two) == _refs(found) | {ticket_ref}
+    by_kind = await _page(maker, admin, Filters(kinds=frozenset({"ticket"}), depth=1))
+    assert _refs(by_kind) == {ticket_ref, card}
 
 
 async def test_a_kind_of_a_feature_that_is_off_is_no_node(

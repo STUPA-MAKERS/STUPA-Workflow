@@ -1,9 +1,9 @@
-"""The reads of the graph: the relations, the ids of each kind and the facts of a node.
+"""The reads of the graph: the relations, the ids of each kind and the date of a node.
 
 A relation is a link of the table ``link`` or a relation that the data model holds
-(spec 001424). The facts are the date and the Gremien of an element, which the filters
-"Zeitraum" and "Gremium" use (spec 001425). The reads apply no read rule: the service
-resolves every element for the reader before it shows one.
+(spec 001424). The date of an element is what the filter "Zeitraum" uses (spec 001425).
+The reads apply no read rule: the service resolves every element for the reader before it
+shows one.
 """
 
 from __future__ import annotations
@@ -23,8 +23,7 @@ from app.modules.graph.build import Ref, Relation
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.tickets.models import Ticket
-from app.modules.todos.grouping import grouped
-from app.modules.todos.models import Link, TodoBoard, TodoCard
+from app.modules.todos.models import Link, TodoCard
 from app.modules.voting.models import Vote
 
 #: A built-in relation: the kinds of its two ends and the read of their ids. A row with a
@@ -117,8 +116,8 @@ async def all_refs(session: AsyncSession, kinds: Collection[str]) -> frozenset[R
     return frozenset((kind, element_id) for kind, ids in found for element_id in ids)
 
 
-def _fact_read(kind: str, ids: Collection[uuid.UUID]) -> Select[Any, Any, Any, Any]:
-    """The read ``(id, date, fallback date, gremium)`` of the elements of one kind.
+def _date_read(kind: str, ids: Collection[uuid.UUID]) -> Select[Any, Any, Any]:
+    """The read ``(id, date, fallback date)`` of the elements of one kind.
 
     The date of a node (spec 001425): the date of a meeting and of its TOPs, the start of
     a Termin, the invoice date of an invoice and of a Buchung, the due date of a card,
@@ -128,55 +127,40 @@ def _fact_read(kind: str, ids: Collection[uuid.UUID]) -> Select[Any, Any, Any, A
     none = null()
     match kind:
         case "application":
-            return select(
-                Application.id, Application.created_at, none, Application.gremium_id
-            ).where(Application.id.in_(wanted))
-        case "meeting":
-            return select(Meeting.id, Meeting.date, none, Meeting.gremium_id).where(
-                Meeting.id.in_(wanted)
+            return select(Application.id, Application.created_at, none).where(
+                Application.id.in_(wanted)
             )
+        case "meeting":
+            return select(Meeting.id, Meeting.date, none).where(Meeting.id.in_(wanted))
         case "agenda_item":
             return (
-                select(MeetingAgendaItem.id, Meeting.date, none, Meeting.gremium_id)
+                select(MeetingAgendaItem.id, Meeting.date, none)
                 .join(Meeting, Meeting.id == MeetingAgendaItem.meeting_id)
                 .where(MeetingAgendaItem.id.in_(wanted))
             )
         case "vote":
-            return select(Vote.id, Vote.created_at, none, Vote.eligible_group).where(
-                Vote.id.in_(wanted)
-            )
+            return select(Vote.id, Vote.created_at, none).where(Vote.id.in_(wanted))
         case "appointment":
-            return (
-                select(Appointment.id, Appointment.starts_on, none, Invitation.gremium_id)
-                .outerjoin(Invitation, Invitation.appointment_id == Appointment.id)
-                .where(Appointment.id.in_(wanted))
+            return select(Appointment.id, Appointment.starts_on, none).where(
+                Appointment.id.in_(wanted)
             )
         case "gremium":
-            return select(Gremium.id, none, none, Gremium.id).where(Gremium.id.in_(wanted))
+            return select(Gremium.id, none, none).where(Gremium.id.in_(wanted))
         case "invoice":
-            return select(Invoice.id, Invoice.issue_date, Invoice.created_at, none).where(
+            return select(Invoice.id, Invoice.issue_date, Invoice.created_at).where(
                 Invoice.id.in_(wanted)
             )
         case "expense":
-            return (
-                select(
-                    BudgetExpense.id,
-                    BudgetExpense.invoice_date,
-                    BudgetExpense.created_at,
-                    Budget.gremium_id,
-                )
-                .join(Budget, Budget.id == BudgetExpense.budget_id)
-                .where(BudgetExpense.id.in_(wanted))
-            )
+            return select(
+                BudgetExpense.id, BudgetExpense.invoice_date, BudgetExpense.created_at
+            ).where(BudgetExpense.id.in_(wanted))
         case "budget":
-            return select(Budget.id, none, none, Budget.gremium_id).where(Budget.id.in_(wanted))
+            return select(Budget.id, none, none).where(Budget.id.in_(wanted))
         case "ticket":
-            return select(Ticket.id, Ticket.created_at, none, none).where(Ticket.id.in_(wanted))
+            return select(Ticket.id, Ticket.created_at, none).where(Ticket.id.in_(wanted))
         case "todo":
-            return (
-                select(TodoCard.id, TodoCard.due_date, TodoCard.created_at, TodoBoard.gremium_id)
-                .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
-                .where(TodoCard.id.in_(wanted))
+            return select(TodoCard.id, TodoCard.due_date, TodoCard.created_at).where(
+                TodoCard.id.in_(wanted)
             )
         case _:
             raise ValueError(f"unknown kind: {kind}")
@@ -193,36 +177,17 @@ def as_date(value: object) -> date | None:
             return None
 
 
-def as_gremium(value: object) -> uuid.UUID | None:
-    """A Gremium column as an id; the Gremium of a vote is text and can be no id."""
-    match value:
-        case uuid.UUID():
-            return value
-        case str():
-            try:
-                return uuid.UUID(value)
-            except ValueError:
-                return None
-        case _:
-            return None
-
-
-Fact = tuple[date | None, frozenset[uuid.UUID]]
-
-
-async def facts(
+async def dates(
     session: AsyncSession, by_kind: Mapping[str, Collection[uuid.UUID]]
-) -> dict[Ref, Fact]:
-    """The date and the Gremien of each element; a Termin has one Gremium per invitation."""
+) -> dict[Ref, date | None]:
+    """The date of each element that still has its row."""
     found = [
-        (kind, (await session.execute(_fact_read(kind, ids))).all())
+        (kind, (await session.execute(_date_read(kind, ids))).all())
         for kind, ids in by_kind.items()
         if ids
     ]
-    rows = [
-        ((kind, element_id), as_date(first) or as_date(second), as_gremium(gremium))
+    return {
+        (kind, element_id): as_date(first) or as_date(second)
         for kind, kind_rows in found
-        for element_id, first, second, gremium in kind_rows
-    ]
-    gremien = grouped((ref, g) for ref, _, g in rows if g is not None)
-    return {ref: (when, frozenset(gremien.get(ref, ()))) for ref, when, _ in rows}
+        for element_id, first, second in kind_rows
+    }

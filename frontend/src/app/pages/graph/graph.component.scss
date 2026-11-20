@@ -132,6 +132,42 @@
   max-width: 22rem;
   min-width: 11rem;
 }
+// "Schritte" (spec 001434) stays beside the search: it is no part of the scroll area.
+.gr__depth {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--control-height-sm);
+  padding-inline-start: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-size: 0.84375rem;
+  font-weight: var(--fw-medium);
+}
+.gr__depthName {
+  margin-inline-end: var(--space-1);
+  white-space: nowrap;
+}
+.gr__depthInput {
+  width: 2ch;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  // The minus and the plus button are the arrows of the field.
+  appearance: textfield;
+  &::-webkit-inner-spin-button,
+  &::-webkit-outer-spin-button {
+    margin: 0;
+    appearance: none;
+  }
+}
 // The filters are at the end edge, the search at the start edge.
 .gr__chips {
   @include lp.chips;
@@ -272,19 +308,20 @@
   .gr__float {
     padding: 0;
   }
+  // The search and "Schritte" in one line, the filters in a line of their own.
   .gr__bar {
-    flex-wrap: nowrap;
-    flex-direction: column;
-    align-items: stretch;
+    flex-wrap: wrap;
     padding: var(--space-3) var(--space-4) var(--space-2);
     border-radius: 0;
   }
   .gr__search {
-    flex: none;
+    flex: 1 1 0;
     max-width: none;
+    min-width: 0;
   }
   .gr__chips {
-    flex: none;
+    flex: 0 0 100%;
+    margin-inline-start: 0;
     justify-content: flex-start;
     @include lp.phone-chips;
   }
@@ -307,6 +344,10 @@
     background: var(--color-bg);
     color: var(--color-text);
     box-shadow: inset 0 0 0 2px var(--color-text);
+  }
+  .gr__depth {
+    border-color: var(--color-text);
+    color: var(--color-text);
   }
   .gr__bar,
   .gr__panel,

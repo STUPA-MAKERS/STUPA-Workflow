@@ -13,6 +13,43 @@
             (valueChange)="setSearch($event)"
           />
         </div>
+        <div class="gr__depth" role="group" [attr.aria-label]="'graph.depth.group' | t">
+          <label class="gr__depthName" for="gr-depth">{{ 'graph.depth.label' | t }}</label>
+          <app-button
+            variant="text"
+            size="sm"
+            data-testid="gr-depth-less"
+            [iconOnly]="true"
+            [ariaLabel]="'graph.depth.less' | t"
+            [disabled]="filters().depth <= 0"
+            (click)="setDepth(filters().depth - 1)"
+          >
+            <app-icon name="minus" />
+          </app-button>
+          <input
+            id="gr-depth"
+            class="gr__depthInput"
+            type="number"
+            inputmode="numeric"
+            min="0"
+            step="1"
+            data-testid="gr-depth"
+            [max]="maxDepth"
+            [value]="filters().depth"
+            (change)="onDepth($event)"
+          />
+          <app-button
+            variant="text"
+            size="sm"
+            data-testid="gr-depth-more"
+            [iconOnly]="true"
+            [ariaLabel]="'graph.depth.more' | t"
+            [disabled]="filters().depth >= maxDepth"
+            (click)="setDepth(filters().depth + 1)"
+          >
+            <app-icon name="plus" />
+          </app-button>
+        </div>
         <div class="gr__chips" role="group" [attr.aria-label]="'graph.filter.group' | t">
           <app-filter-select
             class="gr__chip"
@@ -30,16 +67,6 @@
             [from]="filters().from"
             [to]="filters().to"
             (applied)="setPeriod($event)"
-          />
-          <app-filter-select
-            class="gr__chip"
-            icon="landmark"
-            [label]="'graph.filter.gremium' | t"
-            [options]="gremiumOptions()"
-            [value]="filters().gremiumId"
-            (valueChange)="setGremium($event)"
-            [text]="gremiumText()"
-            [active]="filters().gremiumId !== ''"
           />
           <app-filter-select
             class="gr__chip"

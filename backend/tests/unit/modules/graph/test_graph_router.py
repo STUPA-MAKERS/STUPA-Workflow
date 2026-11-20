@@ -19,7 +19,6 @@ from app.modules.graph.schemas import GraphEdge, GraphNode, GraphPage, GraphRef
 
 A = uuid.UUID(int=1)
 B = uuid.UUID(int=2)
-G = uuid.UUID(int=3)
 
 
 class _FakeService:
@@ -113,7 +112,7 @@ def test_the_graph_answers_a_page_in_camel_case(app: FastAPI) -> None:
         }
     ]
     assert _FakeService.seen is not None
-    assert _FakeService.seen[1] == Filters()
+    assert _FakeService.seen[1] == Filters(depth=2)
     assert _FakeService.seen[2] is None
 
 
@@ -127,9 +126,9 @@ def test_the_query_becomes_the_filters(app: FastAPI) -> None:
                 "kinds": ["meeting", "todo"],
                 "from": "2026-01-01",
                 "to": "2026-12-31",
-                "gremiumId": str(G),
                 "relations": "links",
                 "q": "party",
+                "depth": "4",
                 "single": "true",
                 "noAccess": "true",
                 "cursor": "60",
@@ -141,18 +140,24 @@ def test_the_query_becomes_the_filters(app: FastAPI) -> None:
         kinds=frozenset({"meeting", "todo"}),
         start=date(2026, 1, 1),
         end=date(2026, 12, 31),
-        gremium=G,
         relations="links",
         q="party",
         single=True,
         no_access=True,
+        depth=4,
     )
     assert _FakeService.seen[2] == "60"
 
 
 @pytest.mark.parametrize(
     "params",
-    [{"kinds": "wiki"}, {"relations": "none"}, {"from": "gestern"}, {"gremiumId": "x"}],
+    [
+        {"kinds": "wiki"},
+        {"relations": "none"},
+        {"from": "gestern"},
+        {"depth": "-1"},
+        {"depth": "6"},
+    ],
 )
 def test_a_wrong_query_is_a_problem(app: FastAPI, params: dict[str, str]) -> None:
     _login(app, "graph.view")

@@ -1,4 +1,4 @@
-"""The rules of the graph as pure functions (specs 001422-001426).
+"""The rules of the graph as pure functions (specs 001422-001426, 001434).
 
 ``shown`` takes every candidate node and every relation and gives the nodes and the lines
 that the reader sees with the filters, in the order of the build-up. ``page_of`` cuts one
@@ -23,6 +23,10 @@ RelationChoice = Literal["all", "links", "builtin"]
 
 #: The kinds without a date: they pass every period (spec 001425).
 UNDATED: frozenset[str] = frozenset({"gremium", "budget"})
+#: The most lines from a hit to a neighbour that shows, and the choice of a fresh page
+#: (spec 001434).
+MAX_DEPTH = 5
+DEFAULT_DEPTH = 2
 #: The most nodes of one page (spec 001426).
 PAGE_SIZE = 60
 
@@ -47,7 +51,6 @@ class Node:
     detail: TodoLinkDetail | None = None
     granted: bool = False
     date: date | None = None
-    gremien: frozenset[uuid.UUID] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,11 +60,12 @@ class Filters:
     kinds: frozenset[str] | None = None
     start: date | None = None
     end: date | None = None
-    gremium: uuid.UUID | None = None
     relations: RelationChoice = "all"
     q: str = ""
     single: bool = False
     no_access: bool = False
+    #: The lines from a hit to the farthest neighbour that shows (spec 001434).
+    depth: int = 0
 
 
 def _key(ref: Ref) -> tuple[int, str]:
@@ -96,15 +100,13 @@ def passes(node: Node, filters: Filters) -> bool:
     """Tell if the node passes the filters of its own facts.
 
     A node that the reader does not read passes only with the switch, and then without
-    the period and the Gremium, because these would tell its facts (spec 001422).
+    the period, because it would tell its facts (spec 001422).
     """
     if filters.kinds is not None and node.ref[0] not in filters.kinds:
         return False
     if not node.accessible:
         return filters.no_access
-    return _in_period(node, filters) and (
-        filters.gremium is None or filters.gremium in node.gremien
-    )
+    return _in_period(node, filters)
 
 
 def _wanted(source: Source, choice: RelationChoice) -> bool:
@@ -129,13 +131,17 @@ def _matches(node: Node, term: str) -> bool:
     return node.accessible and term in (node.title or "").casefold()
 
 
-def _found(
-    kept: Mapping[Ref, Node], lines: Sequence[Relation], term: str
-) -> tuple[frozenset[Ref], tuple[Relation, ...]]:
-    """The nodes with the term in the title and their neighbours, with the lines of a hit."""
-    hits = frozenset(ref for ref, node in kept.items() if _matches(node, term))
-    near = tuple(r for r in lines if r.a in hits or r.b in hits)
-    return (hits | _ends(near), near)
+def _within(
+    seen: frozenset[Ref], edge: frozenset[Ref], lines: Sequence[Relation], steps: int
+) -> frozenset[Ref]:
+    """The nodes at most ``steps`` lines away from ``seen``; ``edge`` is its newest ring."""
+    if steps <= 0 or not edge:
+        return seen
+    ring = (
+        frozenset(other for r in lines for own, other in ((r.a, r.b), (r.b, r.a)) if own in edge)
+        - seen
+    )
+    return _within(seen | ring, ring, lines, steps - 1)
 
 
 def _ordered(nodes: Mapping[Ref, Node], lines: Sequence[Relation]) -> tuple[Node, ...]:
@@ -164,28 +170,37 @@ def shown(
 ) -> tuple[tuple[Node, ...], tuple[Relation, ...]]:
     """Return the nodes, in the order of the build-up, and the lines of the graph.
 
-    A line shows when both ends show and the reader reads at least one of them. A node
-    shows when it has a line, or with the switch "Auch ohne Verknüpfung" when the reader
-    reads it (spec 001423).
+    A hit is a node that passes the filters and the search. The neighbours of a hit show
+    too, up to ``filters.depth`` lines away, also when they do not pass the kind, the
+    period or the search (spec 001434). A line shows when both ends show and
+    the reader reads at least one of them. A node shows when it has a line, or with the
+    switch "Auch ohne Verknüpfung" when it is a hit that the reader reads (spec 001423).
     """
-    kept = {ref: node for ref, node in candidates.items() if passes(node, filters)}
+    allowed = {
+        ref: node for ref, node in candidates.items() if node.accessible or filters.no_access
+    }
     lines = tuple(
         r
         for r in merged(relations)
         if _wanted(r.source, filters.relations)
-        and r.a in kept
-        and r.b in kept
-        and (kept[r.a].accessible or kept[r.b].accessible)
+        and r.a in allowed
+        and r.b in allowed
+        and (allowed[r.a].accessible or allowed[r.b].accessible)
     )
     term = filters.q.strip().casefold()
-    refs, near = _found(kept, lines, term) if term else (frozenset(kept), lines)
-    connected = _ends(near)
+    hits = frozenset(
+        ref
+        for ref, node in allowed.items()
+        if passes(node, filters) and (not term or _matches(node, term))
+    )
+    reach = _within(hits, hits, lines, filters.depth)
+    final = _between(lines, reach)
+    connected = _ends(final)
     nodes = {
-        ref: kept[ref]
-        for ref in refs
-        if ref in connected or (filters.single and kept[ref].accessible)
+        ref: allowed[ref]
+        for ref in reach
+        if ref in connected or (filters.single and ref in hits and allowed[ref].accessible)
     }
-    final = _between(near, nodes)
     return (_ordered(nodes, final), final)
 
 
