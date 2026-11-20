@@ -319,6 +319,8 @@ be-auth, frontend
   `link_between`, `pair_condition`.
 - `link_rights.py`: `LinkRights.can_change(kind, id, principal)`, the change right of
   each kind (spec 001404). A change needs read on both ends and change on one.
+  A cost centre end also needs `budget.book` or `budget.structure` (`LinkRights.may_touch`,
+  spec 001410): no search hit, no remove, no `canLink` on a cost centre without it.
 - `link_service.py`: `of` (the list, 404 when the element is unreadable; a linked Event
   first, then `LINK_KINDS` order, newest first; only a card end resolves with grants,
   spec 001405), `add`, `remove`, `view` (needs a readable card end), `targets` (search

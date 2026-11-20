@@ -13,6 +13,9 @@ one of them. The change right of an end is the right that changes the element it
 * budget — ``budget.structure``;
 * ticket — ``ticket.manage``;
 * todo — the write right on the board of the card (``BoardAccess.can_write``).
+
+A link with a cost centre end also needs ``budget.book`` or ``budget.structure``, whatever
+the other end is (``may_touch``, spec 001410).
 """
 
 from __future__ import annotations
@@ -43,6 +46,8 @@ GLOBAL_RIGHT: dict[str, str] = {
     "budget": "budget.structure",
     "ticket": TICKET_MANAGE,
 }
+#: The rights of which one is needed for any link with an end of the kind (spec 001410).
+GATE_RIGHTS: dict[str, tuple[str, ...]] = {"budget": ("budget.book", "budget.structure")}
 #: The gremium rights that change a vote.
 VOTE_RIGHTS: tuple[str, ...] = ("vote.manage", "session.manage")
 
@@ -58,6 +63,15 @@ class LinkRights:
 
     session: AsyncSession
     access: BoardAccess
+
+    @staticmethod
+    def may_touch(kind: str, principal: Principal) -> bool:
+        """Tell if the principal may add or remove a link with an end of ``kind`` (001410).
+
+        A cost centre end needs a budget write right, whatever the other end is.
+        """
+        rights = GATE_RIGHTS.get(kind)
+        return rights is None or any(principal.has(right) for right in rights)
 
     async def can_change(self, kind: str, target_id: uuid.UUID, principal: Principal) -> bool:
         """Tell if the principal changes the element ``(kind, target_id)``."""

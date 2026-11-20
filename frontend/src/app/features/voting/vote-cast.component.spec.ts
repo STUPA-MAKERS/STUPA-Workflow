@@ -127,6 +127,7 @@ async function setup(opts: {
     ? jest.fn(() => throwError(() => new Error('boom')))
     : jest.fn(() => of(opts.delegation ?? NO_DELEGATION));
   const auth = {
+    can: () => false,
     canInGremium: jest.fn(() => opts.sessionManage ?? false),
     canInAnyGremium: jest.fn(() => opts.sessionManage ?? false),
   };
