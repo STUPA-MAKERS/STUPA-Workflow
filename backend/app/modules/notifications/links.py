@@ -1,9 +1,9 @@
 """Deep links from a mail to the element that it refers to.
 
 Every mail carries one absolute link to its element: the application, the task, the
-meeting, the protocol, the ticket, the to-do, the poll or the admin page. The service puts the
-URL into the template context as ``link``. When the rendered text does not contain the
-URL, the service adds one labelled line to the text and one button to the HTML
+meeting, the protocol, the ticket, the to-do, the poll, the Gremium or the admin page.
+The service puts the URL into the template context as ``link``. When the rendered text
+does not contain the URL, the service adds one labelled line to the text and one button to the HTML
 layout. A DB override that does not use ``{{ link }}`` therefore still gets the link.
 
 The link of an application depends on the reader:
@@ -44,6 +44,7 @@ LinkTarget = Literal[
     "poll",
     "circular",
     "appointment",
+    "committee",
 ]
 
 _LABELS: dict[str, dict[str, str]] = {
@@ -58,6 +59,7 @@ _LABELS: dict[str, dict[str, str]] = {
     "poll": {"de": "Umfrage öffnen", "en": "Open the poll"},
     "circular": {"de": "Umlaufverfahren öffnen", "en": "Open the circular vote"},
     "appointment": {"de": "Termin öffnen", "en": "Open the appointment"},
+    "committee": {"de": "Gremium öffnen", "en": "Open the committee"},
 }
 
 
@@ -161,3 +163,8 @@ def vote_link(settings: Settings, vote_id: UUID | str) -> MailLink:
 def circular_link(settings: Settings, vote_id: UUID | str) -> MailLink:
     """Return the link to an Umlaufverfahren on the page "Abstimmungen"."""
     return MailLink(f"{_base(settings)}/voting/{vote_id}", "circular")
+
+
+def committee_link(settings: Settings, gremium_id: UUID | str) -> MailLink:
+    """Return the link to the page of a Gremium (``/committees/{id}``)."""
+    return MailLink(f"{_base(settings)}/committees/{gremium_id}", "committee")
