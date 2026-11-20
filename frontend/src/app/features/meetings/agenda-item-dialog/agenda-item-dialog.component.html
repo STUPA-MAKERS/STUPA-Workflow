@@ -140,11 +140,11 @@
 
   <ng-template #empty>
     @if (emptyCase() === 'noMatch') {
-      <app-empty-state shape="choice"
+      <app-empty-state icon="searchOff" shape="choice"
         [heading]="listText().noMatch | t: { q: activeQuery() }"
        />
     } @else {
-      <app-empty-state shape="choice"
+      <app-empty-state [icon]="kind() === 'todo' ? 'circleok' : kind() === 'plan' ? 'pie' : 'file'" shape="choice"
         [heading]="listText().none | t"
       >
         <app-button-group>

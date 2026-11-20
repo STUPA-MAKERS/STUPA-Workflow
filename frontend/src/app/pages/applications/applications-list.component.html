@@ -193,7 +193,7 @@
             />
           </div>
         } @else if (!rows().length) {
-          <app-empty-state [heading]="'applications.list.empty' | t" />
+          <app-empty-state [icon]="activeFilterCount() > 0 ? 'searchOff' : 'file'" [heading]="'applications.list.empty' | t" />
         } @else {
           <div class="apps__groups" animate.enter="motion-fade-in" [class.skel-stale]="reloading()" [attr.inert]="reloading() ? '' : null">
             @for (group of groups(); track group.key + $index) {

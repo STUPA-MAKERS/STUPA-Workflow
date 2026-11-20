@@ -81,7 +81,7 @@
                       <p class="wh__dead" role="alert">{{ 'admin.webhook.delivery.deadHint' | t }}</p>
                     }
                   } @else {
-                    <app-empty-state rows="1" [heading]="'admin.webhook.delivery.none' | t" />
+                    <app-empty-state icon="send" rows="1" [heading]="'admin.webhook.delivery.none' | t" />
                   }
                 </app-section>
               }
@@ -90,7 +90,7 @@
         }
       </ul>
     } @else {
-      <app-empty-state [heading]="'admin.webhook.none' | t" />
+      <app-empty-state icon="webhook" [heading]="'admin.webhook.none' | t" />
       }
     </ng-template>
   </app-load-state>

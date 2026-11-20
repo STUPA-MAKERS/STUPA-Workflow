@@ -48,7 +48,7 @@
               }
             </div>
           } @else {
-            <app-empty-state shape="choice" [heading]="emptyHeading()" />
+            <app-empty-state icon="circleok" shape="choice" [heading]="emptyHeading()" />
           }
         } @else {
           <app-skeleton variant="rows" [count]="4" [label]="'common.loading' | t" />

@@ -28,7 +28,7 @@
         }
       </ul>
     } @else {
-      <app-empty-state shape="person" rows="1" [heading]="'observers.empty' | t" />
+      <app-empty-state icon="eye" shape="person" rows="1" [heading]="'observers.empty' | t" />
     }
     @if (!loading() && !full()) {
       <form class="od__add" (submit)="$event.preventDefault(); add()">
