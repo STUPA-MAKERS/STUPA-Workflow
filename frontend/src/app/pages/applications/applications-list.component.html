@@ -211,6 +211,9 @@
                       [selected]="!selecting() && row.item.id === selectedId()"
                       [swipeRight]="selecting() ? null : row.swipeRight"
                       [swipeLeft]="selecting() ? null : row.swipeLeft"
+                      appLongPress
+                      [appLongPressOff]="!canBulk()"
+                      (appLongPress)="selectWith(row.item)"
                       (swiped)="onRowSwiped(row.item, $event)"
                       (activate)="onRowActivate(row.item)"
                     >

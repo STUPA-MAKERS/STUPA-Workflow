@@ -44,6 +44,7 @@ import {
   ListDetailLayoutComponent,
   ListGroupComponent,
   ListItemComponent,
+  LongPressDirective,
   MEDIA,
   mediaQuery,
   RowMenuComponent,
@@ -204,6 +205,7 @@ type FilterSheet = 'more' | null;
     ButtonGroupComponent,
     CheckboxComponent,
     SelectionBarComponent,
+    LongPressDirective,
   ],
   providers: [ApplicationsPageService],
   templateUrl: './applications-list.component.html',
@@ -803,6 +805,20 @@ export class ApplicationsListComponent {
 
   toggleSelectAll(checked: boolean): void {
     this.selected.set(checked ? new Set(this.rows().map((r) => r.item.id)) : new Set());
+  }
+
+  /**
+   * A long press on a row (or its context menu key): start the selection with this Antrag,
+   * or, in the selection already, toggle it (000211, 001810).
+   */
+  selectWith(item: ApplicationListItem): void {
+    if (!this.canBulk()) return;
+    if (!this.selecting()) {
+      this.selecting.set(true);
+      this.toggleSelect(item.id, true);
+      return;
+    }
+    this.toggleSelect(item.id, !this.isSelected(item.id));
   }
 
   /** A row in selection mode: a click toggles it instead of opening the Antrag. */

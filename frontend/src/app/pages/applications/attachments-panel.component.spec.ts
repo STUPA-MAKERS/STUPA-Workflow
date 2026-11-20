@@ -522,6 +522,15 @@ describe('AttachmentsPanelComponent', () => {
     cmp.toggleSelect('a', true);
     cmp.toggleSelect('b', true);
     expect(cmp.selectedCount()).toBe(2);
+
+    // A long press (or the context menu key) toggles the row like its checkbox (001810).
+    detectChanges();
+    const row = screen.getByText('a.pdf').closest('li')!;
+    fireEvent.contextMenu(row);
+    detectChanges();
+    expect(cmp.isSelected('a')).toBe(false);
+    fireEvent.contextMenu(row);
+    expect(cmp.isSelected('a')).toBe(true);
     http.verify();
   });
 

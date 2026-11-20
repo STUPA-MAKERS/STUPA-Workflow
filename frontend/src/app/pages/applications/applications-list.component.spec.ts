@@ -8,7 +8,7 @@ import {
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { screen, within } from '@testing-library/angular';
+import { fireEvent, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -415,6 +415,33 @@ describe('ApplicationsListComponent', () => {
       expect(cmp.selectedCount()).toBe(0);
       cmp.onRowActivate({ id: 'app-1' } as never);
       expect(cmp.selectedCount()).toBe(0);
+    });
+
+    it('starts the selection with a long press and does not open the row (000211, 001810)', async () => {
+      const { cmp, router, settle } = await start('/applications', { perms: MANAGE });
+      cmp.selectWith({ id: 'app-1' } as never);
+      expect(cmp.selecting()).toBe(true);
+      expect(cmp.isSelected('app-1')).toBe(true);
+      cmp.selectWith({ id: 'app-1' } as never);
+      expect(cmp.selecting()).toBe(true);
+      expect(cmp.isSelected('app-1')).toBe(false);
+      cmp.stopSelecting();
+      await settle();
+      // The context menu key and a held finger reach the same handler of the kit directive.
+      const row = screen.getByText('Trikots').closest('app-list-item')!;
+      fireEvent.contextMenu(row);
+      await settle();
+      expect(cmp.selecting()).toBe(true);
+      expect(cmp.isSelected('app-3')).toBe(true);
+      expect(router.url).toBe('/applications');
+    });
+
+    it('starts no selection with a long press without application.manage', async () => {
+      const { cmp, settle } = await start();
+      cmp.selectWith({ id: 'app-1' } as never);
+      fireEvent.contextMenu(screen.getByText('Trikots').closest('app-list-item')!);
+      await settle();
+      expect(cmp.selecting()).toBe(false);
     });
 
     it('offers no selection without application.manage', async () => {
