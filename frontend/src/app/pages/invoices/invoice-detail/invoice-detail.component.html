@@ -13,13 +13,21 @@
         ><app-icon name="file" /></app-button>
       }
       @if (canManage()) {
-        <app-sheet-action
-          icon="edit"
-          [label]="'action.edit' | t"
-          [ariaLabel]="'invoices.edit' | t"
-          [phone]="phone()"
-          (pressed)="edit.emit()"
-        />
+        <!-- On a phone the edit button shows its text; elsewhere it is an icon button with a tooltip.
+             It stands right in the group of the sheet bar, so it joins the shape of the group (001350). -->
+        @if (phone()) {
+          <app-button variant="tonal" (click)="edit.emit()">
+            <span class="fd__btn"><app-icon name="edit" />{{ 'action.edit' | t }}</span>
+          </app-button>
+        } @else {
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="'invoices.edit' | t"
+            [title]="'invoices.edit' | t"
+            (click)="edit.emit()"
+          ><app-icon name="edit" /></app-button>
+        }
       }
       @if (menu().length) {
         <app-row-menu [label]="'invoices.detail.menu' | t" [sections]="menu()" (selected)="onMenu($event)" />

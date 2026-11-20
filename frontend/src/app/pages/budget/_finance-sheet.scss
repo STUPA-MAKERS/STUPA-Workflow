@@ -171,6 +171,11 @@
   flex: none;
   color: var(--color-text-muted);
 }
+// The icon stands beside the first line (the kind), not in the middle of a row of three
+// lines: centred, it sat below the kind and the title, and the text looked indented.
+.fd__linkIcon {
+  align-self: flex-start;
+}
 .fd__linkBody {
   display: flex;
   flex: 1 1 auto;
@@ -250,11 +255,17 @@
   color: var(--color-text-muted);
   font-size: 0.8125rem;
 }
+// Each figure is as wide as its amount, and a figure that does not fit goes to the next line:
+// three equal columns cut a long amount ("10.118,56 €") in a narrow pane, and the amounts
+// ran into each other.
 .fd__figs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
   margin: 0;
+}
+.fd__figs > div {
+  flex: 1 0 auto;
 }
 .fd__pos {
   color: var(--color-accent-text);
