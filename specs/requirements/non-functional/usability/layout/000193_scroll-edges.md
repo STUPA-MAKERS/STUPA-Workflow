@@ -4,7 +4,7 @@ title: A scroll area cuts at the edge of a surface
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-19
+updated: 2026-11-20
 implementation:
   - frontend/src/app/pages/admin/admin-list/admin-list.component.scss
   - frontend/src/app/features/todos/card-detail/todo-card-detail.component.scss
@@ -36,6 +36,7 @@ see. At each kind of place, the content must cut as this table says:
 | A row of chips that scrolls sideways on a phone | At the edge of the screen. The row runs from screen edge to screen edge. |
 | The message log of a chat | At its rounded frame. |
 | The rows of a list column on a wide screen | At the lower edge of the list head (000527). |
+| The rows of a one-column list below its filter bar on a wide screen, for example Aktivität or Sitzungen | At the lower edge of the filter bar, with round inner corners at both sides, while rows are under the bar. |
 | A real line, for example a tab line on the phone | At that line. |
 
 In the very high contrast mode (000605), a scroll area draws no extra line at an end where its
