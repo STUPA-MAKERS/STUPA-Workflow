@@ -6,7 +6,7 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:
-  - "frontend/src/app/pages/applications/applications-list.component.spec.ts:Antrag stellen"
+  - "frontend/src/app/pages/applications/applications-list.component.spec.ts:ApplicationsListComponent"
 implementation:
   - frontend/src/app/pages/applications/applications-list.component.html
   - frontend/vendor/ui-kit/src/lib/fab/fab-group.component.ts
