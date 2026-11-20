@@ -1035,6 +1035,21 @@ describe('MeetingPageComponent', () => {
       expect(on.voteDialog).toHaveBeenCalled();
     });
 
+    /** Spec 001804: a closed meeting with a final protocol keeps the vote tab, also for the minute-taker. */
+    it('shows the vote tab in a closed meeting with a final protocol', async () => {
+      const { fixture } = await setup(
+        { meeting: meeting({ status: 'closed', votes: [] }), protocol: protocol({ isFinal: true, isLocked: true }) },
+        [MEDIA.wide],
+      );
+      const host = fixture.nativeElement as HTMLElement;
+      const tab = host.querySelector('.mp__edgeTab--votes') as HTMLElement;
+      expect(tab).not.toBeNull();
+      await userEvent.click(tab);
+      const sheet = screen.getByRole('dialog', { name: 'Abstimmungen' });
+      expect(within(sheet).getByText('Keine Abstimmungen')).toBeInTheDocument();
+      expect(sheet.querySelector('.ss__actions app-button[sheet-actions]')).toBeNull();
+    });
+
     /** Spec 001800: the linked rows of the item are in a side sheet that an edge tab opens. */
     it('opens the linked rows of the item in a side sheet from the edge tab', async () => {
       const { fixture, http } = await setup({}, [MEDIA.wide]);

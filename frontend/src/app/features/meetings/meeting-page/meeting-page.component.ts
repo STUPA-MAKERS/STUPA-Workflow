@@ -606,14 +606,22 @@ export class MeetingPageComponent {
     return t?.applicationId || t?.planVersionId ? this.addVoteKey() : ('meetings.vote.addQuestion' as const);
   });
 
-  /** The column of the vote cards shows when there is a vote or one can be added. */
-  protected readonly showVotes = computed(
-    () => this.votes().length > 0 || this.canAddVote(),
-  );
+  /**
+   * The vote sheet can open for every open item, also without a vote and in a closed meeting
+   * with a final protocol: the sheet then shows its empty state (specs 001802, 001804).
+   */
+  protected readonly showVotes = computed(() => !!this.top() && this.votingOn);
 
-  /** The edge tab of the votes: above the phone width, for everybody but the minute-taker (spec 001460). */
+  /**
+   * The edge tab of the votes: above the phone width, for everybody but the minute-taker
+   * (spec 001460); in a closed meeting for the minute-taker too (spec 001804).
+   */
   protected readonly showVoteTab = computed(
-    () => !this.phone() && this.showVotes() && !this.votesOpen() && this.dockVotes() === null,
+    () =>
+      !this.phone() &&
+      this.showVotes() &&
+      !this.votesOpen() &&
+      (this.dockVotes() === null || this.meeting().status === 'closed'),
   );
   /** The edge tab of the linked rows: above the phone width, while an item is open (spec 001800). */
   protected readonly showLinkTab = computed(() => !this.phone() && !!this.top() && !this.linksOpen());
