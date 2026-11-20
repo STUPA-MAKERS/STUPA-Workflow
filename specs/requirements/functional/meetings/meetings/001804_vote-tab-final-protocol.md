@@ -2,7 +2,7 @@
 id: "001804"
 title: A closed meeting keeps the vote tab
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:
