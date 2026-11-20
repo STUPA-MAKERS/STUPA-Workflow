@@ -102,3 +102,9 @@
     @include lp.phone-chips;
   }
 }
+
+// The check box of a row while selecting sits above the row's link layer.
+.inv__rowCheck {
+  position: relative;
+  z-index: 1;
+}

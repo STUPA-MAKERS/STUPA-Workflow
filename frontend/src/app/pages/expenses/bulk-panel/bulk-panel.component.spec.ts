@@ -90,7 +90,7 @@ describe('BulkPanelComponent', () => {
 
   it('sums an even selection without a sign', async () => {
     await setup({ rows: [{ ...ROW, kind: 'income' }, { ...ROW, id: 'e-2' }] });
-    expect(screen.getAllByText(/^0,00/).length).toBe(2);
+    expect(screen.getAllByText(/(^|· )0,00/).length).toBe(2);
   });
 
   it('picks a cost centre and a category, then reassigns', async () => {
@@ -112,7 +112,7 @@ describe('BulkPanelComponent', () => {
     expect(screen.getByText('Sammel-Löschen gilt für höchstens 5 Buchungen.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '2 Buchungen löschen' }));
     expect(remove).toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Auswahl beenden' }));
+    await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
     expect(closed).toHaveBeenCalled();
   });
 

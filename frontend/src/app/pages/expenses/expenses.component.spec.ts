@@ -2857,12 +2857,13 @@ describe('ExpensesComponent (list/detail)', () => {
 
   it('builds the header menu from the rights, the view and the viewport', () => {
     const { cmp } = build();
-    expect(cmp.headerMenu().flatMap((s) => s.items.map((i) => i.id))).toEqual(['transfer', 'select']);
+    expect(cmp.headerMenu().flatMap((s) => s.items.map((i) => i.id))).toEqual(['transfer']);
     TestBed.resetTestingModule();
     setViewport(PHONE);
     const phone = build();
     const ids = phone.cmp.headerMenu().flatMap((s) => s.items.map((i) => i.id));
     expect(ids).toContain('transfer');
+    expect(ids).toContain('select');
     expect(ids).toContain('paymentDate:desc');
     expect(ids).toContain('export');
     TestBed.resetTestingModule();
@@ -3252,9 +3253,19 @@ describe('ExpensesComponent (list/detail)', () => {
     const all = screen.getByRole('checkbox', { name: /^Alle wählen/ });
     await userEvent.click(all);
     expect(c.selectedCount()).toBe(2);
-    await userEvent.click(screen.getByRole('button', { name: 'Alle wählen' }));
+    expect(screen.getByRole('button', { name: 'Umbuchen' })).toBeInTheDocument();
     await userEvent.click(screen.getAllByRole('button', { name: 'Auswahl beenden' })[0]);
     expect(c.selecting()).toBe(false);
+  });
+
+  /** Spec 001811: "Mehrere auswählen" is a button of the head on a wide screen. */
+  it('starts the selection from the button of the head', async () => {
+    setViewport(WIDE);
+    const { fixture } = await setup({ perms: ['budget.view', 'budget.book'], page: page([EXPENSE]) });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    await userEvent.click(screen.getByRole('button', { name: 'Mehrere auswählen' }));
+    expect(c.selecting()).toBe(true);
   });
 
   it('shows the bulk actions as icons in the bar one pane at a time', async () => {
