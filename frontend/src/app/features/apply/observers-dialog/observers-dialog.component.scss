@@ -39,6 +39,11 @@
   align-items: flex-start;
   gap: 12px;
 }
+// The button is as high as the field beside it (001910). The group sets the height of
+// its buttons, so the group gets the height.
+.od__add > app-button-group {
+  --btn-grp-h: var(--field-height);
+}
 
 .od__input {
   flex: 1;
