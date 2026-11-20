@@ -52,9 +52,10 @@ import {
   EMPTY_GRAPH,
   type Graph,
   KIND_FEATURE,
-  NO_FILTERS,
+  defaultFilters,
   filtersOf,
   isFiltered,
+  localDay,
   merged,
   neighbours,
   nodeKey,
@@ -120,7 +121,11 @@ export class GraphComponent {
   private readonly router = inject(Router);
   private readonly t: Translate = (key, params) => this.i18n.translate(key, params);
 
-  readonly filters = signal<GraphFilters>(filtersOf(this.route.snapshot.queryParamMap));
+  /** The day of the fresh filters (spec 001425): the day on which the page opened. */
+  private readonly today = localDay(new Date());
+  readonly filters = signal<GraphFilters>(filtersOf(this.route.snapshot.queryParamMap, this.today));
+  /** True while the kinds differ from the fresh page. */
+  readonly kindsSet = computed(() => queryOf(this.filters(), this.today)['kinds'] !== null);
   /** The text of the search field; it reaches the filters after a pause. */
   readonly searchText = signal(this.filters().q);
 
@@ -166,7 +171,7 @@ export class GraphComponent {
   /** Where the drawing shows a chosen node: beside the panel, on a phone above the sheet. */
   readonly focusAt = computed(() => (this.phone() ? { x: 0.5, y: 0.3 } : { x: 0.6, y: 0.5 }));
 
-  readonly filtered = computed(() => isFiltered(this.filters()));
+  readonly filtered = computed(() => isFiltered(this.filters(), this.today));
   readonly empty = computed(() => this.graph().nodes.length === 0);
   /** True while the drawing shows. */
   readonly drawing = computed(() => !this.loading() && !this.error() && !this.empty());
@@ -218,7 +223,7 @@ export class GraphComponent {
       .subscribe({ next: (list) => this.gremien.set(list), error: () => undefined });
 
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((query) => {
-      const filters = filtersOf(query);
+      const filters = filtersOf(query, this.today);
       if (!sameFilters(filters, this.filters())) {
         this.filters.set(filters);
         this.searchText.set(filters.q);
@@ -231,7 +236,7 @@ export class GraphComponent {
     });
 
     effect(() => {
-      const queryParams = queryOf(this.filters());
+      const queryParams = queryOf(this.filters(), this.today);
       untracked(
         () =>
           void this.router.navigate([], {
@@ -286,7 +291,7 @@ export class GraphComponent {
     if (this.searchTimer !== null) clearTimeout(this.searchTimer);
     this.searchTimer = null;
     this.searchText.set('');
-    this.filters.set(NO_FILTERS);
+    this.filters.set(defaultFilters(this.today));
   }
 
   retry(): void {

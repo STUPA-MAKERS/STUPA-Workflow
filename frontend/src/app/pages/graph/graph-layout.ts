@@ -15,6 +15,8 @@ export interface Body {
   readonly y: number;
   readonly vx: number;
   readonly vy: number;
+  /** True for a node that the person put somewhere (spec 001433): no force moves it. */
+  readonly fixed?: boolean;
 }
 
 /** A line of the layout between two node ids. */
@@ -132,6 +134,7 @@ function pull(own: Body, others: readonly Body[]): Force {
 export function step(bodies: readonly Body[], near: Adjacency, alpha: number): readonly Body[] {
   const byId = new Map(bodies.map((b) => [b.id, b] as const));
   return bodies.map((own) => {
+    if (own.fixed) return own;
     const linked = (near.get(own.id) ?? []).flatMap((id) => {
       const other = byId.get(id);
       return other ? [other] : [];
@@ -142,6 +145,11 @@ export function step(bodies: readonly Body[], near: Adjacency, alpha: number): r
     const vy = clamp((own.vy + (away.y + toward.y - own.y * GRAVITY) * alpha) * DAMPING, MAX_SPEED);
     return { id: own.id, x: own.x + vx, y: own.y + vy, vx, vy };
   });
+}
+
+/** Put the node `id` at a place and hold it there; the other nodes stay (spec 001433). */
+export function hold(bodies: readonly Body[], id: string, x: number, y: number): readonly Body[] {
+  return bodies.map((b) => (b.id === id ? { id, x, y, vx: 0, vy: 0, fixed: true } : b));
 }
 
 /** Run the layout from `alpha` to rest in one go, for a drawing that must not move (spec 001427). */

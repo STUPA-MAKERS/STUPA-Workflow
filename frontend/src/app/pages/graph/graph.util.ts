@@ -94,18 +94,41 @@ export const NO_FILTERS: GraphFilters = {
   noAccess: false,
 };
 
-/** True while a filter or a switch is set. */
-export function isFiltered(f: GraphFilters): boolean {
-  return (
-    f.kinds.length > 0 ||
-    f.from !== '' ||
-    f.to !== '' ||
-    f.gremiumId !== '' ||
-    f.relations !== 'all' ||
-    f.q.trim() !== '' ||
-    f.single ||
-    f.noAccess
-  );
+/** The days that the period reaches back when the person chose none (spec 001425). */
+export const DEFAULT_DAYS = 30;
+/** The kinds that show when the person chose none: every kind but the cost centres (spec 001425). */
+export const DEFAULT_KINDS: readonly GraphKind[] = GRAPH_KINDS.filter((k) => k !== 'budget');
+/** The value of `kinds` and of `period` in the query that stands for "everything". */
+const ALL = 'all';
+
+/** The local day of a moment as `YYYY-MM-DD`. */
+export function localDay(now: Date): string {
+  const two = (n: number): string => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())}`;
+}
+
+/** The day that is `days` before `day`, both as `YYYY-MM-DD`. */
+export function daysBefore(day: string, days: number): string {
+  return new Date(Date.parse(`${day}T00:00:00Z`) - days * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** The filters of a fresh page: the last 30 days, without the cost centres (spec 001425). */
+export function defaultFilters(today: string): GraphFilters {
+  return { ...NO_FILTERS, kinds: DEFAULT_KINDS, from: daysBefore(today, DEFAULT_DAYS) };
+}
+
+function plain(f: GraphFilters): string {
+  return JSON.stringify({ ...f, kinds: GRAPH_KINDS.filter((k) => f.kinds.includes(k)), q: f.q.trim() });
+}
+
+/** True when two sets of filters ask the server for the same graph. */
+export function sameFilters(a: GraphFilters, b: GraphFilters): boolean {
+  return plain(a) === plain(b);
+}
+
+/** True while a filter or a switch differs from the fresh page. */
+export function isFiltered(f: GraphFilters, today: string): boolean {
+  return !sameFilters(f, defaultFilters(today));
 }
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -114,14 +137,22 @@ function day(value: string | null): string {
   return value !== null && DAY.test(value) ? value : '';
 }
 
-/** The filters from the query of the URL (spec 001425). Unknown values drop. */
-export function filtersOf(query: ParamMap): GraphFilters {
-  const kinds = (query.get('kinds') ?? '').split(',');
+/**
+ * The filters from the query of the URL (spec 001425). Unknown values drop. A query without
+ * kinds or without a period means the fresh page; `all` means every kind or every day.
+ */
+export function filtersOf(query: ParamMap, today: string): GraphFilters {
+  const fresh = defaultFilters(today);
+  const kinds = query.get('kinds');
+  const named = (kinds ?? '').split(',');
   const relations = query.get('rel') as GraphRelations | null;
+  const from = day(query.get('from'));
+  const to = day(query.get('to'));
+  const own = from !== '' || to !== '' || query.get('period') === ALL;
   return {
-    kinds: GRAPH_KINDS.filter((k) => kinds.includes(k)),
-    from: day(query.get('from')),
-    to: day(query.get('to')),
+    kinds: kinds === null ? fresh.kinds : kinds === ALL ? [] : GRAPH_KINDS.filter((k) => named.includes(k)),
+    from: own ? from : fresh.from,
+    to,
     gremiumId: query.get('gremium') ?? '',
     relations: relations !== null && GRAPH_RELATIONS.includes(relations) ? relations : 'all',
     q: query.get('q') ?? '',
@@ -130,21 +161,20 @@ export function filtersOf(query: ParamMap): GraphFilters {
   };
 }
 
-/** The query of the URL for the filters; null removes a parameter. */
-export function queryOf(f: GraphFilters): Readonly<Record<string, string | null>> {
+/** The query of the URL for the filters; null removes a parameter. The fresh page has none. */
+export function queryOf(f: GraphFilters, today: string): Readonly<Record<string, string | null>> {
+  const fresh = defaultFilters(today);
+  const freshKinds = f.kinds.length === fresh.kinds.length && fresh.kinds.every((k) => f.kinds.includes(k));
+  const freshPeriod = f.from === fresh.from && f.to === '';
   return {
-    kinds: f.kinds.length ? f.kinds.join(',') : null,
-    from: f.from || null,
+    kinds: freshKinds ? null : f.kinds.length ? f.kinds.join(',') : ALL,
+    from: freshPeriod ? null : f.from || null,
     to: f.to || null,
+    period: f.from === '' && f.to === '' ? ALL : null,
     gremium: f.gremiumId || null,
     rel: f.relations === 'all' ? null : f.relations,
     q: f.q.trim() || null,
     single: f.single ? '1' : null,
     noaccess: f.noAccess ? '1' : null,
   };
-}
-
-/** True when two sets of filters ask the server for the same graph. */
-export function sameFilters(a: GraphFilters, b: GraphFilters): boolean {
-  return JSON.stringify(queryOf(a)) === JSON.stringify(queryOf(b));
 }
