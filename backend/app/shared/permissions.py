@@ -94,6 +94,9 @@ Keys that need a note:
 - `admin.features`: switch the features of the platform on and off (/admin/features).
   A switch changes the platform for every person, so the key is separate from
   `admin.site`. No OAuth scope carries it, so an agent token never switches a feature.
+- `graph.view`: open the page "Graph", which draws the elements of every area and their
+  relations at once. It opens the page only and gives no read access: each node keeps
+  the read rule of its kind. No seeded role but the admin holds it.
 """
 
 from __future__ import annotations
@@ -149,4 +152,5 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "calendar.publish",
     "admin.calendars",
     "admin.features",
+    "graph.view",
 )

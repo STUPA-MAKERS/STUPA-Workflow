@@ -1,0 +1,57 @@
+// The colour of each kind of node (spec 001430), as `--gk` on an element with `data-kind`.
+// White icons sit on these fills with a contrast of 3:1 or more in both themes. The icon
+// names the kind without the colour.
+@mixin colors {
+  [data-kind='application'] {
+    --gk: #3f74b8;
+  }
+  [data-kind='meeting'] {
+    --gk: #7a5cc0;
+  }
+  [data-kind='agenda_item'] {
+    --gk: #5560b8;
+  }
+  [data-kind='vote'] {
+    --gk: #ad4f8c;
+  }
+  [data-kind='appointment'] {
+    --gk: #24808e;
+  }
+  [data-kind='gremium'] {
+    --gk: #5f6b7a;
+  }
+  [data-kind='invoice'] {
+    --gk: #a8690f;
+  }
+  [data-kind='expense'] {
+    --gk: #bd4f38;
+  }
+  [data-kind='budget'] {
+    --gk: #2f8052;
+  }
+  [data-kind='ticket'] {
+    --gk: #96592a;
+  }
+  [data-kind='todo'] {
+    --gk: #557f1f;
+  }
+}
+
+// The round mark of a kind: the icon on the fill of the kind.
+@mixin mark($size) {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: $size;
+  height: $size;
+  border-radius: 50%;
+  background: var(--gk, var(--color-text-muted));
+  color: #fff;
+}
+
+// The mark of an element that the person does not read (spec 001422): no colour of a kind.
+@mixin mark-muted {
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  box-shadow: inset 0 0 0 1.5px var(--color-border-strong);
+}
