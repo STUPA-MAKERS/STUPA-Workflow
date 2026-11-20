@@ -92,6 +92,8 @@ class MailMessage:
 
     Attributes:
         from_addr: Optional sender; the sender takes the default from the settings.
+        reply_to: Optional Reply-To address, for a mail that a person sends through
+            the platform (the answers go to that person).
     """
 
     to: tuple[str, ...]
@@ -103,6 +105,7 @@ class MailMessage:
     from_name: str | None = None
     attachments: tuple[MailAttachment, ...] = ()
     inline: tuple[MailInline, ...] = ()
+    reply_to: str | None = None
 
     def recipient_domains(self) -> list[str]:
         """Return the recipient domains (for logs free of personal data)."""
@@ -120,6 +123,7 @@ class MailMessage:
             "from_name": self.from_name,
             "attachments": [a.to_payload() for a in self.attachments],
             "inline": [i.to_payload() for i in self.inline],
+            "reply_to": self.reply_to,
         }
 
     @classmethod
@@ -143,6 +147,7 @@ class MailMessage:
                 MailInline.from_payload(i)
                 for i in raw_inline  # type: ignore[union-attr]
             ),
+            reply_to=payload.get("reply_to"),  # type: ignore[arg-type]
         )
 
 
@@ -181,6 +186,8 @@ def build_email_message(msg: MailMessage, settings: Settings) -> EmailMessage:
     email["From"] = Address(display_name=from_name, addr_spec=from_addr) if from_name else from_addr
     email["To"] = ", ".join(msg.to)
     email["Subject"] = msg.subject
+    if msg.reply_to:
+        email["Reply-To"] = msg.reply_to
     email.set_content(msg.text)
     if msg.html:
         email.add_alternative(msg.html, subtype="html")

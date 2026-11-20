@@ -504,6 +504,7 @@ class NotificationService:
         link: MailLink | None = None,
         builtin_html: dict[str, str] | None = None,
         attachments: tuple[MailAttachment, ...] = (),
+        reply_to: str | None = None,
     ) -> bool:
         """Send one notification kind.
 
@@ -512,7 +513,8 @@ class NotificationService:
         layout. ``link`` is the deep link to the element of the mail: the context
         gets it as ``link``, and the mail shows it (see `links`). ``builtin_html`` is
         the HTML body of the builtin; without it the layout escapes the text body.
-        ``attachments`` go with the mail, whichever template renders it.
+        ``attachments`` go with the mail, whichever template renders it. ``reply_to``
+        sets the Reply-To header.
 
         Returns:
             True when the method enqueued a mail.
@@ -535,6 +537,7 @@ class NotificationService:
                 reason=kind,
                 link=link,
                 attachments=attachments,
+                reply_to=reply_to,
             )
         try:
             rendered = await self._render_builtin(
@@ -548,7 +551,9 @@ class NotificationService:
             logger.warning("builtin template %r render failed: %s", template_key, exc)
             return False
         return await self._enqueue(
-            await self._message(rendered, wanted, kind, idempotency_parts, link, attachments)
+            await self._message(
+                rendered, wanted, kind, idempotency_parts, link, attachments, reply_to=reply_to
+            )
         )
 
     async def handle_notify_action(
@@ -742,6 +747,8 @@ class NotificationService:
         idempotency_parts: tuple[str, ...],
         link: MailLink | None,
         attachments: tuple[MailAttachment, ...] = (),
+        *,
+        reply_to: str | None = None,
     ) -> MailMessage:
         """Build the branded mail of a render (see `compose.branded_mail`).
 
@@ -763,6 +770,7 @@ class NotificationService:
             idempotency_key=compute_idempotency_key(*idempotency_parts),
             link=link,
             attachments=attachments,
+            reply_to=reply_to,
         )
 
     async def _render_and_enqueue(
@@ -776,6 +784,7 @@ class NotificationService:
         reason: str = "generic",
         link: MailLink | None = None,
         attachments: tuple[MailAttachment, ...] = (),
+        reply_to: str | None = None,
     ) -> bool:
         """Render the template and enqueue the mail.
 
@@ -791,7 +800,15 @@ class NotificationService:
             logger.warning("template %r render failed: %s", tpl.key, exc)
             return False
         return await self._enqueue(
-            await self._message(rendered, recipients, reason, idempotency_parts, link, attachments)
+            await self._message(
+                rendered,
+                recipients,
+                reason,
+                idempotency_parts,
+                link,
+                attachments,
+                reply_to=reply_to,
+            )
         )
 
     async def _enqueue(self, msg: MailMessage) -> bool:

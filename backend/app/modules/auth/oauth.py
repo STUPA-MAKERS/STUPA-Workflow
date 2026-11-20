@@ -32,8 +32,8 @@ the to-do cards. The to-dos read with any of ``todo.write``, ``todo.all`` and
 ``todo.read_all`` in the scope and write with ``todo.write`` or ``todo.all``. Through
 ``todo.all`` or ``todo.read_all`` a team board also needs its own permission in the scope,
 so a ``read`` token never opens the board "Plattform" (``ticket.manage``).
-``committees:write`` lets the gremium permission ``info.write`` through: the edit of
-the Info tab of a Gremium.
+``committees:write`` lets the gremium permissions ``info.write`` and ``members.notify``
+through: the edit of the Info tab of a Gremium and the message to its members.
 """
 
 from __future__ import annotations
@@ -75,7 +75,7 @@ SCOPES: dict[str, frozenset[str]] = {
     "meetings:write": frozenset({"session.manage", "protocol.write", "protocol.finalize"}),
     "tickets:write": frozenset({"ticket.manage"}),
     "todos:write": frozenset({"todo.write", "todo.configure", "todo.all", "todo.create_board"}),
-    "committees:write": frozenset({"info.write"}),
+    "committees:write": frozenset({"info.write", "members.notify"}),
     "forms:write": frozenset({"form.configure"}),
     "flows:write": frozenset({"flow.configure"}),
     "admin:write": frozenset(
