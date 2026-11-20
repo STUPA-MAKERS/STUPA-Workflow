@@ -354,7 +354,7 @@ export class GremiumDetailComponent {
         void this.router.navigate(['/todos', this.boardId()]);
         break;
       case 'meetings':
-        void this.router.navigate(['/meetings']);
+        void this.router.navigate(['/meetings'], { queryParams: { committee: this.id() } });
         break;
       case 'votes':
         void this.router.navigate(['/voting'], { queryParams: { committee: this.id() } });

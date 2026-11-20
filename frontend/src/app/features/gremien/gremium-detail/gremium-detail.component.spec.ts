@@ -243,7 +243,7 @@ describe('GremiumDetailComponent', () => {
     await s.settle();
     s.detail().onMenu({ id: 'meetings', label: '' }, abo);
     await s.settle();
-    expect(s.router.url).toBe('/meetings');
+    expect(s.router.url).toBe('/meetings?committee=g-1');
   });
 
   it('moves the actions into the ⋮ menu on a phone', async () => {

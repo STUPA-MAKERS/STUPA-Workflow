@@ -66,7 +66,6 @@ import { problemCode } from '@core/api/problem';
 import { toggled } from '@shared/util/immutable';
 import { formatMoney } from '@shared/format-money';
 import { BudgetItemListComponent } from './budget-items/budget-item-list.component';
-import { BudgetItemsDialogComponent } from './budget-items/budget-items-dialog.component';
 import { type BudgetItem, mergeBudgetItems } from './budget-items/budget-items';
 import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
@@ -145,7 +144,7 @@ const ZERO: Figures = {
   planned: null,
 };
 
-/** How many applications the sheet lists before "Alle ansehen". */
+/** How many items the card lists before "Anträge ansehen" and "Buchungen ansehen". */
 export const APPS_SHOWN = 5;
 
 /**
@@ -203,7 +202,6 @@ export const APPS_SHOWN = 5;
     EmptyStateComponent,
     FilterSelectComponent,
     BudgetItemListComponent,
-    BudgetItemsDialogComponent,
     RowMenuComponent,
     SearchPillComponent,
     SegmentedComponent,
@@ -668,8 +666,6 @@ export class BudgetDashboardComponent {
   );
   /** The names of the cost centres, for the rows of the list. */
   readonly nodeNames = computed<ReadonlyMap<string, { name: string; incomeIn?: readonly string[] }>>(() => this.nodeById());
-  readonly itemsOpen = signal(false);
-
   readonly overviewOpen = signal(false);
   readonly overviewMetric = signal<SunburstMetric>('allocated');
   readonly overviewMetrics: readonly SunburstMetric[] = ['allocated', 'available', 'expended'];
@@ -1129,9 +1125,9 @@ export class BudgetDashboardComponent {
     this.syncUrl();
   }
 
-  /** "Alle ansehen": every application and booking in a dialog, a bottom sheet on a phone. */
-  openItems(): void {
-    this.itemsOpen.set(true);
+  /** "Anträge ansehen": the Anträge of the cost centre and its subtree (§ 001873). */
+  openApplications(): void {
+    void this.router.navigate(['/applications'], { queryParams: { budget: this.selectedKsId() } });
   }
 
   /** The action on the structure: the delete of the selected Kostenstelle. */
@@ -1174,8 +1170,14 @@ export class BudgetDashboardComponent {
     else if (item.id === 'delete') this.deleteTarget.set(this.current());
   }
 
+  /**
+   * "Buchungen ansehen": the bookings of the cost centre and its subtree in the selected
+   * Haushaltsjahr (§ 001872).
+   */
   openBookings(): void {
-    void this.router.navigate(['/expenses'], { queryParams: { budget: this.selectedKsId() } });
+    void this.router.navigate(['/expenses'], {
+      queryParams: { budget: this.selectedKsId(), fiscalYear: this.selectedFyId() || null },
+    });
   }
 
   onExport(): void {
