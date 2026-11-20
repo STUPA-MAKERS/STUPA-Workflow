@@ -765,6 +765,7 @@ export class BudgetTreeApi {
   exportExpensesXlsx(
     opts: {
       budget?: string;
+      fiscalYear?: string;
       kind?: string;
       q?: string;
       amountMin?: string;

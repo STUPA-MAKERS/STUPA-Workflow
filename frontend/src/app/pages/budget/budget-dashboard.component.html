@@ -352,7 +352,14 @@
         <app-section class="bd__sec bd__sec--apps" size="lg" headingId="bd-apps" [heading]="itemsTitle()">
           @if (previewItems().length) {
             <app-button-group ngProjectAs="[sectionAction]">
-              <app-button sectionAction variant="text" size="sm" (click)="openItems()">{{ 'budget.dash.appsAll' | t }}</app-button>
+              <app-button sectionAction variant="text" size="sm" (click)="openApplications()">{{
+                (phone() ? 'budget.dash.viewAppsShort' : 'budget.dash.viewApps') | t
+              }}</app-button>
+              @if (canSeeBookings()) {
+                <app-button sectionAction variant="text" size="sm" (click)="openBookings()">{{
+                  (phone() ? 'budget.dash.viewBookingsShort' : 'budget.usage.viewExpenses') | t
+                }}</app-button>
+              }
             </app-button-group>
           }
           @if (apps() === null) {
@@ -509,16 +516,6 @@
       [active]="true"
     />
   </ng-template>
-
-  <app-budget-items-dialog
-    [(open)]="itemsOpen"
-    [title]="itemsTitle()"
-    [ksId]="selectedKsId()"
-    [fyId]="selectedFyId()"
-    [apps]="apps() ?? []"
-    [withBookings]="canSeeBookings()"
-    [names]="nodeNames()"
-  />
 
   <app-dialog
     [open]="overviewOpen()"

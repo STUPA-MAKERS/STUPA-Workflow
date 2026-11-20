@@ -520,20 +520,37 @@ describe('BudgetDashboardComponent', () => {
       expect(c.breadcrumbs().map((n: { id: string }) => n.id)).toEqual(['orphan']);
     });
 
-    it('opens the bookings page and the dialog with every item of the cost centre', async () => {
+    it('opens the bookings of the cost centre and the year from the menu (§ 001872)', async () => {
       const view = await setup({ apps: [app({ applicationId: 'a-1' })] });
       const nav = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
       view.fixture.componentInstance.onAction(view.fixture.componentInstance.moreSections()[0].items[0]);
-      expect(nav).toHaveBeenCalledWith(['/expenses'], { queryParams: { budget: 'b-vs' } });
+      expect(nav).toHaveBeenCalledWith(['/expenses'], { queryParams: { budget: 'b-vs', fiscalYear: 'fy-1' } });
+    });
+
+    it('opens the Anträge and the bookings of the cost centre from the two buttons (§ 001873)', async () => {
+      const view = await setup({ apps: [app({ applicationId: 'a-1' })] });
+      const nav = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
       view.fixture.detectChanges();
-      screen.getByRole('button', { name: 'Alle ansehen' }).click();
-      view.fixture.detectChanges();
-      expect(view.c.itemsOpen()).toBe(true);
-      const req = view.http.expectOne((r) => r.url.endsWith('/expenses') && r.params.get('limit') === '50');
-      expect(req.request.params.get('budget')).toBe('b-vs');
-      req.flush({ items: [], total: 0, limit: 50, offset: 0 });
-      view.fixture.detectChanges();
-      expect(screen.getByRole('dialog', { name: 'Anträge und Buchungen' })).toBeTruthy();
+      screen.getByRole('button', { name: 'Anträge ansehen' }).click();
+      expect(nav).toHaveBeenCalledWith(['/applications'], { queryParams: { budget: 'b-vs' } });
+      screen.getByRole('button', { name: 'Buchungen ansehen' }).click();
+      expect(nav).toHaveBeenLastCalledWith(['/expenses'], { queryParams: { budget: 'b-vs', fiscalYear: 'fy-1' } });
+      expect(screen.queryByRole('button', { name: 'Alle ansehen' })).toBeNull();
+    });
+
+    it('names the two buttons short on a phone', async () => {
+      const view = await setup({ wide: false, phone: true, apps: [app({ applicationId: 'a-1' })] });
+      const section = view.container.querySelector('[aria-labelledby="bd-apps"]') as HTMLElement;
+      expect(within(section).getByRole('button', { name: 'Anträge' })).toBeInTheDocument();
+      expect(within(section).getByRole('button', { name: 'Buchungen' })).toBeInTheDocument();
+    });
+
+    it('sends no year to the bookings when the page has none', async () => {
+      const view = await setup();
+      const nav = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      view.c.selectedFyId.set('');
+      view.c.openBookings();
+      expect(nav).toHaveBeenCalledWith(['/expenses'], { queryParams: { budget: 'b-vs', fiscalYear: null } });
     });
 
     /** A second click while it runs does nothing. */
@@ -776,6 +793,8 @@ describe('BudgetDashboardComponent', () => {
       expect(view.http.match((r) => r.url.endsWith('/expenses'))).toHaveLength(0);
       const section = view.container.querySelector('[aria-labelledby="bd-apps"]') as HTMLElement;
       expect(section.querySelector('h3')?.textContent).toContain('Anträge auf dieser Kostenstelle');
+      expect(within(section).getByRole('button', { name: 'Anträge ansehen' })).toBeInTheDocument();
+      expect(within(section).queryByRole('button', { name: 'Buchungen ansehen' })).toBeNull();
     });
 
     it('shows at most five items', async () => {
@@ -787,10 +806,10 @@ describe('BudgetDashboardComponent', () => {
       expect(view.container.querySelectorAll('[aria-labelledby="bd-apps"] app-list-item')).toHaveLength(5);
     });
 
-    it('says so when the cost centre has no items and hides "Alle ansehen"', async () => {
+    it('says so when the cost centre has no items and hides the buttons', async () => {
       await setup();
       expect(screen.getByText('Keine Anträge oder Buchungen auf dieser Kostenstelle.')).toBeTruthy();
-      expect(screen.queryByRole('button', { name: 'Alle ansehen' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Anträge ansehen' })).toBeNull();
     });
 
     it('shows a placeholder while loading and an error when the request fails', async () => {

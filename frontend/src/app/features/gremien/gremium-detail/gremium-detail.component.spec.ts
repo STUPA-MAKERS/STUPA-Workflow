@@ -246,7 +246,7 @@ describe('GremiumDetailComponent', () => {
     await s.settle();
     s.detail().onMenu({ id: 'meetings', label: '' }, abo);
     await s.settle();
-    expect(s.router.url).toBe('/meetings');
+    expect(s.router.url).toBe('/meetings?committee=g-1');
   });
 
   /** § 001850: "Mitglieder benachrichtigen" for `members.notify`, not for the admin. */
