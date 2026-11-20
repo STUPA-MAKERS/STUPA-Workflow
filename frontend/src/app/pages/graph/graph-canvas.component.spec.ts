@@ -2,8 +2,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { render, screen } from '@testing-library/angular';
-import { type CanvasNode, GraphCanvasComponent, LABEL_ZOOM } from './graph-canvas.component';
-import { SETTLE_STEPS } from './graph-layout';
+import { type CanvasNode, GraphCanvasComponent, LABEL_ZOOM, NUDGE } from './graph-canvas.component';
+import { type Body, SETTLE_STEPS } from './graph-layout';
 import type { GraphLine } from './graph.util';
 
 const node = (key: string, over: Partial<CanvasNode> = {}): CanvasNode => ({
@@ -243,7 +243,7 @@ describe('GraphCanvasComponent', () => {
     cmp.onUp(pointer(surface, 1, 160, 130, 'pointerup'));
     expect(chosen).not.toHaveBeenCalled();
 
-    // A press that starts on a node, a move of an unknown pointer and a cancelled press do nothing.
+    // A drag that starts on a node, a move of an unknown pointer and a cancelled press leave the view.
     cmp.onDown(pointer(button('a'), 2, 0, 0));
     cmp.onMove(pointer(surface, 2, 50, 50, 'pointermove'));
     cmp.onUp(pointer(surface, 2, 50, 50, 'pointerup'));
@@ -251,6 +251,80 @@ describe('GraphCanvasComponent', () => {
     cmp.onUp(pointer(surface, 3, 10, 10, 'pointercancel'));
     expect(chosen).not.toHaveBeenCalled();
     expect(cmp.view()).toEqual({ x: start.x + 60, y: start.y + 30, zoom: start.zoom });
+  });
+
+  /** § F/collaboration/graph/001433: a drag on a node moves the node, and it stays there. */
+  it('moves a node with a drag and holds it where the person lets go', async () => {
+    const { cmp, chosen, surface, button, fixture } = await setup();
+    const capture = jest.fn();
+    Object.defineProperty(surface, 'setPointerCapture', { value: capture, configurable: true });
+    const view = cmp.view();
+    const others = cmp.bodies().filter((b) => b.id !== 'a');
+
+    cmp.onDown(pointer(button('a'), 1, 100, 100));
+    // A second pointer on another node does not take over.
+    cmp.onDown(pointer(button('b'), 2, 0, 0));
+    cmp.onMove(pointer(surface, 1, 102, 101, 'pointermove'));
+    expect(cmp.held()).toBeNull();
+    expect(capture).not.toHaveBeenCalled();
+
+    cmp.onMove(pointer(surface, 1, 200, 150, 'pointermove'));
+    fixture.detectChanges();
+    expect(cmp.held()).toBe('a');
+    expect(capture).toHaveBeenCalledWith(1);
+    expect(button('a')).toHaveClass('gc__node--held');
+    const moved = cmp.bodies().find((b) => b.id === 'a');
+    expect(moved?.fixed).toBe(true);
+    expect(moved?.x).toBeCloseTo((200 - view.x) / view.zoom);
+    expect(moved?.y).toBeCloseTo((150 - view.y) / view.zoom);
+    // With reduced motion the other nodes stay, and the view stays too.
+    expect(cmp.bodies().filter((b) => b.id !== 'a')).toEqual(others);
+    expect(cmp.view()).toEqual(view);
+
+    cmp.onUp(pointer(surface, 1, 200, 150, 'pointerup'));
+    expect(cmp.held()).toBeNull();
+    // The click that ends the drag is no press; the next one is.
+    button('a').click();
+    expect(chosen).not.toHaveBeenCalled();
+    await new Promise((done) => setTimeout(done));
+    button('a').click();
+    expect(chosen).toHaveBeenCalledWith('a');
+  });
+
+  it('lets the neighbours follow a moved node unless nothing may move', async () => {
+    const f = frames();
+    const { cmp, surface, button } = await setup({ reduce: false, nodes: [node('a'), node('b')], lines: [line('a', 'b')] });
+    f.run();
+    cmp.onDown(pointer(button('a'), 1, 0, 0));
+    cmp.onMove(pointer(surface, 1, 300, 300, 'pointermove'));
+    expect(f.queue).toHaveLength(1);
+    const held = cmp.bodies().find((b) => b.id === 'a');
+    const before = cmp.bodies().find((b) => b.id === 'b');
+    f.run();
+    expect(cmp.bodies().find((b) => b.id === 'a')).toEqual(held);
+    expect(cmp.bodies().find((b) => b.id === 'b')).not.toEqual(before);
+    cmp.onUp(pointer(surface, 1, 300, 300, 'pointerup'));
+  });
+
+  /** § F/collaboration/graph/001433: Alt and an arrow key move the node without a pointer. */
+  it('moves a node with Alt and an arrow key', async () => {
+    const { cmp, button } = await setup();
+    const at = cmp.bodies().find((b) => b.id === 'a') as Body;
+    const press = (key: string): void => {
+      button('a').dispatchEvent(new KeyboardEvent('keydown', { key, altKey: true, bubbles: true, cancelable: true }));
+    };
+    press('ArrowRight');
+    press('ArrowDown');
+    const there = cmp.bodies().find((b) => b.id === 'a') as Body;
+    expect(there.fixed).toBe(true);
+    expect(there.x).toBeCloseTo(at.x + NUDGE);
+    expect(there.y).toBeCloseTo(at.y + NUDGE);
+    press('ArrowLeft');
+    press('ArrowUp');
+    const back = cmp.bodies().find((b) => b.id === 'a') as Body;
+    expect(back.x).toBeCloseTo(at.x);
+    expect(back.y).toBeCloseTo(at.y);
+    expect(document.activeElement).not.toBe(button('b'));
   });
 
   it('captures the pointer of a drag', async () => {

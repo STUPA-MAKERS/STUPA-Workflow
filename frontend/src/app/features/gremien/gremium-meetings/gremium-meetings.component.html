@@ -31,9 +31,9 @@
   <app-skeleton variant="rows" [count]="4" [label]="'gremien.meetings.loading' | t" />
 } @else if (!groups().length) {
   @if (filterActive()) {
-    <app-empty-state shape="date" rows="3" [heading]="'gremien.meetings.noMatch' | t" />
+    <app-empty-state icon="searchOff" shape="date" rows="3" [heading]="'gremien.meetings.noMatch' | t" />
   } @else {
-    <app-empty-state shape="date" rows="3" [heading]="'gremien.meetings.empty' | t" />
+    <app-empty-state icon="users" shape="date" rows="3" [heading]="'gremien.meetings.empty' | t" />
   }
 } @else {
   @for (g of groups(); track g.key) {

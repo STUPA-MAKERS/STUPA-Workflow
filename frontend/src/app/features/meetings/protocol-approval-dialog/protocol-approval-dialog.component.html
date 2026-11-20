@@ -8,7 +8,7 @@
     <app-load-state [state]="state()" [lines]="1" [errorText]="'gremien.meetings.error' | t" (retry)="load()">
       <ng-template #content>
         @if (none()) {
-          <app-empty-state shape="choice" rows="2" [heading]="'meetings.approval.none' | t" />
+          <app-empty-state icon="users" shape="choice" rows="2" [heading]="'meetings.approval.none' | t" />
         } @else {
           <app-select
             name="approvedBy"

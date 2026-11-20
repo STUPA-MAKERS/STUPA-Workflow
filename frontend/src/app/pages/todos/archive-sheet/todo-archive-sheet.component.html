@@ -25,7 +25,7 @@
       </ul>
       <span class="sr-only" role="status">{{ 'todos.archive.loading' | t }}</span>
     } @else if (!items().length) {
-      <app-empty-state fill rows="3" [heading]="'todos.archive.empty' | t" />
+      <app-empty-state icon="archive" fill rows="3" [heading]="'todos.archive.empty' | t" />
     }
     @if (items().length) {
       <ul class="as__list">

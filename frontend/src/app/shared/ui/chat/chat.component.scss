@@ -655,71 +655,13 @@
   color: inherit;
 }
 
-// The guarded visibility switch: radio rows whose labels wrap, the chosen visibility as text next
-// to the send button, and a frame on a public draft. Frame and icon tell the two apart without
-// color (001692).
-.chat__visList {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.chat__visRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  padding: 8px 14px;
-  border-radius: 4px;
-  background: var(--color-surface-3);
-  cursor: pointer;
-}
-.chat__visRow:first-child {
-  border-top-left-radius: var(--radius-lg);
-  border-top-right-radius: var(--radius-lg);
-}
-.chat__visRow:last-child {
-  border-bottom-left-radius: var(--radius-lg);
-  border-bottom-right-radius: var(--radius-lg);
-}
-.chat__visRow--on {
-  background: var(--color-selected);
-  color: var(--color-on-selected);
-  @include f.highlight-chosen;
-}
-.chat__visRadio {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  accent-color: var(--color-accent);
-}
-.chat__visRadio:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-.chat__visLabel {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.chat__visHint {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: 4px;
-  align-self: center;
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-  white-space: nowrap;
-}
+// A public draft of the guarded switch shows a solid frame, so it differs from an internal
+// draft without color alone (001692).
 .chat__box--public {
   outline: 2px solid var(--color-text);
   outline-offset: 2px;
 }
-.chat__box--public .chat__visHint {
-  color: var(--color-text);
-  font-weight: var(--fw-semibold);
-}
-.chat__box--internal {
-  outline: 1px dashed var(--color-text-muted);
-  outline-offset: 2px;
+// The attach button sits inside the field: a plain icon without the tonal group surface.
+.chat__box .btn-grp.btn-grp ::ng-deep .chat__attach .btn {
+  background-color: transparent;
 }

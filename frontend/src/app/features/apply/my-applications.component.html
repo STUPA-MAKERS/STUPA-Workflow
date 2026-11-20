@@ -20,7 +20,7 @@
               <app-skeleton variant="items" [count]="4" [grouped]="!split()" [label]="'applications.list.loading' | t" />
             </div>
           } @else if (!rows().length) {
-            <app-empty-state [heading]="(query() ? 'applications.list.empty' : 'myApps.empty') | t" />
+            <app-empty-state [icon]="query() ? 'searchOff' : 'file'" [heading]="(query() ? 'applications.list.empty' : 'myApps.empty') | t" />
           } @else {
             <div class="ma__groups" animate.enter="motion-fade-in">
               @for (group of groups(); track group.key + $index) {
