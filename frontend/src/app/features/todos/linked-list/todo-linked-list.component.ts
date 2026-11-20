@@ -81,7 +81,7 @@ const cardRow = (card: TodoLinkedCard): LinkRow => ({
  * and "To-Do anlegen" to the head, also without a link. "Verknüpfen" shows for a person
  * who may change the element or writes a board, "To-Do anlegen" for a person who writes a
  * board. The new card links the element and starts on the board of `gremiumId`. A page
- * with its own head for them (the To-Dos sheet of a meeting, `headActions`) opens the two
+ * with its own head for them (the sheet "Verknüpft" of a meeting, `headActions`) opens the two
  * through `newOpen` and `linkOpen`. A row that the person may take off has an ×
  * (spec 001404). `emptyHeading` shows an empty state when nothing is linked.
  */
@@ -136,7 +136,7 @@ export class TodoLinkedListComponent {
   /** The head holds "Verknüpfen" and "To-Do anlegen". */
   readonly actions = input(false);
   /**
-   * The page shows the two actions in a head of its own (the To-Dos sheet of a meeting)
+   * The page shows the two actions in a head of its own (the sheet "Verknüpft" of a meeting)
    * and opens them through `newOpen` and `linkOpen`; `canAct` tells it when.
    */
   readonly headActions = input(false);
