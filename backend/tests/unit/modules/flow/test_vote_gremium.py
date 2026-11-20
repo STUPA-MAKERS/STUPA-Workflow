@@ -29,7 +29,7 @@ BUDGET = {"gremiumSource": "budget"}
 def _state(kind: str = "vote", config: Any = None, state_id: UUID | None = None) -> Any:
     return SimpleNamespace(
         id=state_id or uuid4(), kind=kind, config=config if config is not None else {},
-        flow_version_id=None, is_approved=False,
+        flow_version_id=None, is_approved=False, is_initial=False, is_terminal=False,
     )
 
 
@@ -146,7 +146,7 @@ def _app(state_id: object, *, budget_id: UUID | None = None) -> Any:
     return SimpleNamespace(
         id=uuid4(), current_state_id=state_id, flow_version_id=uuid4(),
         type_id=uuid4(), form_version_id=uuid4(), data={}, budget_id=budget_id,
-        vote_gremium_id=None,
+        vote_gremium_id=None, replaces_id=None,
     )
 
 
@@ -253,7 +253,9 @@ async def test_force_status_into_a_budget_vote_without_gremium_409(
     target.flow_version_id = app.flow_version_id
     db = fake_session(result(app), result(target))
     with pytest.raises(ConflictError) as err:
-        await FlowService(db).force_status(app.id, target.id, _principal(), note="x")
+        await FlowService(db).force_status(
+            app.id, target.id, _principal(), reason="other", note="x"
+        )
     assert err.value.code == "no_vote_gremium"
 
 

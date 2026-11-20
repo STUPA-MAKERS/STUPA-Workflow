@@ -1,11 +1,11 @@
 import { TestBed } from '@angular/core/testing';
-import type { Route } from '@angular/router';
+import type { PartialMatchRouteSnapshot, Route } from '@angular/router';
 import { routes } from '../../app.routes';
 import { featureMatch, routeFeatures } from './feature.guard';
 import { FEATURES, type FeatureKey, FeatureService } from './feature.service';
 
 const run = (...keys: FeatureKey[]) =>
-  TestBed.runInInjectionContext(() => featureMatch(...keys)({} as Route, [])) as Promise<boolean>;
+  TestBed.runInInjectionContext(() => featureMatch(...keys)({} as Route, [], {} as PartialMatchRouteSnapshot)) as Promise<boolean>;
 
 /** Every route of the app, flat. */
 const flat = (list: readonly Route[]): readonly Route[] =>

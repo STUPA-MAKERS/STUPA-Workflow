@@ -1,6 +1,6 @@
 ---
 name: be-todos
-description: To-do boards (Kanban) — gremium boards, the personal board "Meine To-Dos" and team boards behind a permission (todo_board/todo_column/todo_card and the assignee, label, checklist, comment, event and link tables). Covers the RBAC (gremium permissions todo.write/todo.configure, OAuth scope todos:write), lexorank moves with board locks, the optimistic lock (version, 409 card_version_conflict), the ETag/304 board read, link targets with per-kind read checks and "kein Zugriff" redaction, back-references (GET /api/todos/linked), agenda items from a card (agenda_item.todo_id), the ticket coupling (todo_done event, completeTodos), the mails todo_assigned/todo_mentioned/todo_due, the archive cron, the live board pings (WS /api/ws/todos, GET cards/{id}/tile), the search source, privacy and the account merge. Use when working on backend/app/modules/todos, TodoService, BoardAccess, LinkResolver, worker/todos.py or the to-do parts of tickets, livevote, search, privacy or the merge.
+description: To-do boards (Kanban) — gremium boards, the personal board "Meine To-Dos" and team boards behind a permission (todo_board/todo_column/todo_card and the assignee, label, checklist, comment, event and link tables). Covers the RBAC (gremium permissions todo.write/todo.configure, OAuth scope todos:write), lexorank moves with board locks, the optimistic lock (version, 409 card_version_conflict), the ETag/304 board read, link targets with per-kind read checks and "kein Zugriff" redaction, links between any two elements (table link, /api/links, LinkService, LinkRights), agenda items from a card (agenda_item.todo_id), the ticket coupling (todo_done event, completeTodos), the mails todo_assigned/todo_mentioned/todo_due, the archive cron, the live board pings (WS /api/ws/todos, GET cards/{id}/tile), the search source, privacy and the account merge. Use when working on backend/app/modules/todos, TodoService, BoardAccess, LinkResolver, worker/todos.py or the to-do parts of tickets, livevote, search, privacy or the merge.
 ---
 
 # To-dos — `backend/app/modules/todos`
@@ -18,9 +18,12 @@ done (`completed_at`).
   (`uq_todo_column_done`), `TodoCard` (`rank` collation `C`, `version`,
   `due_reminded_on`), `TodoAssignee`, `TodoLabel` (unique `lower(name)` per board),
   `TodoCardLabel`, `TodoCheckItem`, `TodoComment` (`mentions` JSONB of id strings, soft
-  delete), `TodoEvent`, `TodoLink` (exactly one target column, `LINK_COLUMNS`; every
-  target FK is `ON DELETE CASCADE`; `ck_todo_link_one_target` counts the columns of
-  `LINK_COLUMNS`, partial indexes `uq_todo_link_<column>` and `ix_todo_link_<column>`).
+  delete), `TodoEvent`, `Link` (table `link`, specs 001400-001403: two typed ends
+  `a_kind`/`a_id` and `b_kind`/`b_id`, stored in one order, kind by byte order then the
+  id bytes (`ordered_ends`, `Link.between`); unique `uq_link_ends`, lookup `ix_link_b`,
+  check `ck_link_not_self`; no FK to the ends: the trigger `link_drop_ends` on each
+  table of `LINK_TABLES` deletes the links of a deleted element, migration
+  `c4d1e2f3a5b6`, which also moved the old `todo_link` rows).
   `LINK_KINDS` is also the picker order: application, meeting, agenda_item, vote,
   appointment (a Termin, `calendar_appointment`; read rule `calendar.appointments.readable`,
   a granted Termin gives title, start, end and place only), gremium, invoice, expense
@@ -141,12 +144,7 @@ boards with `canWrite: false`; the personal board first (the call creates it, li
 and every live card, done ones too; `cardCount` = the live cards of the column; the same
 token gate (403), the same weak ETag and 304, and a constant number of queries: one for
 the boards, one for the cards, one each for columns and labels, and the tile facts),
-`GET /link-targets` (`kind` = `all` or a `TodoLinkKind`), `GET /linked?kind&targetId`
-(`TodoLinkedKind`: every kind but `todo`; a card shows the cards that link it in its own
-`links` instead, as `todo` links with the id of the other card's row, each other card once,
-readable cards only; `DELETE /cards/{id}/links/{linkId}` takes such a link from either card
-and removes every link between the two, and `POST` answers 409 `link_exists` for a link in
-either direction; spec 000573, `service.card_links`), `GET /cards?ids=` (the read-ahead of the board
+`GET /cards?ids=` (the read-ahead of the board
 page: up to 50 whole cards (`CARD_BATCH`) in the order of `ids`; an unreadable or unknown
 card is left out, not 404; `TodoService.cards`), `POST /cards`, `GET|PATCH
 /cards/{id}` (PATCH needs `version`, 409 `card_version_conflict`), `POST
@@ -207,9 +205,12 @@ answers `TodoCardDetail`; 404 for a target board that the caller cannot read, 40
 - Lock order is board, then card, everywhere: `patch` (`_card(lock=True)`) locks the board
   before the card, and the archive cron locks the boards of the due cards (by id) before
   the cards. The other order deadlocks with a move (`test_todos_locks.py`). The card lock
-  is `FOR NO KEY UPDATE`, because `FOR UPDATE` conflicts with the `FOR KEY SHARE` of the
-  `todo_link.todo_id` foreign key check, and two cards on two boards that link each other
-  at the same time then deadlock.
+  is `FOR NO KEY UPDATE`, because no write changes the key of a card and `FOR UPDATE`
+  conflicts with every `FOR KEY SHARE` of a foreign key check.
+- A link change (`LinkService.add`/`remove`) locks the boards of its card ends in the
+  order of their ids (`_cards`), so the links a-b and b-a wait for each other and the
+  second answers 409 `link_exists`; a parallel equal link without a card end meets
+  `uq_link_ends`, which `_commit_new` maps to the same 409.
 - The board also comes before a meeting: `card_for_agenda` locks the board and the card
   before `add_todo_in_tx` locks the meeting, because a card create locks the board and
   then inserts a meeting link (a key share on the meeting row). `TicketTodoBridge.complete`
@@ -310,3 +311,24 @@ personal board or folds it into the target's board.
 
 **Related:** be-tickets, be-livevote, be-notifications, be-search, be-privacy, be-admin,
 be-auth, frontend
+
+## Links (`/api/links`, specs 001400-001409)
+
+- `link_store.py`: `Edge` (a link as one end sees it), `edges(session, kind, ids, kinds)`
+  (both sides of `link` as one union), `linked_ids(own_kind, kind, targets)`,
+  `link_between`, `pair_condition`.
+- `link_rights.py`: `LinkRights.can_change(kind, id, principal)`, the change right of
+  each kind (spec 001404). A change needs read on both ends and change on one.
+  A cost centre end also needs `budget.book` or `budget.structure` (`LinkRights.may_touch`,
+  spec 001410): no search hit, no remove, no `canLink` on a cost centre without it.
+- `link_service.py`: `of` (the list, 404 when the element is unreadable; a linked Event
+  first, then `LINK_KINDS` order, newest first; only a card end resolves with grants,
+  spec 001405), `add`, `remove`, `view` (needs a readable card end), `targets` (search
+  without the excluded element and its links).
+- `links_router.py`: `GET /links?kind&id`, `POST /links` (`{a, b}`), `DELETE
+  /links/{id}`, `GET /links/targets` (`q`, `kind`, `excludeKind`, `excludeId`), `GET
+  /links/{id}/view`. A card end writes the card events `linked`/`unlinked` and touches
+  the board (`TodoService.note_link`); `check_new_link` keeps an Antrag, Buchung or
+  invoice to one Event.
+- A card still takes `links` in `POST /cards`; the card detail lists its links as before.
+

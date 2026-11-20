@@ -1,5 +1,5 @@
 @use 'breakpoints' as bp;
-@use 'dot-parts' as dots;
+@use 'meta-chips' as chips;
 @use 'swatch';
 
 :host {
@@ -22,17 +22,11 @@
   background: var(--color-surface-1);
 }
 
-.fd__line {
-  --fd-sep: 24px;
-}
-.fd__seps {
-  overflow-x: clip;
-}
 .fd__parts {
-  @include dots.list(var(--fd-sep));
+  @include chips.list;
 }
 .fd__part {
-  @include dots.part(var(--fd-sep));
+  @include chips.chip;
 }
 .fd__amount {
   color: var(--color-text);
@@ -131,9 +125,7 @@
   gap: var(--space-3) var(--space-4);
 }
 .fd__stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+  --facts-cols: minmax(0, 1fr);
 }
 .fd__wrap,
 .fd__note {
@@ -144,10 +136,6 @@
 }
 .fd__swatch {
   @include swatch.mark;
-}
-.fd__dot {
-  margin-inline: 6px;
-  color: var(--color-text-subtle);
 }
 .fd__ccLine {
   --ccl-gap: 8px;
@@ -173,9 +161,10 @@
   outline-offset: -2px;
 }
 .fd__linkIcon,
-.fd__chev {
-  flex: none;
-  color: var(--color-text-muted);
+// The icon stands beside the first line (the kind), not in the middle of a row of three
+// lines: centred, it sat below the kind and the title, and the text looked indented.
+.fd__linkIcon {
+  align-self: flex-start;
 }
 .fd__linkBody {
   display: flex;
@@ -256,11 +245,17 @@
   color: var(--color-text-muted);
   font-size: 0.8125rem;
 }
+// Each figure is as wide as its amount, and a figure that does not fit goes to the next line:
+// three equal columns cut a long amount ("10.118,56 €") in a narrow pane, and the amounts
+// ran into each other.
 .fd__figs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
   margin: 0;
+}
+.fd__figs > div {
+  flex: 1 0 auto;
 }
 .fd__pos {
   color: var(--color-accent-text);

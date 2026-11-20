@@ -8,14 +8,27 @@
             <span class="skel-text td__skelTitle td__skelTitle--second"></span>
           }
         </h2>
-        <span class="td__skelIcon skel-in"><span class="skel-box"></span></span>
-        <span class="td__skelIcon skel-in"><span class="skel-box"></span></span>
+        <span class="skel-grp skel-in">
+          <span class="skel-box skel-btn"></span>
+          <span class="skel-box skel-btn"></span>
+        </span>
       </app-sheet-bar>
-      <p class="sheet-line td__line skel-in"><span><span class="skel-text skel-text--muted td__skelLine"></span></span></p>
+      <p class="sheet-line td__line skel-in">
+        <span class="skel-chips">
+          <span class="skel-box skel-chip" style="--skel-w: 3.5rem"></span>
+          <span class="skel-box skel-chip" style="--skel-w: 4.5rem"></span>
+          <span class="skel-box skel-chip" style="--skel-w: 4.25rem"></span>
+          @if (manager) {
+            <span class="skel-box skel-chip" style="--skel-w: 4rem"></span>
+          }
+        </span>
+      </p>
       @if (manager) {
         <div class="td__actions skel-in">
-          <span class="td__act"><span class="skel-box td__skelButton"></span></span>
-          <span class="td__act"><span class="skel-box td__skelButton td__skelButton--short"></span></span>
+          <span class="skel-grp" [class.skel-grp--block]="!split()">
+            <span class="skel-box skel-btn skel-btn--label" style="--skel-w: 5.5rem"></span>
+            <span class="skel-box skel-btn skel-btn--label" style="--skel-w: 5rem"></span>
+          </span>
         </div>
       }
     </header>
@@ -77,39 +90,38 @@
       </app-sheet-bar>
 
       <p class="sheet-line td__line">
-        <app-status-text [kind]="statusKind()">{{ statusLabel() }}</app-status-text>
-        <span class="td__dot" aria-hidden="true">·</span>
-        <span class="mono">{{ ticket.number }}</span>
-        <span class="td__dot" aria-hidden="true">·</span>
-        <span>{{ kindLabel() }}</span>
+        <span class="td__part"><app-status-text chip [kind]="statusKind()">{{ statusLabel() }}</app-status-text></span>
+        <span class="td__part mono">{{ ticket.number }}</span>
+        <span class="td__part">{{ kindLabel() }}</span>
         @if (manager) {
-          <span class="td__dot" aria-hidden="true">·</span>
-          <span>{{ assigneeName() }}</span>
+          <span class="td__part">{{ assigneeName() }}</span>
         }
       </p>
 
       @if (manager) {
         <div #actions class="td__actions" role="group" [attr.aria-label]="'tickets.detail.actions' | t">
-          @if (open()) {
-            <app-button
-              class="td__act"
-              variant="fill"
-              [loading]="saving() === 'status' && closing() === null"
-              [disabled]="saving() !== null"
-              (click)="close('done')"
-            >
-              <app-icon name="check" />
-              {{ 'tickets.detail.done' | t }}
-            </app-button>
-            <app-button class="td__act" variant="tonal" [disabled]="saving() !== null" (click)="close('rejected')">
-              {{ 'tickets.detail.reject' | t }}
-            </app-button>
-          } @else {
-            <app-button variant="tonal" [loading]="saving() === 'status'" (click)="reopen()">
-              <app-icon name="undo" />
-              {{ 'tickets.detail.reopen' | t }}
-            </app-button>
-          }
+          <app-button-group [main]="true">
+            @if (open()) {
+              <app-button
+                class="td__act"
+                variant="fill"
+                [loading]="saving() === 'status' && closing() === null"
+                [disabled]="saving() !== null"
+                (click)="close('done')"
+              >
+                <app-icon name="check" />
+                {{ 'tickets.detail.done' | t }}
+              </app-button>
+              <app-button class="td__act" variant="tonal" [disabled]="saving() !== null" (click)="close('rejected')">
+                {{ 'tickets.detail.reject' | t }}
+              </app-button>
+            } @else {
+              <app-button variant="tonal" [loading]="saving() === 'status'" (click)="reopen()">
+                <app-icon name="undo" />
+                {{ 'tickets.detail.reopen' | t }}
+              </app-button>
+            }
+          </app-button-group>
         </div>
       }
 
@@ -259,17 +271,19 @@
 
   @if (manager) {
     <app-section class="td__sec" [heading]="'tickets.todos.title' | t">
-      <app-button
-        sectionAction
-        variant="text"
-        size="sm"
-        [iconOnly]="true"
-        [ariaLabel]="'tickets.todos.add' | t"
-        data-testid="td-todo-add"
-        (click)="todoOpen.set(true)"
-      >
-        <app-icon name="plus" />
-      </app-button>
+      <app-button-group ngProjectAs="[sectionAction]">
+        <app-button
+          sectionAction
+          variant="text"
+          size="sm"
+          [iconOnly]="true"
+          [ariaLabel]="'tickets.todos.add' | t"
+          data-testid="td-todo-add"
+          (click)="todoOpen.set(true)"
+        >
+          <app-icon name="plus" />
+        </app-button>
+      </app-button-group>
       <app-todo-linked-list
         kind="ticket"
         avatarSize="xs"
@@ -386,7 +400,7 @@
         }
       </ul>
     } @else if (duplicateSearch.applied()) {
-      <app-empty-state rows="1" [heading]="'tickets.duplicate.none' | t" />
+      <app-empty-state icon="searchOff" rows="1" [heading]="'tickets.duplicate.none' | t" />
     }
   </div>
   <app-button dialog-footer variant="text" (click)="duplicateOpen.set(false)">{{ 'action.cancel' | t }}</app-button>

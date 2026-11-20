@@ -28,6 +28,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import {
   ThemeService,
   ButtonComponent,
+  ButtonGroupComponent,
   ChipComponent,
   ConfirmDialogComponent,
   DialogComponent,
@@ -40,6 +41,8 @@ import {
   type SegmentedOption,
   TextareaComponent,
   ToastService,
+  ErrorTextComponent,
+  FactsComponent,
 } from '@stupa-makers/ui-kit';
 import { scanStatus } from '@shared/status-kind.util';
 import { AltchaComponent } from '../../apply/altcha.component';
@@ -96,12 +99,15 @@ const KIND_LABEL: Record<TicketKind, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FactsComponent,
+    ErrorTextComponent,
     TextareaComponent,
     ChipComponent,
     FormsModule,
     TranslatePipe,
     AltchaComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     ConfirmDialogComponent,
     DialogComponent,
     IconComponent,

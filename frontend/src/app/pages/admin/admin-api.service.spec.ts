@@ -386,8 +386,8 @@ describe('AdminApiService — real mode (contract)', () => {
       { id: 't1', nameI18n: { de: 'X' }, gremiumId: 'g1', hasBudget: true, retentionMonths: 12, activeFormVersionId: 'fv' },
       { id: 't2' },
     ]);
-    expect(out![0]).toEqual({ id: 't1', name: { de: 'X' }, gremiumId: 'g1', hasBudget: true, pdfSignatures: false, retentionMonths: 12, activeFormVersionId: 'fv', activeFormVersion: null, groupId: null, position: 0 });
-    expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, hasBudget: false, pdfSignatures: false, retentionMonths: null, activeFormVersionId: null, activeFormVersion: null, groupId: null, position: 0 });
+    expect(out![0]).toEqual({ id: 't1', name: { de: 'X' }, gremiumId: 'g1', hasBudget: true, pdfSignatures: false, attachmentRequired: false, retentionMonths: 12, activeFormVersionId: 'fv', activeFormVersion: null, groupId: null, position: 0 });
+    expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, hasBudget: false, pdfSignatures: false, attachmentRequired: false, retentionMonths: null, activeFormVersionId: null, activeFormVersion: null, groupId: null, position: 0 });
   });
 
   it('maps the number of the active form version', () => {
@@ -506,6 +506,7 @@ describe('AdminApiService — real mode (contract)', () => {
       gremiumId: null,
       hasBudget: false,
       pdfSignatures: false,
+      attachmentRequired: false,
       retentionMonths: null,
       activeFormVersionId: null,
       activeFormVersion: null,
@@ -579,12 +580,18 @@ describe('AdminApiService — real mode (contract)', () => {
   /** An empty body sets no keys. */
   it('PATCHes only the supplied application-type fields and DELETEs', () => {
     let done = false;
-    s.updateApplicationType('t1', { name: { de: 'N' }, gremiumId: 'g1', hasBudget: false, pdfSignatures: true }).subscribe(
+    s.updateApplicationType('t1', { name: { de: 'N' }, gremiumId: 'g1', hasBudget: false, pdfSignatures: true, attachmentRequired: true }).subscribe(
       () => (done = true),
     );
     const req = http.expectOne('/api/admin/application-types/t1');
     expect(req.request.method).toBe('PATCH');
-    expect(req.request.body).toEqual({ nameI18n: { de: 'N' }, gremiumId: 'g1', hasBudget: false, pdfSignatures: true });
+    expect(req.request.body).toEqual({
+      nameI18n: { de: 'N' },
+      gremiumId: 'g1',
+      hasBudget: false,
+      pdfSignatures: true,
+      attachmentRequired: true,
+    });
     req.flush({});
     expect(done).toBe(true);
 
@@ -622,13 +629,19 @@ describe('AdminApiService — real mode (contract)', () => {
   it('POSTs a form version with description default null', () => {
     s.createFormVersion('t1', [{ key: 'a', type: 'text', label: { de: 'A' } }]).subscribe();
     const req = http.expectOne('/api/admin/application-types/t1/form-versions');
-    expect(req.request.body).toEqual({ fields: [{ key: 'a', type: 'text', label: { de: 'A' } }], description: null });
+    expect(req.request.body).toEqual({
+      fields: [{ key: 'a', type: 'text', label: { de: 'A' } }],
+      description: null,
+      rules: [],
+    });
     req.flush({ id: 'fv-1' });
 
-    s.createFormVersion('t1', [], { de: 'D' }).subscribe();
+    const rule = { logic: { var: 'a' }, message: { de: 'A', en: 'A' }, severity: 'warn' as const };
+    s.createFormVersion('t1', [], { de: 'D' }, [rule]).subscribe();
     expect(http.expectOne('/api/admin/application-types/t1/form-versions').request.body).toEqual({
       fields: [],
       description: { de: 'D' },
+      rules: [rule],
     });
   });
 

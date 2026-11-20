@@ -220,6 +220,12 @@ export interface StateOutWire {
   readonly editAllowed: boolean;
   /** State kind: normal|vote. */
   readonly kind?: string;
+  /** The initial state: an Antrag in it is a draft, not submitted yet. */
+  readonly isInitial?: boolean;
+  readonly isTerminal?: boolean;
+  readonly isDenied?: boolean;
+  /** The state carries the flag `Bewilligt`: the approved amount shows only then. */
+  readonly isApproved?: boolean;
 }
 
 /** `ApplicantOut`. It holds PII. The backend fills it only for an authorized reader. */
@@ -369,6 +375,10 @@ export interface ApplicationLinksWire {
   readonly predecessor?: LinkedApplicationWire | null;
   readonly successors?: readonly LinkedApplicationWire[];
   readonly events?: readonly LinkEventWire[];
+  /** The Antrag that this one is a new version of. */
+  readonly replaces?: LinkedApplicationWire | null;
+  /** The new versions of this Antrag. */
+  readonly replacedBy?: readonly LinkedApplicationWire[];
 }
 
 /** `ApplicationPrefillOut`. The answers of a Vorgänger that fit the current form. */
@@ -551,6 +561,42 @@ export interface TimelineEventOutWire {
   readonly voteDeleted?: boolean;
   /** The decision that this status change carried. */
   readonly decision?: TimelineDecision | null;
+  /** `amountChange`: a later change of the approved amount; the state stays. */
+  readonly kind?: TimelineKind;
+  /** A person forced this state. */
+  readonly forced?: boolean;
+  /** The reason key of a forced state; null for an old one and for the applicant. */
+  readonly forceReason?: string | null;
+  /** The decision made outside the platform that fired this branch. */
+  readonly outsideDecision?: OutsideDecision | null;
+  /** The change of the approved amount of an `amountChange` entry. */
+  readonly amountChange?: AmountChange | null;
+}
+
+export type TimelineKind = 'status' | 'amountChange';
+
+/** A decision of a Gremium made in a meeting without a vote on the platform. */
+export interface OutsideDecision {
+  readonly result: 'passed' | 'failed';
+  readonly meetingDate: string;
+  readonly gremiumId?: Uuid | null;
+  readonly gremiumName?: string | null;
+  readonly yes?: number | null;
+  readonly no?: number | null;
+  readonly abstain?: number | null;
+  /** The meeting of the platform; null in the applicant view. */
+  readonly meetingId?: Uuid | null;
+  readonly meetingTitle?: string | null;
+}
+
+/** A later change of the approved amount, for the timeline. */
+export interface AmountChange {
+  readonly previousAmount?: string | null;
+  readonly approvedAmount?: string | null;
+  /** The reason; null in the applicant view. */
+  readonly reason?: string | null;
+  readonly decisionDate?: string | null;
+  readonly gremiumName?: string | null;
 }
 
 export type CommentVisibility = 'internal' | 'public';
@@ -614,6 +660,10 @@ export interface TransitionOutWire {
   readonly agendaGremiumId?: Uuid | null;
   /** The target is an accepted state of the cost center, so a fire takes a decision. */
   readonly allowsDecision?: boolean;
+  /** The target is a terminal state. */
+  readonly toTerminal?: boolean;
+  /** The fire must name the approved amount (a move into an approved state). */
+  readonly requiresAmount?: boolean;
 }
 
 /** A field change in the version diff (`FieldChange`). */
@@ -651,6 +701,49 @@ export interface VersionOutWire {
   /** The resolved editor. The UI renders this and never the raw `changedBy`. */
   readonly changedByInfo?: ActorInfo | null;
   readonly at: IsoDateTime;
+  /** The change of the Antragsart that wrote this version. */
+  readonly typeChange?: VersionTypeChange | null;
+}
+
+/** `VersionTypeChangeOut`: the old and the new Antragsart of a version (spec 001663). */
+export interface VersionTypeChange {
+  readonly fromTypeId?: Uuid | null;
+  readonly fromType?: I18nMap | null;
+  readonly toTypeId?: Uuid | null;
+  readonly toType?: I18nMap | null;
+  /** The labels of the old form for the fields that the new form does not have. */
+  readonly fieldLabels?: Readonly<Record<string, I18nMap>>;
+}
+
+/** `TypeChangeFieldOut`: one field of a change of the Antragsart. */
+export interface TypeChangeField {
+  readonly key: string;
+  readonly label: I18nMap;
+}
+
+/** `TypeChangeTransitionOut`: a transition back to the applicant (spec 001661). */
+export interface TypeChangeTransition {
+  readonly id: Uuid;
+  readonly label: I18nMap;
+  readonly toStateId: Uuid;
+  readonly toStateLabel: I18nMap;
+}
+
+/** `TypeChangePreviewOut`: what a change of the Antragsart does (spec 001661). */
+export interface TypeChangePreview {
+  readonly typeId: Uuid;
+  readonly carried: readonly TypeChangeField[];
+  readonly missing: readonly TypeChangeField[];
+  readonly dropped: readonly TypeChangeField[];
+  readonly transitions: readonly TypeChangeTransition[];
+  readonly possible: boolean;
+}
+
+/** `TypeChangeIn`: the body of the change of the Antragsart. */
+export interface TypeChangeBody {
+  readonly typeId: Uuid;
+  readonly transitionId?: Uuid | null;
+  readonly note?: string | null;
 }
 
 /**
@@ -667,6 +760,10 @@ export interface AttachmentOutWire {
   readonly mime: string;
   readonly size: number;
   readonly scanned: boolean;
+  /** The form field of the file; absent or null for a general attachment. */
+  readonly fieldKey?: string | null;
+  /** The position of a `positions` field that the file belongs to (spec 001730). */
+  readonly positionId?: string | null;
 }
 
 /**
@@ -732,12 +829,79 @@ export interface TransitionRequestBody {
   readonly decision?: DecisionProposal | null;
 }
 
+/** The reasons of a forced status; the report counts per key. */
+export const FORCE_REASONS = [
+  'outside_decision',
+  'applicant_error',
+  'error_correction',
+  'other',
+] as const;
+export type ForceReason = (typeof FORCE_REASONS)[number];
+
 /** `POST /applications/{id}/force-status`. A privileged direct status override.
- *  `note` holds the reason and is mandatory. The change skips the flow. The audit
- *  log records it. */
+ *  `reason` is mandatory; `other` needs a `note` of at least 10 characters. The change
+ *  skips the flow. The audit log records it. */
 export interface ForceStatusBody {
   readonly stateId: Uuid;
-  readonly note: string;
+  readonly reason: ForceReason;
+  readonly note?: string | null;
+  /** The approved amount of a move into an approved state (spec 001653). */
+  readonly decision?: DecisionProposal | null;
+}
+
+/** `POST /applications/{id}/outside-decision`: a decision made in a meeting. */
+export interface OutsideDecisionBody {
+  readonly result: 'passed' | 'failed';
+  readonly meetingDate: string;
+  readonly gremiumId: Uuid;
+  readonly yes?: number | null;
+  readonly no?: number | null;
+  readonly abstain?: number | null;
+  readonly meetingId?: Uuid | null;
+  readonly decision?: DecisionProposal | null;
+}
+
+/** `POST /applications/{id}/approved-amount`: a later change of the approved amount. */
+export interface AmendAmountBody {
+  readonly approvedAmount: string;
+  readonly reason: string;
+  readonly decisionDate: string;
+  readonly gremiumId: Uuid;
+}
+
+/** The answer of a change of the approved amount. */
+export interface AmendAmountResult {
+  readonly previousAmount: string | null;
+  readonly approvedAmount: string;
+  readonly decidedAt: IsoDateTime;
+}
+
+/** `GET /admin/forced-status`: the counts of the forced status changes. */
+export interface ForcedReport {
+  readonly from: string;
+  readonly to: string;
+  readonly total: number;
+  readonly byReason: readonly { readonly reason: string; readonly count: number }[];
+  readonly byPath: readonly ForcedPathCount[];
+}
+
+export interface ForcedPathCount {
+  readonly fromKey: string | null;
+  readonly fromLabel: I18nMap | null;
+  readonly toKey: string;
+  readonly toLabel: I18nMap | null;
+  readonly count: number;
+}
+
+/** `GET /admin/forced-status/events`: one forced status change behind a count. */
+export interface ForcedEvent {
+  readonly applicationId: Uuid;
+  readonly title: string | null;
+  readonly at: IsoDateTime;
+  readonly reason: string;
+  readonly note: string | null;
+  readonly fromLabel: I18nMap | null;
+  readonly toLabel: I18nMap | null;
 }
 
 /** `TransitionResult`. The 200 response of a transition that succeeded. */
@@ -757,6 +921,14 @@ export interface ApplicationState {
   readonly editAllowed: boolean;
   /** State kind: normal|vote. */
   readonly kind: string;
+  /** Set only when true: the initial state, so the Antrag is a draft (001710). */
+  readonly isInitial?: boolean;
+  /** Set only when true: a terminal state. */
+  readonly isTerminal?: boolean;
+  /** Set only when true: a denied state. */
+  readonly isDenied?: boolean;
+  /** The state carries the flag `Bewilligt`. */
+  readonly isApproved?: boolean;
 }
 
 export interface Applicant {
@@ -861,11 +1033,58 @@ export interface ApplicationLinks {
   readonly predecessor: LinkedApplication | null;
   readonly successors: readonly LinkedApplication[];
   readonly events: readonly ApplicationLinkEvent[];
+  /** Set only when there is one: the Antrag that this one is a new version of (001721). */
+  readonly replaces?: LinkedApplication;
+  /** Set only when not empty: the new versions of this Antrag. */
+  readonly replacedBy?: readonly LinkedApplication[];
 }
 
 /** Result of `POST /applications`, frontend view. */
 export interface ApplicationCreated {
   readonly applicationId: Uuid;
+}
+
+/** Result of `POST /applications/{id}/new-version` (001720). */
+export interface NewVersionCreated {
+  readonly applicationId: Uuid;
+  /** The session does not reach the new draft, so a login link went out by mail. */
+  readonly linkSent: boolean;
+}
+
+/** The requested amount of one Antrag that a bulk approval approves (001701). */
+export interface BulkAmount {
+  readonly applicationId: Uuid;
+  readonly title: string | null;
+  readonly amount: string | null;
+}
+
+/** A target state that every selected Antrag reaches (`BulkTransitionOption`). */
+export interface BulkTransitionOptionWire {
+  readonly toStateId: Uuid;
+  readonly label: I18nMap;
+  readonly color?: string | null;
+  readonly approves?: boolean;
+  readonly amounts?: readonly BulkAmount[];
+  /** The selected Anträge that reach the target (001704); the fire skips the others. */
+  readonly applicationIds?: readonly Uuid[];
+}
+
+/** A bulk target, frontend view: the label resolved to the locale. */
+export interface BulkTransitionOption {
+  readonly toStateId: Uuid;
+  readonly label: string;
+  readonly color: string | null;
+  readonly approves: boolean;
+  readonly amounts: readonly BulkAmount[];
+  readonly applicationIds: readonly Uuid[];
+}
+
+/** The outcome of a bulk action at one Antrag (001703). */
+export interface BulkItemResult {
+  readonly applicationId: Uuid;
+  readonly ok: boolean;
+  readonly code?: string | null;
+  readonly error?: string | null;
 }
 
 /** Timeline entry, frontend view. The `label` comes from `toState`. */
@@ -885,6 +1104,11 @@ export interface TimelineEntry {
   readonly voteDeleted: boolean;
   /** The decision that this status change carried. */
   readonly decision?: TimelineDecision | null;
+  readonly kind?: TimelineKind;
+  readonly forced?: boolean;
+  readonly forceReason?: string | null;
+  readonly outsideDecision?: OutsideDecision | null;
+  readonly amountChange?: AmountChange | null;
 }
 
 /** Comment, frontend view. `isPublic` comes from `visibility`. */
@@ -946,6 +1170,10 @@ export interface Transition {
    * menu then open the decision dialog, which can approve with deviations.
    */
   readonly allowsDecision?: boolean;
+  /** Set only when true: the target is terminal, so the applicant page asks first (001712). */
+  readonly toTerminal?: boolean;
+  /** The dialog must ask for the approved amount, without the switch. */
+  readonly requiresAmount?: boolean;
 }
 
 /** A changed field cell, frontend view. The `key` comes out of the diff map. */
@@ -979,6 +1207,8 @@ export interface ApplicationVersion {
   readonly changedBy: string | null;
   readonly changedByInfo?: ActorInfo | null;
   readonly at: IsoDateTime;
+  /** The change of the Antragsart that wrote this version. */
+  readonly typeChange?: VersionTypeChange | null;
 }
 
 /**
@@ -1018,6 +1248,10 @@ export interface Attachment {
   readonly size: number;
   readonly scanned: boolean;
   readonly scanState: ScanState;
+  /** The form field of the file, when it has one. */
+  readonly fieldKey?: string | null;
+  /** The position of a `positions` field that the file belongs to (spec 001730). */
+  readonly positionId?: string | null;
 }
 
 /** Signed download URL, frontend view. */
@@ -1105,6 +1339,8 @@ export interface FieldOption {
   readonly key?: string | null;
   /** The own display colour of the cost centre, or null. */
   readonly color?: string | null;
+  /** The path key of the cost centre (`VS-80004`). */
+  readonly pathKey?: string | null;
 }
 
 export interface FieldValidation {
@@ -1124,6 +1360,26 @@ export interface FieldValidation {
    *  user ticks a checkbox and must give a reason. Then one offer is enough. If
    *  unset, the opt-out is allowed. */
   readonly allowNoOffers?: boolean;
+  /** `number`. The field holds the number of participants (spec 001631); at most one
+   *  field of a form. The cost line then shows the amount per person. */
+  readonly participants?: boolean;
+  /** `budget_select`. The path key of the Kostenstelle whose subtree the picker offers
+   *  (spec 001680). The server sends only the options below it. */
+  readonly rootPath?: string;
+}
+
+/** How a form rule acts when the answers break it (spec 001671). */
+export type RuleSeverity = 'block' | 'warn';
+
+/**
+ * A rule of a form across fields (spec 001670). `logic` is a JsonLogic expression over
+ * the answers by key, `amount` and `costTotal`; the answers meet the rule when it gives
+ * `true`. `message` is shown when they do not.
+ */
+export interface FormRule {
+  readonly logic: Readonly<Record<string, unknown>>;
+  readonly message: I18nMap;
+  readonly severity: RuleSeverity;
 }
 
 /** A field definition of the effective form. It is camelCase like the OpenAPI by_alias. */
@@ -1155,6 +1411,10 @@ export interface EffectiveForm {
   /** Drives `visibleIf: has_budget`. Comes from the type, as the server's own check does. */
   readonly hasBudget: boolean;
   readonly sections: readonly FormSection[];
+  /** The rules across fields (spec 001670); absent from an older server. */
+  readonly rules?: readonly FormRule[];
+  /** The Antragsart needs a file before the submit (spec 001732). */
+  readonly attachmentRequired?: boolean;
 }
 
 /**

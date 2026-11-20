@@ -28,6 +28,7 @@ import pytest
 
 from app.modules.applications.service import ApplicationsService
 from app.modules.applications.service import create as create_mod
+from app.modules.applications.service import edits as edits_mod
 from app.modules.applications.service import listing as listing_mod
 from app.modules.applications.service import reads as reads_mod
 from app.modules.applications.service.service_base import (
@@ -214,6 +215,9 @@ def _state(**over: Any) -> _Obj:
         "edit_allowed": True,
         "kind": "normal",
         "config": {},
+        "is_initial": False,
+        "is_terminal": False,
+        "is_denied": False,
     }
     base.update(over)
     return _Obj(**base)
@@ -453,7 +457,7 @@ def _payload(**over: Any) -> SimpleNamespace:
 
 def _effective(fields: list[FormFieldDef], fv_id: UUID) -> Any:
     section = SimpleNamespace(fields=fields)
-    return SimpleNamespace(sections=[section], form_version_id=fv_id)
+    return SimpleNamespace(sections=[section], form_version_id=fv_id, rules=())
 
 
 class _FakeForms:
@@ -497,6 +501,20 @@ def _reset_flow() -> None:
     _FakeForms.effective = None
 
 
+class _FakeEditForms(_FakeForms):
+    """Stand-in for FormsService in the edit: a form without rules and without a root."""
+
+    async def get_effective_form(
+        self, _type_id: Any, _pot_id: Any = None, *, form_version_id: Any = None
+    ) -> Any:
+        return SimpleNamespace(sections=[], rules=())
+
+
+@pytest.fixture(autouse=True)
+def _patch_edit_forms(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(edits_mod, "FormsService", _FakeEditForms)
+
+
 @pytest.fixture
 def _patch_forms(monkeypatch: pytest.MonkeyPatch) -> type[_FakeForms]:
     monkeypatch.setattr(create_mod, "FormsService", _FakeForms)
@@ -519,7 +537,7 @@ async def test_create_unknown_type_404() -> None:
 
 async def test_create_no_active_flow_404(_patch_forms: type[_FakeForms]) -> None:
     """Answer 404 when no flow is active."""
-    app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4())
+    app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4(), attachment_required=False)
     session = _Session(get_results=[app_type], execute_results=[[]])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     with pytest.raises(NotFoundError, match="no active global flow"):
@@ -528,7 +546,7 @@ async def test_create_no_active_flow_404(_patch_forms: type[_FakeForms]) -> None
 
 async def test_create_validation_error_422(_patch_forms: type[_FakeForms]) -> None:
     """Answer 422 when the required field `title` is missing."""
-    app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4())
+    app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4(), attachment_required=False)
     fv_id = uuid4()
     _FakeForms.effective = _effective(
         [_ff("title", required=True)], fv_id
@@ -546,7 +564,7 @@ async def test_create_no_initial_state_404(
     _patch_forms: type[_FakeForms],
 ) -> None:
     """Answer 404 when the flow has no initial state."""
-    app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4())
+    app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4(), attachment_required=False)
     fv_id = uuid4()
     _FakeForms.effective = _effective([_ff("title", required=True)], fv_id)
     session = _Session(
@@ -558,6 +576,21 @@ async def test_create_no_initial_state_404(
         await svc.create(_payload(data={"title": "T"}))  # type: ignore[arg-type]
 
 
+async def test_create_of_a_type_with_a_required_file_needs_a_file(
+    _patch_forms: type[_FakeForms],
+) -> None:
+    """Answer 422 attachment_required when the type needs a file and none came (001732)."""
+    app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4(), attachment_required=True)
+    fv_id = uuid4()
+    _FakeForms.effective = _effective([_ff("title", required=True)], fv_id)
+    session = _Session(get_results=[app_type], execute_results=[[fv_id]])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    with pytest.raises(ValidationProblem) as exc:
+        await svc.create(_payload(data={"title": "T"}))  # type: ignore[arg-type]
+    assert exc.value.code == "attachment_required"
+    assert session.added == []
+
+
 async def test_create_anonymous_ok(
     _patch_forms: type[_FakeForms], _patch_flow: type[_FakeFlow]
 ) -> None:
@@ -566,7 +599,7 @@ async def test_create_anonymous_ok(
     A guest application rests in the flow until the magic-link verify, so the create starts
     nothing.
     """
-    app_type = _Obj(id=uuid4(), has_budget=True, gremium_id=uuid4())
+    app_type = _Obj(id=uuid4(), has_budget=True, gremium_id=uuid4(), attachment_required=False)
     fv_id = uuid4()
     initial = _state(is_initial=True)
     _FakeForms.effective = _effective(
@@ -600,7 +633,7 @@ async def test_create_logged_in_actor_confirms_immediately(
     _patch_forms: type[_FakeForms], _patch_flow: type[_FakeFlow]
 ) -> None:
     """Confirm a logged-in application and start its flow with the route dispatcher."""
-    app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4())
+    app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4(), attachment_required=False)
     fv_id = uuid4()
     initial = _state(is_initial=True)
     _FakeForms.effective = _effective([_ff("title", required=True)], fv_id)
@@ -965,6 +998,7 @@ async def test_timeline_links_the_vote_or_names_it_as_deleted() -> None:
         execute_results=[
             [(linked, None), (deleted, None)],
             [("approved", "#0f0")],
+            [],
             [(linked, None), (deleted, None)],
         ],
     )
@@ -1022,8 +1056,9 @@ async def test_timeline_missing_404() -> None:
 async def test_versions_resolves_names() -> None:
     """Resolve an editor without a display name to the email."""
     app = _app()
-    v1 = _Obj(version=1, data={"title": "a"}, diff=None, changed_by="sub-1", at=NOW)
-    v2 = _Obj(version=2, data={"title": "b"}, diff=None, changed_by=None, at=NOW)
+    no_change = {"from_type_id": None, "to_type_id": None, "from_form_version_id": None}
+    v1 = _Obj(version=1, data={"title": "a"}, diff=None, changed_by="sub-1", at=NOW, **no_change)
+    v2 = _Obj(version=2, data={"title": "b"}, diff=None, changed_by=None, at=NOW, **no_change)
     session = _Session(
         get_results=[app],
         execute_results=[[sub_ref("sub-1", None, "alice@x.de", AUTHOR_ID)]],

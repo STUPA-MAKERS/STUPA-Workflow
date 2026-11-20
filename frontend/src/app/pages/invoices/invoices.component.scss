@@ -1,6 +1,5 @@
 @use 'breakpoints' as bp;
 @use 'dot-parts' as dots;
-@use 'scroll-fade' as fade;
 @use 'list-pane' as lp;
 
 :host {
@@ -37,9 +36,6 @@
 .inv--split .inv__scroll > * {
   flex: none;
 }
-.inv__scroll {
-  @include fade.fade-y(var(--inv-fade));
-}
 
 .inv__rows {
   @include lp.stack;
@@ -66,14 +62,13 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  margin-inline-end: calc(-1 * var(--space-2));
 }
 .inv__amount {
   font-size: 0.8125rem;
   white-space: nowrap;
 }
 
-// Without hover (touch), the menu always shows.
+// The arrow of a row in one column gives way to the ⋮ of the row (001920).
 @include lp.hover-menu(inv);
 
 .inv__sentinel {
@@ -106,4 +101,10 @@
   .inv__chips {
     @include lp.phone-chips;
   }
+}
+
+// The check box of a row while selecting sits above the row's link layer.
+.inv__rowCheck {
+  position: relative;
+  z-index: 1;
 }

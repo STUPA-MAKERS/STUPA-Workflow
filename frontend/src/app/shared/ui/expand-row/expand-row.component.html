@@ -12,18 +12,20 @@
   <span trail class="xr__trail">
     <ng-content select="[trail]" />
     @if (toggle() === 'row') {
-      <app-icon class="xr__chev" [name]="open() ? 'up' : 'down'" [size]="20" aria-hidden="true" />
+      <app-row-chevron [open]="open()" [size]="20" />
     } @else {
-      <app-button
-        class="xr__chevBtn"
-        variant="text"
-        [iconOnly]="true"
-        [ariaLabel]="toggleLabel()"
-        [ariaExpanded]="open()"
-        [ariaControls]="bodyId"
-        (click)="flip()"
-        ><app-icon [name]="open() ? 'up' : 'down'" [size]="20"
-      /></app-button>
+      <app-button-group>
+        <app-button
+          class="xr__chevBtn"
+          variant="text"
+          [iconOnly]="true"
+          [ariaLabel]="toggleLabel()"
+          [ariaExpanded]="open()"
+          [ariaControls]="bodyId"
+          (click)="flip()"
+          ><app-icon [name]="open() ? 'up' : 'down'" [size]="20"
+        /></app-button>
+      </app-button-group>
     }
   </span>
 </app-list-item>

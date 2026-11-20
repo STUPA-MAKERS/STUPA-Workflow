@@ -1,7 +1,7 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use '../../../shared/ui/dialog-form' as df;
 @use 'field' as f;
+@use '../../../shared/ui/pick-rows' as pr;
 
 @include df.host;
 
@@ -60,80 +60,46 @@
   min-width: 0;
   min-height: 0;
 }
-
-.aid__list {
-  display: flex;
-  flex: 0 1 auto;
-  flex-direction: column;
-  gap: 2px;
-  min-height: 0;
-  overflow-y: auto;
-  @include fade.fade-y(var(--space-5));
+// The empty state sits in the middle of the free height of the list area (001791).
+.aid__slot > app-empty-state {
+  margin-block: auto;
 }
 
+// The choice list: the rows of the select sheet with a subtitle (001790).
+.aid__list {
+  @include pr.list;
+}
 .aid__row {
-  position: relative;
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
-  min-height: 52px;
-  padding: 6px 14px;
-  border-radius: var(--radius-lg);
-  cursor: pointer;
+  @include pr.row;
 }
 @media (hover: hover) {
   .aid__row:hover {
-    background: var(--color-surface-2);
+    @include pr.row-hover;
   }
 }
 .aid__row--on {
-  background: var(--color-selected);
-  color: var(--color-on-selected);
   @include f.highlight-chosen;
 }
-@media (hover: hover) {
-  .aid__row--on:hover {
-    background: var(--color-selected);
-    color: var(--color-on-selected);
-  }
-}
 .aid__row:has(.aid__radio:focus-visible) {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
+  @include pr.row-focus;
 }
 .aid__radio {
-  position: absolute;
-  inset-inline-start: 14px;
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  opacity: 0;
-}
-.aid__mark {
-  flex: none;
-  color: var(--color-text-muted);
-}
-.aid__row--on .aid__mark {
-  color: var(--color-accent-text);
+  @include pr.radio;
 }
 .aid__text {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
+  @include pr.text;
 }
 .aid__title {
-  min-width: 0;
-  font-weight: var(--fw-medium);
+  @include pr.title;
+}
+.aid__row--on .aid__title {
+  @include pr.title-on;
 }
 .aid__sub {
-  font-size: var(--fs-small);
-  color: var(--color-text-muted);
+  @include pr.sub;
 }
-.aid__row--on .aid__sub {
-  color: inherit;
+.aid__check {
+  @include pr.check;
 }
 
 .aid__np {
@@ -144,3 +110,4 @@
   background: var(--color-surface-3);
   cursor: pointer;
 }
+

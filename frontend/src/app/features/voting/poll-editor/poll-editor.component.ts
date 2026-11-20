@@ -5,6 +5,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   DatepickerComponent,
   IconComponent,
   InputComponent,
@@ -43,6 +44,7 @@ const MODES: readonly PollMode[] = ['single', 'multi', 'date'];
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ButtonComponent,
+    ButtonGroupComponent,
     DatepickerComponent,
     FormsModule,
     IconComponent,

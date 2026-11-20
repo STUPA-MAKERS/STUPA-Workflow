@@ -22,7 +22,7 @@ import type {
   Expense,
   FiscalYear,
 } from './budget-tree.api';
-import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
+import { NO_LINKED_TODOS, linkRow, linksOf } from '../../../testing/todo-fixtures';
 import { TodosApiService } from '@core/api/todos.service';
 import { PALETTE, shadeColor } from './budget-color.util';
 import { itemApp, itemBooking } from './budget-items/budget-items.fixtures';
@@ -266,11 +266,20 @@ describe('BudgetDashboardComponent', () => {
      * The year, the overview and the search are outside the scrolling list. The pane sits on the
      * page, so the search field keeps its own surface.
      */
+    /** 001500: the kit hides the title of a column whose filter bar is its direct child. */
+    it('puts the filters of the tree in the filter bar of the column', async () => {
+      const view = await setup();
+      const pane = view.container.querySelector('.bd__pane') as HTMLElement;
+      expect(pane.querySelector(':scope > app-page-header + .ld-pane__filters > app-search-pill')).toBeTruthy();
+      expect(pane.querySelector(':scope > .ld-pane__filters .bd__chips')).toBeTruthy();
+      expect(pane.querySelector(':scope > .bd__tree')).toBeTruthy();
+      expect(pane.querySelector('.bd__paneBody')).toBeNull();
+    });
+
     it('scrolls only the tree and fades an end only where more rows are', async () => {
       const view = await setup();
       const tree = view.container.querySelector('.bd__pane .bd__tree') as HTMLElement;
       expect(tree.querySelector('app-search-pill, .chip')).toBeNull();
-      expect(view.container.querySelector('.bd__pane .bd__paneBody')).not.toHaveClass('bd__paneBody--side');
       const geometry = (scrollHeight: number, scrollTop: number) => {
         Object.defineProperty(tree, 'scrollHeight', { value: scrollHeight, configurable: true });
         Object.defineProperty(tree, 'clientHeight', { value: 300, configurable: true });
@@ -489,12 +498,14 @@ describe('BudgetDashboardComponent', () => {
       expect(view.container.querySelectorAll('#bd-title')).toHaveLength(1);
       expect(view.container.querySelector('.sheet-bar__kicker')).toBeNull();
       const actions = bar.querySelector(':scope > .sheet-bar__actions > .bd__actions') as HTMLElement;
-      // § 000670: one icon button for the export, "Buchungen ansehen" in the ⋮ menu, no text button.
-      const exportButton = within(actions).getByRole('button', { name: /Exportieren/ });
-      expect(exportButton.textContent?.trim()).toBe('');
+      // Spec 001812: the export and "Buchungen ansehen" sit in the ⋮ menu, no button of their own.
+      expect(within(actions).queryByRole('button', { name: /Exportieren/ })).toBeNull();
       expect(within(actions).queryByRole('button', { name: 'Buchungen ansehen' })).toBeNull();
       expect(actions.querySelector('app-row-menu')).not.toBeNull();
-      expect(view.fixture.componentInstance.moreSections()[0].items.map((i) => i.label)).toEqual(['Buchungen ansehen']);
+      expect(view.fixture.componentInstance.moreSections()[0].items.map((i) => i.label)).toEqual([
+        'Exportieren',
+        'Buchungen ansehen',
+      ]);
       expect(view.container.querySelector('.bd__sheetBody')?.firstElementChild).toHaveClass('bd__figs');
     });
 
@@ -520,20 +531,37 @@ describe('BudgetDashboardComponent', () => {
       expect(c.breadcrumbs().map((n: { id: string }) => n.id)).toEqual(['orphan']);
     });
 
-    it('opens the bookings page and the dialog with every item of the cost centre', async () => {
+    it('opens the bookings of the cost centre and the year from the menu (§ 001872)', async () => {
       const view = await setup({ apps: [app({ applicationId: 'a-1' })] });
       const nav = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-      view.fixture.componentInstance.onAction(view.fixture.componentInstance.moreSections()[0].items[0]);
-      expect(nav).toHaveBeenCalledWith(['/expenses'], { queryParams: { budget: 'b-vs' } });
+      view.fixture.componentInstance.onAction({ id: 'bookings', label: '' });
+      expect(nav).toHaveBeenCalledWith(['/expenses'], { queryParams: { budget: 'b-vs', fiscalYear: 'fy-1' } });
+    });
+
+    it('opens the Anträge and the bookings of the cost centre from the two buttons (§ 001873)', async () => {
+      const view = await setup({ apps: [app({ applicationId: 'a-1' })] });
+      const nav = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
       view.fixture.detectChanges();
-      screen.getByRole('button', { name: 'Alle ansehen' }).click();
-      view.fixture.detectChanges();
-      expect(view.c.itemsOpen()).toBe(true);
-      const req = view.http.expectOne((r) => r.url.endsWith('/expenses') && r.params.get('limit') === '50');
-      expect(req.request.params.get('budget')).toBe('b-vs');
-      req.flush({ items: [], total: 0, limit: 50, offset: 0 });
-      view.fixture.detectChanges();
-      expect(screen.getByRole('dialog', { name: 'Anträge und Buchungen' })).toBeTruthy();
+      screen.getByRole('button', { name: 'Anträge ansehen' }).click();
+      expect(nav).toHaveBeenCalledWith(['/applications'], { queryParams: { budget: 'b-vs' } });
+      screen.getByRole('button', { name: 'Buchungen ansehen' }).click();
+      expect(nav).toHaveBeenLastCalledWith(['/expenses'], { queryParams: { budget: 'b-vs', fiscalYear: 'fy-1' } });
+      expect(screen.queryByRole('button', { name: 'Alle ansehen' })).toBeNull();
+    });
+
+    it('names the two buttons short on a phone', async () => {
+      const view = await setup({ wide: false, phone: true, apps: [app({ applicationId: 'a-1' })] });
+      const section = view.container.querySelector('[aria-labelledby="bd-apps"]') as HTMLElement;
+      expect(within(section).getByRole('button', { name: 'Anträge' })).toBeInTheDocument();
+      expect(within(section).getByRole('button', { name: 'Buchungen' })).toBeInTheDocument();
+    });
+
+    it('sends no year to the bookings when the page has none', async () => {
+      const view = await setup();
+      const nav = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      view.c.selectedFyId.set('');
+      view.c.openBookings();
+      expect(nav).toHaveBeenCalledWith(['/expenses'], { queryParams: { budget: 'b-vs', fiscalYear: null } });
     });
 
     /** A second click while it runs does nothing. */
@@ -543,7 +571,7 @@ describe('BudgetDashboardComponent', () => {
       jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
       jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
       const { c, http } = await setup();
-      screen.getByRole('button', { name: /Exportieren/ }).click();
+      c.onAction({ id: 'export', label: '' });
       expect(c.exporting()).toBe(true);
       c.onExport();
       const req = http.expectOne((r) => r.url.includes('/budget/export.xlsx'));
@@ -776,6 +804,8 @@ describe('BudgetDashboardComponent', () => {
       expect(view.http.match((r) => r.url.endsWith('/expenses'))).toHaveLength(0);
       const section = view.container.querySelector('[aria-labelledby="bd-apps"]') as HTMLElement;
       expect(section.querySelector('h3')?.textContent).toContain('Anträge auf dieser Kostenstelle');
+      expect(within(section).getByRole('button', { name: 'Anträge ansehen' })).toBeInTheDocument();
+      expect(within(section).queryByRole('button', { name: 'Buchungen ansehen' })).toBeNull();
     });
 
     it('shows at most five items', async () => {
@@ -787,10 +817,10 @@ describe('BudgetDashboardComponent', () => {
       expect(view.container.querySelectorAll('[aria-labelledby="bd-apps"] app-list-item')).toHaveLength(5);
     });
 
-    it('says so when the cost centre has no items and hides "Alle ansehen"', async () => {
+    it('says so when the cost centre has no items and hides the buttons', async () => {
       await setup();
       expect(screen.getByText('Keine Anträge oder Buchungen auf dieser Kostenstelle.')).toBeTruthy();
-      expect(screen.queryByRole('button', { name: 'Alle ansehen' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Anträge ansehen' })).toBeNull();
     });
 
     it('shows a placeholder while loading and an error when the request fails', async () => {
@@ -1038,11 +1068,13 @@ describe('BudgetDashboardComponent', () => {
       view.http.match(() => true);
     });
 
-    it('names the sheet after the path and puts the actions beside the title', async () => {
+    /** 001500: no visible title beyond a phone; the actions end the line of the chips. */
+    it('names the sheet after the path and puts the actions at the end of the chips', async () => {
       const view = await setup({ wide: false });
       const article = view.container.querySelector('article.bd__sheet');
       expect(article?.getAttribute('aria-label')).toBe('VS-Mittel');
-      expect(view.container.querySelector('.bd__topRow .bd__actions')).toBeTruthy();
+      expect(view.container.querySelector('.bd__chips > .bd__chipActions .bd__actions')).toBeTruthy();
+      expect(view.container.querySelector('.bd__topRow .bd__actions')).toBeNull();
       expect(view.container.querySelector('app-sheet-bar')).toBeNull();
     });
   });
@@ -1513,6 +1545,14 @@ describe('BudgetDashboardComponent income Titel', () => {
     expect(within(view.container.querySelector('.bd__figs') as HTMLElement).getByText('Einnahmen (Ist)')).toBeTruthy();
   });
 
+  it('gives every column of the figure grid the width of the longest amount, so the rows line up', async () => {
+    const view = await incomeSetup();
+    // The longest amount ("100,00 €", 8 characters) is below the floor of 10 characters; jsdom measures no width.
+    expect(view.c.figMin()).toBe('8.75rem');
+    const figs = view.container.querySelector('.bd__figs') as HTMLElement;
+    expect(figs.style.getPropertyValue('--fig-min')).toBe('8.75rem');
+  });
+
   it('§F/finance/budget/001263: the tree row of an income Titel shows its Ansatz and the reached part', async () => {
     const view = await incomeSetup();
     const row = view.c.treeRows().find((r: { node: { id: string } }) => r.node.id === 'b-1');
@@ -1586,8 +1626,8 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   it('shows the cards that link the cost centre on its card, with the actions', async () => {
     const todos = {
-      linked: jest.fn(() =>
-        of([
+      links: jest.fn(() =>
+        of(linksOf([
           {
             id: 'k-1',
             boardId: 'b-1',
@@ -1600,15 +1640,17 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
             event: null,
             balance: null,
           },
-        ]),
+        ], [linkRow({ kind: 'invoice', title: 'RE-2026-17' })])),
       ),
       boards: jest.fn(() => of([{ id: 'b-1', name: 'StuPa', kind: 'gremium', gremiumId: 'g-1', canWrite: true }])),
     };
     await setup({ queryParams: { costCentre: 'b-810' }, todos });
-    expect(todos.linked).toHaveBeenCalledWith('budget', 'b-810');
+    expect(todos.links).toHaveBeenCalledWith('budget', 'b-810');
     const list = document.querySelector('app-todo-linked-list[kind="budget"]') as HTMLElement;
     expect(within(list).getByRole('heading', { name: 'Verknüpft' })).toBeInTheDocument();
     expect(within(list).getByRole('link', { name: 'Inventur Bühnentechnik' })).toHaveAttribute('href', '/todos?card=k-1');
+    expect(within(list).getByRole('link', { name: 'RE-2026-17' })).toHaveAttribute('href', '/invoices?id=i-1');
+    expect(within(list).getByRole('button', { name: 'Verknüpfen' })).toBeInTheDocument();
     expect(within(list).getByRole('button', { name: 'To-Do anlegen' })).toBeInTheDocument();
   });
 
@@ -1668,7 +1710,11 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       expect(screen.queryByRole('heading', { name: 'Kostenstelle' })).toBeNull();
       expect(screen.getByRole('heading', { name: 'Auslastung' })).toBeInTheDocument();
       await userEvent.click(within(view.container.querySelector('.bd__head') as HTMLElement).getByRole('button', { name: 'Weitere Aktionen' }));
-      expect((await screen.findAllByRole('menuitem')).map((i) => i.textContent?.trim())).toEqual(['Buchungen ansehen', 'Kostenstelle löschen']);
+      expect((await screen.findAllByRole('menuitem')).map((i) => i.textContent?.trim())).toEqual([
+        'Exportieren',
+        'Buchungen ansehen',
+        'Kostenstelle löschen',
+      ]);
     });
 
     it('§F/finance/budget/000877: locks the key and the name of a Kostenstelle in a budget with a Haushaltsplan', async () => {

@@ -47,9 +47,9 @@
   <app-skeleton variant="rows" [count]="5" [label]="'gremien.decisions.loading' | t" />
 } @else if (!groups().length) {
   @if (filterActive()) {
-    <app-empty-state rows="3" [heading]="'gremien.decisions.noMatch' | t" />
+    <app-empty-state icon="searchOff" rows="3" [heading]="'gremien.decisions.noMatch' | t" />
   } @else {
-    <app-empty-state rows="3" [heading]="'gremien.decisions.empty' | t" />
+    <app-empty-state icon="vote" rows="3" [heading]="'gremien.decisions.empty' | t" />
   }
 } @else {
   @for (g of groups(); track g.key) {
@@ -94,9 +94,11 @@
       @if (moreError()) {
         <app-load-error [message]="'gremien.decisions.moreError' | t" (retry)="loadMore()" />
       } @else {
-        <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">
-          {{ 'gremien.decisions.more' | t }}
-        </app-button>
+        <app-button-group>
+          <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">
+            {{ 'gremien.decisions.more' | t }}
+          </app-button>
+        </app-button-group>
       }
     </div>
   }

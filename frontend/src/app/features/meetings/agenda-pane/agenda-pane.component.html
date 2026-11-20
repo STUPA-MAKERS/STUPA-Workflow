@@ -65,12 +65,14 @@
                 <app-badge variant="neutral">{{ 'meetings.agenda.nonPublic' | t }}</app-badge>
               }
               @if (menus()[i].length) {
-                <app-row-menu
-                  class="ap__menu"
-                  [sections]="menus()[i]"
-                  [label]="menuLabel(item)"
-                  (selected)="onAction(item, i, $event)"
-                />
+                <app-button-group>
+                  <app-row-menu
+                    class="ap__menu"
+                    [sections]="menus()[i]"
+                    [label]="menuLabel(item)"
+                    (selected)="onAction(item, i, $event)"
+                  />
+                </app-button-group>
               }
             </span>
           </app-list-item>
@@ -79,19 +81,14 @@
       </li>
     }
   </ol>
-  @if (planEnd(); as end) {
-    <p class="ap__plan-end" [class.ap__plan-end--over]="plan().overrun">{{ end }}</p>
-  }
 } @else {
-  <app-empty-state shape="agenda" rows="3" [heading]="'meetings.agenda.empty' | t" />
+  <app-empty-state icon="list" shape="agenda" rows="3" [heading]="'meetings.agenda.empty' | t" />
 }
 
 @if (todoOpen()) {
   <app-todo-new-dialog appBodyPortal [(open)]="todoOpen" [gremiumId]="meeting().gremiumId" [initialLinks]="todoLinks()" (created)="onTodoCreated($event)" />
 }
-@if (linkOpen() && linkItem(); as item) {
-  <app-todo-link-card-dialog appBodyPortal [(open)]="linkOpen" kind="agenda_item" [targetId]="item.id" [exclude]="linkExclude()" />
-}
+<app-todo-link-picker [(open)]="linkOpen" [exclude]="linkEnd()" (picked)="linkPicked($event)" />
 
 <app-confirm-dialog
   appBodyPortal

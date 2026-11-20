@@ -5,6 +5,7 @@ import {
   blankState,
   blankTransition,
   emptyFlowGraph,
+  isDraftWithdrawal,
   normalizeFlowGraph,
   validateFlowGraph,
 } from './flow-graph.util';
@@ -33,6 +34,44 @@ function graph(overrides: Partial<FlowGraph> = {}): FlowGraph {
     ...overrides,
   };
 }
+
+describe('the target for replaced Anträge (001722) and the draft withdrawal (001712)', () => {
+  const withTarget = (extra: Partial<FlowGraph['states'][number]> = {}): FlowGraph =>
+    graph({
+      states: [
+        ...graph().states,
+        { key: 'replaced', label: { de: 'Ersetzt' }, isTerminal: true, isDenied: true, isReplacedTarget: true, ...extra },
+      ],
+    });
+
+  it('counts the target as reachable without a transition', () => {
+    expect(validateFlowGraph(withTarget())).toEqual({ valid: true, errors: [] });
+    expect(normalizeFlowGraph(withTarget()).states.at(-1)?.isReplacedTarget).toBe(true);
+  });
+
+  it('wants one target, terminal and denied', () => {
+    expect(keys(validateFlowGraph(withTarget({ isDenied: false })))).toEqual(['admin.flow.err.replacedTargetKind']);
+    const two = graph({
+      states: [
+        ...withTarget().states,
+        { key: 'replaced2', label: { de: 'Ersetzt 2' }, isTerminal: true, isDenied: true, isReplacedTarget: true },
+      ],
+    });
+    expect(keys(validateFlowGraph(two))).toEqual(['admin.flow.err.replacedTargetMany']);
+  });
+
+  it('finds a manual applicant transition from the start into a terminal state', () => {
+    const states = [
+      { key: 'draft', label: { de: 'Entwurf' }, isInitial: true },
+      { key: 'gone', label: { de: 'Zurückgezogen' }, isTerminal: true },
+    ];
+    const t = { from: 'draft', to: 'gone', guard: { actorIsApplicant: true } } as never;
+    expect(isDraftWithdrawal(t, states)).toBe(true);
+    expect(isDraftWithdrawal({ ...(t as object), automatic: true } as never, states)).toBe(false);
+    expect(isDraftWithdrawal({ from: 'draft', to: 'gone' }, states)).toBe(false);
+    expect(isDraftWithdrawal({ ...(t as object), to: 'draft' } as never, states)).toBe(false);
+  });
+});
 
 describe('validateFlowGraph', () => {
   it('accepts a well-formed graph', () => {

@@ -22,7 +22,8 @@ from app.shared.schemas import FrozenStrictCamelModel
 
 MeetingStatus = Literal["planned", "live", "closed"]
 ProtocolStatus = Literal["draft", "rendering", "final"]
-AttendanceState = Literal["present", "excused", "absent", "delegated"]
+#: ``seat`` and ``no_seat`` are the states of a pool substitute (§F/meetings/meetings/001311).
+AttendanceState = Literal["present", "excused", "absent", "delegated", "seat", "no_seat"]
 DecisionKind = Literal["application", "election", "motion"]
 DecisionResultFilter = Literal["passed", "rejected"]
 
@@ -104,6 +105,9 @@ class AttendanceCellOut(_GremienOut, frozen=True):
     ``member`` tells whether the principal holds a membership in the gremium.
     ``delegated`` counts the meetings in which the member transferred the vote. A
     meeting without a record counts as absent and appears in no number.
+
+    In a row with ``pool``, ``member`` is always true and ``present`` counts the pool
+    seats of the month; ``excused`` and ``delegated`` are 0.
     """
 
     month: str
@@ -114,7 +118,11 @@ class AttendanceCellOut(_GremienOut, frozen=True):
 
 
 class AttendanceRowOut(_GremienOut, frozen=True):
-    """One person of the attendance matrix."""
+    """One person of the attendance matrix.
+
+    A row with ``pool`` is a pool substitute of the gremium (§F/meetings/meetings/001310):
+    no role, no unexcused absences, and its cells count pool seats.
+    """
 
     principal_id: UUID
     display_name: str | None
@@ -125,6 +133,7 @@ class AttendanceRowOut(_GremienOut, frozen=True):
     #: status ``absent`` (§F/meetings/meetings/000920).
     unexcused: int
     cells: tuple[AttendanceCellOut, ...]
+    pool: bool = False
 
 
 class AttendanceOut(_GremienOut, frozen=True):
@@ -154,6 +163,7 @@ class MemberMeetingOut(_GremienOut, frozen=True):
     date: _date | None
     start_time: _time | None
     status: AttendanceState
+    #: The delegate of a ``delegated`` meeting, or the represented member of a ``seat``.
     delegate_name: str | None
     #: The end of the late-excuse window, only on the own ``absent`` row while the
     #: window is open (§F/meetings/meetings/000922).
@@ -248,3 +258,25 @@ class GremiumInfoOut(_GremienOut, frozen=True):
     updated_at: _datetime | None
     updated_by_name: str | None
     can_edit: bool
+
+
+#: The limits of a message to the members (spec 001854).
+NOTIFY_MAX_SUBJECT: Final = 200
+NOTIFY_MAX_MESSAGE: Final = 10_000
+
+
+class GremiumNotifyIn(_GremienOut, frozen=True):
+    """A message to the members: a subject and a plain text, both not blank."""
+
+    subject: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=NOTIFY_MAX_SUBJECT)
+    ]
+    message: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=NOTIFY_MAX_MESSAGE)
+    ]
+
+
+class GremiumNotifyOut(_GremienOut, frozen=True):
+    """The result of a send: the number of recipients, never their addresses."""
+
+    recipients: int

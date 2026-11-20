@@ -1,5 +1,23 @@
+@use 'display' as d;
+
 :host {
   display: inline-flex;
-  margin-inline-end: calc(-1 * var(--space-2));
+  flex: none;
   color: var(--color-text-muted);
+}
+// The arrow of a row that opens a page pulls into the end padding of the row.
+:host(:not(.rch--expand)) {
+  margin-inline-end: calc(-1 * var(--space-2));
+}
+// The arrow of a row that opens in place points down and turns up while the row is open.
+:host(.rch--expand) {
+  transition: transform var(--motion-base) var(--ease-standard);
+}
+:host(.rch--open) {
+  transform: rotate(180deg);
+}
+@include d.host-on(motion) {
+  :host(.rch--expand) {
+    transition: none;
+  }
 }

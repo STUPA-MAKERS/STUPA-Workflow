@@ -7,7 +7,7 @@ import {
   provideBrowserGlobalErrorListeners,
   provideZoneChangeDetection,
 } from '@angular/core';
-import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { provideHttpClient, withInterceptors, withXhr } from '@angular/common/http';
 import {
   TitleStrategy,
   UrlSerializer,
@@ -27,6 +27,7 @@ import {
   ThemeService,
   DisplaySettingsService,
   UI_KIT_AVATAR_SOURCE,
+  providePressRipple,
 } from '@stupa-makers/ui-kit';
 import { provideRouteMotion, watchUAVisualTransitions } from '@stupa-makers/ui-kit/shell';
 import {
@@ -82,6 +83,7 @@ export const appConfig: ApplicationConfig = {
       provideRouteMotion(),
     ),
     provideHttpClient(
+      withXhr(),
       withInterceptors(
         isDevMode()
           ? [loadingInterceptor, cacheInterceptor, reachabilityInterceptor, authInterceptor, lazyMockApiInterceptor]
@@ -96,6 +98,8 @@ export const appConfig: ApplicationConfig = {
       useFactory: () => (inject(USE_MOCK_API) ? inject(MockLiveVoteSource) : inject(WsService)),
     },
     provideAppUiKit(),
+    // The point of a press, the press with a key and the fade of the ripple (001314).
+    providePressRipple(),
     { provide: UI_KIT_AVATAR_SOURCE, useExisting: AvatarService },
     provideAppInitializer(() => {
       inject(ThemeService).init();

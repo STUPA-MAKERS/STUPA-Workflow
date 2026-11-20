@@ -2,12 +2,10 @@
 id: "000573"
 title: A link between two cards shows on both cards
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-09
-implementation:
-  - backend/app/modules/todos/service.py
-  - frontend/src/app/features/todos/card-detail/todo-card-detail.component.ts
+updated: 2026-11-19
+replaced_by: F/collaboration/links/001401
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos

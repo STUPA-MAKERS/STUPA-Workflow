@@ -55,11 +55,14 @@ from app.modules.applications.schemas import (
     ApplicationListItem,
     ApplicationOut,
     ApplicationPatch,
+    BulkCommentCreate,
     CommentCreate,
     CommentOut,
     CommentPatch,
     OnBehalfCreate,
     TimelineEventOut,
+    TypeChangeIn,
+    TypeChangePreviewOut,
     VersionOut,
 )
 from app.modules.applications.service import ApplicationsService
@@ -68,7 +71,9 @@ from app.modules.audit.service import record as audit_record
 from app.modules.auth.people import PersonRef
 from app.modules.files.service import FilesService
 from app.modules.flow.dispatch import ActionDispatcher
-from app.modules.flow.router import get_action_dispatcher
+from app.modules.flow.router import get_action_dispatcher, get_flow_service
+from app.modules.flow.schemas import BulkItemResult, BulkResult
+from app.modules.flow.service import FlowService
 from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.notifications.chat_mail import comment_mail_text
 from app.modules.notifications.provider import mail_queue_from_pool
@@ -81,6 +86,7 @@ from app.shared.antiabuse import (
     verify_altcha_unless_authenticated,
 )
 from app.shared.errors import (
+    AppError,
     ForbiddenError,
     PayloadTooLargeError,
     ProblemDetail,
@@ -107,6 +113,7 @@ def get_applications_service(session: DbSession) -> ApplicationsService:
 
 
 ServiceDep = Annotated[ApplicationsService, Depends(get_applications_service)]
+FlowServiceDep = Annotated[FlowService, Depends(get_flow_service)]
 
 
 async def _deliver_magic_link(
@@ -662,6 +669,64 @@ async def unarchive_application(
     )
 
 
+#: Change the Antragsart of a submitted application (spec 001660).
+CHANGE_TYPE_PERMISSION = "application.change_type"
+
+TypeChanger = Annotated[Principal, Depends(require_principal(CHANGE_TYPE_PERMISSION))]
+
+
+@router.get(
+    "/applications/{application_id}/type-change",
+    response_model=TypeChangePreviewOut,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def preview_type_change(
+    application_id: UUID,
+    type_id: Annotated[UUID, Query(alias="typeId")],
+    service: ServiceDep,
+    flow: FlowServiceDep,
+    principal: TypeChanger,
+) -> TypeChangePreviewOut:
+    """Show what a change of the Antragsart to ``typeId`` does (spec 001661).
+
+    The answer lists the carried, the missing and the dropped fields. With a missing
+    required value it lists the manual transitions into a state with ``editAllowed``
+    that the caller may fire. The caller must read the application.
+    """
+    await resolve_app_read(service.session, application_id, principal, None)
+    return await service.type_change_preview(application_id, type_id, principal, flow)
+
+
+@router.post(
+    "/applications/{application_id}/type-change",
+    response_model=ApplicationOut,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def change_application_type(
+    application_id: UUID,
+    payload: TypeChangeIn,
+    service: ServiceDep,
+    flow: FlowServiceDep,
+    principal: TypeChanger,
+) -> ApplicationOut:
+    """Change the Antragsart of a submitted application (specs 001660-001663).
+
+    The change writes a new version in the form of the new type and keeps the old
+    version. With a missing required value it fires ``transitionId`` back to the
+    applicant, with the missing fields in the note. The caller must read the application.
+    """
+    await resolve_app_read(service.session, application_id, principal, None)
+    strip = not await _principal_reads_pii(service, application_id, principal)
+    staged = await service.stage_type_change(application_id, payload, principal, flow)
+    await service.session.commit()
+    if staged is not None:
+        await flow.after_commit(staged)
+    # The flow writes server-side values (updated_at) that the session does not hold, and
+    # reading such an expired column outside the greenlet raises MissingGreenlet.
+    service.session.expire_all()
+    return await service.get(application_id, include_pii=False, strip_pii_fields=strip)
+
+
 async def _principal_reads_pii(
     service: ApplicationsService, application_id: UUID, principal: Principal
 ) -> bool:
@@ -1042,3 +1107,72 @@ async def list_applicant_applications(
         ids, await observed_ids(service.session, applicant.email)
     )
     return ApplicantApplicationsOut(email=applicant.email, items=tuple(items))
+
+
+@router.post(
+    "/bulk/applications/comments",
+    response_model=BulkResult,
+    responses=_errors(400, 401, 403, 422),
+)
+async def add_bulk_comment(
+    payload: BulkCommentCreate,
+    service: ServiceDep,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    send_comment_mails: Annotated[CommentMailSender, Depends(get_comment_mail_sender)],
+    principal: Annotated[Principal, Depends(require_principal(MANAGE_PERMISSION))],
+) -> BulkResult:
+    """Add the same public comment to each selected Antrag (spec 001702).
+
+    Each comment is a normal public comment of the caller in its own transaction, and
+    each sends the normal comment mail to its applicant. An Antrag that the caller cannot
+    read, or another error at one Antrag, does not stop the others: its entry carries the
+    code and the text of the error (spec 001703).
+    """
+    pool = getattr(request.app.state, "arq_pool", None)
+    results = [
+        await _bulk_comment_one(
+            service, settings, background, send_comment_mails, principal, app_id, payload.body, pool
+        )
+        for app_id in dict.fromkeys(payload.application_ids)
+    ]
+    return BulkResult(results=tuple(results))
+
+
+async def _bulk_comment_one(
+    service: ApplicationsService,
+    settings: Settings,
+    background: BackgroundTasks,
+    send_comment_mails: CommentMailSender,
+    principal: Principal,
+    application_id: UUID,
+    body: str,
+    pool: object,
+) -> BulkItemResult:
+    """Add the comment of a bulk message to one Antrag and queue its mail."""
+    try:
+        await resolve_app_read(service.session, application_id, principal, None)
+        comment = await service.add_comment(
+            application_id,
+            author=principal.sub,
+            author_kind="principal",
+            body=body,
+            visibility="public",
+            allow_unconfirmed=False,
+        )
+    except AppError as exc:
+        await service.session.rollback()
+        return BulkItemResult(applicationId=application_id, ok=False, code=exc.code, error=str(exc))
+    background.add_task(
+        send_comment_mails,
+        settings,
+        application_id,
+        comment.id,
+        "principal",
+        "public",
+        comment_mail_text(body, []),
+        comment.author,
+        pool,
+    )
+    return BulkItemResult(applicationId=application_id, ok=True)

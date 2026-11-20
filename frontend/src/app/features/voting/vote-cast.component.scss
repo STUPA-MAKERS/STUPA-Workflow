@@ -1,4 +1,3 @@
-@use 'scroll-fade' as fade;
 
 :host {
   display: flex;
@@ -107,10 +106,7 @@
   display: flex;
   flex: none;
   align-items: center;
-  gap: var(--space-1);
-}
-.vc--sheet .vc__actions {
-  margin-inline-end: calc(-1 * var(--space-3));
+  gap: 2px;
 }
 .vc--ready.vc--sheet .vc__body {
   flex: 1 1 auto;
@@ -119,9 +115,6 @@
   overscroll-behavior: contain;
   padding: 0 var(--space-6) var(--space-6);
   scroll-padding-block: var(--space-5);
-}
-.vc--ready.vc--sheet .vc__body {
-  @include fade.fade-y(var(--space-5));
 }
 
 .vc__link {

@@ -191,6 +191,8 @@ async function setup(
     skipTimelineFlush?: boolean;
     /** The `?item=` of a link to an agenda item. */
     item?: string;
+    /** The `?committee=` of a link from a Gremium. */
+    committee?: string;
   } = {},
 ) {
   const perms = opts.perms ?? ['admin', 'protocol.write'];
@@ -210,7 +212,12 @@ async function setup(
         provide: ActivatedRoute,
         useValue: {
           paramMap: of(convertToParamMap(id ? { id } : {})),
-          queryParamMap: of(convertToParamMap(opts.item ? { item: opts.item } : {})),
+          queryParamMap: of(
+            convertToParamMap({
+              ...(opts.item ? { item: opts.item } : {}),
+              ...(opts.committee ? { committee: opts.committee } : {}),
+            }),
+          ),
         },
       },
     ],
@@ -264,6 +271,21 @@ function flushDelegationContext(http: HttpTestingController): void {
 
 describe('MeetingsComponent', () => {
   /** The list and its header do not show, so the page header titles the notice. */
+  it('opens the list filtered to the Gremium of `?committee=` (§ 001871)', async () => {
+    const { http } = await setup({
+      id: null,
+      committee: 'g-2',
+      skipTimelineFlush: true,
+      gremien: [{ id: 'g-1', name: 'StuPa' }, { id: 'g-2', name: 'FA' }],
+    });
+    const reqs = http.match((r) => r.url.endsWith('/meetings/timeline'));
+    expect(reqs.length).toBe(2);
+    for (const r of reqs) {
+      expect(r.request.params.get('gremiumId')).toBe('g-2');
+      r.flush({ items: [], nextCursor: null });
+    }
+  });
+
   it('shows a forbidden notice without the required permissions', async () => {
     await setup({ perms: [], id: null });
     expect(screen.getByRole('alert')).toHaveTextContent(/Keine Berechtigung/i);
@@ -373,7 +395,7 @@ describe('MeetingsComponent', () => {
     expect(finReq.request.method).toBe('POST');
     finReq.flush({ ...PROTOCOL, status: 'final', pdfUrl: 'https://example/p.pdf' });
 
-    expect(await screen.findByText('Final')).toBeInTheDocument();
+    expect(await screen.findByText(/^Protokoll final/)).toBeInTheDocument();
   });
 
   /**
@@ -395,8 +417,8 @@ describe('MeetingsComponent', () => {
 
     const internal = await screen.findByRole('link', { name: 'PDF intern' });
     expect(internal).toHaveAttribute('href', '/api/protocols/p-1/pdf');
-    const pub = await screen.findByRole('link', { name: 'PDF öffentlich' });
-    expect(pub).toHaveAttribute('href', '/api/protocols/p-1/pdf/public');
+    await userEvent.click(screen.getByRole('button', { name: 'Sitzungsmenü' }));
+    expect(await screen.findByRole('menuitem', { name: 'PDF öffentlich' })).toBeInTheDocument();
   });
 
   /**
@@ -491,7 +513,7 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1/agenda').flush([]);
     flushDelegationContext(http);
 
-    await screen.findByText('Final');
+    await screen.findByText(/^Protokoll final/);
     expect(container.querySelector('.mtg__saveState')).toBeNull();
   });
 
@@ -541,7 +563,7 @@ describe('MeetingsComponent', () => {
   it('keeps the final protocol of a closed meeting locked for every writer', async () => {
     const { http, fixture } = await setup();
     flushClosed(http, 'final');
-    await screen.findByText('Final');
+    await screen.findByText(/^Protokoll final/);
     expect((fixture.componentInstance as Cmp).canEditProtocol()).toBe(true);
     expect(screen.queryByRole('toolbar', { name: 'Format' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Ins Protokoll übernehmen' })).toBeNull();
@@ -567,7 +589,7 @@ describe('MeetingsComponent', () => {
     const finReq = http.expectOne('/api/protocols/p-1/finalize');
     expect(finReq.request.method).toBe('POST');
     finReq.flush({ ...PROTOCOL, status: 'final', pdfUrl: 'https://example/p.pdf' });
-    expect(await screen.findByText('Final')).toBeInTheDocument();
+    expect(await screen.findByText(/^Protokoll final/)).toBeInTheDocument();
   });
 
   /** "Abbrechen" closes without a finalize. */
@@ -620,7 +642,8 @@ describe('MeetingsComponent', () => {
     await screen.findByText('Sitzungssteuerung');
     ws.subject.next({ type: 'meeting_state', activeApplicationId: 'app-2', status: 'closed' });
     fixture.detectChanges();
-    expect(screen.getByText('Geschlossen', { selector: 'app-status-text' })).toBeInTheDocument();
+    // A closed meeting with a protocol shows the state of the protocol (spec 001304).
+    expect(screen.getByText('Protokoll-Entwurf', { selector: 'app-status-text' })).toBeInTheDocument();
   });
 
   it('shows an error notice when the meeting fails to load', async () => {
@@ -2325,6 +2348,7 @@ describe('MeetingsComponent — methods', () => {
       cmp.agenda.set([AGENDA_ITEM(), AGENDA_ITEM({ id: 't-2', position: 1 })] as never);
       cmp.jumpNext('t-2', 't-1');
       expect(cmp.selectedTopId()).toBe('t-2');
+      expect(cmp.agenda()[0].doneAt).toEqual(expect.any(String));
       const req = http.expectOne('/api/meetings/m-1');
       expect(req.request.method).toBe('PATCH');
       expect(req.request.body).toEqual({ currentAgendaItemId: 't-2', completeAgendaItemId: 't-1' });
@@ -2333,6 +2357,16 @@ describe('MeetingsComponent — methods', () => {
         .expectOne((r) => r.method === 'GET' && r.url === '/api/meetings/m-1/agenda')
         .flush([AGENDA_ITEM({ doneAt: '2026-10-15T16:30:00Z' }), AGENDA_ITEM({ id: 't-2', position: 1 })]);
       expect(cmp.agenda()[0].doneAt).toBe('2026-10-15T16:30:00Z');
+    });
+
+    it('takes the tick of "Nächster TOP" back when the server refuses the step', async () => {
+      const { cmp, http } = await loaded();
+      cmp.meeting.set({ ...MEETING_MODEL, isProtokollant: true, currentAgendaItemId: 't-1' });
+      cmp.agenda.set([AGENDA_ITEM(), AGENDA_ITEM({ id: 't-2', position: 1 })] as never);
+      cmp.jumpNext('t-2', 't-1');
+      expect(cmp.agenda()[0].doneAt).toEqual(expect.any(String));
+      http.expectOne('/api/meetings/m-1').flush({ detail: 'nope' }, { status: 409, statusText: 'Conflict' });
+      expect(cmp.agenda()[0].doneAt).toBeNull();
     });
 
     it('leaves the meeting untouched when the "now" broadcast fails', async () => {

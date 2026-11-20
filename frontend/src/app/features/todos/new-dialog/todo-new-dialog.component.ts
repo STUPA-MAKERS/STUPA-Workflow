@@ -30,6 +30,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   ChipComponent,
   DatepickerComponent,
   TimeInputComponent,
@@ -43,6 +44,7 @@ import {
   type SelectOption,
   TextareaComponent,
   ToastService,
+  ErrorTextComponent,
 } from '@stupa-makers/ui-kit';
 import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-upload.directive';
 import { TodoLinkPickerComponent, linkKey } from '../link-picker/todo-link-picker.component';
@@ -90,11 +92,13 @@ export interface TodoCardCopy {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ErrorTextComponent,
     TextareaComponent,
     ChipComponent,
     FormsModule,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     DatepickerComponent,
     TimeInputComponent,
     DialogComponent,

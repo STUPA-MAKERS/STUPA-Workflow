@@ -105,14 +105,18 @@ neighbors), `todo_comment`, `todo_board_create` (a free board), `todo_board_entr
 `todo_board_entry_add`, `todo_board_entry_update`, `todo_board_entry_remove`,
 `todo_board_archive`, `todo_board_restore`, `todo_board_delete`, the checklist (subtasks)
 `todo_checklist_add`, `todo_checklist_update`, `todo_checklist_remove`, the card parts
-(`todo_card_assignee_*`, `todo_card_label_*`, `todo_card_link_*`, `todo_card_event_set`,
+(`todo_card_assignee_*`, `todo_card_label_*`, `todo_card_event_set`,
 `todo_card_archive`, `todo_card_restore`) and the board setup (`todo_column_*`,
 `todo_label_*`, `todo_board_update`).
+Links between any two elements (spec 001409): `link_list`, `link_add`, `link_remove`,
+`link_targets`, `link_view`.
 Gremien and Kalender: `gremien_overview`, `gremium_members`, `gremium_decisions`,
-`gremium_attendance`, `get_gremium_info`, `set_gremium_info`, `calendar_entries`,
-`create_appointment`, `answer_appointment`.
+`gremium_attendance`, `get_gremium_info`, `set_gremium_info`, `notify_gremium_members`,
+`calendar_entries`, `create_appointment`, `answer_appointment`.
 Search and profile: `search`, `get_profile`.
 Activity: `list_activity`, `get_activity_status`, `mark_activity_seen`.
+
+Graph: `graph_read` (the elements of the caller and their relations, one page per call; needs `graph.view`).
 Tickets: `tickets_list`, `tickets_get`, `tickets_note`, `tickets_update`,
 `tickets_block_sender`, `tickets_unblock_sender`, `tickets_blocked_senders`,
 `tickets_delete_blocked_sender` (need `ticket.manage`); as a reporter `tickets_report`,

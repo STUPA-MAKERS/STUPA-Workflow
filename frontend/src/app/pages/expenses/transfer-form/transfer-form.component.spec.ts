@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -89,6 +89,7 @@ let MODE: 'create' | 'edit' = 'create';
 let LAYOUT: 'pane' | 'sheet' = 'pane';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
   standalone: true,
   imports: [TransferFormComponent],
   template: `
@@ -278,7 +279,7 @@ describe('TransferFormComponent', () => {
     view.fixture.detectChanges();
     await user.click(screen.getByRole('button', { name: /^20,00\s€ umschichten$/ }));
     expect(create).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: 'Schließen' }));
+    await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
     expect(host.dialogs.transferOpen()).toBe(false);
   });
 

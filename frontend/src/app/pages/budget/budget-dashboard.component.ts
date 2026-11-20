@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, type ParamMap, Router, RouterLink } from '@angular/router';
 import { NgTemplateOutlet } from '@angular/common';
@@ -12,9 +12,11 @@ import type { Uuid } from '@core/api/models';
 import {
   FabComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   ConfirmDialogComponent,
   CurrencyInputComponent,
   DialogComponent,
+  elementSize,
   EmptyStateComponent,
   FilterSelectComponent,
   IconComponent,
@@ -42,6 +44,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { exportDownload } from '@shared/download.util';
 import { SimplifyPathPipe } from '@shared/budget-path';
 import { BUDGET_PERMISSIONS } from '../../layout/nav.service';
+import { figureColumns, figureMinRem } from './figure-grid.util';
 import {
   BudgetTreeApi,
   type BudgetAllocationView,
@@ -65,7 +68,6 @@ import { problemCode } from '@core/api/problem';
 import { toggled } from '@shared/util/immutable';
 import { formatMoney } from '@shared/format-money';
 import { BudgetItemListComponent } from './budget-items/budget-item-list.component';
-import { BudgetItemsDialogComponent } from './budget-items/budget-items-dialog.component';
 import { type BudgetItem, mergeBudgetItems } from './budget-items/budget-items';
 import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
@@ -144,7 +146,7 @@ const ZERO: Figures = {
   planned: null,
 };
 
-/** How many applications the sheet lists before "Alle ansehen". */
+/** How many items the card lists before "Anträge ansehen" and "Buchungen ansehen". */
 export const APPS_SHOWN = 5;
 
 /**
@@ -196,12 +198,12 @@ export const APPS_SHOWN = 5;
     TranslatePipe,
     SimplifyPathPipe,
     ButtonComponent,
+    ButtonGroupComponent,
     DialogComponent,
     IconComponent,
     EmptyStateComponent,
     FilterSelectComponent,
     BudgetItemListComponent,
-    BudgetItemsDialogComponent,
     RowMenuComponent,
     SearchPillComponent,
     SegmentedComponent,
@@ -535,6 +537,23 @@ export class BudgetDashboardComponent {
       : tiles;
   });
 
+  /** The figure grid of the loaded sheet, for its width. */
+  private readonly figsEl = viewChild<ElementRef<HTMLElement>>('figs');
+  private readonly figsSize = elementSize(() => this.figsEl()?.nativeElement);
+
+  /** The narrowest column of the figure grid, in rem: the longest amount at least. */
+  private readonly figMinRem = computed(() => {
+    const currency = this.current()?.currency;
+    return figureMinRem(Math.max(...this.figureList().map((f) => this.money(f.value, currency).length)));
+  });
+  /** The narrowest column of the figure grid, as a CSS length. */
+  readonly figMin = computed(() => `${this.figMinRem().toFixed(2)}rem`);
+  /** The columns of the figure grid, spread evenly over its rows (see figureColumns). */
+  readonly figCols = computed(() => {
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    return figureColumns(this.figureList().length, this.figsSize().width, this.figMinRem() * rem);
+  });
+
   /** The amount of a year is the Ansatz when the Haushalt has a Haushaltsplan, else the Zuteilung. */
   figureLabel(key: FigureKey): string {
     const planned = key === 'allocated' && !!this.selectedTop()?.planEnabled;
@@ -666,8 +685,6 @@ export class BudgetDashboardComponent {
   );
   /** The names of the cost centres, for the rows of the list. */
   readonly nodeNames = computed<ReadonlyMap<string, { name: string; incomeIn?: readonly string[] }>>(() => this.nodeById());
-  readonly itemsOpen = signal(false);
-
   readonly overviewOpen = signal(false);
   readonly overviewMetric = signal<SunburstMetric>('allocated');
   readonly overviewMetrics: readonly SunburstMetric[] = ['allocated', 'available', 'expended'];
@@ -1127,9 +1144,9 @@ export class BudgetDashboardComponent {
     this.syncUrl();
   }
 
-  /** "Alle ansehen": every application and booking in a dialog, a bottom sheet on a phone. */
-  openItems(): void {
-    this.itemsOpen.set(true);
+  /** "Anträge ansehen": the Anträge of the cost centre and its subtree (§ 001873). */
+  openApplications(): void {
+    void this.router.navigate(['/applications'], { queryParams: { budget: this.selectedKsId() } });
   }
 
   /** The action on the structure: the delete of the selected Kostenstelle. */
@@ -1158,12 +1175,9 @@ export class BudgetDashboardComponent {
     return [{ items }, ...this.structureItems()];
   }
 
-  /** The ⋮ menu of the head on a wide screen (§ 000670): what is no icon button. */
+  /** The ⋮ menu of the head on a wide screen: the same actions, the export among them (spec 001812). */
   moreSections(): RowMenuSection[] {
-    const bookings: RowMenuSection[] = this.canSeeBookings()
-      ? [{ items: [{ id: 'bookings', label: this.i18n.translate('budget.usage.viewExpenses'), icon: 'receipt' }] }]
-      : [];
-    return [...bookings, ...this.structureItems()];
+    return this.actionSections().filter((section) => section.items.length);
   }
 
   onAction(item: RowMenuItem): void {
@@ -1172,8 +1186,14 @@ export class BudgetDashboardComponent {
     else if (item.id === 'delete') this.deleteTarget.set(this.current());
   }
 
+  /**
+   * "Buchungen ansehen": the bookings of the cost centre and its subtree in the selected
+   * Haushaltsjahr (§ 001872).
+   */
   openBookings(): void {
-    void this.router.navigate(['/expenses'], { queryParams: { budget: this.selectedKsId() } });
+    void this.router.navigate(['/expenses'], {
+      queryParams: { budget: this.selectedKsId(), fiscalYear: this.selectedFyId() || null },
+    });
   }
 
   onExport(): void {

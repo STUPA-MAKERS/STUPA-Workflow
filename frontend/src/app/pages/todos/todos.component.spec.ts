@@ -242,7 +242,7 @@ describe('TodosComponent', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Board wird geladen');
     expect(cmp.openCount()).toBe(2);
     expect(screen.getByPlaceholderText('2 offene To-Dos durchsuchen')).toBeInTheDocument();
-    const icons = document.querySelectorAll('.td__skelIcon');
+    const icons = document.querySelectorAll('.skel-grp > .skel-btn');
     expect(icons).toHaveLength(2);
     const views = document.querySelector('app-segmented')!;
     expect(views.compareDocumentPosition(icons[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -257,7 +257,7 @@ describe('TodosComponent', () => {
     const { cmp } = await start('/todos/b-2', { pending: true });
     expect(cmp.summary()?.canConfigure).toBe(false);
     expect(cmp.openCount()).toBe(4);
-    expect(document.querySelectorAll('.td__skelIcon')).toHaveLength(1);
+    expect(document.querySelectorAll('.skel-grp > .skel-btn')).toHaveLength(1);
   });
 
   it('draws the list in its loaded shape while it loads', async () => {
@@ -1279,6 +1279,13 @@ describe('TodosComponent', () => {
     expect(screen.getByRole('dialog', { name: 'Board-Einstellungen' })).toBeInTheDocument();
   });
 
+  /** 001500: a pane header over the filter bar, so the kit hides the title beyond a phone. */
+  it('gives the board a pane header over its filter bar', async () => {
+    await start('/todos/b-1');
+    const pane = document.querySelector('.td.ld-pane') as HTMLElement;
+    expect(pane.querySelector(':scope > app-page-header.ph--pane + .ld-pane__filters')).toBeTruthy();
+  });
+
   it('shows the archive button in the header also for a board with no archived card', async () => {
     const { cmp, harness } = await start('/todos/b-1', { board: board({ archivedCount: 0 }) });
     const archive = screen.getByTestId('td-archive');
@@ -1469,7 +1476,7 @@ describe('TodosComponent', () => {
       await start('/todos/b-1', { pending: true });
       expect(document.querySelector('.bsk__tabs')).not.toBeNull();
       expect(document.querySelectorAll('.bv__phoneCards .bsk__tile')).toHaveLength(5);
-      expect(document.querySelector('.td__skelIcon')).not.toBeNull();
+      expect(document.querySelector('.skel-grp > .skel-btn')).not.toBeNull();
       expect(document.querySelector('.td__skelChip--filter')).not.toBeNull();
       expect(screen.queryByTestId('td-fab')).toBeNull();
     });

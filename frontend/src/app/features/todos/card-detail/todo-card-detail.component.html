@@ -8,10 +8,13 @@
             <span class="skel-text cd__skelTitle cd__skelTitle--second"></span>
           }
         </p>
-        @if (phone() || mode() === 'drawer') {
-          <span class="cd__skelIcon skel-in" aria-hidden="true"><span class="skel-box"></span></span>
-        }
-        <span class="cd__skelIcon skel-in" aria-hidden="true"><span class="skel-box"></span></span>
+        <!-- The link (a drawer) or the activity (a phone), and the menu: one group. -->
+        <span class="skel-grp skel-in" aria-hidden="true">
+          @if (phone() || mode() === 'drawer') {
+            <span class="skel-box skel-btn"></span>
+          }
+          <span class="skel-box skel-btn"></span>
+        </span>
         @if (mode() === 'drawer' && !phone()) {
           <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="closed.emit()">
             <app-icon name="x" />
@@ -40,7 +43,9 @@
   <div class="cd cd--state">
     <app-empty-state plain icon="circleok" class="cd__none" [heading]="'todos.card.notFound' | t">
       @if (mode() === 'drawer') {
-        <app-button variant="text" size="sm" (click)="closed.emit()">{{ 'todos.card.back' | t }}</app-button>
+        <app-button-group>
+          <app-button variant="text" size="sm" (click)="closed.emit()">{{ 'todos.card.back' | t }}</app-button>
+        </app-button-group>
       }
     </app-empty-state>
   </div>
@@ -56,10 +61,11 @@
           <h2 appSheetBarTitle id="cd-title" class="sheet-title cd__title">{{ card.title }}</h2>
         }
         @if (mode() === 'pane' && !phone() && boardLink(); as link) {
-          <a class="cd__boardLink" [routerLink]="link" [queryParams]="{ card: card.id }">
-            {{ 'todos.card.openInBoard' | t }}
-            <app-icon name="arrow" [size]="16" />
-          </a>
+          <app-button-group class="cd__boardLink">
+            <a appButton="text" size="sm" [routerLink]="link" [queryParams]="{ card: card.id }">{{
+              'todos.card.openInBoard' | t
+            }}</a>
+          </app-button-group>
         }
         @if (!phone() && mode() === 'drawer') {
           <app-button variant="text" [iconOnly]="true" [ariaLabel]="'todos.card.copyLink' | t" (click)="copyLink()">
@@ -100,10 +106,12 @@
             (ngModelChange)="titleDraft.set($event)"
             (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); editingTitle.set(false)"
           />
-          <app-button variant="text" (click)="editingTitle.set(false)">{{ 'action.cancel' | t }}</app-button>
-          <app-button variant="fill" [loading]="busy()" [disabled]="!titleDraft().trim()" (click)="saveTitle()">
-            {{ 'action.save' | t }}
-          </app-button>
+          <app-button-group [main]="true">
+            <app-button variant="text" (click)="editingTitle.set(false)">{{ 'action.cancel' | t }}</app-button>
+            <app-button variant="fill" [loading]="busy()" [disabled]="!titleDraft().trim()" (click)="saveTitle()">
+              {{ 'action.save' | t }}
+            </app-button>
+          </app-button-group>
         </form>
       }
       <p class="sheet-line cd__created">
@@ -214,7 +222,7 @@
 </ng-template>
 
 <ng-template #details let-card>
-  <dl class="cd__fields">
+  <dl appFacts layout="rows" class="cd__fields">
     <div class="cd__field">
       <dt>{{ 'todos.card.column' | t }}</dt>
       <dd>
@@ -501,24 +509,26 @@
   @if (canWrite() || card.links.length) {
     <app-section class="cd__sec" [heading]="'todos.card.links' | t">
       @if (canWrite()) {
-        <app-button
-          sectionAction
-          class="cd__secAction cd__secAction--icon"
-          variant="text"
-          size="sm"
-          [iconOnly]="true"
-          [ariaLabel]="'todos.card.link' | t"
-          data-testid="cd-link-add"
-          (click)="pickerOpen.set(!pickerOpen())"
-        >
-          <app-icon name="link" />
-        </app-button>
+        <app-button-group ngProjectAs="[sectionAction]">
+          <app-button
+            sectionAction
+            class="cd__secAction cd__secAction--icon"
+            variant="text"
+            size="sm"
+            [iconOnly]="true"
+            [ariaLabel]="'todos.card.link' | t"
+            data-testid="cd-link-add"
+            (click)="pickerOpen.set(!pickerOpen())"
+          >
+            <app-icon name="link" />
+          </app-button>
+        </app-button-group>
       }
       <div class="cd__pickerAnchor">
         <app-todo-link-picker
           class="cd__picker"
           [(open)]="pickerOpen"
-          [excludeCardId]="card.id"
+          [exclude]="linkSelf()"
           [linked]="linkedKeys()"
           (picked)="pickLink($event)"
         />
@@ -542,22 +552,24 @@
                 <app-icon class="cd__linkChev" name="right" [size]="16" />
               }
               @if (canWrite()) {
-                <app-button
-                  class="cd__linkX"
-                  variant="text"
-                  size="sm"
-                  [iconOnly]="true"
-                  [ariaLabel]="'todos.card.unlink' | t: { title: linkTitle(link) }"
-                  (click)="removeLink(link)"
-                >
-                  <app-icon name="x" />
-                </app-button>
+                <app-button-group>
+                  <app-button
+                    class="cd__linkX"
+                    variant="text"
+                    size="sm"
+                    [iconOnly]="true"
+                    [ariaLabel]="'todos.card.unlink' | t: { title: linkTitle(link) }"
+                    (click)="removeLink(link)"
+                  >
+                    <app-icon name="x" />
+                  </app-button>
+                </app-button-group>
               }
             </li>
           }
         </ul>
       } @else {
-        <app-empty-state shape="row" rows="1" data-testid="cd-links-empty" [heading]="'todos.card.noLinks' | t" />
+        <app-empty-state icon="link" shape="row" rows="1" data-testid="cd-links-empty" [heading]="'todos.card.noLinks' | t" />
       }
     </app-section>
 
@@ -608,17 +620,19 @@
   @if (canWrite() || card.descriptionMd) {
     <app-section class="cd__sec" [heading]="'todos.card.description' | t">
       @if (canWrite() && !editingDesc()) {
-        <app-button
-          sectionAction
-          class="cd__secAction cd__secAction--icon"
-          data-focus="desc-edit"
-          variant="text"
-          [iconOnly]="true"
-          [ariaLabel]="'todos.card.editDescription' | t"
-          (click)="startDesc()"
-        >
-          <app-icon name="edit" />
-        </app-button>
+        <app-button-group ngProjectAs="[sectionAction]">
+          <app-button
+            sectionAction
+            class="cd__secAction cd__secAction--icon"
+            data-focus="desc-edit"
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="'todos.card.editDescription' | t"
+            (click)="startDesc()"
+          >
+            <app-icon name="edit" />
+          </app-button>
+        </app-button-group>
       }
       @if (editingDesc()) {
         <label class="cd__area">
@@ -636,18 +650,20 @@
           ></textarea>
         </label>
         <div class="cd__formFoot">
-          <app-button
-            class="cd__formStart"
-            variant="text"
-            [iconOnly]="true"
-            [ariaLabel]="'markdown.image.insert' | t"
-            [loading]="descImages.uploading() > 0"
-            (click)="descImages.pick()"
-          >
-            <app-icon name="image" />
-          </app-button>
-          <app-button variant="text" (click)="cancelDesc()">{{ 'action.cancel' | t }}</app-button>
-          <app-button variant="fill" [loading]="busy()" [disabled]="descImages.uploading() > 0" (click)="saveDesc()">{{ 'action.save' | t }}</app-button>
+          <app-button-group [main]="true">
+            <app-button
+              class="cd__formStart"
+              variant="text"
+              [iconOnly]="true"
+              [ariaLabel]="'markdown.image.insert' | t"
+              [loading]="descImages.uploading() > 0"
+              (click)="descImages.pick()"
+            >
+              <app-icon name="image" />
+            </app-button>
+            <app-button variant="text" (click)="cancelDesc()">{{ 'action.cancel' | t }}</app-button>
+            <app-button variant="fill" [loading]="busy()" [disabled]="descImages.uploading() > 0" (click)="saveDesc()">{{ 'action.save' | t }}</app-button>
+          </app-button-group>
         </div>
       } @else if (card.descriptionMd) {
         <app-markdown-view class="cd__desc" [src]="card.descriptionMd" />
@@ -703,14 +719,18 @@
               (ngModelChange)="itemDraft.set($event)"
               (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); cancelItem()"
             />
-            <app-button variant="text" (click)="cancelItem()">{{ 'action.cancel' | t }}</app-button>
-            <app-button variant="fill" [disabled]="!itemDraft().trim()" (click)="addItem()">{{ 'todos.card.addItem' | t }}</app-button>
+            <app-button-group [main]="true">
+              <app-button variant="text" (click)="cancelItem()">{{ 'action.cancel' | t }}</app-button>
+              <app-button variant="fill" [disabled]="!itemDraft().trim()" (click)="addItem()">{{ 'todos.card.addItem' | t }}</app-button>
+            </app-button-group>
           </form>
         } @else {
-          <app-button class="cd__addItem" variant="text" size="sm" data-focus="item-add" (click)="startAddItem()">
-            <app-icon name="plus" />
-            {{ 'todos.card.addItem' | t }}
-          </app-button>
+          <app-button-group>
+            <app-button class="cd__addItem" variant="text" size="sm" data-focus="item-add" (click)="startAddItem()">
+              <app-icon name="plus" />
+              {{ 'todos.card.addItem' | t }}
+            </app-button>
+          </app-button-group>
         }
       }
     </app-section>
@@ -731,7 +751,9 @@
           (ngModelChange)="itemEditDraft.set($event)"
           (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); cancelRename(item)"
         />
-        <app-button variant="fill" size="sm" (click)="renameItem(item)">{{ 'action.save' | t }}</app-button>
+        <app-button-group [main]="true">
+          <app-button variant="fill" (click)="renameItem(item)">{{ 'action.save' | t }}</app-button>
+        </app-button-group>
       </form>
     } @else {
       <button
@@ -748,35 +770,37 @@
       </button>
       @if (canWrite()) {
         <span class="cd__itemActions">
-          <app-button
-            variant="text"
-            size="sm"
-            [iconOnly]="true"
-            [attr.data-to-card]="item.id"
-            [ariaLabel]="'todos.card.itemToCard' | t: { text: item.text }"
-            (click)="makeCard(item)"
-          >
-            <app-icon name="kanban" />
-          </app-button>
-          <app-button
-            variant="text"
-            size="sm"
-            [iconOnly]="true"
-            [attr.data-rename]="item.id"
-            [ariaLabel]="'todos.card.renameItem' | t: { text: item.text }"
-            (click)="startItem(item)"
-          >
-            <app-icon name="edit" />
-          </app-button>
-          <app-button
-            variant="text"
-            size="sm"
-            [iconOnly]="true"
-            [ariaLabel]="'todos.card.deleteItem' | t: { text: item.text }"
-            (click)="deleteItem(item)"
-          >
-            <app-icon name="trash" />
-          </app-button>
+          <app-button-group>
+            <app-button
+              variant="text"
+              size="sm"
+              [iconOnly]="true"
+              [attr.data-to-card]="item.id"
+              [ariaLabel]="'todos.card.itemToCard' | t: { text: item.text }"
+              (click)="makeCard(item)"
+            >
+              <app-icon name="kanban" />
+            </app-button>
+            <app-button
+              variant="text"
+              size="sm"
+              [iconOnly]="true"
+              [attr.data-rename]="item.id"
+              [ariaLabel]="'todos.card.renameItem' | t: { text: item.text }"
+              (click)="startItem(item)"
+            >
+              <app-icon name="edit" />
+            </app-button>
+            <app-button
+              variant="text"
+              size="sm"
+              [iconOnly]="true"
+              [ariaLabel]="'todos.card.deleteItem' | t: { text: item.text }"
+              (click)="deleteItem(item)"
+            >
+              <app-icon name="trash" />
+            </app-button>
+          </app-button-group>
         </span>
       }
     }
@@ -784,7 +808,7 @@
 </ng-template>
 
 <ng-template #detailsSkel>
-  <dl class="cd__fields">
+  <dl appFacts layout="rows" class="cd__fields">
     <div class="cd__field">
       <dt>{{ 'todos.card.column' | t }}</dt>
       <dd class="cd__chips skel-in"><span class="skel-box cd__skelChip"></span></dd>
@@ -856,5 +880,5 @@
   <p class="cd__warn">{{ 'todos.eventCard.makeEventText' | t: { title: card()?.title ?? '' } }}</p>
 </app-confirm-dialog>
 @if (card(); as c) {
-  <app-todo-link-view [cardId]="c.id" [link]="viewedLink()" [(open)]="linkViewOpen" />
+  <app-todo-link-view [link]="viewedLink()" [(open)]="linkViewOpen" />
 }

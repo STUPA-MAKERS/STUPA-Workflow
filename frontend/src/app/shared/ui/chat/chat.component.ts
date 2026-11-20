@@ -19,30 +19,7 @@ import {
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
-import {
-  AvatarComponent,
-  ButtonComponent,
-  ChipComponent,
-  ConfirmDialogComponent,
-  copyText,
-  DropOverlayComponent,
-  EmptyStateComponent,
-  FileDragTracker,
-  FileViewerComponent,
-  type FileViewerItem,
-  IconComponent,
-  isFileDrag,
-  MEDIA,
-  mediaQuery,
-  PressSelectDirective,
-  ScrollFadeDirective,
-  SegmentedComponent,
-  type SegmentedOption,
-  SideSheetComponent,
-  SkeletonComponent,
-  StatusTextComponent,
-  ToastService,
-} from '@stupa-makers/ui-kit';
+import { AvatarComponent, ButtonComponent, ButtonGroupComponent, ChipComponent, ConfirmDialogComponent, copyText, DropOverlayComponent, EmptyStateComponent, FileDragTracker, FileViewerComponent, type FileViewerItem, IconComponent, isFileDrag, MEDIA, mediaQuery, MetaLineComponent, PressSelectDirective, ScrollFadeDirective, SegmentedComponent, type SegmentedOption, SideSheetComponent, SkeletonComponent, StatusTextComponent, ToastService } from '@stupa-makers/ui-kit';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { PersonRef } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -74,6 +51,7 @@ import type {
   ChatRef,
   ChatSend,
   ChatVisibility,
+  ChatVisibilityGuard,
 } from './chat.models';
 import { CHAT_MAX_FILES, buildItems, chatFileUrl, dayKey, isPending, newCount } from './chat.util';
 
@@ -185,12 +163,14 @@ function writeStore(key: string, value: string | null): void {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    MetaLineComponent,
     ChipComponent,
     ConfirmDialogComponent,
     DropOverlayComponent,
     EmptyStateComponent,
     AvatarComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     ChatBodyPipe,
     FileViewerComponent,
     IconComponent,
@@ -244,6 +224,12 @@ export class ChatComponent {
   readonly loading = input(false);
   /** The visibilities the composer offers. Empty: no toggle. */
   readonly visibilityOptions = input<readonly ChatVisibility[]>([]);
+  /**
+   * Null: the plain switch. Set: the options are radio rows with the readers in the label, the
+   * choice shows next to the send button, a public draft has a frame, and a new message starts
+   * with the first option again.
+   */
+  readonly visibilityGuard = input<ChatVisibilityGuard | null>(null);
   /** Names the thread in the browser storage (draft, last seen). */
   readonly draftKey = input.required<string>();
   readonly placeholder = input<TranslationKey>('chat.placeholder');
@@ -334,11 +320,18 @@ export class ChatComponent {
   private stick = true;
   protected readonly atBottom = signal(true);
 
-  protected readonly segmentOptions = computed<SegmentedOption[]>(() =>
-    this.visibilityOptions().map((v) => ({
+  /** The visibility switch; with a guard it names who reads the comment (001691). */
+  protected readonly segmentOptions = computed<SegmentedOption[]>(() => {
+    const labels = this.visibilityGuard()?.labels;
+    return this.visibilityOptions().map((v) => ({
       value: v,
-      label: this.i18n.translate(v === 'internal' ? 'chat.internal' : 'chat.public'),
-    })),
+      label: this.i18n.translate(labels?.[v] ?? (v === 'internal' ? 'chat.internal' : 'chat.public')),
+    }));
+  });
+
+  /** The guarded switch shows: a guard and two options. */
+  protected readonly guarded = computed(
+    () => this.visibilityGuard() !== null && this.visibilityOptions().length > 1,
   );
 
   /** Mark visibilities only where both kinds exist in the thread. */
@@ -662,6 +655,7 @@ export class ChatComponent {
     this.send.emit(req);
     this.drafts.clear();
     this.onDraft('');
+    if (this.guarded()) this.visibility.set(this.visibilityOptions()[0] ?? null);
     this.scrollToEnd();
   }
 

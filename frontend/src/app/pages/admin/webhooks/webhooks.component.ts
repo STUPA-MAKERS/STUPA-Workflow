@@ -16,6 +16,7 @@ import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
 import {
   FabComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   ConfirmDialogComponent,
   DialogComponent,
   EmptyStateComponent,
@@ -28,6 +29,8 @@ import {
   ToastService,
   PageHeaderComponent,
   SectionComponent,
+  ErrorTextComponent,
+  FactsComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { type StatusView, webhookDeliveryStatus } from '@shared/status-kind.util';
@@ -102,6 +105,8 @@ function withMember(set: ReadonlySet<string>, id: string, on: boolean): Readonly
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FactsComponent,
+    ErrorTextComponent,
     LoadStateComponent,
     SectionComponent,
     ExpandRowComponent,
@@ -112,6 +117,7 @@ function withMember(set: ReadonlySet<string>, id: string, on: boolean): Readonly
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     DialogComponent,
     InputComponent,
     PageHeaderComponent,

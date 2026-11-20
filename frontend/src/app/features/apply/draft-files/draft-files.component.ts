@@ -2,15 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output, si
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { scanStatus } from '@shared/status-kind.util';
-import {
-  ConfirmDialogComponent,
-  FileDropZoneComponent,
-  formatBytes,
-  IconComponent,
-  StatusTextComponent,
-  ToastService,
-  SectionComponent,
-} from '@stupa-makers/ui-kit';
+import { ConfirmDialogComponent, FileDropZoneComponent, formatBytes, IconComponent, MetaLineComponent, SectionComponent, StatusTextComponent, ToastService, ErrorTextComponent } from '@stupa-makers/ui-kit';
 import { UPLOAD_ACCEPT } from '../apply.util';
 import { DraftAttachmentsService, type DraftFile } from '../draft-attachments.service';
 
@@ -23,6 +15,9 @@ import { DraftAttachmentsService, type DraftFile } from '../draft-attachments.se
  * submit) shows "Nicht mehr vorhanden" in red; its button takes it off the list at once.
  * Below the rows the drop zone with the limits.
  *
+ * With `positionId` it lists the files of one cost position of the `positions` field
+ * `fieldKey` (spec 001730); the field type shows it below the position.
+ *
  * `changed` emits the ids of the field after each upload and delete; the formly field
  * keeps them as its value.
  */
@@ -31,6 +26,8 @@ import { DraftAttachmentsService, type DraftFile } from '../draft-attachments.se
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ErrorTextComponent,
+    MetaLineComponent,
     SectionComponent,
     TranslatePipe,
     ConfirmDialogComponent,
@@ -48,6 +45,8 @@ export class DraftFilesComponent {
 
   /** The field of the files; `null` for the general block. */
   readonly fieldKey = input<string | null>(null);
+  /** The position of the `positions` field `fieldKey`, for the files of one position. */
+  readonly positionId = input<string | null>(null);
   /** The heading above the rows. */
   readonly heading = input.required<string>();
   /** Show the count and the bytes of the whole draft beside the heading. */
@@ -62,10 +61,8 @@ export class DraftFilesComponent {
 
   protected readonly accept = UPLOAD_ACCEPT;
 
-  protected readonly files = computed(() => this.drafts.filesOf(this.fieldKey()));
-  protected readonly pending = computed(() =>
-    this.drafts.pending().filter((p) => p.fieldKey === this.fieldKey()),
-  );
+  protected readonly files = computed(() => this.mine(this.drafts.files()));
+  protected readonly pending = computed(() => this.mine(this.drafts.pending()));
   protected readonly busy = this.drafts.busy;
   /** The file whose delete waits for the confirmation. */
   protected readonly toRemove = signal<DraftFile | null>(null);
@@ -89,6 +86,14 @@ export class DraftFilesComponent {
     }),
   );
 
+  /** The entries of this block: its field, and its position or none. */
+  private mine<T extends { fieldKey: string | null; positionId?: string | null }>(
+    list: readonly T[],
+  ): readonly T[] {
+    const position = this.positionId();
+    return list.filter((f) => f.fieldKey === this.fieldKey() && (f.positionId ?? null) === position);
+  }
+
   protected size(bytes: number): string {
     return formatBytes(bytes, this.i18n.formatLocale(), 'file');
   }
@@ -98,7 +103,10 @@ export class DraftFilesComponent {
   }
 
   protected async onFiles(files: File[]): Promise<void> {
-    const { failed } = await this.drafts.upload(files, { fieldKey: this.fieldKey() });
+    const { failed } = await this.drafts.upload(files, {
+      fieldKey: this.fieldKey(),
+      positionId: this.positionId(),
+    });
     for (const f of failed) {
       this.toast.error(`${f.filename}: ${this.i18n.translate(f.reason)}`);
     }
@@ -125,6 +133,6 @@ export class DraftFilesComponent {
   }
 
   private emit(): void {
-    this.changed.emit(this.drafts.filesOf(this.fieldKey()).filter((f) => !f.failed).map((f) => f.id));
+    this.changed.emit(this.files().filter((f) => !f.failed).map((f) => f.id));
   }
 }

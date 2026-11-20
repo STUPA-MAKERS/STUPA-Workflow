@@ -23,41 +23,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { searchPlaceholder } from '@shared/util/search-placeholder';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import {
-  ButtonComponent,
-  CheckboxComponent,
-  ConfirmDialogComponent,
-  downloadBlob,
-  EmptyStateComponent,
-  FilterSelectComponent,
-  type FilterSelectOption,
-  filterChipText,
-  IconComponent,
-  InfiniteScrollDirective,
-  ListDetailLayoutComponent,
-  ListGroupComponent,
-  ListItemComponent,
-  LongPressDirective,
-  MEDIA,
-  mediaQuery,
-  RangeChipComponent,
-  type RangeValue,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-  type RowSwipeAction,
-  ScrollFadeDirective,
-  SearchPillComponent,
-  SelectionBarComponent,
-  SideSheetComponent,
-  SkeletonComponent,
-  StatusTextComponent,
-  StickyBarComponent,
-  ToastService,
-  DetailNoneComponent,
-  FabComponent,
-  PageHeaderComponent,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, CheckboxComponent, ConfirmDialogComponent, DetailNoneComponent, downloadBlob, EmptyStateComponent, FabComponent, filterChipText, FilterSelectComponent, type FilterSelectOption, IconComponent, InfiniteScrollDirective, ListDetailLayoutComponent, ListGroupComponent, ListItemComponent, LongPressDirective, MEDIA, mediaQuery, MetaLineComponent, PageHeaderComponent, RangeChipComponent, type RangeValue, RowMenuComponent, type RowMenuItem, type RowMenuSection, type RowSwipeAction, ScrollFadeDirective, SearchPillComponent, SelectionBarComponent, SideSheetComponent, SkeletonComponent, StatusTextComponent, StickyBarComponent, ToastService } from '@stupa-makers/ui-kit';
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { CostCentreSelectComponent } from '../budget/cost-centre-select/cost-centre-select.component';
 import {
@@ -95,6 +61,7 @@ import { TodosApiService } from '@core/api/todos.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
+import { RowChevronComponent } from '../../shared/ui/row-chevron/row-chevron.component';
 
 /** The two views of the page. Bookings are the default. */
 export type ExpensesTab = 'bookings' | 'transfers';
@@ -140,6 +107,8 @@ const SORTS: readonly {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowChevronComponent,
+    MetaLineComponent,
     PullRefreshDirective,
     InfiniteScrollDirective,
     CostCentreLabelComponent,
@@ -150,6 +119,7 @@ const SORTS: readonly {
     BookingFormComponent,
     BulkPanelComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     CheckboxComponent,
     CostCentreSelectComponent,
     EmptyStateComponent,
@@ -270,6 +240,27 @@ export class ExpensesComponent implements OnDestroy {
   readonly linkedApplication = signal<Application | null>(null);
   /** The fiscal-year labels ("2026", "2025/26") by id, loaded per top cost centre. */
   readonly fyLabels = signal<ReadonlyMap<string, string>>(new Map());
+  /** The fiscal years by top cost centre, for the options of the Haushaltsjahr chip. */
+  private readonly fysByTop = signal<ReadonlyMap<string, readonly FiscalYear[]>>(new Map());
+  readonly fiscalYearId = this.list.fiscalYearId;
+  /**
+   * The Haushaltsjahr chip shows with a cost centre, because a fiscal year belongs to one top
+   * cost centre (§ 001874). Its options are the years of that top cost centre.
+   */
+  readonly showYearChip = computed(() => !!this.budgetId());
+  readonly yearOptions = computed<FilterSelectOption[]>(() => {
+    const top = findTopBudgetNode(this.budgetTree(), this.budgetId());
+    const fys = top ? (this.fysByTop().get(top.id) ?? []) : [];
+    return [
+      { value: '', label: this.i18n.translate('expenses.filter.allYears') },
+      ...fys.map((f) => ({ value: f.id, label: f.display })),
+    ];
+  });
+  readonly yearChipLabel = computed(() => {
+    const id = this.fiscalYearId();
+    const hit = id ? this.yearOptions().find((o) => o.value === id) : undefined;
+    return filterChipText(this.i18n.translate('expenses.filter.fiscalYear'), hit?.label);
+  });
   /** The ids of the closed fiscal years among the loaded ones. Their bookings are frozen. */
   readonly closedFys = signal<ReadonlySet<string>>(new Set());
   private readonly fyRequested = new Set<string>();
@@ -368,8 +359,9 @@ export class ExpensesComponent implements OnDestroy {
     ];
   });
 
-  /** The page actions in the ⋮ menu of the header. On a phone the sort and the export
-   *  join them. */
+  /** The page actions in the ⋮ menu of the header: the transfer and the export (spec 001812).
+   *  On a phone the sort and "Mehrere auswählen" join them; a wider screen has a button for
+   *  each (spec 001811). */
   readonly headerMenu = computed<RowMenuSection[]>(() => {
     const manage = this.canManage();
     const bookings = this.tab() === 'bookings';
@@ -383,27 +375,23 @@ export class ExpensesComponent implements OnDestroy {
       label: this.i18n.translate('expenses.bulk.start'),
       icon: 'check',
     };
+    const exportItem: RowMenuItem = {
+      id: 'export',
+      label: this.i18n.translate('expenses.exportAction'),
+      icon: 'download',
+    };
     const items: RowMenuItem[] = [
       ...(manage ? [transfer] : []),
-      ...(manage && bookings ? [select] : []),
+      ...(this.canExport() && bookings ? [exportItem] : []),
     ];
-    return [
-      ...(items.length ? [{ items }] : []),
-      ...(this.phone() ? this.phoneSections(bookings) : []),
-    ];
-  });
-
-  /** The sections only a phone adds to the header menu: the sort, the export and "Aktualisieren". */
-  private phoneSections(bookings: boolean): RowMenuSection[] {
-    const exportSection: RowMenuSection = {
-      items: [{ id: 'export', label: this.i18n.translate('expenses.export'), icon: 'download' }],
-    };
+    if (!this.phone()) return items.length ? [{ items }] : [];
     return [
       ...(bookings ? this.sortSections() : []),
-      ...(this.canExport() ? [exportSection] : []),
+      ...(items.length ? [{ items }] : []),
+      ...(manage && bookings ? [{ items: [select] }] : []),
       refreshMenuSection((key) => this.i18n.translate(key)),
     ];
-  }
+  });
 
   onHeaderMenu(item: RowMenuItem): void {
     if (isRefreshItem(item)) return reloadLikePull(() => this.refreshList());
@@ -555,6 +543,7 @@ export class ExpensesComponent implements OnDestroy {
     effect(() => {
       const queryParams = {
         budget: this.budgetId() || null,
+        fiscalYear: this.fiscalYearId() || null,
         kind: this.kind() || null,
         q: this.q().trim() || null,
         view: this.tab() === 'transfers' ? 'transfers' : null,
@@ -619,6 +608,13 @@ export class ExpensesComponent implements OnDestroy {
         if (this.canManage()) for (const top of tree) this.loadFyLabels(top.id, tree);
       });
     });
+    effect(() => {
+      const id = this.budgetId();
+      const tree = this.budgetTree();
+      untracked(() => {
+        if (id) this.loadFyLabels(id, tree);
+      });
+    });
   }
 
   /**
@@ -633,9 +629,15 @@ export class ExpensesComponent implements OnDestroy {
     const raw = qp.get('kind');
     const kind: '' | ExpenseKind = raw === 'expense' || raw === 'income' ? raw : '';
     const budgetId = qp.get('budget') ?? '';
+    const fiscalYearId = budgetId ? (qp.get('fiscalYear') ?? '') : '';
     const q = qp.get('q') ?? '';
-    const changed = budgetId !== this.budgetId() || kind !== this.kind() || q !== this.q();
+    const changed =
+      budgetId !== this.budgetId() ||
+      fiscalYearId !== this.fiscalYearId() ||
+      kind !== this.kind() ||
+      q !== this.q();
     this.budgetId.set(budgetId);
+    this.fiscalYearId.set(fiscalYearId);
     this.kind.set(kind);
     this.q.set(q);
     const view: ExpensesTab =
@@ -749,6 +751,7 @@ export class ExpensesComponent implements OnDestroy {
     this.api.listFiscalYears(top.id).subscribe({
       next: (fys) => {
         this.fyLabels.update((m) => new Map([...m, ...fys.map((f) => [f.id, f.display] as const)]));
+        this.fysByTop.update((m) => new Map([...m, [top.id, fys]]));
         this.closedFys.update((c) => withClosedYears(c, fys));
       },
       error: () => this.fyRequested.delete(top.id),
@@ -840,6 +843,11 @@ export class ExpensesComponent implements OnDestroy {
 
   selectBudget(id: string): void {
     this.list.selectBudget(id);
+    if (this.tab() === 'transfers') this.transfers.reload();
+  }
+
+  selectFiscalYear(id: string): void {
+    this.list.selectFiscalYear(id);
     if (this.tab() === 'transfers') this.transfers.reload();
   }
 
@@ -1063,6 +1071,12 @@ export class ExpensesComponent implements OnDestroy {
   startSelecting(): void {
     if (!this.canManage()) return;
     this.selecting.set(true);
+  }
+
+  /** The head button "Mehrere auswählen" is a toggle: a second press ends the selection (spec 001811). */
+  toggleSelecting(): void {
+    if (this.selecting()) this.stopSelecting();
+    else this.startSelecting();
   }
 
   stopSelecting(): void {

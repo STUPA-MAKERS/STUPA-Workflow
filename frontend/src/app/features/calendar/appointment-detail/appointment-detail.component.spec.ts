@@ -8,12 +8,13 @@ import type { TodoLinkedCard } from '@core/api/todos.service';
 import { appointment } from '../../../../testing/calendar-fixtures';
 import { runAxe } from '../../../../testing/a11y';
 import { errorToasts } from '../../../../testing/load-error';
+import { linksOf } from '../../../../testing/todo-fixtures';
 import { CALENDAR_NOW } from '../calendar-grid.util';
 import { AppointmentDetailComponent } from './appointment-detail.component';
 
 const URL = '/api/calendar/appointments/a-1';
 
-const LINKED = '/api/todos/linked';
+const LINKED = '/api/links';
 
 async function setup(
   a: Appointment | null = appointment(),
@@ -32,7 +33,7 @@ async function setup(
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
-  http.match((r) => r.url === LINKED).forEach((r) => r.flush(cards));
+  http.match((r) => r.url === LINKED).forEach((r) => r.flush(linksOf(cards)));
   view.fixture.detectChanges();
   return { ...view, on, http };
 }

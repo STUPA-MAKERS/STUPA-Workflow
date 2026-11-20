@@ -30,35 +30,7 @@ import type {
 } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
-import {
-  ButtonComponent,
-  ConfirmDialogComponent,
-  CurrencyInputComponent,
-  DatepickerComponent,
-  EmptyStateComponent,
-  FilterSelectComponent,
-  IconComponent,
-  InfiniteScrollDirective,
-  ListDetailLayoutComponent,
-  ListGroupComponent,
-  ListItemComponent,
-  MEDIA,
-  mediaQuery,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-  type RowSwipeAction,
-  ScrollFadeDirective,
-  SearchPillComponent,
-  SideSheetComponent,
-  SkeletonComponent,
-  type StatusKind,
-  StatusTextComponent,
-  StickyBarComponent,
-  ToastService,
-  FabComponent,
-  PageHeaderComponent,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, CheckboxComponent, ConfirmDialogComponent, CurrencyInputComponent, DatepickerComponent, EmptyStateComponent, FabComponent, FilterSelectComponent, IconComponent, InfiniteScrollDirective, ListDetailLayoutComponent, ListGroupComponent, ListItemComponent, LongPressDirective, MEDIA, mediaQuery, MetaLineComponent, PageHeaderComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, type RowSwipeAction, ScrollFadeDirective, SearchPillComponent, SelectionBarComponent, SideSheetComponent, SkeletonComponent, type StatusKind, StatusTextComponent, StickyBarComponent, ToastService } from '@stupa-makers/ui-kit';
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { flowColorKind } from '@shared/ui';
 import { exportDownload } from '@shared/download.util';
@@ -75,8 +47,10 @@ import {
   type RowAction,
   rowArchiveItem,
   rowForceItem,
+  rowMenuShown,
 } from './row-transitions-menu/row-transitions-menu.component';
 import { ApplicationCaptureComponent } from './capture/application-capture.component';
+import { BULK_MAX, BulkDialogComponent, type BulkMode } from './bulk-dialog/bulk-dialog.component';
 import { debounced } from '@shared/debounced';
 import { AmountComponent } from '@shared/ui/amount/amount.component';
 import { groupByMonth, type MonthGroup } from '@shared/group-by-month';
@@ -86,6 +60,7 @@ import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.direc
 import { withEntry, withoutKey } from '@shared/util/immutable';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import { RowChevronComponent } from '../../shared/ui/row-chevron/row-chevron.component';
 
 /**
  * One filter of the list.
@@ -163,6 +138,8 @@ type FilterSheet = 'more' | null;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowChevronComponent,
+    MetaLineComponent,
     PullRefreshDirective,
     InfiniteScrollDirective,
     AmountComponent,
@@ -173,6 +150,7 @@ type FilterSheet = 'more' | null;
     RouterOutlet,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     CurrencyInputComponent,
     DatepickerComponent,
     EmptyStateComponent,
@@ -195,6 +173,11 @@ type FilterSheet = 'more' | null;
     AgendaDialogComponent,
     DecisionDialogComponent,
     ApplicationCaptureComponent,
+    BulkDialogComponent,
+    ButtonGroupComponent,
+    CheckboxComponent,
+    SelectionBarComponent,
+    LongPressDirective,
   ],
   providers: [ApplicationsPageService],
   templateUrl: './applications-list.component.html',
@@ -212,6 +195,35 @@ export class ApplicationsListComponent {
   private readonly page = inject(ApplicationsPageService);
 
   readonly canExport = computed(() => this.auth.can('application.export'));
+  /** The multiple selection with its bulk actions (001700). */
+  readonly canBulk = computed(() => this.auth.can('application.manage'));
+  /** The ⋮ of a row shows only when it holds an action (spec 001981). */
+  readonly showRowMenu = computed(() => rowMenuShown(this.auth));
+  /** The rows show check boxes. */
+  readonly selecting = signal(false);
+  readonly selected = signal<ReadonlySet<Uuid>>(new Set());
+  readonly selectedCount = computed(() => this.selected().size);
+  /** One action takes at most `BULK_MAX` Anträge (001700). */
+  readonly overMax = computed(() => this.selectedCount() > BULK_MAX);
+  readonly allSelected = computed(() => {
+    const list = this.rows();
+    return list.length > 0 && list.every((r) => this.selected().has(r.item.id));
+  });
+  readonly selectionLabel = computed(() => {
+    const count = this.i18n.translate('applications.bulk.selectedCount', {
+      count: String(this.selectedCount()),
+    });
+    if (!this.overMax()) return count;
+    return `${count} · ${this.i18n.translate('applications.bulk.max', { max: String(BULK_MAX) })}`;
+  });
+  /** The open bulk dialog, or null. */
+  readonly bulkMode = signal<BulkMode | null>(null);
+  /** The selected rows as the bulk dialog names them. */
+  readonly bulkTargets = computed(() =>
+    this.items()
+      .filter((item) => this.selected().has(item.id))
+      .map((item) => ({ id: item.id, title: this.titleOf(item) })),
+  );
   /** #11: "Antrag erfassen" for another person. */
   readonly canCapture = computed(() => this.auth.can('application.create_on_behalf'));
   /** "Antrag erfassen" is open. */
@@ -417,13 +429,20 @@ export class ApplicationsListComponent {
       createdAt: item.createdAt,
       title: this.titleOf(item),
       typeLabel: this.typesById().get(item.typeId) ?? '',
-      stateLabel: item.state?.label ?? null,
-      stateKind: flowColorKind(item.state?.color),
+      ...this.stateOf(item),
       amount: this.money(item),
       approved: this.approvedMoney(item),
       ...this.swipeOf(item),
     })),
   );
+
+  /** A draft says that it is not submitted yet (001710). */
+  private stateOf(item: ApplicationListItem): Pick<ListRow, 'stateLabel' | 'stateKind'> {
+    if (item.state?.isInitial) {
+      return { stateLabel: this.i18n.translate('status.draft.note'), stateKind: 'warn' };
+    }
+    return { stateLabel: item.state?.label ?? null, stateKind: flowColorKind(item.state?.color) };
+  }
 
   /**
    * The swipe actions of a row: the same items, ids and permissions as its row menu.
@@ -462,19 +481,33 @@ export class ApplicationsListComponent {
     return [{ label: this.i18n.translate('applications.list.sort.title'), items: sorts }];
   });
 
+  /** The ⋮ menu of a wider screen: the export (spec 001812). */
+  readonly moreSections = computed<RowMenuSection[]>(() =>
+    this.exportShown()
+      ? [
+          {
+            items: [
+              { id: 'export', label: this.i18n.translate('applications.list.export'), icon: 'download' },
+            ],
+          },
+        ]
+      : [],
+  );
+
   /** Phone: the sort orders, the export and "Aktualisieren" in one "more" menu of the header. */
-  readonly phoneMenuSections = computed<RowMenuSection[]>(() => {
-    const exportItem: RowMenuItem = {
-      id: 'export',
-      label: this.i18n.translate('applications.list.export'),
-      icon: 'download',
-    };
-    return [
-      ...this.sortSections(),
-      ...(this.exportShown() ? [{ items: [exportItem] }] : []),
-      refreshMenuSection((key) => this.i18n.translate(key)),
-    ];
-  });
+  readonly phoneMenuSections = computed<RowMenuSection[]>(() => [
+    ...this.sortSections(),
+    ...this.moreSections(),
+    ...this.selectSections(),
+    refreshMenuSection((key) => this.i18n.translate(key)),
+  ]);
+
+  /** "Mehrere auswählen" for a person with `application.manage` (001700). */
+  readonly selectSections = computed<RowMenuSection[]>(() =>
+    this.canBulk() && !this.selecting()
+      ? [{ items: [{ id: 'select', label: this.i18n.translate('applications.bulk.start'), icon: 'check' }] }]
+      : [],
+  );
 
   /** The row the force-status dialog acts on. */
   readonly forceFor = signal<ApplicationListItem | null>(null);
@@ -525,15 +558,19 @@ export class ApplicationsListComponent {
     return item.title?.trim() || this.i18n.translate('applications.list.untitled');
   }
 
-  /** The amount in the currency of the row, or null without an amount. */
-  /** The approved amount as money when it deviates from the requested one, else null. */
+  /**
+   * The approved amount as money when it deviates from the requested one, else null. A
+   * state without the flag `Bewilligt` shows no approved amount (spec 001612).
+   */
   private approvedMoney(item: ApplicationListItem): string | null {
     const approved = item.approvedAmount;
+    if (!item.state?.isApproved) return null;
     if (approved === null || approved === undefined || item.amount === null) return null;
     if (Number(approved) === Number(item.amount)) return null;
     return this.money({ ...item, amount: approved });
   }
 
+  /** The amount in the currency of the row, or null without an amount. */
   private money(item: ApplicationListItem): string | null {
     if (item.amount === null) return null;
     return formatMoney(item.amount, this.i18n.formatLocale(), { currency: item.currency }) || item.amount;
@@ -650,6 +687,10 @@ export class ApplicationsListComponent {
       this.onExport();
       return;
     }
+    if (item.id === 'select') {
+      this.selecting.set(this.canBulk());
+      return;
+    }
     const [sort, order] = item.id.split(':');
     this.navigate({ sort, order });
   }
@@ -681,9 +722,6 @@ export class ApplicationsListComponent {
 
   onRowAction(item: ApplicationListItem, action: RowAction): void {
     switch (action.kind) {
-      case 'open':
-        this.open(item.id);
-        return;
       case 'force':
         this.forceFor.set(item);
         this.forceOpen.set(true);
@@ -726,7 +764,62 @@ export class ApplicationsListComponent {
     });
   }
 
+  /** The head button "Mehrere auswählen" is a toggle: a second press ends the selection (spec 001811). */
+  toggleSelecting(): void {
+    if (this.selecting()) this.stopSelecting();
+    else this.selecting.set(true);
+  }
+
   /** A swipe of a phone carried out an item of the row menu. */
+  stopSelecting(): void {
+    this.selecting.set(false);
+    this.selected.set(new Set());
+  }
+
+  isSelected(id: Uuid): boolean {
+    return this.selected().has(id);
+  }
+
+  toggleSelect(id: Uuid, checked: boolean): void {
+    this.selected.update((cur) =>
+      checked ? new Set([...cur, id]) : new Set([...cur].filter((x) => x !== id)),
+    );
+  }
+
+  toggleSelectAll(checked: boolean): void {
+    this.selected.set(checked ? new Set(this.rows().map((r) => r.item.id)) : new Set());
+  }
+
+  /**
+   * A long press on a row (or its context menu key): start the selection with this Antrag,
+   * or, in the selection already, toggle it (000211, 001810).
+   */
+  selectWith(item: ApplicationListItem): void {
+    if (!this.canBulk()) return;
+    if (!this.selecting()) {
+      this.selecting.set(true);
+      this.toggleSelect(item.id, true);
+      return;
+    }
+    this.toggleSelect(item.id, !this.isSelected(item.id));
+  }
+
+  /** A row in selection mode: a click toggles it instead of opening the Antrag. */
+  onRowActivate(item: ApplicationListItem): void {
+    if (this.selecting()) this.toggleSelect(item.id, !this.isSelected(item.id));
+  }
+
+  /** Open a bulk action for the selection; more than `BULK_MAX` rows open nothing. */
+  openBulk(mode: BulkMode): void {
+    if (!this.selectedCount() || this.overMax()) return;
+    this.bulkMode.set(mode);
+  }
+
+  /** The bulk action ran: the rows show the new states, the selection stays for the result. */
+  onBulkDone(): void {
+    this.reload();
+  }
+
   onRowSwiped(item: ApplicationListItem, action: RowSwipeAction): void {
     if (action.id === 'force') this.onRowAction(item, { kind: 'force' });
     else if (action.id === 'archive') this.swipeArchive(item, action.leaves === true);

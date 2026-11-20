@@ -15,7 +15,7 @@
  */
 import type { StatusKind } from '@stupa-makers/ui-kit';
 import type { TranslationKey } from '@core/i18n/translations';
-import type { MeetingStatus, MeetingVoteStatus, ScanState, VoteResult } from '@core/api/models';
+import type { MeetingStatus, MeetingVoteStatus, Protocol, ScanState, VoteResult } from '@core/api/models';
 import type { InvoiceStatus } from '../pages/budget/budget-tree.api';
 import type {
   BackupStatus,
@@ -68,6 +68,24 @@ const MEETING: Record<MeetingStatus, StatusView> = {
 /** The status of a meeting. Only a live meeting takes the accent; a closed one is done. */
 export function meetingStatus(status: MeetingStatus): StatusView {
   return MEETING[status];
+}
+
+/**
+ * The state of the protocol of a closed meeting, for the status of the meeting head
+ * (spec 001304). A draft waits for the finalization, and a final protocol without a
+ * mail waits for a send by hand (§ 000997), so both take `warn`.
+ */
+export function protocolStatus(
+  protocol: Pick<Protocol, 'status' | 'isFinal' | 'sentAt' | 'approvedAt'>,
+): StatusView {
+  if (protocol.isFinal) {
+    if (protocol.approvedAt) return { kind: 'accent', key: 'meetings.protocolStatus.approved' };
+    return protocol.sentAt
+      ? { kind: 'accent', key: 'meetings.protocolStatus.final' }
+      : { kind: 'warn', key: 'meetings.protocolStatus.finalUnsent' };
+  }
+  if (protocol.status === 'rendering') return { kind: 'neutral', key: 'meetings.protocolStatus.rendering' };
+  return { kind: 'warn', key: 'meetings.protocolStatus.draft' };
 }
 
 const MEETING_VOTE: Record<MeetingVoteStatus, StatusView> = {

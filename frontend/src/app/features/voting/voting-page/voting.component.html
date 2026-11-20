@@ -59,9 +59,11 @@
             filled
           />
           @if (activeFilterCount() > 0) {
-            <app-button variant="text" size="sm" (click)="reset()">
-              {{ 'voting.list.filter.reset' | t }}
-            </app-button>
+            <app-button-group>
+              <app-button variant="text" size="sm" (click)="reset()">
+                {{ 'voting.list.filter.reset' | t }}
+              </app-button>
+            </app-button-group>
           }
         </div>
         @if (reloading()) {
@@ -92,13 +94,11 @@
           </div>
         } @else if (!rows().length) {
           @if (activeFilterCount() > 0) {
-            <app-empty-state [heading]="'voting.list.noMatch' | t">
-              <app-button variant="text" size="sm" (click)="reset()">{{ 'voting.list.filter.reset' | t }}</app-button>
-            </app-empty-state>
+            <app-empty-state icon="searchOff" [heading]="'voting.list.noMatch' | t" />
           } @else if (split()) {
-            <app-empty-state rows="3" [heading]="'voting.list.empty' | t" />
+            <app-empty-state icon="vote" rows="3" [heading]="'voting.list.empty' | t" />
           } @else {
-            <app-empty-state
+            <app-empty-state icon="vote"
               fill
               [heading]="'voting.list.empty' | t"
               [body]="'voting.list.emptyBody' | t"
@@ -152,9 +152,11 @@
 
           @if (hasMore()) {
             <div class="vl__more">
-              <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">
-                {{ 'voting.list.loadMore' | t }}
-              </app-button>
+              <app-button-group>
+                <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">
+                  {{ 'voting.list.loadMore' | t }}
+                </app-button>
+              </app-button-group>
             </div>
           }
         }

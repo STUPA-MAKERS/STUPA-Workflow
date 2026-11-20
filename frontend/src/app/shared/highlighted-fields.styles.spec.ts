@@ -20,7 +20,6 @@ const FIELDS: readonly (readonly [string, string])[] = [
   ['pages/budget/cost-centre-select/cost-centre-select.component.scss', '.ccs__search'],
   ['pages/admin/mail-templates/mail-templates.component.scss', '.mt__area'],
   ['pages/admin/branding/branding-editor.component.scss', '.br__area'],
-  ['pages/applications/force-status-dialog/force-status-dialog.component.scss', 'textarea'],
 ];
 
 /** The declarations of every rule whose selector line is this selector. */
@@ -40,7 +39,7 @@ const SURFACES: readonly (readonly [string, string])[] = [
   ['pages/admin/committees/gremium-dialog/gremium-dialog.component.scss', '.gd__mail'],
   ['features/meetings/attendance-sheet/attendance-sheet.component.scss', '.as__note'],
   ['pages/admin/forms/form-editor.component.scss', '.fe__pv-control'],
-  ['pages/dashboard/dashboard.component.scss', '.dash__btn--fill'],
+  ['features/meetings/live-cards/live-cards.component.scss', '.lc__join'],
   ['pages/todos/board-picker/todo-board-picker.component.scss', '.bp__chip'],
   ['features/help/help-menu/help-menu.component.scss', '.hm__head'],
   ['features/meetings/top-sheet/top-sheet.component.scss', '.ts'],
@@ -77,7 +76,6 @@ describe('highlightedFields (§000598)', () => {
     ['features/meetings/delegation-dialog/delegation-dialog.component.scss', '.dd__row--on'],
     ['features/meetings/agenda-item-dialog/agenda-item-dialog.component.scss', '.aid__row--on'],
     ['pages/budget/budget-dashboard.component.scss', '.tn--on'],
-    ['pages/admin/admin-frame/admin-frame.component.scss', '.af__item--on'],
     ['pages/admin/forms/form-editor.component.scss', '.fe__row--on'],
     ['pages/applications/agenda-dialog/agenda-dialog.component.scss', '.agd__row--on'],
     ['features/meetings/attendance-sheet/attendance-sheet.component.scss', '.as__opt--on'],

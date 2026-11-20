@@ -11,7 +11,9 @@
         <strong class="ell">{{ ownName() }}</strong>
         <span>{{ 'guests.tag' | t }}</span>
       </span>
-      <app-row-menu [sections]="menu()" [label]="'guests.page.menu' | t" (selected)="onMenu($event.id)" />
+      <app-button-group>
+        <app-row-menu [sections]="menu()" [label]="'guests.page.menu' | t" (selected)="onMenu($event.id)" />
+      </app-button-group>
     </span>
   } @else {
     <app-language-select [label]="'lang.switch' | t" display="code" />
@@ -51,7 +53,9 @@
             [ngModel]="typedCode()"
             (ngModelChange)="typedCode.set($event)"
           />
-          <app-button variant="fill" type="submit" (click)="goToCode()">{{ 'guests.page.codeGo' | t }}</app-button>
+          <app-button-group [main]="true">
+            <app-button variant="fill" type="submit" (click)="goToCode()">{{ 'guests.page.codeGo' | t }}</app-button>
+          </app-button-group>
         </form>
       </div>
     }
@@ -59,7 +63,9 @@
       <div class="pm__center" role="alert">
         <span class="pm__stateIcon pm__stateIcon--muted"><app-icon name="alert" [size]="38" /></span>
         <h1 class="pm__h1">{{ 'guests.page.errorTitle' | t }}</h1>
-        <app-button variant="tonal" (click)="guest.load(guest.code())">{{ 'guests.page.reload' | t }}</app-button>
+        <app-button-group>
+          <app-button variant="tonal" (click)="guest.load(guest.code())">{{ 'guests.page.reload' | t }}</app-button>
+        </app-button-group>
       </div>
     }
     @case ('notPublic') {
@@ -87,14 +93,14 @@
         <div class="pm__head">
           <span class="pm__eyebrow">{{ 'guests.page.eyebrow' | t }}</span>
           <h1 class="pm__title">{{ h.title }}</h1>
-          <span class="pm__meta">
+          <span class="pm__meta"><app-meta-line>
             @if (status(); as s) {
               <app-status-text [kind]="s.kind">{{ s.key | t }}</app-status-text>
             }
             @if (metaLine()) {
-              <span class="pm__sep" aria-hidden="true">·</span><span>{{ metaLine() }}</span>
+              <span>{{ metaLine() }}</span>
             }
-          </span>
+          </app-meta-line></span>
         </div>
         <p class="pm__intro">{{ introKey() | t }}</p>
         <form class="pm__form" (submit)="$event.preventDefault(); join()">
@@ -109,10 +115,12 @@
           @if (joinErrorKey(); as e) {
             <app-note kind="error" icon="alert" role="alert">{{ e | t }}</app-note>
           }
-          <app-button variant="fill" size="lg" [block]="true" [loading]="guest.joining()" [disabled]="!nameValid()" (click)="join()">
-            <app-icon name="arrow" />
-            {{ 'guests.join.submit' | t }}
-          </app-button>
+          <app-button-group [main]="true">
+            <app-button variant="fill" [block]="true" [loading]="guest.joining()" [disabled]="!nameValid()" (click)="join()">
+              <app-icon name="arrow" />
+              {{ 'guests.join.submit' | t }}
+            </app-button>
+          </app-button-group>
           <button type="submit" hidden></button>
         </form>
         @if (!loggedIn()) {
@@ -138,18 +146,20 @@
               [ngModel]="name()"
               (ngModelChange)="name.set($event)"
             />
-            <div class="pm__row">
+            <app-button-group class="pm__row" [main]="true">
               <app-button variant="text" (click)="renaming.set(false)">{{ 'action.cancel' | t }}</app-button>
               <app-button variant="fill" [loading]="guest.saving()" [disabled]="!nameValid()" (click)="saveRename()">{{ 'action.save' | t }}</app-button>
-            </div>
+            </app-button-group>
           </form>
         } @else {
           <div class="pm__row">
-            <app-button variant="outlined" (click)="renaming.set(true)">
-              <app-icon name="edit" />
-              {{ 'guests.page.rename' | t }}
-            </app-button>
-            <app-button variant="text" class="pm__danger" [loading]="guest.saving()" (click)="guest.leave()">{{ 'guests.page.withdraw' | t }}</app-button>
+            <app-button-group>
+              <app-button variant="outlined" (click)="renaming.set(true)">
+                <app-icon name="edit" />
+                {{ 'guests.page.rename' | t }}
+              </app-button>
+              <app-button variant="text" class="pm__danger" [loading]="guest.saving()" (click)="guest.leave()">{{ 'guests.page.withdraw' | t }}</app-button>
+            </app-button-group>
           </div>
         }
       </div>
@@ -171,14 +181,14 @@
 <ng-template #meetingCard>
   @if (h) {
     <div class="pm__card">
-      <span class="pm__cardMeta">
+      <span class="pm__cardMeta"><app-meta-line>
         @if (status(); as s) {
           <app-status-text [kind]="s.kind">{{ s.key | t }}</app-status-text>
         }
         @if (metaLine()) {
-          <span class="pm__sep" aria-hidden="true">·</span><span>{{ metaLine() }}</span>
+          <span>{{ metaLine() }}</span>
         }
-      </span>
+      </app-meta-line></span>
       <strong class="pm__cardTitle">{{ h.title }}</strong>
     </div>
   }
@@ -193,10 +203,12 @@
     </div>
     <ng-container *ngTemplateOutlet="meetingCard" />
     <div class="pm__retry">
-      <app-button variant="tonal" [disabled]="waitSeconds() > 0" [loading]="guest.joining()" (click)="retry()">
-        <app-icon name="repeat" />
-        {{ 'guests.page.retry' | t }}
-      </app-button>
+      <app-button-group>
+        <app-button variant="tonal" [disabled]="waitSeconds() > 0" [loading]="guest.joining()" (click)="retry()">
+          <app-icon name="repeat" />
+          {{ 'guests.page.retry' | t }}
+        </app-button>
+      </app-button-group>
       @if (waitSeconds() > 0) {
         <p class="pm__hint">{{ retryLine() }}</p>
       }

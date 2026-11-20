@@ -99,6 +99,10 @@ _REASONS: dict[str, dict[str, str]] = {
         "eine Idee gemeldet haben.",
         "en": "You are receiving this email because you reported a problem, a question or an idea.",
     },
+    "gremium_message": {
+        "de": "Sie erhalten diese E-Mail, weil Sie Mitglied in diesem Gremium sind.",
+        "en": "You are receiving this email because you are a member of this committee.",
+    },
     "appointment": {
         "de": "Sie erhalten diese E-Mail, weil Sie zu einem Termin eingeladen sind.",
         "en": "You are receiving this email because you are invited to an appointment.",
@@ -120,6 +124,10 @@ _REASONS: dict[str, dict[str, str]] = {
     "todo_board_added": {
         "de": "Sie erhalten diese E-Mail, weil Sie zu einem Board hinzugefügt wurden.",
         "en": "You are receiving this email because you were added to a board.",
+    },
+    "draft_reminder": {
+        "de": "Sie erhalten diese E-Mail, weil Ihr Antrag noch nicht eingereicht ist.",
+        "en": "You are receiving this email because your application is not submitted yet.",
     },
     "poll_started": {
         "de": "Sie erhalten diese E-Mail, weil Sie in diesem Gremium abstimmen dürfen.",

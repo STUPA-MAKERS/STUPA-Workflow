@@ -116,14 +116,6 @@
   flex: none;
 }
 
-.pos__chev {
-  flex: none;
-  color: var(--color-text-muted);
-}
-.pos__chev--open {
-  transform: rotate(180deg);
-}
-
 .pos__icon {
   display: inline-flex;
   flex: none;
@@ -151,6 +143,9 @@
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 0;
 }
+.pos__offer > .pos__icon {
+  margin-top: calc((var(--field-height) - 2.25rem) / 2);
+}
 .pos__icon:disabled {
   opacity: 0.35;
   cursor: not-allowed;
@@ -177,7 +172,7 @@
 }
 .pos__offer {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-2);
   min-width: 0;
 }
@@ -185,7 +180,8 @@
   flex: none;
   width: 1.125rem;
   height: 1.125rem;
-  margin: 0 var(--space-1);
+  /* Centred on the field box, not on the field and its warning below it. */
+  margin: calc((var(--field-height) - 1.125rem) / 2) var(--space-1) 0;
   accent-color: var(--color-accent);
   cursor: pointer;
 }
@@ -226,13 +222,57 @@
 .pos__link:focus-visible {
   outline: 2px solid var(--color-focus-ring);
 }
-.pos__error {
-  margin: 0;
-  color: var(--color-danger);
-  font-size: var(--fs-small);
-}
 .pos__add {
   align-self: flex-start;
+}
+
+/* A field of an offer and the placeholder warning under it (spec 001640). */
+.pos__cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+/* The field ring in the warning colour: a hint, not an error, so not the danger red. */
+.pf.pf--warn {
+  box-shadow: inset 0 0 0 2px var(--color-warning);
+}
+/* The warning under the field: the icon in the warning colour, the text in the muted text
+   colour, so it reads in every contrast mode. */
+.pos__fieldWarn {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 0 var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+/* The amount box is narrow: its short warning may run on below the delete button. */
+.pos__money .pos__fieldWarn {
+  padding-inline-end: 0;
+  white-space: nowrap;
+}
+.pos__warnIcon {
+  flex: none;
+  margin-top: 3px;
+  color: var(--color-warning);
+}
+/* The hint to the switch for no comparison offers (spec 001641). */
+.pos__warn {
+  margin: 0;
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+
+/* The cost line below the positions (specs 001630, 001631). */
+.pos__line {
+  margin: 0;
+  padding: 0 var(--space-1);
+  color: var(--color-text);
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
 }
 
 .pf {

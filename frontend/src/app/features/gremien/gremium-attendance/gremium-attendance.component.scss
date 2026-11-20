@@ -91,10 +91,8 @@ thead .gat__th {
 .gat__month,
 .gat__sortBtn {
   color: var(--color-text-muted);
-  font-size: 0.75rem;
+  font-size: var(--fs-small);
   font-weight: var(--fw-semibold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 .gat__month {
   display: block;
@@ -162,6 +160,29 @@ tbody tr:last-child .gat__who {
 }
 tbody tr:last-child .gat__td:last-child {
   border-end-end-radius: var(--radius-lg);
+}
+
+// The title of the row group "Pool-Vertretungen" (spec 001310): the look of a section
+// title (`app-section`), above the pool rows. In the matrix the text sticks to the start
+// while the matrix scrolls sideways.
+.gat__groupTitle {
+  margin: var(--space-3) 0 var(--space-2);
+  padding: 0 var(--space-1);
+  color: var(--color-accent-text);
+  font-size: 0.84375rem;
+  font-weight: var(--fw-semibold);
+  line-height: 1.25rem;
+  text-align: start;
+}
+th.gat__groupTitle {
+  height: calc(var(--space-3) + var(--space-2) + 1.25rem);
+  padding: var(--space-3) 0 var(--space-2);
+  vertical-align: bottom;
+}
+.gat__groupText {
+  position: sticky;
+  inset-inline-start: 0;
+  padding-inline-start: var(--space-4);
 }
 .gat__whoIn {
   display: flex;

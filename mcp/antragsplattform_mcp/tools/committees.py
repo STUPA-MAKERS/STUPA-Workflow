@@ -98,10 +98,17 @@ async def gremium_attendance(
 
 
 @group.tool
-async def gremium_member_attendance(gremium_id: str, principal_id: str, month: str) -> dict:
-    """Give the closed meetings of one month (YYYY-MM) with the state of one member."""
+async def gremium_member_attendance(
+    gremium_id: str, principal_id: str, month: str, pool: bool = False
+) -> dict:
+    """Give the closed meetings of one month (YYYY-MM) with the state of one member.
+
+    With `pool` the person is read as a pool substitute: the state is `seat` (with the
+    represented member) or `no_seat`.
+    """
     return await api().get(
-        f"/committees/{gremium_id}/attendance/{principal_id}", params={"month": month}
+        f"/committees/{gremium_id}/attendance/{principal_id}",
+        params={"month": month, **({"pool": "true"} if pool else {})},
     )
 
 
@@ -149,6 +156,19 @@ async def set_gremium_info(
 
 
 @group.tool
+async def notify_gremium_members(gremium_id: str, subject: str, message: str) -> dict:
+    """Mail a message to every member and pool substitute of a Gremium, the sender included.
+
+    Requires `members.notify` in the Gremium. The subject holds 1 to 200 characters, the
+    message 1 to 10000 characters of plain text. The Reply-To of the mail is the caller.
+    The answer is `{"recipients": n}`.
+    """
+    return await api().post(
+        f"/committees/{gremium_id}/notify", json={"subject": subject, "message": message}
+    )
+
+
+@group.tool
 async def gremium_meeting_defaults(gremium_id: str) -> dict:
     """What a new meeting of the Gremium allows (guests vote, quorum); session.manage."""
     return await api().get(f"/committees/{gremium_id}/meeting-defaults")
@@ -161,9 +181,7 @@ async def gremium_meeting_members(gremium_id: str) -> list:
 
 
 @group.tool
-async def download_gremium_logo(
-    gremium_id: str, target_path: str, overwrite: bool = False
-) -> dict:
+async def download_gremium_logo(gremium_id: str, target_path: str, overwrite: bool = False) -> dict:
     """Download the square logo of the CD variant of a Gremium to a local file."""
     return await download_to(
         "GET",

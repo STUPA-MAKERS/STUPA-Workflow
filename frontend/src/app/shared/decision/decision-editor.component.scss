@@ -19,9 +19,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  padding: var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-1);
 }
 
 .dec__list {
@@ -31,7 +28,6 @@
   min-width: 0;
 }
 .dec__cap {
-  padding: 0 2px;
   font-size: var(--fs-small);
   font-weight: var(--fw-medium);
   color: var(--color-text-muted);
@@ -76,12 +72,6 @@
 }
 .dec__add {
   align-self: flex-start;
-  margin-left: 2rem;
-}
-.dec__error {
-  margin: 0;
-  font-size: var(--fs-small);
-  color: var(--color-danger);
 }
 
 @media (max-width: 599.98px) {

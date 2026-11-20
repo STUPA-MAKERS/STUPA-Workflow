@@ -22,9 +22,9 @@
             <span class="chat__sepText">{{ 'chat.newCount' | t: { count: item.count } }}</span>
           </div>
         } @else if (item.kind === 'event') {
-          <p class="chat__event">
-            {{ item.text }}<span class="chat__dot" aria-hidden="true">·</span><time [attr.datetime]="item.at">{{ time(item.at) }}</time>
-          </p>
+          <p class="chat__event"><app-meta-line>
+            <span>{{ item.text }}</span><time [attr.datetime]="item.at">{{ time(item.at) }}</time>
+          </app-meta-line></p>
         } @else {
           @let m = item.msg;
           <div
@@ -55,20 +55,22 @@
               <div class="chat__line">
                 @if (canAct(m) && !touchMenu() && editingId() !== m.id) {
                   <span class="chat__acts">
-                    <app-button
-                      variant="text"
-                      size="sm"
-                      [iconOnly]="true"
-                      [ariaLabel]="'chat.edit' | t"
-                      (click)="startEdit(m)"
-                    ><app-icon name="edit" /></app-button>
-                    <app-button
-                      variant="text"
-                      size="sm"
-                      [iconOnly]="true"
-                      [ariaLabel]="'chat.delete' | t"
-                      (click)="askDelete(m)"
-                    ><app-icon name="trash" /></app-button>
+                    <app-button-group>
+                      <app-button
+                        variant="text"
+                        size="sm"
+                        [iconOnly]="true"
+                        [ariaLabel]="'chat.edit' | t"
+                        (click)="startEdit(m)"
+                      ><app-icon name="edit" /></app-button>
+                      <app-button
+                        variant="text"
+                        size="sm"
+                        [iconOnly]="true"
+                        [ariaLabel]="'chat.delete' | t"
+                        (click)="askDelete(m)"
+                      ><app-icon name="trash" /></app-button>
+                    </app-button-group>
                   </span>
                 }
                 @if (editingId() === m.id) {
@@ -103,12 +105,12 @@
                       />
                     </div>
                     <ng-container *ngTemplateOutlet="msgFiles; context: { $implicit: m }" />
-                    <span class="chat__editActions">
-                      <app-button variant="text" size="sm" (click)="cancelEdit()">{{ 'action.cancel' | t }}</app-button>
-                      <app-button type="submit" variant="fill" size="sm" [disabled]="!editDraft().trim()">{{
+                    <app-button-group class="chat__editActions" [main]="true">
+                      <app-button variant="text" (click)="cancelEdit()">{{ 'action.cancel' | t }}</app-button>
+                      <app-button type="submit" variant="fill" [disabled]="!editDraft().trim()">{{
                         'chat.save' | t
                       }}</app-button>
-                    </span>
+                    </app-button-group>
                   </form>
                 } @else {
                   <div
@@ -152,23 +154,20 @@
                   </button>
                 </span>
               } @else if (item.tail || m.editedAt) {
-                <span class="chat__meta">
+                <span class="chat__meta"><app-meta-line>
                   @if (item.tail) {
                     <time [attr.datetime]="m.at">{{ time(m.at) }}</time>
-                  }
-                  @if (item.tail && m.editedAt) {
-                    <span class="chat__dot" aria-hidden="true">·</span>
                   }
                   @if (m.editedAt) {
                     <span>{{ 'chat.edited' | t }}</span>
                   }
-                </span>
+                </app-meta-line></span>
               }
             </div>
           </div>
         }
       } @empty {
-        <app-empty-state shape="chat" class="chat__empty" rows="3" [heading]="'chat.empty' | t" />
+        <app-empty-state icon="chat" shape="chat" class="chat__empty" rows="3" [heading]="'chat.empty' | t" />
       }
     }
   </div>
@@ -233,7 +232,10 @@
         }
       </ul>
     }
-    <div class="chat__box">
+    <div
+      class="chat__box"
+      [class.chat__box--public]="guarded() && visibility() === 'public'"
+    >
       <ng-container
         *ngTemplateOutlet="mentionList; context: { $implicit: composerMentions, below: false }"
       />
@@ -259,14 +261,16 @@
         "
       ></textarea>
       @if (canAttach()) {
-        <app-button
-          class="chat__attach"
-          variant="text"
-          [iconOnly]="true"
-          [disabled]="full()"
-          [ariaLabel]="'chat.attach' | t"
-          (click)="pickFiles()"
-        ><app-icon name="clip" /></app-button>
+        <app-button-group>
+          <app-button
+            class="chat__attach"
+            variant="text"
+            [iconOnly]="true"
+            [disabled]="full()"
+            [ariaLabel]="'chat.attach' | t"
+            (click)="pickFiles()"
+          ><app-icon name="clip" /></app-button>
+        </app-button-group>
         <input
           #fileInput
           class="chat__fileInput"
@@ -278,14 +282,16 @@
           (change)="onPicked($event)"
         />
       }
-      <app-button
-        class="chat__send"
-        type="submit"
-        variant="fill"
-        [iconOnly]="true"
-        [disabled]="uploading()"
-        [ariaLabel]="'chat.send' | t"
-      ><app-icon name="send" /></app-button>
+      <app-button-group [main]="true">
+        <app-button
+          class="chat__send"
+          type="submit"
+          variant="fill"
+          [iconOnly]="true"
+          [disabled]="uploading()"
+          [ariaLabel]="'chat.send' | t"
+        ><app-icon name="send" /></app-button>
+      </app-button-group>
     </div>
   </form>
 }

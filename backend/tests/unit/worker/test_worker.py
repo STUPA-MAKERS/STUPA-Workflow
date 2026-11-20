@@ -29,7 +29,7 @@ def test_worker_settings_registers_tasks() -> None:
     The cron jobs are the nightly budget rollup, the deadline scan every minute, the hourly
     task reminders, the daily DSGVO retention, the nightly backup, the hourly draft purge,
     the nightly audit-chain check, the hourly heal of the public protocols, the daily ticket
-    anonymization and the daily to-do archive.
+    anonymization, the daily to-do archive and the hourly draft reminders.
     """
     assert ping in WorkerSettings.functions
     assert refresh_budget_stats in WorkerSettings.functions
@@ -37,7 +37,11 @@ def test_worker_settings_registers_tasks() -> None:
     assert process_retention in WorkerSettings.functions
     assert purge_draft_attachments in WorkerSettings.functions
     assert WorkerSettings.redis_settings is not None
-    assert len(WorkerSettings.cron_jobs) == 11
+    assert len(WorkerSettings.cron_jobs) == 12
+    from worker.drafts import process_draft_reminders
+
+    assert process_draft_reminders in WorkerSettings.functions
+    assert any(job.coroutine is process_draft_reminders for job in WorkerSettings.cron_jobs)
     from worker.calendars import fetch_external_calendars
 
     assert fetch_external_calendars in WorkerSettings.functions

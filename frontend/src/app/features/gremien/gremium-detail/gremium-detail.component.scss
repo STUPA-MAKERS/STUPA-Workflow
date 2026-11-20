@@ -1,5 +1,5 @@
 @use 'breakpoints' as bp;
-@use 'dot-parts' as dots;
+@use 'meta-chips' as chips;
 
 :host {
   display: flex;
@@ -39,8 +39,20 @@
 .gd__skelTitle {
   width: 14rem;
 }
-.gd__skelLine {
-  width: 16rem;
+// The bar of `app-tabs`: 44px tabs, 20px apart, over a hairline.
+.gd__skelTabs {
+  display: flex;
+  gap: var(--space-5);
+  overflow: hidden;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.gd__skelTab {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 44px;
+  padding: 0 var(--space-1);
+  font-size: var(--fs-md);
 }
 .gd__head {
   display: flex;
@@ -64,23 +76,24 @@
 .gd__head .gd__titleRow {
   padding-block: 6px;
 }
+// The logo is the top of the head, so its top edge, not the capitals of the title, is as far
+// from the top of the sheet as from the side (6px of the 60px line are above the logo).
+.gd__bar {
+  --sheet-bar-cap: 6px;
+}
 .gd__title {
   min-width: 0;
 }
 
-.gd__line {
-  --gd-sep: 24px;
-  overflow-x: clip;
-}
 .gd__line:empty,
 .gd__parts:empty {
   display: none;
 }
 .gd__parts {
-  @include dots.list(var(--gd-sep));
+  @include chips.list;
 }
 .gd__part {
-  @include dots.part(var(--gd-sep));
+  @include chips.chip;
 }
 
 .gd__actions {

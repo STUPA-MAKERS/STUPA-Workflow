@@ -21,7 +21,7 @@
           (valueChange)="onQuery($event)"
         />
         <div class="cal-list__chips">
-          <ng-container *ngTemplateOutlet="chips; context: { size: 'sm' }" />
+          <ng-container *ngTemplateOutlet="chips" />
         </div>
       </app-sticky-bar>
       <div class="cal-list__scroll" appScrollFade="y" [attr.aria-busy]="loading() ? 'true' : null">
@@ -32,17 +32,17 @@
                 @for (e of hits(); track e.kind + e.id) {
                   <app-list-item role="listitem" [title]="e.title" [wrap]="true" (activate)="jump(e)">
                     <span lead class="cal__lead"><app-icon [name]="icon(e.kind)" /></span>
-                    <span sub class="cal__sub">
+                    <span sub class="cal__sub"><app-meta-line>
                       <span class="mono">{{ hitWhen(e) }}</span>
-                      <span aria-hidden="true">·</span><span>{{ kindKey(e.kind) | t }}</span>
-                      @if (e.source) {<span aria-hidden="true">·</span><span>{{ e.source }}</span>}
-                    </span>
+                      <span>{{ kindKey(e.kind) | t }}</span>
+                      @if (e.source) {<span>{{ e.source }}</span>}
+                    </app-meta-line></span>
                   </app-list-item>
                 }
               </div>
             </section>
           } @else if (searched()) {
-            <app-empty-state shape="date" [heading]="'calendar.search.none' | t" />
+            <app-empty-state icon="searchOff" shape="date" [heading]="'calendar.search.none' | t" />
           }
         } @else {
           @if (error()) {
@@ -55,10 +55,12 @@
             </div>
           } @else {
           <div class="cal-list__more">
-            <app-button variant="text" size="sm" [loading]="loading()" (click)="loadEarlier()">
-              <app-icon name="up" />
-              {{ 'calendar.list.earlier' | t }}
-            </app-button>
+            <app-button-group>
+              <app-button variant="text" size="sm" [loading]="loading()" (click)="loadEarlier()">
+                <app-icon name="up" />
+                {{ 'calendar.list.earlier' | t }}
+              </app-button>
+            </app-button-group>
           </div>
           @for (day of days(); track day.iso) {
             <app-list-group [label]="day.label">
@@ -75,14 +77,16 @@
             </app-list-group>
           } @empty {
             @if (!loading() && !error()) {
-              <app-empty-state shape="date" [heading]="'calendar.list.empty' | t" />
+              <app-empty-state icon="cal" shape="date" [heading]="'calendar.list.empty' | t" />
             }
           }
           <div class="cal-list__more">
-            <app-button variant="text" size="sm" [loading]="loading()" (click)="loadLater()">
-              <app-icon name="down" />
-              {{ 'calendar.list.later' | t }}
-            </app-button>
+            <app-button-group>
+              <app-button variant="text" size="sm" [loading]="loading()" (click)="loadLater()">
+                <app-icon name="down" />
+                {{ 'calendar.list.later' | t }}
+              </app-button>
+            </app-button-group>
           </div>
           }
         }
@@ -94,44 +98,29 @@
   </div>
 } @else {
   <div class="cal">
-    <app-page-header [pane]="true" [title]="titleKey | t">
-      <ng-container ngProjectAs="[actions]">
-        @if (isPublic) {
-          <app-button variant="outlined" [ariaPressed]="abo.isOpen()" (click)="abo.toggle($event.currentTarget)">
-            <app-icon name="cal" />
-            {{ 'calendar.public.subscribe' | t }}
-          </app-button>
-        } @else {
-          <app-button
-            variant="text"
-            [iconOnly]="true"
-            [ariaLabel]="'meetings.overview.subscribe' | t"
-            [ariaPressed]="abo.isOpen()"
-            (click)="abo.toggle($event.currentTarget)"
-          ><app-icon name="cal" /></app-button>
-        }
-        <app-calendar-subscribe #abo [fixedUrl]="publicFeed" />
-      </ng-container>
-    </app-page-header>
+    <app-page-header class="sr-only" [pane]="true" [title]="titleKey | t" />
 
     <div class="cal__tools" role="toolbar" [attr.aria-label]="titleKey | t">
       <div class="cal__nav">
-        <app-button
-          variant="text"
-          [iconOnly]="true"
-          [ariaLabel]="(view() === 'week' ? 'calendar.prev.week' : 'calendar.prev.month') | t"
-          [title]="(view() === 'week' ? 'calendar.prev.week' : 'calendar.prev.month') | t"
-          (click)="step(-1)"
-        ><app-icon name="left" /></app-button>
+        <app-button-group>
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="(view() === 'week' ? 'calendar.prev.week' : 'calendar.prev.month') | t"
+            [title]="(view() === 'week' ? 'calendar.prev.week' : 'calendar.prev.month') | t"
+            (click)="step(-1)"
+          ><app-icon name="left" /></app-button>
+        </app-button-group>
         <h2 class="cal__month" aria-live="polite">{{ heading() }}</h2>
-        <app-button
-          variant="text"
-          [iconOnly]="true"
-          [ariaLabel]="(view() === 'week' ? 'calendar.next.week' : 'calendar.next.month') | t"
-          [title]="(view() === 'week' ? 'calendar.next.week' : 'calendar.next.month') | t"
-          (click)="step(1)"
-        ><app-icon name="right" /></app-button>
-        <app-button class="cal__today" variant="outlined" (click)="goToday()">{{ 'meetings.overview.today' | t }}</app-button>
+        <app-button-group>
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="(view() === 'week' ? 'calendar.next.week' : 'calendar.next.month') | t"
+            [title]="(view() === 'week' ? 'calendar.next.week' : 'calendar.next.month') | t"
+            (click)="step(1)"
+          ><app-icon name="right" /></app-button>
+        </app-button-group>
         <app-segmented
           class="cal__view"
           [ariaLabel]="'calendar.view.label' | t"
@@ -139,6 +128,25 @@
           [value]="view()"
           (valueChange)="setView($event)"
         />
+        <app-button-group class="cal__actions">
+          <app-button (click)="goToday()">{{ 'meetings.overview.today' | t }}</app-button>
+          @if (isPublic) {
+            <app-button [ariaPressed]="abo.isOpen()" (click)="abo.toggle($event.currentTarget)">
+              <app-icon name="cal" />
+              {{ 'calendar.public.subscribe' | t }}
+            </app-button>
+          } @else {
+            <app-button
+              [iconOnly]="true"
+              [ariaLabel]="'meetings.overview.subscribe' | t"
+              [title]="'meetings.overview.subscribe' | t"
+              [ariaPressed]="abo.isOpen()"
+              (click)="abo.toggle($event.currentTarget)"
+            ><app-icon name="cal" /></app-button>
+            <app-button (click)="createAppointment()"><app-icon name="plus" />{{ 'fab.appointment' | t }}</app-button>
+          }
+        </app-button-group>
+        <app-calendar-subscribe #abo [fixedUrl]="publicFeed" />
       </div>
       <div class="cal__filters">
         <div class="cal__searchBox" role="search" tabindex="-1" (keydown)="onSearchKey($event)">
@@ -177,7 +185,9 @@
             </div>
           }
         </div>
-        <ng-container *ngTemplateOutlet="chips; context: { size: 'md' }" />
+        <div class="cal__chips" role="group" [attr.aria-label]="'calendar.filter.group' | t">
+          <ng-container *ngTemplateOutlet="chips" />
+        </div>
       </div>
     </div>
 
@@ -259,38 +269,29 @@
           }
         </div>
       }
-      @if (!isPublic) {
-        <app-fab [contained]="true" [label]="'fab.appointment' | t" (activate)="createAppointment()" />
-      }
     </div>
 
     <aside class="cal__panel" [attr.aria-label]="dayHeading()">
       <div class="cal__panelScroll" appScrollFade="y">
-        <section class="cal__cards" aria-live="polite" [attr.aria-label]="dayHeading()">
+        <section class="cal__dayList" aria-live="polite" [attr.aria-label]="dayHeading()">
           @if (error()) {
             <app-load-error [message]="'calendar.error' | t" (retry)="reload()" />
           } @else if (firstLoad()) {
-            <app-skeleton class="skel-in" variant="items" [count]="3" [lead]="true" [label]="'common.loading' | t" />
+            <app-skeleton class="skel-in" variant="items" [count]="3" [lead]="true" [grouped]="true" [label]="'common.loading' | t" />
           } @else if (!dayEntries().length && !loading()) {
-            <app-empty-state shape="date" rows="3" [heading]="'calendar.day.empty' | t" />
-          }
-          @for (e of dayEntries(); track e.kind + e.id) {
-            <button type="button" class="cal__card" (click)="openEntry(e)">
-              <span class="cal__lead cal__cardIcon"><app-icon [name]="icon(e.kind)" /></span>
-              <span class="cal__cardText">
-                <span class="cal__cardKind">
-                  <ng-container *ngTemplateOutlet="facts; context: { $implicit: e, short: true }" />
-                </span>
-                <span class="cal__cardTitle">{{ e.title }}</span>
-                @if (e.source || e.place) {
-                  <span class="cal__cardSrc">{{ e.source }}@if (e.source && e.place) { · }{{ e.place }}</span>
-                }
-                @if (e.myAnswer; as answer) {
-                  <span class="cal__cardState"><app-status-text [kind]="answerKind(answer)">{{ answerKey(answer) | t }}</app-status-text></span>
-                }
-              </span>
-              <app-icon class="cal__go" name="right" />
-            </button>
+            <app-empty-state icon="cal" shape="date" rows="3" [heading]="'calendar.day.empty' | t" />
+          } @else {
+            <div class="rowgroup cal__rows" role="list">
+              @for (e of dayEntries(); track e.kind + e.id) {
+                <app-list-item class="cal__dayRow" role="listitem" [title]="e.title" [wrap]="true" [subWrap]="true" (activate)="openEntry(e)">
+                  <span lead class="cal__lead cal__rowIcon"><app-icon [name]="icon(e.kind)" /></span>
+                  <span sub class="cal__sub">
+                    <ng-container *ngTemplateOutlet="facts; context: { $implicit: e, place: true }" />
+                  </span>
+                  <app-row-chevron trail />
+                </app-list-item>
+              }
+            </div>
           }
         </section>
       </div>
@@ -298,19 +299,19 @@
   </div>
 }
 
-<ng-template #facts let-e let-short="short">
+<ng-template #facts let-e let-place="place"><app-meta-line>
   <app-status-text kind="neutral">{{ kindKey(e.kind) | t }}</app-status-text>
-  @if (time(e); as when) {<span aria-hidden="true">·</span><span class="mono">{{ when }}</span>}
-  @if (!short && e.source) {<span aria-hidden="true">·</span><span>{{ e.source }}</span>}
-  @if (!short && e.myAnswer) {<span aria-hidden="true">·</span><app-status-text [kind]="answerKind(e.myAnswer)">{{ answerKey(e.myAnswer) | t }}</app-status-text>}
-</ng-template>
+  @if (time(e); as when) {<span class="mono">{{ when }}</span>}
+  @if (e.source) {<span>{{ e.source }}</span>}
+  @if (place && e.place) {<span>{{ e.place }}</span>}
+  @if (e.myAnswer) {<app-status-text [kind]="answerKind(e.myAnswer)">{{ answerKey(e.myAnswer) | t }}</app-status-text>}
+</app-meta-line></ng-template>
 
-<ng-template #chips let-size="size">
+<ng-template #chips>
   @if (!isPublic) {
   <app-filter-select
     class="cal__chip"
     icon="funnel"
-    [size]="size"
     [label]="'calendar.filter.kind' | t"
     [multiple]="true"
     [options]="kindOptions()"
@@ -323,8 +324,7 @@
     <app-filter-select
       class="cal__chip"
       icon="building"
-      [size]="size"
-      [label]="'calendar.filter.gremium' | t"
+        [label]="'calendar.filter.gremium' | t"
       [options]="gremiumOptions()"
       [value]="gremium()"
       (valueChange)="gremium.set($event)"
@@ -336,12 +336,11 @@
   <app-filter-select
     class="cal__chip"
     icon="user"
-    [size]="size"
     [label]="'calendar.filter.assigned' | t"
     [options]="mineOptions()"
     [value]="mine()"
     (valueChange)="mine.set($event)"
-    [text]="(mine() ? 'calendar.filter.mine' : 'calendar.filter.all') | t"
+    [text]="mineText()"
     [active]="mine() !== ''"
   />
   }

@@ -1,9 +1,11 @@
-// Without linked cards the host holds only a comment node, so it takes no gap.
+// Without linked cards, actions or an empty state the host holds no section, only the link picker
+// (which shows as a dialog) and comment nodes, so it takes no space, no gap and no margin. The
+// empty state of a sheet (`emptyHeading`, spec 001800) keeps the host shown.
 :host {
   display: block;
   min-width: 0;
 }
-:host(:empty) {
+:host(:not(:has(> .tl, > app-empty-state))) {
   display: none;
 }
 .tl {
@@ -69,4 +71,18 @@
 .tl__actions {
   display: inline-flex;
   gap: var(--space-1);
+}
+.tl__plain {
+  color: var(--color-text);
+  font-weight: var(--fw-medium);
+}
+.tl__muted {
+  color: var(--color-text-muted);
+  font-weight: var(--fw-regular);
+}
+// The × stands above the link of the row, whose ::after covers the whole row.
+.tl__x {
+  position: relative;
+  z-index: 1;
+  flex: none;
 }

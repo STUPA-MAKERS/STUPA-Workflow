@@ -6,6 +6,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   ButtonLinkComponent,
   IconComponent,
   InputComponent,
@@ -37,6 +38,7 @@ type Phase = 'form' | 'sending' | 'sent' | 'error';
     TranslatePipe,
     AltchaComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     ButtonLinkComponent,
     IconComponent,
     InputComponent,
@@ -69,7 +71,7 @@ export class LoginComponent {
 
   /** Start the OIDC login. It leaves the SPA and comes back to the dashboard. */
   ssoLogin(): void {
-    this.auth.login('/dashboard');
+    this.auth.login('/activity');
   }
 
   onAltchaSolved(solution: string): void {

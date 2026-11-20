@@ -45,7 +45,7 @@
                         {{ 'admin.users.col.lastLogin' | t }}:
                         {{ c.lastLogin ? (c.lastLogin | ldate: 'mediumDate') : ('admin.users.never' | t) }}
                       </span>
-                      <app-icon trail class="um__chev" name="right" [size]="18" />
+                      <app-row-chevron trail />
                     </app-list-item>
                   </li>
                 } @empty {
@@ -152,7 +152,7 @@
                     }
                   </ul>
                 } @else {
-                  <app-empty-state rows="2" [heading]="'admin.users.merge.nothing' | t" />
+                  <app-empty-state icon="users" rows="2" [heading]="'admin.users.merge.nothing' | t" />
                 }
                 <p class="um__legend um__muted">{{ 'admin.users.merge.legend' | t }}</p>
               </app-section>

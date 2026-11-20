@@ -1,0 +1,18 @@
+.aad {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.aad__pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--space-3);
+}
+
+.aad__note {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+

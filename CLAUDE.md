@@ -14,7 +14,7 @@ cost-center budgets and invoices. The platform versions and audits all of this w
 VM, `docker compose`.
 
 **Stack:** Backend = Python 3.13 / FastAPI / Pydantic v2 / SQLAlchemy 2.0 async + Alembic / arq
-worker. Frontend = Angular 20 (strict TS, standalone, separate `.html`/`.scss`, signals,
+worker. Frontend = Angular 22 (strict TS, standalone, separate `.html`/`.scss`, signals,
 ngx-formly). Postgres 16 (versioned JSONB), Redis, MinIO (S3), ClamAV, typst (internal
 Markdown→PDF), ALTCHA.
 
@@ -74,11 +74,13 @@ Backend domain modules (`backend/app/modules/<module>`):
   gate of its own module
 - **be-tickets** — help-menu tickets: one-way public report (ALTCHA when signed out),
   `ticket.manage` work routes, notes, events, retention cron
+- **be-graph** — the graph page: `GET /api/graph` (elements and relations as nodes and edges,
+  paged), permission `graph.view`, read rules through the link resolver
 - **be-todos** — to-do boards (gremium, personal, team): RBAC `todo.write`/`todo.configure`,
   lexorank moves, ETag, links with per-kind read checks, ticket and agenda coupling, mails
 
 Components:
-- **frontend** — Angular 20 SPA (`frontend/`): core/shared/features/pages, design system, build
+- **frontend** — Angular 22 SPA (`frontend/`): core/shared/features/pages, design system, build
 - **mcp** — MCP server (`mcp/`): act on the platform through its API as the logged-in user, PKCE
   browser grant
 - **typst** — internal Markdown→PDF render service (`typst/`), data-driven Typst template,

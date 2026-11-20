@@ -1,27 +1,27 @@
+@use 'meta-chips' as chips;
+
 :host {
   display: flex;
   flex-direction: column;
   gap: 22px;
   min-width: 0;
-  padding: 28px 32px;
+  // The sheet bar sets the top: the capitals of the title sit 32px below the top edge, as far
+  // as the text from the side.
+  padding: 0 32px 28px;
   border-radius: var(--radius-xl);
   background: var(--color-surface-1);
 }
 
 .vpn__meta {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
+  @include chips.list;
+  flex-wrap: nowrap;
+}
+.vpn__part {
+  @include chips.chip;
+  flex: none;
 }
 .vpn__where {
-  min-width: 0;
-}
-.vpn__sep {
-  flex: none;
-  color: var(--color-text-subtle);
-}
-.vpn__rules {
-  flex: none;
+  flex: 0 1 auto;
 }
 .vpn__app {
   flex: none;
@@ -33,9 +33,6 @@
   .vpn__app:hover {
     text-decoration: underline;
   }
-}
-.vpn__app.vpn__where {
-  flex: 0 1 auto;
 }
 
 .vpn__q {
@@ -75,11 +72,9 @@
   background: none;
 }
 .vpn__cap {
-  font-size: var(--fs-cap);
+  font-size: var(--fs-small);
   line-height: 1rem;
   font-weight: var(--fw-semibold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 :host(.vpn--phone) .vpn__bar + .vpn__meta {
   margin-top: calc(-1 * var(--space-3));
@@ -88,21 +83,22 @@
 // and a long meeting title is cut on its own line.
 :host(.vpn--phone) .vpn__meta {
   flex-wrap: wrap;
-  row-gap: 2px;
 }
 :host(.vpn--phone) .vpn__where {
   max-width: 100%;
 }
 
 // The same 18px inline padding as the other boxes of the column, so their content shares one edge.
+// The capitals of the kicker sit as far below the top edge as the text from the side: 4px of
+// its 16px line are above the capitals.
 :host(.vpn--card) {
   gap: 14px;
-  padding: 20px 18px;
+  padding: 14px 18px 20px;
 }
 
 :host(.vpn--strip) {
   gap: var(--space-3);
-  padding: 18px 20px;
+  padding: 16px 20px 18px;
 }
 .vpn__head {
   display: flex;

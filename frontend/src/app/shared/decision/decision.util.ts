@@ -21,13 +21,17 @@ export interface DecisionDraft {
 /** The first problem of a draft, or null. The keys are i18n keys. */
 export type DecisionDraftError =
   | 'decision.error.amountInvalid'
+  | 'decision.error.amountRequired'
   | 'decision.error.amountExceeds'
   | 'decision.error.conditionLength'
   | 'decision.error.conditionCount';
 
-/** A new draft: switched off, the amount set to the requested amount. */
-export function emptyDraft(requested: string | null | undefined): DecisionDraft {
-  return { enabled: false, amount: requested ?? '', conditions: [] };
+/**
+ * A new draft with the amount set to the requested amount. It is switched off, unless
+ * the move must name the approved amount (`required`, spec 001610).
+ */
+export function emptyDraft(requested: string | null | undefined, required = false): DecisionDraft {
+  return { enabled: required, amount: requested ?? '', conditions: [] };
 }
 
 /**
@@ -60,14 +64,16 @@ export function cleanConditions(conditions: readonly string[]): readonly string[
 /**
  * Check a draft as the server does: an amount greater than 0 with at most two decimals
  * and not above the requested amount, at most 20 conditions of 1 to 1000 characters.
- * A switched-off draft has no error.
+ * A switched-off draft has no error. A `required` draft must name the amount.
  */
 export function draftError(
   draft: DecisionDraft,
   requested: string | null | undefined,
+  required = false,
 ): DecisionDraftError | null {
   if (!draft.enabled) return null;
   const req = toNumber(requested);
+  if (required && draft.amount.trim() === '') return 'decision.error.amountRequired';
   if (draft.amount.trim() !== '') {
     const amount = toNumber(draft.amount);
     if (amount === null || amount <= 0 || req === null || !/^\d+(\.\d{1,2})?$/.test(draft.amount)) {
@@ -86,17 +92,20 @@ export function draftError(
 /**
  * The proposal of a draft for the server, or null when the draft is off or changes
  * nothing. An amount equal to the requested one (or empty) goes as `null` ("as
- * requested").
+ * requested"). A `required` draft always sends its amount, because the server needs
+ * the confirmed amount of every approval (spec 001610).
  */
 export function toProposal(
   draft: DecisionDraft,
   requested: string | null | undefined,
+  required = false,
 ): DecisionProposal | null {
+  const conditions = cleanConditions(draft.conditions);
+  if (required) return { approvedAmount: draft.amount, conditions };
   if (!draft.enabled) return null;
   const amount = toNumber(draft.amount);
   const req = toNumber(requested);
   const approvedAmount = amount !== null && amount !== req ? draft.amount : null;
-  const conditions = cleanConditions(draft.conditions);
   if (approvedAmount === null && conditions.length === 0) return null;
   return { approvedAmount, conditions };
 }

@@ -9,6 +9,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   DialogComponent,
   EmptyStateComponent,
   IconComponent,
@@ -45,6 +46,7 @@ const REFUSALS: Readonly<Record<string, TranslationKey>> = {
     TranslatePipe,
     DialogComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     InputComponent,
     AvatarComponent,

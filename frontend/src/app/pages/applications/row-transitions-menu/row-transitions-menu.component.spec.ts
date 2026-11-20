@@ -8,7 +8,7 @@ import userEvent from '@testing-library/user-event';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { AuthService } from '@core/auth/auth.service';
 import type { ApplicationListItem, TransitionOutWire } from '@core/api/models';
-import { RowTransitionsMenuComponent, type RowAction } from './row-transitions-menu.component';
+import { RowTransitionsMenuComponent, rowMenuShown, type RowAction } from './row-transitions-menu.component';
 
 const ITEM: ApplicationListItem = {
   id: 'app-1',
@@ -80,14 +80,14 @@ describe('RowTransitionsMenuComponent', () => {
       'Auf Tagesordnung setzen',
       'Ablehnen',
       'Übergang',
-      'Öffnen',
       'Archivieren',
       'Status setzen',
       'Löschen',
     ]);
     expect(screen.getByRole('menuitem', { name: 'Ablehnen' })).toHaveClass('rm__item--danger');
     expect(screen.getByRole('menuitem', { name: 'Löschen' })).toHaveClass('rm__item--danger');
-    expect(screen.getByRole('menuitem', { name: 'Öffnen' })).not.toHaveClass('rm__item--danger');
+    expect(screen.getByRole('menuitem', { name: 'Archivieren' })).not.toHaveClass('rm__item--danger');
+    expect(screen.queryByRole('menuitem', { name: 'Öffnen' })).not.toBeInTheDocument();
   });
 
   it('loads them again on every opening', async () => {
@@ -114,7 +114,6 @@ describe('RowTransitionsMenuComponent', () => {
   });
 
   it.each([
-    ['Öffnen', 'open'],
     ['Archivieren', 'archive'],
     ['Status setzen', 'force'],
     ['Löschen', 'delete'],
@@ -135,12 +134,13 @@ describe('RowTransitionsMenuComponent', () => {
     expect(screen.getByRole('menuitem', { name: 'Aus Archiv holen' })).toBeInTheDocument();
   });
 
-  it('shows only "Öffnen" without any right, and asks for no transitions', async () => {
-    const { http, trigger, detectChanges } = await setup([]);
+  /** § NF/usability/controls/001981: the menu has no "Öffnen"; a press on the row opens it. */
+  it('shows the empty note when the transitions are the only right and there are none', async () => {
+    const { http, trigger, detectChanges } = await setup(['application.transition']);
     await userEvent.click(trigger);
+    http.expectOne(TRANSITIONS_URL).flush([]);
     await settle(detectChanges);
-    http.verify();
-    expect(screen.getAllByRole('menuitem').map((el) => el.textContent?.trim())).toEqual(['Öffnen']);
+    expect(screen.queryAllByRole('menuitem')).toEqual([]);
   });
 
   it('shows no transitions when they fail to load', async () => {
@@ -148,7 +148,7 @@ describe('RowTransitionsMenuComponent', () => {
     await userEvent.click(trigger);
     http.expectOne(TRANSITIONS_URL).flush({}, { status: 500, statusText: 'x' });
     await settle(detectChanges);
-    expect(screen.getByRole('menuitem', { name: 'Öffnen' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Archivieren' })).toBeInTheDocument();
     expect(screen.queryByText('Übergänge')).not.toBeInTheDocument();
   });
 
@@ -186,5 +186,12 @@ describe('RowTransitionsMenuComponent', () => {
     const cmp = fixture.componentInstance as unknown as { onSelected: (i: { id: string; label: string }) => void };
     cmp.onSelected({ id: 't:gone', label: 'x' });
     expect(actions).toEqual([]);
+  });
+
+  it('tells whether a row menu holds anything', () => {
+    const auth = (perms: string[]) => ({ can: (p: string) => perms.includes(p) }) as unknown as AuthService;
+    expect(rowMenuShown(auth([]))).toBe(false);
+    expect(rowMenuShown(auth(['application.read']))).toBe(false);
+    for (const p of ALL) expect(rowMenuShown(auth([p]))).toBe(true);
   });
 });

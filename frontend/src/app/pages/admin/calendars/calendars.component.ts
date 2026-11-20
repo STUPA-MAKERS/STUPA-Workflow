@@ -15,6 +15,7 @@ import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
 import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   ConfirmDialogComponent,
   DialogComponent,
   EmptyStateComponent,
@@ -30,6 +31,7 @@ import {
   SkeletonComponent,
   StatusTextComponent,
   ToastService,
+  FactsComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminOptionsService } from '../admin-options.service';
@@ -115,6 +117,7 @@ function withSaved(
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FactsComponent,
     FormsModule,
     TranslatePipe,
     LocalizedDatePipe,
@@ -122,6 +125,7 @@ function withSaved(
     ExpandRowComponent,
     BreadcrumbsComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     ConfirmDialogComponent,
     DialogComponent,
     EmptyStateComponent,

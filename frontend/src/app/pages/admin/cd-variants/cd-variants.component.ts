@@ -13,26 +13,7 @@ import { errorStatus, problemCode } from '@core/api/problem';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import {
-  FabComponent,
-  ButtonComponent,
-  ConfirmDialogComponent,
-  DialogComponent,
-  EmptyStateComponent,
-  FilePickerComponent,
-  formatBytes,
-  IconComponent,
-  InputComponent,
-  NoteComponent,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-  SegmentedComponent,
-  type SegmentedOption,
-  SkeletonComponent,
-  ToastService,
-  PageHeaderComponent,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, ConfirmDialogComponent, DialogComponent, EmptyStateComponent, FabComponent, FilePickerComponent, formatBytes, IconComponent, InputComponent, MetaLineComponent, NoteComponent, PageHeaderComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, SegmentedComponent, type SegmentedOption, SkeletonComponent, ToastService } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import {
@@ -113,6 +94,7 @@ function emptyForm(): VariantForm {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    MetaLineComponent,
     LoadStateComponent,
     FilePickerComponent,
     FabComponent,
@@ -121,6 +103,7 @@ function emptyForm(): VariantForm {
     FormsModule,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     DialogComponent,
     IconComponent,
     InputComponent,

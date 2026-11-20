@@ -1,0 +1,364 @@
+@use 'breakpoints' as bp;
+@use 'list-pane' as lp;
+@use './graph-kinds' as kinds;
+
+// The drawing fills the page. One layer over it holds the filters at the top, the panel of
+// the chosen node under them and the state of the build-up at the foot.
+
+:host {
+  @include lp.stack;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.gr {
+  @include lp.single-column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  @include kinds.colors;
+}
+// The shell has more room under a page than beside it: the frame of the drawing takes the
+// difference, so its edge is the same on every side.
+.gr__pane {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 24rem;
+  margin-bottom: calc(-1 * var(--space-5));
+  // The radius of the detail pane of a list page.
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-sunken);
+}
+
+// The loading, the error and the empty state show under the filters.
+.gr__body {
+  @include lp.stack;
+  position: absolute;
+  inset: 0;
+  padding: 6rem var(--space-4) 0;
+  border-radius: inherit;
+}
+.gr__body:has(.gr__canvas) {
+  padding: 0;
+}
+// The skeleton is the canvas: it fills the body as `app-graph-canvas` does.
+.gr__skel {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.gr__skelLines {
+  position: absolute;
+  top: calc(50% - 100px);
+  left: calc(50% - 100px);
+  width: 200px;
+  height: 200px;
+  overflow: visible;
+}
+.gr__skelLine {
+  stroke: color-mix(in srgb, var(--color-text) 12%, transparent);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+// A node of `app-graph-canvas`: a 36px dot with its title under it.
+.gr__skelNode {
+  position: absolute;
+  top: calc(50% + var(--y) - 18px);
+  left: calc(50% + var(--x) - 18px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 36px;
+}
+.gr__skelDot {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+.gr__skelName {
+  flex: none;
+  font-size: var(--fs-small);
+}
+.gr__skelTools {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+}
+.gr__canvas {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+// The layer takes no pointer, its parts do.
+.gr__float {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  pointer-events: none;
+}
+// A popup of a filter is inside the layer, so the layer goes up with it.
+.gr__float:has([aria-expanded='true']) {
+  z-index: var(--z-dialog);
+}
+.gr__float > * {
+  flex: none;
+  pointer-events: auto;
+}
+
+// The filters are one surface inside the frame of the drawing, so each control shows on it
+// as on a page.
+.gr__bar {
+  display: flex;
+  // One line (spec 001425): the search narrows first, then the filters scroll sideways.
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  // More room at the end: a chip has small corners and would touch the round corner.
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
+  // Concentric with the search field: half the height of the field and the padding.
+  border-radius: calc(1.375rem + var(--space-2));
+  background: var(--color-surface-1);
+  box-shadow: var(--shadow-md);
+}
+.gr__search {
+  flex: 1 1 14rem;
+  max-width: 22rem;
+  min-width: 11rem;
+}
+// "Schritte" (spec 001434) stays beside the search: it is no part of the scroll area.
+.gr__depth {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.84375rem;
+  font-weight: var(--fw-medium);
+}
+.gr__depthName {
+  white-space: nowrap;
+}
+.gr__depthInput {
+  width: 2ch;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  // The minus and the plus button are the arrows of the field.
+  appearance: textfield;
+  &::-webkit-inner-spin-button,
+  &::-webkit-outer-spin-button {
+    margin: 0;
+    appearance: none;
+  }
+}
+// The filters are at the end edge, the search at the start edge.
+.gr__chips {
+  @include lp.chips;
+  flex: 0 1 auto;
+  flex-wrap: nowrap;
+  margin-inline-start: auto;
+  overflow-x: auto;
+  // Room for the focus ring of a chip inside the scroll area.
+  padding: 3px;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+.gr__chips > * {
+  flex: none;
+}
+
+.gr__mark {
+  @include kinds.mark(36px);
+}
+.gr__mark--muted {
+  @include kinds.mark-muted;
+}
+
+// The panel of the chosen node, under the filters at the start edge.
+.gr__float > .gr__panel {
+  flex: 0 1 auto;
+}
+.gr__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: min(20rem, 100%);
+  min-height: 0;
+  padding: var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-1);
+  box-shadow: var(--shadow-md);
+}
+// The panel scrolls when it is full: its parts keep their height.
+.gr__panel > * {
+  flex: none;
+}
+.gr__panelHead,
+.gr__sheetHead {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.gr__sheetHead {
+  align-items: center;
+}
+.gr__panelText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.gr__panelTitle {
+  margin: 0 0 var(--space-1);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.gr__panelSub {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.gr__panelSub + .gr__panelSub {
+  margin-top: var(--space-1);
+}
+.gr__hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.gr__panelHead {
+  align-items: center;
+  justify-content: space-between;
+}
+.gr__actions {
+  align-self: flex-start;
+}
+.gr__hint {
+  margin-top: var(--space-2);
+}
+
+// The chosen element in the sheet of a phone.
+.gr__sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4) var(--space-5);
+  @include kinds.colors;
+}
+
+// The foot of the layer: the state of the build-up. It leaves the corner of the zoom
+// buttons free.
+.gr__foot {
+  display: flex;
+  margin-top: auto;
+  margin-inline-end: calc(var(--control-height) + var(--space-5));
+  min-width: 0;
+}
+.gr__pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-1);
+  box-shadow: var(--shadow-sm);
+}
+.gr__growing {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.gr__more {
+  padding: 0 var(--space-1);
+}
+
+// A phone: the drawing fills the screen above the bar of the shell, and the filters are one
+// strip at its top from edge to edge.
+@include bp.phone {
+  .gr__pane {
+    margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) calc(-1 * var(--space-6));
+    border-radius: 0;
+  }
+  // From edge to edge: no corner and no frame, also not in "Hoher Kontrast".
+  .gr__pane .gr__body .gr__canvas {
+    border: 0;
+    border-radius: 0;
+  }
+  .gr__float {
+    padding: 0;
+  }
+  // The search and "Schritte" in one line, the filters in a line of their own.
+  .gr__bar {
+    flex-wrap: wrap;
+    padding: var(--space-3) var(--space-4) var(--space-2);
+    border-radius: 0;
+  }
+  .gr__search {
+    flex: 1 1 0;
+    max-width: none;
+    min-width: 0;
+  }
+  .gr__chips {
+    flex: 0 0 100%;
+    margin-inline-start: 0;
+    justify-content: flex-start;
+    @include lp.phone-chips;
+  }
+  .gr__chip,
+  .gr__switch {
+    flex: none;
+  }
+  .gr__foot {
+    padding: 0 var(--space-3) var(--space-3);
+  }
+}
+
+// "Hoher Kontrast": every mark in the text colour, the surfaces with an edge.
+:host-context([data-very-high-contrast='on']) {
+  .gr__mark {
+    background: var(--color-text);
+    color: var(--color-bg);
+  }
+  .gr__mark--muted {
+    background: var(--color-bg);
+    color: var(--color-text);
+    box-shadow: inset 0 0 0 2px var(--color-text);
+  }
+  .gr__depth {
+    color: var(--color-text);
+  }
+  // A control shows yellow (000614): the field has the yellow edge of a chip.
+  .gr__depthInput {
+    width: 2.5rem;
+    height: var(--control-height-sm);
+    border-radius: var(--radius-md);
+    box-shadow: inset 0 0 0 2px var(--vh-hi);
+  }
+  .gr__bar,
+  .gr__panel,
+  .gr__pill {
+    border: 2px solid var(--color-text);
+    box-shadow: none;
+  }
+}
+@include bp.phone {
+  :host-context([data-very-high-contrast='on']) .gr__bar {
+    border-width: 0 0 2px;
+  }
+}

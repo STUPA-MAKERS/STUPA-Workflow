@@ -14,6 +14,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   IconComponent,
   SearchPillComponent,
   TruncatedDirective,
@@ -45,7 +46,7 @@ interface Candidate {
   selector: 'app-keeper-menu',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TruncatedDirective, SearchPillComponent, TranslatePipe, ButtonComponent, IconComponent, AvatarComponent],
+  imports: [TruncatedDirective, SearchPillComponent, TranslatePipe, ButtonComponent, ButtonGroupComponent, IconComponent, AvatarComponent],
   templateUrl: './keeper-menu.component.html',
   styleUrl: './keeper-menu.component.scss',
   host: { '[class.km--sheet]': 'inSheet()' },

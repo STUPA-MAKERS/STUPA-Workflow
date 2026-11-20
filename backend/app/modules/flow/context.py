@@ -25,6 +25,7 @@ from app.modules.auth.principal import Principal
 from app.modules.budget.decision import effective_decision_gremium
 from app.modules.budget.tree_models import BudgetAllocation, BudgetExpense
 from app.modules.files.models import Attachment
+from app.modules.flow.models import State
 from app.modules.forms.models import FormField
 from app.modules.gremien.models import GremiumMembership
 from app.shared.guards import GuardContext
@@ -125,6 +126,35 @@ async def _has_attachment(session: AsyncSession, app: Application) -> bool:
                     Attachment.storage_key.is_not(None),
                     Attachment.scanned.is_(True),
                     Attachment.scan_result == "clean",
+                )
+            )
+        )
+    )
+
+
+async def missing_required_file(session: AsyncSession, app: Application) -> bool:
+    """Report whether the Antrag may not leave its state for want of a file (spec 001732).
+
+    It may not when its Antragsart has the switch "Anhang Pflicht", it stands in the
+    initial state of the flow, and it has no bound file. A file that still waits for the
+    scan counts, because the applicant uploads and submits in one go, and the scan
+    result decides later; a file that ClamAV removed (`storage_key IS NULL`) does not.
+    One query answers all three, so a fire costs one round trip more.
+    """
+    return bool(
+        await session.scalar(
+            select(
+                exists().where(
+                    ApplicationType.id == app.type_id,
+                    ApplicationType.attachment_required.is_(True),
+                )
+                & exists().where(
+                    State.id == app.current_state_id,
+                    State.is_initial.is_(True),
+                )
+                & ~exists().where(
+                    Attachment.application_id == app.id,
+                    Attachment.storage_key.is_not(None),
                 )
             )
         )

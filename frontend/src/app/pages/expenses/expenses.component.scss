@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use '../budget/swatch';
 @use 'list-pane' as lp;
 
@@ -48,21 +47,9 @@
 .exp--split .exp__scroll > * {
   flex: none;
 }
-.exp__scroll {
-  @include fade.fade-y(var(--exp-fade));
-}
 
 .exp__rows {
   @include lp.stack;
-}
-.exp__row--checked {
-  --li-bg: var(--color-selected);
-  --li-hover: var(--color-selected);
-  --li-color: var(--color-on-selected);
-}
-.exp__dot {
-  margin-inline: 6px;
-  color: var(--color-text-subtle);
 }
 .exp__sub {
   display: flex;
@@ -97,7 +84,6 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  margin-inline-end: calc(-1 * var(--space-2));
 }
 .exp__amount {
   font-size: 0.8125rem;
@@ -131,9 +117,6 @@
   .exp__row {
     --li-pad-x: var(--space-3);
     --li-gap: var(--space-2);
-  }
-  .exp__dot {
-    margin-inline: var(--space-1);
   }
   .exp__arrow {
     margin-inline: var(--space-1);

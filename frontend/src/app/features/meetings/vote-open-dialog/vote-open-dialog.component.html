@@ -43,23 +43,27 @@
     <div class="vod__group">
       <span class="vod__cap cap" id="vod-seats-cap">{{ 'election.dialog.seats' | t }}</span>
       <div class="vod__stepper" role="group" aria-labelledby="vod-seats-cap">
-        <app-button
-          variant="tonal"
-          size="sm"
-          [disabled]="seats() <= 1"
-          [iconOnly]="true"
-          [ariaLabel]="'election.dialog.seatsLess' | t"
-          (click)="changeSeats(-1)"
-        ><app-icon name="minus" /></app-button>
+        <app-button-group>
+          <app-button
+            variant="tonal"
+            size="sm"
+            [disabled]="seats() <= 1"
+            [iconOnly]="true"
+            [ariaLabel]="'election.dialog.seatsLess' | t"
+            (click)="changeSeats(-1)"
+          ><app-icon name="minus" /></app-button>
+        </app-button-group>
         <span class="vod__seats mono" aria-live="polite">{{ seats() }}</span>
-        <app-button
-          variant="tonal"
-          size="sm"
-          [disabled]="seats() >= 50"
-          [iconOnly]="true"
-          [ariaLabel]="'election.dialog.seatsMore' | t"
-          (click)="changeSeats(1)"
-        ><app-icon name="plus" /></app-button>
+        <app-button-group>
+          <app-button
+            variant="tonal"
+            size="sm"
+            [disabled]="seats() >= 50"
+            [iconOnly]="true"
+            [ariaLabel]="'election.dialog.seatsMore' | t"
+            (click)="changeSeats(1)"
+          ><app-icon name="plus" /></app-button>
+        </app-button-group>
       </div>
     </div>
 
@@ -88,12 +92,14 @@
                 [downLabel]="'election.dialog.down' | t: { name: c.name }"
                 (move)="moveCandidate(i, $event)"
               />
-              <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'election.dialog.remove' | t: { name: c.name }" (click)="removeCandidate(c.key)"><app-icon name="trash" /></app-button>
+              <app-button-group>
+                <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'election.dialog.remove' | t: { name: c.name }" (click)="removeCandidate(c.key)"><app-icon name="trash" /></app-button>
+              </app-button-group>
             </li>
           }
         </ol>
       } @else {
-        <app-empty-state shape="person" rows="2" [heading]="'election.dialog.none' | t" />
+        <app-empty-state icon="vote" shape="person" rows="2" [heading]="'election.dialog.none' | t" />
       }
       @if (memberOptions().length > 0) {
         <app-select
@@ -117,10 +123,12 @@
           (ngModelChange)="freeName.set($event)"
           (keydown.enter)="$event.preventDefault(); addFreeName()"
         />
-        <app-button variant="tonal" [disabled]="!freeName().trim() || freeNameTaken()" (click)="addFreeName()">
-          <app-icon name="plus" />
-          {{ 'election.dialog.add' | t }}
-        </app-button>
+        <app-button-group>
+          <app-button variant="tonal" [disabled]="!freeName().trim() || freeNameTaken()" (click)="addFreeName()">
+            <app-icon name="plus" />
+            {{ 'election.dialog.add' | t }}
+          </app-button>
+        </app-button-group>
       </div>
       @if (tooFew()) {
         <p class="vod__warn" role="status">{{ 'election.dialog.tooFew' | t: { n: seats() } }}</p>

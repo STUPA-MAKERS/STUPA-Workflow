@@ -4,19 +4,27 @@
     <app-sheet-bar [bleed]="split()">
       <h2 appSheetBarTitle id="tdt-title" class="sheet-title fd__title">{{ t.description }}</h2>
       @if (canManage()) {
-        <app-sheet-action
-          icon="edit"
-          [label]="'action.edit' | t"
-          [ariaLabel]="'expenses.transfers.editTitle' | t"
-          [phone]="phone()"
-          (pressed)="edit.emit()"
-        />
+        <!-- On a phone the edit button shows its text; elsewhere it is an icon button with a tooltip.
+             It stands right in the group of the sheet bar, so it joins the shape of the group (001350). -->
+        @if (phone()) {
+          <app-button variant="tonal" (click)="edit.emit()">
+            <span class="fd__btn"><app-icon name="edit" />{{ 'action.edit' | t }}</span>
+          </app-button>
+        } @else {
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="'expenses.transfers.editTitle' | t"
+            [title]="'expenses.transfers.editTitle' | t"
+            (click)="edit.emit()"
+          ><app-icon name="edit" /></app-button>
+        }
       }
       @if (menu().length) {
         <app-row-menu [label]="'expenses.detail.menu' | t" [sections]="menu()" (selected)="onMenu($event)" />
       }
     </app-sheet-bar>
-    <p class="sheet-line fd__line fd__seps">
+    <p class="sheet-line fd__line">
       <span class="fd__parts">
         <span class="fd__part fd__cc">
           {{ from().name }}
@@ -40,7 +48,7 @@
       </div>
 
       <app-section class="fd__sec" [heading]="'expenses.detail.data' | t">
-        <dl class="fd__card fd__grid">
+        <dl appFacts [card]="true">
           <div>
             <dt>{{ 'expenses.col.amount' | t }}</dt>
             <dd class="mono">{{ amount() }}</dd>
@@ -69,7 +77,7 @@
 
     <div class="fd__col">
       <app-section class="fd__sec" [heading]="'expenses.detail.details' | t">
-        <dl class="fd__card fd__stack">
+        <dl appFacts [card]="true" class="fd__stack">
           <div>
             <dt>{{ 'expenses.detail.createdBy' | t }}</dt>
             <dd>{{ t.actorName || '—' }}</dd>

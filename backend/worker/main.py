@@ -34,6 +34,7 @@ from worker.cd_builtin import migrate_builtin_cd_logos
 from worker.cd_builtin import on_startup as cd_builtin_on_startup
 from worker.deadlines import on_startup as deadlines_on_startup
 from worker.deadlines import process_deadlines
+from worker.drafts import process_draft_reminders
 from worker.files_drafts import purge_draft_attachments
 from worker.mail import on_startup as mail_on_startup
 from worker.mail import send_mail
@@ -150,13 +151,15 @@ class WorkerSettings:
     The fetch of the external calendars runs every minute at second 30 and fetches
     only the calendars whose interval is over.
     Task reminders run hourly (thresholds in days); ``task_reminder_log`` prevents
-    duplicate sends. Expired wizard drafts go hourly with their objects. The public
+    duplicate sends. Draft reminders run hourly too; ``draft_reminder_at`` sends each
+    draft one reminder at most. Expired wizard drafts go hourly with their objects. The public
     protocol heal builds the public versions that a failed or raced backfill left out,
     so they appear without a new switch of the gremium flag. The backup at 04:00 runs
     after retention, so the archive holds the anonymized state rather than PII that
     retention is about to drop. The audit-chain check at 04:30 does not depend on the
     backup and runs also when backups are off or failed.
     """
+
     functions = [
         ping,
         refresh_budget_stats,
@@ -168,6 +171,7 @@ class WorkerSettings:
         func(deliver_webhook, timeout=_WEBHOOK_JOB_TIMEOUT_SECONDS),
         process_deadlines,
         process_task_reminders,
+        process_draft_reminders,
         process_retention,
         purge_draft_attachments,
         anonymize_tickets,
@@ -187,6 +191,7 @@ class WorkerSettings:
         cron(process_deadlines, second=0),
         cron(fetch_external_calendars, second=30),
         cron(process_task_reminders, minute=10),
+        cron(process_draft_reminders, minute=15),
         cron(purge_draft_attachments, minute=20),
         cron(heal_public_protocols, minute=40),
         cron(scheduled_backup, hour=4, minute=0),
@@ -199,6 +204,4 @@ class WorkerSettings:
     ]
     on_startup = _on_startup
     on_shutdown = _shutdown
-    redis_settings = RedisSettings.from_dsn(
-        os.environ.get("REDIS_URL", "redis://redis:6379/0")
-    )
+    redis_settings = RedisSettings.from_dsn(os.environ.get("REDIS_URL", "redis://redis:6379/0"))

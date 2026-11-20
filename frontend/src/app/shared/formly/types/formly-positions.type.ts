@@ -1,10 +1,30 @@
-import { ChangeDetectionStrategy, Component, type OnInit, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  type OnInit,
+  inject,
+  signal,
+} from '@angular/core';
+import { NgComponentOutlet } from '@angular/common';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
-import { ButtonComponent, IconComponent, SwitchComponent, parseMoney } from '@stupa-makers/ui-kit';
+import type { FormFieldDef } from '@core/api/models';
+import {
+  ButtonComponent,
+  ButtonGroupComponent,
+  IconComponent,
+  SwitchComponent,
+  parseMoney,
+  ErrorTextComponent,
+} from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { formatMoney } from '@shared/format-money';
 import { withEntry, withoutEntry } from '@shared/util/immutable';
+import { type CostLine, costLine, placeholderReasons } from '@shared/forms/form-rules';
+import { POSITION_FILES, newPositionId } from '@shared/forms/position-files';
+import { RowChevronComponent } from '../../ui/row-chevron/row-chevron.component';
 
 /** A comparison offer within a cost position. */
 interface Offer {
@@ -15,6 +35,8 @@ interface Offer {
 
 /** A cost position with several comparison offers. */
 interface Position {
+  /** The stable id of the position: the files of the position name it (spec 001730). */
+  readonly id?: string;
   readonly label: string;
   readonly offers: readonly Offer[];
   /** Opt-out of comparison offers. It needs a reason and allows only one offer. */
@@ -46,6 +68,20 @@ let nextUid = 0;
  * `props.serverErrors` (index → text) holds the 422 messages of the last save; the
  * position shows its message and opens. The next change clears them.
  *
+ * The last `positions` field of a form (`props.costLine`) shows below the positions the
+ * line "Gesamtkosten X €, davon beantragt Y €" and, with a number of participants above 0,
+ * "Z € pro Person" (specs 001630, 001631). It reads the other answers from the model and
+ * updates on every change of the form.
+ *
+ * An offer that looks like a placeholder (0 € or 1 €, a supplier with fewer than 3
+ * characters, the same supplier twice in a position) gets a warning below it (spec
+ * 001640). The warning names the switch for "no comparison offers" when the field offers
+ * it. It never makes the field invalid (spec 001641).
+ *
+ * A page that provides `POSITION_FILES` gets a files block below each open position
+ * (spec 001730). A new position gets a stable `id`; on such a page an older position
+ * without one gets it when the field starts.
+ *
  * The legend must be the first child of the fieldset, so the legend and the sum float and the sum
  * sits at the end of the legend line.
  */
@@ -53,13 +89,26 @@ let nextUid = 0;
   selector: 'app-formly-positions',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonComponent, IconComponent, SwitchComponent],
+  imports: [
+    ErrorTextComponent,
+    RowChevronComponent,
+    ButtonComponent,
+    ButtonGroupComponent,
+    IconComponent,
+    SwitchComponent,
+    NgComponentOutlet,
+  ],
   templateUrl: './formly-positions.type.html',
   styleUrl: './formly-positions.type.scss',
 })
 export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements OnInit {
   private readonly i18n = inject(I18nService);
   private readonly uid = `pos-${nextUid++}`;
+  private readonly destroyRef = inject(DestroyRef);
+  /** The files of a position, when the page offers them. */
+  protected readonly positionFiles = inject(POSITION_FILES, { optional: true });
+  /** Counts the changes of the form, so the cost line reads the other answers again. */
+  private readonly formTick = signal(0);
 
   /** The open positions, by index. */
   private readonly open = signal<ReadonlySet<number>>(new Set());
@@ -69,9 +118,15 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
    * applicant never touches it, and otherwise it passes the required check of the wizard.
    */
   ngOnInit(): void {
-    this.open.set(
-      new Set(this.positions.flatMap((p, i) => (this.positionComplete(p) ? [] : [i]))),
-    );
+    this.formControl.root.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.formTick.update((n) => n + 1));
+    if (this.positionFiles && this.positions.some((p) => !p.id)) {
+      this.formControl.setValue(
+        this.positions.map((p) => (p.id ? p : { ...p, id: newPositionId() })),
+      );
+    }
+    this.open.set(new Set(this.positions.flatMap((p, i) => (this.positionComplete(p) ? [] : [i]))));
     queueMicrotask(() => this.revalidate(this.positions));
   }
 
@@ -135,8 +190,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
 
   /** The accessible name of the radio of an offer: "Bevorzugt: <supplier>". */
   protected radioLabel(o: Offer, oi: number): string {
-    const name =
-      o.label.trim() || this.i18n.translate('forms.positions.offerN', { n: oi + 1 });
+    const name = o.label.trim() || this.i18n.translate('forms.positions.offerN', { n: oi + 1 });
     return this.i18n.translate('forms.positions.preferOfferNamed', { name });
   }
 
@@ -206,13 +260,69 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     }
     if (!this.showError) return '';
     if (p.offers.length < this.requiredOffers(p)) return this.t('apply.positions.errMinOffers');
-    if (p.offers.filter((o) => o.preferred).length !== 1) return this.t('apply.positions.errPreferred');
+    if (p.offers.filter((o) => o.preferred).length !== 1)
+      return this.t('apply.positions.errPreferred');
     if (!p.label.trim()) return this.t('apply.positions.errLabel');
     if (p.offers.some((o) => !o.label.trim() || o.value === null || o.value < 0)) {
       return this.t('apply.positions.errOffers');
     }
     if (this.reasonInvalid(p)) return this.t('apply.positions.errNoOffersReason');
     return '';
+  }
+
+  /** The figures of the cost line, or null when this field does not show it. */
+  protected costLine(): CostLine | null {
+    this.formTick();
+    if (this.props['costLine'] !== true) return null;
+    const fields = (this.props['costFields'] ?? []) as readonly FormFieldDef[];
+    const model = (this.model ?? {}) as Record<string, unknown>;
+    return costLine(fields, { ...model, [String(this.key)]: this.formControl.value });
+  }
+
+  /** "Gesamtkosten 1.200,00 €, davon beantragt 800,00 €, 40,00 € pro Person". */
+  protected costLineText(line: CostLine): string {
+    const head = this.i18n.translate('forms.costLine.total', {
+      total: this.fmt(line.total),
+      requested: this.fmt(line.requested),
+    });
+    return line.perPerson === null
+      ? head
+      : `${head}, ${this.i18n.translate('forms.costLine.perPerson', { amount: this.fmt(line.perPerson) })}`;
+  }
+
+  /**
+   * The placeholder warning under one field of an offer (spec 001640), or '': `label`
+   * for the supplier (too short, or the same as another offer), `value` for the amount.
+   */
+  protected offerWarning(p: Position, oi: number, field: 'label' | 'value'): string {
+    const reasons = placeholderReasons(p.offers)[oi] ?? [];
+    return reasons
+      .filter((r) => (field === 'value' ? r === 'value' : r !== 'value'))
+      .map((r) => this.t(`forms.positions.placeholder.${r}`))
+      .join(' ');
+  }
+
+  /**
+   * The hint under the offers of a position with a placeholder offer, when the field
+   * offers the switch for no comparison offers and it is off (spec 001641), or ''.
+   */
+  protected switchHint(p: Position): string {
+    if (!this.allowNoOffers || p.noOffers) return '';
+    const any = placeholderReasons(p.offers).some((r) => r.length > 0);
+    return any
+      ? this.i18n.translate('forms.positions.placeholder.useSwitch', {
+          switch: this.t('apply.positions.noOffers'),
+        })
+      : '';
+  }
+
+  /** The inputs of the files block of one position. */
+  protected filesInputs(p: Position): Record<string, unknown> {
+    return {
+      fieldKey: String(this.key),
+      positionId: p.id,
+      heading: this.t('forms.positions.files'),
+    };
   }
 
   protected fmt(value: number): string {
@@ -252,11 +362,13 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   addPosition(): void {
     const offers = Array.from({ length: this.minOffers }, (_, i) => this.blankOffer(i === 0));
     const index = this.positions.length;
-    this.commit([...this.positions, { label: '', offers }]);
+    this.commit([...this.positions, { id: newPositionId(), label: '', offers }]);
     this.open.update((cur) => new Set([...cur, index]));
   }
 
   removePosition(pi: number): void {
+    const id = this.positions[pi]?.id;
+    if (id) this.positionFiles?.removed(String(this.key), id);
     this.remapRaw((i, k) => (i === pi ? null : [i > pi ? i - 1 : i, k]));
     this.commit(this.positions.filter((_, i) => i !== pi));
     this.open.update(
@@ -288,9 +400,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   setOfferLabel(pi: number, oi: number, label: string): void {
     this.commit(
       this.positions.map((p, i) =>
-        i === pi
-          ? { ...p, offers: p.offers.map((o, k) => (k === oi ? { ...o, label } : o)) }
-          : p,
+        i === pi ? { ...p, offers: p.offers.map((o, k) => (k === oi ? { ...o, label } : o)) } : p,
       ),
     );
   }
@@ -300,9 +410,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     const value = this.parseNum(raw);
     this.commit(
       this.positions.map((p, i) =>
-        i === pi
-          ? { ...p, offers: p.offers.map((o, k) => (k === oi ? { ...o, value } : o)) }
-          : p,
+        i === pi ? { ...p, offers: p.offers.map((o, k) => (k === oi ? { ...o, value } : o)) } : p,
       ),
     );
   }
@@ -384,9 +492,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   setPreferred(pi: number, oi: number): void {
     this.commit(
       this.positions.map((p, i) =>
-        i === pi
-          ? { ...p, offers: p.offers.map((o, k) => ({ ...o, preferred: k === oi })) }
-          : p,
+        i === pi ? { ...p, offers: p.offers.map((o, k) => ({ ...o, preferred: k === oi })) } : p,
       ),
     );
   }
@@ -420,8 +526,6 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   }
 
   setNoOffersReason(pi: number, reason: string): void {
-    this.commit(
-      this.positions.map((p, i) => (i === pi ? { ...p, noOffersReason: reason } : p)),
-    );
+    this.commit(this.positions.map((p, i) => (i === pi ? { ...p, noOffersReason: reason } : p)));
   }
 }

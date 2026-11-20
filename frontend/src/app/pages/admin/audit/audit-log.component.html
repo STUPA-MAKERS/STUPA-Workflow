@@ -21,9 +21,11 @@
       }
     </div>
     @if (canVerify()) {
-      <app-button variant="tonal" size="sm" [loading]="verifying()" (click)="runVerify()">
-        <app-icon name="shieldok" /> {{ 'admin.audit.verify.now' | t }}
-      </app-button>
+      <app-button-group>
+        <app-button variant="tonal" size="sm" [loading]="verifying()" (click)="runVerify()">
+          <app-icon name="shieldok" /> {{ 'admin.audit.verify.now' | t }}
+        </app-button>
+      </app-button-group>
     }
   </div>
 
@@ -75,14 +77,14 @@
               >
               @if (isOpen(e.id)) {
                 <div class="al__details" [id]="'al-detail-' + e.id">
-                  <dl class="al__meta">
+                  <dl appFacts layout="rows" class="al__meta">
                     <dt>{{ 'admin.audit.detail.action' | t }}</dt>
                     <dd>{{ actionLabel(e.action) }}</dd>
                     @if (e.targetType || e.targetId) {
                       <dt>{{ 'admin.audit.detail.target' | t }}</dt>
-                      <dd class="al__wrap">
-                        @if (e.targetType) {<span>{{ targetTypeLabel(e.targetType) }}</span>}@if (e.targetLabel) {<span>{{ e.targetType ? ' · ' : '' }}{{ e.targetLabel }}</span>}@if (e.targetId) {<span class="mono">{{ e.targetType || e.targetLabel ? ' · ' : '' }}{{ e.targetId }}</span>}@if (revisionId(e); as rev) {<span> · </span><span class="mono">rev {{ rev }}</span>}
-                      </dd>
+                      <dd class="al__wrap"><app-meta-line>
+                        @if (e.targetType) {<span>{{ targetTypeLabel(e.targetType) }}</span>}@if (e.targetLabel) {<span>{{ e.targetLabel }}</span>}@if (e.targetId) {<span class="mono">{{ e.targetId }}</span>}@if (revisionId(e); as rev) {<span class="mono">rev {{ rev }}</span>}
+                      </app-meta-line></dd>
                     }
                     <dt>{{ 'admin.audit.detail.actor' | t }}</dt>
                     <dd class="al__wrap">{{ actorDisplay(e) }}</dd>
@@ -115,9 +117,11 @@
                         <a class="al__open" [routerLink]="link">{{ 'admin.audit.openTarget' | t }}</a>
                       }
                       @if (isRevertable(e)) {
-                        <app-button variant="danger" size="sm" [disabled]="reverting()" (click)="askRevert(e)">
-                          {{ 'admin.audit.revert.action' | t }}
-                        </app-button>
+                        <app-button-group>
+                          <app-button variant="danger" size="sm" [disabled]="reverting()" (click)="askRevert(e)">
+                            {{ 'admin.audit.revert.action' | t }}
+                          </app-button>
+                        </app-button-group>
                       }
                     </div>
                   }
@@ -128,11 +132,7 @@
           }
         </ul>
       } @else {
-        <app-empty-state shape="table" [heading]="'admin.audit.empty' | t">
-          @if (activeFilterCount()) {
-            <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'admin.audit.filter.reset' | t }}</app-button>
-          }
-        </app-empty-state>
+        <app-empty-state [icon]="activeFilterCount() ? 'searchOff' : 'clipcheck'" shape="table" [heading]="'admin.audit.empty' | t" />
       }
 
       @if (hasMore()) {

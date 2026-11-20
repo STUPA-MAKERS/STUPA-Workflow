@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use '../../shared/ui/surface-card' as sc;
 @use 'list-pane' as lp;
 
@@ -86,9 +85,6 @@
 .apps--split .apps__scroll > * {
   flex: none;
 }
-.apps__scroll {
-  @include fade.fade-y(var(--apps-fade));
-}
 
 .apps__rows {
   @include lp.stack;
@@ -96,10 +92,6 @@
 
 .apps__row--busy {
   opacity: 0.6;
-}
-.apps__dot {
-  margin-inline: 6px;
-  color: var(--color-text-subtle);
 }
 .apps__archived {
   display: inline-flex;
@@ -111,9 +103,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  margin-inline-end: calc(-1 * var(--space-2));
 }
-// Without hover (touch), the menu always shows.
+// The arrow of a row in one column gives way to the ⋮ of the row (001920).
 @include lp.hover-menu(apps);
 
 .apps__progress {
@@ -172,4 +163,10 @@
   .apps__chips {
     @include lp.phone-chips;
   }
+}
+
+// The multiple selection (001700): the box sits above the row link, a chosen row is selected.
+.apps__rowCheck {
+  position: relative;
+  z-index: 1;
 }

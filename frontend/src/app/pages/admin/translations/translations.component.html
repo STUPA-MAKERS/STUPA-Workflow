@@ -30,12 +30,14 @@
                   (checkedChange)="setActive(l, $event)"
                   >{{ 'admin.translations.active' | t }}</app-switch
                 >
+              </span>
+              <app-button-group menu>
                 <app-row-menu
                   [sections]="languageMenu()"
                   [label]="('ui.rowMenu.trigger' | t) + ': ' + l.name"
                   (selected)="onLanguageMenu($event, l)"
                 />
-              </span>
+              </app-button-group>
             </app-list-item>
           }
         </div>
@@ -111,13 +113,15 @@
                 </div>
                 <span class="tr__reset">
                   @if (isChanged(key)) {
-                    <app-button
-                      variant="text"
-                      [iconOnly]="true"
-                      [ariaLabel]="'admin.translations.reset' | t: { key: key }"
-                      (click)="reset(key)"
-                      ><app-icon name="undo"
-                    /></app-button>
+                    <app-button-group>
+                      <app-button
+                        variant="text"
+                        [iconOnly]="true"
+                        [ariaLabel]="'admin.translations.reset' | t: { key: key }"
+                        (click)="reset(key)"
+                        ><app-icon name="undo"
+                      /></app-button>
+                    </app-button-group>
                   }
                 </span>
               </li>
@@ -127,7 +131,7 @@
             <app-load-more [label]="'admin.translations.more' | t" (more)="more()" />
           }
         } @else {
-          <app-empty-state rows="3" [heading]="'admin.translations.noMatch' | t" />
+          <app-empty-state icon="searchOff" rows="3" [heading]="'admin.translations.noMatch' | t" />
         }
       </app-section>
     </ng-template>

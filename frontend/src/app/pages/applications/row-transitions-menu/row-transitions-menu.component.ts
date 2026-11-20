@@ -12,7 +12,7 @@ import type { ApplicationListItem, Transition } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { isRejection } from '../applications.util';
-import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@stupa-makers/ui-kit';
+import { RowMenuComponent, type RowMenuItem, type RowMenuSection, ButtonGroupComponent } from '@stupa-makers/ui-kit';
 
 type T = (key: Parameters<I18nService['translate']>[0]) => string;
 
@@ -36,9 +36,23 @@ export function rowForceItem(auth: AuthService, t: T): RowMenuItem | null {
   return { id: 'force', label: t('applications.detail.forceStatus'), icon: 'flow' };
 }
 
+const ROW_MENU_PERMISSIONS = [
+  'application.transition',
+  'application.archive',
+  'application.force_status',
+  'application.delete',
+] as const;
+
+/**
+ * True when the reader may do anything from the row menu. Without one of these rights the list
+ * draws no ⋮ at all, because a press on the row already opens it (spec 001981).
+ */
+export function rowMenuShown(auth: AuthService): boolean {
+  return ROW_MENU_PERMISSIONS.some((p) => auth.can(p));
+}
+
 /** What the reader chose in the row menu. The list page carries it out. */
 export type RowAction =
-  | { readonly kind: 'open' }
   | { readonly kind: 'archive' }
   | { readonly kind: 'force' }
   | { readonly kind: 'delete' }
@@ -48,15 +62,15 @@ export type RowAction =
  * The "more" menu of one row of the applications list.
  *
  * "Übergänge" load only when the menu opens (`GET /applications/{id}/transitions`), so a
- * list of fifty rows makes no fifty requests. Then: Öffnen, Archivieren
- * or Aus Archiv holen, Status setzen, and Löschen in red. Each item shows only with its
- * permission; the server checks again.
+ * list of fifty rows makes no fifty requests. Then: Archivieren or Aus Archiv holen, Status
+ * setzen, and Löschen in red. Each item shows only with its permission; the server checks
+ * again. The menu has no "Öffnen", because a press on the row opens it (spec 001981).
  */
 @Component({
   selector: 'app-row-transitions-menu',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RowMenuComponent],
+  imports: [ButtonGroupComponent, RowMenuComponent],
   templateUrl: './row-transitions-menu.component.html',
   styleUrl: './row-transitions-menu.component.scss',
 })
@@ -93,7 +107,6 @@ export class RowTransitionsMenuComponent {
     const archive = rowArchiveItem(this.auth, t, this.item());
     const force = rowForceItem(this.auth, t);
     const actions: RowMenuItem[] = [
-      { id: 'open', label: t('applications.row.open'), icon: 'ext' },
       ...(archive ? [archive] : []),
       ...(force ? [force] : []),
     ];

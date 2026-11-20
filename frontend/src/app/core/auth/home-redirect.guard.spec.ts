@@ -57,10 +57,10 @@ describe('homeRedirectGuard', () => {
     return result;
   }
 
-  it('redirects an authenticated visitor to /dashboard', () => {
+  it('redirects an authenticated visitor to /activity', () => {
     const result = run(MEMBER);
     expect(result).toBeInstanceOf(UrlTree);
-    expect((result as UrlTree).toString()).toBe('/dashboard');
+    expect((result as UrlTree).toString()).toBe('/activity');
   });
 
   it('lets an anonymous visitor stay on the public landing page', () => {

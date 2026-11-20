@@ -8,6 +8,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { SKIP_LOADING } from '@stupa-makers/ui-kit';
 import { ApiClient } from './api-client.service';
 import { USE_MOCK_API } from './api.config';
+import type { Attachment } from './models';
 import type {
   ApplicationOutWire,
   ApplicationTypeListItemWire,
@@ -730,22 +731,36 @@ describe('ApiClient', () => {
 
   it('uploads an attachment with a field key', () => {
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
-    api.uploadAttachment('app-1', file, { fieldKey: 'invoice' }).subscribe();
+    let out: Attachment | undefined;
+    api
+      .uploadAttachment('app-1', file, { fieldKey: 'invoice', positionId: 'p-1' })
+      .subscribe((a) => (out = a));
     const req = http.expectOne('/api/applications/app-1/attachments');
     const form = req.request.body as FormData;
     expect(form.get('field_key')).toBe('invoice');
+    expect(form.get('position_id')).toBe('p-1');
     req.flush(
-      { id: 'att-1', filename: 'a.pdf', mime: 'application/pdf', size: 1, scanned: false },
+      {
+        id: 'att-1',
+        filename: 'a.pdf',
+        mime: 'application/pdf',
+        size: 1,
+        scanned: false,
+        fieldKey: 'invoice',
+        positionId: 'p-1',
+      },
       { status: 201, statusText: 'Created' },
     );
+    expect(out).toMatchObject({ fieldKey: 'invoice', positionId: 'p-1' });
   });
 
   it('uploads an attachment with no opts (no field_key)', () => {
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
-    api.uploadAttachment('app-1', file).subscribe();
+    api.uploadAttachment('app-1', file, { positionId: 'p-1' }).subscribe();
     const req = http.expectOne('/api/applications/app-1/attachments');
     const form = req.request.body as FormData;
     expect(form.has('field_key')).toBe(false);
+    expect(form.has('position_id')).toBe(false);
     req.flush(
       { id: 'att-1', filename: 'a.pdf', mime: 'application/pdf', size: 1, scanned: true },
       { status: 201, statusText: 'Created' },

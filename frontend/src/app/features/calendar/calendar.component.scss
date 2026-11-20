@@ -1,4 +1,3 @@
-@use 'scroll-fade' as fade;
 @use 'list-pane' as lp;
 @use 'display' as d;
 
@@ -23,7 +22,6 @@
 .cal-list__scroll {
   @include lp.scroll(--cal-list-fade);
   padding-bottom: calc(56px + var(--space-6));
-  @include fade.fade-y(var(--cal-list-fade));
 }
 .cal-list__group,
 .cal-list__rows {
@@ -47,7 +45,8 @@
   gap: 0 6px;
 }
 
-// The desktop: the title and the tools over both columns, then the grid and the cards.
+// The desktop: the tools over both columns, then the grid and the day list. The title is only
+// for a screen reader; the actions stand at the end of the first tools row (spec 001771).
 .cal {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -57,12 +56,16 @@
 :host(.cal--wide) .cal {
   flex: 1 1 0;
   grid-template-columns: minmax(0, 1fr) 380px;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
 }
-:host(.cal--wide) .cal > app-page-header,
 :host(.cal--wide) .cal__tools {
   grid-column: 1 / -1;
+}
+// The search and its chips are only as wide as the grid column (001946): the tools span both
+// columns, so the day list and the gap come off.
+:host(.cal--wide) .cal__filters {
+  max-width: calc(100% - 380px - var(--space-5));
 }
 
 .cal__tools {
@@ -75,8 +78,12 @@
 }
 .cal__nav {
   display: flex;
+  flex: 1 1 100%;
   align-items: center;
   gap: var(--space-1);
+}
+.cal__actions {
+  margin-inline-start: auto;
 }
 .cal__month {
   min-width: 10.5rem;
@@ -86,11 +93,8 @@
   text-align: center;
   white-space: nowrap;
 }
-.cal__today {
-  margin-inline-start: var(--space-2);
-}
 .cal__view {
-  margin-inline-start: var(--space-3);
+  margin-inline-start: var(--space-2);
 }
 .cal__filters {
   display: flex;
@@ -98,6 +102,16 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+// The chips stand in a row of their own below the search (001946), because the 44px pill and
+// the 32px chips clash on one line.
+.cal__chips {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
   min-width: 0;
 }
@@ -110,8 +124,8 @@
 .cal__searchBox {
   position: relative;
   outline: none;
-  flex: 1 1 14rem;
-  min-width: 12rem;
+  flex: 1 1 100%;
+  min-width: 0;
 }
 .cal__search {
   display: block;
@@ -182,11 +196,18 @@
   min-width: 0;
   min-height: 0;
 }
-// The 1px gap on the border colour draws the grid lines.
+// Each day is its own segment, 2px apart, like the rows of a row group: only the four outer
+// corners of the month are round. The month view has no surface of its own (spec 001780).
 .cal__grid {
+  --cal-gap: 2px;
+  --cal-in: 4px;
+  --cal-out: var(--radius-lg);
   display: flex;
   flex-direction: column;
+  gap: var(--cal-gap);
   min-width: 0;
+}
+app-calendar-week.cal__grid {
   overflow: hidden;
   border-radius: var(--radius-xl);
   background: var(--color-surface-1);
@@ -203,14 +224,12 @@
   position: relative;
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 1px;
+  gap: var(--cal-gap);
   min-width: 0;
 }
 .cal__row:not(.cal__row--head) {
   flex: 1 1 0;
   min-height: 9rem;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-border);
 }
 :host(.cal--wide) .cal__row:not(.cal__row--head) {
   min-height: 0;
@@ -231,10 +250,23 @@
   min-height: 0;
   padding: 6px;
   overflow: hidden;
+  border-radius: var(--cal-in);
   background: var(--color-surface-1);
 }
 .cal__cell--out {
   background: var(--color-surface-2);
+}
+.cal__row:nth-child(2) > .cal__cell:first-child {
+  border-start-start-radius: var(--cal-out);
+}
+.cal__row:nth-child(2) > .cal__cell:nth-child(7) {
+  border-start-end-radius: var(--cal-out);
+}
+.cal__row:last-child > .cal__cell:first-child {
+  border-end-start-radius: var(--cal-out);
+}
+.cal__row:last-child > .cal__cell:nth-child(7) {
+  border-end-end-radius: var(--cal-out);
 }
 .cal__day {
   position: absolute;
@@ -242,7 +274,7 @@
   z-index: 0;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-md);
+  border-radius: inherit;
   background: transparent;
   cursor: pointer;
 }
@@ -254,13 +286,6 @@
 .cal__day:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: -2px;
-}
-// The bottom corner cells take the radius of the grid, so its clip does not cut their ring.
-.cal__row:last-child .cal__cell:first-child .cal__day {
-  border-end-start-radius: var(--radius-xl);
-}
-.cal__row:last-child .cal__cell:nth-child(7) .cal__day {
-  border-end-end-radius: var(--radius-xl);
 }
 .cal__cell--sel .cal__day {
   box-shadow: inset 0 0 0 2px var(--color-accent);
@@ -343,7 +368,7 @@
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   grid-auto-rows: 1.25rem;
-  gap: 4px 1px;
+  gap: 4px var(--cal-gap);
   pointer-events: none;
 }
 .cal__bar {
@@ -381,7 +406,8 @@
   }
 }
 
-// The entries of the picked day, each a card that is pressable as a whole.
+// The entries of the picked day: one row group under the day, like the list of Aktivität
+// (spec 001770). The column has no surface and no frame of its own.
 :host(:not(.cal--wide)) .cal__panel {
   margin-top: var(--space-3);
 }
@@ -391,79 +417,32 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border-radius: var(--radius-2xl);
-  background: var(--color-surface-1);
 }
 .cal__panelScroll {
   --cal-fade: var(--space-3);
   flex: 1 1 auto;
   min-height: 0;
-  padding: var(--space-3);
   overflow-y: auto;
   overscroll-behavior: contain;
-  @include fade.fade-y(var(--cal-fade));
 }
-.cal__cards {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+.cal__rows {
+  @include lp.stack;
 }
-.cal__card {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  padding: var(--space-4);
-  border: 0;
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-2);
-  color: inherit;
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
-}
-.cal__card:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-.cal__cardIcon {
-  flex: none;
-  align-self: flex-start;
+// The row lies on surface 2, so the lead icon takes surface 3 to stand out.
+.cal__rowIcon {
   background: var(--color-surface-3);
-}
-.cal__cardText {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.cal__cardKind {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 6px;
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
-.cal__cardTitle {
-  font-weight: var(--fw-semibold);
-  overflow-wrap: anywhere;
-}
-.cal__cardSrc {
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-  overflow-wrap: anywhere;
-}
-.cal__cardState {
-  margin-top: 4px;
-  font-size: var(--fs-small);
-}
-.cal__go {
-  flex: none;
-  color: var(--color-text-muted);
 }
 
 @include d.host-on(veryHigh) {
+  // As in a row group: wider gaps, every segment round and with its own edge.
+  .cal__grid {
+    --cal-gap: var(--space-2);
+    --cal-in: var(--radius-lg);
+  }
+  .cal__row:not(.cal__row--head) > .cal__cell {
+    background: var(--vh-bg, #000);
+    box-shadow: inset 0 0 0 2px var(--vh-fg, #fff);
+  }
   .cal__pop {
     background: var(--vh-bg, #000);
     box-shadow: inset 0 0 0 2px var(--vh-fg, #fff);

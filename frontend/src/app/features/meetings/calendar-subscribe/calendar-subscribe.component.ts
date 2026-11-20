@@ -15,6 +15,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   CopyButtonComponent,
   EmptyStateComponent,
   FocusDialogDirective,
@@ -26,6 +27,7 @@ import {
   SideSheetComponent,
   SkeletonComponent,
   watchAnchoredPopover,
+  ErrorTextComponent,
 } from '@stupa-makers/ui-kit';
 
 /** The gap between the anchor and the popover, and the least gap to the viewport edge. */
@@ -68,11 +70,13 @@ let nextId = 0;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ErrorTextComponent,
     FocusDialogDirective,
     EmptyStateComponent,
     NgTemplateOutlet,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     CopyButtonComponent,
     IconComponent,
     SideSheetComponent,

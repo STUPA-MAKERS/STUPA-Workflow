@@ -18,6 +18,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 })
 export class MeetingPageSkeletonComponent {
   protected readonly wide = mediaQuery(MEDIA.wide);
+  protected readonly phone = mediaQuery(MEDIA.phone);
   /** Name widths of the agenda rows, in percent. */
   protected readonly rows = [62, 78, 55, 70, 48];
 }

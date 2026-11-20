@@ -11,10 +11,7 @@ jest.mock('@stupa-makers/ui-kit', () => ({
 }));
 import { signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 import { render, screen, within } from '@testing-library/angular';
@@ -68,18 +65,46 @@ function appWire(over: Partial<ApplicationOutWire> = {}): ApplicationOutWire {
 
 /** One section with the title field: the edit form needs the fields of the form. */
 const FORM_SECTIONS = [
-  { key: 'main', label: { de: 'Antrag' }, fields: [{ key: 'title', type: 'text', label: { de: 'Titel' } }] },
+  {
+    key: 'main',
+    label: { de: 'Antrag' },
+    fields: [{ key: 'title', type: 'text', label: { de: 'Titel' } }],
+  },
 ];
 
 const VERSIONS: VersionOutWire[] = [
   { version: 1, data: {}, diff: null, changedBy: 'Lea', at: '2026-09-26T12:12:00Z' },
-  { version: 2, data: {}, diff: { added: {}, removed: {}, changed: {} }, changedBy: 'applicant', at: '2026-09-27T21:05:00Z' },
+  {
+    version: 2,
+    data: {},
+    diff: { added: {}, removed: {}, changed: {} },
+    changedBy: 'applicant',
+    at: '2026-09-27T21:05:00Z',
+  },
 ];
 
 const TRANSITIONS: TransitionOutWire[] = [
-  { id: 'tr-reject', fromStateId: 's1', toStateId: 's9', label: { de: 'Ablehnen' }, color: '#c0392b' },
-  { id: 'tr-agenda', fromStateId: 's1', toStateId: 's3', label: { de: 'Auf Tagesordnung setzen' }, addsToAgenda: true },
-  { id: 'tr-more', fromStateId: 's1', toStateId: 's1', label: { de: 'Nachforderung stellen' }, color: '#e8a33d' },
+  {
+    id: 'tr-reject',
+    fromStateId: 's1',
+    toStateId: 's9',
+    label: { de: 'Ablehnen' },
+    color: '#c0392b',
+  },
+  {
+    id: 'tr-agenda',
+    fromStateId: 's1',
+    toStateId: 's3',
+    label: { de: 'Auf Tagesordnung setzen' },
+    addsToAgenda: true,
+  },
+  {
+    id: 'tr-more',
+    fromStateId: 's1',
+    toStateId: 's1',
+    label: { de: 'Nachforderung stellen' },
+    color: '#e8a33d',
+  },
 ];
 
 const ALL = [
@@ -131,13 +156,19 @@ async function setup(opts: Opts = {}) {
         provide: AuthService,
         useValue: {
           can: (p: string) => perms.has(p),
-          gremien: signal(opts.gremien ?? [{ id: 'g1', name: 'Studierendenparlament', slug: 'stupa' }]),
+          gremien: signal(
+            opts.gremien ?? [{ id: 'g1', name: 'Studierendenparlament', slug: 'stupa' }],
+          ),
         },
       },
       { provide: RailStatusService, useValue: { refresh: jest.fn() } },
       {
         provide: ActivatedRoute,
-        useValue: { paramMap: paramMap$, fragment: new BehaviorSubject<string | null>(null), snapshot: { fragment: null } },
+        useValue: {
+          paramMap: paramMap$,
+          fragment: new BehaviorSubject<string | null>(null),
+          snapshot: { fragment: null },
+        },
       },
       ...(opts.page === false ? [] : [{ provide: ApplicationsPageService, useValue: page }]),
       ...(opts.nav ? [{ provide: ListDetailNav, useValue: opts.nav }] : []),
@@ -150,21 +181,40 @@ async function setup(opts: Opts = {}) {
   const notices: ApplicationChange[] = [];
   page.changes$.subscribe((c) => notices.push(c));
 
-  http.expectOne((r) => r.url === '/api/application-types').flush({
-    items: [{ id: 't1', name: 'Förderantrag', hasBudget: true, active: true, activeFormVersionId: 'v1' }],
-    total: 1,
-    limit: 20,
-    offset: 0,
-  });
+  http
+    .expectOne((r) => r.url === '/api/application-types')
+    .flush({
+      items: [
+        {
+          id: 't1',
+          name: 'Förderantrag',
+          hasBudget: true,
+          active: true,
+          activeFormVersionId: 'v1',
+        },
+      ],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    });
   http.expectOne((r) => r.url === '/api/applications/app-1').flush(appWire(opts.app));
-  http.expectOne((r) => r.url === '/api/applications/app-1/versions').flush(opts.versions ?? VERSIONS);
+  http
+    .expectOne((r) => r.url === '/api/applications/app-1/versions')
+    .flush(opts.versions ?? VERSIONS);
   http.expectOne((r) => r.url === '/api/applications/app-1/comments').flush([]);
   if (perms.has('application.transition')) {
-    http.expectOne((r) => r.url === '/api/applications/app-1/transitions').flush(opts.transitions ?? TRANSITIONS);
+    http
+      .expectOne((r) => r.url === '/api/applications/app-1/transitions')
+      .flush(opts.transitions ?? TRANSITIONS);
   }
   http
     .expectOne((r) => r.url === '/api/applications/app-1/form')
-    .flush({ applicationTypeId: 't1', formVersionId: 'fv', hasBudget: opts.hasBudget ?? true, sections: FORM_SECTIONS });
+    .flush({
+      applicationTypeId: 't1',
+      formVersionId: 'fv',
+      hasBudget: opts.hasBudget ?? true,
+      sections: FORM_SECTIONS,
+    });
   view.detectChanges();
   if (opts.tree) {
     for (const req of http.match((r) => r.url === '/api/budgets')) req.flush(opts.tree);
@@ -176,7 +226,9 @@ async function setup(opts: Opts = {}) {
 
 /** The budget tree (managers) and the attachments load on their own. */
 function flushRest(http: HttpTestingController) {
-  for (const req of http.match((r) => r.url === '/api/budgets' || /\/(attachments|timeline|links)$/.test(r.url))) {
+  for (const req of http.match(
+    (r) => r.url === '/api/budgets' || /\/(attachments|timeline|links)$/.test(r.url),
+  )) {
     req.flush([]);
   }
 }
@@ -186,7 +238,8 @@ function flushRefresh(http: HttpTestingController, over: Partial<ApplicationOutW
   http.expectOne((r) => r.url === '/api/applications/app-1').flush(appWire(over));
   http.expectOne((r) => r.url === '/api/applications/app-1/versions').flush(VERSIONS);
   http.expectOne((r) => r.url === '/api/applications/app-1/comments').flush([]);
-  for (const req of http.match((r) => r.url === '/api/applications/app-1/transitions')) req.flush([]);
+  for (const req of http.match((r) => r.url === '/api/applications/app-1/transitions'))
+    req.flush([]);
   flushRest(http);
 }
 
@@ -201,17 +254,22 @@ describe('ApplicationsDetailComponent — header', () => {
 
   /**
    * The title opens the sheet on the line of the actions; no line stands above it. Intl puts a
-   * non-breaking space before the currency sign. The dots are CSS: every part draws one before it,
-   * and the line clips the one at each line start.
+   * non-breaking space before the currency sign. The meta line is a list of chips, with no dot
+   * between them (spec 001306, metaChips).
    */
-  it('shows the title and status · type · amount, with no line above the title and no gremium', async () => {
+  it('shows the title and the chips status, type and amount, with no line above the title and no gremium (metaChips)', async () => {
     await setup();
-    expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
+    expect(
+      document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]'),
+    ).not.toBeNull();
     expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
-    expect(screen.getByRole('heading', { level: 2, name: 'Zuschuss Kennenlernwochenende' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Zuschuss Kennenlernwochenende' }),
+    ).toBeInTheDocument();
     const line = document.querySelector('.ad__line') as HTMLElement;
-    expect(line).toHaveClass('ad__seps');
-    const parts = [...line.querySelectorAll('.ad__part')].map((el) => el.textContent?.replace(/\s+/g, ''));
+    const parts = [...line.querySelectorAll('.ad__part')].map((el) =>
+      el.textContent?.replace(/\s+/g, ''),
+    );
     expect(parts).toEqual(['Eingereicht', 'Förderantrag', '1.250,00€']);
     expect(line.textContent).not.toContain('·');
   });
@@ -225,7 +283,9 @@ describe('ApplicationsDetailComponent — header', () => {
   it('starts the status line with an item when the state is missing', async () => {
     await setup({ app: { state: null } });
     const line = document.querySelector('.ad__line') as HTMLElement;
-    const parts = [...line.querySelectorAll('.ad__part')].map((el) => el.textContent?.replace(/\s+/g, ''));
+    const parts = [...line.querySelectorAll('.ad__part')].map((el) =>
+      el.textContent?.replace(/\s+/g, ''),
+    );
     expect(parts).toEqual(['Förderantrag', '1.250,00€']);
   });
 
@@ -241,7 +301,9 @@ describe('ApplicationsDetailComponent — header', () => {
     await setup();
     const history = document.querySelector('#ad-history app-history') as HTMLElement;
     expect(history).not.toBeNull();
-    const titles = [...history.querySelectorAll('.hist__title')].map((el) => el.textContent?.trim());
+    const titles = [...history.querySelectorAll('.hist__title')].map((el) =>
+      el.textContent?.trim(),
+    );
     expect(titles).toEqual(['Version 2', 'Version 1']);
     const metas = [...history.querySelectorAll('.hist__meta')].map((el) => el.textContent ?? '');
     expect(metas[0]).toContain('Antragsteller:in');
@@ -251,7 +313,9 @@ describe('ApplicationsDetailComponent — header', () => {
   /** The title opens the sheet on the line of the actions; no line stands above it. */
   it('leaves out an unknown type and a missing amount', async () => {
     const { http } = await setup({ app: { gremiumId: null, amount: null, typeId: 'other' } });
-    expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
+    expect(
+      document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]'),
+    ).not.toBeNull();
     expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     expect(document.querySelector('.ad__line')!.textContent?.trim()).toBe('Eingereicht');
     http.verify();
@@ -265,6 +329,7 @@ describe('ApplicationsDetailComponent — header', () => {
       'Ablehnen',
       'Auf Tagesordnung setzen',
       'Nachforderung stellen',
+      'Neue Fassung',
     ]);
     expect(buttons[0]).toHaveClass('btn--danger');
     expect(buttons[1]).toHaveClass('btn--fill');
@@ -308,7 +373,10 @@ describe('ApplicationsDetailComponent — header', () => {
   });
 
   it('lets the creator upload, but not delete, attachments in a locked state', async () => {
-    const { cmp } = await setup({ perms: ['application.read'], app: { state: { ...SUBMITTED, editAllowed: false } } });
+    const { cmp } = await setup({
+      perms: ['application.read'],
+      app: { state: { ...SUBMITTED, editAllowed: false } },
+    });
     expect(cmp.canUploadFiles()).toBe(true);
     expect(cmp.canDeleteFiles()).toBe(false);
   });
@@ -344,7 +412,13 @@ describe('ApplicationsDetailComponent — header', () => {
       const { detectChanges } = await setup();
       await openMenu(detectChanges);
       const items = screen.getAllByRole('menuitem').map((el) => el.textContent?.trim());
-      expect(items).toEqual(['Status setzen', 'Beobachter:innen', 'Versionen vergleichen', 'Als PDF öffnen', 'Löschen']);
+      expect(items).toEqual([
+        'Status setzen',
+        'Beobachter:innen',
+        'Versionen vergleichen',
+        'Als PDF öffnen',
+        'Löschen',
+      ]);
       expect(screen.getByRole('menuitem', { name: 'Löschen' })).toHaveClass('rm__item--danger');
     });
 
@@ -359,7 +433,9 @@ describe('ApplicationsDetailComponent — header', () => {
       ]);
       await userEvent.click(screen.getByRole('menuitem', { name: 'Anonymisierung beantragen' }));
       expect(owner.cmp.confirmErase()).toBe(true);
-      owner.cmp.app.update((a) => (a ? { ...a, applicant: { name: null, email: null, anonymized: true } } : a));
+      owner.cmp.app.update((a) =>
+        a ? { ...a, applicant: { name: null, email: null, anonymized: true } } : a,
+      );
       expect(owner.cmp.canRequestErasure()).toBe(false);
     });
 
@@ -382,14 +458,22 @@ describe('ApplicationsDetailComponent — header', () => {
       });
       expect(screen.getByText('Eingereicht von Luis Meyer')).toBeInTheDocument();
       expect(cmp.canManageObservers()).toBe(false);
-      expect(cmp.menuSections().flatMap((sec) => sec.items.map((i) => i.id))).toEqual(['versions', 'pdf']);
+      expect(cmp.menuSections().flatMap((sec) => sec.items.map((i) => i.id))).toEqual([
+        'versions',
+        'pdf',
+      ]);
       expect(screen.queryByRole('group', { name: 'Übergänge' })).not.toBeInTheDocument();
       expect(cmp.historyEntries().some((e) => e.actor === 'Luis Meyer')).toBe(true);
     });
 
     it('leaves "Versionen vergleichen" out with only one version', async () => {
       const { cmp } = await setup({ versions: [VERSIONS[0]] });
-      expect(cmp.menuSections().flatMap((s) => s.items.map((i) => i.id))).toEqual(['force', 'observers', 'pdf', 'delete']);
+      expect(cmp.menuSections().flatMap((s) => s.items.map((i) => i.id))).toEqual([
+        'force',
+        'observers',
+        'pdf',
+        'delete',
+      ]);
     });
 
     it('opens the force dialog, confirms the delete, and reloads after a forced state', async () => {
@@ -405,6 +489,30 @@ describe('ApplicationsDetailComponent — header', () => {
 
       cmp.onMenu({ id: 'delete', label: '' });
       expect(cmp.confirmDelete()).toBe(true);
+    });
+
+    it('offers "Antragsart ändern" with its permission and opens the dialog', async () => {
+      const { cmp, detectChanges } = await setup({ perms: [...ALL, 'application.change_type'] });
+      expect(cmp.menuSections().flatMap((s) => s.items.map((i) => i.id))).toEqual([
+        'force',
+        'type',
+        'observers',
+        'versions',
+        'pdf',
+        'delete',
+      ]);
+      cmp.onMenu({ id: 'type', label: '' });
+      detectChanges();
+      expect(cmp.typeDialogOpen()).toBe(true);
+    });
+
+    /** § 001660: a draft keeps its Antragsart, so the menu leaves the entry out. */
+    it('leaves "Antragsart ändern" out for a draft', async () => {
+      const { cmp } = await setup({
+        perms: [...ALL, 'application.change_type'],
+        app: { state: { ...SUBMITTED, isInitial: true } },
+      });
+      expect(cmp.menuSections().flatMap((s) => s.items.map((i) => i.id))).not.toContain('type');
     });
 
     it('scrolls to the history side by side', async () => {
@@ -428,7 +536,12 @@ describe('ApplicationsDetailComponent — header', () => {
     });
 
     it('holds only the rights the reader has on a phone', async () => {
-      const { cmp } = await setup({ phone: true, perms: ['application.read'], versions: [VERSIONS[0]], app: { state: { ...SUBMITTED, editAllowed: false } } });
+      const { cmp } = await setup({
+        phone: true,
+        perms: ['application.read'],
+        versions: [VERSIONS[0]],
+        app: { state: { ...SUBMITTED, editAllowed: false } },
+      });
       expect(cmp.menuSections().flatMap((s) => s.items.map((i) => i.id))).toEqual(['pdf']);
     });
 
@@ -453,7 +566,7 @@ describe('ApplicationsDetailComponent — header', () => {
       expect(cmp.menuSections()[0].items[1].label).toBe('Aus Archiv holen');
       const g = globalThis as unknown as { structuredClone?: unknown };
       const saved = g.structuredClone;
-      g.structuredClone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+      g.structuredClone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
       cmp.onMenu({ id: 'edit', label: '' });
       g.structuredClone = saved;
       expect(cmp.editing()).toBe(true);
@@ -464,7 +577,9 @@ describe('ApplicationsDetailComponent — header', () => {
     /** The comments are a header action that opens a sheet, not a tab. */
     it('shows the sections in tabs without counts (spec 000560)', async () => {
       const { detectChanges } = await setup({ split: false });
-      const tabs = screen.getAllByRole('tab').map((t) => t.getAttribute('aria-label') ?? t.textContent?.trim());
+      const tabs = screen
+        .getAllByRole('tab')
+        .map((t) => t.getAttribute('aria-label') ?? t.textContent?.trim());
       expect(tabs).toEqual(['Antrag', 'Verlauf', 'Anhänge']);
       expect(screen.getByRole('button', { name: 'Kommentare, 0' })).toBeInTheDocument();
       expect(screen.getByRole('tabpanel', { name: 'Antrag' })).toBeVisible();
@@ -486,7 +601,7 @@ describe('ApplicationsDetailComponent — header', () => {
       expect(cmp.tab()).toBe('files');
       const g = globalThis as unknown as { structuredClone?: unknown };
       const saved = g.structuredClone;
-      g.structuredClone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+      g.structuredClone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
       try {
         await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
       } finally {
@@ -511,7 +626,7 @@ describe('ApplicationsDetailComponent — header', () => {
       const { cmp, detectChanges, fixture } = await setup({ split: false, phone: true, nav });
       const g = globalThis as unknown as { structuredClone?: unknown };
       const saved = g.structuredClone;
-      g.structuredClone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+      g.structuredClone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
       try {
         cmp.startEdit(cmp.app() as NonNullable<ReturnType<typeof cmp.app>>);
       } finally {
@@ -586,13 +701,43 @@ describe('ApplicationsDetailComponent — header', () => {
   describe('cost centre and fiscal year', () => {
     const TREE = [
       { id: 'b0', parentId: null, key: '000', pathKey: '000', name: 'Leer', children: [] },
-      { id: 'b1', parentId: null, key: '100', pathKey: '100', name: 'Haushalt', children: [
-        { id: 'b2', parentId: 'b1', key: '110', pathKey: '100-110', name: 'Kultur', children: [] },
-      ] },
+      {
+        id: 'b1',
+        parentId: null,
+        key: '100',
+        pathKey: '100',
+        name: 'Haushalt',
+        children: [
+          {
+            id: 'b2',
+            parentId: 'b1',
+            key: '110',
+            pathKey: '100-110',
+            name: 'Kultur',
+            children: [],
+          },
+        ],
+      },
     ];
     const YEARS = [
-      { id: 'fy1', budgetId: 'b1', year: 2026, display: '2026', startDate: '', endDate: '', active: true },
-      { id: 'fy0', budgetId: 'b1', year: 2025, display: '2025', startDate: '', endDate: '', active: false },
+      {
+        id: 'fy1',
+        budgetId: 'b1',
+        year: 2026,
+        display: '2026',
+        startDate: '',
+        endDate: '',
+        active: true,
+      },
+      {
+        id: 'fy0',
+        budgetId: 'b1',
+        year: 2025,
+        display: '2025',
+        startDate: '',
+        endDate: '',
+        active: false,
+      },
     ];
     const YEARS_URL = (r: { url: string }) => r.url === '/api/budgets/b1/fiscal-years';
 
@@ -601,13 +746,25 @@ describe('ApplicationsDetailComponent — header', () => {
      * another budget empties the cost centre, a pair of the same budget keeps it.
      */
     it('names the cost centre with its fiscal year and asks for the pair in the dialog', async () => {
-      const { http, cmp, detectChanges } = await setup({ app: { budgetId: 'b2', fiscalYearId: 'fy1' }, tree: TREE });
+      const { http, cmp, detectChanges } = await setup({
+        app: { budgetId: 'b2', fiscalYearId: 'fy1' },
+        tree: TREE,
+      });
       http.expectOne(YEARS_URL).flush(YEARS);
       detectChanges();
       expect(screen.getByText('Kostenstelle · HHJ 2026')).toBeInTheDocument();
 
       await userEvent.click(screen.getByRole('button', { name: 'Kostenstelle ändern' }));
-      const pair = { budgetId: 'b1', budgetName: 'VS-Mittel', fiscalYearId: 'fy1', display: '2026', current: true, past: false, startDate: '2026-01-01', endDate: '2026-12-31' };
+      const pair = {
+        budgetId: 'b1',
+        budgetName: 'VS-Mittel',
+        fiscalYearId: 'fy1',
+        display: '2026',
+        current: true,
+        past: false,
+        startDate: '2026-01-01',
+        endDate: '2026-12-31',
+      };
       http.expectOne('/api/budget-years').flush([pair]);
       detectChanges();
       const c = cmp as unknown as {
@@ -636,7 +793,11 @@ describe('ApplicationsDetailComponent — header', () => {
 
     /** An Antrag of a type without money takes no Kostenstelle (spec 001033). */
     it('shows no Kostenstelle row for an Antrag of a type without money', async () => {
-      const { http } = await setup({ app: { budgetId: null, fiscalYearId: null }, tree: TREE, hasBudget: false });
+      const { http } = await setup({
+        app: { budgetId: null, fiscalYearId: null },
+        tree: TREE,
+        hasBudget: false,
+      });
       expect(screen.queryByRole('button', { name: 'Kostenstelle' })).not.toBeInTheDocument();
       http.verify();
     });
@@ -659,7 +820,10 @@ describe('ApplicationsDetailComponent — header', () => {
     });
 
     it('drops the years of an application it no longer shows', async () => {
-      const { http, cmp, paramMap$ } = await setup({ app: { budgetId: 'b2', fiscalYearId: 'fy1' }, tree: TREE });
+      const { http, cmp, paramMap$ } = await setup({
+        app: { budgetId: 'b2', fiscalYearId: 'fy1' },
+        tree: TREE,
+      });
       const stale = http.expectOne(YEARS_URL);
       paramMap$.next(convertToParamMap({ id: 'app-1' }));
       stale.flush(YEARS);

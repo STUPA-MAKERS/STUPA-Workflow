@@ -12,6 +12,8 @@ import {
   type WritableSignal,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { type Observable, concatMap, from } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, type ParamMap, Router } from '@angular/router';
 import { problemDetail } from '@core/api/problem';
@@ -22,6 +24,8 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
+  CheckboxComponent,
   ConfirmDialogComponent,
   DropOverlayComponent,
   EmptyStateComponent,
@@ -32,6 +36,7 @@ import {
   ListDetailLayoutComponent,
   ListGroupComponent,
   ListItemComponent,
+  LongPressDirective,
   MEDIA,
   mediaQuery,
   RangeChipComponent,
@@ -42,6 +47,7 @@ import {
   type RowSwipeAction,
   ScrollFadeDirective,
   SearchPillComponent,
+  SelectionBarComponent,
   FilterSelectComponent,
   type FilterSelectOption,
   type SelectOption,
@@ -80,6 +86,7 @@ import { TodosApiService } from '@core/api/todos.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
+import { RowChevronComponent } from '../../shared/ui/row-chevron/row-chevron.component';
 
 /** What the import found, for the note at the top of the review form. */
 export type ImportNotice = 'parsed' | 'manual' | null;
@@ -116,6 +123,10 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
  *
  * Side by side it is a pane page (`styles.scss`): the panes fill the free height and scroll
  * by themselves.
+ *
+ * Multi-select works as in every list (spec 001811): "Mehrere auswählen" in the head (in
+ * the menu of a phone), a long press or the swipe to the left on a row; the bar under the
+ * search holds "Als bezahlt markieren" and "Löschen" as icons.
  */
 @Component({
   selector: 'app-invoices',
@@ -123,12 +134,15 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowChevronComponent,
     PullRefreshDirective,
     InfiniteScrollDirective,
     DetailNoneComponent,
     ConfirmDialogComponent,
     PageHeaderComponent,
     ButtonComponent,
+    ButtonGroupComponent,
+    CheckboxComponent,
     DropOverlayComponent,
     EmptyStateComponent,
     FabComponent,
@@ -140,11 +154,14 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
     ListDetailLayoutComponent,
     ListGroupComponent,
     ListItemComponent,
+    LongPressDirective,
+    FormsModule,
     NgTemplateOutlet,
     RangeChipComponent,
     RowMenuComponent,
     ScrollFadeDirective,
     SearchPillComponent,
+    SelectionBarComponent,
     FilterSelectComponent,
     SideSheetComponent,
     SkeletonComponent,
@@ -176,11 +193,57 @@ export class InvoicesComponent implements InvoiceFormHost {
   /** The status as coloured text. */
   readonly invoiceStatus = invoiceStatus;
 
+  /** The ⋮ menu of a wider screen: the import (spec 001812). */
+  readonly moreMenu = computed<RowMenuSection[]>(() => [
+    { items: [{ id: 'import', label: this.i18n.translate('invoices.import'), icon: 'upload' }] },
+  ]);
+
   /** The page actions that do not fit the title row of a phone. */
   readonly phoneMenu = computed<RowMenuSection[]>(() => [
-    { items: [{ id: 'import', label: this.i18n.translate('invoices.import'), icon: 'upload' }] },
+    ...this.moreMenu(),
+    { items: [{ id: 'select', label: this.i18n.translate('invoices.bulk.start'), icon: 'check' }] },
     refreshMenuSection((key) => this.i18n.translate(key)),
   ]);
+
+  /** The rows show check boxes (spec 001811). */
+  readonly selecting = signal(false);
+  readonly selected = signal<ReadonlySet<string>>(new Set());
+  readonly bulkBusy = signal(false);
+  readonly selectedCount = computed(() => this.selected().size);
+  readonly allSelected = computed(() => {
+    const list = this.items();
+    return list.length > 0 && list.every((i) => this.selected().has(i.id));
+  });
+  /** The selected rows that are still open: "Als bezahlt markieren" takes these. */
+  readonly selectedOpen = computed(() =>
+    this.items().filter((i) => this.selected().has(i.id) && i.status === 'open'),
+  );
+  /** The bulk delete confirmation is open. */
+  readonly bulkConfirm = signal(false);
+  /** Most rows one bulk delete may take, as for the bookings. */
+  readonly bulkDeleteMax = 5;
+  readonly bulkDeleteOverMax = computed(() => this.selectedCount() > this.bulkDeleteMax);
+  /** Select-all must not enable mass deletion: the user picks each row for the delete. */
+  readonly bulkDeleteBlocked = computed(
+    () => this.bulkDeleteOverMax() || (this.allSelected() && this.selectedCount() > 1),
+  );
+  /** "3 ausgewählt", plus the delete cap once the selection is past it. */
+  readonly selectionLabel = computed(() => {
+    const count = this.i18n.translate('invoices.bulk.selectedCount', {
+      count: String(this.selectedCount()),
+    });
+    if (!this.bulkDeleteOverMax()) return count;
+    const cap = this.i18n.translate('invoices.bulk.deleteMax', { max: String(this.bulkDeleteMax) });
+    return `${count} · ${cap}`;
+  });
+  /** Why the bulk delete is off, or null while it is on. */
+  readonly bulkDeleteReason = computed(() => {
+    if (this.bulkDeleteOverMax()) {
+      return this.i18n.translate('invoices.bulk.deleteMaxBlocked', { max: String(this.bulkDeleteMax) });
+    }
+    if (this.bulkDeleteBlocked()) return this.i18n.translate('invoices.bulk.deleteAllBlocked');
+    return null;
+  });
 
   /** The cost-centre tree, for the swatches of the bookings in the detail. It loads once
    *  the first open invoice with a booking shows up. */
@@ -645,6 +708,7 @@ export class InvoicesComponent implements InvoiceFormHost {
   onHeaderMenu(item: RowMenuItem): void {
     if (isRefreshItem(item)) return reloadLikePull(() => this.reload());
     if (item.id === 'import') this.fileInput()?.nativeElement.click();
+    else if (item.id === 'select') this.startSelecting();
   }
 
   /** Parse a PDF. On success, prefill the form. Without ZUGFeRD data, open it empty. */
@@ -934,6 +998,103 @@ export class InvoicesComponent implements InvoiceFormHost {
     else if (item.id === 'delete') this.askDelete(i);
   }
 
+  startSelecting(): void {
+    if (!this.canManage()) return;
+    this.selecting.set(true);
+  }
+
+  /** The head button "Mehrere auswählen" is a toggle: a second press ends the selection (spec 001811). */
+  toggleSelecting(): void {
+    if (this.selecting()) this.stopSelecting();
+    else this.startSelecting();
+  }
+
+  stopSelecting(): void {
+    this.selecting.set(false);
+    this.selected.set(new Set());
+    this.bulkConfirm.set(false);
+  }
+
+  isSelected(id: string): boolean {
+    return this.selected().has(id);
+  }
+
+  toggleSelect(id: string, checked: boolean): void {
+    this.selected.update((cur) =>
+      checked ? new Set([...cur, id]) : new Set([...cur].filter((x) => x !== id)),
+    );
+  }
+
+  toggleSelectAll(checked: boolean): void {
+    this.selected.set(checked ? new Set(this.items().map((i) => i.id)) : new Set());
+  }
+
+  /**
+   * A long press or the swipe to the left: start the selection with this invoice, or, in
+   * the selection already, toggle it.
+   */
+  selectWith(i: Invoice): void {
+    if (!this.canManage()) return;
+    if (!this.selecting()) {
+      this.startSelecting();
+      this.toggleSelect(i.id, true);
+      return;
+    }
+    this.toggleSelect(i.id, !this.isSelected(i.id));
+  }
+
+  /** A row in selection mode: a click toggles it. */
+  onRowActivate(i: Invoice): void {
+    if (this.selecting()) this.toggleSelect(i.id, !this.isSelected(i.id));
+  }
+
+  /** "Als bezahlt markieren" for every selected open invoice, one after the other. */
+  runBulkPaid(): void {
+    const ids = this.selectedOpen().map((i) => i.id);
+    if (!ids.length || this.bulkBusy()) return;
+    this.runBulk(ids, (id) => this.api.updateInvoice(id, { status: 'paid' }), 'invoices.bulk.paidDone');
+  }
+
+  askBulkDelete(): void {
+    if (!this.selectedCount() || this.bulkDeleteBlocked()) return;
+    this.bulkConfirm.set(true);
+  }
+
+  /** The disabled button is an affordance, not a control, so the cap is checked here too. */
+  runBulkDelete(): void {
+    const ids = [...this.selected()];
+    if (!ids.length || this.bulkBusy() || this.bulkDeleteBlocked()) return;
+    this.runBulk(ids, (id) => this.api.deleteInvoice(id), 'invoices.bulk.deleteDone');
+  }
+
+  /** Run one request per id in order; the first failure stops the rest. */
+  private runBulk(
+    ids: readonly string[],
+    call: (id: string) => Observable<unknown>,
+    doneKey: TranslationKey,
+  ): void {
+    this.bulkBusy.set(true);
+    const finish = (failed: boolean): void => {
+      this.bulkBusy.set(false);
+      this.stopSelecting();
+      this.reload();
+      if (failed) this.toast.error(this.i18n.translate('invoices.bulk.failed'));
+      else this.toast.success(this.i18n.translate(doneKey, { count: String(ids.length) }));
+    };
+    from(ids)
+      .pipe(concatMap((id) => call(id)))
+      .subscribe({
+        error: () => finish(true),
+        complete: () => finish(false),
+      });
+  }
+
+  /** The swipe to the left: start the selection with this invoice. */
+  swipeLeft(): RowSwipeAction | null {
+    if (!this.canManage()) return null;
+    return { id: 'select', label: this.i18n.translate('invoices.bulk.pick'), icon: 'check' };
+  }
+
   /** The swipe to the right of a phone: "Als bezahlt markieren" of the row menu. */
   swipeRight(menu: readonly RowMenuSection[]): RowSwipeAction | null {
     return swipeFrom(menu, 'paid', this.filterParams().status === 'open');
@@ -942,6 +1103,7 @@ export class InvoicesComponent implements InvoiceFormHost {
   /** A swipe of a phone carried out an item of the row menu. */
   onRowSwiped(action: RowSwipeAction, i: Invoice): void {
     if (action.id === 'paid') this.swipePaid(i, action.leaves === true);
+    else if (action.id === 'select') this.selectWith(i);
   }
 
   /**

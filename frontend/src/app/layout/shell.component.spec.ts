@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { Router, provideRouter, type Routes } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -26,7 +26,10 @@ const MEMBER: Principal = {
   groups: [],
 };
 
-@Component({ standalone: true, template: '<h1>Seite</h1>' })
+@Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
+  standalone: true, template: '<h1>Seite</h1>'
+})
 class StubPage {}
 
 const ROUTES: Routes = [
@@ -250,7 +253,8 @@ describe('ShellComponent', () => {
     it('shows a member without budget or admin rights no Budget, Buchungen, Rechnungen or Verwaltung', async () => {
       await setup(MEMBER);
       const nav = within(mainNav() as HTMLElement);
-      expect(nav.getByRole('link', { name: /^Start/ })).toHaveAttribute('href', '/dashboard');
+      expect(nav.getByRole('link', { name: /^Aktivität/ })).toHaveAttribute('href', '/activity');
+      expect(nav.queryByRole('link', { name: /^Start/ })).not.toBeInTheDocument();
       expect(nav.getByRole('link', { name: /^Anträge/ })).toBeInTheDocument();
       expect(nav.getByRole('link', { name: /^Aufgaben/ })).toBeInTheDocument();
       for (const hidden of [/^Haushalt/, /^Buchungen/, /^Rechnungen/, /^Verwaltung/, /^Abstimmungen/, /^Sitzungen/]) {
@@ -285,12 +289,11 @@ describe('ShellComponent', () => {
     it('shows every entry to the admin, Verwaltung last', async () => {
       await setup({ ...MEMBER, roles: ['admin'] });
       expect(labels()).toEqual([
-        'Start',
+        'Aktivität',
         'Anträge',
         'Aufgaben',
         'Boards',
         'Kalender',
-        'Aktivität',
         'Sitzungen',
         'Gremien',
         'Abstimmungen',
@@ -298,15 +301,23 @@ describe('ShellComponent', () => {
         'Buchungen',
         'Rechnungen',
         'Tickets',
+        'Graph',
+        'Protokolle',
+        'Beschlüsse',
+        'Kalender',
         'Verwaltung',
       ]);
+      expect(within(mainNav() as HTMLElement).getByRole('button', { name: 'Öffentlich' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
     });
 
     it('leads the rail with the mark, which links to the start page', async () => {
       await setup(MEMBER);
       expect(
         within(mainNav() as HTMLElement).getByRole('link', { name: 'STUPA, Start' }),
-      ).toHaveAttribute('href', '/dashboard');
+      ).toHaveAttribute('href', '/activity');
     });
 
     it('marks the entry of the current page', async () => {
@@ -315,7 +326,7 @@ describe('ShellComponent', () => {
       fixture.detectChanges();
       const nav = within(mainNav() as HTMLElement);
       expect(nav.getByRole('link', { name: /^Aufgaben/ })).toHaveAttribute('aria-current', 'page');
-      expect(nav.getByRole('link', { name: /^Start/ })).not.toHaveAttribute('aria-current');
+      expect(nav.getByRole('link', { name: /^Aktivität/ })).not.toHaveAttribute('aria-current');
     });
 
     it('carries the task count and the live mark from the rail status', async () => {
@@ -405,10 +416,10 @@ describe('ShellComponent', () => {
     const more = () => within(bar()).getByRole('button', { name: 'Mehr' });
     const ADMIN: Principal = { ...MEMBER, display_name: 'Ada Admin', roles: ['admin'] };
 
-    it('shows Start, Anträge, Sitzungen and Aufgaben, then Mehr', async () => {
+    it('shows Aktivität, Anträge, Sitzungen and Aufgaben, then Mehr', async () => {
       await setup(ADMIN, { status: railStatusStub(8, true) });
       const labels = Array.from(bar().querySelectorAll('.bb__label')).map((l) => l.textContent?.trim());
-      expect(labels).toEqual(['Start', 'Anträge', 'Sitzungen', 'Aufgaben', 'Mehr']);
+      expect(labels).toEqual(['Aktivität', 'Anträge', 'Sitzungen', 'Aufgaben', 'Mehr']);
       expect(within(bar()).getByRole('link', { name: 'Aufgaben 8 offen' })).toHaveAttribute('href', '/tasks');
       expect(within(bar()).getByRole('link', { name: 'Sitzungen Sitzung läuft' })).toBeInTheDocument();
     });
@@ -422,7 +433,7 @@ describe('ShellComponent', () => {
       for (const name of ['Abstimmungen', 'Haushalt', 'Buchungen', 'Rechnungen', 'Verwaltung']) {
         expect(within(sheet).getByRole('link', { name })).toBeInTheDocument();
       }
-      expect(within(sheet).queryByRole('link', { name: 'Start' })).not.toBeInTheDocument();
+      expect(within(sheet).queryByRole('link', { name: /^Aktivität/ })).not.toBeInTheDocument();
       expect(within(sheet).getByRole('button', { name: 'Suche' })).toBeInTheDocument();
       const a11y = within(sheet).getByRole('group', { name: 'Barrierefreiheit' });
       const help = within(sheet).getByRole('group', { name: 'Hilfe' });

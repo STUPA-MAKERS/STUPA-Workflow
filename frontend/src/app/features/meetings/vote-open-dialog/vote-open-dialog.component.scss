@@ -77,9 +77,13 @@
 }
 .vod__free {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: var(--space-2);
-  --button-height: var(--field-height);
+}
+// The button is as high as the field beside it (001910). The group sets the height of
+// its buttons, so the group gets the height.
+.vod__free > app-button-group {
+  --btn-grp-h: var(--field-height);
 }
 .vod__freeInput {
   flex: 1 1 auto;

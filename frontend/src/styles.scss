@@ -4,6 +4,7 @@
 @use 'surface';
 @use 'skeleton';
 @use 'display-settings';
+@use 'button-group';
 @use './app/shared/ui/very-high-contrast';
 @use 'breakpoints' as bp;
 @use 'press';
@@ -75,10 +76,6 @@
       display: none;
     }
   }
-}
-
-.af--split .af__page {
-  @include surface.context(1);
 }
 
 // A pane page fills the free height of `.main` and its panes scroll inside themselves. A basis
@@ -156,7 +153,6 @@ app-dialog {
   color: var(--color-text);
   font-weight: var(--fw-semibold);
   text-decoration: none;
-  transition: scale var(--motion-xs) var(--ease-standard);
   @include press.press;
   @include press.chrome-text;
 }

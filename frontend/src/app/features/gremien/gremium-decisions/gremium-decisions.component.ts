@@ -24,6 +24,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { voteResultStatus, type StatusView } from '@shared/status-kind.util';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
@@ -108,6 +109,7 @@ function decisionKey(d: GremiumDecision): string {
     LoadErrorComponent,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     EmptyStateComponent,
     FilterSelectComponent,

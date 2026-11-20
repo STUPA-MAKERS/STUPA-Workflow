@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { EmptyStateComponent, IconComponent } from '@stupa-makers/ui-kit';
+import { EmptyStateComponent, IconComponent, MetaLineComponent } from '@stupa-makers/ui-kit';
 import type { TransitionListRow, TransitionLists } from './flow-editor.models';
 
 /**
@@ -12,7 +12,7 @@ import type { TransitionListRow, TransitionLists } from './flow-editor.models';
   selector: 'app-transition-lists',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [EmptyStateComponent, TranslatePipe, IconComponent],
+  imports: [MetaLineComponent, EmptyStateComponent, TranslatePipe, IconComponent],
   templateUrl: './transition-lists.component.html',
   styleUrl: './transition-lists.component.scss',
 })

@@ -1,0 +1,129 @@
+@use '../../../shared/ui/dialog-form' as df;
+@use 'field' as f;
+@use 'option-menu' as om;
+
+@include df.host;
+
+.bkd {
+  @include df.form;
+}
+
+.bkd__lead {
+  margin: 0;
+}
+
+.bkd__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 18rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  border-radius: var(--radius-lg);
+  list-style: none;
+}
+.bkd__row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 10px 14px;
+  border-radius: 4px;
+  background: var(--color-surface-3);
+}
+.bkd__row:first-child {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+.bkd__row:last-child {
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
+/* The target status as rows of the select sheet (specs 001380, 001704): tiles of a row
+   group on surface 3, the chosen row with the check mark at its end. */
+.bkd__pick {
+  @include om.option;
+  @include om.option-sheet;
+}
+@media (hover: hover) {
+  .bkd__pick:hover {
+    @include om.option-hover;
+  }
+}
+.bkd__pick:focus-visible {
+  @include om.option-focus;
+}
+.bkd__pick--on {
+  @include f.highlight-chosen;
+}
+.bkd__pick--on .bkd__name {
+  font-weight: var(--fw-semibold);
+}
+.bkd__name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.bkd__check {
+  @include om.check;
+}
+.bkd__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: var(--fw-semibold);
+}
+.bkd__amount,
+.bkd__state {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.bkd__state {
+  max-width: 50%;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  text-align: end;
+}
+.bkd__row--error .bkd__state {
+  color: var(--color-danger);
+}
+
+.bkd__refusal {
+  padding-inline: var(--space-1);
+}
+
+.bkd__note {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px var(--space-4) 6px;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-sunken);
+  cursor: text;
+  @include f.highlight-surface;
+}
+.bkd__note:focus-within {
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+}
+.bkd__noteLabel {
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: var(--fw-medium);
+}
+.bkd__note:focus-within .bkd__noteLabel {
+  color: var(--color-accent-text);
+}
+.bkd__noteInput {
+  width: 100%;
+  min-height: 6rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  line-height: 1.375rem;
+  resize: vertical;
+}
+.bkd__noteInput:focus-visible {
+  outline: none;
+}

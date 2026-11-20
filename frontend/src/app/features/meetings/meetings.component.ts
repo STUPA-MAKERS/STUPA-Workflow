@@ -24,6 +24,7 @@ import { BreadcrumbsComponent } from '../../layout/breadcrumbs.component';
 import {
   BadgeComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   CardComponent,
   IconComponent,
   PageHeaderComponent,
@@ -84,6 +85,7 @@ import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
     TranslatePipe,
     BadgeComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     CardComponent,
     IconComponent,
     PageHeaderComponent,
@@ -160,8 +162,17 @@ export class MeetingsComponent {
 
   /** The meeting id of the route, `null` on the list. */
   private routeId: string | null = null;
+  /**
+   * `?committee=<id>` of a link from a Gremium: the list opens filtered to it (§ 001871).
+   * The query subscription runs first, so the list load reads it.
+   */
+  private committeeParam = '';
 
   constructor() {
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
+      this.agendaSvc.requestTop(qp.get('item'));
+      this.committeeParam = qp.get('committee') ?? '';
+    });
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       const id = pm.get('id');
       this.routeId = id;
@@ -170,12 +181,10 @@ export class MeetingsComponent {
         this.session.loadMeeting(id);
       } else {
         this.meeting.set(null);
+        this.timeline.gremiumFilter.set(this.committeeParam);
         this.timeline.loadList();
       }
     });
-    this.route.queryParamMap
-      .pipe(takeUntilDestroyed())
-      .subscribe((qp) => this.agendaSvc.requestTop(qp.get('item')));
   }
 
   /** Back from the meeting page to the list. */

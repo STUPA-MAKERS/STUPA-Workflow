@@ -51,6 +51,7 @@ class _FakeService:
         data: bytes,
         by: str,
         field_key: str | None = None,
+        position_id: str | None = None,
     ) -> AttachmentOut:
         self.uploaded.append((application_id, filename, len(data)))
         return AttachmentOut(

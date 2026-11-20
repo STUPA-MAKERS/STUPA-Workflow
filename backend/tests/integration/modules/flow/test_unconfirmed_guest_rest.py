@@ -249,7 +249,11 @@ async def test_flow_routes_answer_404_until_the_verify(
         assert fire.status_code == 404, fire.text
         force = client.post(
             f"{base}/force-status",
-            json={"stateId": str(seed.states["pruefung"].id), "note": "x"},
+            json={
+                "stateId": str(seed.states["pruefung"].id),
+                "reason": "other",
+                "note": "x is a note",
+            },
         )
         assert force.status_code == 404, force.text
 

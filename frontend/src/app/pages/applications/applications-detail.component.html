@@ -3,10 +3,18 @@
     <header class="sheet-head ad__head" aria-hidden="true">
       <app-sheet-bar [bleed]="split()">
         <h2 appSheetBarTitle class="sheet-title ad__title skel-in"><span class="skel-text ad__skelTitle"></span></h2>
-        <span class="ad__skelIcon ad__skelComments skel-in"><span class="skel-box"></span></span>
-        <span class="ad__skelIcon skel-in"><span class="skel-box"></span></span>
+        <span class="skel-grp skel-in">
+          <span class="skel-box skel-btn skel-btn--label ad__skelComments"></span>
+          <span class="skel-box skel-btn"></span>
+          <span class="skel-box skel-btn"></span>
+        </span>
       </app-sheet-bar>
-      <p class="sheet-line ad__line skel-in"><span class="skel-text skel-text--muted ad__skelLine"></span></p>
+      <p class="sheet-line ad__line skel-in">
+        <span class="skel-chips">
+          <span class="skel-box skel-chip" style="--skel-w: 5.5rem"></span>
+          <span class="skel-box skel-chip" style="--skel-w: 6.5rem"></span>
+        </span>
+      </p>
       @if (canTransition()) {
         <ng-container *ngTemplateOutlet="transitionsSkel" />
       }
@@ -53,12 +61,14 @@
       @if (!editDocked()) {
         <header class="ad__editBar">
           @if (phone()) {
-            <app-button
-              variant="text"
-              [iconOnly]="true"
-              [ariaLabel]="'action.cancel' | t"
-              (click)="cancelEdit()"
-            ><app-icon name="x" /></app-button>
+            <app-button-group>
+              <app-button
+                variant="text"
+                [iconOnly]="true"
+                [ariaLabel]="'action.cancel' | t"
+                (click)="cancelEdit()"
+              ><app-icon name="x" /></app-button>
+            </app-button-group>
           } @else {
             <app-icon class="ad__editIcon" name="edit" [size]="18" />
           }
@@ -66,7 +76,9 @@
             <strong id="ad-edit-title">{{ 'applications.edit.title' | t }}</strong>
           </p>
           @if (!phone()) {
-            <app-button variant="text" (click)="cancelEdit()">{{ 'action.cancel' | t }}</app-button>
+            <app-button-group>
+              <app-button variant="text" (click)="cancelEdit()">{{ 'action.cancel' | t }}</app-button>
+            </app-button-group>
           }
           <span class="ad__editFade" aria-hidden="true"></span>
         </header>
@@ -112,6 +124,7 @@
                 : ('applications.comments.open' | t: { n: comments().length })
             "
             [count]="commentsLoading() ? null : comments().length"
+            [ariaExpanded]="commentsOpen()"
             data-testid="ad-comments-open"
             (click)="commentsOpen.set(true)"
           >
@@ -148,11 +161,11 @@
           }
         </app-sheet-bar>
 
-        <p class="sheet-line ad__line ad__seps">
+        <p class="sheet-line ad__line">
           <span class="ad__parts">
             @if (application.state) {
               <span class="ad__part">
-                <app-status-text [kind]="stateKind()">{{ application.state.label }}</app-status-text>
+                <app-status-text chip [kind]="stateKind()">{{ application.state.label }}</app-status-text>
               </span>
             }
             @if (typeName(); as type) {
@@ -167,9 +180,22 @@
           </span>
         </p>
 
-        @if (canTransition() && !application.observer && transitions().length) {
-          <div class="ad__transitions" role="group" [attr.aria-label]="'applications.transitions.title' | t">
-            @for (t of transitions(); track t.id) {
+        @for (r of links()?.replacedBy ?? []; track r.id) {
+          <p class="sheet-line ad__replaced" data-testid="replaced-by">
+            <app-icon name="right" [size]="16" />
+            <span>{{ 'status.replacedBy' | t }}</span>
+            <a class="ad__replacedLink" [routerLink]="['/applications', r.id]">{{ r.title || ('applications.list.untitled' | t) }}</a>
+          </p>
+        }
+        @if (application.state?.isInitial) {
+          <app-note class="ad__archived" icon="info" role="status" data-testid="draft-note">{{ 'status.draft.note' | t }}</app-note>
+        }
+
+        @if (canTransition() && !application.observer && transitionsLoading()) {
+          <ng-container *ngTemplateOutlet="transitionsSkel" />
+        } @else if (offersNewVersion() || (canTransition() && !application.observer && transitions().length)) {
+          <app-button-group class="ad__transitionGroup" [label]="'applications.transitions.title' | t">
+            @for (t of canTransition() && !application.observer ? transitions() : []; track t.id) {
               <app-button
                 [variant]="looks().get(t.id) ?? 'tonal'"
                 [loading]="firing() === t.id"
@@ -182,9 +208,15 @@
                 {{ t.label || ('applications.transitions.fallback' | t) }}
               </app-button>
             }
-          </div>
-        } @else if (canTransition() && !application.observer && transitionsLoading()) {
-          <ng-container *ngTemplateOutlet="transitionsSkel" />
+            @if (offersNewVersion()) {
+              <app-button
+                variant="tonal"
+                data-testid="new-version"
+                [loading]="creatingVersion()"
+                (click)="createNewVersion()"
+              ><app-icon name="copy" />{{ 'status.newVersion.action' | t }}</app-button>
+            }
+          </app-button-group>
         }
 
         @if (application.archivedAt) {
@@ -252,6 +284,7 @@
           [draftKey]="'application.' + application.id"
           [messages]="chatMessages()"
           [visibilityOptions]="chatVisibilities()"
+          [visibilityGuard]="chatVisibilityGuard"
           [canAttach]="canAttach()"
           [canPost]="!observer()"
           [mentionables]="mentionables()"
@@ -306,6 +339,21 @@
           }
         </div>
       }
+      @if (application.amount !== null) {
+        <div class="ad__pair">
+          <app-field-row [label]="'applications.amount.requested' | t">{{ amount(application) }}</app-field-row>
+          <app-field-row [label]="'applications.amount.approved' | t">
+            {{ approvedShown(application) || '—' }}
+            @if (canAmendAmount()) {
+              <app-button-group trail>
+                <app-button variant="text" size="sm" (click)="amendOpen.set(true)">
+                  {{ 'amendAmount.change' | t }}
+                </app-button>
+              </app-button-group>
+            }
+          </app-field-row>
+        </div>
+      }
       @if (budgetRow()) {
       <app-field-row
         [label]="application.fiscalYearId && fiscalLabel(application.fiscalYearId)
@@ -320,28 +368,30 @@
             <span class="ad__bound">{{ 'decision.bound' | t: { amount: approved } }}</span>
           }
         }
-        @if (canManage() && hasBudget()) {
-          <app-button
-            trail
-            variant="text"
-            size="sm"
-            [ariaLabel]="(application.budgetId ? 'applications.budget.change' : 'applications.budget.assign') | t"
-            (click)="openBudgetDialog()"
-          >
-            {{ (application.budgetId ? 'applications.detail.budgetChange' : 'applications.detail.budgetAssign') | t }}
-          </app-button>
-        } @else if (canManage() && !formLoading()) {
-          <app-button
-            trail
-            variant="text"
-            size="sm"
-            [ariaLabel]="'applications.budget.remove' | t"
-            [loading]="assigningBudget()"
-            (click)="clearBudget()"
-          >
-            {{ 'action.remove' | t }}
-          </app-button>
-        }
+        <app-button-group ngProjectAs="[trail]">
+          @if (canManage() && hasBudget()) {
+            <app-button
+              trail
+              variant="text"
+              size="sm"
+              [ariaLabel]="(application.budgetId ? 'applications.budget.change' : 'applications.budget.assign') | t"
+              (click)="openBudgetDialog()"
+            >
+              {{ (application.budgetId ? 'applications.detail.budgetChange' : 'applications.detail.budgetAssign') | t }}
+            </app-button>
+          } @else if (canManage() && !formLoading()) {
+            <app-button
+              trail
+              variant="text"
+              size="sm"
+              [ariaLabel]="'applications.budget.remove' | t"
+              [loading]="assigningBudget()"
+              (click)="clearBudget()"
+            >
+              {{ 'action.remove' | t }}
+            </app-button>
+          }
+        </app-button-group>
       </app-field-row>
       }
       @if (links(); as l) {
@@ -353,15 +403,17 @@
               {{ 'applications.predecessor.none' | t }}
             }
             @if (canLink()) {
-              <app-button
-                trail
-                variant="text"
-                size="sm"
-                data-testid="ad-predecessor"
-                (click)="predecessorOpen.set(true)"
-              >
-                {{ (l.predecessor ? 'applications.predecessor.change' : 'applications.predecessor.link') | t }}
-              </app-button>
+              <app-button-group ngProjectAs="[trail]">
+                <app-button
+                  trail
+                  variant="text"
+                  size="sm"
+                  data-testid="ad-predecessor"
+                  (click)="predecessorOpen.set(true)"
+                >
+                  {{ (l.predecessor ? 'applications.predecessor.change' : 'applications.predecessor.link') | t }}
+                </app-button>
+              </app-button-group>
             }
           </app-field-row>
         }
@@ -380,6 +432,7 @@
       [data]="application.data"
       [contentLang]="application.lang"
       [context]="formContext()"
+      [files]="positionFiles()"
       [emptyText]="'applications.detail.data.empty' | t"
     />
   }
@@ -405,7 +458,7 @@
     @if (historyEntries().length) {
       <app-history [entries]="historyEntries()" />
     } @else {
-      <app-empty-state rows="1" [heading]="'applications.history.empty' | t" />
+      <app-empty-state icon="history" rows="1" [heading]="'applications.history.empty' | t" />
     }
   </app-section>
 </ng-template>
@@ -501,7 +554,38 @@
 <app-force-status-dialog
   [applicationId]="app()?.id ?? null"
   [currentStateId]="app()?.state?.id ?? null"
+  [requested]="app()?.amount ?? null"
+  [currency]="app()?.currency ?? 'EUR'"
   [(open)]="forceDialogOpen"
+  (done)="onForced()"
+/>
+
+<app-outside-decision-dialog
+  [applicationId]="app()?.id ?? null"
+  [applicationTitle]="title()"
+  [requested]="app()?.amount ?? null"
+  [currency]="app()?.currency ?? 'EUR'"
+  [gremiumId]="app()?.voteGremiumId ?? app()?.gremiumId ?? null"
+  [(open)]="outsideOpen"
+  (done)="onForced()"
+/>
+
+<app-amend-amount-dialog
+  [applicationId]="app()?.id ?? null"
+  [applicationTitle]="title()"
+  [requested]="app()?.amount ?? null"
+  [approved]="app()?.approvedAmount ?? null"
+  [currency]="app()?.currency ?? 'EUR'"
+  [gremiumId]="app()?.gremiumId ?? null"
+  [(open)]="amendOpen"
+  (done)="onForced()"
+/>
+
+<app-type-change-dialog
+  [applicationId]="app()?.id ?? null"
+  [currentTypeId]="app()?.typeId ?? null"
+  [types]="types()"
+  [(open)]="typeDialogOpen"
   (done)="onForced()"
 />
 
@@ -524,9 +608,9 @@
 />
 
 <ng-template #transitionsSkel>
-  <div class="ad__transitions skel-in" aria-hidden="true">
-    <span class="skel-box ad__skelButton"></span>
-    <span class="skel-box ad__skelButton ad__skelButton--short"></span>
+  <div class="skel-grp ad__transitionGroup skel-in" aria-hidden="true">
+    <span class="skel-box skel-btn skel-btn--label" style="--skel-w: 8.5rem"></span>
+    <span class="skel-box skel-btn skel-btn--label" style="--skel-w: 5rem"></span>
   </div>
 </ng-template>
 

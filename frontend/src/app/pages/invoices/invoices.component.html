@@ -19,11 +19,18 @@
               <app-button
                 variant="text"
                 [iconOnly]="true"
-                [loading]="importing()"
-                [ariaLabel]="'invoices.import' | t"
-                [title]="'invoices.import' | t"
-                (click)="fileInput.click()"
-              ><app-icon name="upload" /></app-button>
+                data-testid="inv-select"
+                [ariaLabel]="'invoices.bulk.start' | t"
+                [title]="'invoices.bulk.start' | t"
+                [ariaPressed]="selecting()"
+                (click)="toggleSelecting()"
+              ><app-icon name="boxok" /></app-button>
+              <app-row-menu
+                data-testid="inv-more"
+                [label]="'invoices.moreActions' | t"
+                [sections]="moreMenu()"
+                (selected)="onHeaderMenu($event)"
+              />
             }
           }
         </ng-container>
@@ -68,7 +75,46 @@
             [to]="grossMax()"
             (applied)="onGrossRange($event)"
           />
+          @if (activeFilterCount() > 0) {
+            <app-button-group>
+              <app-button variant="text" size="sm" (click)="resetFilters()">
+                {{ 'invoices.filter.reset' | t }}
+              </app-button>
+            </app-button-group>
+          }
         </div>
+        @if (selecting()) {
+          <app-selection-bar
+            inline
+            data-testid="inv-selection"
+            [count]="selectedCount()"
+            [countLabel]="selectionLabel()"
+            [allSelected]="allSelected()"
+            [selectAllLabel]="'invoices.bulk.selectAll' | t"
+            [clearLabel]="'invoices.bulk.stop' | t"
+            (selectAll)="toggleSelectAll($event)"
+            (cleared)="stopSelecting()"
+          >
+            <app-button-group>
+              <app-button
+                variant="text"
+                [iconOnly]="true"
+                [ariaLabel]="'invoices.bulk.markPaid' | t"
+                [title]="'invoices.bulk.markPaid' | t"
+                [disabled]="bulkBusy() || !selectedOpen().length"
+                (click)="runBulkPaid()"
+              ><app-icon name="check" /></app-button>
+              <app-button
+                variant="text"
+                [iconOnly]="true"
+                [ariaLabel]="'invoices.bulk.delete' | t"
+                [title]="bulkDeleteReason() ?? ('invoices.bulk.delete' | t)"
+                [disabled]="bulkBusy() || !selectedCount() || bulkDeleteBlocked()"
+                (click)="askBulkDelete()"
+              ><app-icon name="trash" /></app-button>
+            </app-button-group>
+          </app-selection-bar>
+        }
         @if (reloading()) {
           <span class="skel-progress skel-progress--foot" aria-hidden="true"></span>
         }
@@ -107,11 +153,7 @@
             />
           </div>
         } @else if (!items().length) {
-          <app-empty-state [heading]="'invoices.empty' | t">
-            @if (activeFilterCount() > 0) {
-              <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'invoices.filter.reset' | t }}</app-button>
-            }
-          </app-empty-state>
+          <app-empty-state [icon]="activeFilterCount() > 0 ? 'searchOff' : 'receipt'" [heading]="'invoices.empty' | t" />
         } @else {
           <div class="inv__groups" [class.skel-stale]="reloading()" [attr.inert]="reloading() ? '' : null">
           @for (group of groups(); track group.key + $index) {
@@ -119,18 +161,35 @@
               <div class="inv__rows" [class.rowgroup]="!split()" role="list">
                 @for (i of group.items; track i.id) {
                   @let st = invoiceStatus(i.status);
-                  @let menu = rowMenu(i);
+                  @let menu = selecting() ? [] : rowMenu(i);
                   <app-list-item
                     role="listitem"
                     class="inv__row"
+                    [checked]="selecting() && isSelected(i.id)"
                     [title]="titleOf(i)"
-                    [link]="[]"
+                    [link]="selecting() ? null : []"
                     [linkQueryParams]="{ id: i.id }"
                     linkQueryParamsHandling="merge"
-                    [selected]="i.id === selectedId()"
-                    [swipeRight]="swipeRight(menu)"
+                    [selected]="!selecting() && i.id === selectedId()"
+                    [swipeRight]="selecting() ? null : swipeRight(menu)"
+                    [swipeLeft]="selecting() ? null : swipeLeft()"
+                    appLongPress
+                    [appLongPressOff]="!canManage()"
+                    (appLongPress)="selectWith(i)"
+                    (activate)="onRowActivate(i)"
                     (swiped)="onRowSwiped($event, i)"
                   >
+                    @if (selecting()) {
+                      <app-checkbox
+                        lead
+                        class="inv__rowCheck"
+                        [ngModel]="isSelected(i.id)"
+                        (ngModelChange)="toggleSelect(i.id, $event)"
+                        ><span class="sr-only">{{
+                          'invoices.bulk.selectRow' | t: { name: titleOf(i) }
+                        }}</span></app-checkbox
+                      >
+                    }
                     <span sub class="inv__sub">
                       <span class="inv__parts">
                         <span class="inv__part">
@@ -148,24 +207,19 @@
                     </span>
                     <span trail class="inv__trail">
                       <span class="mono inv__amount">{{ money(i.grossAmount) }}</span>
-                      @if (menu.length || !split()) {
-                        <span class="inv__menuSlot">
-                          @if (!split()) {
-                            <span class="inv__chev" aria-hidden="true">
-                              <app-icon name="right" [size]="17" />
-                            </span>
-                          }
-                          @if (menu.length) {
-                            <app-row-menu
-                              class="inv__menu"
-                              [label]="rowMenuLabel(i)"
-                              [sections]="menu"
-                              (selected)="onRowMenu($event, i)"
-                            />
-                          }
-                        </span>
+                      @if (!selecting() && !split()) {
+                        <app-row-chevron />
                       }
                     </span>
+                    @if (menu.length) {
+                      <app-button-group menu>
+                        <app-row-menu
+                          [label]="rowMenuLabel(i)"
+                          [sections]="menu"
+                          (selected)="onRowMenu($event, i)"
+                        />
+                      </app-button-group>
+                    }
                   </app-list-item>
                 }
               </div>
@@ -175,15 +229,17 @@
           @if (hasMore()) {
             <div class="inv__sentinel" appInfiniteScroll [scrollRoot]="split() ? scroller : null" (scrolledToEnd)="loadMore()" aria-hidden="true"></div>
             <div class="inv__more">
-              <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">{{
-                'invoices.loadMore' | t
-              }}</app-button>
+              <app-button-group>
+                <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">{{
+                  'invoices.loadMore' | t
+                }}</app-button>
+              </app-button-group>
             </div>
           }
         }
       </div>
 
-      @if (canManage() && formMode() === null) {
+      @if (canManage() && !selecting() && formMode() === null) {
         <app-fab [label]="'fab.invoice' | t" [contained]="split()" (activate)="openCreate()" />
       }
     </section>
@@ -264,4 +320,13 @@
   [busy]="saving()"
   (confirm)="doDelete()"
   (cancel)="confirmDelete.set(null)"
+/>
+
+<app-confirm-dialog
+  [open]="bulkConfirm()"
+  [title]="'invoices.bulk.deleteTitle' | t"
+  [body]="'invoices.bulk.deleteBody' | t: { count: selectedCount() }"
+  [busy]="bulkBusy()"
+  (confirm)="runBulkDelete()"
+  (cancel)="bulkConfirm.set(false)"
 />

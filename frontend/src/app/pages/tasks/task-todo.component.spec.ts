@@ -1,6 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, TitleStrategy, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
@@ -13,7 +13,7 @@ import { provideFakeTodoLive } from '../../../testing/todo-live';
 import { TaskTodoComponent } from './task-todo.component';
 import { TasksComponent } from './tasks.component';
 
-@Component({ standalone: true, template: '' })
+@Component({ changeDetection: ChangeDetectionStrategy.Eager, standalone: true, template: '' })
 class ListStub {}
 
 async function start(withPage: boolean, split = true, titles = false) {

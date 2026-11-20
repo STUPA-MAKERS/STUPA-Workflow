@@ -158,6 +158,9 @@ class AuditAction(StrEnum):
         GREMIUM_INFO_UPDATE: A save of the Info tab of a Gremium (``info.write``).
             ``data`` carries the gremium id, the new version, the length of the text
             and the number of links, never the text or a link.
+        GREMIUM_NOTIFY: A message of a Gremium to its members (``members.notify``).
+            ``data`` carries the gremium id, the subject and the number of recipients,
+            never an address or the text.
     """
 
     LOGIN = "login"
@@ -190,6 +193,7 @@ class AuditAction(StrEnum):
     GUEST_APPLICATION_DISCARD = "guest_application_discard"
     APPLICATION_OWNER_MATCH = "application_owner_match"
     APPLICATION_UPDATE = "application_update"
+    APPLICATION_TYPE_CHANGE = "application_type_change"
     APPLICATION_ARCHIVE = "application_archive"
     APPLICATION_UNARCHIVE = "application_unarchive"
     APPLICATION_DECISION = "application_decision"
@@ -270,6 +274,7 @@ class AuditAction(StrEnum):
     BACKUP_IMPORT = "backup_import"
     BACKUP_RESTORE = "backup_restore"
     GREMIUM_INFO_UPDATE = "gremium_info_update"
+    GREMIUM_NOTIFY = "gremium_notify"
 
 
 REVERTABLE_BUDGET_ACTIONS: frozenset[AuditAction] = frozenset(

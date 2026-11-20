@@ -11,6 +11,7 @@ import type {
   DataDiff,
   DataDiffWire,
   FormFieldDef,
+  FormRule,
   I18nMap,
   Uuid,
 } from '@core/api/models';
@@ -45,6 +46,11 @@ export interface StateDef {
   readonly isApproved?: boolean;
   /** An Antrag in this state counts as denied (spec 000571). Never on a vote state. */
   readonly isDenied?: boolean;
+  /**
+   * "Ziel für ersetzte Anträge" (001722): the old Antrag moves here when its new version is
+   * submitted. At most one state; it is terminal and denied.
+   */
+  readonly isReplacedTarget?: boolean;
   /** State kind. Absent ⇒ `normal`. */
   readonly kind?: StateKind | null;
   /** Kind-specific configuration. */
@@ -721,6 +727,8 @@ export interface ApplicationTypeFull {
   readonly hasBudget: boolean;
   /** The Antrag PDF ends with the signature section (spec 000888). */
   readonly pdfSignatures?: boolean;
+  /** "Anhang Pflicht": an Antrag of this type needs a file (spec 001732). */
+  readonly attachmentRequired?: boolean;
   readonly comparisonOffers?: ComparisonOffers | null;
   /** DSGVO retention in months. null = the global default. */
   readonly retentionMonths?: number | null;
@@ -763,6 +771,7 @@ export interface ApplicationTypeUpdateBody {
   readonly gremiumId?: Uuid | null;
   readonly hasBudget?: boolean;
   readonly pdfSignatures?: boolean;
+  readonly attachmentRequired?: boolean;
   readonly comparisonOffers?: ComparisonOffers | null;
   /** `null` takes the type out of its group (spec 001180); absent keeps it. */
   readonly groupId?: Uuid | null;
@@ -779,6 +788,8 @@ export interface FormDraft {
   readonly active?: boolean;
   readonly description?: I18nMap | null;
   readonly fields: readonly FormFieldDef[];
+  /** The rules across fields (spec 001670); absent from an older server. */
+  readonly rules?: readonly FormRule[];
 }
 
 export type FormStatus = 'active' | 'draft' | 'inactive';
@@ -878,6 +889,7 @@ export const GREMIUM_PERMISSIONS = [
   'protocol.write',
   'protocol.finalize',
   'info.write',
+  'members.notify',
 ] as const;
 
 /**

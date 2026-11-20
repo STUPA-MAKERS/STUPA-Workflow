@@ -9,7 +9,7 @@
     } @else if (view(); as v) {
       @if (plain(v).length) {
         <app-section class="fd__sec" [heading]="'todos.linkView.details' | t">
-          <dl class="fd__card fd__grid">
+          <dl appFacts [card]="true">
             @for (f of plain(v); track f.key) {
               <div>
                 <dt>{{ label(f) }}</dt>

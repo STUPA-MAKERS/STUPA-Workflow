@@ -9,6 +9,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   FabComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   CapitalizePipe,
   CheckboxComponent,
   ConfirmDialogComponent,
@@ -77,6 +78,7 @@ const FIXED_ROLES = new Set(['admin', 'member']);
     TranslatePipe,
     CapitalizePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     CheckboxComponent,
     DialogComponent,
     InputComponent,

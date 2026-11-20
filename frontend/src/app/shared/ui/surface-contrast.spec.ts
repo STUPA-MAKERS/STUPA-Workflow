@@ -173,16 +173,6 @@ describe('a table on a shared sheet steps up one surface', () => {
     expect(ld).toMatch(/:host\(\.ld--split\) \.ld__detail \{\s*@include surface\.context\(1\);/);
   });
 
-  /** The admin frame draws that sheet on surface 1. */
-  it('the sheet of the wide admin frame sets the context of surface 1', () => {
-    const global = scss('../../../styles.scss');
-    expect(global).toContain("@use 'surface';");
-    expect(global).toMatch(/\.af--split \.af__page \{\s*@include surface\.context\(1\);/);
-    expect(scss('../../pages/admin/admin-frame/admin-frame.component.scss')).toMatch(
-      /\.af--split \.af__page \{[^}]*background: var\(--color-surface-1\);/,
-    );
-  });
-
   it('the context puts the table one step above the container', () => {
     expect(SURFACE).toMatch(/\$level == 1 \{\s*--table-bg: var\(--color-surface-2\);/);
     expect(SURFACE).toMatch(/\$level == 2 \{\s*--table-bg: var\(--color-surface-3\);/);

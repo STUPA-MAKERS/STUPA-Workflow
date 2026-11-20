@@ -1,6 +1,5 @@
 @use 'field' as f;
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use '../../shared/ui/surface-card' as sc;
 
 :host {
@@ -30,27 +29,16 @@
   @include sc.raised-fields($muted-label: false);
 }
 
-.ff__head {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-5) var(--space-6) var(--space-4);
-}
-
 .ff__body {
   --ff-fade: var(--space-5);
   flex: 1 1 auto;
   min-height: 0;
-  padding: var(--space-1) var(--space-6) var(--ff-fab-room);
+  padding: var(--space-5) var(--space-6) var(--ff-fab-room);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 .ff--sheet .ff__body {
   padding: var(--space-2) 0 var(--ff-fab-room);
-}
-.ff__body {
-  @include fade.fade-y(var(--ff-fade));
 }
 
 .ff__cols {

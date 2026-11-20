@@ -98,7 +98,7 @@ async def test_route_methods_404_for_unconfirmed(call: str) -> None:
         ),
         "list_states": lambda: svc.list_states(app.id, allow_unconfirmed=False),
         "force_status": lambda: svc.force_status(
-            app.id, uuid4(), principal, note="x", allow_unconfirmed=False
+            app.id, uuid4(), principal, reason="other", note="x", allow_unconfirmed=False
         ),
     }
     with pytest.raises(NotFoundError):

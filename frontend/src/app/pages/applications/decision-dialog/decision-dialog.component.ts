@@ -21,11 +21,12 @@ import {
   emptyDraft,
   toProposal,
 } from '@shared/decision/decision.util';
-import { ButtonComponent, DialogComponent, ToastService } from '@stupa-makers/ui-kit';
+import { ButtonComponent, DialogComponent, ToastService, ErrorTextComponent } from '@stupa-makers/ui-kit';
 
 /** The server refused the decision: the codes of the 422 answers. */
 const DECISION_CODES: Record<string, Parameters<I18nService['translate']>[0]> = {
   approved_amount_invalid: 'decision.error.amountInvalid',
+  approved_amount_required: 'decision.error.amountRequired',
   approved_amount_exceeds_requested: 'decision.error.amountExceeds',
   decision_not_allowed: 'decision.error.notAllowed',
 };
@@ -35,7 +36,8 @@ const DECISION_CODES: Record<string, Parameters<I18nService['translate']>[0]> = 
  *
  * The dialog offers the decision: switched off, the transition fires as before
  * ("as requested, no conditions"). Switched on, it takes the approved amount and the
- * conditions. Other transitions never open this dialog. The detail and the row menu of
+ * conditions. A move that must name the amount (`requiresAmount`) has no switch: the
+ * amount is prefilled with the requested one and always sent. Other transitions never open this dialog. The detail and the row menu of
  * the list both open it; `done` fires after the transition, and also after a 409, so
  * the caller loads the application again.
  */
@@ -43,7 +45,7 @@ const DECISION_CODES: Record<string, Parameters<I18nService['translate']>[0]> = 
   selector: 'app-decision-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ButtonComponent, DialogComponent, DecisionEditorComponent],
+  imports: [ErrorTextComponent, TranslatePipe, ButtonComponent, DialogComponent, DecisionEditorComponent],
   templateUrl: './decision-dialog.component.html',
   styleUrl: './decision-dialog.component.scss',
 })
@@ -67,7 +69,11 @@ export class DecisionDialogComponent {
   /** The reason the server refused the decision, shown in the dialog. */
   protected readonly refusal = signal('');
 
-  protected readonly invalid = computed(() => draftError(this.draft(), this.requested()) !== null);
+  /** The move must name the approved amount (spec 001610): the amount is always sent. */
+  protected readonly required = computed(() => this.transition()?.requiresAmount ?? false);
+  protected readonly invalid = computed(
+    () => draftError(this.draft(), this.requested(), this.required()) !== null,
+  );
   protected readonly confirmLabel = computed(
     () => this.transition()?.label || this.i18n.translate('applications.transitions.fallback'),
   );
@@ -78,7 +84,7 @@ export class DecisionDialogComponent {
       const transition = this.transition();
       untracked(() => {
         if (open && transition) {
-          this.draft.set(emptyDraft(this.requested()));
+          this.draft.set(emptyDraft(this.requested(), this.required()));
           this.refusal.set('');
           this.saving.set(false);
         }
@@ -96,7 +102,7 @@ export class DecisionDialogComponent {
     if (!id || !transition || this.saving() || this.invalid()) return;
     this.saving.set(true);
     this.refusal.set('');
-    const decision = toProposal(this.draft(), this.requested());
+    const decision = toProposal(this.draft(), this.requested(), this.required());
     this.api
       .fireTransition(id, decision ? { transitionId: transition.id, decision } : { transitionId: transition.id })
       .subscribe({

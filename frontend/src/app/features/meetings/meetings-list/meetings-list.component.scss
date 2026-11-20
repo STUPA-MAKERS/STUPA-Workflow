@@ -1,4 +1,3 @@
-@use 'scroll-fade' as fade;
 @use 'list-pane' as lp;
 
 // One column on every screen: the meeting page is the detail.
@@ -21,7 +20,6 @@
 .mtl__scroll {
   @include lp.scroll(--mtl-fade);
   padding-bottom: calc(56px + var(--space-6));
-  @include fade.fade-y(var(--mtl-fade));
 }
 
 .mtl__group {
@@ -36,10 +34,6 @@
 }
 .mtl__row {
   cursor: default;
-}
-.mtl__dot {
-  margin-inline: 6px;
-  color: var(--color-text-subtle);
 }
 
 .mtl__trail {

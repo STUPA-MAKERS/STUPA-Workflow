@@ -25,6 +25,7 @@ import type { StatusView } from '@shared/status-kind.util';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   EmptyStateComponent,
   FocusDialogDirective,
   MEDIA,
@@ -56,6 +57,8 @@ export interface AttendanceDetailRequest {
   readonly summary: string;
   /** The months (`YYYY-MM`) to read, the newest first. */
   readonly months: readonly string[];
+  /** The person is read as a pool substitute: the meetings show the pool seats. */
+  readonly pool?: boolean;
 }
 
 export interface AttendanceDetailGroup {
@@ -69,6 +72,8 @@ export const ATTENDANCE_STATE: Record<GremiumAttendanceState, StatusView> = {
   excused: { kind: 'warn', key: 'gremien.attendance.state.excused' },
   absent: { kind: 'error', key: 'gremien.attendance.state.absent' },
   delegated: { kind: 'neutral', key: 'gremien.attendance.state.delegated' },
+  seat: { kind: 'accent', key: 'gremien.attendance.state.seat' },
+  no_seat: { kind: 'neutral', key: 'gremien.attendance.state.noSeat' },
 };
 
 /**
@@ -99,6 +104,7 @@ export const ATTENDANCE_STATE: Record<GremiumAttendanceState, StatusView> = {
     TranslatePipe,
     AvatarComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     LateExcuseDialogComponent,
     SideSheetComponent,
     SkeletonComponent,
@@ -215,7 +221,11 @@ export class AttendanceDetailComponent {
     }
     const multi = months.length > 1;
     this.sub = forkJoin(
-      months.map((m) => this.api.memberAttendance(this.gremiumId(), request.principalId, m)),
+      months.map((m) =>
+        request.pool
+          ? this.api.memberAttendance(this.gremiumId(), request.principalId, m, true)
+          : this.api.memberAttendance(this.gremiumId(), request.principalId, m),
+      ),
     ).subscribe({
       next: (answers) => {
         this.groups.set(

@@ -1,6 +1,7 @@
 @use 'breakpoints' as bp;
 
-// The frame of `app-meeting-page` (its `:host`, `.mp__head`, `.mp__body`, `.mp__dock`).
+// The frame of `app-meeting-page` (its `:host`, `.mp__head`, `.mp__body`, `.mp__dock`), of the
+// agenda pane (`AgendaPaneComponent`) and of the sheet of the item (`TopSheetComponent`).
 :host {
   display: flex;
   flex: 1 1 0;
@@ -9,6 +10,12 @@
   margin-block: calc(var(--app-top-safe-area, 0px) - var(--main-pad-top, var(--space-8)))
     calc(-1 * var(--main-pad-bottom, var(--space-8)));
   margin-inline: calc(-1 * var(--layout-gutter));
+}
+// 12px of space to the navigation rail, as the page (001440).
+@include bp.not-phone {
+  :host {
+    padding-inline-start: var(--space-3);
+  }
 }
 
 .mps__head {
@@ -19,12 +26,6 @@
   min-height: 84px;
   padding: var(--space-3) var(--space-5) var(--space-3) var(--space-3);
 }
-.mps__back,
-.mps__menu {
-  width: var(--control-height);
-  height: var(--control-height);
-  border-radius: 999px;
-}
 .mps__titles {
   display: flex;
   flex: 1 1 auto;
@@ -32,19 +33,25 @@
   gap: 2px;
   min-width: 0;
 }
+.mps__titleLine {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
 .mps__title {
   font-size: var(--fs-h1);
   line-height: 1.75rem;
 }
 .mps__titleBar {
-  width: min(24em, 90%);
+  width: 13rem;
 }
 .mps__sub {
   font-size: var(--fs-small);
   line-height: 1.125rem;
 }
 .mps__subBar {
-  width: min(22em, 80%);
+  width: 11rem;
 }
 
 .mps__body {
@@ -61,76 +68,109 @@
   padding: 0 var(--space-3) 0 0;
 }
 
+// The agenda: a 48px split head (the title and a 56px add button, 3px apart) over rows of
+// 55px, all one group with corners of 6px and outer corners of 24px.
 .mps__agenda {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: var(--space-2) var(--space-3);
+  gap: 3px;
 }
-.mps__kicker {
-  padding: var(--space-1) var(--space-2) var(--space-2);
-  font-size: var(--fs-small);
-  line-height: 1.125rem;
+.mps__agendaHead {
+  display: flex;
+  gap: 3px;
+  height: 48px;
 }
-.mps__kickerBar {
-  width: 9em;
+.mps__agendaTitle,
+.mps__agendaAdd,
+.mps__row {
+  background: var(--color-surface-1);
+  border-radius: 6px;
+}
+.mps__agendaTitle {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  padding: 0 var(--space-4);
+  border-start-start-radius: 24px;
+  font-size: var(--fs-md);
+}
+.mps__agendaTitleBar {
+  width: 4rem;
+}
+.mps__agendaAdd {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 56px;
+  border-start-end-radius: 24px;
+}
+.mps__addIcon {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
 }
 .mps__row {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  min-height: 3rem;
-  padding: 0 var(--space-2);
+  min-height: 55px;
+  padding: 0 var(--space-3);
+}
+.mps__row:last-child {
+  border-end-start-radius: 24px;
+  border-end-end-radius: 24px;
 }
 .mps__num {
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2rem;
+  height: 2rem;
   border-radius: 999px;
 }
-.mps__rowName {
+.mps__rowText {
+  display: flex;
   flex: 1 1 auto;
+  flex-direction: column;
   min-width: 0;
-  font-size: var(--fs-body);
+}
+.mps__rowName {
+  font-size: var(--fs-md);
+  line-height: 1.25rem;
+}
+.mps__rowSub {
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+}
+.mps__rowSubBar {
+  width: 7rem;
 }
 
+// The sheet of the item: the kicker 28px from the edges, the title, the text below.
 .mps__sheet {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
   min-height: 24rem;
-  border-radius: var(--radius-xl);
+  padding: 23px 28px;
+  border-radius: var(--radius-2xl);
   background: var(--color-surface-1);
   overflow: hidden;
 }
-.mps__bar {
-  display: flex;
-  align-items: center;
-  min-height: 2.75rem;
-  padding: 0 var(--space-5);
-  background: var(--color-surface-2);
-  font-size: var(--fs-small);
-}
-.mps__barText {
-  width: 18em;
-}
 .mps__kind {
-  padding: var(--space-5) var(--space-5) 2px;
-  font-size: 0.75rem;
-  line-height: 1rem;
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
 }
 .mps__kindBar {
   width: 3.5em;
 }
 .mps__topTitle {
-  padding: 0 var(--space-5) var(--space-5);
-  font-size: 1.375rem;
+  margin-bottom: var(--space-6);
+  font-size: var(--fs-h1);
   line-height: 1.75rem;
 }
 .mps__topTitleBar {
-  width: min(14em, 70%);
+  width: min(16em, 70%);
 }
 .mps__text {
-  padding: 0 var(--space-5) var(--space-2);
+  padding-bottom: var(--space-2);
   font-size: var(--fs-body);
   line-height: 1.5rem;
 }
@@ -141,14 +181,16 @@
   width: min(18em, 55%);
 }
 
+// The dock: the item before, the place in the agenda, the item after, the tools, the chip
+// of the minute taker at the end.
 .mps__dock {
   display: flex;
   flex: none;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-4);
   min-height: 3.5rem;
   margin: var(--space-3) var(--space-3) var(--space-3) 0;
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-2);
   border-radius: var(--radius-xl);
   background: var(--color-surface-2);
   box-shadow: var(--shadow-md);
@@ -161,25 +203,21 @@
 .mps__dockText {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 6px;
   font-size: var(--fs-small);
 }
 .mps__dockLine {
-  width: 8em;
+  width: 2.5em;
 }
 .mps__dockLine--short {
-  width: 4.5em;
+  width: 3em;
 }
 .mps__grow {
   flex: 1 1 auto;
 }
-.mps__chip {
-  width: 6rem;
-  height: var(--control-height-sm);
-  border-radius: 999px;
-}
 
-// A phone: the page reaches the screen edges, the protocol fills them, and the dock floats
+// A phone: the bar of the kit is the head, the text runs on the page, and the dock floats
 // above the navigation bar (`MeetingPageComponent`).
 @include bp.phone {
   :host {
@@ -188,8 +226,20 @@
     margin-inline: calc(-1 * var(--space-4));
   }
   .mps__head {
-    min-height: 64px;
+    min-height: 72px;
     padding: var(--space-2) var(--space-3);
+  }
+  .mps__backIcon {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+  }
+  .mps__backIcon .skel-box {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
   }
   .mps__title {
     font-size: var(--fs-lg);
@@ -200,13 +250,20 @@
   }
   .mps__sheet {
     min-height: 60dvh;
+    padding: var(--space-4);
     border-radius: 0;
+    background: transparent;
+  }
+  .mps__topTitle {
+    font-size: var(--fs-lg);
+    line-height: 1.5rem;
   }
   .mps__dock {
     position: fixed;
     inset-inline: var(--space-2);
     bottom: calc(var(--app-bottom-inset, 0px) + var(--space-2));
     z-index: var(--z-sticky, 10);
+    gap: var(--space-2);
     margin: 0;
   }
 }

@@ -1,6 +1,6 @@
 import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
 import { LoadMoreComponent } from '@shared/ui/load-more/load-more.component';
-import { StickyBarComponent as _Sb, PageHeaderComponent } from '@stupa-makers/ui-kit';
+import { ButtonGroupComponent, MetaLineComponent, PageHeaderComponent, StickyBarComponent as _Sb, FactsComponent } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import {
   ChangeDetectionStrategy,
@@ -93,6 +93,7 @@ export const AUDIT_ACTIONS = [
   'application_create_on_behalf',
   'guest_application_discard',
   'application_update',
+  'application_type_change',
   'application_archive',
   'application_unarchive',
   'application_decision',
@@ -171,6 +172,7 @@ export const AUDIT_ACTIONS = [
   'backup_import',
   'backup_restore',
   'gremium_info_update',
+  'gremium_notify',
 ] as const;
 
 /** Target type to router target: the detail page or the admin list that owns the target. */
@@ -256,6 +258,8 @@ type VerifyState =
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FactsComponent,
+    MetaLineComponent,
     LoadStateComponent,
     ExpandRowComponent,
     LoadMoreComponent,
@@ -265,6 +269,7 @@ type VerifyState =
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     ConfigDiffComponent,
     ConfirmDialogComponent,
     IconComponent,

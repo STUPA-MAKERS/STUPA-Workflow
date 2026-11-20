@@ -1,4 +1,5 @@
 import { FeatureService, type FeatureKey } from '@core/features/feature.service';
+import { AuthService } from '@core/auth/auth.service';
 import { NgTemplateOutlet } from '@angular/common';
 import { DomPortalOutlet, TemplatePortal } from '@angular/cdk/portal';
 import {
@@ -21,20 +22,19 @@ import {
   viewChild,
 } from '@angular/core';
 import type { Uuid } from '@core/api/models';
-import { TodosApiService, type TodoLinkKind, type TodoLinkTarget } from '@core/api/todos.service';
+import { TodosApiService, type LinkEnd, type TodoLinkKind, type TodoLinkTarget } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate, TranslationKey } from '@core/i18n/translations';
 import {
   reducedMotion,
-  ButtonComponent,
   EmptyStateComponent,
   focusableIn,
   IconComponent,
+  isApplePlatform,
   liveSearch,
   MEDIA,
   mediaQuery,
-  SideSheetComponent,
   trapTab,
 } from '@stupa-makers/ui-kit';
 import { LINK_ICON, linkSub } from '../todos.util';
@@ -62,6 +62,9 @@ const KIND_CHIPS: readonly { readonly value: PickerKind; readonly label: Transla
   { value: 'todo', label: 'todos.picker.todos' },
 ];
 
+/** The rights of which one links a cost centre (spec 001410). */
+const BUDGET_WRITE = ['budget.book', 'budget.structure'] as const;
+
 /** The feature of a link kind; a kind without an entry has no switch. */
 const LINK_FEATURE: Partial<Record<TodoLinkKind, FeatureKey>> = {
   meeting: 'meetings',
@@ -80,25 +83,22 @@ export function linkKey(kind: TodoLinkKind, id: Uuid): string {
 }
 
 /**
- * "Verknüpfen": search what a card can link. The server lists per kind only
+ * "Verknüpfen" (spec 001408): search what an element can link. The server lists per kind only
  * what the person may read. The chips narrow the kind; the hits come in groups (Anträge,
  * Sitzungen und TOPs, Abstimmungen, Gremien, Rechnungen, Buchungen, Kostenstellen, Tickets, To-Dos), a
  * linked target carries a check mark. A pick of a linked target takes the link off again.
  *
- * Desktop: a panel that floats over the whole page, like the search palette, with a
- * scrim; a click on the scrim, Escape or the × closes it, and the focus goes back to
- * where it was. The panel is rendered at the end of `<body>`, because a dialog or a
- * drawer around the picker clips and transforms its content. Phone: the shared bottom
- * sheet.
- *
- * On desktop the panel renders at the end of <body>, because a dialog or a drawer around the picker
- * clips and transforms its content.
+ * A panel that floats over the whole page and looks like the global search (spec 001977),
+ * on a phone too, with a scrim; a click on the scrim, Escape or the close button ("Esc",
+ * on a phone ×) closes it, and the focus goes back to where it was. The panel is rendered
+ * at the end of `<body>`, because a dialog or a drawer around the picker clips and
+ * transforms its content.
  */
 @Component({
   selector: 'app-todo-link-picker',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, TranslatePipe, ButtonComponent, EmptyStateComponent, IconComponent, SideSheetComponent],
+  imports: [NgTemplateOutlet, TranslatePipe, EmptyStateComponent, IconComponent],
   templateUrl: './todo-link-picker.component.html',
   styleUrl: './todo-link-picker.component.scss',
 })
@@ -106,20 +106,27 @@ export class TodoLinkPickerComponent {
   private readonly api = inject(TodosApiService);
   private readonly i18n = inject(I18nService);
   private readonly features = inject(FeatureService);
+  private readonly auth = inject(AuthService);
   private readonly t: Translate = (key, params) => this.i18n.translate(key, params);
 
   readonly open = model(false);
-  /** The card itself never shows as a to-do hit. */
-  readonly excludeCardId = input<Uuid | null>(null);
+  /** The element that links: it and the elements that it links already never show. */
+  readonly exclude = input<LinkEnd | null>(null);
   /** The targets the card links now (`kind:id`). */
   readonly linked = input<ReadonlySet<string>>(new Set());
   readonly picked = output<TodoLinkTarget>();
 
   readonly phone = mediaQuery(MEDIA.phone);
-  /** The chips of the kinds that this platform has (spec 000758). */
+  /** The label of the Esc key, as in the global search. */
+  protected readonly escLabel = isApplePlatform() ? '⎋' : 'Esc';
+  /**
+   * The chips of the kinds that this platform has (spec 000758). A cost centre needs a budget
+   * write right (spec 001410).
+   */
   readonly chips = KIND_CHIPS.filter((chip) => {
     const feature = chip.value === 'all' ? undefined : LINK_FEATURE[chip.value];
-    return feature === undefined || this.features.isOn(feature);
+    const allowed = chip.value !== 'budget' || BUDGET_WRITE.some((p) => this.auth.can(p));
+    return allowed && (feature === undefined || this.features.isOn(feature));
   });
   readonly kind = signal<PickerKind>('all');
   readonly hits = signal<TodoLinkTarget[]>([]);
@@ -141,7 +148,7 @@ export class TodoLinkPickerComponent {
   readonly search = liveSearch<TodoLinkTarget[]>({
     run: (q) => {
       this.failed.set(false);
-      return this.api.linkTargets(q, this.kind(), this.excludeCardId());
+      return this.api.linkTargets(q, this.kind(), this.exclude());
     },
     result: (hits) => this.hits.set(hits),
     reset: () => this.hits.set([]),
@@ -179,13 +186,13 @@ export class TodoLinkPickerComponent {
         this.kind.set('all');
         this.search.clear();
         this.failed.set(false);
-        if (!this.phone()) this.returnFocus = this.document.activeElement as HTMLElement | null;
+        this.returnFocus = this.document.activeElement as HTMLElement | null;
         queueMicrotask(() => this.panelRoot().querySelector<HTMLInputElement>('.lp__field')?.focus());
       });
     });
     effect(() => {
       const pop = this.pop();
-      const floating = this.open() && !this.phone();
+      const floating = this.open();
       untracked(() => {
         if (!floating) this.detach();
         else if (pop) this.attach(pop);
@@ -197,7 +204,7 @@ export class TodoLinkPickerComponent {
     });
   }
 
-  /** The root of the open view: the sheet on a phone, the floating panel on a desktop. */
+  /** The root of the open view: the floating panel. */
   private panelRoot(): ParentNode {
     return this.host ?? (this.viewContainer.element.nativeElement as HTMLElement);
   }

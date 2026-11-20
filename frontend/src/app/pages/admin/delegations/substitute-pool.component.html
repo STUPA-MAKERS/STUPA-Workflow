@@ -1,9 +1,11 @@
 <app-section class="sp" headingId="sp-title" [level]="2" [heading]="'admin.substitutes.title' | t">
   <span sectionAction class="sp__actions">
     <ng-content select="[poolActions]" />
-    <app-button variant="text" size="sm" (click)="openAdd()">
-      <app-icon name="plus" /> {{ 'admin.substitutes.add' | t }}
-    </app-button>
+    <app-button-group>
+      <app-button variant="text" size="sm" (click)="openAdd()">
+        <app-icon name="plus" /> {{ 'admin.substitutes.add' | t }}
+      </app-button>
+    </app-button-group>
   </span>
 
   <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.substitutes.loadFailed' | t" (retry)="retry()">
@@ -26,16 +28,18 @@
                 <span class="sp__name">{{ entryName(s) }}</span>
               </span>
             </span>
-  <app-row-menu
-              [sections]="rowMenu()"
-              [label]="('ui.rowMenu.trigger' | t) + ': ' + entryName(s)"
-              (selected)="remove(s)"
-            />
+  <app-button-group>
+    <app-row-menu
+                [sections]="rowMenu()"
+                [label]="('ui.rowMenu.trigger' | t) + ': ' + entryName(s)"
+                (selected)="remove(s)"
+              />
+  </app-button-group>
           </li>
         }
       </ul>
     } @else {
-      <app-empty-state shape="person" rows="3" [heading]="'admin.substitutes.empty' | t" />
+      <app-empty-state icon="users" shape="person" rows="3" [heading]="'admin.substitutes.empty' | t" />
       }
     </ng-template>
   </app-load-state>

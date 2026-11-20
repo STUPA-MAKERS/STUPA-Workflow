@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use 'list-pane' as lp;
 
 // The page reuses the list "Anträge" of a member. The public frame has no rail, so a round
@@ -46,24 +45,13 @@
 .ma--split .ma__scroll > * {
   flex: none;
 }
-.ma__scroll {
-  @include fade.fade-y(var(--ma-fade));
-}
 .ma__rows {
   @include lp.stack;
-}
-.ma__dot {
-  margin-inline: 6px;
-  color: var(--color-text-subtle);
 }
 .ma__trail {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-}
-.ma__chev {
-  display: inline-flex;
-  color: var(--color-text-muted);
 }
 .ma__detail {
   @include lp.detail;

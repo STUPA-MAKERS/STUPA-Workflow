@@ -5,9 +5,9 @@
   (closed)="cancel()"
 >
   @if (none()) {
-    <app-empty-state shape="choice" rows="3" [heading]="'todos.transfer.none' | t" />
+    <app-empty-state icon="kanban" shape="choice" rows="3" [heading]="'todos.transfer.none' | t" />
   } @else if (unloadable()) {
-    <p class="tt__error" role="alert">{{ 'todos.error.transfer' | t }}</p>
+    <app-error-text>{{ 'todos.error.transfer' | t }}</app-error-text>
   } @else {
     <form class="tt" (submit)="$event.preventDefault(); confirm()">
       <app-select
@@ -25,7 +25,7 @@
         (ngModelChange)="column.set($event)"
       />
       @if (failed()) {
-        <p class="tt__error" role="alert">{{ 'todos.error.transfer' | t }}</p>
+        <app-error-text>{{ 'todos.error.transfer' | t }}</app-error-text>
       }
     </form>
   }

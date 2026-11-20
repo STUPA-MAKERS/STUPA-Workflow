@@ -52,7 +52,7 @@ def _fake_drafts(monkeypatch: pytest.MonkeyPatch) -> type[_DraftCalls]:
 
 
 def _session_for_create() -> tuple[_Session, UUID]:
-    app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4())
+    app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4(), attachment_required=False)
     fv_id = uuid4()
     _FakeForms.effective = _effective(
         [_ff("title", required=True), _ff("belege", type="file")], fv_id

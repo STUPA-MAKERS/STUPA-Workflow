@@ -30,7 +30,8 @@ async function setup(
   opts: { api?: Api; type?: ApplicationTypeFull | null; paramId?: string | null } = {},
 ) {
   const createFormVersion = jest.fn(
-    (_id: string, _fields: FormFieldDef[], _description: I18nMap) => of({ id: 'fv2' }),
+    (_id: string, _fields: FormFieldDef[], _description: I18nMap, _rules?: unknown) =>
+      of({ id: 'fv2' }),
   );
   const updateApplicationType = jest.fn((_id: string, _body: Record<string, unknown>) =>
     of(void 0),
@@ -1273,5 +1274,81 @@ describe('group serialize/deserialize round-trip', () => {
     expect(groups).toHaveLength(1);
     expect(groups[0].title['de']).toBe('Erster');
     expect(groupsToFields(groups)).toEqual(flat);
+  });
+  describe('rules, participants, root and "Anhang Pflicht" (specs 001631, 001670, 001680, 001732)', () => {
+    const rule = {
+      logic: { '>=': [{ var: 'amount' }, 500] },
+      message: { de: 'Ab 500 €.', en: 'From 500 €.' },
+      severity: 'block' as const,
+    };
+
+    it('loads, changes, orders and saves the rules', async () => {
+      const d = { ...draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }]), rules: [rule] };
+      const { c, fixture, createFormVersion } = await setup(d);
+      expect(screen.getByText('Regel 1')).toBeInTheDocument();
+      expect(c.rules()[0].logic).toBe(JSON.stringify(rule.logic));
+      c.addRule();
+      fixture.detectChanges();
+      expect(c.ruleErrors()[1]).toBe('admin.forms.rules.logicInvalid');
+      expect(c.formValid()).toBe(false);
+      c.setRule(1, { logic: '{"var":"costTotal"}' });
+      expect(c.ruleErrors()[1]).toBe('admin.forms.rules.messageMissing');
+      c.setRule(1, { message: { de: 'Kosten', en: 'Cost' }, severity: 'warn' });
+      expect(c.ruleErrors()).toEqual([null, null]);
+      c.setRule(1, { logic: '{"eval":["x"]}' });
+      expect(c.ruleErrors()[1]).toBe('admin.forms.rules.logicInvalid');
+      c.setRule(1, { logic: '[1]' });
+      expect(c.ruleErrors()[1]).toBe('admin.forms.rules.logicInvalid');
+      c.setRule(1, { logic: '{"var":"costTotal"}' });
+      c.moveRule(1, -1);
+      c.moveRule(0, -1);
+      c.moveRule(1, 1);
+      expect(c.rules().map((r: { severity: string }) => r.severity)).toEqual(['warn', 'block']);
+      fixture.detectChanges();
+      expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+      c.save();
+      expect(createFormVersion.mock.calls[0][3]).toEqual([
+        { logic: { var: 'costTotal' }, message: { de: 'Kosten', en: 'Cost' }, severity: 'warn' },
+        rule,
+      ]);
+      c.removeRule(0);
+      expect(c.rules()).toHaveLength(1);
+    });
+
+    it('lets one number field be the number of participants', async () => {
+      const { c } = await setup(
+        draft([
+          { key: 'n', type: 'number', label: { de: 'N', en: '' } },
+          { key: 'm', type: 'number', label: { de: 'M', en: '' } },
+        ]),
+      );
+      expect(c.participantsTaken(c.groups()[0].fields[1])).toBe(false);
+      c.setParticipants({ gi: 0, qi: 0 }, true);
+      expect(c.groups()[0].fields[0].validation).toEqual({ participants: true });
+      expect(c.participantsTaken(c.groups()[0].fields[1])).toBe(true);
+      expect(c.participantsTaken(c.groups()[0].fields[0])).toBe(false);
+      c.setParticipants({ gi: 0, qi: 1 }, true);
+      expect(c.fundingIssue()).toBe('admin.form.participantsTwice');
+      c.setParticipants({ gi: 0, qi: 1 }, false);
+      expect(c.fundingIssue()).toBeNull();
+    });
+
+    it('sets and clears the root of a cost-centre picker', async () => {
+      const { c } = await setup(draft([{ key: 'ks', type: 'budget_select', label: { de: 'KS', en: '' } }]));
+      c.setRootPath({ gi: 0, qi: 0 }, 'QSM');
+      expect(c.groups()[0].fields[0].validation).toEqual({ rootPath: 'QSM' });
+      c.setRootPath({ gi: 0, qi: 0 }, ' ');
+      expect(c.groups()[0].fields[0].validation).toEqual({});
+    });
+
+    it('saves "Anhang Pflicht" with the type', async () => {
+      const { c, updateApplicationType } = await setup(
+        draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }]),
+        { type: { ...TYPE, attachmentRequired: false } },
+      );
+      c.attachmentRequired.set(true);
+      c.save();
+      expect(updateApplicationType.mock.calls[0][1]).toMatchObject({ attachmentRequired: true });
+    });
   });
 });

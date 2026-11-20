@@ -1,4 +1,3 @@
-@use 'scroll-fade' as fade;
 :host {
   display: flex;
   flex: 1 1 auto;
@@ -26,23 +25,14 @@
   --color-surface-sunken: var(--color-surface-3);
 }
 
-.mf__head {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-5) var(--space-6) var(--space-4);
-}
-
 .mf__body {
   flex: 1 1 auto;
   min-height: 0;
-  padding: var(--space-1) var(--space-6) var(--mf-fab-room);
+  padding: var(--space-5) var(--space-6) var(--mf-fab-room);
   overflow-y: auto;
   overscroll-behavior: contain;
   container-type: inline-size;
   scroll-padding-block: var(--space-5);
-  @include fade.fade-y(var(--space-5));
 }
 .mf--sheet .mf__body {
   padding: var(--space-1) 0 var(--mf-fab-room);
@@ -85,14 +75,6 @@
 .mf__chips {
   --chip-group-height: var(--control-height);
 }
-
-.mf__error {
-  margin: 0;
-  padding: 0 var(--space-4);
-  color: var(--color-danger);
-  font-size: var(--fs-small);
-}
-
 
 // One view: the form docks in the bar of the layout and fills the page like a detail.
 .mf--page .mf__body {

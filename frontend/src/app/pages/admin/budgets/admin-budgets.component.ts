@@ -6,6 +6,7 @@ import { type Observable, concat, defer, forkJoin, of } from 'rxjs';
 import { catchError, last, map } from 'rxjs/operators';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   CellDirective,
   type ColumnDef,
   ConfirmDialogComponent,
@@ -109,6 +110,7 @@ const STEP_NAME_MAX = 120;
     SimplifyPathPipe,
     BreadcrumbsComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     CellDirective,
     ColourFieldComponent,
     ConfirmDialogComponent,

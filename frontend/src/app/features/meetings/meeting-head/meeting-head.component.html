@@ -2,13 +2,15 @@
   <app-list-detail-bar class="mh__bar" [label]="'meetings.page.back' | t" [title]="heading()" (back)="back.emit()" />
   <h1 class="sr-only">{{ heading() }}</h1>
 } @else {
-  <app-button class="mh__back" variant="text" [iconOnly]="true" [ariaLabel]="'meetings.page.back' | t" (click)="back.emit()">
-    <app-icon name="back" />
-  </app-button>
+  <app-button-group>
+    <app-button class="mh__back" variant="text" [iconOnly]="true" [ariaLabel]="'meetings.page.back' | t" (click)="back.emit()">
+      <app-icon name="back" />
+    </app-button>
+  </app-button-group>
   <div class="mh__titles">
     <div class="mh__titleLine">
       <h1 class="mh__title" [title]="heading()">{{ heading() }}</h1>
-      <app-status-text class="mh__status" [kind]="statusKind()">{{ statusText() }}</app-status-text>
+      <app-status-text chip class="mh__status" [kind]="statusKind()">{{ statusText() }}</app-status-text>
     </div>
     @if (sub() !== null) {
       <span class="mh__sub">{{ sub() }}</span>
@@ -17,19 +19,17 @@
       <a class="mh__link" [routerLink]="l.to">{{ l.label }}</a>
     }
   </div>
-  <ng-container [ngTemplateOutlet]="actions" />
+  <app-button-group class="mh__actions"><ng-container [ngTemplateOutlet]="actions" /></app-button-group>
 }
 
 <ng-template #actions><ng-content /></ng-template>
 
-<ng-template #subtitle>
+<ng-template #subtitle><app-meta-line>
   <app-status-text class="mh__barStatus" [kind]="statusKind()">{{ statusText() }}</app-status-text>
   @if (sub()) {
-    <span aria-hidden="true">·</span>
     <span class="mh__barSub">{{ sub() }}</span>
   }
   @if (link(); as l) {
-    <span aria-hidden="true">·</span>
     <a class="mh__link" [routerLink]="l.to">{{ l.label }}</a>
   }
-</ng-template>
+</app-meta-line></ng-template>

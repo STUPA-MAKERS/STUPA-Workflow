@@ -1,6 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/angular';
+import { fireEvent, render, screen, within } from '@testing-library/angular';
 import { of, throwError } from 'rxjs';
 import { TodosApiService, type TodoLinkTarget } from '@core/api/todos.service';
+import { AuthService } from '@core/auth/auth.service';
 import { MEDIA } from '@stupa-makers/ui-kit';
 import { asPhone } from '../../../../testing/todo-fixtures';
 import { TodoLinkPickerComponent, linkKey } from './todo-link-picker.component';
@@ -12,13 +13,18 @@ const HITS: TodoLinkTarget[] = [
   { kind: 'todo', targetId: 'k-2', title: 'Haushalt Kapitel 3', detail: { boardName: 'StuPa' } },
 ];
 
-async function setup(opts: { fail?: boolean; linked?: string[] } = {}) {
+async function setup(opts: { fail?: boolean; linked?: string[]; budgetWrite?: boolean } = {}) {
   const linkTargets = jest.fn(() => (opts.fail ? throwError(() => new Error('x')) : of(HITS)));
   const picked = jest.fn();
   const view = await render(TodoLinkPickerComponent, {
-    inputs: { open: false, excludeCardId: 'k-1', linked: new Set(opts.linked ?? []) },
+    inputs: { open: false, exclude: { kind: 'todo', id: 'k-1' }, linked: new Set(opts.linked ?? []) },
     on: { picked },
-    providers: [{ provide: TodosApiService, useValue: { linkTargets } }],
+    providers: [
+      { provide: TodosApiService, useValue: { linkTargets } },
+      ...(opts.budgetWrite === undefined
+        ? []
+        : [{ provide: AuthService, useValue: { can: () => opts.budgetWrite } }]),
+    ],
   });
   const open = async () => {
     view.fixture.componentInstance.open.set(true);
@@ -58,7 +64,7 @@ describe('TodoLinkPickerComponent', () => {
   it('opens on the first render when open is true from the start', async () => {
     const linkTargets = jest.fn(() => of(HITS));
     await render(TodoLinkPickerComponent, {
-      inputs: { open: true, excludeCardId: 'k-1', linked: new Set<string>() },
+      inputs: { open: true, exclude: { kind: 'todo', id: 'k-1' }, linked: new Set<string>() },
       providers: [{ provide: TodosApiService, useValue: { linkTargets } }],
     });
     expect(screen.getByRole('dialog', { name: 'Verknüpfen' }).closest('.lp-layer')?.parentElement).toBe(document.body);
@@ -113,7 +119,7 @@ describe('TodoLinkPickerComponent', () => {
     const { open, type, linkTargets, picked } = await setup({ linked: ['application:a-1'] });
     await open();
     type('Haushalt');
-    expect(linkTargets).toHaveBeenLastCalledWith('Haushalt', 'all', 'k-1');
+    expect(linkTargets).toHaveBeenLastCalledWith('Haushalt', 'all', { kind: 'todo', id: 'k-1' });
     expect(screen.getByText('Anträge', { selector: '.lp__group' })).toBeInTheDocument();
     expect(screen.getByText('Sitzungen und TOPs')).toBeInTheDocument();
     expect(screen.getByText('To-Dos', { selector: '.lp__group' })).toBeInTheDocument();
@@ -158,7 +164,7 @@ describe('TodoLinkPickerComponent', () => {
       ['Buchungen', 'expense'],
     ] as const) {
       fireEvent.click(screen.getByRole('button', { name: label }));
-      expect(linkTargets).toHaveBeenLastCalledWith('Pla', kind, 'k-1');
+      expect(linkTargets).toHaveBeenLastCalledWith('Pla', kind, { kind: 'todo', id: 'k-1' });
     }
   });
 
@@ -171,7 +177,7 @@ describe('TodoLinkPickerComponent', () => {
     expect(linkTargets).toHaveBeenCalledTimes(calls);
     fireEvent.click(screen.getByRole('button', { name: 'TOPs' }));
     expect(screen.getByRole('button', { name: 'TOPs' })).toHaveAttribute('aria-pressed', 'true');
-    expect(linkTargets).toHaveBeenLastCalledWith('Haushalt', 'agenda_item', 'k-1');
+    expect(linkTargets).toHaveBeenLastCalledWith('Haushalt', 'agenda_item', { kind: 'todo', id: 'k-1' });
   });
 
   it('shows the shared empty state when nothing matches', async () => {
@@ -205,6 +211,35 @@ describe('TodoLinkPickerComponent', () => {
    * A second closing in the fade starts no second fade. An opening in the fade stops it. A fade
    * that ends after an opening in it leaves the panel.
    */
+  it('drops the layer at once under reduced motion, without asking for animations', async () => {
+    document.documentElement.setAttribute('data-display-motion', 'reduce');
+    try {
+      const { open, fixture } = await setup();
+      await open();
+      const anims = jest.fn(() => [{ finished: new Promise<void>(() => undefined) } as unknown as Animation]);
+      Object.defineProperty(screen.getByRole('dialog'), 'getAnimations', { value: anims, configurable: true });
+      fixture.componentInstance.open.set(false);
+      fixture.detectChanges();
+      expect(anims).not.toHaveBeenCalled();
+      expect(document.querySelector('.lp-layer')).toBeNull();
+    } finally {
+      document.documentElement.removeAttribute('data-display-motion');
+    }
+  });
+
+  it('closes without moving the focus when the element it came from is gone', async () => {
+    const { open, fixture } = await setup();
+    const before = document.createElement('button');
+    document.body.appendChild(before);
+    before.focus();
+    await open();
+    before.remove();
+    fixture.componentInstance.open.set(false);
+    fixture.detectChanges();
+    expect(document.activeElement).not.toBe(before);
+    expect(document.querySelector('.lp-layer')).toBeNull();
+  });
+
   it('fades the panel out before the layer goes, and keeps it on an opening in the fade', async () => {
     let finish: () => void = () => undefined;
     const fading = () => [{ finished: new Promise<void>((r) => (finish = r)) } as unknown as Animation];
@@ -242,12 +277,23 @@ describe('TodoLinkPickerComponent', () => {
     expect(screen.getByRole('dialog')).toBe(again);
   });
 
-    it('uses the bottom sheet on the phone', async () => {
-    asPhone(MEDIA.phone);
-    const { open, container } = await setup();
+    it('names the close key ⎋ on Apple devices, as the global search does', async () => {
+    jest.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel');
+    const { open } = await setup();
     await open();
-    expect(container.querySelector('.lp--sheet')).not.toBeNull();
-    expect(container.querySelector('.lp__x')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Schließen' })).toHaveTextContent('⎋');
+  });
+
+  it('floats like the global search on the phone too, with a × as the close button (spec 001977)', async () => {
+    asPhone(MEDIA.phone);
+    const { open, fixture, container } = await setup();
+    await open();
+    const panel = screen.getByRole('dialog', { name: 'Verknüpfen' });
+    expect(container.querySelector('app-side-sheet')).toBeNull();
+    expect(panel.closest('.lp-layer')?.parentElement).toBe(document.body);
+    expect(panel.querySelector('.lp__esc')).toBeNull();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Schließen' }));
+    expect(fixture.componentInstance.open()).toBe(false);
   });
 
   /** Spec 000758: the picker offers no kind of a feature that is off. */
@@ -262,5 +308,14 @@ describe('TodoLinkPickerComponent', () => {
     expect(chips).not.toContain('Kostenstellen');
     expect(chips).not.toContain('Buchungen');
   });
-});
 
+  it.each([
+    [true, true],
+    [false, false],
+  ])('§F/collaboration/links/001410: a budget write right %s shows cost centres: %s', async (budgetWrite, shown) => {
+    const { open } = await setup({ budgetWrite });
+    await open();
+    const chips = screen.getAllByRole('button', { pressed: false }).map((b) => b.textContent?.trim());
+    expect(chips.includes('Kostenstellen')).toBe(shown);
+  });
+});

@@ -18,6 +18,8 @@ Layout of the package:
     Internal and public comments.
 ``anonymize``
     GDPR anonymization: PII blanking, magic links and attachments.
+``type_change``
+    The change of the Antragsart: carried answers, missing fields, the transition back.
 ``service``
     The `ApplicationsService` facade that combines these operations.
 

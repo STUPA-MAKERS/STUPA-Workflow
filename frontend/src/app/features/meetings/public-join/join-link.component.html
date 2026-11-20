@@ -11,36 +11,41 @@
     @if (variant() === 'settings') {
       @if (confirming()) {
         <p class="jl__confirm" role="alert">{{ 'guests.link.rotateConfirm' | t }}</p>
-        <div class="jl__actions">
+        <app-button-group class="jl__actions">
           <app-button size="sm" variant="danger" [loading]="rotating()" (click)="confirmRotate()">
             {{ 'guests.link.rotateYes' | t }}
           </app-button>
           <app-button size="sm" variant="text" (click)="confirming.set(false)">{{ 'action.cancel' | t }}</app-button>
-        </div>
+        </app-button-group>
       } @else {
         <div class="jl__actions">
-          <app-copy-button
-            [text]="link().joinUrl"
-            [share]="true"
-            variant="text"
-            [label]="'guests.link.copy' | t"
-            [copiedLabel]="'guests.link.copied' | t"
-            [resetMs]="copiedMs"
-          />
-          @if (canRotate()) {
-            <app-button size="sm" variant="text" [loading]="rotating()" (click)="confirming.set(true)">
-              <app-icon name="repeat" />
-              {{ 'guests.link.rotate' | t }}
-            </app-button>
-          }
+          <app-button-group>
+            <app-copy-button
+              class="btn-grp__seg"
+              [text]="link().joinUrl"
+              [share]="true"
+              variant="text"
+              [label]="'guests.link.copy' | t"
+              [copiedLabel]="'guests.link.copied' | t"
+              [resetMs]="copiedMs"
+            />
+            @if (canRotate()) {
+              <app-button size="sm" variant="text" [loading]="rotating()" (click)="confirming.set(true)">
+                <app-icon name="repeat" />
+                {{ 'guests.link.rotate' | t }}
+              </app-button>
+            }
+          </app-button-group>
         </div>
       }
     }
   </div>
   @if (variant() === 'sheet') {
-    <app-button class="jl__large" size="sm" variant="text" (click)="showLarge.emit()">
-      <app-icon name="grid" />
-      {{ 'guests.sheet.showLarge' | t }}
-    </app-button>
+    <app-button-group>
+      <app-button class="jl__large" size="sm" variant="text" (click)="showLarge.emit()">
+        <app-icon name="grid" />
+        {{ 'guests.sheet.showLarge' | t }}
+      </app-button>
+    </app-button-group>
   }
 </div>

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
@@ -15,8 +15,12 @@ import type { CalendarSubscribeComponent } from '../../meetings/calendar-subscri
 import { GremienNoneComponent } from '../gremien-none/gremien-none.component';
 import { GREMIUM_VIEW_ALL, GremienComponent } from './gremien.component';
 import { loadErrorToast, retryLoadError } from '../../../../testing/load-error';
+import { IMAGE_PRELOADER, type ImagePreloader } from '@shared/util/preload-images';
 
-@Component({ standalone: true, template: '<p>Detail</p>' })
+@Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
+  standalone: true, template: '<p>Detail</p>'
+})
 class DetailStub {}
 
 const ITEMS: GremiumOverview[] = [
@@ -45,7 +49,13 @@ const ITEMS: GremiumOverview[] = [
 
 async function start(
   url: string,
-  opts: { items?: GremiumOverview[]; viewAll?: boolean; media?: string[]; overview?: jest.Mock } = {},
+  opts: {
+    items?: GremiumOverview[];
+    viewAll?: boolean;
+    media?: string[];
+    overview?: jest.Mock;
+    preload?: ImagePreloader;
+  } = {},
 ) {
   localStorage.setItem('ap.locale', 'de');
   const restore = matchMediaQueries(...(opts.media ?? []));
@@ -66,6 +76,7 @@ async function start(
       { provide: GremienApiService, useValue: api },
       { provide: AuthService, useValue: auth },
       { provide: ApiClient, useValue: {} },
+      { provide: IMAGE_PRELOADER, useValue: opts.preload ?? (() => Promise.resolve()) },
     ],
   });
   const harness = await RouterTestingHarness.create();
@@ -97,6 +108,28 @@ describe('GremienComponent', () => {
     expect(screen.queryByText('Detail')).toBeNull();
     s.harness.fixture.destroy();
     expect(s.frame.fill()).toBe(false);
+  });
+
+  it('§NF/performance/loading/001280: keeps the skeleton until the logos of the first answer have loaded', async () => {
+    let done!: () => void;
+    const preload = jest.fn(() => new Promise<void>((r) => (done = r)));
+    const s = await start('/committees', { preload });
+    restore = s.restore;
+    expect(preload).toHaveBeenCalledWith(['/api/committees/g-2/logo']);
+    expect(s.cmp.showSkeleton()).toBe(true);
+    expect(screen.queryByText('Wahlausschuss')).toBeNull();
+    done();
+    await s.settle();
+    expect(s.cmp.showSkeleton()).toBe(false);
+    expect(screen.getByText('Wahlausschuss')).toBeTruthy();
+  });
+
+  it('§NF/performance/loading/001280: does not wait without a logo', async () => {
+    const preload = jest.fn(() => Promise.resolve());
+    const s = await start('/committees', { preload, items: [gremium()] });
+    restore = s.restore;
+    expect(preload).not.toHaveBeenCalled();
+    expect(s.cmp.showSkeleton()).toBe(false);
   });
 
   /** Without gremium.view_all there is no other gremium and no chip. */

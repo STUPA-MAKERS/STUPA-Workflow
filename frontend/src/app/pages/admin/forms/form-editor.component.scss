@@ -1,6 +1,5 @@
 @use 'field' as f;
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use '../../../shared/formly/textarea-glass' as glass;
 @use '../../../shared/ui/surface-card' as sc;
 
@@ -95,7 +94,6 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: thin;
-    @include fade.fade-y(var(--space-5));
   }
 }
 
@@ -130,12 +128,10 @@
   border: 0;
   background: none;
   font: inherit;
-  font-size: var(--fs-cap);
+  font-size: var(--fs-small);
   line-height: var(--lh-cap);
   font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-cap);
   text-align: left;
-  text-transform: uppercase;
   color: var(--color-accent-text);
   cursor: pointer;
 }
@@ -635,4 +631,26 @@
   .fe__pv-select {
     max-width: 100%;
   }
+}
+
+/* The rules across fields (spec 001670): one block per rule. */
+.fe__rule {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+.fe__ruleHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.fe__ruleTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: var(--fw-medium);
+}
+.fe__ruleAdd {
+  align-self: flex-start;
 }

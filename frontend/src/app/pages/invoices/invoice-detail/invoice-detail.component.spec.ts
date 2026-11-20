@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import type { Invoice, InvoiceBooking } from '../../budget/budget-tree.api';
 import type { CostCentreLabel } from '../../budget/expense-display.util';
 import { InvoiceDetailComponent } from './invoice-detail.component';
-import { NO_LINKED_TODOS } from '../../../../testing/todo-fixtures';
+import { NO_LINKED_TODOS, linksOf } from '../../../../testing/todo-fixtures';
 import { of } from 'rxjs';
 import { TodosApiService } from '@core/api/todos.service';
 
@@ -96,14 +96,18 @@ describe('InvoiceDetailComponent', () => {
   });
 
   it('lists the to-dos that link the invoice', async () => {
-    const linked = jest.fn(() =>
-      of([{ id: 'k-1', boardId: 'b', boardName: 'StuPa', title: 'Rechnung prüfen', columnName: 'Offen', isDone: false, dueDate: null, assignees: [] }]),
+    const links = jest.fn(() =>
+      of(
+        linksOf([
+          { id: 'k-1', boardId: 'b', boardName: 'StuPa', title: 'Rechnung prüfen', columnName: 'Offen', isDone: false, dueDate: null, assignees: [] },
+        ]),
+      ),
     );
     await render(InvoiceDetailComponent, {
       inputs: { invoice: INVOICE, canManage: false, split: true },
-      providers: [provideRouter([]), { provide: TodosApiService, useValue: { linked, boards: () => of([]) } }],
+      providers: [provideRouter([]), { provide: TodosApiService, useValue: { links, boards: () => of([]) } }],
     });
-    expect(linked).toHaveBeenCalledWith('invoice', INVOICE.id);
+    expect(links).toHaveBeenCalledWith('invoice', INVOICE.id);
     expect(screen.getByRole('heading', { name: 'Verknüpft' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Rechnung prüfen' }).getAttribute('href')).toBe('/todos?card=k-1');
   });
@@ -163,7 +167,11 @@ describe('InvoiceDetailComponent', () => {
     // § 000671: exactly one button "Buchung anlegen", in the head of the section "Buchungen".
     expect(screen.getAllByRole('button', { name: 'Buchung anlegen' })).toHaveLength(1);
     await user.click(screen.getByRole('button', { name: 'Buchung anlegen' }));
-    expect(createBooking).toHaveBeenCalled();
+    expect(createBooking).toHaveBeenCalledTimes(1);
+    // § 001292: the head menu has "Buchung anlegen" too.
+    await user.click(screen.getByRole('button', { name: 'Weitere Aktionen' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Buchung anlegen' }));
+    expect(createBooking).toHaveBeenCalledTimes(2);
     await user.click(screen.getAllByRole('button', { name: 'Beleg öffnen' })[0]);
     expect(openFile).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: /RE-2026-118\.pdf/ }));

@@ -23,7 +23,7 @@
             [attr.aria-expanded]="false"
             (click)="toggleOpen(pi)"
           >
-            <app-icon class="pos__chev" name="down" [size]="18" />
+            <app-row-chevron [open]="false" [size]="18" />
             <span class="pos__sumText">
               <span class="pos__sumName">{{ p.label || t('forms.positions.untitled') }}</span>
               <span class="pos__sumSub">{{ summary(p) }}</span>
@@ -40,7 +40,7 @@
           </button>
         </div>
         @if (cardError(p, pi); as msg) {
-          <p class="pos__error" role="alert">{{ msg }}</p>
+          <app-error-text>{{ msg }}</app-error-text>
         }
       } @else {
         <div class="pos__row pos__row--top">
@@ -52,7 +52,7 @@
             [attr.aria-label]="t('forms.positions.collapse')"
             (click)="toggleOpen(pi)"
           >
-            <app-icon class="pos__chev pos__chev--open" name="down" [size]="18" />
+            <app-row-chevron [open]="true" [size]="18" />
           </button>
           <label class="pf pos__grow" [class.pf--invalid]="titleInvalid(p)">
             <span class="pf__label">{{ t('forms.positions.position') }}</span>
@@ -95,29 +95,57 @@
                     [attr.aria-label]="radioLabel(o, oi)"
                   />
                 }
-                <label class="pf pos__grow" [class.pf--invalid]="offerLabelInvalid(o)">
-                  <span class="pf__label">{{ t('forms.positions.provider') }}</span>
-                  <input
-                    class="pf__control"
-                    [value]="o.label"
-                    [attr.aria-invalid]="offerLabelInvalid(o) ? 'true' : null"
-                    (input)="setOfferLabel(pi, oi, $any($event.target).value)"
-                  />
-                </label>
-                <label class="pf pos__money" [class.pf--invalid]="offerValueInvalid(o, pi, oi)">
-                  <span class="pf__label">{{ t('forms.positions.amount') }}</span>
-                  <input
-                    class="pf__control mono"
-                    type="text"
-                    inputmode="decimal"
-                    [value]="offerValueText(pi, oi)"
-                    [attr.aria-invalid]="offerValueInvalid(o, pi, oi) ? 'true' : null"
-                    (focus)="beginEditValue(pi, oi)"
-                    (blur)="endEditValue()"
-                    (input)="setOfferValue(pi, oi, $any($event.target).value)"
-                  />
-                  <span class="pf__suffix" aria-hidden="true">€</span>
-                </label>
+                @let labelWarn = offerWarning(p, oi, 'label');
+                @let valueWarn = offerWarning(p, oi, 'value');
+                <div class="pos__cell pos__grow">
+                  <label
+                    class="pf"
+                    [class.pf--invalid]="offerLabelInvalid(o)"
+                    [class.pf--warn]="!!labelWarn && !offerLabelInvalid(o)"
+                  >
+                    <span class="pf__label">{{ t('forms.positions.provider') }}</span>
+                    <input
+                      class="pf__control"
+                      [value]="o.label"
+                      [attr.aria-invalid]="offerLabelInvalid(o) ? 'true' : null"
+                      [attr.aria-describedby]="labelWarn ? radioName(pi) + '-' + oi + '-lw' : null"
+                      (input)="setOfferLabel(pi, oi, $any($event.target).value)"
+                    />
+                  </label>
+                  @if (labelWarn) {
+                    <p class="pos__fieldWarn" [id]="radioName(pi) + '-' + oi + '-lw'">
+                      <app-icon class="pos__warnIcon" name="alert" [size]="14" />
+                      <span>{{ labelWarn }}</span>
+                    </p>
+                  }
+                </div>
+                <div class="pos__cell pos__money">
+                  <label
+                    class="pf"
+                    [class.pf--invalid]="offerValueInvalid(o, pi, oi)"
+                    [class.pf--warn]="!!valueWarn && !offerValueInvalid(o, pi, oi)"
+                  >
+                    <span class="pf__label">{{ t('forms.positions.amount') }}</span>
+                    <input
+                      class="pf__control mono"
+                      type="text"
+                      inputmode="decimal"
+                      [value]="offerValueText(pi, oi)"
+                      [attr.aria-invalid]="offerValueInvalid(o, pi, oi) ? 'true' : null"
+                      [attr.aria-describedby]="valueWarn ? radioName(pi) + '-' + oi + '-vw' : null"
+                      (focus)="beginEditValue(pi, oi)"
+                      (blur)="endEditValue()"
+                      (input)="setOfferValue(pi, oi, $any($event.target).value)"
+                    />
+                    <span class="pf__suffix" aria-hidden="true">€</span>
+                  </label>
+                  @if (valueWarn) {
+                    <p class="pos__fieldWarn" [id]="radioName(pi) + '-' + oi + '-vw'">
+                      <app-icon class="pos__warnIcon" name="alert" [size]="14" />
+                      <span>{{ valueWarn }}</span>
+                    </p>
+                  }
+                </div>
                 @if (!p.noOffers) {
                   <button
                     type="button"
@@ -133,6 +161,9 @@
               </div>
             }
           </div>
+          @if (switchHint(p); as hint) {
+            <p class="pos__warn">{{ hint }}</p>
+          }
 
           @if (!p.noOffers) {
             <button type="button" class="pos__link" (click)="addOffer(pi)">
@@ -151,23 +182,32 @@
               ></textarea>
             </label>
           }
+          @if (positionFiles && p.id) {
+            <ng-container *ngComponentOutlet="positionFiles.component; inputs: filesInputs(p)" />
+          }
           @if (cardError(p, pi); as msg) {
-            <p class="pos__error" role="alert">{{ msg }}</p>
+            <app-error-text>{{ msg }}</app-error-text>
           }
         </div>
       }
     </div>
   }
 
-  <app-button class="pos__add" variant="tonal" (click)="addPosition()">
-    <app-icon name="plus" />
-    {{ t('apply.positions.add') }}
-  </app-button>
+  @if (costLine(); as line) {
+    <p class="pos__line" aria-live="polite">{{ costLineText(line) }}</p>
+  }
+
+  <app-button-group>
+    <app-button class="pos__add" variant="tonal" (click)="addPosition()">
+      <app-icon name="plus" />
+      {{ t('apply.positions.add') }}
+    </app-button>
+  </app-button-group>
   @if (showError && positions.length < minPositions) {
-    <p class="pos__error" role="alert">{{ t('apply.positions.errMinPositions') }}</p>
+    <app-error-text>{{ t('apply.positions.errMinPositions') }}</app-error-text>
   }
   @if (serverError(-1); as msg) {
-    <p class="pos__error" role="alert">{{ msg }}</p>
+    <app-error-text>{{ msg }}</app-error-text>
   }
   </div>
 </fieldset>

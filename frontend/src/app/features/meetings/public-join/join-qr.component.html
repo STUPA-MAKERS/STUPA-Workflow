@@ -1,26 +1,44 @@
 @if (link(); as l) {
-  <div class="jq" [class.jq--up]="iconOnly()">
-    @if (button() && iconOnly()) {
-      <app-button
-        [variant]="open() ? 'tonal' : 'text'"
-        [iconOnly]="true"
-        [ariaLabel]="'guests.qr.title' | t"
-        [attr.aria-expanded]="open()"
-        aria-haspopup="dialog"
-        (click)="open.set(!open())"
-      ><app-icon name="grid" /></app-button>
-    } @else if (button()) {
-      <app-button
-        variant="outlined"
-        [class.jq__trigger--on]="open()"
-        [attr.aria-expanded]="open()"
-        aria-haspopup="dialog"
-        (click)="open.set(!open())"
-      >
-        <app-icon name="grid" />
-        {{ 'guests.qr.button' | t }}
-      </app-button>
-    }
+  @if (segment()) {
+    <app-button
+      [variant]="open() ? 'tonal' : 'text'"
+      [iconOnly]="true"
+      [ariaLabel]="'guests.qr.title' | t"
+      [ariaExpanded]="open()"
+      aria-haspopup="dialog"
+      (click)="open.set(!open())"
+    ><app-icon name="grid" /></app-button>
+    <ng-container [ngTemplateOutlet]="popover" />
+  } @else {
+    <div class="jq" [class.jq--up]="iconOnly()">
+      <app-button-group>
+        @if (button() && iconOnly()) {
+          <app-button
+            [variant]="open() ? 'tonal' : 'text'"
+            [iconOnly]="true"
+            [ariaLabel]="'guests.qr.title' | t"
+            [ariaExpanded]="open()"
+            aria-haspopup="dialog"
+            (click)="open.set(!open())"
+          ><app-icon name="grid" /></app-button>
+        } @else if (button()) {
+          <app-button
+            variant="outlined"
+            [class.jq__trigger--on]="open()"
+            [ariaExpanded]="open()"
+            aria-haspopup="dialog"
+            (click)="open.set(!open())"
+          >
+            <app-icon name="grid" />
+            {{ 'guests.qr.button' | t }}
+          </app-button>
+        }
+      </app-button-group>
+      <ng-container [ngTemplateOutlet]="popover" />
+    </div>
+  }
+
+  <ng-template #popover>
     @if (phone()) {
       <app-side-sheet side="bottom" [heading]="'guests.qr.title' | t" [(open)]="open">
         @if (open()) {
@@ -33,7 +51,7 @@
         <ng-container [ngTemplateOutlet]="body" />
       </div>
     }
-  </div>
+  </ng-template>
 
   <ng-template #body>
     <div class="jq__body">
@@ -44,15 +62,18 @@
       <a class="jq__url mono" [href]="l.joinUrl" target="_blank" rel="noopener">{{ l.joinUrl }}</a>
       <p class="jq__code">{{ 'guests.qr.code' | t: { code: formatCode(l.joinCode) } }}</p>
       <div class="jq__actions">
-        <app-copy-button
-          [text]="l.joinUrl"
-          [share]="true"
-          [shareTitle]="meeting().title"
-          variant="tonal"
-          [label]="'guests.qr.copy' | t"
-          [copiedLabel]="'guests.link.copied' | t"
-          [resetMs]="copiedMs"
-        />
+        <app-button-group>
+          <app-copy-button
+            class="btn-grp__seg"
+            [text]="l.joinUrl"
+            [share]="true"
+            [shareTitle]="meeting().title"
+            variant="tonal"
+            [label]="'guests.qr.copy' | t"
+            [copiedLabel]="'guests.link.copied' | t"
+            [resetMs]="copiedMs"
+          />
+        </app-button-group>
       </div>
     </div>
   </ng-template>

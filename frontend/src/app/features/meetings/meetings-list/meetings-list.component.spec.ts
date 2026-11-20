@@ -264,6 +264,32 @@ describe('MeetingsListComponent', () => {
     timelineReq(view.http, 'past').flush({ items: [], nextCursor: null });
   });
 
+  it('writes the Gremium of the chip into the URL and takes it out again (§ 001871)', async () => {
+    const view = await setup({ url: '/meetings' });
+    load(view, { gremien: [{ id: 'g-1', name: 'StuPa' }, { id: 'g-2', name: 'Finanzausschuss' }] });
+    view.timeline.selectGremiumFilter('g-2');
+    view.fixture.detectChanges();
+    await view.fixture.whenStable();
+    expect(view.router.url).toBe('/meetings?committee=g-2');
+    view.http.match((r) => r.url === '/api/meetings/timeline').forEach((r) => r.flush({ items: [], nextCursor: null }));
+    view.timeline.selectGremiumFilter('');
+    view.fixture.detectChanges();
+    await view.fixture.whenStable();
+    expect(view.router.url).toBe('/meetings');
+    view.http.match((r) => r.url === '/api/meetings/timeline').forEach((r) => r.flush({ items: [], nextCursor: null }));
+  });
+
+  it('drops a filter Gremium that the chip does not offer and loads every meeting', async () => {
+    const view = await setup();
+    view.timeline.gremiumFilter.set('g-gone');
+    view.http.expectOne('/api/meetings/committees').flush([{ id: 'g-1', name: 'StuPa' }, { id: 'g-2', name: 'FA' }]);
+    expect(view.timeline.gremiumFilter()).toBe('');
+    const up = timelineReq(view.http, 'upcoming');
+    expect(up.request.params.has('gremiumId')).toBe(false);
+    up.flush({ items: [], nextCursor: null });
+    timelineReq(view.http, 'past').flush({ items: [], nextCursor: null });
+  });
+
   it('reads an unknown Gremium of the filter as no choice', async () => {
     const view = await setup();
     load(view, { gremien: [{ id: 'g-1', name: 'StuPa' }, { id: 'g-2', name: 'FA' }] });
@@ -369,7 +395,7 @@ describe('MeetingsListComponent', () => {
       const view = await setup({ media: [MEDIA.phone], canCreate: false });
       load(view);
       const [liveRow] = screen.getAllByRole('listitem');
-      expect(liveRow.querySelector('.mtl__sub')?.textContent?.replace(/\s*·\s*/g, ' · ').trim()).toBe(
+      expect([...liveRow.querySelectorAll('.mtl__sub .ml__parts > *')].map((p) => p.textContent?.trim()).join(' · ')).toBe(
         'Live · seit 18:04 · 8 TOPs',
       );
       expect(liveRow.querySelector('.li')).toHaveClass('li--wrap');

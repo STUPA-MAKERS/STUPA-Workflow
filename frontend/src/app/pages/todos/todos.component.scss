@@ -1,5 +1,5 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
+@use 'display' as d;
 @use 'frosted' as *;
 :host {
   display: flex;
@@ -24,6 +24,15 @@
 .td__bar {
   flex: none;
 }
+// Beyond a phone the board shows no title (001500): the buttons of the header stand at the
+// end of the filter line, as high as the board picker at its start. The line is as high as
+// the search bar, so the buttons move down by half the difference, onto the line of the picker.
+@include bp.not-phone {
+  .td.ld-pane.ld-pane > app-page-header {
+    --ph-pane-h: var(--control-height);
+    translate: 0 calc((2.75rem - var(--control-height)) / 2);
+  }
+}
 .td__barRow {
   display: flex;
   flex-wrap: wrap;
@@ -45,21 +54,11 @@
   overflow-x: auto;
   scrollbar-width: none;
 }
-.td__filter {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: 36px;
-  padding-inline: var(--space-3);
-}
 .td__chips > * {
   flex: none;
 }
 .td__chips::-webkit-scrollbar {
   display: none;
-}
-.td__chips {
-  @include fade.fade-x(var(--td-chip-fade));
 }
 .td__reset {
   min-height: 32px;
@@ -82,16 +81,6 @@
   outline: 2px solid var(--color-focus-ring);
 }
 
-.td__skelIcon {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-}
-.td__skelIcon .skel-box {
-  width: 22px;
-  height: 22px;
-}
 .td__skelChip {
   width: 5rem;
   height: 32px;
@@ -102,7 +91,7 @@
 }
 .td__skelChip--filter {
   width: 6rem;
-  height: 36px;
+  height: var(--control-height-sm);
 }
 
 .td__body {
@@ -173,6 +162,10 @@
 .td--phone .td__chips {
   flex-basis: 100%;
   max-width: none;
+  // The row runs from screen edge to screen edge and cuts at the edge of the screen (000193).
+  margin-inline: calc(-1 * var(--space-4));
+  padding-inline: var(--space-4);
+  scroll-padding-inline: var(--space-4);
 }
 
 .td__scrim {
@@ -286,5 +279,14 @@
 @keyframes td-fade-out {
   to {
     opacity: 0;
+  }
+}
+
+// In very high contrast the board body has no frame of its own: each board has its white edge
+// (spec 001442), and a frame around them would double it.
+@include d.host-on(veryHigh) {
+  .td.ld-pane--glass > .td__body--rows.ld-pane__rows:has(> app-todo-board-view, > app-todo-board-rows) {
+    border: 0 !important;
+    border-radius: 0 !important;
   }
 }

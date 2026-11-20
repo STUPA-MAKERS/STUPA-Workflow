@@ -1,8 +1,10 @@
 <div class="ins__head">
   <h2 class="cap ins__title">{{ 'admin.flow.stateInspector' | t }}</h2>
-  <app-button variant="danger" size="sm" (click)="remove.emit()">
-    <app-icon name="trash" /> {{ 'admin.flow.removeState' | t }}
-  </app-button>
+  <app-button-group>
+    <app-button variant="danger" size="sm" (click)="remove.emit()">
+      <app-icon name="trash" /> {{ 'admin.flow.removeState' | t }}
+    </app-button>
+  </app-button-group>
 </div>
 
 <app-input
@@ -38,6 +40,11 @@
       [ngModel]="state().isDenied === true"
       (ngModelChange)="outcomeChange.emit({ outcome: 'denied', on: $event })"
     >{{ 'admin.flow.denied' | t }}</app-switch>
+    <app-switch
+      data-testid="state-replaced-target"
+      [ngModel]="state().isReplacedTarget === true"
+      (ngModelChange)="replacedTargetChange.emit($event)"
+    >{{ 'admin.flow.replacedTarget' | t }}</app-switch>
   }
 </div>
 

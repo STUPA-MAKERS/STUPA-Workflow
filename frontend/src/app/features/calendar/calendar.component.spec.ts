@@ -17,6 +17,13 @@ import { CALENDAR_NOW } from './calendar-grid.util';
 import { CalendarComponent } from './calendar.component';
 import { VIEW_STORAGE_KEY } from './calendar.util';
 
+/** The text of `el` with a space between the parts of each meta line (the dots are CSS). */
+function spaced(el: Element | null | undefined): string {
+  const copy = el?.cloneNode(true) as Element | undefined;
+  copy?.querySelectorAll('.ml__parts > *').forEach((part) => part.before(' '));
+  return (copy?.textContent ?? '').replace(/\s+/g, ' ').trim();
+}
+
 /** "Now" of the tests: Wednesday, 11.11.2026, 10:00. */
 const NOW = new Date(2026, 10, 11, 10, 0);
 
@@ -122,7 +129,8 @@ function reload(view: View, items: readonly CalendarEntry[] = MONTH): TestReques
 
 const cell = (name: RegExp) => screen.getByRole('button', { name }).closest('.cal__cell') as HTMLElement;
 const panel = () => screen.getByRole('complementary');
-const cards = () => within(panel()).queryAllByRole('button').map((b) => b.querySelector('.cal__cardTitle')?.textContent);
+const cards = () => within(panel()).queryAllByRole('listitem').map((r) => r.querySelector('.li__title')?.textContent?.trim());
+const dayRow = (name: RegExp) => within(panel()).getByRole('button', { name }).closest('[role=listitem]') as HTMLElement;
 
 jest.setTimeout(20_000);
 
@@ -178,17 +186,21 @@ describe('CalendarComponent (desktop)', () => {
     expect(screen.getByRole('button', { name: 'Mittwoch, 18. November 2026, 1 Eintrag' })).toBeInTheDocument();
   });
 
-  it('shows the entries of the picked day as cards', async () => {
+  it('shows the entries of the picked day as the rows of one row group without a day label (001770)', async () => {
     const view = await setup();
     load(view);
     expect(panel()).toHaveAccessibleName('Mi, 11.11.2026 · Heute');
     expect(cards()).toEqual(['Angebot einholen', 'Zahnarzt', 'Jour fixe']);
-    const termin = within(panel()).getByRole('button', { name: /Jour fixe/ });
+    expect(panel().querySelectorAll('.rowgroup[role=list]').length).toBe(1);
+    expect(panel().querySelector('app-list-group')).toBeNull();
+    expect(within(panel()).queryByText('Mi, 11.11.2026 · Heute')).toBeNull();
+    const termin = dayRow(/Jour fixe/);
     expect(termin).toHaveTextContent('Termin');
     expect(termin).toHaveTextContent('14:00 – 15:30');
-    expect(termin).toHaveTextContent('Haushaltsausschuss · AStA-Büro');
+    expect(termin).toHaveTextContent('Haushaltsausschuss');
+    expect(termin).toHaveTextContent('AStA-Büro');
     expect(termin).toHaveTextContent('Zusage');
-    expect(within(panel()).getByRole('button', { name: /Angebot einholen/ })).not.toHaveTextContent('Ganztägig');
+    expect(dayRow(/Angebot einholen/)).not.toHaveTextContent('Ganztägig');
     await userEvent.click(screen.getByRole('button', { name: /14\. November/ }));
     expect(panel()).toHaveAccessibleName('Sa, 14.11.2026');
     expect(within(panel()).getByText('Keine Einträge an diesem Tag.')).toBeInTheDocument();
@@ -342,15 +354,15 @@ describe('CalendarComponent (desktop)', () => {
     const view = await setup();
     load(view);
     expect(view.cmp.gremiumOptions().map((o) => o.label)).toEqual(['Alle Gremien', 'Studierendenparlament', 'Haushaltsausschuss']);
-    expect(view.cmp.gremiumText()).toBe('Alle Gremien');
+    expect(view.cmp.gremiumText()).toBe('Gremium');
     expect(cards()).toContain('Zahnarzt');
     view.cmp.gremium.set('g-2');
     view.fixture.detectChanges();
-    expect(view.cmp.gremiumText()).toBe('Haushaltsausschuss');
+    expect(view.cmp.gremiumText()).toBe('Gremium: Haushaltsausschuss');
     expect(cards()).toEqual(['Jour fixe']);
     expect(view.container.querySelector('.cal__bar')).toBeNull();
     view.cmp.gremium.set('gone');
-    expect(view.cmp.gremiumText()).toBe('');
+    expect(view.cmp.gremiumText()).toBe('Gremium');
     expect(view.http.match(() => true).length).toBe(0);
   });
 
@@ -368,6 +380,7 @@ describe('CalendarComponent (desktop)', () => {
     load(view);
     expect(view.cmp.kindOptions().map((o) => o.label)).toEqual(['Sitzung', 'Karte', 'Termin', 'Extern']);
     expect(view.cmp.mineOptions().map((o) => o.label)).toEqual(['Alle Einträge', 'Nur meine']);
+    expect(view.cmp.mineText()).toBe('Zuständig');
     view.cmp.kinds.set(['card']);
     view.fixture.detectChanges();
     expect(cards()).toEqual(['Angebot einholen']);
@@ -377,7 +390,18 @@ describe('CalendarComponent (desktop)', () => {
     view.fixture.detectChanges();
     const req = reload(view, [CARD, TERMIN]);
     expect(req.request.params.get('mine')).toBe('true');
+    expect(view.cmp.mineText()).toBe('Zuständig: Nur meine');
     expect(cards()).toEqual(['Angebot einholen', 'Jour fixe']);
+  });
+
+  /** Spec 001892: the filter row uses the one filter chip of the kit, also beside the search. */
+  it('draws every filter chip in the one chip size', async () => {
+    const view = await setup();
+    load(view);
+    const chips = view.container.querySelectorAll('app-filter-select .fs__chip');
+    expect(chips.length).toBeGreaterThan(0);
+    expect(view.container.querySelector('.fs__chip--md')).toBeNull();
+    for (const chip of Array.from(chips)) expect(chip.textContent ?? '').not.toMatch(/^\s*Alle/);
   });
 
   it('shows no Gremium filter to a person without a Gremium', async () => {
@@ -429,6 +453,19 @@ describe('CalendarComponent (desktop)', () => {
     expect(within(column()).getByRole('button', { name: '19:00 – 20:30 Infoabend' })).toBeInTheDocument();
     expect(view.cmp.visible().map((e) => e.id)).toEqual(['a-2', 'a-1', 'e-1', 'a-3']);
     expect(view.cmp.kindOptions().map((o) => o.value)).not.toContain('event');
+  });
+
+  it('puts Heute, Kalender-Abo and Termin anlegen in one group at the end of the tools row (001771)', async () => {
+    const view = await setup();
+    load(view);
+    const group = screen.getByRole('toolbar').querySelector('.cal__nav app-button-group.cal__actions') as HTMLElement;
+    expect(within(group).getAllByRole('button').map((b) => b.textContent?.trim() || b.getAttribute('aria-label'))).toEqual([
+      'Heute',
+      'Kalender-Abo',
+      'Termin anlegen',
+    ]);
+    expect(within(group).getByRole('button', { name: 'Termin anlegen' })).toBeInTheDocument();
+    expect(view.container.querySelector('app-fab')).toBeNull();
   });
 
   it('creates a Termin on the picked day and shows it at once', async () => {
@@ -662,8 +699,8 @@ describe('CalendarComponent (phone)', () => {
     ]);
     expect(screen.getAllByText('Klausurtagung')).toHaveLength(3);
     const row = screen.getByText('Jour fixe').closest('[role="listitem"]') as HTMLElement;
-    expect(row.querySelector('.cal__sub')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-      'Termin·14:00 – 15:30·Haushaltsausschuss·Zusage',
+    expect(spaced(row.querySelector('.cal__sub'))).toBe(
+      'Termin 14:00 – 15:30 Haushaltsausschuss Zusage',
     );
     expect(await runAxe(view.container)).toHaveNoViolations();
   });

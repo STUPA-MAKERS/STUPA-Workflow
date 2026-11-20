@@ -206,57 +206,57 @@
       "to": "shared"
     },
     {
-      "count": 3,
+      "count": 4,
       "from": "applications",
       "to": "application_types"
     },
     {
-      "count": 18,
+      "count": 20,
       "from": "applications",
       "to": "audit"
     },
     {
-      "count": 25,
+      "count": 26,
       "from": "applications",
       "to": "auth"
     },
     {
-      "count": 10,
+      "count": 12,
       "from": "applications",
       "to": "budget"
     },
     {
-      "count": 9,
+      "count": 10,
       "from": "applications",
       "to": "files"
     },
     {
-      "count": 23,
+      "count": 32,
       "from": "applications",
       "to": "flow"
     },
     {
-      "count": 13,
+      "count": 19,
       "from": "applications",
       "to": "forms"
     },
     {
-      "count": 8,
+      "count": 12,
       "from": "applications",
       "to": "gremien"
     },
     {
-      "count": 6,
+      "count": 7,
       "from": "applications",
       "to": "meetings"
     },
     {
-      "count": 30,
+      "count": 36,
       "from": "applications",
       "to": "notifications"
     },
     {
-      "count": 53,
+      "count": 65,
       "from": "applications",
       "to": "shared"
     },
@@ -686,7 +686,7 @@
       "to": "application_types"
     },
     {
-      "count": 17,
+      "count": 22,
       "from": "flow",
       "to": "applications"
     },
@@ -696,7 +696,7 @@
       "to": "audit"
     },
     {
-      "count": 7,
+      "count": 9,
       "from": "flow",
       "to": "auth"
     },
@@ -706,7 +706,7 @@
       "to": "budget"
     },
     {
-      "count": 1,
+      "count": 2,
       "from": "flow",
       "to": "files"
     },
@@ -716,12 +716,12 @@
       "to": "forms"
     },
     {
-      "count": 3,
+      "count": 4,
       "from": "flow",
       "to": "gremien"
     },
     {
-      "count": 7,
+      "count": 8,
       "from": "flow",
       "to": "meetings"
     },
@@ -731,7 +731,7 @@
       "to": "notifications"
     },
     {
-      "count": 19,
+      "count": 27,
       "from": "flow",
       "to": "shared"
     },
@@ -761,6 +761,56 @@
       "to": "shared"
     },
     {
+      "count": 1,
+      "from": "graph",
+      "to": "applications"
+    },
+    {
+      "count": 2,
+      "from": "graph",
+      "to": "auth"
+    },
+    {
+      "count": 2,
+      "from": "graph",
+      "to": "budget"
+    },
+    {
+      "count": 1,
+      "from": "graph",
+      "to": "calendar"
+    },
+    {
+      "count": 1,
+      "from": "graph",
+      "to": "gremien"
+    },
+    {
+      "count": 1,
+      "from": "graph",
+      "to": "meetings"
+    },
+    {
+      "count": 3,
+      "from": "graph",
+      "to": "shared"
+    },
+    {
+      "count": 1,
+      "from": "graph",
+      "to": "tickets"
+    },
+    {
+      "count": 8,
+      "from": "graph",
+      "to": "todos"
+    },
+    {
+      "count": 1,
+      "from": "graph",
+      "to": "voting"
+    },
+    {
       "count": 4,
       "from": "gremien",
       "to": "audit"
@@ -781,12 +831,12 @@
       "to": "applications"
     },
     {
-      "count": 4,
+      "count": 6,
       "from": "gremien_overview",
       "to": "audit"
     },
     {
-      "count": 8,
+      "count": 11,
       "from": "gremien_overview",
       "to": "auth"
     },
@@ -796,7 +846,7 @@
       "to": "delegations"
     },
     {
-      "count": 5,
+      "count": 7,
       "from": "gremien_overview",
       "to": "gremien"
     },
@@ -806,7 +856,12 @@
       "to": "meetings"
     },
     {
-      "count": 8,
+      "count": 6,
+      "from": "gremien_overview",
+      "to": "notifications"
+    },
+    {
+      "count": 10,
       "from": "gremien_overview",
       "to": "shared"
     },
@@ -1231,12 +1286,12 @@
       "to": "todos"
     },
     {
-      "count": 8,
+      "count": 9,
       "from": "todos",
       "to": "applications"
     },
     {
-      "count": 16,
+      "count": 20,
       "from": "todos",
       "to": "auth"
     },
@@ -1246,7 +1301,7 @@
       "to": "budget"
     },
     {
-      "count": 4,
+      "count": 7,
       "from": "todos",
       "to": "calendar"
     },
@@ -1276,7 +1331,7 @@
       "to": "livevote"
     },
     {
-      "count": 3,
+      "count": 4,
       "from": "todos",
       "to": "meetings"
     },
@@ -1286,7 +1341,7 @@
       "to": "notifications"
     },
     {
-      "count": 16,
+      "count": 19,
       "from": "todos",
       "to": "shared"
     },
@@ -1296,12 +1351,12 @@
       "to": "site_config"
     },
     {
-      "count": 5,
+      "count": 6,
       "from": "todos",
       "to": "tickets"
     },
     {
-      "count": 5,
+      "count": 6,
       "from": "todos",
       "to": "voting"
     },
@@ -1341,7 +1396,7 @@
       "to": "delegations"
     },
     {
-      "count": 8,
+      "count": 9,
       "from": "voting",
       "to": "flow"
     },
@@ -1491,6 +1546,12 @@
       "layer": 5,
       "name": "forms",
       "path": "backend/app/modules/forms"
+    },
+    {
+      "id": "graph",
+      "layer": 1,
+      "name": "graph",
+      "path": "backend/app/modules/graph"
     },
     {
       "id": "gremien",

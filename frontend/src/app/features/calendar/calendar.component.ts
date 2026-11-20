@@ -32,31 +32,9 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { dayMonth, dayMonthYear, isoDay, monthYear, parseDay, weekdayDate } from '@shared/date-format';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
-import {
-  ButtonComponent,
-  EmptyStateComponent,
-  FabComponent,
-  FilterSelectComponent,
-  IconComponent,
-  ListGroupComponent,
-  ListItemComponent,
-  MEDIA,
-  PageFrame,
-  PageHeaderComponent,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-  ScrollFadeDirective,
-  SearchPillComponent,
-  SegmentedComponent,
-  SkeletonComponent,
-  StatusTextComponent,
-  StickyBarComponent,
-  ToastService,
-  liveSearch,
-  mediaQuery,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, EmptyStateComponent, FabComponent, FilterSelectComponent, IconComponent, ListGroupComponent, ListItemComponent, liveSearch, MEDIA, mediaQuery, MetaLineComponent, PageFrame, PageHeaderComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, ScrollFadeDirective, SearchPillComponent, SegmentedComponent, SkeletonComponent, StatusTextComponent, StickyBarComponent, ToastService } from '@stupa-makers/ui-kit';
 import { useNoindex } from '../public-protocols/public-protocols.util';
 import { CalendarSubscribeComponent } from '../meetings/calendar-subscribe/calendar-subscribe.component';
 import { AppointmentDetailComponent } from './appointment-detail/appointment-detail.component';
@@ -132,10 +110,12 @@ const KEY_STEPS: Readonly<Record<string, number>> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    MetaLineComponent,
     NgTemplateOutlet,
     AppointmentDetailComponent,
     AppointmentDialogComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     CalendarSubscribeComponent,
     CalendarWeekComponent,
     EmptyStateComponent,
@@ -148,6 +128,7 @@ const KEY_STEPS: Readonly<Record<string, number>> = {
     LoadErrorComponent,
     PageHeaderComponent,
     PublicEntryComponent,
+    RowChevronComponent,
     RowMenuComponent,
     ScrollFadeDirective,
     SearchPillComponent,
@@ -239,9 +220,16 @@ export class CalendarComponent implements OnDestroy {
     { value: '', label: this.i18n.translate('calendar.filter.allGremien') },
     ...this.gremien().map((g) => ({ value: g.id, label: g.name })),
   ]);
-  readonly gremiumText = computed(
-    () => this.gremiumOptions().find((o) => o.value === this.gremium())?.label ?? '',
-  );
+  /** The chip text (spec 000663): the name, then name and value. */
+  readonly gremiumText = computed(() => {
+    const name = this.i18n.translate('calendar.filter.gremium');
+    const hit = this.gremium() ? this.gremien().find((g) => g.id === this.gremium()) : undefined;
+    return hit ? `${name}: ${hit.name}` : name;
+  });
+  readonly mineText = computed(() => {
+    const name = this.i18n.translate('calendar.filter.assigned');
+    return this.mine() ? `${name}: ${this.i18n.translate('calendar.filter.mine')}` : name;
+  });
 
   readonly items = signal<readonly CalendarEntry[]>([]);
   readonly loading = signal(true);

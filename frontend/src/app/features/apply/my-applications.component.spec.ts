@@ -7,6 +7,10 @@ import { AuthService } from '@core/auth/auth.service';
 import { createLocationMock, provideLocationMock } from '../../../testing/location-mock';
 import { MyApplicationsComponent } from './my-applications.component';
 
+/** The dots of the meta lines: one between two parts (001961). */
+const dots = (root: ParentNode = document) =>
+  [...root.querySelectorAll('.ml__parts')].reduce((n, l) => n + Math.max(0, l.children.length - 1), 0);
+
 const LIST: ApplicantApplications = {
   email: 'lena@example.org',
   items: [
@@ -101,7 +105,19 @@ describe('MyApplicationsComponent', () => {
     const bare = { ...LIST.items[1], id: 'a5', typeId: 'unknown', observed: true };
     await setup({ list: () => of({ ...LIST, items: [watched, bare] }) });
     expect(await screen.findAllByText('Beobachtet')).toHaveLength(2);
-    expect(document.querySelectorAll('.ma__dot')).toHaveLength(2);
+    expect(dots()).toBe(2);
+  });
+
+  it('says that a draft is not submitted yet (001710)', async () => {
+    const draft = {
+      ...LIST.items[0],
+      id: 'a6',
+      state: { ...LIST.items[0].state!, key: 'entwurf', label: { de: 'Entwurf' }, isInitial: true },
+    };
+    const { fixture } = await setup({ list: () => of({ ...LIST, items: [draft] } as ApplicantApplications) });
+    expect(await screen.findByText('Noch nicht eingereicht')).toBeInTheDocument();
+    expect(screen.queryByText('Entwurf')).toBeNull();
+    expect(fixture.componentInstance.rows()[0].stateKind).toBe('warn');
   });
 
   it('names an Antrag without a title and keeps an amount that is no number', async () => {

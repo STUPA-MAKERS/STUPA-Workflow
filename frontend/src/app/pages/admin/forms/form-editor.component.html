@@ -7,7 +7,7 @@
   >
     <app-breadcrumbs crumbs />
     @if (hasVersion()) {
-      <app-status-text heading [kind]="active() ? 'accent' : 'muted'">
+      <app-status-text chip heading [kind]="active() ? 'accent' : 'muted'">
         {{ (active() ? 'admin.forms.active' : 'admin.forms.inactive') | t }}
       </app-status-text>
     }
@@ -81,7 +81,7 @@
             <p class="fe__pv-desc">{{ resolved(description()) }}</p>
           }
           @if (groups().length === 0) {
-            <app-empty-state rows="3" [heading]="'admin.forms.empty' | t" />
+            <app-empty-state icon="form" rows="3" [heading]="'admin.forms.empty' | t" />
           }
           @for (group of groups(); track $index; let gi = $index) {
             <section class="fe__pv-group">
@@ -142,11 +142,13 @@
                 <button type="button" class="fe__groupName ell" [attr.aria-current]="gi === groupIndex() ? 'true' : null" (click)="selectGroup(gi)">
                   {{ groupHeading(group, gi) }}
                 </button>
-                <app-row-menu
-                  [label]="('admin.form.groupMenu' | t: { n: gi + 1 })"
-                  [sections]="groupMenu(gi)"
-                  (selected)="onGroupMenu(gi, $event)"
-                />
+                <app-button-group>
+                  <app-row-menu
+                    [label]="('admin.form.groupMenu' | t: { n: gi + 1 })"
+                    [sections]="groupMenu(gi)"
+                    (selected)="onGroupMenu(gi, $event)"
+                  />
+                </app-button-group>
               </div>
 
               <ol class="fe__list">
@@ -176,34 +178,37 @@
                           <span class="sr-only">{{ 'admin.common.errors' | t }}</span>
                         }
                       </span>
-                      <span class="fe__rowSub">
+                      <span class="fe__rowSub"><app-meta-line>
                         @if (field.key) {
                           <span class="mono ell">{{ field.key }}</span>
-                          <span aria-hidden="true">·</span>
                         }
                         <span class="ell">{{ typeLabel(field.type) }}</span>
-                      </span>
+                      </app-meta-line></span>
                     </button>
                   </li>
                 }
               </ol>
 
               <div class="fe__add">
-                <app-button
-                  class="fe__addBtn"
-                  variant="text"
-                  size="sm"
-                  [attr.aria-expanded]="typeMenuGroup() === gi"
-                  (click)="toggleTypeMenu(gi, $event)"
-                >
-                  <app-icon name="plus" /> {{ 'admin.forms.addQuestion' | t }}
-                </app-button>
+                <app-button-group>
+                  <app-button
+                    class="fe__addBtn"
+                    variant="text"
+                    size="sm"
+                    [ariaExpanded]="typeMenuGroup() === gi"
+                    (click)="toggleTypeMenu(gi, $event)"
+                  >
+                    <app-icon name="plus" /> {{ 'admin.forms.addQuestion' | t }}
+                  </app-button>
+                </app-button-group>
               </div>
             </section>
           }
-          <app-button class="fe__addGroup" variant="tonal" size="sm" (click)="addGroup()">
-            <app-icon name="plus" /> {{ 'admin.form.addGroup' | t }}
-          </app-button>
+          <app-button-group>
+            <app-button class="fe__addGroup" variant="tonal" size="sm" (click)="addGroup()">
+              <app-icon name="plus" /> {{ 'admin.form.addGroup' | t }}
+            </app-button>
+          </app-button-group>
         </nav>
 
         <div class="fe__main" appScrollFade="y">
@@ -214,7 +219,7 @@
             <p class="fe__alert" role="alert">{{ issue | t }}</p>
           }
           @if (groups().length === 0) {
-            <app-empty-state [heading]="'admin.forms.empty' | t" />
+            <app-empty-state icon="form" [heading]="'admin.forms.empty' | t" />
           }
           @if (currentGroup(); as group) {
             @let gi = groupIndex();
@@ -231,7 +236,7 @@
             </section>
 
             @if (group.fields.length === 0) {
-              <app-empty-state rows="1" [heading]="'admin.form.groupEmpty' | t" />
+              <app-empty-state icon="form" rows="1" [heading]="'admin.form.groupEmpty' | t" />
             }
 
             @for (field of group.fields; track $index; let qi = $index) {
@@ -249,8 +254,10 @@
                 <div class="fe__cardHead">
                   <h3 class="cap fe__cardTitle ell">{{ resolved(field.label) || ('admin.forms.untitledQuestion' | t) }}</h3>
                   <app-move-buttons (click)="$event.stopPropagation()" (move)="moveQuestion(pos, $event)" />
-                  <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.forms.duplicate' | t" [title]="'admin.forms.duplicate' | t" (click)="$event.stopPropagation(); duplicateQuestion(pos)"><app-icon name="copy" /></app-button>
-                  <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.delete' | t" [title]="'admin.common.delete' | t" (click)="$event.stopPropagation(); removeQuestion(pos)"><app-icon name="trash" /></app-button>
+                  <app-button-group>
+                    <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.forms.duplicate' | t" [title]="'admin.forms.duplicate' | t" (click)="$event.stopPropagation(); duplicateQuestion(pos)"><app-icon name="copy" /></app-button>
+                    <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.delete' | t" [title]="'admin.common.delete' | t" (click)="$event.stopPropagation(); removeQuestion(pos)"><app-icon name="trash" /></app-button>
+                  </app-button-group>
                 </div>
 
                 <div class="fe__base">
@@ -290,12 +297,16 @@
                       <div class="fe__opt">
                         <app-input class="fe__mono" [label]="'admin.form.optionValue' | t" [(ngModel)]="opt.value" (ngModelChange)="touch()" />
                         <app-i18n-input [short]="true" [value]="opt.label" (valueChange)="setOptionLabel(pos, oi, $event)" />
-                        <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [title]="'admin.common.remove' | t" (click)="removeOption(pos, oi)"><app-icon name="trash" /></app-button>
+                        <app-button-group>
+                          <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [title]="'admin.common.remove' | t" (click)="removeOption(pos, oi)"><app-icon name="trash" /></app-button>
+                        </app-button-group>
                       </div>
                     }
-                    <app-button class="fe__inlineAdd" variant="text" size="sm" (click)="addOption(pos)">
-                      <app-icon name="plus" /> {{ 'admin.form.addOption' | t }}
-                    </app-button>
+                    <app-button-group>
+                      <app-button class="fe__inlineAdd" variant="text" size="sm" (click)="addOption(pos)">
+                        <app-icon name="plus" /> {{ 'admin.form.addOption' | t }}
+                      </app-button>
+                    </app-button-group>
                   </fieldset>
                 }
 
@@ -323,6 +334,24 @@
                       (ngModelChange)="setAllowNoOffers(pos, $event)"
                     >{{ 'admin.form.allowNoOffers' | t }}</app-checkbox>
                   </fieldset>
+                }
+
+                @if (field.type === 'number') {
+                  <app-checkbox
+                    [ngModel]="field.validation?.participants === true"
+                    [disabled]="field.validation?.participants !== true && participantsTaken(field)"
+                    (ngModelChange)="setParticipants(pos, $event)"
+                  >{{ 'admin.form.participants' | t }}</app-checkbox>
+                }
+
+                @if (field.type === 'budget_select') {
+                  <app-input
+                    class="fe__mono"
+                    [label]="'admin.form.rootPath' | t"
+                    placeholder="QSM"
+                    [ngModel]="field.validation?.rootPath ?? ''"
+                    (ngModelChange)="setRootPath(pos, $event)"
+                  />
                 }
 
                 @if (field.type === 'computed') {
@@ -428,6 +457,10 @@
             (ngModelChange)="pdfSignatures.set($event)"
           >{{ 'admin.forms.pdfSignatures' | t }}</app-checkbox>
           <app-checkbox
+            [ngModel]="attachmentRequired()"
+            (ngModelChange)="attachmentRequired.set($event)"
+          >{{ 'admin.forms.attachmentRequired' | t }}</app-checkbox>
+          <app-checkbox
             [ngModel]="cmpRequired()"
             (ngModelChange)="cmpRequired.set($event)"
           >{{ 'admin.forms.cmpRequired' | t }}</app-checkbox>
@@ -440,6 +473,62 @@
               (ngModelChange)="cmpMinCount.set(+$event)"
             />
           }
+        </section>
+
+        <section class="fe__card fe__meta fe__rules" [attr.aria-labelledby]="'fe-rules-h'">
+          <h2 id="fe-rules-h" class="cap fe__cap">{{ 'admin.forms.rules.title' | t }}</h2>
+          @for (rule of rules(); track $index; let ri = $index) {
+            <div class="fe__rule" [attr.aria-label]="'admin.forms.rules.ruleN' | t: { n: ri + 1 }" role="group">
+              <div class="fe__ruleHead">
+                <span class="fe__ruleTitle">{{ 'admin.forms.rules.ruleN' | t: { n: ri + 1 } }}</span>
+                <app-move-buttons
+                  [upDisabled]="ri === 0"
+                  [downDisabled]="ri === rules().length - 1"
+                  (move)="moveRule(ri, $event)"
+                />
+                <app-button-group>
+                  <app-button
+                    variant="text"
+                    size="sm"
+                    [iconOnly]="true"
+                    [ariaLabel]="'admin.forms.rules.remove' | t"
+                    [title]="'admin.forms.rules.remove' | t"
+                    (click)="removeRule(ri)"
+                  ><app-icon name="trash" /></app-button>
+                </app-button-group>
+              </div>
+              <label class="fe__code">
+                <span class="fe__codeLabel">{{ 'admin.forms.rules.logic' | t }}</span>
+                <textarea
+                  class="mono"
+                  rows="3"
+                  [ngModel]="rule.logic"
+                  (ngModelChange)="setRule(ri, { logic: $event })"
+                  [attr.aria-invalid]="ruleErrors()[ri] === 'admin.forms.rules.logicInvalid' ? 'true' : null"
+                  placeholder='{">=":[{"var":"amount"},500]}'
+                ></textarea>
+              </label>
+              <app-i18n-input
+                [label]="'admin.forms.rules.message' | t"
+                [value]="rule.message"
+                (valueChange)="setRule(ri, { message: $event })"
+              />
+              <app-select
+                [label]="'admin.forms.rules.severity' | t"
+                [options]="severityOptions"
+                [ngModel]="rule.severity"
+                (ngModelChange)="setRule(ri, { severity: $event })"
+              />
+              @if (ruleErrors()[ri]; as problem) {
+                <p class="fe__alert" role="alert">{{ problem | t }}</p>
+              }
+            </div>
+          }
+          <app-button-group class="fe__ruleAdd">
+            <app-button variant="text" size="sm" (click)="addRule()">
+              <app-icon name="plus" /> {{ 'admin.forms.rules.add' | t }}
+            </app-button>
+          </app-button-group>
         </section>
 
         @if (typeId()) {

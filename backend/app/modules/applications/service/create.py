@@ -18,6 +18,7 @@ from app.modules.applications.models import (
     SubmissionVersion,
 )
 from app.modules.applications.schemas import ApplicationCreate
+from app.modules.applications.service.form_checks import check_form_rules
 from app.modules.applications.service.links import check_predecessor, write_link
 from app.modules.applications.service.service_base import (
     ApplicationsServiceBase,
@@ -28,6 +29,7 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.budget.form_options import budget_field_options
 from app.modules.files.drafts import DRAFT_ATTACHMENTS_MISSING, bind_drafts, check_drafts
+from app.modules.files.service import ATTACHMENT_REQUIRED
 from app.modules.flow.models import FlowVersion, State
 from app.modules.flow.vote_gremium import resolve_vote_gremium
 from app.modules.forms.service import FormsService
@@ -58,6 +60,43 @@ class Capture:
     matched_by_email: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class NewVersion:
+    """A new version ("Neue Fassung") of an Antrag (spec 001720).
+
+    ``owner_sub`` is the ``created_by`` of the old Antrag, so the applicant owns the new
+    version also when a member creates it. ``replaces_id`` is the old Antrag. A new
+    version is a draft: a ``required`` answer may be missing, because a file field is
+    never copied and the applicant adds it before the submit.
+    """
+
+    owner_sub: str | None
+    replaces_id: UUID
+
+
+def _owner(actor: str, capture: Capture | None, new_version: NewVersion | None) -> str | None:
+    """Return ``created_by`` of a new Antrag.
+
+    It is the applicant account of a capture or of a new version, else the logged-in
+    actor, and None for a guest.
+    """
+    fallback = actor if actor != "applicant" else None
+    kept = new_version.owner_sub if new_version is not None else fallback
+    return capture.owner_sub if capture is not None else kept
+
+
+def _blocking(exc: AnswerValidationError, new_version: NewVersion | None) -> list[dict[str, str]]:
+    """Return the answer errors that stop the create.
+
+    A new version is a draft, so a missing ``required`` answer does not stop it.
+    """
+    return [
+        {"field": e.field, "msg": e.msg}
+        for e in exc.errors
+        if new_version is None or e.msg != "required"
+    ]
+
+
 class CreateOps(ApplicationsServiceBase):
     """Public and managed application creation."""
 
@@ -70,6 +109,7 @@ class CreateOps(ApplicationsServiceBase):
         email_confirmed: bool | None = None,
         draft_pepper: str | None = None,
         capture: Capture | None = None,
+        new_version: NewVersion | None = None,
     ) -> tuple[Application, str]:
         """Create an application.
 
@@ -77,6 +117,9 @@ class CreateOps(ApplicationsServiceBase):
 
         1. Load the effective form.
         2. Run ``validate_answers``. A bad answer raises 422 before any DB write.
+           Then the checks across fields (`check_form_rules`): a ``block`` rule and the
+           root of a cost-center field. An Antragsart with "Anhang Pflicht" needs at
+           least one draft upload (422 ``attachment_required``, spec 001732).
            Check and lock the draft uploads of the wizard (``_check_drafts``).
            A missing, expired, foreign or infected draft raises 422 too.
         3. Write the application, the PII row, version 1, the initial state and
@@ -114,6 +157,10 @@ class CreateOps(ApplicationsServiceBase):
         write and writes the link, its history entry and ``application_link_set`` in the
         same transaction.
 
+        ``new_version`` makes the Antrag a new version of an old one: the owner of the old
+        Antrag owns it, ``replaces_id`` names the old one, a missing ``required`` answer
+        passes, and the audit entry names the old Antrag.
+
         ``draft_pepper`` is the pepper of the draft-token hash
         (``MAGIC_LINK_SECRET``). The router passes the value of its settings.
         ``None`` reads it from ``get_settings``.
@@ -147,10 +194,17 @@ class CreateOps(ApplicationsServiceBase):
         try:
             validate_answers(fields, payload.data, context)
         except AnswerValidationError as exc:
+            errors = _blocking(exc, new_version)
+            if errors:
+                raise ValidationProblem("Invalid application data.", errors=errors) from exc
+
+        check_form_rules(effective, payload.data)
+        if app_type.attachment_required and not payload.attachment_ids:
             raise ValidationProblem(
-                "Invalid application data.",
-                errors=[{"field": e.field, "msg": e.msg} for e in exc.errors],
-            ) from exc
+                "This Antragsart needs a file.",
+                code=ATTACHMENT_REQUIRED,
+                errors=[{"field": "attachmentIds", "msg": "a file is required"}],
+            )
 
         confirmed = actor != "applicant" if email_confirmed is None else email_confirmed
         initial = await self._initial_state(flow_version_id)
@@ -169,11 +223,8 @@ class CreateOps(ApplicationsServiceBase):
             currency=currency,
             data=clean,
             lang=payload.lang,
-            created_by=(
-                capture.owner_sub
-                if capture is not None
-                else (actor if actor != "applicant" else None)
-            ),
+            created_by=_owner(actor, capture, new_version),
+            replaces_id=new_version.replaces_id if new_version is not None else None,
             captured_by=actor if capture is not None else None,
             capture_intake=capture.intake if capture is not None else None,
             received_on=capture.received_on if capture is not None else None,
@@ -226,6 +277,7 @@ class CreateOps(ApplicationsServiceBase):
                 "initialStateId": str(initial.id),
                 "emailConfirmed": confirmed,
                 "attachments": len(set(payload.attachment_ids)),
+                **({"replacesId": str(new_version.replaces_id)} if new_version is not None else {}),
             },
         )
         if payload.predecessor_id is not None:

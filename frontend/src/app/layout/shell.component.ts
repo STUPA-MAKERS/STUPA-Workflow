@@ -11,6 +11,7 @@ import {
   ShellComponent as KitShellComponent,
   type ShellBrand,
   type ShellFrame,
+  type ShellNavGroupRef,
   type ShellNavItem,
 } from '@stupa-makers/ui-kit/shell';
 import { HelpMenuComponent } from '../features/help/help-menu/help-menu.component';
@@ -143,12 +144,20 @@ export class ShellComponent {
       icon: item.icon,
       place: item.place,
       exact: item.exact,
+      group: item.group ? this.publicGroup() : undefined,
     })),
   );
 
+  /** The group "Öffentlich" of the public pages (spec 001303). */
+  private readonly publicGroup = computed<ShellNavGroupRef>(() => ({
+    key: 'public',
+    label: this.i18n.translate('nav.public'),
+    icon: 'globe',
+  }));
+
   /** The mark without the wordmark: the upload of the branding, else the built-in one. */
   readonly brand = computed<ShellBrand>(() => ({
-    home: '/dashboard',
+    home: '/activity',
     label: this.branding.appName(),
     mark: this.branding.markSrc(),
   }));

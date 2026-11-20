@@ -23,6 +23,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import type { AgendaItem, Meeting, Protocol, Uuid } from '@core/api/models';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   EmptyStateComponent,
   IconComponent,
   type IconName,
@@ -58,7 +59,6 @@ import {
   imageUploadErrorKey,
 } from '@shared/markdown/markdown-image-upload.directive';
 import { meetingKeeperLine } from '../keepers.util';
-import { ProtocolBarComponent } from '../protocol-bar/protocol-bar.component';
 import { type LinkedLead, TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { voteResultResolver } from '../vote-result/vote-result';
 import { hasOpenBlackout } from '../../../shared/markdown/markdown.util';
@@ -151,6 +151,7 @@ const TOOLS: readonly FormatTool[] = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ButtonComponent,
+    ButtonGroupComponent,
     EmptyStateComponent,
     FormsModule,
     NgTemplateOutlet,
@@ -160,7 +161,6 @@ const TOOLS: readonly FormatTool[] = [
     MarkdownImageUploadDirective,
     DocumentViewerComponent,
     NoteComponent,
-    ProtocolBarComponent,
     ScrollFadeDirective,
     SegmentedComponent,
     StatusTextComponent,
@@ -194,8 +194,6 @@ export class TopSheetComponent {
    * outside the editor, like a vote result, raises this number so the new text shows.
    */
   readonly revision = input(0);
-  /** The finalize runs. */
-  readonly finalizing = input(false);
   /**
    * The participant view: read only, "Jetzt"
    * before the item that the room handles, the line "Mara Keller führt das Protokoll"
@@ -225,8 +223,6 @@ export class TopSheetComponent {
   readonly renameDraft = model<string>('');
 
   readonly bodyChange = output<{ itemId: Uuid; body: string }>();
-  /** "Finalisieren & versenden" in the protocol bar of a closed meeting. */
-  readonly finalize = output<void>();
   readonly startRename = output<AgendaItem>();
   readonly cancelRename = output<void>();
   readonly renameTop = output<AgendaItem>();
@@ -235,6 +231,14 @@ export class TopSheetComponent {
 
 
   readonly tools = TOOLS;
+  /**
+   * The format tools as connected button groups (spec 001354): the inline marks (bold, italic,
+   * blackout) and the blocks (heading, list, quote). The insert tools are a third group.
+   */
+  readonly toolGroups: readonly (readonly FormatTool[])[] = [
+    TOOLS.filter((t) => ['bold', 'italic', 'blackout'].includes(t.format)),
+    TOOLS.filter((t) => ['heading', 'bulletList', 'blockquote'].includes(t.format)),
+  ];
 
   /**
    * The item whose rename started from this heading. The agenda pane shows its own field

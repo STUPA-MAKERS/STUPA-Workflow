@@ -12,6 +12,8 @@ import { USE_MOCK_API } from './api.config';
 import type { Delegation } from './delegations.service';
 import type { MediaImage } from '@shared/markdown/media-api.service';
 import type {
+  ForcedEvent,
+  ForcedReport,
   OnBehalfApplication,
   ApplicationCreatedWire,
   ApplicationListItemWire,
@@ -121,7 +123,10 @@ const MOCK_PRINCIPAL: Principal = {
     'application.archive',
     'application.delete',
     'application.force_status',
+    'application.record_decision',
+    'application.amend_decision',
     'application.create_on_behalf',
+    'application.change_type',
     'admin.site',
     'admin.gremien',
     'admin.types',
@@ -1607,9 +1612,40 @@ function mockStartPlannedHandover(fromItem: string | null | undefined, toItem: s
   };
 }
 
+/** The forced status changes of the demo (specs 001651, 001652). */
+const FORCED_EVENTS: readonly ForcedEvent[] = [
+  { applicationId: 'a1000000-0000-0000-0000-000000000010', title: 'Banner für den Tag der offenen Tür', at: '2026-11-12T10:15:00Z', reason: 'outside_decision', note: 'Beschluss StuPa-Sitzung 11.11.', fromLabel: { de: 'Auf Tagesordnung', en: 'On the agenda' }, toLabel: { de: 'Bewilligt', en: 'Approved' } },
+  { applicationId: 'a1000000-0000-0000-0000-000000000013', title: 'Drucker für den Fachschaftsraum', at: '2026-11-03T09:40:00Z', reason: 'outside_decision', note: null, fromLabel: { de: 'Auf Tagesordnung', en: 'On the agenda' }, toLabel: { de: 'Bewilligt', en: 'Approved' } },
+  { applicationId: 'a1000000-0000-0000-0000-000000000005', title: 'Seminarreihe Nachhaltigkeit im Studium', at: '2026-10-28T14:05:00Z', reason: 'applicant_error', note: 'Falsche Antragsart gewählt', fromLabel: { de: 'Eingereicht', en: 'Submitted' }, toLabel: { de: 'In Prüfung', en: 'In review' } },
+  { applicationId: 'a1000000-0000-0000-0000-000000000012', title: 'Anreise zur Bundeskonferenz', at: '2026-10-02T08:30:00Z', reason: 'none', note: '.', fromLabel: { de: 'In Prüfung', en: 'In review' }, toLabel: { de: 'Abgelehnt', en: 'Rejected' } },
+];
+
+function mockForcedReport(from: string | null, to: string | null): ForcedReport {
+  const count = (reason: string) => FORCED_EVENTS.filter((e) => e.reason === reason).length;
+  return {
+    from: from ?? '2026-08-21',
+    to: to ?? '2026-11-19',
+    total: FORCED_EVENTS.length,
+    byReason: [
+      { reason: 'outside_decision', count: count('outside_decision') },
+      { reason: 'applicant_error', count: count('applicant_error') },
+      { reason: 'none', count: count('none') },
+    ],
+    byPath: [
+      { fromKey: 'agenda', fromLabel: { de: 'Auf Tagesordnung', en: 'On the agenda' }, toKey: 'approved', toLabel: { de: 'Bewilligt', en: 'Approved' }, count: 2 },
+      { fromKey: 'review', fromLabel: { de: 'In Prüfung', en: 'In review' }, toKey: 'rejected', toLabel: { de: 'Abgelehnt', en: 'Rejected' }, count: 1 },
+      { fromKey: 'submitted', fromLabel: { de: 'Eingereicht', en: 'Submitted' }, toKey: 'review', toLabel: { de: 'In Prüfung', en: 'In review' }, count: 1 },
+    ],
+  };
+}
+
+function mockForcedEvents(reason: string | null): readonly ForcedEvent[] {
+  return FORCED_EVENTS.filter((e) => !reason || e.reason === reason);
+}
+
 /** The paths of the demo applications in `mock-applications.ts` (id prefix `a1000000-`). */
 const DEMO_APPLICATION_PATH =
-  /\/applications\/a1000000-[^/]+(\/(transitions|attachments|flow-states|form|timeline|versions|transition|archive|force-status))?$/;
+  /\/applications\/a1000000-[^/]+(\/(transitions|attachments|flow-states|form|timeline|versions|transition|archive|force-status|outside-decision|approved-amount|type-change))?$/;
 
 /** The Gremium of the demo applications; its planned meetings serve the agenda dialog. */
 const DEMO_GREMIUM = 'g0000000-0000-0000-0000-000000000001';
@@ -1965,6 +2001,14 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         nextCursor: offset + limit < rows.length ? String(offset + limit) : null,
       };
       return ok(page);
+    }
+    if (p.endsWith('/admin/forced-status')) return ok(mockForcedReport(req.params.get('from'), req.params.get('to')));
+    if (p.endsWith('/admin/forced-status/events')) return ok(mockForcedEvents(req.params.get('reason')));
+    if (p.endsWith('/api/committees')) {
+      return ok([
+        { id: 'g0000000-0000-0000-0000-000000000001', name: 'Studierendenparlament' },
+        { id: 'g0000000-0000-0000-0000-000000000002', name: 'Haushaltsausschuss' },
+      ]);
     }
     if (p.endsWith('/meetings/committees')) {
       return ok([

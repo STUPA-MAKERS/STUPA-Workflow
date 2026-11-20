@@ -35,6 +35,7 @@ import type {
   LinkedApplication,
   ApplicationType,
   ApplicationVersion,
+  I18nMap,
   FormFieldDef,
   FormSection,
   ProblemDetail,
@@ -46,17 +47,36 @@ import { resolveI18n, langAttr } from '@shared/forms/i18n-text';
 import { actorLabel } from '@shared/actor-label.util';
 import { toFormlySections } from '@shared/forms/formly-mapper';
 import { formatAnswer, formatFieldValue } from '@shared/forms/answer-format';
-import {
-  normalizePositions,
-  positionValue,
-  positionsTotal,
-} from '@shared/forms/positions';
+import { normalizePositions, positionValue, positionsTotal } from '@shared/forms/positions';
 import { applyServerErrors, clearServerErrors } from '@shared/forms/server-errors';
 import { AnswerViewComponent } from '@shared/forms/answer-view/answer-view.component';
 import { PredecessorFieldComponent } from '../../features/apply/predecessor-field/predecessor-field.component';
-import { ChatComponent, ChatDrafts, ChatOutbox, appendOnce, withScanStates, draftDropper, filesRefused, sendErrorKey, toChatAttachments, HistoryComponent, flowColorKind, chatPeople, type ChatEdit, type ChatPerson, type ChatMessage, type ChatRef, type ChatSend, type ChatVisibility, type HistoryChange, type HistoryEntry } from '@shared/ui';
+import {
+  ChatComponent,
+  ChatDrafts,
+  ChatOutbox,
+  appendOnce,
+  withScanStates,
+  draftDropper,
+  filesRefused,
+  sendErrorKey,
+  toChatAttachments,
+  HistoryComponent,
+  flowColorKind,
+  chatPeople,
+  type ChatEdit,
+  type ChatPerson,
+  type ChatMessage,
+  type ChatRef,
+  type ChatSend,
+  type ChatVisibility,
+  type ChatVisibilityGuard,
+  type HistoryChange,
+  type HistoryEntry,
+} from '@shared/ui';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   ConfirmDialogComponent,
   DialogComponent,
   DropOverlayComponent,
@@ -104,8 +124,16 @@ import { AgendaDialogComponent } from './agenda-dialog/agenda-dialog.component';
 import { DecisionDialogComponent } from './decision-dialog/decision-dialog.component';
 import { DecisionSectionComponent } from '@shared/decision/decision-section.component';
 import { decisionHistoryLine } from '@shared/decision/decision.util';
+import {
+  amountChangeLines,
+  forcedLine,
+  outsideDecisionLines,
+} from '@shared/decision/timeline-lines';
 import { ApplicationsPageService } from './applications-page.service';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
+import { OutsideDecisionDialogComponent } from './outside-decision-dialog/outside-decision-dialog.component';
+import { AmendAmountDialogComponent } from './amend-amount-dialog/amend-amount-dialog.component';
+import { TypeChangeDialogComponent } from './type-change-dialog/type-change-dialog.component';
 import {
   type LinkedLead,
   TodoLinkedListComponent,
@@ -132,6 +160,11 @@ const NO_FILES = new Set<string>();
 /** The tabs of the detail when the list and the detail do not sit side by side. */
 type DetailTab = 'app' | 'history' | 'files';
 
+/** The comment switch: who reads each choice, and the short text next to the send button. */
+const COMMENT_VISIBILITY_GUARD: ChatVisibilityGuard = {
+  labels: { internal: 'applications.comments.vis.internal', public: 'applications.comments.vis.public' },
+};
+
 /** A link to the comments: `#comments`, or `#comment-<id>` for one comment. */
 const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
 
@@ -155,8 +188,10 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
  * screen, from the bottom on a phone. The header action "Kommentare" with the count
  * opens it. A link with `#comments` or `#comment-<id>` opens it too, and scrolls to that
  * comment. A comment is internal or public. The composer offers
- * the internal visibility only with `application.manage`. Without it, a new comment is
- * public. The author edits and deletes an own comment; the visibility stays as written.
+ * the internal visibility only with `application.manage`, and there each new comment starts
+ * internal, because a wrong public comment mails the applicant at once. The switch names who
+ * reads the comment, and the choice shows next to the send button. Without the permission, a
+ * new comment is public. The author edits and deletes an own comment; the visibility stays as written.
  *
  * RBAC here only gates the UX. The server decides.
  *
@@ -200,6 +235,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
     RowMenuComponent,
     StatusTextComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     DialogComponent,
     IconComponent,
     TabPageDirective,
@@ -211,6 +247,9 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
     AnswerViewComponent,
     HistoryComponent,
     ForceStatusDialogComponent,
+    OutsideDecisionDialogComponent,
+    AmendAmountDialogComponent,
+    TypeChangeDialogComponent,
     AgendaDialogComponent,
     DecisionDialogComponent,
     DecisionSectionComponent,
@@ -290,14 +329,14 @@ export class ApplicationsDetailComponent {
   readonly formFields = computed<FormFieldDef[]>(() => this.sections().flatMap((s) => s.fields));
   /** The same field definitions by key. The data rows and the version diff both
    *  look a key up, so they share one map. */
-  private readonly fieldByKey = computed(
-    () => new Map(this.formFields().map((f) => [f.key, f])),
-  );
+  private readonly fieldByKey = computed(() => new Map(this.formFields().map((f) => [f.key, f])));
 
-  /** The composer offers the internal visibility only with `application.manage`. */
+  /** The composer offers the internal visibility only with `application.manage`, first. */
   readonly chatVisibilities = computed<ChatVisibility[]>(() =>
-    this.canManage() ? ['public', 'internal'] : [],
+    this.canManage() ? ['internal', 'public'] : [],
   );
+  /** The switch names the readers of each choice and shows the choice before the send. */
+  readonly chatVisibilityGuard: ChatVisibilityGuard = COMMENT_VISIBILITY_GUARD;
   /** Optimistic send: a new comment shows at once, the server answer replaces it. */
   private readonly outbox = new ChatOutbox<ApplicationComment>(
     (req) => this.api.addComment(this.id, req.body, req.visibility ?? 'public', req, req.mentions),
@@ -335,11 +374,15 @@ export class ApplicationsDetailComponent {
   private readonly linkedComment = signal<string | null>(null);
   private readonly injector = inject(Injector);
   private readonly filesPanel = viewChild(AttachmentsPanelComponent);
+  /** The files of the application, for the files of each cost position (spec 001730). */
+  protected readonly positionFiles = computed(() => this.filesPanel()?.attachments() ?? []);
   /**
    * Files dropped anywhere on the application become its attachments. Not while another
    * application loads, and not while the comments are open: the chat takes its own drop.
    */
-  readonly takesDrop = computed(() => this.canUploadFiles() && !this.switching() && !this.commentsOpen());
+  readonly takesDrop = computed(
+    () => this.canUploadFiles() && !this.switching() && !this.commentsOpen(),
+  );
 
   /** Upload attachments: as the server's `require_app_edit`, a manager, a holder of
    *  `application.edit_any` or the creator, in every state. */
@@ -470,6 +513,43 @@ export class ApplicationsDetailComponent {
    */
   readonly canForceStatus = computed(() => this.auth.can('application.force_status'));
   readonly forceDialogOpen = signal(false);
+  /** "Antragsart ändern" needs `application.change_type` and a submitted application (001660). */
+  readonly canChangeType = computed(() => {
+    const state = this.app()?.state;
+    return Boolean(state) && !state?.isInitial && this.auth.can('application.change_type');
+  });
+  readonly typeDialogOpen = signal(false);
+
+  /**
+   * "Beschluss erfassen" (spec 001600): a decision made outside the platform, for an
+   * application in a vote state, with `application.record_decision`.
+   */
+  readonly canRecordDecision = computed(() => {
+    const app = this.app();
+    return (
+      !!app &&
+      !app.observer &&
+      app.state?.kind === 'vote' &&
+      this.auth.can('application.record_decision')
+    );
+  });
+  readonly outsideOpen = signal(false);
+
+  /**
+   * "Genehmigten Betrag ändern" (spec 001620): for an application with money in an
+   * approved state, with `application.amend_decision`.
+   */
+  readonly canAmendAmount = computed(() => {
+    const app = this.app();
+    return (
+      !!app &&
+      !app.observer &&
+      app.amount !== null &&
+      !!app.state?.isApproved &&
+      this.auth.can('application.amend_decision')
+    );
+  });
+  readonly amendOpen = signal(false);
 
   private readonly router = inject(Router);
   readonly canManage = computed(() => this.auth.can('application.manage'));
@@ -503,8 +583,39 @@ export class ApplicationsDetailComponent {
     return [
       ...(l.predecessor ? [row(l.predecessor, t('applications.predecessor.field'))] : []),
       ...l.successors.map((s) => row(s, t('applications.predecessor.successor'))),
+      ...(l.replaces ? [row(l.replaces, t('applications.links.replaces'))] : []),
+      ...(l.replacedBy ?? []).map((s) => row(s, t('status.replacedBy'))),
     ];
   });
+
+  /**
+   * A denied Antrag, or one sent back for changes, offers a new version to a person with
+   * `application.manage` (001720).
+   */
+  readonly offersNewVersion = computed(() => {
+    const app = this.app();
+    const state = app?.state;
+    if (!state || !this.canManage() || app.observer) return false;
+    return Boolean(state.isDenied) || (state.editAllowed && !state.isInitial);
+  });
+  /** "Neue Fassung" is running. */
+  readonly creatingVersion = signal(false);
+
+  /** Create the new version (001720) and open it. */
+  createNewVersion(): void {
+    if (this.creatingVersion()) return;
+    this.creatingVersion.set(true);
+    this.api.newVersion(this.id).subscribe({
+      next: (res) => {
+        this.creatingVersion.set(false);
+        void this.router.navigate(['/applications', res.applicationId]);
+      },
+      error: () => {
+        this.creatingVersion.set(false);
+        this.toast.error(this.i18n.translate('status.newVersion.failed'));
+      },
+    });
+  }
   readonly archiving = signal(false);
 
   /**
@@ -614,10 +725,15 @@ export class ApplicationsDetailComponent {
     return formatMoney(value ?? 0, this.i18n.formatLocale());
   }
 
-  /** The label of a field of the diff, or its key when the form does not define it. */
-  private fieldLabel(key: string): string {
+  /**
+   * The label of a field of the diff, or its key when no form defines it. A version that
+   * changed the Antragsart brings the labels of the old form for the removed fields.
+   */
+  private fieldLabel(key: string, version?: ApplicationVersion): string {
     const field = this.fieldByKey().get(key);
-    return field ? resolveI18n(field.label, this.i18n.uiLocale()) : key;
+    const old = version?.typeChange?.fieldLabels?.[key];
+    const label = field?.label ?? old;
+    return label ? resolveI18n(label, this.i18n.uiLocale()) : key;
   }
 
   /**
@@ -632,7 +748,7 @@ export class ApplicationsDetailComponent {
       return (version.changedKeys ?? []).map((key) => ({
         kind: 'warn',
         tag: t('applications.history.diff.changed'),
-        label: this.fieldLabel(key),
+        label: this.fieldLabel(key, version),
       }));
     }
     const detail = (
@@ -652,7 +768,7 @@ export class ApplicationsDetailComponent {
         return {
           kind: 'warn' as const,
           tag: t('applications.history.diff.changed'),
-          label: this.fieldLabel(c.key),
+          label: this.fieldLabel(c.key, version),
           old: same ? null : old,
           new: same ? null : neu,
           detail: more,
@@ -661,14 +777,14 @@ export class ApplicationsDetailComponent {
       ...version.diff.added.map((a) => ({
         kind: 'accent' as const,
         tag: t('applications.history.diff.added'),
-        label: this.fieldLabel(a.key),
+        label: this.fieldLabel(a.key, version),
         new: this.fmt(a.value, a.key),
         detail: detail(a.key, { new: a.value }),
       })),
       ...version.diff.removed.map((r) => ({
         kind: 'error' as const,
         tag: t('applications.history.diff.removed'),
-        label: this.fieldLabel(r.key),
+        label: this.fieldLabel(r.key, version),
         old: this.fmt(r.value, r.key),
         detail: detail(r.key, { old: r.value }),
       })),
@@ -701,56 +817,91 @@ export class ApplicationsDetailComponent {
     const versions = this.versions();
     const capture = this.app()?.capture ?? null;
     const firstVersion = versions.some((v) => v.version === 1);
-    const statusEntries: HistoryEntry[] = events.map((e, i) => {
-      const first = i === 0;
-      const intake = capture?.intake
-        ? [t('applications.history.intake', { intake: capture.intake })]
-        : [];
-      const decision = e.decision
-        ? decisionHistoryLine(
-            e.decision,
-            this.i18n.formatLocale(),
-            this.app()?.currency ?? 'EUR',
-            t,
-          )
-        : null;
-      const lines = [
-        ...(first && firstVersion ? [t('applications.history.version', { version: 1 })] : []),
-        ...(first && capture ? [t('applications.history.captured'), ...intake] : []),
-        ...(e.transitionLabel
-          ? [t('applications.history.transition', { label: e.transitionLabel })]
-          : []),
-        ...(e.note && !e.note.startsWith('vote:') ? [e.note] : []),
-        ...(decision ? [decision] : []),
-        ...(e.voteDeleted ? [t('applications.history.voteDeleted')] : []),
-      ];
-      return {
-        at: e.at,
-        icon: i === 0 ? 'send' : 'flow',
-        title: e.toState?.label || e.label,
-        kind: flowColorKind(e.toState?.color),
-        actor: this.actor(e.actorInfo, e.actor),
-        body: lines.join('\n') || null,
-        link: e.voteId
-          ? { label: t('applications.history.voteLink'), route: ['/voting', e.voteId] }
-          : null,
-      };
-    });
+    const locale = this.i18n.formatLocale();
+    const currency = this.app()?.currency ?? 'EUR';
+    const amountEntries: HistoryEntry[] = events.flatMap((e) =>
+      e.kind === 'amountChange' && e.amountChange
+        ? [
+            {
+              at: e.at,
+              icon: 'edit' as const,
+              title: t('amendAmount.historyTitle'),
+              actor: this.actor(e.actorInfo, e.actor),
+              body: amountChangeLines(e.amountChange, locale, currency, t).join('\n'),
+            },
+          ]
+        : [],
+    );
+    const statusEntries: HistoryEntry[] = events
+      .filter((e) => e.kind !== 'amountChange')
+      .map((e, i) => {
+        const first = i === 0;
+        const intake = capture?.intake
+          ? [t('applications.history.intake', { intake: capture.intake })]
+          : [];
+        const decision = e.decision ? decisionHistoryLine(e.decision, locale, currency, t) : null;
+        const lines = [
+          ...(first && firstVersion ? [t('applications.history.version', { version: 1 })] : []),
+          ...(first && capture ? [t('applications.history.captured'), ...intake] : []),
+          ...(e.transitionLabel
+            ? [t('applications.history.transition', { label: e.transitionLabel })]
+            : []),
+          ...(e.outsideDecision
+            ? [
+                t('outsideDecision.historyTitle'),
+                ...outsideDecisionLines(e.outsideDecision, locale, t),
+              ]
+            : []),
+          ...(e.forced ? [forcedLine(e.forceReason, t)] : []),
+          ...(e.note && !e.note.startsWith('vote:') && !e.note.startsWith('outside:')
+            ? [e.note]
+            : []),
+          ...(decision ? [decision] : []),
+          ...(e.voteDeleted ? [t('applications.history.voteDeleted')] : []),
+        ];
+        return {
+          at: e.at,
+          icon: i === 0 ? 'send' : 'flow',
+          title: e.toState?.label || e.label,
+          kind: flowColorKind(e.toState?.color),
+          actor: this.actor(e.actorInfo, e.actor),
+          body: lines.join('\n') || null,
+          link: e.voteId
+            ? { label: t('applications.history.voteLink'), route: ['/voting', e.voteId] }
+            : e.outsideDecision?.meetingId
+              ? {
+                  label: e.outsideDecision.meetingTitle
+                    ? t('outsideDecision.meetingLink', { title: e.outsideDecision.meetingTitle })
+                    : t('outsideDecision.meetingLinkPlain'),
+                  route: ['/meetings', e.outsideDecision.meetingId],
+                }
+              : null,
+        };
+      });
     const versionEntries: HistoryEntry[] = versions
       .filter((v) => !(v.version === 1 && events.length))
       .map((v) => {
         const changes = v.version === 1 ? [] : this.versionChanges(v);
+        const typeChange = v.typeChange
+          ? t('applications.history.typeChange', {
+              from: this.typeLabel(v.typeChange.fromType),
+              to: this.typeLabel(v.typeChange.toType),
+            })
+          : null;
         return {
           at: v.at,
-          icon: 'edit',
-          title: t('applications.history.version', { version: v.version }),
+          icon: typeChange ? 'swap' : 'edit',
+          title: typeChange
+            ? `${t('applications.history.typeChanged')} · ${t('applications.history.version', { version: v.version })}`
+            : t('applications.history.version', { version: v.version }),
           actor: this.actor(v.changedByInfo, v.changedBy),
           body:
-            v.version === 1
+            typeChange ??
+            (v.version === 1
               ? t('applications.history.initial')
               : changes.length
                 ? null
-                : t('applications.history.diff.none'),
+                : t('applications.history.diff.none')),
           changes,
         };
       });
@@ -759,15 +910,19 @@ export class ApplicationsDetailComponent {
       at: e.at,
       icon: 'link',
       title: t(
-        e.action === 'set' ? 'applications.history.predecessorSet' : 'applications.history.predecessorRemoved',
+        e.action === 'set'
+          ? 'applications.history.predecessorSet'
+          : 'applications.history.predecessorRemoved',
       ),
       actor: this.actor(e.actorInfo, null),
-      body: e.predecessor ? e.predecessor.title || untitled : t('applications.history.predecessorHidden'),
+      body: e.predecessor
+        ? e.predecessor.title || untitled
+        : t('applications.history.predecessorHidden'),
       link: e.predecessor
         ? { label: t('applications.predecessor.open'), route: ['/applications', e.predecessor.id] }
         : null,
     }));
-    return [...statusEntries, ...versionEntries, ...linkEntries];
+    return [...statusEntries, ...amountEntries, ...versionEntries, ...linkEntries];
   });
 
   private id: Uuid = '';
@@ -782,8 +937,13 @@ export class ApplicationsDetailComponent {
    */
   protected readonly contentLang = computed(() => langAttr(this.app()?.lang, this.i18n.uiLocale()));
 
+  /** The name of an Antragsart of the history in the UI language, or "—". */
+  private typeLabel(name: I18nMap | null | undefined): string {
+    return (name ? resolveI18n(name, this.i18n.uiLocale()) : '') || '—';
+  }
+
   /** The application types, for "<Typ> · Version n". */
-  private readonly types = signal<ApplicationType[]>([]);
+  protected readonly types = signal<ApplicationType[]>([]);
 
   /** "<Typ> · Version n" above the title. */
   readonly typeName = computed(() => {
@@ -812,7 +972,9 @@ export class ApplicationsDetailComponent {
   /** The creator and a holder of `application.manage` manage the observers (spec 000751). */
   readonly canManageObservers = computed(() => {
     const app = this.app();
-    return !!app && !app.observer && !app.applicant?.anonymized && (app.isOwner || this.canManage());
+    return (
+      !!app && !app.observer && !app.applicant?.anonymized && (app.isOwner || this.canManage())
+    );
   });
   /** The dialog "Beobachter:innen" is open. */
   readonly observersOpen = signal(false);
@@ -847,10 +1009,25 @@ export class ApplicationsDetailComponent {
     ];
     const pdf: RowMenuItem = { id: 'pdf', label: t('applications.detail.openPdf'), icon: 'file' };
     const more = [
+      ...when(this.canRecordDecision(), {
+        id: 'outside',
+        label: t('outsideDecision.title'),
+        icon: 'check',
+      }),
+      ...when(this.canAmendAmount(), {
+        id: 'amend',
+        label: t('amendAmount.title'),
+        icon: 'edit',
+      }),
       ...when(this.canForceStatus(), {
         id: 'force',
         label: t('applications.detail.forceStatus'),
         icon: 'flow',
+      }),
+      ...when(this.canChangeType(), {
+        id: 'type',
+        label: t('applications.detail.changeType'),
+        icon: 'swap',
       }),
       ...when(this.canManageObservers(), {
         id: 'observers',
@@ -952,6 +1129,15 @@ export class ApplicationsDetailComponent {
         break;
       case 'force':
         this.openForceDialog();
+        break;
+      case 'outside':
+        this.outsideOpen.set(true);
+        break;
+      case 'amend':
+        this.amendOpen.set(true);
+        break;
+      case 'type':
+        this.typeDialogOpen.set(true);
         break;
       case 'versions':
         this.showVersions();
@@ -1277,17 +1463,32 @@ export class ApplicationsDetailComponent {
 
   amount(app: Application): string {
     if (app.amount === null) return this.i18n.translate('applications.detail.notProvided');
-    return formatMoney(app.amount, this.i18n.formatLocale(), { currency: app.currency }) || app.amount;
+    return (
+      formatMoney(app.amount, this.i18n.formatLocale(), { currency: app.currency }) || app.amount
+    );
   }
 
   /**
    * The approved amount when it deviates from the requested one, else `''`. The
-   * header and the cost centre then name it next to the struck requested amount.
+   * header and the cost centre then name it next to the struck requested amount. A
+   * state without the flag `Bewilligt` shows none (spec 001612).
    */
   approvedAmount(app: Application): string {
-    if (app.approvedAmount === null || app.approvedAmount === undefined || app.amount === null) return '';
+    if (!app.state?.isApproved) return '';
+    if (app.approvedAmount === null || app.approvedAmount === undefined || app.amount === null)
+      return '';
     if (Number(app.approvedAmount) === Number(app.amount)) return '';
     return formatMoney(app.approvedAmount, this.i18n.formatLocale(), { currency: app.currency });
+  }
+
+  /**
+   * The approved amount of the field "Genehmigt" (spec 001612): empty unless the state
+   * carries the flag `Bewilligt`; without a stored amount it is the requested one.
+   */
+  approvedShown(app: Application): string {
+    if (!app.state?.isApproved || app.amount === null) return '';
+    const value = app.approvedAmount ?? app.amount;
+    return formatMoney(value, this.i18n.formatLocale(), { currency: app.currency }) || value;
   }
 
   /**
@@ -1438,7 +1639,8 @@ export class ApplicationsDetailComponent {
   /** Display name of a comment: the author, or a fallback based on the role. */
   protected authorName(comment: ApplicationComment): string {
     const info =
-      comment.authorInfo ?? (comment.authorKind === 'applicant' ? { kind: 'applicant' as const } : null);
+      comment.authorInfo ??
+      (comment.authorKind === 'applicant' ? { kind: 'applicant' as const } : null);
     return (
       this.actor(info, comment.author) ??
       this.i18n.translate('applications.comments.author.committee')
@@ -1614,13 +1816,18 @@ function rowLines(value: unknown): string {
 }
 
 /** The text of a refused Vorgänger change, by the status and the problem code. */
-export function predecessorErrorKey(status: number | undefined, code: string | null | undefined): TranslationKey {
+export function predecessorErrorKey(
+  status: number | undefined,
+  code: string | null | undefined,
+): TranslationKey {
   switch (code) {
     case 'predecessor_cycle':
       return 'applications.predecessor.errorCycle';
     case 'predecessor_type_mismatch':
       return 'applications.predecessor.errorType';
     default:
-      return status === 403 ? 'applications.predecessor.errorForbidden' : 'applications.predecessor.error';
+      return status === 403
+        ? 'applications.predecessor.errorForbidden'
+        : 'applications.predecessor.error';
   }
 }

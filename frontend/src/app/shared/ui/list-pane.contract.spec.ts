@@ -1,9 +1,9 @@
 /**
- * One set of rules for the list pane pages (the ui-kit partial `_list-pane.scss`) and one
- * fade for a scroll area (the ui-kit partial `_scroll-fade.scss`).
+ * One set of rules for the list pane pages (the ui-kit partial `_list-pane.scss`). The rows
+ * cut at the edge of their surface, without a fade (spec 000193).
  *
  * The lists of applications, bookings, invoices, tasks, votes, tickets, meetings and
- * gremien each had a copy of the column, the chips, the scroll area with its fade, the
+ * gremien each had a copy of the column, the chips, the scroll area, the
  * groups and the row menu. jsdom applies no styles, so this spec reads the sources.
  */
 import { existsSync, readFileSync } from 'node:fs';
@@ -35,21 +35,26 @@ describe('the list pane pages', () => {
     expect(src).toContain('@include lp.stack;');
   });
 
-  it.each(PAGES)('%s spells out no fade of its own for the rows', (scss, block) => {
+  /** The rows cut at the edge of their surface, never with a fade (spec 000193). */
+  it.each(PAGES)('%s fades no end of the rows', (scss, block) => {
     const src = read(scss);
     expect(src).not.toContain(`.${block}__scroll.is-fade-start`);
-    expect(src).toContain(`@include fade.fade-y(var(--${block}-fade));`);
+    expect(src).not.toContain('fade.fade-y');
   });
 
+  /** The ⋮ of a row sits in the menu slot of the list item, which hides it at rest (001920). */
   it('shares the row menu of the applications, the bookings and the invoices', () => {
     for (const [scss, block] of PAGES.slice(0, 3)) {
       expect(read(scss)).toContain(`@include lp.hover-menu(${block});`);
       expect(read(scss)).not.toContain(`.${block}__menuSlot {`);
+      const html = read(scss.replace(/\.scss$/, '.html'));
+      expect(html).not.toContain('__menuSlot');
+      expect(html).toMatch(/<app-button-group menu>|<app-row-transitions-menu\s+menu\b/);
     }
   });
 
-  /** The app keeps no copy: `@use 'scroll-fade'` resolves to the kit partial. */
-  it('keeps the fades in one partial, for the rows', () => {
+  /** The app keeps no copy of the list pane, and the list pane draws no fade (spec 000193). */
+  it('keeps the list pane in the kit, without a fade', () => {
     const kitFade = join(APP, '../../vendor/ui-kit/src/styles/_scroll-fade.scss');
     const fade = readFileSync(kitFade, 'utf8');
     expect(fade).toContain('@mixin fade-y($size');
@@ -57,7 +62,7 @@ describe('the list pane pages', () => {
     expect(existsSync(join(APP, 'shared/ui/_scroll-fade.scss'))).toBe(false);
     expect(existsSync(join(APP, 'shared/ui/_list-pane.scss'))).toBe(false);
     const pane = read('../../vendor/ui-kit/src/styles/_list-pane.scss');
-    expect(pane).toContain("@use 'scroll-fade' as fade;");
+    expect(pane).not.toContain("@use 'scroll-fade'");
   });
 
   it('cuts the phone chips at the screen edges, not with a fade', () => {

@@ -12,6 +12,7 @@ import { resolveI18n } from '@shared/forms/i18n-text';
 import {
   FabComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   CellDirective,
   CheckboxComponent,
   type ColumnDef,
@@ -105,6 +106,7 @@ interface TypeBlock {
     RouterLink,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     CheckboxComponent,
     DialogComponent,
     DataTableComponent,

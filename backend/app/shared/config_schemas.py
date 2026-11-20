@@ -159,6 +159,8 @@ class FieldOption(FrozenStrictCamelModel, frozen=True):
             center, or None for a top-level one. Only the server sets it, together with
             ``key`` and ``color``, so the client can show the options as a tree.
         key: For ``budget_select``, the path segment of the cost center.
+        path_key: For ``budget_select``, the path key of the cost center (``VS-80004``).
+            The root of a field (``rootPath``) names a cost center by it.
         color: For ``budget_select``, the own display color of the cost center, or None.
     """
 
@@ -166,6 +168,7 @@ class FieldOption(FrozenStrictCamelModel, frozen=True):
     label: I18nMap
     parent_id: str | None = Field(default=None, alias="parentId")
     key: str | None = None
+    path_key: str | None = Field(default=None, alias="pathKey")
     color: str | None = None
 
 
@@ -180,6 +183,12 @@ class FieldValidation(FrozenStrictCamelModel, frozen=True):
         allow_no_offers: For ``positions``, allow the per-position opt-out of offers.
             The opt-out is a checkbox with a mandatory reason, and the position then
             needs only one offer. Unset means allowed.
+        participants: For ``number``, the field holds the number of participants. The
+            cost line of the form divides the requested amount by it (spec 001631). A form
+            has at most one such field.
+        root_path: For ``budget_select``, the path key of the Kostenstelle whose subtree
+            the picker offers (spec 001680). The node itself is not offered. A path key
+            stays the same across fiscal years, while the id of a Kostenstelle does not.
     """
 
     min: float | None = None
@@ -195,6 +204,8 @@ class FieldValidation(FrozenStrictCamelModel, frozen=True):
     max_positions: int | None = Field(default=None, alias="maxPositions", ge=1)
     max_offers: int | None = Field(default=None, alias="maxOffers", ge=1)
     allow_no_offers: bool | None = Field(default=None, alias="allowNoOffers")
+    participants: bool | None = None
+    root_path: str | None = Field(default=None, alias="rootPath", min_length=1, max_length=200)
 
     @field_validator("pattern")
     @classmethod
@@ -261,6 +272,43 @@ class FormFieldDef(FrozenStrictCamelModel, frozen=True):
         return self
 
 
+#: How a form rule acts when its expression is not true: ``block`` stops the submit,
+#: ``warn`` only shows the message (spec 001671).
+RuleSeverity = Literal["block", "warn"]
+
+
+class FormRule(FrozenStrictCamelModel, frozen=True):
+    """A rule of a form version across several fields (spec 001670).
+
+    ``logic`` is a JsonLogic expression over the answers by field key, ``amount`` (the
+    amount of the Antrag) and ``costTotal`` (the sum of the preferred offers). The answers
+    meet the rule when the expression gives ``true``. ``message`` is the text that the
+    form shows when they do not, in German and in English.
+    """
+
+    logic: dict[str, Any]
+    message: I18nMap
+    severity: RuleSeverity = "block"
+
+    @field_validator("logic")
+    @classmethod
+    def _check_logic(cls, v: dict[str, Any]) -> dict[str, Any]:
+        """Reject an expression with an operator that is not allowed (spec 000285)."""
+        try:
+            validate_jsonlogic(v)
+        except JsonLogicError as exc:
+            raise ValueError(str(exc)) from exc
+        return v
+
+    @field_validator("message")
+    @classmethod
+    def _check_message(cls, v: I18nMap) -> I18nMap:
+        """Require the message in German and in English."""
+        if not all((v.get(lang) or "").strip() for lang in ("de", "en")):
+            raise ValueError("a rule needs its message in German and in English")
+        return v
+
+
 StateKind = Literal["normal", "vote"]
 TransitionBranch = Literal["pass", "fail"]
 
@@ -272,6 +320,8 @@ class StateDef(FrozenStrictCamelModel, frozen=True):
         is_terminal: Retention and anonymization apply to an application in this state.
         is_approved: An application in this state is approved (spec 000571).
         is_denied: An application in this state is denied (spec 000571).
+        is_replaced_target: An Antrag goes into this state when its new version is
+            submitted (spec 001722). The state is terminal and denied.
     """
 
     key: str = Field(pattern=KEY_PATTERN)
@@ -282,6 +332,7 @@ class StateDef(FrozenStrictCamelModel, frozen=True):
     is_terminal: bool = Field(default=False, alias="isTerminal")
     is_approved: bool = Field(default=False, alias="isApproved")
     is_denied: bool = Field(default=False, alias="isDenied")
+    is_replaced_target: bool = Field(default=False, alias="isReplacedTarget")
     kind: StateKind = "normal"
     config: dict[str, Any] = Field(default_factory=dict)
 
@@ -295,6 +346,10 @@ class StateDef(FrozenStrictCamelModel, frozen=True):
             raise ValueError(f"state {self.key!r} cannot be approved and denied")
         if self.kind == "vote" and (self.is_approved or self.is_denied):
             raise ValueError(f"vote state {self.key!r} cannot be approved or denied")
+        if self.is_replaced_target and not (self.is_terminal and self.is_denied):
+            raise ValueError(
+                f"state {self.key!r} takes replaced Anträge, so it must be terminal and denied"
+            )
         return self
 
 
@@ -362,6 +417,9 @@ def validate_flow_graph(graph: FlowGraph) -> None:
         raise FlowValidationError(f"duplicate state keys: {sorted(duplicates)}")
     key_set = set(keys)
 
+    replaced = [s.key for s in states if s.is_replaced_target]
+    if len(replaced) > 1:
+        raise FlowValidationError(f"flow graph has more than one target for replaced: {replaced}")
     initials = [s.key for s in states if s.is_initial]
     if len(initials) == 0:
         raise FlowValidationError("flow graph has no initial state")
@@ -422,7 +480,7 @@ def validate_flow_graph(graph: FlowGraph) -> None:
             raise FlowValidationError(str(exc)) from exc
 
     _validate_state_kinds(graph, key_set)
-    _assert_all_reachable(initials[0], key_set, graph.transitions)
+    _assert_all_reachable((initials[0], *replaced), key_set, graph.transitions)
     _assert_no_automatic_cycle(key_set, graph.transitions)
 
 
@@ -498,11 +556,15 @@ def _validate_vote_gremium(state: StateDef) -> None:
 
 
 def _assert_all_reachable(
-    initial: str, key_set: set[str], transitions: list[TransitionDef]
+    starts: tuple[str, ...], key_set: set[str], transitions: list[TransitionDef]
 ) -> None:
-    """Raise FlowValidationError when a state is not reachable from the initial one."""
+    """Raise FlowValidationError when a state is not reachable from a start state.
+
+    The start states are the initial state and the target for replaced Anträge, because
+    the submit of a new version moves an Antrag into that target without a transition.
+    """
     adjacency = {k: tuple(t.to for t in transitions if t.from_ == k) for k in key_set}
-    seen = _reachable(initial, adjacency)
+    seen = frozenset[str]().union(*(_reachable(start, adjacency) for start in starts))
     unreachable = key_set - seen
     if unreachable:
         raise FlowValidationError(f"unreachable states: {sorted(unreachable)}")

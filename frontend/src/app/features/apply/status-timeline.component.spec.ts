@@ -142,6 +142,8 @@ interface ApiOverrides {
   listAttachments?: Partial<ApiClient>['listAttachments'];
   effectiveForm?: Partial<ApiClient>['effectiveForm'];
   requestErasure?: jest.Mock;
+  applicationLinks?: Partial<ApiClient>['applicationLinks'];
+  newVersion?: jest.Mock;
 }
 
 function fakeApi(o: ApiOverrides = {}): Partial<ApiClient> {
@@ -168,6 +170,9 @@ function fakeApi(o: ApiOverrides = {}): Partial<ApiClient> {
     requestErasure: (o.requestErasure ?? jest.fn(() => of(undefined))) as unknown as ApiClient['requestErasure'],
     attachmentUrl: jest.fn(),
     applicationTypes: (() => of([{ id: 't1', name: 'Finanzantrag' }])) as unknown as ApiClient['applicationTypes'],
+    applicationLinks: (o.applicationLinks ??
+      (() => of({ predecessor: null, successors: [], events: [] }))) as ApiClient['applicationLinks'],
+    newVersion: (o.newVersion ?? jest.fn(() => of({ applicationId: 'new-1', linkSent: false }))) as unknown as ApiClient['newVersion'],
   };
 }
 
@@ -905,5 +910,74 @@ describe('StatusTimelineComponent', () => {
     const { comp } = await setup(fakeApi({ application: app(true, {}) }));
     await waitFor(() => expect(comp.phase()).toBe('ready'));
     expect(comp.title()).toBe('Ohne Titel');
+  });
+
+  describe('drafts and new versions (001710, 001712, 001720, 001721)', () => {
+    const draft = (): Application => ({
+      ...app(true),
+      state: { id: 's0', key: 'entwurf', label: 'Entwurf', color: null, editAllowed: true, kind: 'normal', isInitial: true },
+    });
+    const submit = { id: 'tr-sub', label: 'Einreichen', color: null, toStateId: 's1' } as Transition;
+    const withdraw = { id: 'tr-wd', label: 'Zurückziehen', color: null, toStateId: 's9', toTerminal: true } as Transition;
+
+    it('shows a draft as not submitted, with "Einreichen" and without the withdrawal', async () => {
+      const fire = jest.fn(() => of({ newStateId: 's1', statusEventId: 'e1', dispatchedActions: [] }));
+      await setup(
+        fakeApi({ application: draft(), applicantTransitions: () => of([withdraw, submit]), fireApplicant: fire }),
+      );
+      const note = await screen.findByTestId('draft-note');
+      expect(note).toHaveTextContent('Noch nicht eingereicht');
+      expect(screen.queryByRole('button', { name: 'Zurückziehen' })).toBeNull();
+      expect(screen.queryByTestId('new-version')).toBeNull();
+      await userEvent.click(within(note).getByRole('button', { name: 'Einreichen' }));
+      expect(fire).toHaveBeenCalledWith(ID, { transitionId: 'tr-sub' });
+    });
+
+    it('asks before a transition into a terminal state', async () => {
+      const fire = jest.fn(() => of({ newStateId: 's9', statusEventId: 'e1', dispatchedActions: [] }));
+      const { comp } = await setup(fakeApi({ applicantTransitions: () => of([withdraw]), fireApplicant: fire }));
+      await userEvent.click(await screen.findByRole('button', { name: 'Zurückziehen' }));
+      expect(fire).not.toHaveBeenCalled();
+      expect(comp.confirmAction()).toEqual(withdraw);
+      comp.confirmFire();
+      expect(fire).toHaveBeenCalledWith(ID, { transitionId: 'tr-wd' });
+      expect(comp.confirmAction()).toBeNull();
+    });
+
+    it('creates a new version and opens it', async () => {
+      const newVersion = jest.fn(() => of({ applicationId: 'new-1', linkSent: false }));
+      const { fixture } = await setup(fakeApi({ newVersion }));
+      const router = fixture.debugElement.injector.get(Router);
+      const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+      await userEvent.click(await screen.findByTestId('new-version'));
+      expect(newVersion).toHaveBeenCalledWith(ID);
+      expect(navigate).toHaveBeenCalledWith(['/my-applications', 'new-1']);
+    });
+
+    it('says that the link went out by mail for a link of one Antrag', async () => {
+      const newVersion = jest.fn(() => of({ applicationId: 'new-1', linkSent: true }));
+      const { toast } = await setup(fakeApi({ newVersion }));
+      await userEvent.click(await screen.findByTestId('new-version'));
+      expect(toast.success).toHaveBeenCalledWith(
+        'Die neue Fassung ist angelegt. Den Link dazu haben wir dir per Mail geschickt.',
+      );
+    });
+
+    it('shows "Ersetzt durch" with a link to the new version', async () => {
+      const replacedBy = [
+        { id: 'new-1', title: 'Sommerfest (neu)', state: null, createdAt: '2026-11-19T10:00:00Z', archived: false },
+      ];
+      await setup(
+        fakeApi({
+          applicationLinks: () => of({ predecessor: null, successors: [], events: [], replacedBy }),
+        }),
+      );
+      const line = await screen.findByTestId('replaced-by');
+      expect(line).toHaveTextContent('Ersetzt durch');
+      expect(within(line).getByRole('link', { name: 'Sommerfest (neu)' })).toHaveAttribute(
+        'href',
+        '/my-applications/new-1',
+      );
+    });
   });
 });

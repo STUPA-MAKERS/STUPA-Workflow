@@ -19,18 +19,14 @@
   background: var(--color-surface-1);
   overflow: hidden;
 }
-/* The band of the protocol is the top of the pane: an edge of the band follows the round
-   corners of the pane, or the pane cuts it. */
-app-protocol-bar {
-  --pb-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
-}
-
 .ts__head {
   display: flex;
   flex: none;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-5) 28px var(--space-2);
+  // The capitals of the kicker sit 28px below the top edge, as far as the text from the side:
+  // 5px of its 18px line are above the capitals.
+  padding: 23px 28px var(--space-2);
 }
 .ts__done {
   flex: none;
@@ -118,43 +114,12 @@ app-protocol-bar {
   min-height: var(--control-height);
   padding: 0 28px 10px 14px;
 }
+// The format tools are three connected button groups (spec 001354): text, blocks, insert.
 .ts__tools {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 2px;
-}
-.ts__tool {
-  display: grid;
-  place-items: center;
-  width: var(--control-height);
-  height: var(--control-height);
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-}
-@media (hover: hover) {
-  .ts__tool:hover {
-    background: var(--color-surface-2);
-    color: var(--color-text);
-  }
-}
-.ts__tool--on {
-  background: var(--color-selected);
-  color: var(--color-accent-text);
-}
-@media (hover: hover) {
-  .ts__tool--on:hover {
-    background: var(--color-selected);
-    color: var(--color-accent-text);
-  }
-}
-.ts__tool:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
+  gap: var(--space-2);
 }
 .ts__spacer {
   flex: 1 1 auto;
@@ -286,22 +251,10 @@ app-protocol-bar {
   flex: none;
 }
 
-// The text scrolls inside the sheet on a wider screen: its top end fades below the title
-// while lines lie above it. The foot ends at the round edge of the sheet.
-@include bp.not-phone {
-  .ts__editor.is-fade-start {
-    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--space-5));
-    mask-image: linear-gradient(to bottom, transparent, #000 var(--space-5));
-  }
-}
-
 @include bp.phone {
   // The protocol is the page there, not a card on it: no surface, no clip, and the format
   // bar sticks below the bar of the page (`--ld-bar-height`) while the text scrolls, as
   // frosted glass like that bar.
-  app-protocol-bar {
-    --pb-radius: 0;
-  }
   .ts {
     border-radius: 0;
     background: transparent;

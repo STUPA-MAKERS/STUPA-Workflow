@@ -33,21 +33,23 @@
                   <span class="cdv__usage">{{ usage(v) }}</span>
                 </span>
                 <span class="cdv__actions hitrow__keep">
-                  <app-button
-                    class="cdv__toggle"
-                    variant="text"
-                    [ariaExpanded]="isExpanded(v.id)"
-                    [ariaControls]="'cdv-logos-' + v.id"
-                    (click)="toggle(v.id)"
-                  >
-                    {{ (isExpanded(v.id) ? 'admin.cdVariants.hideLogos' : 'admin.cdVariants.toggleLogos') | t }}
-                    <span class="cdv__count">({{ v.logos.length }})</span>
-                  </app-button>
-                  <app-row-menu
-                    [sections]="variantMenu()"
-                    [label]="('ui.rowMenu.trigger' | t) + ': ' + v.name"
-                    (selected)="askDelete(v)"
-                  />
+                  <app-button-group>
+                    <app-button
+                      class="cdv__toggle"
+                      variant="text"
+                      [ariaExpanded]="isExpanded(v.id)"
+                      [ariaControls]="'cdv-logos-' + v.id"
+                      (click)="toggle(v.id)"
+                    >
+                      {{ (isExpanded(v.id) ? 'admin.cdVariants.hideLogos' : 'admin.cdVariants.toggleLogos') | t }}
+                      <span class="cdv__count">({{ v.logos.length }})</span>
+                    </app-button>
+                    <app-row-menu
+                      [sections]="variantMenu()"
+                      [label]="('ui.rowMenu.trigger' | t) + ': ' + v.name"
+                      (selected)="askDelete(v)"
+                    />
+                  </app-button-group>
                 </span>
               </div>
 
@@ -64,40 +66,43 @@
                               <span class="cdv__thumb" aria-hidden="true"><app-icon [name]="logo.vendoredName ? 'pin' : 'file'" [size]="18" /></span>
                             }
                             <span class="cdv__logoText">
-                              <span class="cdv__logoHead">
+                              <span class="cdv__logoHead"><app-meta-line>
                                 <strong>{{ slotLabel(slot) }}</strong>
-                                <span class="cdv__dot" aria-hidden="true">·</span>
                                 <span class="cdv__muted">{{ (logo.vendoredName ? 'admin.cdVariants.sourceVendored' : 'admin.cdVariants.sourceUpload') | t }}</span>
-                              </span>
+                              </app-meta-line></span>
                               <span class="cdv__logoName mono">{{ logoDetail(logo) }}</span>
                               @if (logo.vendoredName) {
                                 <span class="cdv__logoHint">{{ 'admin.cdVariants.vendoredHint' | t }}</span>
                               }
                             </span>
                             <span class="cdv__logoActions">
-                              <app-row-menu
-                                [sections]="logoMenu(slot, i, last, logo)"
-                                [label]="('ui.rowMenu.trigger' | t) + ': ' + logoLabel(logo)"
-                                (selected)="onLogoMenu($event, v, slot, i, logo)"
-                              />
+                              <app-button-group>
+                                <app-row-menu
+                                  [sections]="logoMenu(slot, i, last, logo)"
+                                  [label]="('ui.rowMenu.trigger' | t) + ': ' + logoLabel(logo)"
+                                  (selected)="onLogoMenu($event, v, slot, i, logo)"
+                                />
+                              </app-button-group>
                             </span>
                           </li>
                         }
                       }
                     </ul>
                   } @else {
-                    <app-empty-state shape="file" rows="1" [heading]="'admin.cdVariants.noLogos' | t" />
+                    <app-empty-state icon="image" shape="file" rows="1" [heading]="'admin.cdVariants.noLogos' | t" />
                   }
-                  <app-button class="cdv__add" variant="text" size="sm" (click)="openLogoDialog(v)">
-                    <app-icon name="plus" /> {{ 'admin.cdVariants.addLogo' | t }}
-                  </app-button>
+                  <app-button-group>
+                    <app-button class="cdv__add" variant="text" size="sm" (click)="openLogoDialog(v)">
+                      <app-icon name="plus" /> {{ 'admin.cdVariants.addLogo' | t }}
+                    </app-button>
+                  </app-button-group>
                 </div>
               }
             </li>
           }
         </ul>
       } @else {
-        <app-empty-state [heading]="'admin.cdVariants.empty' | t" />
+        <app-empty-state icon="palette" [heading]="'admin.cdVariants.empty' | t" />
       }
     </ng-template>
   </app-load-state>
@@ -177,10 +182,12 @@
             }
           }
         </span>
-        <app-button [variant]="draft.file ? 'tonal' : 'outlined'" size="sm" (click)="logoFile.open()">
-          <app-icon name="upload" />
-          {{ (draft.file ? 'admin.cdVariants.otherFile' : 'admin.cdVariants.pickFile') | t }}
-        </app-button>
+        <app-button-group>
+          <app-button [variant]="draft.file ? 'tonal' : 'outlined'" size="sm" (click)="logoFile.open()">
+            <app-icon name="upload" />
+            {{ (draft.file ? 'admin.cdVariants.otherFile' : 'admin.cdVariants.pickFile') | t }}
+          </app-button>
+        </app-button-group>
       </div>
       @if (draft.slot === 'square') {
         @if (draft.previewUrl && verdict() === 'ok') {

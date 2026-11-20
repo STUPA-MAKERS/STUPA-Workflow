@@ -387,6 +387,9 @@ class ApplicationTypeCreate(WireModel, frozen=True):
     gremiumId: str | None = None
     hasBudget: bool = False
     pdfSignatures: bool = False
+    attachmentRequired: bool = Field(
+        default=False, description="The Antrag needs a file before the submit"
+    )
     comparisonOffers: dict[str, Any] | None = None
     groupId: str | None = Field(
         default=None, description="The group of Antragsarten in step 1 of the apply wizard"
@@ -398,6 +401,9 @@ class ApplicationTypeUpdate(WireModel, frozen=True):
     gremiumId: str | None = None
     hasBudget: bool | None = None
     pdfSignatures: bool | None = None
+    attachmentRequired: bool | None = Field(
+        default=None, description="The Antrag needs a file before the submit"
+    )
     comparisonOffers: dict[str, Any] | None = None
     groupId: str | None = Field(
         default=None, description="The group of Antragsarten in step 1 of the apply wizard"
@@ -933,6 +939,11 @@ class TodoLinkIn(WireModel, frozen=True):
     targetId: str = Field(
         description="The id of the linked object; the caller must be able to read it"
     )
+
+
+class LinkEndIn(WireModel, frozen=True):
+    kind: TodoLinkKind
+    id: str = Field(description="The id of the element; the caller must be able to read it")
 
 
 TodoEntryRole = Literal["read", "edit", "manage"]

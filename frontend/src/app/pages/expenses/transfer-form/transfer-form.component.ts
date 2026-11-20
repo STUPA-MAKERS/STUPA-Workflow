@@ -5,6 +5,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   CurrencyInputComponent,
   DatepickerComponent,
   FabComponent,
@@ -14,6 +15,7 @@ import {
   TextareaComponent,
   ScrollFadeDirective,
   SectionComponent,
+  ErrorTextComponent,
 } from '@stupa-makers/ui-kit';
 import { formatMoney } from '@shared/format-money';
 import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
@@ -61,10 +63,12 @@ interface LegFree {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ErrorTextComponent,
     SectionComponent,
     ScrollFadeDirective,
     PaneFormHeadComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     BudgetYearSelectComponent,
     CostCentreSelectComponent,
     CurrencyInputComponent,

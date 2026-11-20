@@ -179,6 +179,7 @@ export function gremienApiMock(over: Partial<GremienApiMock> = {}): GremienApiMo
     decisions: jest.fn(() => of({ items: [decision()], nextCursor: null })),
     info: jest.fn(() => of(gremiumInfo())),
     saveInfo: jest.fn(() => of(gremiumInfo({ version: 1, canEdit: true }))),
+    notify: jest.fn(() => of({ recipients: 3 })),
     ...over,
   };
 }

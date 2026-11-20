@@ -68,6 +68,10 @@ logger = logging.getLogger("app.files")
 
 SCAN_RESULT_CLEAN = "clean"
 
+#: The code of a 422 for an Antrag of an Antragsart with "Anhang Pflicht" and without a
+#: file (spec 001732).
+ATTACHMENT_REQUIRED = "attachment_required"
+
 #: The chat messages that own files.
 MessageOwner = Literal["ticket_note", "todo_comment", "comment"]
 #: Every owner of a bound attachment.
@@ -164,6 +168,7 @@ class FilesService:
         data: bytes,
         by: str,
         field_key: str | None = None,
+        position_id: str | None = None,
     ) -> AttachmentOut:
         """Validate the file, store in MinIO, create the row, enqueue the scan.
 
@@ -194,6 +199,7 @@ class FilesService:
             id=uuid.uuid4(),
             application_id=application_id,
             field_key=field_key,
+            position_id=position_id if field_key else None,
             filename=display_name,
             mime=mime,
             size=len(data),
@@ -727,4 +733,6 @@ def attachment_out(attachment: Attachment) -> AttachmentOut:
         mime=attachment.mime,
         size=attachment.size,
         scanned=attachment.scanned,
+        fieldKey=attachment.field_key,
+        positionId=attachment.position_id,
     )

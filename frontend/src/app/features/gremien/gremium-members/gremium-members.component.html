@@ -29,13 +29,15 @@
       filled
     />
     @if (!phone()) {
-      <app-button
-        variant="text"
-        [iconOnly]="true"
-        [ariaLabel]="'gremien.members.export' | t"
-        [disabled]="loading() || !groups().length"
-        (click)="exportCsv()"
-      ><app-icon name="download" /></app-button>
+      <app-button-group>
+        <app-button
+          variant="text"
+          [iconOnly]="true"
+          [ariaLabel]="'gremien.members.export' | t"
+          [disabled]="loading() || !groups().length"
+          (click)="exportCsv()"
+        ><app-icon name="download" /></app-button>
+      </app-button-group>
     }
   </div>
 </div>
@@ -44,9 +46,9 @@
   <app-skeleton variant="rows" [count]="5" [label]="'gremien.members.loading' | t" />
 } @else if (!groups().length) {
   @if (filterActive()) {
-    <app-empty-state shape="person" rows="3" [heading]="'gremien.members.noMatch' | t" />
+    <app-empty-state icon="searchOff" shape="person" rows="3" [heading]="'gremien.members.noMatch' | t" />
   } @else {
-    <app-empty-state shape="person"
+    <app-empty-state icon="users" shape="person"
       rows="3"
       [heading]="(former() ? 'gremien.members.emptyFormer' : 'gremien.members.empty') | t"
     />

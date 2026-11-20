@@ -1,6 +1,5 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
-@use 'dot-parts' as dots;
+@use 'meta-chips' as chips;
 @use 'swatch';
 @use 'display' as d;
 @use 'field' as f;
@@ -23,6 +22,26 @@
   line-height: 2.25rem;
   font-weight: var(--fw-semibold);
   letter-spacing: -0.01em;
+}
+// Beyond a phone the page shows no title, the same as the other tabs (001500): the
+// navigation already names it. The heading stays for a screen reader. Its buttons stand at the
+// end of the line of the chips (`.bd__chipActions`). A title row that holds
+// only the title takes no room, and its heading stays in the page.
+@include bp.not-phone {
+  .bd__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .bd__topRow:not(:has(> :not(.bd__title))) {
+    display: contents;
+  }
 }
 
 :host:has(> .bd__empty) {
@@ -100,6 +119,10 @@
   flex: none;
   align-self: center;
 }
+.bd__chipActions {
+  flex: none;
+  margin-inline-start: auto;
+}
 .bd__chips {
   display: flex;
   flex-wrap: wrap;
@@ -117,10 +140,6 @@
 .bd__sheetBody {
   --bd-fade: var(--space-6);
 }
-.bd__tree,
-.bd__sheetBody {
-  @include fade.fade-y(var(--bd-fade));
-}
 
 .bd__tree {
   display: flex;
@@ -132,6 +151,15 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scroll-padding-block: var(--bd-fade);
+}
+// Beside the sheet the tree runs to the bottom edge of the screen and cuts there, without a
+// surface of its own. In a sheet it cuts at its own rounded frame (000193).
+.bd--wide .bd__tree {
+  margin-bottom: calc(-1 * var(--space-4));
+  padding-bottom: var(--space-4);
+}
+.bd__paneBody--side .bd__tree {
+  border-radius: var(--radius-lg);
 }
 .bd__tree > * {
   flex: none;
@@ -263,15 +291,11 @@
   flex: none;
   margin-inline: var(--space-6);
 }
-.bd__line {
-  --bd-sep: 24px;
-  overflow-x: clip;
-}
 .bd__parts {
-  @include dots.list(var(--bd-sep));
+  @include chips.list;
 }
 .bd__part {
-  @include dots.part(var(--bd-sep));
+  @include chips.chip;
 }
 .bd__keyPart {
   display: inline-flex;
@@ -292,24 +316,30 @@
   gap: var(--space-3);
 }
 
+// The figures stand in a grid of equal columns, each as wide as the longest amount at least
+// (`--fig-min`), spread evenly over the rows (`--fig-cols`, both set by the page), so a second
+// row lines up with the first. The line
+// between two tiles is a shadow on the start of each tile; the box cuts the shadow of the
+// first tile of each row, so a row has lines only between its tiles.
 .bd__figs {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(var(--fig-cols, auto-fit), minmax(min(100%, var(--fig-min, 9rem)), 1fr));
   row-gap: var(--space-3);
   margin: 0;
   padding: var(--space-4) 0;
+  overflow: hidden;
+  // The box cuts its content, so in the column of the sheet it would shrink below its rows.
+  flex-shrink: 0;
   border-radius: var(--radius-lg);
   background: var(--color-surface-2);
 }
 .bd__fig {
   display: flex;
-  flex: 1 1 auto;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
   padding: 0 var(--space-3);
-}
-.bd__fig + .bd__fig {
-  border-inline-start: 1px solid var(--color-border);
+  box-shadow: -1px 0 0 var(--color-border);
 }
 .bd__figLabel {
   font-size: 0.78125rem;
@@ -456,10 +486,10 @@
     padding: 0;
     background: none;
   }
-  .bd__fig,
-  .bd__fig + .bd__fig {
+  .bd__fig {
     padding: 14px 18px;
     border: 0;
+    box-shadow: none;
     border-radius: var(--radius-lg);
     background: var(--color-surface-1);
   }
@@ -537,9 +567,6 @@
 }
 .bd__skTitle {
   width: 12em;
-}
-.bd__skLine {
-  width: 16em;
 }
 .bd__skFig {
   width: 5.5em;

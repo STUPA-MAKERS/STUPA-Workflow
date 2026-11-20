@@ -4,22 +4,30 @@
     <app-sheet-bar [bleed]="split()">
       <h2 appSheetBarTitle id="bd-title" class="sheet-title fd__title">{{ e.description }}</h2>
       @if (canManage()) {
-        <app-sheet-action
-          icon="edit"
-          [label]="'action.edit' | t"
-          [ariaLabel]="'expenses.edit' | t"
-          [phone]="phone()"
-          (pressed)="edit.emit(e)"
-        />
+        <!-- On a phone the edit button shows its text; elsewhere it is an icon button with a tooltip.
+             It stands right in the group of the sheet bar, so it joins the shape of the group (001350). -->
+        @if (phone()) {
+          <app-button variant="tonal" (click)="edit.emit(e)">
+            <span class="fd__btn"><app-icon name="edit" />{{ 'action.edit' | t }}</span>
+          </app-button>
+        } @else {
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="'expenses.edit' | t"
+            [title]="'expenses.edit' | t"
+            (click)="edit.emit(e)"
+          ><app-icon name="edit" /></app-button>
+        }
       }
       @if (menu().length) {
         <app-row-menu [label]="'expenses.detail.menu' | t" [sections]="menu()" (selected)="onMenu($event)" />
       }
     </app-sheet-bar>
-    <p class="sheet-line fd__line fd__seps">
+    <p class="sheet-line fd__line">
       <span class="fd__parts">
         <span class="fd__part">
-          <app-status-text [kind]="e.kind === 'income' ? 'accent' : 'neutral'">{{
+          <app-status-text chip [kind]="e.kind === 'income' ? 'accent' : 'neutral'">{{
             (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t
           }}</app-status-text>
         </span>
@@ -40,7 +48,7 @@
   <div class="fd__cols">
     <div class="fd__col">
       <app-section class="fd__sec bd__pay" [heading]="'expenses.detail.payment' | t">
-        <dl class="fd__card fd__grid">
+        <dl appFacts [card]="true">
           <div>
             <dt>{{ 'expenses.field.paymentDate' | t }}</dt>
             <dd class="mono">{{ e.paymentDate ? (e.paymentDate | ldate: 'mediumDate') : '—' }}</dd>
@@ -71,11 +79,13 @@
       @if (showSubs()) {
         <app-section class="fd__sec bd__subs" [heading]="'expenses.sub.title' | t">
           @if (canManage() && !e.parentExpenseId) {
-            <app-button sectionAction variant="text" size="sm" (click)="addSub.emit()">
-              <span class="fd__btn"><app-icon name="plus" />{{
-                (phone() ? 'expenses.sub.addShort' : 'expenses.sub.add') | t
-              }}</span>
-            </app-button>
+            <app-button-group ngProjectAs="[sectionAction]">
+              <app-button sectionAction variant="text" size="sm" (click)="addSub.emit()">
+                <span class="fd__btn"><app-icon name="plus" />{{
+                  (phone() ? 'expenses.sub.addShort' : 'expenses.sub.add') | t
+                }}</span>
+              </app-button>
+            </app-button-group>
           }
           @if (subLoading() && !subRows().length) {
             <app-skeleton variant="rows" [count]="2" [label]="'expenses.sub.loading' | t" />
@@ -84,24 +94,26 @@
               @for (s of subRows(); track s.id) {
                 <app-booking-row mark [title]="s.description" [amount]="signed(s)">
                   <span meta
-                    ><span class="mono">{{ s.paymentDate ? (s.paymentDate | ldate: 'mediumDate') : '—' }}</span>
+                    ><app-meta-line><span class="mono">{{ s.paymentDate ? (s.paymentDate | ldate: 'mediumDate') : '—' }}</span>
                     @if (s.correspondent) {
-                      <span class="fd__dot" aria-hidden="true">·</span>{{ s.correspondent }}
-                    }</span
+                      <span>{{ s.correspondent }}</span>
+                    }</app-meta-line></span
                   >
                   @if (canManage()) {
-                    <app-row-menu
-                      [label]="'expenses.rowMenu' | t: { description: s.description }"
-                      [sections]="subMenu()"
-                      (selected)="onSubMenu($event, s)"
-                    />
+                    <app-button-group>
+                      <app-row-menu
+                        [label]="'expenses.rowMenu' | t: { description: s.description }"
+                        [sections]="subMenu()"
+                        (selected)="onSubMenu($event, s)"
+                      />
+                    </app-button-group>
                   }
                 </app-booking-row>
               }
               <app-sum-row [label]="'expenses.sub.sumLine' | t" [amount]="subSum()" />
             </div>
           } @else {
-            <app-empty-state rows="1" [heading]="'expenses.sub.none' | t" />
+            <app-empty-state icon="swap" rows="1" [heading]="'expenses.sub.none' | t" />
           }
         </app-section>
       }
@@ -109,16 +121,15 @@
 
     <div class="fd__col">
       <app-section class="fd__sec bd__details" [heading]="'expenses.detail.details' | t">
-        <dl class="fd__card fd__stack">
+        <dl appFacts [card]="true" class="fd__stack">
           <div>
             <dt>{{ 'expenses.detail.costCentreFy' | t }}</dt>
-            <dd class="fd__ccLine">
+            <dd class="fd__ccLine"><app-meta-line>
               <app-cost-centre-label [name]="ccTrail()" [color]="cc().color" />
               @if (fyLabel(); as fy) {
-                <span class="fd__dot" aria-hidden="true">·</span>
                 <span>{{ 'expenses.detail.fy' | t: { fy } }}</span>
               }
-            </dd>
+            </app-meta-line></dd>
           </div>
           <div>
             <dt>{{ 'expenses.detail.created' | t }}</dt>
@@ -140,6 +151,34 @@
 
       @if (app() || inv()) {
         <app-section class="fd__sec bd__linked" [heading]="'expenses.detail.linked' | t">
+          <!-- The section holds the Antrag, the Rechnung and the linked elements, so "Verknüpfen" and
+               "To-Do anlegen" stand in its head, as in the section of a booking without them. -->
+          @if (canManage() || todos.canAct()) {
+            <app-button-group sectionAction>
+              <app-button
+                variant="text"
+                size="sm"
+                [iconOnly]="true"
+                [ariaLabel]="'todos.linked.link' | t"
+                data-testid="bd-link"
+                (click)="todos.linkOpen.set(true)"
+              >
+                <app-icon name="link" />
+              </app-button>
+              @if (todos.canAct()) {
+                <app-button
+                  variant="text"
+                  size="sm"
+                  [iconOnly]="true"
+                  [ariaLabel]="'todos.linked.add' | t"
+                  data-testid="bd-new"
+                  (click)="todos.newOpen.set(true)"
+                >
+                  <app-icon name="plus" />
+                </app-button>
+              }
+            </app-button-group>
+          }
           <div class="rowgroup">
             @if (app(); as a) {
               <a class="fd__link" [routerLink]="['/applications', a.id]">
@@ -154,7 +193,7 @@
                 @if (a.amount) {
                   <span class="mono fd__linkAmount">{{ a.amount }}</span>
                 }
-                <app-icon class="fd__chev" name="right" [size]="17" />
+                <app-row-chevron />
               </a>
             }
             @if (inv(); as i) {
@@ -164,20 +203,19 @@
                   <span class="fd__linkKind">{{ 'expenses.field.invoice' | t }}</span>
                   <span class="fd__linkTitle">{{ i.title || ('expenses.field.invoice' | t) }}</span>
                   @if (i.loaded; as loaded) {
-                    <span class="fd__linkMeta">
+                    <span class="fd__linkMeta"><app-meta-line>
                       @let st = invoiceStatus(loaded.status);
                       <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
                       @if (loaded.dueDate) {
-                        <span class="fd__dot" aria-hidden="true">·</span>
                         <span class="mono">{{ 'invoices.dueLine' | t: { date: (loaded.dueDate | ldate: 'mediumDate') } }}</span>
                       }
-                    </span>
+                    </app-meta-line></span>
                   }
                 </span>
                 @if (i.loaded; as loaded) {
                   <span class="mono fd__linkAmount">{{ money(loaded.grossAmount) }}</span>
                 }
-                <app-icon class="fd__chev" name="right" [size]="17" />
+                <app-row-chevron />
               </a>
               @if (i.booked; as b) {
                 <div class="fd__booked">
@@ -195,7 +233,7 @@
               }
             }
           </div>
-          <app-todo-linked-list class="bd__todos" kind="expense" headingId="bd-todos" [showTitle]="false" [targetId]="e.id" />
+          <app-todo-linked-list #todos class="bd__todos" kind="expense" headingId="bd-todos" [showTitle]="false" [targetId]="e.id" [headActions]="true" [linkLabel]="e.description" />
         </app-section>
       }
 

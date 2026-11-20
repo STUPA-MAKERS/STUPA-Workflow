@@ -1,7 +1,6 @@
 <app-dialog
   [open]="open()"
   [title]="confirmLabel()"
-  [subtitle]="applicationTitle()"
   [closeLabel]="'action.close' | t"
   (closed)="close()"
 >
@@ -11,10 +10,11 @@
       idPrefix="ddg"
       [requested]="requested()"
       [currency]="currency()"
+      [required]="required()"
       [(draft)]="draft"
     />
     @if (refusal()) {
-      <p class="ddg__refusal" role="alert">{{ refusal() }}</p>
+      <app-error-text>{{ refusal() }}</app-error-text>
     }
     <button type="submit" hidden></button>
   </form>

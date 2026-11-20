@@ -1,5 +1,5 @@
 import { of, throwError } from 'rxjs';
-import { render, screen } from '@testing-library/angular';
+import { render, type RenderResult, screen } from '@testing-library/angular';
 import { ApiClient } from '@core/api/api-client.service';
 import type { Profile } from '@core/api/models';
 import { BrandingService } from '@core/branding/branding.service';
@@ -23,7 +23,7 @@ const PROFILE: Profile = {
 async function setup(
   answer = of(PROFILE),
   gravatar = true,
-): Promise<Awaited<ReturnType<typeof render>>> {
+): Promise<RenderResult<AccountProfileComponent>> {
   const api = { getMyProfile: jest.fn(() => answer) };
   const branding = { loaded: signal(true), gravatarEnabled: signal(gravatar) };
   const view = await render(AccountProfileComponent, {

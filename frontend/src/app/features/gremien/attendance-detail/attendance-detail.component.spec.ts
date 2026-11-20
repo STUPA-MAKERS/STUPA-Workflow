@@ -1,4 +1,4 @@
-import { Component, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, viewChild } from '@angular/core';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { of, throwError } from 'rxjs';
@@ -12,6 +12,7 @@ import { AttendanceDetailComponent, type AttendanceDetailRequest } from './atten
 import { loadErrorToast, retryLoadError } from '../../../../testing/load-error';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
   standalone: true,
   imports: [AttendanceDetailComponent],
   template: `
@@ -78,6 +79,27 @@ describe('AttendanceDetailComponent', () => {
     expect(dialog).toHaveTextContent('29.09.');
     expect(dialog.querySelector('.gad__month')).toBeNull();
     expect(dialog.classList.contains('gad--placed')).toBe(true);
+    expect(await runAxe(view.container)).toHaveNoViolations();
+  });
+
+  /** § 001311 */
+  it('poolSeats: shows the pool seats of a pool substitute with the represented member', async () => {
+    const seats = memberAttendance({
+      principalId: 'p-7',
+      displayName: 'Lea Pool',
+      meetings: [
+        { meetingId: 'm-2', title: '32. Sitzung', date: '2026-09-29', startTime: '18:00:00', status: 'seat', delegateName: 'Anna Berg' },
+        { meetingId: 'm-3', title: '31. Sitzung', date: '2026-09-15', startTime: '18:00:00', status: 'no_seat', delegateName: null },
+      ],
+    });
+    const view = await setup({ api: gremienApiMock({ memberAttendance: jest.fn(() => of(seats)) }) });
+    restore = view.restore;
+    await view.openWith({ ...ONE, principalId: 'p-7', name: 'Lea Pool', heading: 'Lea Pool · September 2026', pool: true });
+    expect(view.api.memberAttendance).toHaveBeenCalledWith('g-1', 'p-7', '2026-09', true);
+    const dialog = screen.getByRole('dialog', { name: 'Lea Pool · September 2026' });
+    expect(dialog).toHaveTextContent('Vertreten');
+    expect(dialog).toHaveTextContent('für Anna Berg');
+    expect(dialog).toHaveTextContent('Kein Sitz');
     expect(await runAxe(view.container)).toHaveNoViolations();
   });
 
@@ -227,10 +249,10 @@ describe('AttendanceDetailComponent', () => {
     });
     const matches = HTMLElement.prototype.matches;
     Object.defineProperty(HTMLElement.prototype, 'showPopover', { configurable: true, value: show });
-    HTMLElement.prototype.matches = function (sel: string) {
+    HTMLElement.prototype.matches = function (this: HTMLElement, sel: string) {
       if (sel === ':popover-open') return this.hasAttribute('data-open');
       return matches.call(this, sel);
-    };
+    } as typeof matches;
     try {
       const view = await setup();
       restore = view.restore;
@@ -248,10 +270,10 @@ describe('AttendanceDetailComponent', () => {
     const show = jest.fn();
     const matches = HTMLElement.prototype.matches;
     Object.defineProperty(HTMLElement.prototype, 'showPopover', { configurable: true, value: show });
-    HTMLElement.prototype.matches = function (sel: string) {
+    HTMLElement.prototype.matches = function (this: HTMLElement, sel: string) {
       if (sel === ':popover-open') throw new SyntaxError('unknown');
       return matches.call(this, sel);
-    };
+    } as typeof matches;
     try {
       const view = await setup();
       restore = view.restore;

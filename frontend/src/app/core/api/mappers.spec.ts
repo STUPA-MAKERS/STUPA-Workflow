@@ -4,6 +4,7 @@ import {
   mapApplicationListItem,
   mapApplicationType,
   mapAttachment,
+  mapBulkOption,
   mapComment,
   mapMeeting,
   mapMeetingPage,
@@ -61,6 +62,7 @@ describe('mapState', () => {
       color: '#4a90d9',
       editAllowed: true,
       kind: 'normal',
+      isApproved: false,
     });
   });
 
@@ -94,7 +96,7 @@ describe('mapApplication', () => {
     expect(view).toEqual({
       id: 'a1',
       typeId: 't1',
-      state: { id: 's1', key: 'submitted', label: 'Eingereicht', color: '#4a90d9', editAllowed: true, kind: 'normal' },
+      state: { id: 's1', key: 'submitted', label: 'Eingereicht', color: '#4a90d9', editAllowed: true, kind: 'normal', isApproved: false },
       gremiumId: 'g1',
       budgetId: 'c1',
       fiscalYearId: 'fy1',
@@ -229,7 +231,7 @@ describe('mapTimelineEvent', () => {
     const view = mapTimelineEvent(wire, 'en');
     expect(view).toEqual({
       toStateId: 's1',
-      toState: { id: 's1', key: 'submitted', label: 'Submitted', color: '#4a90d9', editAllowed: true, kind: 'normal' },
+      toState: { id: 's1', key: 'submitted', label: 'Submitted', color: '#4a90d9', editAllowed: true, kind: 'normal', isApproved: false },
       label: 'Submitted',
       transitionLabel: null,
       actor: 'Referat',
@@ -239,6 +241,11 @@ describe('mapTimelineEvent', () => {
       voteId: null,
       voteDeleted: false,
       decision: null,
+      kind: 'status',
+      forced: false,
+      forceReason: null,
+      outsideDecision: null,
+      amountChange: null,
     });
   });
 
@@ -413,6 +420,7 @@ describe('mapTransition', () => {
       addsToAgenda: false,
       agendaGremiumId: null,
       allowsDecision: false,
+      requiresAmount: false,
     });
   });
 
@@ -1039,5 +1047,63 @@ describe('messageFiles', () => {
     expect(messageFiles({ attachmentIds: [], draftToken: 'tok' })).toEqual({});
     expect(messageFiles({ attachmentIds: ['a'] })).toEqual({ attachmentIds: ['a'], draftToken: null });
     expect(messageFiles({ attachmentIds: ['a'], draftToken: 'tok' })).toEqual({ attachmentIds: ['a'], draftToken: 'tok' });
+  });
+});
+
+describe('mapper flag branches', () => {
+  it('keeps the terminal and denied flags of a state', () => {
+    expect(mapState({ ...STATE, isTerminal: true, isDenied: true }, 'de')).toMatchObject({
+      isTerminal: true,
+      isDenied: true,
+    });
+  });
+
+  it('keeps a transition into a terminal state', () => {
+    const wire = {
+      id: 'tr1',
+      fromStateId: 's1',
+      toStateId: 's2',
+      label: { de: 'Ablehnen' },
+      toTerminal: true,
+    } as TransitionOutWire;
+    expect(mapTransition(wire, 'de').toTerminal).toBe(true);
+  });
+
+  it('sends the predecessor of a new application', () => {
+    const input: NewApplication = {
+      typeId: 't1',
+      data: {},
+      applicantEmail: 'a@b.de',
+      lang: 'de',
+      predecessorId: 'p1',
+    };
+    expect(toApplicationCreateBody(input).predecessorId).toBe('p1');
+  });
+
+  it('maps a bulk target with its colour and amounts', () => {
+    expect(
+      mapBulkOption(
+        { toStateId: 's2', label: { de: 'Genehmigt' }, color: '#0a0', approves: true, amounts: [] },
+        'de',
+      ),
+    ).toEqual({
+      toStateId: 's2',
+      label: 'Genehmigt',
+      color: '#0a0',
+      approves: true,
+      amounts: [],
+      applicationIds: [],
+    });
+    expect(mapBulkOption({ toStateId: 's2', label: { de: 'X' } }, 'de')).toEqual({
+      toStateId: 's2',
+      label: 'X',
+      color: null,
+      approves: false,
+      amounts: [],
+      applicationIds: [],
+    });
+    expect(
+      mapBulkOption({ toStateId: 's3', label: { de: 'Y' }, applicationIds: ['a-1'] }, 'de').applicationIds,
+    ).toEqual(['a-1']);
   });
 });

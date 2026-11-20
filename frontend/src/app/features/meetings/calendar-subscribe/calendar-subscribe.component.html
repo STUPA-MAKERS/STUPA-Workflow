@@ -1,20 +1,23 @@
 <ng-template #body>
   @if (error()) {
-    <p class="cs__error" role="alert">{{ 'account.calendar.error' | t }}</p>
+    <app-error-text>{{ 'account.calendar.error' | t }}</app-error-text>
   }
   @if (rotateError()) {
-    <p class="cs__error" role="alert">{{ 'account.calendar.rotateError' | t }}</p>
+    <app-error-text>{{ 'account.calendar.rotateError' | t }}</app-error-text>
   }
   @if (fixedUrl(); as openUrl) {
     <span class="cs__label" id="{{ headingId }}-url">{{ 'account.calendar.urlLabel' | t }}</span>
     <code class="cs__url" [attr.aria-labelledby]="headingId + '-url'">{{ openUrl }}</code>
     <div class="cs__actions">
-      <app-copy-button
-        [text]="openUrl"
-        [share]="true"
-        [label]="'account.calendar.copy' | t"
-        [copiedLabel]="'account.calendar.copied' | t"
-      />
+      <app-button-group [main]="true">
+        <app-copy-button
+          class="btn-grp__seg"
+          [text]="openUrl"
+          [share]="true"
+          [label]="'account.calendar.copy' | t"
+          [copiedLabel]="'account.calendar.copied' | t"
+        />
+      </app-button-group>
     </div>
   } @else if (loading()) {
     <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
@@ -23,37 +26,44 @@
     <code class="cs__url" [attr.aria-labelledby]="headingId + '-url'">{{ feedUrl }}</code>
     @if (confirming()) {
       <div class="cs__confirm" role="group" [attr.aria-label]="'account.calendar.rotate' | t">
-        <div class="cs__actions">
-          <app-button variant="text" size="sm" (click)="cancelRotate()">{{ 'action.cancel' | t }}</app-button>
-          <app-button variant="danger" size="sm" [loading]="busy()" (click)="rotate()">
+        <app-button-group class="cs__actions" [main]="true">
+          <app-button variant="text" (click)="cancelRotate()">{{ 'action.cancel' | t }}</app-button>
+          <app-button variant="danger" [loading]="busy()" (click)="rotate()">
             {{ 'account.calendar.rotate' | t }}
           </app-button>
-        </div>
+        </app-button-group>
       </div>
     } @else {
       <div class="cs__actions">
-        <app-button variant="danger" size="sm" (click)="askRotate()">
-          <app-icon name="repeat" />
-          {{ 'account.calendar.rotate' | t }}
-        </app-button>
-        <app-copy-button
-          [text]="feedUrl"
-          [share]="true"
-          [label]="'account.calendar.copy' | t"
-          [copiedLabel]="'account.calendar.copied' | t"
-        />
+        <app-button-group [main]="true">
+          <app-button variant="danger" (click)="askRotate()">
+            <app-icon name="repeat" />
+            {{ 'account.calendar.rotate' | t }}
+          </app-button>
+          <app-copy-button
+            class="btn-grp__seg"
+            [text]="feedUrl"
+            [share]="true"
+            [label]="'account.calendar.copy' | t"
+            [copiedLabel]="'account.calendar.copied' | t"
+          />
+        </app-button-group>
       </div>
     }
   } @else if (error()) {
     <div class="cs__actions">
-      <app-button variant="tonal" size="sm" (click)="load()">{{ 'meetings.overview.selRetry' | t }}</app-button>
+      <app-button-group [main]="true">
+        <app-button variant="tonal" (click)="load()">{{ 'meetings.overview.selRetry' | t }}</app-button>
+      </app-button-group>
     </div>
   } @else {
-    <app-empty-state rows="1" [heading]="'account.calendar.none' | t">
-      <app-button variant="tonal" size="sm" [loading]="busy()" (click)="rotate()">
-        <app-icon name="link" />
-        {{ 'account.calendar.generate' | t }}
-      </app-button>
+    <app-empty-state icon="cal" rows="1" [heading]="'account.calendar.none' | t">
+      <app-button-group [main]="true">
+        <app-button variant="tonal" [loading]="busy()" (click)="rotate()">
+          <app-icon name="link" />
+          {{ 'account.calendar.generate' | t }}
+        </app-button>
+      </app-button-group>
     </app-empty-state>
   }
 </ng-template>

@@ -4,7 +4,7 @@ title: The Haushalt tab has the views Bewirtschaftung and Planung
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-16
+updated: 2026-11-20
 tests:
   - "frontend/src/app/pages/budget/budget-dashboard.component.spec.ts:BudgetDashboardComponent"
   - "frontend/src/app/pages/budget/plan/budget-plan.component.spec.ts:BudgetPlanComponent"
@@ -19,10 +19,11 @@ scope:
 # The Haushalt tab has the views Bewirtschaftung and Planung
 
 The Haushalt tab must have the two views "Bewirtschaftung" and "Planung". The view Planung is
-the plan page. A segmented switch
-above the search field of the list must change the view. On a phone the switch must be below
-the title. The view Planung must have the route `/budget/plan`. The switch must show only
-when a top-level Kostenstelle has the plan switch on (000814).
+the plan page. A segmented switch above the search field of the list must change the view. The
+switch must fill the width of the list column and must be as high as the search field below it.
+On a phone the switch must be below the title. The view Planung must have the route
+`/budget/plan`. The switch must show only when a top-level Kostenstelle has the plan switch on
+(000814).
 
 Reason: A person must see how to go from the budget to its plan and back.
 

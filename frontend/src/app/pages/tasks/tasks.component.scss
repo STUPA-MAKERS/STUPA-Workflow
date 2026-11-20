@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use 'list-pane' as lp;
 
 // The same two panes as applications-list.component.scss.
@@ -24,9 +23,6 @@
 .tasks--split .tasks__scroll > * {
   flex: none;
 }
-.tasks__scroll {
-  @include fade.fade-y(var(--tasks-fade));
-}
 
 // The to-do section below the month groups.
 .tasks__group {
@@ -36,10 +32,6 @@
   @include lp.stack;
 }
 
-.tasks__dot {
-  margin-inline: 6px;
-  color: var(--color-text-subtle);
-}
 
 .tasks__trail {
   display: flex;
@@ -61,12 +53,6 @@
   font-size: 0.75rem;
   white-space: nowrap;
 }
-.tasks__chev {
-  display: inline-flex;
-  margin-inline-end: calc(-1 * var(--space-2));
-  color: var(--color-text-muted);
-}
-
 .tasks__detail {
   @include lp.detail;
 }

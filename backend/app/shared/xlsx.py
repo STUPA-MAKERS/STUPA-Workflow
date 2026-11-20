@@ -63,6 +63,8 @@ class _State(Protocol):
 
     @property
     def label(self) -> Mapping[str, str]: ...
+    @property
+    def is_approved(self) -> bool: ...
 
 
 class _ApplicationRow(Protocol):
@@ -78,6 +80,8 @@ class _ApplicationRow(Protocol):
     def gremium_id(self) -> UUID | None: ...
     @property
     def amount(self) -> Decimal | None: ...
+    @property
+    def approved_amount(self) -> Decimal | None: ...
     @property
     def currency(self) -> str | None: ...
     @property
@@ -303,7 +307,8 @@ def build_applications_workbook(
         "Antragstyp",
         "Status",
         "Gremium",
-        "Betrag",
+        "Beantragt",
+        "Genehmigt",
         "Währung",
         "Erstellt",
         "Aktualisiert",
@@ -322,6 +327,7 @@ def build_applications_workbook(
                 _state_label(item, locale),
                 gremium_names.get(item.gremium_id, "") if item.gremium_id else "",
                 _num(item.amount),
+                _num(_approved(item)),
                 item.currency or "",
                 _fmt_dt(item.created_at),
                 _fmt_dt(item.updated_at),
@@ -331,6 +337,16 @@ def build_applications_workbook(
 
     _autosize(ws, headers)
     return _workbook_bytes(wb)
+
+
+def _approved(item: _ApplicationRow) -> Decimal | None:
+    """Return the approved amount, only for an application in an approved state (001612).
+
+    An approved application without its own amount was approved as requested.
+    """
+    if item.state is None or not item.state.is_approved:
+        return None
+    return item.approved_amount if item.approved_amount is not None else item.amount
 
 
 def _state_label(item: _ApplicationRow, locale: str) -> str:

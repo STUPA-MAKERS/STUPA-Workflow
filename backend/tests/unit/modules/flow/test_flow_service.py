@@ -23,7 +23,7 @@ from app.modules.flow import context as flow_context
 from app.modules.flow import service as flow_service
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.service import FlowService
-from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
+from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 from app.shared.guards import GuardContext
 from tests._support.flow_fakes import fake_session, result
 
@@ -81,6 +81,7 @@ def _app(state_id: object, flow_id: object) -> SimpleNamespace:
         data={},
         budget_id=None,
         vote_gremium_id=None,
+        replaces_id=None,
     )
 
 
@@ -606,7 +607,9 @@ async def test_revert_status_leaves_the_commit_to_the_caller() -> None:
 
 def _target_state(state_id: object, flow_id: object) -> SimpleNamespace:
     """Build a target state of a flow."""
-    return SimpleNamespace(id=state_id, flow_version_id=flow_id, kind="normal", config={})
+    return SimpleNamespace(
+        id=state_id, flow_version_id=flow_id, kind="normal", config={}, is_approved=False
+    )
 
 
 def _vote_cancel_stmts(db) -> list[Any]:
@@ -618,7 +621,7 @@ async def test_force_status_no_current_state_conflicts() -> None:
     app = _app(None, uuid4())
     db = fake_session(result(app))
     with pytest.raises(ConflictError) as ei:
-        await FlowService(db).force_status(app.id, uuid4(), _principal(), note="x")
+        await FlowService(db).force_status(app.id, uuid4(), _principal(), reason="other", note="x")
     assert ei.value.code == "no_current_state"
     assert db.committed == 0
 
@@ -629,7 +632,7 @@ async def test_force_status_unknown_target_state_404() -> None:
     app = _app(uuid4(), flow_id)
     db = fake_session(result(app), result())
     with pytest.raises(NotFoundError):
-        await FlowService(db).force_status(app.id, uuid4(), _principal(), note="x")
+        await FlowService(db).force_status(app.id, uuid4(), _principal(), reason="other", note="x")
     assert db.committed == 0
 
 
@@ -643,7 +646,9 @@ async def test_force_status_foreign_flow_state_404() -> None:
     foreign = _target_state(target_id, uuid4())
     db = fake_session(result(app), result(foreign))
     with pytest.raises(NotFoundError, match="does not belong"):
-        await FlowService(db).force_status(app.id, target_id, _principal(), note="x")
+        await FlowService(db).force_status(
+            app.id, target_id, _principal(), reason="other", note="x"
+        )
 
 
 async def test_force_status_same_state_conflicts() -> None:
@@ -653,7 +658,9 @@ async def test_force_status_same_state_conflicts() -> None:
     target = _target_state(cur, flow_id)
     db = fake_session(result(app), result(target))
     with pytest.raises(ConflictError) as ei:
-        await FlowService(db).force_status(app.id, cur, _principal(), note="x")
+        await FlowService(db).force_status(
+            app.id, cur, _principal(), reason="other", note="x"
+        )
     assert ei.value.code == "already_in_state"
     assert db.committed == 0
 
@@ -665,7 +672,9 @@ async def test_force_status_concurrent_change_409_rolls_back() -> None:
     target = _target_state(target_id, flow_id)
     db = fake_session(result(app), result(target), result(rowcount=0))
     with pytest.raises(ConflictError) as ei:
-        await FlowService(db).force_status(app.id, target_id, _principal(), note="x")
+        await FlowService(db).force_status(
+            app.id, target_id, _principal(), reason="other", note="x"
+        )
     assert ei.value.code == "concurrent_state_change"
     assert db.rolled_back == 1
     assert db.committed == 0
@@ -688,7 +697,7 @@ async def test_force_status_happy_writes_event_audit_and_cancels_votes() -> None
         result(), result(), result(),
     )
     res = await FlowService(db).force_status(
-        app.id, target_id, _principal(), note="admin override"
+        app.id, target_id, _principal(), reason="other", note="admin override"
     )
     assert res.new_state_id == target_id
     assert res.dispatched_actions == []
@@ -707,17 +716,20 @@ async def test_list_states_returns_flow_states() -> None:
     app = _app(uuid4(), flow_id)
     s1 = SimpleNamespace(
         id=uuid4(), key="draft", label_i18n={"de": "Entwurf"}, color=None,
-        edit_allowed=True, kind="normal",
+        edit_allowed=True, kind="normal", is_initial=True, is_terminal=False, is_denied=False,
+        is_approved=False,
     )
     s2 = SimpleNamespace(
         id=uuid4(), key="done", label_i18n={}, color="#111",
-        edit_allowed=False, kind="normal",
+        edit_allowed=False, kind="normal", is_initial=False, is_terminal=True, is_denied=False,
+        is_approved=True,
     )
     db = fake_session(result(app), result(s1, s2))
     out = await FlowService(db).list_states(app.id)
     assert [o.key for o in out] == ["draft", "done"]
     assert out[1].color == "#111"
     assert out[0].edit_allowed is True
+    assert [o.is_approved for o in out] == [False, True]
 
 
 async def test_list_states_unknown_application_404() -> None:
@@ -754,9 +766,11 @@ async def test_available_flags_the_agenda_only_into_a_vote_state() -> None:
     plain = _transition(flow_id=flow_id, from_id=draft, to_id=voting)
     db = fake_session(result(app), result(to_vote, to_done, plain))
     vote_state = SimpleNamespace(
-        id=voting, kind="vote", is_approved=False, config={"gremiumId": str(gid)}
+        id=voting, kind="vote", is_approved=False, is_terminal=False, config={"gremiumId": str(gid)}
     )
-    done_state = SimpleNamespace(id=done, kind="normal", is_approved=False, config={})
+    done_state = SimpleNamespace(
+        id=done, kind="normal", is_approved=False, is_terminal=True, config={}
+    )
     db.get_results = [vote_state, done_state, vote_state]
 
     out = {t.id: t for t in await FlowService(db).available_transitions(app.id, _principal())}
@@ -955,3 +969,63 @@ async def test_stage_branch_race_leaves_the_rollback_to_the_savepoint() -> None:
     assert db.committed == 0
 
 
+
+
+async def test_fire_out_of_the_initial_state_needs_the_required_file(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Refuse the submit of an Antrag whose Antragsart needs a file (spec 001732)."""
+
+    async def _missing(_session: object, _app: object) -> bool:
+        return True
+
+    monkeypatch.setattr(flow_context, "missing_required_file", _missing)
+    flow_id, draft = uuid4(), uuid4()
+    app = _app(draft, flow_id)
+    transition = _transition(flow_id=flow_id, from_id=draft, to_id=uuid4())
+    db = fake_session(result(app), result(transition), result(rowcount=1))
+    with pytest.raises(ValidationProblem) as exc:
+        await FlowService(db).fire(app.id, transition.id, _principal())
+    assert exc.value.code == "attachment_required"
+    assert db.committed == 0
+
+
+async def test_auto_advance_waits_for_the_required_file(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An automatic transition does not take an Antrag without its required file."""
+
+    async def _missing(_session: object, _app: object) -> bool:
+        return True
+
+    monkeypatch.setattr(flow_context, "missing_required_file", _missing)
+    flow_id, draft = uuid4(), uuid4()
+    app = _app(draft, flow_id)
+    state = SimpleNamespace(id=draft, kind="normal", config={})
+    auto_t = _transition(flow_id=flow_id, from_id=draft, to_id=uuid4())
+    auto_t.automatic = True
+    db = fake_session(result(app), result(state), result(auto_t))
+    assert await FlowService(db).auto_advance(app.id, _principal()) is None
+    assert db.added == []
+
+
+async def test_missing_required_file_reads_the_type_the_state_and_the_files() -> None:
+    """One query checks the switch, the initial state and a stored file."""
+    from sqlalchemy.dialects import postgresql
+
+    class _Capture:
+        statement: Any = None
+
+        async def scalar(self, stmt: Any) -> Any:
+            self.statement = stmt
+            return None
+
+    db = _Capture()
+    app = _app(uuid4(), uuid4())
+    assert await flow_context.missing_required_file(db, app) is False  # type: ignore[arg-type]
+    sql = str(
+        db.statement.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True})
+    )
+    assert "application_type.attachment_required IS true" in sql
+    assert "state.is_initial IS true" in sql
+    assert "attachment.storage_key IS NOT NULL" in sql

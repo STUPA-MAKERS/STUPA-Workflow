@@ -80,7 +80,7 @@ async def list_activity(
     that the caller made, holds or touched, newest first, 50 per step.
 
     Args:
-        kinds: Limit to ``application``, ``todo``, ``ticket`` and/or ``meeting``.
+        kinds: Limit the hits to ``application``, ``todo``, ``ticket`` and/or ``meeting``.
         own: Show the own actions too; without it they are hidden.
         cursor: The ``nextCursor`` of the step before.
         lang: The language of the state labels (``de`` or ``en``).
@@ -106,6 +106,55 @@ async def mark_activity_seen(at: str) -> dict:
     """
     await api().post("/activity/seen", json={"at": at})
     return {"seen": at}
+
+
+@group.tool
+async def graph_read(
+    kinds: list[str] | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    relations: str | None = None,
+    q: str | None = None,
+    depth: int | None = None,
+    single: bool = False,
+    no_access: bool = False,
+    cursor: str | None = None,
+) -> dict:
+    """Read one page of the graph: the elements that the caller reads as ``nodes`` and
+    the relations between them as ``edges``, the newest nodes first, 60 per page.
+
+    An edge has the ``source`` ``link`` (a link that a person made) or ``builtin`` (a
+    relation of the data, for example a meeting and its TOP). The answer holds each
+    edge between a node of the page and a node of this page or of an earlier page.
+    Needs the permission ``graph.view``.
+
+    Args:
+        kinds: Limit the hits to ``application``, ``meeting``, ``agenda_item``, ``vote``,
+            ``appointment``, ``gremium``, ``invoice``, ``expense``, ``budget``,
+            ``ticket`` and/or ``todo``.
+        date_from: Only hits with their date on or after this day (``YYYY-MM-DD``).
+        date_to: Only hits with their date on or before this day.
+        relations: ``all`` (default), ``links`` or ``builtin``.
+        q: Only hits with the term in their title.
+        depth: Add the neighbours of the hits, up to this count of lines away (0 to 5,
+            default 2). A neighbour shows also when it does not pass the filters.
+        single: Add the elements without a relation.
+        no_access: Add the elements that the caller does not read, as nodes with their
+            kind only.
+        cursor: The ``nextCursor`` of the page before.
+    """
+    query = {
+        "kinds": kinds,
+        "from": date_from,
+        "to": date_to,
+        "relations": relations,
+        "q": q,
+        "depth": depth,
+        "single": single or None,
+        "noAccess": no_access or None,
+        "cursor": cursor,
+    }
+    return await api().get("/graph", params=params(**query))
 
 
 @group.tool

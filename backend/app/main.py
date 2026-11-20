@@ -39,6 +39,7 @@ from app.modules.admin.router import public_router as site_config_public_router
 from app.modules.admin.router import router as admin_router
 from app.modules.antiabuse.router import router as antiabuse_router
 from app.modules.application_types.router import router as application_types_router
+from app.modules.applications.amend_router import router as application_amend_router
 from app.modules.applications.email_login import resolve_session as resolve_email_session
 from app.modules.applications.links_router import router as application_links_router
 from app.modules.applications.login_router import router as applicant_login_router
@@ -64,11 +65,13 @@ from app.modules.delegations.router import router as delegations_router
 from app.modules.documents.router import router as application_pdf_router
 from app.modules.files.storage import build_object_storage
 from app.modules.flow.dispatch import ActionDispatcher, build_worker_dispatcher
+from app.modules.flow.forced_router import router as forced_status_router
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.flow.router import router as flow_router
 from app.modules.forms.router import get_budget_options
 from app.modules.forms.router import router as forms_router
 from app.modules.forms.service import BudgetOptions
+from app.modules.graph.router import router as graph_router
 from app.modules.gremien_overview.router import router as gremien_tab_router
 from app.modules.livevote.broker import RedisBroker
 from app.modules.livevote.locks import RedisLocker
@@ -93,6 +96,7 @@ from app.modules.protocol.public_router import router as public_protocol_router
 from app.modules.protocol.router import router as protocol_router
 from app.modules.search.router import router as search_router
 from app.modules.tickets.router import router as tickets_router
+from app.modules.todos.links_router import router as links_router
 from app.modules.todos.router import router as todos_router
 from app.modules.todos.socket import ws_router as todos_ws_router
 from app.modules.translations.router import public_router as i18n_public_router
@@ -122,9 +126,11 @@ api_router.include_router(form_versions_router)
 api_router.include_router(application_types_router)
 api_router.include_router(applications_router)
 api_router.include_router(application_links_router)
+api_router.include_router(application_amend_router)
 api_router.include_router(application_observers_router)
 api_router.include_router(application_pdf_router)
 api_router.include_router(flow_router)
+api_router.include_router(forced_status_router)
 api_router.include_router(voting_router)
 api_router.include_router(vote_open_router)
 api_router.include_router(livevote_router)
@@ -154,8 +160,10 @@ api_router.include_router(erasure_request_router)
 api_router.include_router(backup_router)
 api_router.include_router(search_router)
 api_router.include_router(activity_router)
+api_router.include_router(graph_router)
 api_router.include_router(tickets_router)
 api_router.include_router(todos_router)
+api_router.include_router(links_router)
 api_router.include_router(todos_ws_router)
 api_router.include_router(gremien_authed_router)
 api_router.include_router(gremien_tab_router)

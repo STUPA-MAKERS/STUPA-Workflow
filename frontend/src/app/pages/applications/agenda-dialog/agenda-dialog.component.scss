@@ -1,4 +1,3 @@
-@use 'scroll-fade' as fade;
 @use '../../../shared/ui/dialog-form' as df;
 @use 'field' as f;
 
@@ -96,10 +95,7 @@
 }
 
 .agd__refusal {
-  margin: 0;
-  padding: 0 4px;
-  color: var(--color-danger);
-  font-size: 0.8125rem;
+  padding-inline: var(--space-1);
 }
 .agd__switchLabel {
   font-weight: var(--fw-medium);
@@ -146,6 +142,8 @@
   opacity: 1;
 }
 
+// The list cuts hard at its own rounded frame, and its rows run to the sides of the frame
+// (000193).
 .agd__list {
-  @include fade.fade-y(var(--space-5));
+  border-radius: var(--radius-lg);
 }

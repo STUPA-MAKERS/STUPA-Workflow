@@ -5,14 +5,14 @@ import { ForbiddenComponent } from './forbidden.component';
 describe('ForbiddenComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('shows the code, the heading, the reason and the way to the dashboard', async () => {
+  it('shows the code, the heading, the reason and the way to the start page', async () => {
     await render(ForbiddenComponent, { providers: [provideRouter([])] });
     expect(screen.getByText('403')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Kein Zugriff' })).toBeInTheDocument();
     expect(
       screen.getByText('Für diesen Bereich fehlt dir die erforderliche Berechtigung.'),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Zum Dashboard' })).toHaveAttribute('href', '/dashboard');
+    expect(screen.getByRole('link', { name: 'Zur Startseite' })).toHaveAttribute('href', '/activity');
   });
 
   it('marks the heading with the lock icon', async () => {

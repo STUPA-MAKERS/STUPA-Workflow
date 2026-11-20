@@ -2,16 +2,12 @@
 id: "000624"
 title: The work list on Start keeps its column header and cuts at the window edge
 kind: non-functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-16
-tests:
-  - "frontend/vendor/ui-kit/src/lib/data-table/data-table.component.spec.ts:stickyHead"
-implementation:
-  - frontend/vendor/ui-kit/src/lib/data-table
-  - frontend/src/app/pages/dashboard/dashboard.component.scss
+updated: 2026-11-19
+replaced_by: F/collaboration/activity/001300
 scope:
-  - frontend/src/app/pages/dashboard
+  - frontend/src/app/pages/activity
   - frontend/vendor/ui-kit/src/lib/data-table
 ---
 

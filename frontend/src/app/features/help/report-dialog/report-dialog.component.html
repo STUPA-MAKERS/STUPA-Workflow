@@ -98,10 +98,12 @@
             </app-chip>
           }
           @if (!full()) {
-            <app-button variant="tonal" size="sm" [disabled]="drafts.busy()" (click)="pickFiles()">
-              <app-icon name="clip" />
-              {{ 'help.report.attach' | t }}
-            </app-button>
+            <app-button-group>
+              <app-button variant="tonal" size="sm" [disabled]="drafts.busy()" (click)="pickFiles()">
+                <app-icon name="clip" />
+                {{ 'help.report.attach' | t }}
+              </app-button>
+            </app-button-group>
           }
         </div>
         <input
@@ -121,9 +123,9 @@
           <app-icon class="rd__ctxChev" name="down" [size]="16" />
           {{ 'help.report.context' | t }}
         </summary>
-        <dl class="rd__ctxList">
+        <dl appFacts layout="rows" class="rd__ctxList">
           @for (row of contextRows(); track row.label) {
-            <div class="rd__ctxRow">
+            <div>
               <dt>{{ row.label | t }}</dt>
               <dd>{{ row.value }}</dd>
             </div>
@@ -132,7 +134,7 @@
       </details>
 
       @if (error(); as e) {
-        <p class="rd__error" role="alert">{{ e | t }}</p>
+        <app-error-text>{{ e | t }}</app-error-text>
       }
       <button type="submit" hidden aria-hidden="true" tabindex="-1"></button>
     </form>

@@ -161,14 +161,207 @@
   }
 }
 
-.ap__plan-end {
-  flex: none;
-  margin: 0;
-  padding: var(--space-2) var(--space-4) 0;
-  font-size: var(--fs-small);
-  color: var(--color-text-muted);
+
+// Beside the protocol on a wide screen (001440) the agenda is a split head over its list:
+// a title segment and an add segment side by side, the TOPs below as split boxes (001443).
+// A 3px gap and small inner corners part the segments. Only the list scrolls, and its
+// boxes cut hard at its rounded edge (000193).
+:host-context(.mp__agenda) {
+  gap: 3px;
+  height: 100%;
 }
-.ap__plan-end--over {
-  color: var(--color-warning);
-  font-weight: var(--fw-semibold);
+:host-context(.mp__agenda) .ap__head {
+  gap: 3px;
+  min-height: 48px;
+  padding: 0;
+}
+:host-context(.mp__agenda) .ap__title {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  padding-inline: var(--space-4);
+  border-radius: var(--radius-2xl) 6px 6px 6px;
+  background: var(--color-surface-1);
+  font-size: var(--fs-body);
+  color: var(--color-text);
+}
+:host-context(.mp__agenda) .ap__add {
+  align-self: stretch;
+  width: 56px;
+  height: auto;
+  margin: 0;
+  border-radius: 6px var(--radius-2xl) 6px 6px;
+  background: var(--color-surface-1);
+  color: var(--color-text);
+}
+:host-context(.mp__agenda) .ap__list {
+  flex: 0 1 auto;
+  gap: 3px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 6px 6px var(--radius-2xl) var(--radius-2xl);
+}
+// Each TOP is a split box like the head (001443): the item on its own surface and the ⋮
+// menu on a second one beside it, 3px apart, in the column of the add segment. The last
+// TOP has the large corners at the bottom.
+:host-context(.mp__agenda) .ap__row app-list-item {
+  --li-bg: var(--color-surface-1);
+  --li-hover: var(--color-surface-2);
+  --li-radius: 6px;
+}
+:host-context(.mp__agenda) .ap__row ::ng-deep .li {
+  margin-inline-end: calc(56px + 3px);
+}
+:host-context(.mp__agenda) .ap__row:last-child ::ng-deep .li {
+  border-end-start-radius: var(--radius-2xl);
+}
+:host-context(.mp__agenda) .ap__row ::ng-deep .li__trail {
+  position: static;
+}
+// The menu stands outside the item, so a trail without a badge is empty: it takes back the gap
+// in front of it, and the title reaches the end of the item.
+:host-context(.mp__agenda) .ap__trail:not(:has(app-badge)) {
+  margin-inline-start: -14px;
+}
+:host-context(.mp__agenda) .ap__menu,
+:host-context(.mp__agenda) .ap__row:focus-within .ap__menu {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: calc(-56px - 3px);
+  display: grid;
+  place-items: center;
+  width: 56px;
+  margin: 0;
+  overflow: visible;
+  border-radius: 6px;
+  background: var(--color-surface-1);
+}
+// The ⋮ fills its box, which is the segment, so it has no tonal pill of a button group of
+// its own: plain like the plus of the add segment.
+:host-context(.mp__agenda) .ap__menu ::ng-deep .rm__trigger {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background-color: transparent;
+  color: var(--color-text);
+}
+// The hover keeps the text colour: the hover of a button group would turn the ⋮ into the
+// dark ink of the tonal surface, which vanishes on the plain box.
+@media (hover: hover) {
+  :host-context(.mp__agenda) .ap__menu ::ng-deep .rm__trigger:hover:not(:disabled) {
+    background-color: var(--color-surface-2);
+    color: var(--color-text);
+  }
+  // The ⋮ shows only while the pointer is on its TOP, while the TOP holds the keyboard focus,
+  // and while its menu is open (001443). The box stays, so the TOPs keep their shape. A touch
+  // screen has no hover, so there the ⋮ always shows.
+  :host-context(.mp__agenda) .ap__menu ::ng-deep .rm__trigger {
+    opacity: 0;
+    transition: opacity var(--motion-fast) var(--ease-standard);
+  }
+  :host-context(.mp__agenda) .ap__row:hover .ap__menu ::ng-deep .rm__trigger,
+  :host-context(.mp__agenda) .ap__row:focus-within .ap__menu ::ng-deep .rm__trigger,
+  :host-context(.mp__agenda) .ap__menu ::ng-deep .rm__trigger[aria-expanded='true'] {
+    opacity: 1;
+  }
+}
+// The hover rule of a row widens the menu to its own size, so a hover keeps the box width.
+@media (hover: hover) {
+  :host-context(.mp__agenda) .ap__row:hover .ap__menu {
+    width: 56px;
+    margin: 0;
+  }
+  // A TOP at rest is one box over the full width: the split and the box of the menu show only
+  // with the ⋮ (001443). At rest the title uses the full width of the box, so it gives room to
+  // the menu only while the ⋮ shows.
+  :host-context(.mp__agenda) .ap__row:not(:hover):not(:focus-within):not(:has([aria-expanded='true'])) ::ng-deep .li {
+    margin-inline-end: 0;
+  }
+  :host-context(.mp__agenda) .ap__row:last-child:not(:hover):not(:focus-within):not(:has([aria-expanded='true'])) ::ng-deep .li {
+    border-end-end-radius: var(--radius-2xl);
+  }
+  :host-context(.mp__agenda) .ap__row:not(:hover):not(:focus-within):not(:has([aria-expanded='true'])) .ap__menu {
+    inset-inline-end: 0;
+    background: transparent;
+  }
+  :host-context([data-very-high-contrast='on'] .mp__agenda) .ap__row:not(:hover):not(:focus-within):not(:has([aria-expanded='true'])) .ap__menu {
+    border-color: transparent !important;
+  }
+}
+:host-context(.mp__agenda) .ap__row:last-child .ap__menu {
+  border-end-end-radius: var(--radius-2xl);
+}
+:host-context(.mp__agenda) .ap__rename {
+  margin-inline-end: calc(56px + 3px);
+  border-radius: 6px;
+  background: var(--color-surface-1);
+}
+:host-context(.mp__agenda) .ap__row:last-child .ap__rename {
+  border-end-start-radius: var(--radius-2xl);
+}
+:host-context(.mp__agenda) .ap__head:not(:has(.ap__add)) .ap__title {
+  border-radius: var(--radius-2xl) var(--radius-2xl) 6px 6px;
+}
+// Without a list below it (an empty agenda), the head is round at the bottom too (001440).
+:host-context(.mp__agenda) .ap__head:not(:has(~ .ap__list)) .ap__title {
+  border-radius: var(--radius-2xl) 6px 6px var(--radius-2xl);
+}
+:host-context(.mp__agenda) .ap__head:not(:has(~ .ap__list)) .ap__add {
+  border-radius: 6px var(--radius-2xl) var(--radius-2xl) 6px;
+}
+:host-context(.mp__agenda) .ap__head:not(:has(~ .ap__list)):not(:has(.ap__add)) .ap__title {
+  border-radius: var(--radius-2xl);
+}
+// In the very high contrast mode each segment has the white edge of a surface, and the add
+// segment is black with a yellow plus, not a yellow button.
+:host-context([data-very-high-contrast='on'] .mp__agenda) .ap__title,
+:host-context([data-very-high-contrast='on'] .mp__agenda) .ap__add,
+:host-context([data-very-high-contrast='on'] .mp__agenda) .ap__row ::ng-deep .li,
+:host-context([data-very-high-contrast='on'] .mp__agenda) .ap__menu {
+  border: var(--vh-edge) !important;
+}
+// The chosen TOP redefines the ink of very high contrast for its yellow fill, so the edge of
+// its menu box is taken from the row, and the chosen box itself drops the black ring of a
+// chosen row: a yellow edge on the yellow fill, so both boxes have the same outer size and
+// the same 3px gap (001443).
+:host-context([data-very-high-contrast='on'] .mp__agenda) .ap__row {
+  --ap-edge: var(--vh-edge);
+}
+:host-context([data-very-high-contrast='on'] .mp__agenda) .ap__menu {
+  border: var(--ap-edge) !important;
+}
+// The box of the menu sits in the item, which has the 2px edge here, so it reaches past that
+// edge to match the outer size of the item.
+:host-context([data-very-high-contrast='on'] .mp__agenda) .ap__row .ap__menu {
+  inset-block: -2px;
+  inset-inline-end: calc(-56px - 3px - 2px);
+}
+:host-context([data-very-high-contrast='on'] .mp__agenda) .ap__row ::ng-deep .li.li--on {
+  border: 2px solid var(--vh-hi) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+:host-context([data-very-high-contrast='on'] .mp__agenda) .ap__add {
+  border-radius: 6px var(--radius-2xl) 6px 6px !important;
+  outline: none !important;
+  background: var(--vh-bg) !important;
+  color: var(--vh-hi) !important;
+  box-shadow: none !important;
+}
+:host-context([data-very-high-contrast='on'] .mp__agenda) .ap__head:not(:has(~ .ap__list)) .ap__add {
+  border-radius: 6px var(--radius-2xl) var(--radius-2xl) 6px !important;
+}
+:host-context([data-very-high-contrast='on'] .mp__agenda) .ap__menu ::ng-deep .rm__trigger {
+  background-color: var(--vh-bg) !important;
+  color: var(--vh-hi) !important;
+  box-shadow: none !important;
+}
+:host-context([data-very-high-contrast='on'] .mp__agenda) .ap__add::before,
+:host-context([data-very-high-contrast='on'] .mp__agenda) .ap__add::after {
+  display: none !important;
+}
+:host-context([data-very-high-contrast='on'] .mp__agenda) .ap__add:focus-visible {
+  outline: 3px solid var(--vh-hi) !important;
+  outline-offset: 2px !important;
 }

@@ -57,7 +57,7 @@
             @if (p.markdown) {
               <app-markdown-view [src]="p.markdown" [imageSrc]="imageSrc()" [documentSrc]="documentSrc()" [attr.lang]="textLang()" />
             } @else {
-              <app-empty-state shape="text" rows="3" [heading]="'publicProtocols.detail.noText' | t" />
+              <app-empty-state icon="file" shape="text" rows="3" [heading]="'publicProtocols.detail.noText' | t" />
             }
           </div>
         } @else {
@@ -140,10 +140,11 @@
             <li>{{ 'publicProtocols.version.nonPublic' | t }}</li>
             <li>{{ 'publicProtocols.version.internal' | t }}</li>
           </ul>
-          <a class="pd__more" routerLink="/protocols" [queryParams]="{ committee: p.gremium.id }">
-            {{ 'publicProtocols.detail.allOf' | t: { name: p.gremium.name } }}
-            <app-icon name="arrow" [size]="14" />
-          </a>
+          <app-button-group class="pd__more">
+            <a appButton="text" size="sm" routerLink="/protocols" [queryParams]="{ committee: p.gremium.id }">{{
+              'publicProtocols.detail.allOf' | t: { name: p.gremium.name }
+            }}</a>
+          </app-button-group>
         </section>
       </aside>
     </div>

@@ -143,7 +143,7 @@ describe('SearchPaletteComponent', () => {
    */
   it('gives a page row the icon of its section, not a gear for everything', async () => {
     const { cmp, fixture } = await setup([
-      { path: '/dashboard', label: 'Seite Dashboard', parentLabel: null },
+      { path: '/activity', label: 'Seite Aktivität', parentLabel: null },
       { path: '/admin/roles', label: 'Seite Rollen', parentLabel: 'Verwaltung' },
       { path: '/invoices', label: 'Seite Rechnungen', parentLabel: null },
     ]);
@@ -151,7 +151,7 @@ describe('SearchPaletteComponent', () => {
     cmp.onQuery('seite');
     fixture.detectChanges();
     const byTitle = new Map(cmp.rows().map((r) => [r.title, r.icon]));
-    expect(byTitle.get('Seite Dashboard')).toBe('home');
+    expect(byTitle.get('Seite Aktivität')).toBe('history');
     expect(byTitle.get('Seite Rollen')).toBe('gear');
     expect(byTitle.get('Seite Rechnungen')).toBe('receipt');
   });

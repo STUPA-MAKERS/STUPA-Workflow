@@ -14,6 +14,7 @@ from typing import Any
 
 from sqlalchemy import (
     CHAR,
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -85,6 +86,11 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
         received_on: The date on which the application reached the Gremium. The
             capturing person sets it (default: the day of the capture). It is
             information only.
+        replaces_id: The Antrag that this one is a new version of ("Neue Fassung").
+            The submit of this Antrag closes that one. A delete of that Antrag sets it
+            to NULL, so the new version stays.
+        draft_reminder_at: When the worker sent the reminder mail of this draft. It is
+            set once, so a draft gets the mail at most once.
     """
 
     __tablename__ = "application"
@@ -116,6 +122,12 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     captured_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     capture_intake: Mapped[str | None] = mapped_column(Text, nullable=True)
     received_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    replaces_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("application.id", ondelete="SET NULL"), nullable=True
+    )
+    draft_reminder_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     __table_args__ = (
         Index(
@@ -132,6 +144,7 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
         Index("ix_application_type_id", "type_id"),
         Index("ix_application_created_at", "created_at"),
         Index("ix_application_archived_at", "archived_at"),
+        Index("ix_application_replaces_id", "replaces_id"),
     )
 
 
@@ -236,7 +249,13 @@ class Applicant(UUIDPkMixin, Base):
 
 
 class SubmissionVersion(UUIDPkMixin, Base):
-    """Versioned snapshot of the answer data plus diff."""
+    """Versioned snapshot of the answer data plus diff.
+
+    A change of the Antragsart writes a version that holds the old and the new type and
+    the form version of the old type (``from_*``/``to_type_id``). The old version keeps
+    every value, and ``from_form_version_id`` gives the labels of the fields that the new
+    form does not have. All three are NULL for every other version.
+    """
 
     __tablename__ = "submission_version"
 
@@ -248,6 +267,15 @@ class SubmissionVersion(UUIDPkMixin, Base):
     changed_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     diff: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    from_type_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("application_type.id", ondelete="SET NULL"), nullable=True
+    )
+    to_type_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("application_type.id", ondelete="SET NULL"), nullable=True
+    )
+    from_form_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("form_version.id", ondelete="SET NULL"), nullable=True
+    )
 
     __table_args__ = (UniqueConstraint("application_id", "version"),)
 
@@ -280,6 +308,9 @@ class StatusEvent(UUIDPkMixin, Base):
     vote_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("vote.id", ondelete="SET NULL"), nullable=True
     )
+    forced: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    force_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    outside_decision: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (
         Index("ix_status_event_application_id_at", "application_id", "at"),
@@ -306,6 +337,13 @@ class ApplicationDecision(UUIDPkMixin, Base):
             NULL when a passed vote could not fire its branch.
         decided_by: The OIDC ``sub`` of the person who fired the transition. NULL for a
             vote.
+        amend_reason: The reason of a later change of the approved amount. Set only on
+            such a change, which has no status event: the state stays.
+        previous_amount: The approved amount before the change, for the timeline.
+        basis_date: The date of the decision that allows the change.
+        basis_gremium_id: The Gremium of that decision. No foreign key, because the
+            row is history: a deleted Gremium leaves the id, and the name read gives
+            nothing.
     """
 
     __tablename__ = "application_decision"
@@ -324,6 +362,10 @@ class ApplicationDecision(UUIDPkMixin, Base):
     decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     decided_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    amend_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    previous_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    basis_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    basis_gremium_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
 
     __table_args__ = (
         Index("ix_application_decision_application_id", "application_id"),

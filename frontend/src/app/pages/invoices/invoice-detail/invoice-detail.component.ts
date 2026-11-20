@@ -3,20 +3,7 @@ import { RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import {
-  ButtonComponent,
-  EmptyStateComponent,
-  IconComponent,
-  NoteComponent,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-  SegBarComponent,
-  SheetBarComponent,
-  SheetBarTitleDirective,
-  StatusTextComponent,
-  SectionComponent,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, EmptyStateComponent, IconComponent, MetaLineComponent, NoteComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, SectionComponent, SegBarComponent, SheetBarComponent, SheetBarTitleDirective, StatusTextComponent, FactsComponent } from '@stupa-makers/ui-kit';
 import {
   invoiceStatus,
 } from '@shared/ui';
@@ -29,9 +16,9 @@ import {
 } from '../../budget/expense-display.util';
 import { bookedOn } from '../invoice-figures';
 import { TodoLinkedListComponent } from '../../../features/todos/linked-list/todo-linked-list.component';
-import { SheetActionComponent } from '../../budget/sheet-action/sheet-action.component';
 import { dayMonth, daysUntil } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
+import { RowChevronComponent } from '../../../shared/ui/row-chevron/row-chevron.component';
 
 /**
  * The detail of an invoice:
@@ -47,13 +34,16 @@ import { formatMoney } from '@shared/format-money';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FactsComponent,
+    RowChevronComponent,
+    MetaLineComponent,
     SectionComponent,
-    SheetActionComponent,
     NoteComponent,
     EmptyStateComponent,
     SheetBarComponent,
     SheetBarTitleDirective,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     LocalizedDatePipe,
     RouterLink,
@@ -132,19 +122,30 @@ export class InvoiceDetailComponent {
       label: this.i18n.translate('invoices.openFile'),
       icon: 'file',
     };
+    // "Buchung anlegen" also stands in the head menu (spec 001292, exception of 000671).
+    const book: RowMenuItem = {
+      id: 'book',
+      label: this.i18n.translate('invoices.createBooking'),
+      icon: 'plus',
+    };
     const remove: RowMenuSection = {
       items: [
         { id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true },
       ],
     };
+    const items: RowMenuItem[] = [
+      ...(this.canManage() ? [book] : []),
+      ...(this.phone() && i.hasFile ? [file] : []),
+    ];
     return [
-      ...(this.phone() && i.hasFile ? [{ items: [file] }] : []),
+      ...(items.length ? [{ items }] : []),
       ...(this.canManage() ? [remove] : []),
     ];
   });
 
   onMenu(item: RowMenuItem): void {
-    if (item.id === 'file') this.openFile.emit();
+    if (item.id === 'book') this.createBooking.emit();
+    else if (item.id === 'file') this.openFile.emit();
     else if (item.id === 'delete') this.remove.emit();
   }
 

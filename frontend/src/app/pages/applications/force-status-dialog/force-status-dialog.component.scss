@@ -1,39 +1,6 @@
-@use 'field' as f;
-.fsd__lead {
-  margin: 0 0 var(--space-3);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
-
-.fsd__reason {
+.fsd__note {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  margin-top: var(--space-3);
-
-  span {
-    color: var(--color-text-muted);
-    font-size: var(--fs-small);
-    font-weight: var(--fw-medium);
-  }
-
-  textarea {
-    width: 100%;
-    resize: vertical;
-    padding: var(--space-2) var(--space-3);
-    border: 0;
-    border-radius: var(--radius-field);
-    background: var(--field-bg, var(--color-surface-3));
-    color: var(--field-text, var(--color-text));
-    font: inherit;
-    line-height: 1.4;
-    box-shadow: var(--field-edge, none);
-    @include f.ring;
-  }
-
-  textarea:focus-visible {
-    outline: var(--field-focus-outline, 2px solid var(--color-focus-ring));
-    outline-offset: 1px;
-    box-shadow: var(--field-focus, var(--field-edge, none));
-  }
 }
+

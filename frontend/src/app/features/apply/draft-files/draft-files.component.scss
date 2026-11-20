@@ -44,9 +44,6 @@
   color: var(--color-text-muted);
   font-size: 0.8125rem;
 }
-.df__sep {
-  color: var(--color-text-subtle);
-}
 .df__remove {
   display: inline-flex;
   flex: none;
@@ -90,10 +87,7 @@
   }
 }
 .df__error {
-  margin: 0;
   padding-inline: var(--space-1);
-  color: var(--color-danger);
-  font-size: var(--fs-small);
 }
 
 .df__summary {

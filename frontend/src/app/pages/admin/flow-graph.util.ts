@@ -65,8 +65,9 @@ export function validateFlowGraph(graph: FlowGraph): FlowValidationResult {
       .map((s) => ({ key: 'admin.flow.err.invalidKey' as const, params: { key: String(s.key) } })),
     ...initialErrors(initials),
     ...transitions.flatMap((t) => transitionErrors(t, states, keySet)),
+    ...replacedTargetErrors(states),
     ...(initials.length === 1 && duplicates.length === 0
-      ? unreachableErrors(findUnreachable(initials[0], keySet, transitions))
+      ? unreachableErrors(findUnreachable([initials[0], ...replacedTargets(states)], keySet, transitions))
       : []),
     ...states.flatMap((s) => voteStateErrors(s, transitions)),
   ];
@@ -84,6 +85,41 @@ function initialErrors(initials: readonly string[]): readonly FlowValidationErro
   return initials.length > 1
     ? [{ key: 'admin.flow.err.multipleInitial', params: { keys: initials.join(', ') } }]
     : [];
+}
+
+/** The keys of the states marked as the target for replaced Anträge (001722). */
+function replacedTargets(states: readonly StateDef[]): readonly string[] {
+  return states.filter((s) => s.isReplacedTarget).map((s) => s.key);
+}
+
+/**
+ * The target for replaced Anträge is one state, terminal and denied (001722). The server
+ * moves an Antrag there without a transition, so it counts as reachable.
+ */
+function replacedTargetErrors(states: readonly StateDef[]): readonly FlowValidationError[] {
+  const targets = states.filter((s) => s.isReplacedTarget);
+  return [
+    ...(targets.length > 1
+      ? [{ key: 'admin.flow.err.replacedTargetMany' as const, params: { keys: sortedList(targets.map((s) => s.key)) } }]
+      : []),
+    ...targets
+      .filter((s) => !s.isTerminal || !s.isDenied)
+      .map((s) => ({ key: 'admin.flow.err.replacedTargetKind' as const, params: { key: s.key } })),
+  ];
+}
+
+/**
+ * A manual transition of the applicant from the initial state into a terminal state: a
+ * withdrawal of a draft. The editor warns about it (001712).
+ */
+export function isDraftWithdrawal(t: TransitionDef, states: readonly StateDef[]): boolean {
+  const from = states.find((s) => s.key === t.from);
+  const to = states.find((s) => s.key === t.to);
+  return (
+    !t.automatic &&
+    Boolean(from?.isInitial && to?.isTerminal) &&
+    JSON.stringify(t.guard ?? null).includes('"actorIsApplicant"')
+  );
 }
 
 /** The error that names the unreachable states, if there are any. */
@@ -215,7 +251,7 @@ function voteGremiumError(s: StateDef, config: StateConfig): TranslationKey | nu
 }
 
 function findUnreachable(
-  initial: string,
+  starts: readonly string[],
   keySet: ReadonlySet<string>,
   transitions: readonly TransitionDef[],
 ): readonly string[] {
@@ -231,7 +267,7 @@ function findUnreachable(
     );
     return next.length === 0 ? seen : reach(next, new Set([...seen, ...next]));
   };
-  const seen = reach([initial], new Set([initial]));
+  const seen = reach(starts, new Set(starts));
   return [...keySet].filter((k) => !seen.has(k));
 }
 
@@ -246,6 +282,7 @@ function normalizeState(s: StateDef): StateDef {
     ...(s.isTerminal ? { isTerminal: true } : {}),
     ...(s.isApproved ? { isApproved: true } : {}),
     ...(s.isDenied ? { isDenied: true } : {}),
+    ...(s.isReplacedTarget ? { isReplacedTarget: true } : {}),
     ...(s.kind && s.kind !== 'normal' ? { kind: s.kind } : {}),
     ...(s.config && Object.keys(s.config).length > 0 ? { config: s.config } : {}),
   };

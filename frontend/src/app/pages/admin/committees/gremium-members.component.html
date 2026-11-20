@@ -26,7 +26,7 @@
       </ng-template>
       <ng-template #content>
         @if (!visible().length) {
-        <app-empty-state shape="person" [heading]="'admin.gremien.membersEmpty' | t" />
+        <app-empty-state icon="users" shape="person" [heading]="'admin.gremien.membersEmpty' | t" />
       } @else {
         <ul class="rowgroup rowgroup--records gmm__list" [attr.aria-label]="'admin.gremien.members' | t">
           @for (m of visible(); track m.id) {
@@ -39,19 +39,21 @@
           }
         </ul>
         @if (members().length > preview) {
-          <app-button
-            class="gmm__more"
-            variant="text"
-            size="sm"
-            [ariaExpanded]="showAll()"
-            (click)="showAll.set(!showAll())"
-          >
-            {{
-              showAll()
-                ? ('admin.gremien.showLess' | t)
-                : ('admin.gremien.showAll' | t: { count: members().length })
-            }}
-          </app-button>
+          <app-button-group>
+            <app-button
+              class="gmm__more"
+              variant="text"
+              size="sm"
+              [ariaExpanded]="showAll()"
+              (click)="showAll.set(!showAll())"
+            >
+              {{
+                showAll()
+                  ? ('admin.gremien.showLess' | t)
+                  : ('admin.gremien.showAll' | t: { count: members().length })
+              }}
+            </app-button>
+          </app-button-group>
         }
         }
       </ng-template>

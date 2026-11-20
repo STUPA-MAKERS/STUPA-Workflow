@@ -32,6 +32,7 @@ import {
   type TodoEventEdition,
   type TodoEventIn,
   type TodoEventSeries,
+  type LinkEnd,
   type TodoLink,
   type TodoLinkTarget,
   type TodoMember,
@@ -52,6 +53,8 @@ import { chatPeople } from '@shared/ui/chat/chat-mentions';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
+  ButtonLinkComponent,
   ChipComponent,
   EmptyStateComponent,
   FilterSelectComponent,
@@ -74,6 +77,7 @@ import {
   ToastService,
   SectionComponent,
   ConfirmDialogComponent,
+  FactsComponent,
 } from '@stupa-makers/ui-kit';
 import { TodoAgendaDialogComponent } from '../agenda-dialog/todo-agenda-dialog.component';
 import { TodoDueChipComponent } from '../due-chip/todo-due-chip.component';
@@ -155,6 +159,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FactsComponent,
     LoadErrorComponent,
     ConfirmDialogComponent,
     SectionComponent,
@@ -165,6 +170,8 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     TranslatePipe,
     AvatarComponent,
     ButtonComponent,
+    ButtonGroupComponent,
+    ButtonLinkComponent,
     ChatComponent,
     EmptyStateComponent,
     FilterSelectComponent,
@@ -621,6 +628,12 @@ export class TodoCardDetailComponent {
   route(url: string) {
     return splitUrl(url);
   }
+
+  /** The card as a link end: the picker leaves it and its links out (spec 001408). */
+  readonly linkSelf = computed<LinkEnd | null>(() => {
+    const c = this.card();
+    return c ? { kind: 'todo', id: c.id } : null;
+  });
 
   /** The link whose read sheet is open (spec 000487): a link readable only through the card. */
   readonly viewedLink = signal<TodoLink | null>(null);

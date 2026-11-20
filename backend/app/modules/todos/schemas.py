@@ -36,19 +36,6 @@ TodoLinkKind = Literal[
     "ticket",
     "todo",
 ]
-#: The kinds of a back-reference (``GET /todos/linked``): every kind but a card.
-TodoLinkedKind = Literal[
-    "application",
-    "meeting",
-    "agenda_item",
-    "vote",
-    "appointment",
-    "gremium",
-    "invoice",
-    "expense",
-    "budget",
-    "ticket",
-]
 TodoEventKind = Literal[
     "created",
     "moved",
@@ -438,6 +425,34 @@ class TodoLinkedCard(FrozenCamelModel, frozen=True):
     balance: str | None = None
 
 
+class LinkRow(FrozenCamelModel, frozen=True):
+    """A link of an element as its reader sees it (``GET /api/links``, spec 001407).
+
+    ``accessible`` is false when the reader cannot read the other end. ``granted`` is set
+    on the links of a card only (spec 001405). ``card`` carries the board, the column and
+    the Event of a linked card. ``removable`` tells if the reader may remove the link.
+    """
+
+    id: UUID
+    kind: TodoLinkKind
+    target_id: UUID = Field(serialization_alias="targetId")
+    accessible: bool
+    title: str | None = None
+    url: str | None = None
+    detail: TodoLinkDetail | None = None
+    granted: bool = False
+    card: TodoLinkedCard | None = None
+    removable: bool = False
+    created_at: datetime = Field(serialization_alias="createdAt")
+
+
+class LinksOut(FrozenCamelModel, frozen=True):
+    """The links of an element and whether the reader may link it (``canLink``)."""
+
+    can_link: bool = Field(serialization_alias="canLink")
+    links: list[LinkRow] = Field(default_factory=list)
+
+
 class BoardPatch(FrozenStrictCamelModel, frozen=True):
     """A change of the board name or the archive delay."""
 
@@ -551,6 +566,20 @@ class LinkIn(FrozenStrictCamelModel, frozen=True):
 
     kind: TodoLinkKind
     target_id: UUID = Field(alias="targetId")
+
+
+class LinkEndIn(FrozenStrictCamelModel, frozen=True):
+    """One end of a link: an element by its kind and id (spec 001400)."""
+
+    kind: TodoLinkKind
+    id: UUID
+
+
+class LinkCreate(FrozenStrictCamelModel, frozen=True):
+    """A new link between two elements (spec 001409)."""
+
+    a: LinkEndIn
+    b: LinkEndIn
 
 
 class EventIn(FrozenStrictCamelModel, frozen=True):

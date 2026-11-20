@@ -6,6 +6,7 @@ import {
   inject,
   input,
   output,
+  untracked,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -15,27 +16,7 @@ import type { Meeting, Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { meetingStatus, type StatusView } from '@shared/status-kind.util';
-import {
-  FabComponent,
-  ButtonComponent,
-  DateBlockComponent,
-  EmptyStateComponent,
-  FilterSelectComponent,
-  IconComponent,
-  ListGroupComponent,
-  ListItemComponent,
-  MEDIA,
-  mediaQuery,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-  ScrollFadeDirective,
-  SearchPillComponent,
-  SkeletonComponent,
-  StatusTextComponent,
-  StickyBarComponent,
-  PageHeaderComponent,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, DateBlockComponent, EmptyStateComponent, FabComponent, FilterSelectComponent, IconComponent, ListGroupComponent, ListItemComponent, MEDIA, mediaQuery, MetaLineComponent, PageHeaderComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, ScrollFadeDirective, SearchPillComponent, SkeletonComponent, StatusTextComponent, StickyBarComponent } from '@stupa-makers/ui-kit';
 import { meetingDay, meetingTimeText } from '../meetings-display.util';
 import { type MeetingGroup, overviewGroups, topsLabel } from '../meetings-overview.util';
 import { MeetingsTimelineService } from '../meetings-timeline.service';
@@ -47,7 +28,8 @@ import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pu
 /**
  * The list view of the meeting overview (`/meetings`): one column on every screen, with no
  * detail pane, because the meeting page itself is the detail. A row opens the meeting
- * page; an old `?sel=<id>` link opens it as well.
+ * page; an old `?sel=<id>` link opens it as well. The Gremium chip and `?committee=<id>` are
+ * one state: a link from a Gremium opens the list filtered, and a pick writes the URL.
  *
  * The title, the search and the Gremium chip (they never scroll away), then the groups "Jetzt",
  * "Anstehend · <Monat>" and "Vergangen · <Monat>". A row shows the date, the title, the
@@ -63,12 +45,14 @@ import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pu
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    MetaLineComponent,
     PullRefreshDirective,
     RowChevronComponent,
     PageHeaderComponent,
     NgTemplateOutlet,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     DateBlockComponent,
     EmptyStateComponent,
@@ -106,6 +90,12 @@ export class MeetingsListComponent {
     { initialValue: null },
   );
 
+  /** `?committee=<id>` of the URL, to write the Gremium chip back only on a change. */
+  private readonly committeeParam = toSignal(
+    this.route.queryParamMap.pipe(map((q) => q.get('committee'))),
+    { initialValue: null },
+  );
+
   readonly groups = computed<readonly MeetingGroup[]>(() =>
     overviewGroups(this.timeline.upcomingItems(), this.timeline.pastItems(), this.i18n.locale()),
   );
@@ -122,6 +112,18 @@ export class MeetingsListComponent {
     effect(() => {
       const id = this.selParam();
       if (id) void this.router.navigate(['/meetings', id], { replaceUrl: true });
+    });
+    effect(() => {
+      const committee = this.timeline.gremiumFilter() || null;
+      untracked(() => {
+        if (this.selParam() || this.committeeParam() === committee) return;
+        void this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { committee },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+      });
     });
   }
 

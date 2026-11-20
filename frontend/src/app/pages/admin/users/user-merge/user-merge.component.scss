@@ -63,9 +63,6 @@
 .um__hitLogin--sub {
   display: none;
 }
-.um__chev {
-  color: var(--color-text-muted);
-}
 .um__none {
   padding: var(--space-4);
   color: var(--color-text-muted);
@@ -90,10 +87,8 @@
   box-shadow: inset 0 0 0 1px var(--color-accent);
 }
 .um__cardLbl {
-  font-size: var(--fs-xs);
+  font-size: var(--fs-small);
   font-weight: var(--fw-semibold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--color-text-muted);
 }
 .um__cardWho {

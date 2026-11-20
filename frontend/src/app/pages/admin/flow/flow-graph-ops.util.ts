@@ -119,6 +119,24 @@ export function setStateTerminal(g: FlowGraph, key: string, on: boolean): FlowGr
 }
 
 /**
+ * Mark the state as the target for replaced Anträge (001722). Only one state carries the
+ * flag, and it is terminal and denied, so switching it on sets both and clears the flag
+ * on every other state.
+ */
+export function setStateReplacedTarget(g: FlowGraph, key: string, on: boolean): FlowGraph {
+  const cleared: FlowGraph = on
+    ? { ...g, states: g.states.map((s) => (s.isReplacedTarget ? { ...s, isReplacedTarget: false } : s)) }
+    : g;
+  return patchState(
+    cleared,
+    key,
+    on
+      ? { isReplacedTarget: true, isTerminal: true, isDenied: true, isApproved: false }
+      : { isReplacedTarget: false },
+  );
+}
+
+/**
  * Mark the state as approved or denied (spec 000571). A state carries at most one of the
  * two flags, so switching one on switches the other off.
  */

@@ -1,0 +1,70 @@
+<app-dialog
+  [open]="open()"
+  [title]="'applications.typeChange.title' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="close()"
+>
+  <app-select
+    [label]="'applications.typeChange.type' | t"
+    [placeholder]="'applications.typeChange.typePlaceholder' | t"
+    [options]="typeOptions()"
+    [ngModel]="typeId()"
+    (ngModelChange)="pickType($event)"
+  />
+  @if (previewError(); as error) {
+    <p class="tcd__blocked" role="alert">{{ error | t }}</p>
+  }
+  @if (preview(); as p) {
+    <dl class="tcd__fields">
+      @if (missing().length) {
+        <div class="tcd__group tcd__group--warn">
+          <dt>{{ 'applications.typeChange.missing' | t }}</dt>
+          <dd>{{ missing().join(', ') }}</dd>
+        </div>
+      }
+      @if (dropped().length) {
+        <div class="tcd__group">
+          <dt>{{ 'applications.typeChange.dropped' | t }}</dt>
+          <dd>{{ dropped().join(', ') }}</dd>
+        </div>
+      }
+      @if (carried().length) {
+        <div class="tcd__group">
+          <dt>{{ 'applications.typeChange.carried' | t }}</dt>
+          <dd>{{ carried().join(', ') }}</dd>
+        </div>
+      }
+    </dl>
+    @if (!p.possible) {
+      <p class="tcd__blocked" role="alert">{{ 'applications.typeChange.blocked' | t }}</p>
+    } @else if (p.missing.length) {
+      <app-select
+        [label]="'applications.typeChange.transition' | t"
+        [placeholder]="'applications.typeChange.transitionPlaceholder' | t"
+        [options]="transitionOptions()"
+        [ngModel]="transitionId()"
+        (ngModelChange)="transitionId.set($event)"
+      />
+      <label class="tcd__note">
+        <span>{{ 'applications.typeChange.note' | t }}</span>
+        <textarea
+          rows="3"
+          name="typeChangeNote"
+          maxlength="2000"
+          [ngModel]="note()"
+          (ngModelChange)="note.set($event)"
+        ></textarea>
+      </label>
+    }
+  }
+  <app-button dialog-footer variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+  <app-button
+    dialog-footer
+    variant="fill"
+    [loading]="saving()"
+    [disabled]="!canSubmit()"
+    (click)="submit()"
+  >
+    {{ 'applications.typeChange.confirm' | t }}
+  </app-button>
+</app-dialog>

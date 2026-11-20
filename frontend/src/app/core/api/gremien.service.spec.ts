@@ -66,6 +66,15 @@ describe('GremienApiService', () => {
     api.memberAttendance('g-1', 'p-1', '2026-09').subscribe();
     const req = http.expectOne((r) => r.url === '/api/committees/g-1/attendance/p-1');
     expect(req.request.params.get('month')).toBe('2026-09');
+    expect(req.request.params.has('pool')).toBe(false);
+    req.flush({});
+  });
+
+  /** § 001311 */
+  it('reads the pool seats of one pool substitute in one month', () => {
+    api.memberAttendance('g-1', 'p-7', '2026-09', true).subscribe();
+    const req = http.expectOne((r) => r.url === '/api/committees/g-1/attendance/p-7');
+    expect(req.request.params.get('pool')).toBe('true');
     req.flush({});
   });
 

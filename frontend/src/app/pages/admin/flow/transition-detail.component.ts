@@ -6,6 +6,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   EmptyStateComponent,
   IconComponent,
   InputComponent,
@@ -40,6 +41,7 @@ import { actionParamOf, recipientNeedsRef, recipientsOf } from './flow-guard.uti
     FormsModule,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     InputComponent,
     SelectFieldComponent,

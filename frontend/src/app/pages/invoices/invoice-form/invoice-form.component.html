@@ -12,6 +12,7 @@
     <header
       class="ff__head"
       appPaneFormHead
+      [icon]="mode() === 'create' ? 'receipt' : 'edit'"
       [heading]="title() | t"
       [headingId]="'if-title-' + mode()"
       [subtitle]="subtitle()"
@@ -51,9 +52,11 @@
               />
               <div class="if__empty">
                 <app-icon name="upload" [size]="22" />
-                <app-button variant="tonal" size="sm" [loading]="h.attaching()" (click)="createFile.click()">
-                  {{ 'invoices.attachBeleg' | t }}
-                </app-button>
+                <app-button-group>
+                  <app-button variant="tonal" size="sm" [loading]="h.attaching()" (click)="createFile.click()">
+                    {{ 'invoices.attachBeleg' | t }}
+                  </app-button>
+                </app-button-group>
               </div>
             }
           } @else if (edited) {
@@ -80,7 +83,9 @@
           @if (h.importDuplicate() !== null) {
             <app-note class="if__dup" icon="alert" kind="warn" [surface]="layout() === 'sheet' ? 3 : 2" role="alert">
               {{ 'invoices.import.duplicate' | t: { number: h.importDuplicate() ?? '' } }}
-              <app-button noteAction variant="text" size="sm" (click)="openDuplicate.emit()">{{ 'invoices.import.openExisting' | t }}</app-button>
+              <app-button-group ngProjectAs="[noteAction]">
+                <app-button noteAction variant="text" size="sm" (click)="openDuplicate.emit()">{{ 'invoices.import.openExisting' | t }}</app-button>
+              </app-button-group>
             </app-note>
           }
           <div class="ff__grid">

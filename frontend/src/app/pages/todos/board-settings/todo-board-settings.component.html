@@ -24,10 +24,12 @@
     }
 
     <app-section class="bs__sec" [heading]="'todos.settings.columns' | t">
-      <app-button sectionAction variant="text" size="sm" [ariaLabel]="'todos.settings.addColumn' | t" (click)="newColumn.set('')">
-        <app-icon name="plus" />
-        {{ 'todos.settings.addColumnShort' | t }}
-      </app-button>
+      <app-button-group ngProjectAs="[sectionAction]">
+        <app-button sectionAction variant="text" size="sm" [ariaLabel]="'todos.settings.addColumn' | t" (click)="newColumn.set('')">
+          <app-icon name="plus" />
+          {{ 'todos.settings.addColumnShort' | t }}
+        </app-button>
+      </app-button-group>
       <ul class="bs__cols rowgroup" cdkDropList [cdkDropListDisabled]="busy()" (cdkDropListDropped)="drop($event)">
         @for (col of columns(); track col.id; let i = $index) {
           <li class="bs__col" cdkDrag cdkDragLockAxis="y">
@@ -43,7 +45,9 @@
                   (ngModelChange)="renameDraft.set($event)"
                   (keydown.escape)="renaming.set(null)"
                 />
-                <app-button variant="fill" size="sm" (click)="saveRename(col)">{{ 'action.save' | t }}</app-button>
+                <app-button-group [main]="true">
+                  <app-button variant="fill" (click)="saveRename(col)">{{ 'action.save' | t }}</app-button>
+                </app-button-group>
               </form>
             } @else {
               <span class="bs__colName">{{ col.name }}</span>
@@ -51,11 +55,13 @@
                 <span class="bs__doneTag"><app-icon name="check" [size]="12" />{{ 'todos.board.doneColumn' | t }}</span>
               }
               <span class="bs__cards num">{{ 'todos.settings.cards' | t: { n: col.cardCount } }}</span>
-              <app-row-menu
-                [label]="'todos.column.menu' | t: { name: col.name }"
-                [sections]="columnMenu(col, i)"
-                (selected)="onColumnMenu(col, i, $event)"
-              />
+              <app-button-group>
+                <app-row-menu
+                  [label]="'todos.column.menu' | t: { name: col.name }"
+                  [sections]="columnMenu(col, i)"
+                  (selected)="onColumnMenu(col, i, $event)"
+                />
+              </app-button-group>
             }
           </li>
         }
@@ -71,10 +77,12 @@
             (ngModelChange)="newColumn.set($event)"
             (keydown.escape)="newColumn.set(null)"
           />
-          <app-button variant="text" size="sm" (click)="newColumn.set(null)">{{ 'action.cancel' | t }}</app-button>
-          <app-button variant="fill" size="sm" [disabled]="!newColumn()?.trim()" (click)="addColumn()">
-            {{ 'todos.settings.add' | t }}
-          </app-button>
+          <app-button-group [main]="true">
+            <app-button variant="text" (click)="newColumn.set(null)">{{ 'action.cancel' | t }}</app-button>
+            <app-button variant="fill" [disabled]="!newColumn()?.trim()" (click)="addColumn()">
+              {{ 'todos.settings.add' | t }}
+            </app-button>
+          </app-button-group>
         </form>
       }
       @if (deleting(); as col) {
@@ -88,20 +96,24 @@
             (ngModelChange)="moveTo.set($event)"
           />
           <div class="bs__confirmFoot">
-            <app-button variant="text" size="sm" (click)="deleting.set(null)">{{ 'action.cancel' | t }}</app-button>
-            <app-button variant="danger" size="sm" [disabled]="!moveTo()" (click)="confirmDelete()">
-              {{ 'todos.settings.deleteColumn' | t }}
-            </app-button>
+            <app-button-group [main]="true">
+              <app-button variant="text" (click)="deleting.set(null)">{{ 'action.cancel' | t }}</app-button>
+              <app-button variant="danger" [disabled]="!moveTo()" (click)="confirmDelete()">
+                {{ 'todos.settings.deleteColumn' | t }}
+              </app-button>
+            </app-button-group>
           </div>
         </div>
       }
     </app-section>
 
     <app-section class="bs__sec" [heading]="'todos.settings.labels' | t">
-      <app-button sectionAction variant="text" size="sm" [ariaLabel]="'todos.settings.addLabel' | t" (click)="editLabel(null)">
-        <app-icon name="plus" />
-        {{ 'todos.settings.addLabelShort' | t }}
-      </app-button>
+      <app-button-group ngProjectAs="[sectionAction]">
+        <app-button sectionAction variant="text" size="sm" [ariaLabel]="'todos.settings.addLabel' | t" (click)="editLabel(null)">
+          <app-icon name="plus" />
+          {{ 'todos.settings.addLabelShort' | t }}
+        </app-button>
+      </app-button-group>
       <div class="bs__labels rowgroup">
         <div class="bs__labelRow">
         @for (label of board().labels; track label.id) {
@@ -114,7 +126,7 @@
             (click)="editLabel(label)"
           >
             <span class="bs__dot" aria-hidden="true"></span>
-            {{ label.name }}
+            <span class="chip__text">{{ label.name }}</span>
           </button>
         } @empty {
           <span class="bs__none">{{ 'todos.settings.noLabels' | t }}</span>
@@ -147,13 +159,15 @@
             }
           </div>
           <div class="bs__confirmFoot">
-            @if (labelEdit()) {
-              <app-button variant="danger" size="sm" (click)="deleteLabel()">{{ 'todos.settings.deleteLabel' | t }}</app-button>
-            }
-            <app-button variant="text" size="sm" (click)="labelEdit.set(null)">{{ 'action.cancel' | t }}</app-button>
-            <app-button variant="fill" size="sm" [disabled]="!labelName().trim()" (click)="saveLabel()">
-              {{ 'action.save' | t }}
-            </app-button>
+            <app-button-group [main]="true">
+              @if (labelEdit()) {
+                <app-button variant="danger" (click)="deleteLabel()">{{ 'todos.settings.deleteLabel' | t }}</app-button>
+              }
+              <app-button variant="text" (click)="labelEdit.set(null)">{{ 'action.cancel' | t }}</app-button>
+              <app-button variant="fill" [disabled]="!labelName().trim()" (click)="saveLabel()">
+                {{ 'action.save' | t }}
+              </app-button>
+            </app-button-group>
           </div>
         </form>
       }
@@ -191,10 +205,12 @@
 
     @if (isFree()) {
       <app-section class="bs__sec" [heading]="'todos.boardArchive.section' | t">
-        <app-button class="bs__archiveBoard" variant="outlined" (click)="confirmArchive.set(true)">
-          <app-icon name="archive" />
-          {{ 'todos.boardArchive.action' | t }}
-        </app-button>
+        <app-button-group>
+          <app-button class="bs__archiveBoard" variant="outlined" (click)="confirmArchive.set(true)">
+            <app-icon name="archive" />
+            {{ 'todos.boardArchive.action' | t }}
+          </app-button>
+        </app-button-group>
       </app-section>
     }
   </div>

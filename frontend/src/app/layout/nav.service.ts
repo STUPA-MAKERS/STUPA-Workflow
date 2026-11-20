@@ -47,10 +47,10 @@ export const ADMIN_AREA_PERMISSIONS = [
 
 /** The key of a navigation entry. */
 export type NavKey =
-  | 'start'
   | 'applications'
   | 'tasks'
   | 'activity'
+  | 'graph'
   | 'todos'
   | 'calendar'
   | 'meetings'
@@ -60,6 +60,9 @@ export type NavKey =
   | 'expenses'
   | 'invoices'
   | 'tickets'
+  | 'protocols'
+  | 'decisions'
+  | 'publicCalendar'
   | 'admin';
 
 /** One entry of the navigation rail and of the phone bar. */
@@ -84,6 +87,8 @@ export interface NavItem {
   readonly feature?: FeatureKey;
   /** `end` entries sit at the foot of the rail, after the spacer. */
   readonly place: 'main' | 'end';
+  /** The collapsible group of the entry: `public` is "Öffentlich" (spec 001303). */
+  readonly group?: 'public';
 }
 
 /**
@@ -91,15 +96,14 @@ export interface NavItem {
  * (app.routes.ts), so an entry never leads to /forbidden.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
-  { key: 'start', path: '/dashboard', labelKey: 'shell.nav.start', icon: 'home', permissions: [], place: 'main' },
+  /** The start page: the events of the own items (specs 001270, 001300); every session has it. */
+  { key: 'activity', path: '/activity', labelKey: 'nav.activity', icon: 'history', permissions: [], place: 'main' },
   /** Without `application.read` these pages show only the applications and tasks of the user. */
   { key: 'applications', path: '/applications', labelKey: 'nav.applications', icon: 'file', permissions: [], place: 'main' },
   { key: 'tasks', path: '/tasks', labelKey: 'nav.tasks', icon: 'tasks', permissions: [], place: 'main' },
   /** Every session has at least the personal board. */
   { key: 'todos', path: '/todos', labelKey: 'nav.todos', icon: 'circleok', permissions: [], feature: 'todos', place: 'main' },
   { key: 'calendar', path: '/calendar', labelKey: 'nav.calendar', icon: 'cal', permissions: [], feature: 'calendar', place: 'main' },
-  /** The events of the own items (spec 001270); every session has the page. */
-  { key: 'activity', path: '/activity', labelKey: 'nav.activity', icon: 'history', permissions: [], place: 'main' },
   {
     key: 'meetings',
     path: '/meetings',
@@ -149,11 +153,22 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'expenses', path: '/expenses', labelKey: 'nav.expenses', icon: 'swap', permissions: BUDGET_PERMISSIONS, feature: 'budget', place: 'main' },
   { key: 'invoices', path: '/invoices', labelKey: 'nav.invoices', icon: 'receipt', permissions: BUDGET_PERMISSIONS, feature: 'invoices', place: 'main' },
   { key: 'tickets', path: '/tickets', labelKey: 'nav.tickets', icon: 'ticket', permissions: ['ticket.manage'], reportedTickets: true, feature: 'tickets', place: 'main' },
+  /** The graph of the elements and their relations (specs 001420, 001421). */
+  { key: 'graph', path: '/graph', labelKey: 'nav.graph', icon: 'shapes', permissions: ['graph.view'], place: 'main' },
+  /**
+   * The public pages, for a signed-in person (spec 001303): the public start page `/` holds
+   * the only other links to them, and it leads a session to the activity page. They form
+   * the group "Öffentlich" at the end of the main entries; a page shows only while its
+   * feature is on.
+   */
+  { key: 'protocols', path: '/protocols', labelKey: 'nav.public.protocols', icon: 'file', permissions: [], feature: 'meetings', place: 'main', group: 'public' },
+  { key: 'decisions', path: '/decisions', labelKey: 'nav.public.decisions', icon: 'vote', permissions: [], feature: 'meetings', place: 'main', group: 'public' },
+  { key: 'publicCalendar', path: '/public-calendar', labelKey: 'nav.public.calendar', icon: 'cal', permissions: [], feature: 'calendar', place: 'main', group: 'public' },
   { key: 'admin', path: '/admin', labelKey: 'nav.admin', icon: 'shield', permissions: ADMIN_AREA_PERMISSIONS, place: 'end' },
 ];
 
 /** The entries of the phone bar. The other visible entries go into the "Mehr" sheet. */
-export const BOTTOM_BAR_KEYS: readonly NavKey[] = ['start', 'applications', 'meetings', 'tasks'];
+export const BOTTOM_BAR_KEYS: readonly NavKey[] = ['activity', 'applications', 'meetings', 'tasks'];
 
 /**
  * The navigation entries the signed-in principal may open.

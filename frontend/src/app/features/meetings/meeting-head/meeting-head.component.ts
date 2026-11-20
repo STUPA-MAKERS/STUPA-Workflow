@@ -11,17 +11,7 @@ import {
 import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import {
-  ButtonComponent,
-  dockInListDetailBar,
-  IconComponent,
-  ListDetailBarComponent,
-  ListDetailNav,
-  MEDIA,
-  mediaQuery,
-  type StatusKind,
-  StatusTextComponent,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, dockInListDetailBar, IconComponent, ListDetailBarComponent, ListDetailNav, MEDIA, mediaQuery, MetaLineComponent, type StatusKind, StatusTextComponent } from '@stupa-makers/ui-kit';
 
 /**
  * The head of a meeting view: "Zurück", the title with the status after it, and a quiet
@@ -38,7 +28,8 @@ import {
  *
  * The host is the `header` of the page, so the page keeps its frame rules (padding,
  * height, gap, role). The page can set `--mh-title-size` and `--mh-title-line`
- * for the title and `--mh-status-size` for the status.
+ * for the title and `--mh-status-size` for the status. Beside the title the status is a
+ * chip centred on the title line (spec 001305); in the phone bar it stays text.
  *
  * ```html
  * <header appMeetingHead class="mp__head" [heading]="m.title" [statusKind]="status().kind"
@@ -52,7 +43,9 @@ import {
   selector: 'header[appMeetingHead]',
   standalone: true,
   imports: [
+    MetaLineComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     ListDetailBarComponent,
     NgTemplateOutlet,

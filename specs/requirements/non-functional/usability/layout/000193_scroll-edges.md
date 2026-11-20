@@ -1,11 +1,12 @@
 ---
 id: "000193"
-title: A scroll edge fades, or cuts at a line
+title: A scroll area cuts at the edge of a surface
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-16
+updated: 2026-11-20
 implementation:
+  - frontend/src/app/pages/admin/admin-list/admin-list.component.scss
   - frontend/src/app/features/todos/card-detail/todo-card-detail.component.scss
   - frontend/vendor/ui-kit/src/styles/_frosted.scss
   - frontend/vendor/ui-kit/src/styles/list-detail.scss
@@ -19,24 +20,32 @@ scope:
   - frontend/src/app/features/todos/card-detail
 ---
 
-# A scroll edge fades, or cuts at a line
+# A scroll area cuts at the edge of a surface
 
-A scrolling pane must fade at its edges. At each edge of this table, the content must do what
-the table says in place of the fade:
+A scroll area must not fade at its ends. Its content must cut hard at an edge that the user can
+see. At each kind of place, the content must cut as this table says:
 
-| Edge | What the content must do |
+| Place | Where the content cuts |
 | --- | --- |
-| A real line, for example a tab line on the phone | It cuts hard at that line. |
-| The lower edge of a glass list head (000527) | It runs on under the line as a blur. The list under the head does not fade, and its rows run to the bottom edge of the screen. |
-| The top edge of the screen, where the glass of a list head reaches it | The glass turns into the solid page colour at that edge over 48 px. This applies to every list head: the head of a list column on a wide screen, the search bar of a list on a phone, and a group head that carries the glass of the head. The sides of the glass keep their fade into the page colour. Where the head sticks below another bar, the glass does not fade at its top, because that bar is the edge. |
-| The lower edge of the side sheet of a to-do card beside the board, on a wider screen | The details column runs to that edge and cuts hard there. Its upper end still fades. |
-| The lower edge of the window below the work list of Start (000624) | The rows cut hard at that edge, and the panel fades at neither end. |
+| A scroll area that fills a surface, for example a detail sheet, a dialog, a side sheet, a bottom sheet or a form | At the rounded edge of that surface, as the detail of a list does. |
+| A column on the page background that ends above the bottom edge of the screen, for example the agenda of a Sitzung | The column lies on a surface of its own with rounded corners, and the content cuts at its edge. |
+| A column that reaches the bottom edge of the screen, for example the cost-centre tree of the Haushalt | At the edge of the screen. The column has no surface of its own. |
+| A list inside a dialog or a sheet, for example the bookings of a cost centre or the attendance | At the rounded frame of the list itself. The rows run to the sides of the frame, without side padding. |
+| The page body of the administration sheet on a wide screen | At a rounded frame that is exactly as wide as the fields, 24 px inside the sheet, so that a field that scrolls past an end keeps its rounded corners. |
+| The scroll part of the navigation rail | The scroll part lies on a surface of its own with rounded corners (001441). |
+| A row of chips that scrolls sideways on a phone | At the edge of the screen. The row runs from screen edge to screen edge. |
+| The message log of a chat | At its rounded frame. |
+| The rows of a list column on a wide screen | At the lower edge of the list head (000527). |
+| The rows of a one-column list below its filter bar on a wide screen, for example Aktivität or Sitzungen | At the lower edge of the filter bar, with round inner corners at both sides, while rows are under the bar. |
+| A real line, for example a tab line on the phone | At that line. |
 
-Reason: A fade shows that the content goes on. The edge of the screen and a tab line are real
-lines, so a fade there hides rows for no gain. Rows under a glass head stay in view as a
-blur, and at the top edge of the screen they would cut sharp, so the glass runs out into the
-page colour there, as its sides do.
+In the very high contrast mode (000605), a scroll area draws no extra line at an end where its
+content cuts at the edge of a surface, because that edge is already drawn.
 
-Test: Screenshots of a list with rows scrolled under the head (Verwaltung, Anträge) on a phone
-and on a desktop width, in the light and the dark theme, and of an open to-do card with a long
-details column on a desktop width.
+Reason: A fade at one place and a hard cut at another made the app look inconsistent. A cut at
+an edge that the user sees looks intended, and the user still sees that the content goes on,
+because the cut runs through a row.
+
+Test: Screenshots of each kind of place in the table, in the light and the dark theme and in the
+very high contrast mode, and a check that no `fade-y` or `fade-x` mixin and no scroll-fade mask
+is left in `frontend/src` and in the ui-kit.

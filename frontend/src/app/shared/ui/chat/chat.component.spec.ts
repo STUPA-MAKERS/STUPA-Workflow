@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -12,8 +12,17 @@ import { runAxe } from '../../../../testing/a11y';
 import { AltchaService } from '../../../features/apply/altcha.service';
 import { ChatDrafts } from './chat-drafts';
 import { ChatComponent, SCAN_BACKOFF, chatUploadError } from './chat.component';
-import type { ChatEvent, ChatMessage, ChatVisibility } from './chat.models';
+import { TestBed } from '@angular/core/testing';
+import { I18nService } from '@core/i18n/i18n.service';
+import type { ChatEvent, ChatMessage, ChatVisibility, ChatVisibilityGuard } from './chat.models';
 import type { ChatPerson } from './chat-mentions';
+
+/** The text of `el` with a space between the parts of each meta line (the dots are CSS). */
+function spaced(el: Element | null | undefined): string {
+  const copy = el?.cloneNode(true) as Element | undefined;
+  copy?.querySelectorAll('.ml__parts > *').forEach((part) => part.before(' '));
+  return (copy?.textContent ?? '').replace(/\s+/g, ' ').trim();
+}
 
 /** A time today, so the day separator reads "Heute". */
 function today(h: number, m = 0): string {
@@ -55,6 +64,7 @@ interface SetupOpts {
   events?: ChatEvent[];
   canPost?: boolean;
   visibilityOptions?: ChatVisibility[];
+  visibilityGuard?: ChatVisibilityGuard | null;
   draftKey?: string;
   phone?: boolean;
   /** A phone width with a mouse or a keyboard (a narrow or zoomed desktop window). */
@@ -104,6 +114,7 @@ async function setup(opts: SetupOpts = {}) {
       events: opts.events ?? [],
       canPost: opts.canPost ?? true,
       visibilityOptions: opts.visibilityOptions ?? [],
+      visibilityGuard: opts.visibilityGuard ?? null,
       draftKey: opts.draftKey ?? 't1',
       canAttach: opts.canAttach ?? false,
       loading: opts.loading ?? false,
@@ -123,7 +134,8 @@ async function setup(opts: SetupOpts = {}) {
     view.fixture.detectChanges();
   };
   const log = () => screen.getByRole('log');
-  const input = () => screen.getByRole('textbox', { name: 'Nachricht schreiben …' }) as HTMLTextAreaElement;
+  const input = () =>
+    screen.getByRole('textbox', { name: 'Nachricht schreiben …' }) as HTMLTextAreaElement;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cmp = view.fixture.componentInstance as any;
   /** Pick files with the hidden input and let the uploads finish. */
@@ -137,9 +149,25 @@ async function setup(opts: SetupOpts = {}) {
     await new Promise((r) => setTimeout(r));
     view.fixture.detectChanges();
   };
-  return { view, send, edit, del, retry, discard, refresh, set, log, input, cmp, api, toast, pick, settle, user: userEvent.setup() };
+  return {
+    view,
+    send,
+    edit,
+    del,
+    retry,
+    discard,
+    refresh,
+    set,
+    log,
+    input,
+    cmp,
+    api,
+    toast,
+    pick,
+    settle,
+    user: userEvent.setup(),
+  };
 }
-
 
 /** Confirm the open "Anhang entfernen?" dialog of a draft chip. */
 async function confirmRemove(settle: () => Promise<void>): Promise<void> {
@@ -213,13 +241,17 @@ describe('ChatComponent', () => {
       messages: [msg('y', daysAgo(1)), msg('w', daysAgo(3)), msg('o', old.toISOString())],
       events: [{ id: 'e', at: today(8, 12), text: 'Status: Neu → In Bearbeitung' }],
     });
-    const seps = [...view.container.querySelectorAll('.chat__sep')].map((s) => s.textContent?.trim());
+    const seps = [...view.container.querySelectorAll('.chat__sep')].map((s) =>
+      s.textContent?.trim(),
+    );
     expect(seps).toHaveLength(4);
     expect(seps[0]).toContain(String(old.getFullYear()));
     expect(seps[1]).toMatch(/\d{2}\.\d{2}\.$/);
     expect(seps[2]).toBe('Gestern');
     expect(seps[3]).toBe('Heute');
-    expect(view.container.querySelector('.chat__event')?.textContent).toContain('Status: Neu → In Bearbeitung');
+    expect(view.container.querySelector('.chat__event')?.textContent).toContain(
+      'Status: Neu → In Bearbeitung',
+    );
     expect(view.container.querySelector('.chat__event time')?.textContent).toBe('08:12');
   });
 
@@ -240,10 +272,16 @@ describe('ChatComponent', () => {
   /** A thread that offers both visibilities marks a single one too. */
   it('marks internal and public only where both exist', async () => {
     const { view, set } = await setup({
-      messages: [msg('a', today(9), { visibility: 'internal' }), msg('b', today(10), { visibility: 'internal' })],
+      messages: [
+        msg('a', today(9), { visibility: 'internal' }),
+        msg('b', today(10), { visibility: 'internal' }),
+      ],
     });
     expect(view.container.querySelector('.chat__mark')).toBeNull();
-    set('messages', [msg('a', today(9), { visibility: 'internal' }), msg('b', today(10), { visibility: 'public' })]);
+    set('messages', [
+      msg('a', today(9), { visibility: 'internal' }),
+      msg('b', today(10), { visibility: 'public' }),
+    ]);
     expect(view.container.querySelector('.chat__mark--internal')).toHaveTextContent('Intern');
     expect(view.container.querySelector('.chat__mark--public')).toHaveTextContent('Öffentlich');
     expect(view.container.querySelector('.chat__bubble--internal')).not.toBeNull();
@@ -253,9 +291,15 @@ describe('ChatComponent', () => {
   });
 
   it('renders Markdown and links bare URLs in full', async () => {
-    await setup({ messages: [msg('a', today(9), { body: '**fett** https://lastenrad.example.de/angebot/2026-1187' })] });
+    await setup({
+      messages: [
+        msg('a', today(9), { body: '**fett** https://lastenrad.example.de/angebot/2026-1187' }),
+      ],
+    });
     expect(screen.getByText('fett').tagName).toBe('STRONG');
-    const link = screen.getByRole('link', { name: 'https://lastenrad.example.de/angebot/2026-1187' });
+    const link = screen.getByRole('link', {
+      name: 'https://lastenrad.example.de/angebot/2026-1187',
+    });
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
   });
@@ -269,15 +313,38 @@ describe('ChatComponent', () => {
       messages: [
         msg('a', today(9), {
           attachments: [
-            { id: 'f', filename: 'angebot.pdf', mime: 'application/pdf', size: 10, url: '/api/attachments/f/download' },
-            { id: 'g', filename: 'kopf.png', mime: 'image/png', size: 98_304, url: '/api/attachments/g/download' },
-            { id: 'h', filename: 'README', mime: 'text/plain', size: 2048, url: '/api/attachments/h/download' },
+            {
+              id: 'f',
+              filename: 'angebot.pdf',
+              mime: 'application/pdf',
+              size: 10,
+              url: '/api/attachments/f/download',
+            },
+            {
+              id: 'g',
+              filename: 'kopf.png',
+              mime: 'image/png',
+              size: 98_304,
+              url: '/api/attachments/g/download',
+            },
+            {
+              id: 'h',
+              filename: 'README',
+              mime: 'text/plain',
+              size: 2048,
+              url: '/api/attachments/h/download',
+            },
           ],
         }),
       ],
     });
-    expect(screen.getByRole('link', { name: /^angebot\.pdf/ })).toHaveAttribute('href', '/api/attachments/f/download');
-    const metas = [...document.querySelectorAll('.chat__fileMeta')].map((m) => m.textContent?.trim());
+    expect(screen.getByRole('link', { name: /^angebot\.pdf/ })).toHaveAttribute(
+      'href',
+      '/api/attachments/f/download',
+    );
+    const metas = [...document.querySelectorAll('.chat__fileMeta')].map((m) =>
+      m.textContent?.trim(),
+    );
     expect(metas).toEqual(['PDF · 1 KB', '2 KB']);
     const img = screen.getByRole('img', { name: 'kopf.png' });
     expect(img).toHaveAttribute('src', '/api/attachments/g/download?inline=1');
@@ -297,32 +364,76 @@ describe('ChatComponent', () => {
       messages: [
         msg('a', today(9), {
           attachments: [
-            { id: 'f', filename: 'angebot.pdf', mime: 'application/pdf', size: 10, url: '/api/attachments/f/download' },
-            { id: 'g', filename: 'kopf.png', mime: 'image/png', size: 10, url: '/api/attachments/g/download' },
-            { id: 'h', filename: 'README', mime: 'text/plain', size: 10, url: '/api/attachments/h/download' },
-            { id: 'k', filename: 'neu.png', mime: 'image/png', size: 10, url: '/api/attachments/k/download', scanState: 'scanning' },
+            {
+              id: 'f',
+              filename: 'angebot.pdf',
+              mime: 'application/pdf',
+              size: 10,
+              url: '/api/attachments/f/download',
+            },
+            {
+              id: 'g',
+              filename: 'kopf.png',
+              mime: 'image/png',
+              size: 10,
+              url: '/api/attachments/g/download',
+            },
+            {
+              id: 'h',
+              filename: 'README',
+              mime: 'text/plain',
+              size: 10,
+              url: '/api/attachments/h/download',
+            },
+            {
+              id: 'k',
+              filename: 'neu.png',
+              mime: 'image/png',
+              size: 10,
+              url: '/api/attachments/k/download',
+              scanState: 'scanning',
+            },
           ],
         }),
         msg('b', today(10), {
-          attachments: [{ id: 'z', filename: 'anderes.png', mime: 'image/png', size: 10, url: '/api/attachments/z/download' }],
+          attachments: [
+            {
+              id: 'z',
+              filename: 'anderes.png',
+              mime: 'image/png',
+              size: 10,
+              url: '/api/attachments/z/download',
+            },
+          ],
         }),
       ],
     });
     expect(fireEvent.click(screen.getByRole('link', { name: /^README/ }))).toBe(true);
-    expect(fireEvent.click(screen.getByRole('link', { name: 'kopf.png' }), { ctrlKey: true })).toBe(true);
+    expect(fireEvent.click(screen.getByRole('link', { name: 'kopf.png' }), { ctrlKey: true })).toBe(
+      true,
+    );
     expect(screen.queryByRole('dialog')).toBeNull();
 
     expect(fireEvent.click(screen.getByRole('link', { name: 'kopf.png' }))).toBe(false);
     view.fixture.detectChanges();
     const viewer = screen.getByRole('dialog', { name: 'kopf.png' });
-    expect(within(viewer).getByRole('img', { name: 'kopf.png' })).toHaveAttribute('src', '/api/attachments/g/download?inline=1');
+    expect(within(viewer).getByRole('img', { name: 'kopf.png' })).toHaveAttribute(
+      'src',
+      '/api/attachments/g/download?inline=1',
+    );
     expect(viewer.querySelector('.fv__position')).toHaveTextContent('2 von 2');
-    expect(within(viewer).getByRole('link', { name: 'Herunterladen' })).toHaveAttribute('href', '/api/attachments/g/download');
+    expect(within(viewer).getByRole('link', { name: 'Herunterladen' })).toHaveAttribute(
+      'href',
+      '/api/attachments/g/download',
+    );
 
     await userEvent.click(within(viewer).getByRole('button', { name: 'Vorherige Datei' }));
     view.fixture.detectChanges();
     expect(screen.getByRole('dialog', { name: 'angebot.pdf' })).toBeInTheDocument();
-    expect(viewer.querySelector('iframe')).toHaveAttribute('src', '/api/attachments/f/download?inline=1');
+    expect(viewer.querySelector('iframe')).toHaveAttribute(
+      'src',
+      '/api/attachments/f/download?inline=1',
+    );
     const download = within(viewer).getByRole('link', { name: 'Herunterladen' });
     expect(download).toHaveAttribute('href', '/api/attachments/f/download');
     expect(download).toHaveAttribute('download');
@@ -342,8 +453,20 @@ describe('ChatComponent', () => {
       messages: [
         msg('a', today(9), {
           attachments: [
-            { id: 'f', filename: 'angebot.pdf', mime: 'application/pdf', size: 10, url: '/api/attachments/f/download' },
-            { id: 'g', filename: 'kopf.png', mime: 'image/png', size: 10, url: '/api/attachments/g/download' },
+            {
+              id: 'f',
+              filename: 'angebot.pdf',
+              mime: 'application/pdf',
+              size: 10,
+              url: '/api/attachments/f/download',
+            },
+            {
+              id: 'g',
+              filename: 'kopf.png',
+              mime: 'image/png',
+              size: 10,
+              url: '/api/attachments/g/download',
+            },
           ],
         }),
       ],
@@ -362,7 +485,14 @@ describe('ChatComponent', () => {
         msg('a', today(9), {
           body: '| a | b |\n|---|--:|\n| 1 | 2 |\n\n![Plan](/api/media/images/0b8f3c3e-4d6a-4f43-9a1e-2f0c1d2e3f40)',
           attachments: [
-            { id: 'g', filename: 'kopf.png', mime: 'image/png', size: 10, url: '/x?sig=1', scanState: 'scanning' },
+            {
+              id: 'g',
+              filename: 'kopf.png',
+              mime: 'image/png',
+              size: 10,
+              url: '/x?sig=1',
+              scanState: 'scanning',
+            },
           ],
         }),
       ],
@@ -386,8 +516,13 @@ describe('ChatComponent', () => {
         msg('f', today(10), { own: true, state: 'failed' }),
       ],
     });
-    const metas = [...view.container.querySelectorAll('.chat__meta')].map((m) => m.textContent?.replace(/\s+/g, ' ').trim());
-    expect(metas).toEqual(['bearbeitet', '09:01·bearbeitet', 'wird gesendet …', 'Nicht gesendet Erneut senden Bearbeiten Verwerfen']);
+    const metas = [...view.container.querySelectorAll('.chat__meta')].map((m) => spaced(m));
+    expect(metas).toEqual([
+      'bearbeitet',
+      '09:01 bearbeitet',
+      'wird gesendet …',
+      'Nicht gesendet Erneut senden Bearbeiten Verwerfen',
+    ]);
     expect(view.container.querySelector('.chat__bubble--failed')).not.toBeNull();
     expect(screen.queryAllByRole('button', { name: 'Nachricht bearbeiten' })).toHaveLength(0);
     fireEvent.click(screen.getByRole('button', { name: 'Erneut senden' }));
@@ -414,7 +549,14 @@ describe('ChatComponent', () => {
   it('resends a failed message with its own visibility, not the one the composer shows', async () => {
     const { input, send, view, cmp } = await setup({
       visibilityOptions: ['public', 'internal'],
-      messages: [msg('f', today(10), { own: true, state: 'failed', body: 'Kosten noch unklar', visibility: 'internal' })],
+      messages: [
+        msg('f', today(10), {
+          own: true,
+          state: 'failed',
+          body: 'Kosten noch unklar',
+          visibility: 'internal',
+        }),
+      ],
     });
     expect(cmp.visibility()).toBe('public');
     fireEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
@@ -427,7 +569,9 @@ describe('ChatComponent', () => {
   it('keeps the composer visibility for a failed message of a kind it does not offer', async () => {
     const { view, cmp } = await setup({
       visibilityOptions: ['internal'],
-      messages: [msg('f', today(10), { own: true, state: 'failed', body: 'x', visibility: 'public' })],
+      messages: [
+        msg('f', today(10), { own: true, state: 'failed', body: 'x', visibility: 'public' }),
+      ],
     });
     fireEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
     view.fixture.detectChanges();
@@ -473,7 +617,9 @@ describe('ChatComponent', () => {
     expect(input().getAttribute('maxlength')).toBe('10000');
     cmp.startEdit(cmp.messages()[0]);
     view.fixture.detectChanges();
-    expect(view.container.querySelector('.chat__editInput')?.getAttribute('maxlength')).toBe('10000');
+    expect(view.container.querySelector('.chat__editInput')?.getAttribute('maxlength')).toBe(
+      '10000',
+    );
   });
 
   describe('composer', () => {
@@ -509,9 +655,72 @@ describe('ChatComponent', () => {
       fireEvent.input(input(), { target: { value: 'Geheim' } });
       fireEvent.keyDown(input(), { key: 'Enter' });
       expect(send).toHaveBeenCalledWith({ body: 'Geheim', visibility: 'internal' });
-      expect(within(group).getByRole('radio', { name: 'Intern' })).toHaveAttribute('aria-checked', 'true');
+      expect(within(group).getByRole('radio', { name: 'Intern' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
       cmp.setVisibility('other');
       expect(cmp.visibility()).toBeNull();
+    });
+
+    describe('with a guarded visibility switch', () => {
+      const GUARD: ChatVisibilityGuard = {
+        labels: {
+          internal: 'applications.comments.vis.internal',
+          public: 'applications.comments.vis.public',
+        },
+      };
+      const INT = 'Intern';
+      const PUB = 'Öffentlich';
+
+      it('names the readers of each choice in German and in English', async () => {
+        const { view } = await setup({
+          visibilityOptions: ['internal', 'public'],
+          visibilityGuard: GUARD,
+        });
+        const group = screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
+        expect(within(group).getByRole('radio', { name: INT })).toBeChecked();
+        expect(within(group).getByRole('radio', { name: PUB })).not.toBeChecked();
+        const i18n = TestBed.inject(I18nService);
+        i18n.setLocale('en');
+        view.fixture.detectChanges();
+        try {
+          expect(within(group).getByRole('radio', { name: 'Internal' })).toBeChecked();
+          expect(within(group).getByRole('radio', { name: 'Public' })).toBeInTheDocument();
+        } finally {
+          i18n.setLocale('de');
+        }
+      });
+
+      it('frames a public draft and keeps an internal one plain', async () => {
+        const { user, view } = await setup({
+          visibilityOptions: ['internal', 'public'],
+          visibilityGuard: GUARD,
+        });
+        expect(view.container.querySelector('app-segmented.chat__vis')).not.toBeNull();
+        expect(view.container.querySelector('.chat__box--public')).toBeNull();
+        await user.click(screen.getByRole('radio', { name: PUB }));
+        expect(screen.getByRole('radio', { name: PUB })).toBeChecked();
+        expect(view.container.querySelector('.chat__box--public')).not.toBeNull();
+      });
+
+      it('starts the next message with the first choice again', async () => {
+        const { user, input, send } = await setup({
+          visibilityOptions: ['internal', 'public'],
+          visibilityGuard: GUARD,
+        });
+        await user.click(screen.getByRole('radio', { name: PUB }));
+        fireEvent.input(input(), { target: { value: 'An alle' } });
+        fireEvent.keyDown(input(), { key: 'Enter' });
+        expect(send).toHaveBeenCalledWith({ body: 'An alle', visibility: 'public' });
+        expect(screen.getByRole('radio', { name: INT })).toBeChecked();
+      });
+
+      it('shows no switch and no frame with one choice', async () => {
+        const { view } = await setup({ visibilityOptions: ['public'], visibilityGuard: GUARD });
+        expect(screen.queryByRole('radiogroup')).toBeNull();
+        expect(view.container.querySelector('.chat__box--public')).toBeNull();
+      });
     });
 
     it('sends the only visibility without a toggle', async () => {
@@ -534,9 +743,15 @@ describe('ChatComponent', () => {
       const { user, set } = await setup({ visibilityOptions: ['public', 'internal'] });
       const group = () => screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
       await user.click(within(group()).getByRole('radio', { name: 'Intern' }));
-      expect(within(group()).getByRole('radio', { name: 'Intern' })).toHaveAttribute('aria-checked', 'true');
+      expect(within(group()).getByRole('radio', { name: 'Intern' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
       set('draftKey', 't2');
-      expect(within(group()).getByRole('radio', { name: 'Öffentlich' })).toHaveAttribute('aria-checked', 'true');
+      expect(within(group()).getByRole('radio', { name: 'Öffentlich' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
     });
 
     it('keeps the draft per thread', async () => {
@@ -884,12 +1099,16 @@ describe('ChatComponent', () => {
   });
 
   describe('own messages on a desktop', () => {
-    const own = () => [msg('m', today(9), { own: true, body: 'Alt' }), msg('n', today(9, 1), { own: true })];
+    const own = () => [
+      msg('m', today(9), { own: true, body: 'Alt' }),
+      msg('n', today(9, 1), { own: true }),
+    ];
 
     it('edits inline: Enter saves, Escape cancels, an unchanged text emits nothing', async () => {
       const { edit } = await setup({ messages: own() });
       fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })[0]);
-      const box = () => screen.getByRole('textbox', { name: 'Nachricht bearbeiten' }) as HTMLTextAreaElement;
+      const box = () =>
+        screen.getByRole('textbox', { name: 'Nachricht bearbeiten' }) as HTMLTextAreaElement;
       expect(box().value).toBe('Alt');
       fireEvent.keyDown(box(), { key: 'Enter' });
       expect(edit).not.toHaveBeenCalled();
@@ -914,8 +1133,10 @@ describe('ChatComponent', () => {
         view.fixture.detectChanges();
         await view.fixture.whenStable();
       };
-      const editOf = (i: number) => screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })[i];
-      const box = () => screen.getByRole('textbox', { name: 'Nachricht bearbeiten' }) as HTMLTextAreaElement;
+      const editOf = (i: number) =>
+        screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })[i];
+      const box = () =>
+        screen.getByRole('textbox', { name: 'Nachricht bearbeiten' }) as HTMLTextAreaElement;
       editOf(1).focus();
       fireEvent.click(editOf(1));
       await settle();
@@ -951,7 +1172,10 @@ describe('ChatComponent', () => {
         view.fixture.detectChanges();
         await view.fixture.whenStable();
       };
-      const box = () => screen.queryByRole('textbox', { name: 'Nachricht bearbeiten' }) as HTMLTextAreaElement | null;
+      const box = () =>
+        screen.queryByRole('textbox', {
+          name: 'Nachricht bearbeiten',
+        }) as HTMLTextAreaElement | null;
       fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })[0]);
       fireEvent.input(box() as HTMLTextAreaElement, { target: { value: 'Lange neue Fassung' } });
       fireEvent.keyDown(box() as HTMLTextAreaElement, { key: 'Enter' });
@@ -987,7 +1211,11 @@ describe('ChatComponent', () => {
       expect(edit).not.toHaveBeenCalled();
       fireEvent.input(box, { target: { value: 'Geändert' } });
       fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-      expect(edit).toHaveBeenCalledWith({ id: 'n', body: 'Geändert', restore: expect.any(Function) });
+      expect(edit).toHaveBeenCalledWith({
+        id: 'n',
+        body: 'Geändert',
+        restore: expect.any(Function),
+      });
 
       fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })[1]);
       fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
@@ -1006,10 +1234,17 @@ describe('ChatComponent', () => {
       trash.focus();
       fireEvent.click(trash);
       view.fixture.detectChanges();
-      fireEvent.click(within(screen.getByRole('dialog', { name: 'Nachricht löschen?' })).getByRole('button', { name: 'Löschen' }));
+      fireEvent.click(
+        within(screen.getByRole('dialog', { name: 'Nachricht löschen?' })).getByRole('button', {
+          name: 'Löschen',
+        }),
+      );
       view.fixture.detectChanges();
       set('messages', own());
-      set('messages', own().filter((m) => m.id !== 'm'));
+      set(
+        'messages',
+        own().filter((m) => m.id !== 'm'),
+      );
       await view.fixture.whenStable();
       expect(document.activeElement).toBe(input());
     });
@@ -1022,7 +1257,11 @@ describe('ChatComponent', () => {
       fireEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
       expect(del).not.toHaveBeenCalled();
       fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht löschen' })[0]);
-      fireEvent.click(within(screen.getByRole('dialog', { name: 'Nachricht löschen?' })).getByRole('button', { name: 'Löschen' }));
+      fireEvent.click(
+        within(screen.getByRole('dialog', { name: 'Nachricht löschen?' })).getByRole('button', {
+          name: 'Löschen',
+        }),
+      );
       expect(del).toHaveBeenCalledWith({ id: 'm' });
       (view.fixture.componentInstance as unknown as { confirmDelete(): void }).confirmDelete();
       expect(del).toHaveBeenCalledTimes(1);
@@ -1031,7 +1270,10 @@ describe('ChatComponent', () => {
 
   describe('actions in a narrow window with a mouse', () => {
     it('keeps the hover and focus actions when the width is a phone but the pointer is fine', async () => {
-      const { edit, view } = await setup({ fine: true, messages: [msg('m', today(8, 21), { own: true, body: 'Prüfe ich' })] });
+      const { edit, view } = await setup({
+        fine: true,
+        messages: [msg('m', today(8, 21), { own: true, body: 'Prüfe ich' })],
+      });
       expect(view.fixture.nativeElement).toHaveClass('chat--phone');
       fireEvent.click(screen.getByRole('button', { name: 'Nachricht bearbeiten' }));
       const box = screen.getByRole('textbox', { name: 'Nachricht bearbeiten' });
@@ -1053,7 +1295,11 @@ describe('ChatComponent', () => {
       });
       expect(screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })).toHaveLength(1);
       fireEvent.click(screen.getByRole('button', { name: 'Nachricht löschen' }));
-      fireEvent.click(within(screen.getByRole('dialog', { name: 'Nachricht löschen?' })).getByRole('button', { name: 'Löschen' }));
+      fireEvent.click(
+        within(screen.getByRole('dialog', { name: 'Nachricht löschen?' })).getByRole('button', {
+          name: 'Löschen',
+        }),
+      );
       expect(del).toHaveBeenCalledWith({ id: 'a' });
     });
   });
@@ -1063,7 +1309,10 @@ describe('ChatComponent', () => {
     afterEach(() => jest.useRealTimers());
 
     async function longPress() {
-      const ctx = await setup({ phone: true, messages: [msg('m', today(8, 21), { own: true, body: 'Prüfe ich' })] });
+      const ctx = await setup({
+        phone: true,
+        messages: [msg('m', today(8, 21), { own: true, body: 'Prüfe ich' })],
+      });
       expect(screen.queryByRole('button', { name: 'Nachricht bearbeiten' })).toBeNull();
       const bubble = ctx.view.container.querySelector('.chat__bubble') as HTMLElement;
       fireEvent.pointerDown(bubble);
@@ -1089,7 +1338,10 @@ describe('ChatComponent', () => {
 
     /** A tap is the alternative to the long press (app spec 000514). */
     it('opens the sheet on a plain tap too', async () => {
-      const { view } = await setup({ phone: true, messages: [msg('m', today(8, 21), { own: true, body: 'Prüfe ich' })] });
+      const { view } = await setup({
+        phone: true,
+        messages: [msg('m', today(8, 21), { own: true, body: 'Prüfe ich' })],
+      });
       fireEvent.click(view.container.querySelector('.chat__bubble') as HTMLElement);
       view.fixture.detectChanges();
       expect(screen.getByRole('dialog', { name: 'Deine Nachricht · 08:21' })).toBeInTheDocument();
@@ -1111,10 +1363,16 @@ describe('ChatComponent', () => {
     /** Enter is a new line on a phone. A phone has no Edit button, so the focus goes to the log. */
     it('edits and deletes from the sheet', async () => {
       const { view, cmp } = await longPress();
-      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Bearbeiten' }));
+      fireEvent.click(
+        within(screen.getByRole('dialog')).getByRole('button', { name: 'Bearbeiten' }),
+      );
       view.fixture.detectChanges();
-      expect(screen.getByRole('textbox', { name: 'Nachricht bearbeiten' })).toHaveValue('Prüfe ich');
-      fireEvent.keyDown(screen.getByRole('textbox', { name: 'Nachricht bearbeiten' }), { key: 'Enter' });
+      expect(screen.getByRole('textbox', { name: 'Nachricht bearbeiten' })).toHaveValue(
+        'Prüfe ich',
+      );
+      fireEvent.keyDown(screen.getByRole('textbox', { name: 'Nachricht bearbeiten' }), {
+        key: 'Enter',
+      });
       expect(screen.getByRole('textbox', { name: 'Nachricht bearbeiten' })).toBeInTheDocument();
       expect(screen.getByRole('textbox', { name: 'Nachricht bearbeiten' })).toHaveFocus();
       cmp.cancelEdit();
@@ -1136,13 +1394,17 @@ describe('ChatComponent', () => {
       cmp.openMenu(cmp.messages()[0]);
       view.fixture.detectChanges();
       const sheet = screen.getByRole('dialog');
-      expect(within(sheet).queryByRole('button', { name: 'Text kopieren' })).not.toBeInTheDocument();
+      expect(
+        within(sheet).queryByRole('button', { name: 'Text kopieren' }),
+      ).not.toBeInTheDocument();
       expect(within(sheet).getByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument();
     });
 
     it('closes the sheet with its close button', async () => {
       const { view, cmp } = await longPress();
-      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Schließen' }));
+      fireEvent.click(
+        within(screen.getByRole('dialog')).getByRole('button', { name: 'Schließen' }),
+      );
       view.fixture.detectChanges();
       expect(cmp.menuFor()).toBeNull();
       cmp.onMenuOpen(true);
@@ -1170,7 +1432,9 @@ describe('ChatComponent', () => {
      */
     it('shows "N neue" where the viewer was last', async () => {
       localStorage.setItem('ap.chat.seen.t1', today(9));
-      const { view } = await setup({ messages: [msg('a', today(9)), msg('b', today(10)), msg('c', today(10, 1))] });
+      const { view } = await setup({
+        messages: [msg('a', today(9)), msg('b', today(10)), msg('c', today(10, 1))],
+      });
       const sep = view.container.querySelector('.chat__sep--new');
       expect(sep).toHaveTextContent('2 neue');
       expect(screen.queryAllByRole('separator')).toHaveLength(0);
@@ -1199,7 +1463,12 @@ describe('ChatComponent', () => {
       size(log(), 800);
       fireEvent.scroll(log());
       view.fixture.detectChanges();
-      set('messages', [msg('a', today(9)), msg('b', today(10)), msg('c', today(11)), msg('d', today(12))]);
+      set('messages', [
+        msg('a', today(9)),
+        msg('b', today(10)),
+        msg('c', today(11)),
+        msg('d', today(12)),
+      ]);
       expect(screen.queryByRole('button', { name: /neue Nachricht/ })).toBeNull();
     });
 
@@ -1255,14 +1524,25 @@ describe('ChatComponent', () => {
     it('uploads picked files as chips and sends them with the message', async () => {
       const { pick, api, send, input, view, cmp } = await setup({ canAttach: true });
       const clip = screen.getByRole('button', { name: 'Datei anhängen' });
-      const click = jest.spyOn(view.container.querySelector('.chat__fileInput') as HTMLInputElement, 'click');
+      const click = jest.spyOn(
+        view.container.querySelector('.chat__fileInput') as HTMLInputElement,
+        'click',
+      );
       fireEvent.click(clip);
       expect(click).toHaveBeenCalled();
       await pick(pdf(), pdf('kopf.png'));
-      expect(api.uploadDraftAttachment.mock.calls[0][1]).toMatchObject({ token: null, altcha: null });
+      expect(api.uploadDraftAttachment.mock.calls[0][1]).toMatchObject({
+        token: null,
+        altcha: null,
+      });
       expect(api.uploadDraftAttachment.mock.calls[1][1]).toMatchObject({ token: 'tok' });
-      const chips = [...view.container.querySelectorAll('.chat__draft')].map((c) => c.textContent?.replace(/\s+/g, ' ').trim());
-      expect(chips).toEqual(['angebot.pdf PDF · 1 KB · In Prüfung', 'kopf.png PNG · 1 KB · In Prüfung']);
+      const chips = [...view.container.querySelectorAll('.chat__draft')].map((c) =>
+        c.textContent?.replace(/\s+/g, ' ').trim(),
+      );
+      expect(chips).toEqual([
+        'angebot.pdf PDF · 1 KB · In Prüfung',
+        'kopf.png PNG · 1 KB · In Prüfung',
+      ]);
       expect((view.container.querySelector('.chat__fileInput') as HTMLInputElement).value).toBe('');
 
       fireEvent.keyDown(input(), { key: 'Enter' });
@@ -1271,8 +1551,22 @@ describe('ChatComponent', () => {
         attachmentIds: ['d1', 'd2'],
         draftToken: 'tok',
         files: [
-          { id: 'd1', filename: 'angebot.pdf', mime: 'application/pdf', size: 4, scanState: 'scanning', url: '/api/attachments/d1/download' },
-          { id: 'd2', filename: 'kopf.png', mime: 'application/pdf', size: 4, scanState: 'scanning', url: '/api/attachments/d2/download' },
+          {
+            id: 'd1',
+            filename: 'angebot.pdf',
+            mime: 'application/pdf',
+            size: 4,
+            scanState: 'scanning',
+            url: '/api/attachments/d1/download',
+          },
+          {
+            id: 'd2',
+            filename: 'kopf.png',
+            mime: 'application/pdf',
+            size: 4,
+            scanState: 'scanning',
+            url: '/api/attachments/d2/download',
+          },
         ],
       });
       view.fixture.detectChanges();
@@ -1283,16 +1577,26 @@ describe('ChatComponent', () => {
     });
 
     it('sends text and files with the visibility', async () => {
-      const { pick, send, input } = await setup({ canAttach: true, visibilityOptions: ['public', 'internal'] });
+      const { pick, send, input } = await setup({
+        canAttach: true,
+        visibilityOptions: ['public', 'internal'],
+      });
       await pick(pdf());
       fireEvent.input(input(), { target: { value: 'Siehe Anhang' } });
       fireEvent.keyDown(input(), { key: 'Enter' });
-      expect(send.mock.calls[0][0]).toMatchObject({ body: 'Siehe Anhang', visibility: 'public', attachmentIds: ['d1'] });
+      expect(send.mock.calls[0][0]).toMatchObject({
+        body: 'Siehe Anhang',
+        visibility: 'public',
+        attachmentIds: ['d1'],
+      });
     });
 
     it('shows the upload, and sends nothing while it runs', async () => {
       const answer = new Subject<DraftUpload>();
-      const { pick, send, input, view, settle } = await setup({ canAttach: true, upload: () => answer });
+      const { pick, send, input, view, settle } = await setup({
+        canAttach: true,
+        upload: () => answer,
+      });
       await pick(pdf());
       const chip = view.container.querySelector('.chat__draft--pending') as HTMLElement;
       expect(chip).toHaveTextContent('angebot.pdf');
@@ -1323,7 +1627,9 @@ describe('ChatComponent', () => {
       await confirmRemove(settle);
       expect(api.deleteDraftAttachment).toHaveBeenCalledWith('d1', 'tok');
       expect(view.container.querySelectorAll('.chat__draft')).toHaveLength(1);
-      api.deleteDraftAttachment.mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 500 })));
+      api.deleteDraftAttachment.mockReturnValueOnce(
+        throwError(() => new HttpErrorResponse({ status: 500 })),
+      );
       await cmp.removeFile(cmp.files()[0]);
       await settle();
       expect(toast.error).toHaveBeenCalledWith('Die Datei konnte nicht entfernt werden.');
@@ -1371,7 +1677,11 @@ describe('ChatComponent', () => {
       expect(chip.tagName).toBe('LI');
       expect(chip).not.toHaveAttribute('role');
       expect(within(chip).getByRole('status')).toHaveTextContent('angebot.pdf');
-      expect(within(view.container.querySelector('.chat__drafts') as HTMLElement).getAllByRole('listitem')).toHaveLength(1);
+      expect(
+        within(view.container.querySelector('.chat__drafts') as HTMLElement).getAllByRole(
+          'listitem',
+        ),
+      ).toHaveLength(1);
     });
 
     it('counts a batch still on its way against the 5 files of a message', async () => {
@@ -1407,7 +1717,9 @@ describe('ChatComponent', () => {
       fireEvent.click(screen.getByRole('button', { name: 'angebot.pdf entfernen' }));
       view.fixture.detectChanges();
       fireEvent.click(
-        within(screen.getByRole('dialog', { name: 'Anhang entfernen?' })).getByRole('button', { name: 'Entfernen' }),
+        within(screen.getByRole('dialog', { name: 'Anhang entfernen?' })).getByRole('button', {
+          name: 'Entfernen',
+        }),
       );
       view.fixture.detectChanges();
       expect(view.container.querySelectorAll('.chat__draft')).toHaveLength(1);
@@ -1437,7 +1749,9 @@ describe('ChatComponent', () => {
       expect(toast.error).toHaveBeenLastCalledWith('b.pdf: Datei zu groß (max. 10 MB).');
       status = 500;
       await cmp.addFiles([pdf('c.pdf')]);
-      expect(toast.error).toHaveBeenLastCalledWith('c.pdf: Die Datei konnte nicht hochgeladen werden.');
+      expect(toast.error).toHaveBeenLastCalledWith(
+        'c.pdf: Die Datei konnte nicht hochgeladen werden.',
+      );
     });
 
     it('maps the reasons of the draft service to the chat texts', () => {
@@ -1474,7 +1788,12 @@ describe('ChatComponent', () => {
       expect(unnamed.defaultPrevented).toBe(true);
       await settle();
       const names = api.uploadDraftAttachment.mock.calls.map((c) => (c[0] as File).name);
-      expect(names).toEqual(['Bild-20261015-104500.png', 'Bild-20261015-104500.jpg', 'Bild-20261015-104500.bin', 'shot.png']);
+      expect(names).toEqual([
+        'Bild-20261015-104500.png',
+        'Bild-20261015-104500.jpg',
+        'Bild-20261015-104500.bin',
+        'shot.png',
+      ]);
       expect((api.uploadDraftAttachment.mock.calls[0][0] as File).type).toBe('image/png');
 
       expect(paste([]).defaultPrevented).toBe(false);
@@ -1484,9 +1803,16 @@ describe('ChatComponent', () => {
     });
 
     describe('a file dragged onto the composer', () => {
-      const drag = (target: Element, type: 'dragover' | 'drop', files: File[], types = ['Files']) => {
+      const drag = (
+        target: Element,
+        type: 'dragover' | 'drop',
+        files: File[],
+        types = ['Files'],
+      ) => {
         const event = new Event(type, { bubbles: true, cancelable: true }) as DragEvent;
-        Object.defineProperty(event, 'dataTransfer', { value: { files, types, dropEffect: 'none' } });
+        Object.defineProperty(event, 'dataTransfer', {
+          value: { files, types, dropEffect: 'none' },
+        });
         target.dispatchEvent(event);
         return event;
       };
@@ -1499,12 +1825,17 @@ describe('ChatComponent', () => {
         const drop = drag(input(), 'drop', [new File(['x'], 'a.pdf', { type: 'application/pdf' })]);
         expect(drop.defaultPrevented).toBe(true);
         await settle();
-        expect(api.uploadDraftAttachment.mock.calls.map((c) => (c[0] as File).name)).toEqual(['a.pdf']);
+        expect(api.uploadDraftAttachment.mock.calls.map((c) => (c[0] as File).name)).toEqual([
+          'a.pdf',
+        ]);
       });
 
       it('applies the limit of five files', async () => {
         const { input, api, toast, settle } = await setup({ canAttach: true });
-        const files = Array.from({ length: 6 }, (_, i) => new File(['x'], `f${i}.pdf`, { type: 'application/pdf' }));
+        const files = Array.from(
+          { length: 6 },
+          (_, i) => new File(['x'], `f${i}.pdf`, { type: 'application/pdf' }),
+        );
         drag(input(), 'drop', files);
         await settle();
         expect(api.uploadDraftAttachment).toHaveBeenCalledTimes(5);
@@ -1539,7 +1870,9 @@ describe('ChatComponent', () => {
         expect(drop.defaultPrevented).toBe(true);
         await settle();
         expect(frame()).toBeNull();
-        expect(api.uploadDraftAttachment.mock.calls.map((c) => (c[0] as File).name)).toEqual(['a.pdf']);
+        expect(api.uploadDraftAttachment.mock.calls.map((c) => (c[0] as File).name)).toEqual([
+          'a.pdf',
+        ]);
       });
 
       it('lets a file drag pass on the log of a chat that takes no files', async () => {
@@ -1565,7 +1898,9 @@ describe('ChatComponent', () => {
         input().dispatchEvent(event);
         return event;
       };
-      expect(paste({ 'text/plain': 'Tabelle', 'text/html': '<table></table>' }).defaultPrevented).toBe(false);
+      expect(
+        paste({ 'text/plain': 'Tabelle', 'text/html': '<table></table>' }).defaultPrevented,
+      ).toBe(false);
       await settle();
       expect(api.uploadDraftAttachment).not.toHaveBeenCalled();
       expect(paste({}).defaultPrevented).toBe(true);
@@ -1593,7 +1928,9 @@ describe('ChatComponent', () => {
     it('takes no pasted file where the thread takes none', async () => {
       const { input, api } = await setup();
       const event = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
-      Object.defineProperty(event, 'clipboardData', { value: { files: [new File(['x'], 'a.png', { type: 'image/png' })] } });
+      Object.defineProperty(event, 'clipboardData', {
+        value: { files: [new File(['x'], 'a.png', { type: 'image/png' })] },
+      });
       input().dispatchEvent(event);
       expect(event.defaultPrevented).toBe(false);
       expect(api.uploadDraftAttachment).not.toHaveBeenCalled();
@@ -1617,6 +1954,7 @@ describe('ChatComponent', () => {
      */
     it('keeps the files of the page (ChatDrafts) when a layout switch re-creates the chat', async () => {
       @Component({
+        changeDetection: ChangeDetectionStrategy.Eager,
         standalone: true,
         imports: [ChatComponent],
         providers: [ChatDrafts],
@@ -1655,9 +1993,12 @@ describe('ChatComponent', () => {
         fixture.detectChanges();
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const chat = (cls: string): any => fixture.debugElement.query(By.css(`app-chat.${cls}`)).componentInstance;
+      const chat = (cls: string): any =>
+        fixture.debugElement.query(By.css(`app-chat.${cls}`)).componentInstance;
       const pick = async (cls: string, file: File) => {
-        const box = fixture.nativeElement.querySelector(`app-chat.${cls} .chat__fileInput`) as HTMLInputElement;
+        const box = fixture.nativeElement.querySelector(
+          `app-chat.${cls} .chat__fileInput`,
+        ) as HTMLInputElement;
         Object.defineProperty(box, 'files', { value: [file], configurable: true });
         fireEvent.change(box);
         await settle();
@@ -1667,7 +2008,11 @@ describe('ChatComponent', () => {
       fixture.componentInstance.wide.set(false);
       await settle();
       expect(chat('one')).not.toBe(first);
-      expect(chat('one').files().map((f: { id: string }) => f.id)).toEqual(['d1']);
+      expect(
+        chat('one')
+          .files()
+          .map((f: { id: string }) => f.id),
+      ).toEqual(['d1']);
       expect(api.deleteDraftAttachment).not.toHaveBeenCalled();
       expect(screen.getByRole('button', { name: 'a.pdf entfernen' })).toBeInTheDocument();
 
@@ -1675,7 +2020,11 @@ describe('ChatComponent', () => {
       await settle();
       expect(chat('two').files()).toEqual([]);
       await pick('two', pdf('b.pdf'));
-      expect(chat('one').files().map((f: { id: string }) => f.id)).toEqual(['d1']);
+      expect(
+        chat('one')
+          .files()
+          .map((f: { id: string }) => f.id),
+      ).toEqual(['d1']);
       fixture.componentInstance.second.set(false);
       await settle();
       expect(api.deleteDraftAttachment).toHaveBeenCalledWith('d2', 'tok');
@@ -1692,7 +2041,10 @@ describe('ChatComponent', () => {
 
     it('drops an upload that is still running when the thread changes', async () => {
       const answer = new Subject<DraftUpload>();
-      const { pick, set, api, cmp, settle, view } = await setup({ canAttach: true, upload: () => answer });
+      const { pick, set, api, cmp, settle, view } = await setup({
+        canAttach: true,
+        upload: () => answer,
+      });
       await pick(pdf());
       expect(cmp.uploads()).toHaveLength(1);
       set('draftKey', 't2');
@@ -1723,7 +2075,16 @@ describe('ChatComponent', () => {
     describe('scan refresh', () => {
       const scanning = (id: string, extra: Partial<ChatMessage> = {}) =>
         msg(id, today(9), {
-          attachments: [{ id: `f-${id}`, filename: 'a.png', mime: 'image/png', size: 1, url: '/a', scanState: 'scanning' }],
+          attachments: [
+            {
+              id: `f-${id}`,
+              filename: 'a.png',
+              mime: 'image/png',
+              size: 1,
+              url: '/a',
+              scanState: 'scanning',
+            },
+          ],
           ...extra,
         });
       beforeEach(() => jest.useFakeTimers());
@@ -1758,12 +2119,37 @@ describe('ChatComponent', () => {
 
       it('stops once the scan is done, and never runs for pending, lost or clean files', async () => {
         const { refresh, set, view } = await setup({ messages: [scanning('a')] });
-        set('messages', [msg('a', today(9), { attachments: [{ id: 'f-a', filename: 'a.png', mime: 'image/png', size: 1, url: '/a', scanState: 'clean' }] })]);
+        set('messages', [
+          msg('a', today(9), {
+            attachments: [
+              {
+                id: 'f-a',
+                filename: 'a.png',
+                mime: 'image/png',
+                size: 1,
+                url: '/a',
+                scanState: 'clean',
+              },
+            ],
+          }),
+        ]);
         jest.advanceTimersByTime(60_000);
         expect(refresh).not.toHaveBeenCalled();
         set('messages', [
           scanning('p', { state: 'sending' }),
-          msg('l', today(9), { attachments: [{ id: 'f-l', filename: 'a.png', mime: 'image/png', size: 1, url: '/a', scanState: 'scanning', lost: true }] }),
+          msg('l', today(9), {
+            attachments: [
+              {
+                id: 'f-l',
+                filename: 'a.png',
+                mime: 'image/png',
+                size: 1,
+                url: '/a',
+                scanState: 'scanning',
+                lost: true,
+              },
+            ],
+          }),
           msg('n', today(9)),
         ]);
         jest.advanceTimersByTime(60_000);
@@ -1802,7 +2188,9 @@ describe('ChatComponent', () => {
         '/api/attachments/clean/download',
         '/api/attachments/plain/download',
       ]);
-      const off = [...view.container.querySelectorAll('.chat__file--off')].map((c) => c.textContent?.replace(/\s+/g, ' ').trim());
+      const off = [...view.container.querySelectorAll('.chat__file--off')].map((c) =>
+        c.textContent?.replace(/\s+/g, ' ').trim(),
+      );
       expect(off).toEqual([
         'scan.pdf PDF · 1 KB · In Prüfung',
         'bad.pdf PDF · 1 KB · Quarantäne',
@@ -1818,8 +2206,22 @@ describe('ChatComponent', () => {
             own: true,
             body: 'Alt',
             attachments: [
-              { id: 'f1', filename: 'plan.pdf', mime: 'application/pdf', size: 10, url: '/api/attachments/f1/download', scanState: 'clean' },
-              { id: 'f2', filename: 'bild.png', mime: 'image/png', size: 10, url: '/x', scanState: 'scanning' },
+              {
+                id: 'f1',
+                filename: 'plan.pdf',
+                mime: 'application/pdf',
+                size: 10,
+                url: '/api/attachments/f1/download',
+                scanState: 'clean',
+              },
+              {
+                id: 'f2',
+                filename: 'bild.png',
+                mime: 'image/png',
+                size: 10,
+                url: '/x',
+                scanState: 'scanning',
+              },
             ],
           }),
         ],
@@ -1827,7 +2229,10 @@ describe('ChatComponent', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Nachricht bearbeiten' }));
       const form = view.container.querySelector('.chat__edit') as HTMLElement;
       expect(form).not.toBeNull();
-      expect(within(form).getByRole('link', { name: /plan\.pdf/ })).toHaveAttribute('href', '/api/attachments/f1/download');
+      expect(within(form).getByRole('link', { name: /plan\.pdf/ })).toHaveAttribute(
+        'href',
+        '/api/attachments/f1/download',
+      );
       expect(within(form).getByText('bild.png')).toBeInTheDocument();
       expect(form.querySelectorAll('button[aria-label*="entfernen"]')).toHaveLength(0);
     });
@@ -1838,7 +2243,16 @@ describe('ChatComponent', () => {
           msg('f', today(10), {
             own: true,
             state: 'failed',
-            attachments: [{ id: 'x', filename: 'x.pdf', mime: 'application/pdf', size: 1, url: '/x', scanState: 'scanning' }],
+            attachments: [
+              {
+                id: 'x',
+                filename: 'x.pdf',
+                mime: 'application/pdf',
+                size: 1,
+                url: '/x',
+                scanState: 'scanning',
+              },
+            ],
           }),
         ],
       });
@@ -1853,7 +2267,16 @@ describe('ChatComponent', () => {
             own: true,
             body: '',
             state: 'failed',
-            attachments: [{ id: 'x', filename: 'x.pdf', mime: 'application/pdf', size: 1, url: '/x', lost: true }],
+            attachments: [
+              {
+                id: 'x',
+                filename: 'x.pdf',
+                mime: 'application/pdf',
+                size: 1,
+                url: '/x',
+                lost: true,
+              },
+            ],
           }),
         ],
       });
@@ -1864,7 +2287,10 @@ describe('ChatComponent', () => {
     it('marks a lost file in the composer', async () => {
       const { pick, cmp, view } = await setup({ canAttach: true });
       await pick(pdf());
-      cmp.drafts.markFailed({ code: 'draft_attachments_missing', errors: [{ field: 'attachmentIds.d1' }] });
+      cmp.drafts.markFailed({
+        code: 'draft_attachments_missing',
+        errors: [{ field: 'attachmentIds.d1' }],
+      });
       view.fixture.detectChanges();
       const chip = view.container.querySelector('.chat__draft') as HTMLElement;
       expect(chip).toHaveClass('chat__draft--failed');
@@ -1878,4 +2304,3 @@ describe('ChatComponent', () => {
     });
   });
 });
-

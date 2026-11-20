@@ -5,20 +5,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import {
-  ButtonComponent,
-  EmptyStateComponent,
-  IconComponent,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-  SegBarComponent,
-  SheetBarComponent,
-  SheetBarTitleDirective,
-  SkeletonComponent,
-  StatusTextComponent,
-  SectionComponent,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, EmptyStateComponent, IconComponent, MetaLineComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, SectionComponent, SegBarComponent, SheetBarComponent, SheetBarTitleDirective, SkeletonComponent, StatusTextComponent, FactsComponent } from '@stupa-makers/ui-kit';
 import { flowColorKind, invoiceStatus } from '@shared/ui';
 import { simplifyPathKey } from '@shared/budget-path';
 import type { BudgetTreeNode, Expense, Invoice } from '../../budget/budget-tree.api';
@@ -36,9 +23,9 @@ import { TodoLinkedListComponent } from '../../../features/todos/linked-list/tod
 import { CostCentreLabelComponent } from '../../budget/cost-centre-label/cost-centre-label.component';
 import { BookingRowComponent } from '../../budget/booking-row/booking-row.component';
 import { SumRowComponent } from '../../budget/booking-row/sum-row.component';
-import { SheetActionComponent } from '../../budget/sheet-action/sheet-action.component';
 import { dayMonth } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
+import { RowChevronComponent } from '../../../shared/ui/row-chevron/row-chevron.component';
 
 /**
  * The detail of a booking:
@@ -53,8 +40,10 @@ import { formatMoney } from '@shared/format-money';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FactsComponent,
+    RowChevronComponent,
+    MetaLineComponent,
     SectionComponent,
-    SheetActionComponent,
     SumRowComponent,
     BookingRowComponent,
     CostCentreLabelComponent,
@@ -62,6 +51,7 @@ import { formatMoney } from '@shared/format-money';
     SheetBarComponent,
     SheetBarTitleDirective,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     LocalizedDatePipe,
     RouterLink,

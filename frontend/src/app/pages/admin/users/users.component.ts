@@ -25,6 +25,8 @@ import {
   StickyBarComponent,
   ToastService,
   PageHeaderComponent,
+  ButtonGroupComponent,
+  FactsComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
@@ -89,6 +91,8 @@ function lastLoginFilters(lastLogin: LastLoginFilter, now: number): PrincipalFil
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FactsComponent,
+    ButtonGroupComponent,
     LoadStateComponent,
     ExpandRowComponent,
     RouterLink,

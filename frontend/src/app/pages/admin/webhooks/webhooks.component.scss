@@ -20,14 +20,7 @@
   background: var(--color-surface-3);
 }
 .wh__grid {
-  --kv-cols: 4;
-  --kv-gap: var(--space-3) var(--space-4);
-  --kv-item-gap: 0;
-}
-.wh__dead {
-  margin: 0;
-  font-size: var(--fs-sm);
-  color: var(--color-danger);
+  --facts-cols: repeat(4, minmax(0, 1fr));
 }
 .wh__form {
   display: flex;
@@ -43,6 +36,6 @@
 
 @include w.columns {
       .wh__grid {
-    --kv-cols: 2;
+    --facts-cols: repeat(2, minmax(0, 1fr));
   }
 }

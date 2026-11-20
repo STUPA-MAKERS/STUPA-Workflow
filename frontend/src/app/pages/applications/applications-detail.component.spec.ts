@@ -450,8 +450,9 @@ describe('ApplicationsDetailComponent', () => {
     expect(busy).toHaveClass('ad--split');
     expect(busy).toHaveAttribute('aria-busy', 'true');
     expect(busy.querySelector('.ad__head .ad__title .skel-text')).not.toBeNull();
-    expect(busy.querySelector('.ad__head .ad__line .skel-text')).not.toBeNull();
-    expect(busy.querySelectorAll('.ad__transitions .ad__skelButton')).toHaveLength(2);
+    expect(busy.querySelectorAll('.ad__head .ad__line .skel-chip')).toHaveLength(2);
+    expect(busy.querySelectorAll('.ad__head .skel-grp:not(.ad__transitionGroup) > .skel-btn')).toHaveLength(3);
+    expect(busy.querySelectorAll('.ad__transitionGroup .skel-btn')).toHaveLength(2);
     expect(busy.querySelectorAll('.ad__cols > .ad__col')).toHaveLength(2);
     expect(within(busy as HTMLElement).getByText('Details')).toBeInTheDocument();
     expect(within(busy as HTMLElement).getByText('Verlauf')).toBeInTheDocument();
@@ -485,7 +486,7 @@ describe('ApplicationsDetailComponent', () => {
     const busy = view.container.querySelector('article.ad--busy')!;
     expect(busy).not.toHaveClass('ad--split');
     expect(busy.querySelector('app-tabs')).not.toBeNull();
-    expect(busy.querySelector('.ad__transitions')).toBeNull();
+    expect(busy.querySelector('.ad__transitionGroup')).toBeNull();
     const http = view.fixture.debugElement.injector.get(HttpTestingController);
     for (const req of http.match(() => true)) req.flush(null, { status: 404, statusText: 'x' });
   });
@@ -562,11 +563,13 @@ describe('ApplicationsDetailComponent', () => {
     detectChanges();
     const req = http.expectOne(url('/transitions'));
     expect(cmp.transitionsLoading()).toBe(true);
-    expect(container.querySelectorAll('.ad__head .ad__skelButton')).toHaveLength(2);
+    expect(container.querySelectorAll('.ad__transitionGroup .skel-btn')).toHaveLength(2);
     req.flush([]);
     detectChanges();
     expect(cmp.transitionsLoading()).toBe(false);
-    expect(container.querySelector('.ad__head .ad__transitions')).toBeNull();
+    // Only "Neue Fassung" (001720) stays: the state allows edits and is not the start.
+    expect(container.querySelectorAll('.ad__head .ad__transitionGroup app-button')).toHaveLength(1);
+    expect(container.querySelector('[data-testid="new-version"]')).not.toBeNull();
     flushAttachments(http);
     http.verify();
   });
@@ -1280,6 +1283,95 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
+  /** Specs 001602, 001621, 001650: the outside decision, the forced state, the amount change. */
+  it('shows an outside decision, a forced state and an amount change in the history', async () => {
+    const { http, detectChanges, cmp } = await setup();
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush([]);
+    http.expectOne(url('/comments')).flush([]);
+    http.expectOne(url('/timeline')).flush([
+      { toStateId: 's1', toState: SUBMITTED, at: '2026-06-05T10:00:00Z' },
+      {
+        toStateId: 's1',
+        toState: SUBMITTED,
+        at: '2026-06-06T10:00:00Z',
+        note: 'outside:passed',
+        outsideDecision: {
+          result: 'passed',
+          meetingDate: '2026-06-04',
+          gremiumName: 'StuPa',
+          yes: 7,
+          no: 1,
+          abstain: null,
+          meetingId: 'm1',
+          meetingTitle: '34. Sitzung',
+        },
+      },
+      {
+        toStateId: 's1',
+        toState: SUBMITTED,
+        at: '2026-06-07T10:00:00Z',
+        note: null,
+        outsideDecision: { result: 'failed', meetingDate: '2026-06-06' },
+      },
+      { toStateId: 's1', toState: SUBMITTED, at: '2026-06-08T10:00:00Z', forced: true, forceReason: 'error_correction', note: 'Doppelt' },
+      { toStateId: 's1', toState: SUBMITTED, at: '2026-06-09T10:00:00Z', forced: true, forceReason: null },
+      {
+        toStateId: 's1',
+        toState: SUBMITTED,
+        at: '2026-06-10T10:00:00Z',
+        kind: 'amountChange',
+        amountChange: {
+          previousAmount: '100.00',
+          approvedAmount: '122.00',
+          reason: 'Mehrkosten Druck',
+          decisionDate: '2026-06-09',
+          gremiumName: 'StuPa',
+        },
+      },
+    ]);
+    flushForm(http);
+    detectChanges();
+    const [, passed, failed, forced, oldForced, change] = cmp
+      .historyEntries()
+      .map((e) => ({ ...e, body: e.body?.replace(/\u00a0/g, ' ') ?? null }));
+    expect(passed.body).toBe(
+      'Beschluss außerhalb der Plattform\nErgebnis: Angenommen\nSitzung vom 04.06.2026 · StuPa\nJa 7 · Nein 1',
+    );
+    expect(passed.link).toEqual({ label: 'Zur Sitzung „34. Sitzung“', route: ['/meetings', 'm1'] });
+    expect(failed.body).toBe('Beschluss außerhalb der Plattform\nErgebnis: Abgelehnt\nBeschluss vom 06.06.2026');
+    expect(failed.link).toBeNull();
+    expect(forced.body).toBe('Status erzwungen · Korrektur eines Fehlers\nDoppelt');
+    expect(oldForced.body).toBe('Status erzwungen · Ohne Grund');
+    expect(change.title).toBe('Genehmigter Betrag geändert');
+    expect(change.body).toBe('Bisher: 100,00 € · Neu: 122,00 €\nMehrkosten Druck\nBeschluss vom 09.06.2026 · StuPa');
+    flushAttachments(http);
+    http.verify();
+  });
+
+  /** Specs 001600, 001620: the menu offers the two actions only with their state and permission. */
+  it('offers "Beschluss erfassen" in a vote state and the amount change in an approved one', async () => {
+    const vote = await setup(['application.read', 'application.record_decision', 'application.amend_decision']);
+    vote.http.expectOne(url('')).flush({ ...appWire(), state: { ...SUBMITTED, kind: 'vote' } });
+    vote.detectChanges();
+    const ids = (c: typeof vote.cmp) => c.menuSections().flatMap((sec) => sec.items.map((i) => i.id));
+    expect(ids(vote.cmp)).toContain('outside');
+    expect(ids(vote.cmp)).not.toContain('amend');
+    vote.cmp.onMenu({ id: 'outside', label: '' });
+    expect(vote.cmp.outsideOpen()).toBe(true);
+  });
+
+  it('offers the amount change in an approved state with money', async () => {
+    const view = await setup(['application.read', 'application.amend_decision']);
+    view.http.expectOne(url('')).flush({ ...appWire(), amount: '250.00', state: { ...SUBMITTED, isApproved: true } });
+    view.detectChanges();
+    const ids = view.cmp.menuSections().flatMap((sec) => sec.items.map((i) => i.id));
+    expect(ids).toContain('amend');
+    expect(ids).not.toContain('outside');
+    view.cmp.onMenu({ id: 'amend', label: '' });
+    expect(view.cmp.amendOpen()).toBe(true);
+  });
+
   /** A server that sends only the raw string still gets the id hidden. */
   it('renders every resolved actor and never a raw id or key', async () => {
     const { http, detectChanges, cmp, container } = await setup();
@@ -1488,6 +1580,31 @@ describe('ApplicationsDetailComponent', () => {
       ['Hinzugefügt', 'accent'],
       ['Entfernt', 'error'],
     ]);
+    http.verify();
+  });
+
+  /** § 001663: a version that changed the Antragsart names both types and the old labels. */
+  it('shows a change of the Antragsart with both types and the old field labels', async () => {
+    const fields: FormFieldDef[] = [{ key: 'title', type: 'text', label: { de: 'Titel' } }];
+    const { http, cmp } = await setupWithFields(fields, {}, {}, [
+      VERSIONS[0],
+      {
+        ...VERSIONS[1],
+        diff: { added: {}, removed: { iban: 'DE89', alt: 'x' }, changed: {} },
+        typeChange: {
+          fromTypeId: 't1',
+          fromType: { de: 'Finanzantrag' },
+          toTypeId: 't2',
+          toType: null,
+          fieldLabels: { iban: { de: 'IBAN' } },
+        },
+      },
+    ]);
+    flushAttachments(http);
+    const entry = cmp.historyEntries().find((e) => e.icon === 'swap');
+    expect(entry?.title).toBe('Antragsart geändert · Version 2');
+    expect(entry?.body).toBe('Finanzantrag → —');
+    expect(entry?.changes?.map((c) => c.label)).toEqual(['IBAN', 'alt']);
     http.verify();
   });
 
@@ -1904,6 +2021,7 @@ describe('ApplicationsDetailComponent', () => {
     ]);
     http.expectOne(url('')).flush({
       ...appWire(),
+      state: { ...SUBMITTED, isApproved: true },
       budgetId: 'c1',
       approvedAmount: '200.00',
       decision: {
@@ -1946,12 +2064,33 @@ describe('ApplicationsDetailComponent', () => {
 
   it('names no approved amount when it equals the requested one', async () => {
     const { cmp } = await setup(['application.read']);
-    const base = { ...appWire(), amount: '250.00', currency: 'EUR' } as unknown as Parameters<
-      typeof cmp.approvedAmount
-    >[0];
+    const base = {
+      ...appWire(),
+      state: { ...SUBMITTED, label: 'Bewilligt', kind: 'normal', isApproved: true },
+      amount: '250.00',
+      currency: 'EUR',
+    } as unknown as Parameters<typeof cmp.approvedAmount>[0];
     expect(cmp.approvedAmount({ ...base, approvedAmount: null })).toBe('');
     expect(cmp.approvedAmount({ ...base, approvedAmount: '250.00' })).toBe('');
     expect(cmp.approvedAmount({ ...base, approvedAmount: '200.00' }).replace(/\u00a0/g, ' ')).toBe('200,00 €');
+  });
+
+  /** Spec 001612: "Genehmigt" is empty unless the state carries the flag `Bewilligt`. */
+  it('shows the approved amount only in an approved state', async () => {
+    const { cmp } = await setup(['application.read']);
+    const base = {
+      ...appWire(),
+      state: { ...SUBMITTED, label: 'Eingereicht', kind: 'normal' },
+      amount: '250.00',
+      currency: 'EUR',
+      approvedAmount: '200.00',
+    } as unknown as Parameters<typeof cmp.approvedShown>[0];
+    expect(cmp.approvedShown(base)).toBe('');
+    expect(cmp.approvedAmount(base)).toBe('');
+    const approved = { ...base, state: { ...base.state!, isApproved: true } };
+    expect(cmp.approvedShown(approved).replace(/\u00a0/g, ' ')).toBe('200,00 €');
+    expect(cmp.approvedShown({ ...approved, approvedAmount: null }).replace(/\u00a0/g, ' ')).toBe('250,00 €');
+    expect(cmp.approvedShown({ ...approved, amount: null })).toBe('');
   });
 
   /**

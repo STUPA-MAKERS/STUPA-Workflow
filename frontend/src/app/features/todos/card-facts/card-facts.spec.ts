@@ -21,7 +21,9 @@ describe('to-do card facts', () => {
   it('shows the due date with its note and colours an overdue one', async () => {
     const { container, rerender } = await render(`<app-todo-due [due]="due" />`, {
       imports: [TodoDueComponent],
-      componentProperties: { due: { date: '14.10.', note: 'überfällig', tone: 'overdue' } },
+      componentProperties: {
+        due: { date: '14.10.', note: 'überfällig' as string | null, tone: 'overdue' },
+      },
     });
     const host = container.querySelector('app-todo-due')!;
     expect(host).toHaveTextContent('14.10. · überfällig');

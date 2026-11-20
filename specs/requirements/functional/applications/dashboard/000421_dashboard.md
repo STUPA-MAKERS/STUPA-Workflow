@@ -2,13 +2,12 @@
 id: "000421"
 title: The start page is a work list with a side sheet
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-08
-implementation:
-  - frontend/src/app/pages/dashboard/dashboard.component.ts
+updated: 2026-11-19
+replaced_by: F/collaboration/activity/001300
 scope:
-  - frontend/src/app/pages/dashboard
+  - frontend/src/app/pages/activity
 ---
 
 # The start page is a work list with a side sheet

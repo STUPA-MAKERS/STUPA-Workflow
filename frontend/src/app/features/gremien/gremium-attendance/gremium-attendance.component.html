@@ -28,19 +28,21 @@
       [text]="sortText()"
     />
     <span class="gat__grow"></span>
-    @if (canExportList()) {
-      <app-button variant="text" [loading]="exporting()" [disabled]="loading()" (click)="exportList()">
-        <app-icon name="download" />
-        {{ 'gremien.attendance.exportList' | t }}
-      </app-button>
-    }
-    <app-button
-      variant="text"
-      [iconOnly]="true"
-      [ariaLabel]="'gremien.attendance.export' | t"
-      [disabled]="loading() || !rows().length"
-      (click)="exportCsv()"
-    ><app-icon name="download" /></app-button>
+    <app-button-group>
+      @if (canExportList()) {
+        <app-button variant="text" [loading]="exporting()" [disabled]="loading()" (click)="exportList()">
+          <app-icon name="download" />
+          {{ 'gremien.attendance.exportList' | t }}
+        </app-button>
+      }
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="'gremien.attendance.export' | t"
+        [disabled]="loading() || !rows().length"
+        (click)="exportCsv()"
+      ><app-icon name="download" /></app-button>
+    </app-button-group>
   }
 </div>
 
@@ -59,58 +61,120 @@
     }
   </div>
 } @else if (!rows().length) {
-  <app-empty-state shape="table" rows="3" [heading]="(role() ? 'gremien.attendance.noMatch' : 'gremien.attendance.empty') | t" />
+  <app-empty-state [icon]="role() ? 'searchOff' : 'users'" shape="table" rows="3" [heading]="(role() ? 'gremien.attendance.noMatch' : 'gremien.attendance.empty') | t" />
 } @else if (phone()) {
   <div class="gat__phoneHead" aria-hidden="true">
     @for (h of heads(); track h.month) {
       <span>{{ h.short }}</span>
     }
   </div>
-  <ul class="rowgroup gat__cards">
-    @for (m of rows(); track m.row.principalId) {
-      <li>
-        <button
-          type="button"
-          class="gat__card"
-          [attr.aria-label]="m.name + ', ' + ('gremien.attendance.ofPresent' | t: { present: m.totals.present, held: m.totals.held }) + (m.unexcused ? ', ' + m.unexcused : '')"
-          (click)="openPerson(m, $event.currentTarget)"
-        >
-          <span class="gat__cardHead">
-            <span class="gat__cardName">{{ m.name }}</span>
-            <span class="mono gat__cardSum">{{ m.totals.present }}/{{ m.totals.held }}</span>
-            <app-row-chevron [size]="16" />
-          </span>
-          @if (m.unexcused) {
-            <span class="gat__absent" [class.gat__absent--near]="m.nearLimit">{{ m.unexcused }}</span>
-          }
-          <span class="gat__cardCells">
-            @for (c of m.cells; track c.month) {
-              <span
-                class="gat__cell gat__cell--sm"
-                [class.gat__cell--na]="c.view.kind === 'na'"
-                [class.gat__cell--none]="c.view.kind === 'none'"
-                [class.gat__cell--full]="c.strength === 100"
-                [style.--gat-s]="c.strength + '%'"
-              >
-                @if (c.view.kind === 'count') {
-                  {{ c.view.present }}
-                  @if (c.view.excused) {
-                    <span class="gat__dot gat__dot--ex"></span>
-                  }
-                  @if (c.view.delegated) {
-                    <span class="gat__dot gat__dot--dv"></span>
-                  }
-                } @else if (c.view.kind === 'none') {
-                  –
+  <ng-template #cardTpl let-m>
+    <li>
+      <button
+        type="button"
+        class="gat__card"
+        [attr.aria-label]="m.name + ', ' + m.sumLabel + (m.unexcused ? ', ' + m.unexcused : '')"
+        (click)="openPerson(m, $event.currentTarget)"
+      >
+        <span class="gat__cardHead">
+          <span class="gat__cardName">{{ m.name }}</span>
+          <span class="mono gat__cardSum">{{ m.totals.present }}/{{ m.totals.held }}</span>
+          <app-row-chevron [size]="16" />
+        </span>
+        @if (m.unexcused) {
+          <span class="gat__absent" [class.gat__absent--near]="m.nearLimit">{{ m.unexcused }}</span>
+        }
+        <span class="gat__cardCells">
+          @for (c of m.cells; track c.month) {
+            <span
+              class="gat__cell gat__cell--sm"
+              [class.gat__cell--na]="c.view.kind === 'na'"
+              [class.gat__cell--none]="c.view.kind === 'none'"
+              [class.gat__cell--full]="c.strength === 100"
+              [style.--gat-s]="c.strength + '%'"
+            >
+              @if (c.view.kind === 'count') {
+                {{ c.view.present }}
+                @if (c.view.excused) {
+                  <span class="gat__dot gat__dot--ex"></span>
                 }
-              </span>
-            }
-          </span>
-        </button>
-      </li>
+                @if (c.view.delegated) {
+                  <span class="gat__dot gat__dot--dv"></span>
+                }
+              } @else if (c.view.kind === 'none') {
+                –
+              }
+            </span>
+          }
+        </span>
+      </button>
+    </li>
+  </ng-template>
+  <ul class="rowgroup gat__cards">
+    @for (m of memberRows(); track m.key) {
+      <ng-container [ngTemplateOutlet]="cardTpl" [ngTemplateOutletContext]="{ $implicit: m }" />
     }
   </ul>
+  @if (poolRows().length) {
+    <h3 class="gat__groupTitle">{{ 'gremien.attendance.poolHeading' | t }}</h3>
+    <ul class="rowgroup gat__cards">
+      @for (m of poolRows(); track m.key) {
+        <ng-container [ngTemplateOutlet]="cardTpl" [ngTemplateOutletContext]="{ $implicit: m }" />
+      }
+    </ul>
+  }
 } @else {
+  <ng-template #rowTpl let-m>
+    <tr>
+      <th scope="row" class="gat__who">
+        <span class="gat__whoIn">
+          <app-avatar size="sm" [name]="m.name" [principalId]="m.row.principalId" [decorative]="true" />
+          <span class="gat__whoText">
+            <span class="gat__name">{{ m.name }}</span>
+            @if (m.role) {
+              <span class="gat__role">{{ m.role }}</span>
+            }
+            @if (m.unexcused) {
+              <span class="gat__absent" [class.gat__absent--near]="m.nearLimit">{{ m.unexcused }}</span>
+            }
+          </span>
+        </span>
+      </th>
+      @for (c of m.cells; track c.month) {
+        <td class="gat__td" [class.gat__td--empty]="c.empty">
+          @if (c.empty) {
+            <span class="gat__dash" role="img" [attr.aria-label]="c.label">–</span>
+          } @else if (c.view.kind === 'count') {
+            <button
+              type="button"
+              class="gat__cell"
+              [class.gat__cell--full]="c.strength === 100"
+              [class.gat__cell--zero]="c.view.present === 0"
+              [style.--gat-s]="c.strength + '%'"
+              [attr.aria-label]="c.label"
+              (click)="openCell(m, c, $event.currentTarget)"
+            >
+              <span class="mono">{{ c.view.present }}/{{ c.view.held }}</span>
+              @if (c.view.excused) {
+                <span class="gat__ex" aria-hidden="true">{{ c.view.excused }}E</span>
+              }
+              @if (c.view.delegated) {
+                <span class="gat__ex gat__ex--dv" aria-hidden="true">{{ c.view.delegated }}V</span>
+              }
+            </button>
+          } @else {
+            <span class="gat__cell gat__cell--na" role="img" [attr.aria-label]="c.label"></span>
+          }
+        </td>
+      }
+      <td class="gat__td gat__td--total">
+        <span class="mono">{{ m.totals.present }}/{{ m.totals.held }}</span>
+        @if (!m.pool) {
+          <span class="gat__pct">{{ m.totals.pct === null ? '—' : m.totals.pct + ' %' }}</span>
+        }
+      </td>
+    </tr>
+  </ng-template>
   <div class="gat__frame" tabindex="0" role="region" [attr.aria-label]="'gremien.attendance.matrix' | t">
     <table class="gat__mx">
       <caption class="sr-only">{{ 'gremien.attendance.caption' | t: { range: rangeText() } }}</caption>
@@ -153,56 +217,24 @@
         </tr>
       </thead>
       <tbody>
-        @for (m of rows(); track m.row.principalId) {
-          <tr>
-            <th scope="row" class="gat__who">
-              <span class="gat__whoIn">
-                <app-avatar size="sm" [name]="m.name" [principalId]="m.row.principalId" [decorative]="true" />
-                <span class="gat__whoText">
-                  <span class="gat__name">{{ m.name }}</span>
-                  @if (m.role) {
-                    <span class="gat__role">{{ m.role }}</span>
-                  }
-                  @if (m.unexcused) {
-                    <span class="gat__absent" [class.gat__absent--near]="m.nearLimit">{{ m.unexcused }}</span>
-                  }
-                </span>
-              </span>
-            </th>
-            @for (c of m.cells; track c.month) {
-              <td class="gat__td" [class.gat__td--empty]="c.empty">
-                @if (c.empty) {
-                  <span class="gat__dash" role="img" [attr.aria-label]="c.label">–</span>
-                } @else if (c.view.kind === 'count') {
-                  <button
-                    type="button"
-                    class="gat__cell"
-                    [class.gat__cell--full]="c.strength === 100"
-                    [class.gat__cell--zero]="c.view.present === 0"
-                    [style.--gat-s]="c.strength + '%'"
-                    [attr.aria-label]="c.label"
-                    (click)="openCell(m, c, $event.currentTarget)"
-                  >
-                    <span class="mono">{{ c.view.present }}/{{ c.view.held }}</span>
-                    @if (c.view.excused) {
-                      <span class="gat__ex" aria-hidden="true">{{ c.view.excused }}E</span>
-                    }
-                    @if (c.view.delegated) {
-                      <span class="gat__ex gat__ex--dv" aria-hidden="true">{{ c.view.delegated }}V</span>
-                    }
-                  </button>
-                } @else {
-                  <span class="gat__cell gat__cell--na" role="img" [attr.aria-label]="c.label"></span>
-                }
-              </td>
-            }
-            <td class="gat__td gat__td--total">
-              <span class="mono">{{ m.totals.present }}/{{ m.totals.held }}</span>
-              <span class="gat__pct">{{ m.totals.pct === null ? '—' : m.totals.pct + ' %' }}</span>
-            </td>
-          </tr>
+        @for (m of memberRows(); track m.key) {
+          <ng-container [ngTemplateOutlet]="rowTpl" [ngTemplateOutletContext]="{ $implicit: m }" />
         }
       </tbody>
+      @if (poolRows().length) {
+        <tbody class="gat__groupHead">
+          <tr>
+            <th scope="colgroup" class="gat__groupTitle" [attr.colspan]="heads().length + 2">
+              <span class="gat__groupText">{{ 'gremien.attendance.poolHeading' | t }}</span>
+            </th>
+          </tr>
+        </tbody>
+        <tbody class="gat__pool">
+          @for (m of poolRows(); track m.key) {
+            <ng-container [ngTemplateOutlet]="rowTpl" [ngTemplateOutletContext]="{ $implicit: m }" />
+          }
+        </tbody>
+      }
       <tfoot>
         <tr>
           <th scope="row" class="gat__foot gat__foot--name">{{ 'gremien.attendance.average' | t }}</th>

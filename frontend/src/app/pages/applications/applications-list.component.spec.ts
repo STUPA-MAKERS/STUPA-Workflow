@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
@@ -8,7 +8,7 @@ import {
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { screen, within } from '@testing-library/angular';
+import { fireEvent, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -26,14 +26,21 @@ import { ApplicationsListComponent, actionErrorKey } from './applications-list.c
 import { ApplicationsPageService } from './applications-page.service';
 import { loadErrorToast } from '../../../testing/load-error';
 
+/** The dots of the meta lines: one between two parts (001961). */
+const dots = (root: ParentNode = document) =>
+  [...root.querySelectorAll('.ml__parts')].reduce((n, l) => n + Math.max(0, l.children.length - 1), 0);
+
 /** The detail of the outlet. The detail has its own spec; here only the route matters. */
-@Component({ standalone: true, template: '<p>detail</p>' })
+@Component({
+  changeDetection: ChangeDetectionStrategy.Eager,
+  standalone: true, template: '<p>detail</p>'
+})
 class DetailStub {}
 
-@Component({ standalone: true, template: '' })
+@Component({ changeDetection: ChangeDetectionStrategy.Eager, standalone: true, template: '' })
 class NoneStub {}
 
-@Component({ standalone: true, template: '' })
+@Component({ changeDetection: ChangeDetectionStrategy.Eager, standalone: true, template: '' })
 class ApplyStub {}
 
 const SUBMITTED: StateOutWire = {
@@ -235,7 +242,7 @@ describe('ApplicationsListComponent', () => {
       });
       expect(screen.getByRole('link', { name: 'Ohne Titel' })).toBeInTheDocument();
       expect(screen.getByText('abc')).toBeInTheDocument();
-      expect(document.querySelector('.apps__dot')).toBeNull();
+      expect(dots()).toBe(0);
     });
 
     it('starts an archived row without state and type with the marker, not with a dot', async () => {
@@ -243,7 +250,13 @@ describe('ApplicationsListComponent', () => {
         rows: [row({ typeId: 'unknown', state: null, archivedAt: '2026-09-01T10:00:00Z' })],
       });
       expect(screen.getByText('Archiviert')).toBeInTheDocument();
-      expect(document.querySelector('.apps__dot')).toBeNull();
+      expect(dots()).toBe(0);
+    });
+
+    it('says that a draft is not submitted yet (001710)', async () => {
+      await start('/applications', { rows: [row({ state: { ...SUBMITTED, isInitial: true } })] });
+      expect(screen.getByText('Noch nicht eingereicht')).toBeInTheDocument();
+      expect(screen.queryByText('Eingereicht')).toBeNull();
     });
 
     it('marks an observed row "Beobachtet", with a dot only after a part before it', async () => {
@@ -251,16 +264,17 @@ describe('ApplicationsListComponent', () => {
         rows: [row({ observed: true }), row({ id: 'r-bare', typeId: 'unknown', state: null, observed: true })],
       });
       expect(screen.getAllByText('Beobachtet')).toHaveLength(2);
-      expect(document.querySelectorAll('.apps__dot')).toHaveLength(2);
+      expect(dots()).toBe(2);
     });
 
-    /** The chevron is decoration, and the row menu stays the control. */
-    it('puts a chevron in the place of the row menu in the full-width list', async () => {
+    /** The chevron is decoration, and the row menu in the menu slot stays the control (001920). */
+    it('puts a chevron at the end of the trail and the row menu in the menu slot in the full-width list', async () => {
       const { cmp } = await start();
       expect(cmp.split()).toBe(false);
-      const chevrons = document.querySelectorAll('.apps__menuSlot .apps__chev');
+      const chevrons = document.querySelectorAll('.apps__trail .apps__chev');
       expect(chevrons).toHaveLength(ROWS.length);
       expect(chevrons[0].getAttribute('aria-hidden')).toBe('true');
+      expect(document.querySelectorAll('.li__menu app-row-transitions-menu')).toHaveLength(ROWS.length);
     });
 
     it('formats an amount without a currency as euros', async () => {
@@ -370,6 +384,139 @@ describe('ApplicationsListComponent', () => {
       cmp.total.set(0);
       cmp.loading.set(true);
       expect(cmp.searchPlaceholder()).toBe('Anträge durchsuchen');
+    });
+  });
+
+  describe('multiple selection (001700, 001701, 001703)', () => {
+    const MANAGE = [...ALL, 'application.manage'];
+
+    it('toggles rows, guards the bulk limit and starts from the row menu', async () => {
+      const { cmp } = await start('/applications', { perms: MANAGE });
+      expect(cmp.selectSections()).toHaveLength(1);
+      cmp.onHeaderMenu({ id: 'select' } as never);
+      expect(cmp.selecting()).toBe(true);
+      expect(cmp.selectSections()).toEqual([]);
+      cmp.toggleSelect('app-1', true);
+      cmp.toggleSelect('app-2', true);
+      cmp.toggleSelect('app-2', false);
+      expect(cmp.isSelected('app-1')).toBe(true);
+      expect(cmp.isSelected('app-2')).toBe(false);
+      expect(cmp.allSelected()).toBe(false);
+      cmp.onRowActivate({ id: 'app-1' } as never);
+      expect(cmp.selectedCount()).toBe(0);
+      cmp.openBulk('message');
+      expect(cmp.bulkMode()).toBeNull();
+      cmp.toggleSelectAll(true);
+      expect(cmp.allSelected()).toBe(true);
+      cmp.toggleSelectAll(false);
+      expect(cmp.selectedCount()).toBe(0);
+      cmp.selected.set(new Set(Array.from({ length: 101 }, (_, i) => `x-${i}`)));
+      expect(cmp.overMax()).toBe(true);
+      expect(cmp.selectionLabel()).toContain('100');
+      cmp.openBulk('transition');
+      expect(cmp.bulkMode()).toBeNull();
+      cmp.stopSelecting();
+      expect(cmp.selecting()).toBe(false);
+      expect(cmp.selectedCount()).toBe(0);
+      cmp.onRowActivate({ id: 'app-1' } as never);
+      expect(cmp.selectedCount()).toBe(0);
+    });
+
+    it('starts the selection with a long press and does not open the row (000211, 001810)', async () => {
+      const { cmp, router, settle } = await start('/applications', { perms: MANAGE });
+      cmp.selectWith({ id: 'app-1' } as never);
+      expect(cmp.selecting()).toBe(true);
+      expect(cmp.isSelected('app-1')).toBe(true);
+      cmp.selectWith({ id: 'app-1' } as never);
+      expect(cmp.selecting()).toBe(true);
+      expect(cmp.isSelected('app-1')).toBe(false);
+      cmp.stopSelecting();
+      await settle();
+      // The context menu key and a held finger reach the same handler of the kit directive.
+      const row = screen.getByText('Trikots').closest('app-list-item')!;
+      fireEvent.contextMenu(row);
+      await settle();
+      expect(cmp.selecting()).toBe(true);
+      expect(cmp.isSelected('app-3')).toBe(true);
+      expect(router.url).toBe('/applications');
+    });
+
+    it('starts no selection with a long press without application.manage', async () => {
+      const { cmp, settle } = await start();
+      cmp.selectWith({ id: 'app-1' } as never);
+      fireEvent.contextMenu(screen.getByText('Trikots').closest('app-list-item')!);
+      await settle();
+      expect(cmp.selecting()).toBe(false);
+    });
+
+    it('offers no selection without application.manage', async () => {
+      await start();
+      expect(screen.queryByTestId('apps-select')).toBeNull();
+    });
+
+    it('selects rows, lists the approved amounts and shows the result per Antrag', async () => {
+      const { http, settle } = await start('/applications', { perms: MANAGE });
+      await userEvent.click(screen.getByTestId('apps-select'));
+      await settle();
+      await userEvent.click(screen.getByRole('checkbox', { name: '„Zuschuss Kennenlernwochenende“ auswählen' }));
+      await userEvent.click(screen.getByRole('checkbox', { name: '„Trikots“ auswählen' }));
+      await settle();
+      const bar = screen.getByTestId('apps-selection');
+      expect(bar).toHaveTextContent('2 ausgewählt');
+      expect(screen.getByTestId('apps-select').querySelector('button')).toHaveAttribute('aria-pressed', 'true');
+
+      await userEvent.click(within(bar).getByRole('button', { name: 'Status setzen' }));
+      const options = http.expectOne((r) => r.url === '/api/bulk/applications/transitions');
+      expect(options.request.body).toEqual({ applicationIds: ['app-1', 'app-3'] });
+      options.flush([
+        {
+          toStateId: 's-ok',
+          label: { de: 'Bewilligt' },
+          approves: true,
+          amounts: [
+            { applicationId: 'app-1', title: 'Zuschuss Kennenlernwochenende', amount: '1250.00' },
+            { applicationId: 'app-3', title: 'Trikots', amount: null },
+          ],
+          applicationIds: ['app-1', 'app-3'],
+        },
+      ]);
+      await settle();
+      await userEvent.click(screen.getByRole('radio', { name: 'Bewilligt' }));
+      await settle();
+      expect(screen.getByTestId('bulk-amounts')).toHaveTextContent('1.250,00 €');
+
+      await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Status setzen' }));
+      const fire = http.expectOne((r) => r.url === '/api/bulk/applications/transition');
+      expect(fire.request.body).toEqual({ applicationIds: ['app-1', 'app-3'], toStateId: 's-ok' });
+      fire.flush({
+        results: [
+          { applicationId: 'app-1', ok: true },
+          { applicationId: 'app-3', ok: false, code: 'transition_not_available', error: 'Übergang nicht verfügbar' },
+        ],
+      });
+      http.expectOne(LIST).flush(page(ROWS));
+      await settle();
+      const results = screen.getByTestId('bulk-results');
+      expect(within(results).getByText('Erledigt')).toBeInTheDocument();
+      expect(within(results).getByText('Übersprungen: Status nicht erlaubt')).toBeInTheDocument();
+    });
+
+    it('sends one message to every selected Antrag', async () => {
+      const { http, settle } = await start('/applications', { perms: MANAGE });
+      await userEvent.click(screen.getByTestId('apps-select'));
+      await settle();
+      await userEvent.click(screen.getByRole('checkbox', { name: /^Alle wählen/ }));
+      await settle();
+      await userEvent.click(within(screen.getByTestId('apps-selection')).getByRole('button', { name: 'Mitteilung senden' }));
+      await settle();
+      await userEvent.type(screen.getByRole('textbox', { name: 'Mitteilung an die Antragsteller:innen' }), 'Hallo');
+      await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+      const send = http.expectOne((r) => r.url === '/api/bulk/applications/comments');
+      expect(send.request.body).toEqual({ applicationIds: ['app-1', 'app-2', 'app-3'], body: 'Hallo' });
+      send.flush({ results: ROWS.map((r) => ({ applicationId: r.id, ok: true })) });
+      http.expectOne(LIST).flush(page(ROWS));
+      await settle();
+      expect(screen.getByText('3 von 3 erledigt')).toBeInTheDocument();
     });
   });
 
@@ -801,7 +948,7 @@ describe('ApplicationsListComponent', () => {
       try {
         const { go, http, cmp } = await start();
         await go('/applications?state=s1&state=s2&q=fest&sort=amount&order=asc');
-        await userEvent.click(screen.getByRole('button', { name: 'Exportieren' }));
+        expect(cmp.moreSections()[0].items.map((i) => i.id)).toEqual(['export']);
         cmp.onExport();
         const req = http.expectOne((r) => r.url === '/api/applications/export.xlsx');
         const p = req.request.params;
@@ -827,8 +974,9 @@ describe('ApplicationsListComponent', () => {
     });
 
     it('hides the export without the right', async () => {
-      await start('/applications', { perms: ['application.read'] });
-      expect(screen.queryByRole('button', { name: 'Exportieren' })).not.toBeInTheDocument();
+      const { cmp } = await start('/applications', { perms: ['application.read'] });
+      expect(cmp.moreSections()).toEqual([]);
+      expect(screen.queryByTestId('apps-more')).not.toBeInTheDocument();
     });
 
     it('exports the archived rows when the list shows them', async () => {
@@ -836,7 +984,7 @@ describe('ApplicationsListComponent', () => {
       try {
         const { go, http, cmp } = await start();
         await go('/applications?archived=all');
-        expect(screen.getByRole('button', { name: 'Exportieren' })).toBeInTheDocument();
+        expect(cmp.moreSections().length).toBe(1);
         cmp.onExport();
         const req = http.expectOne((r) => r.url === '/api/applications/export.xlsx');
         expect(req.request.params.get('archived')).toBe('all');
@@ -849,9 +997,9 @@ describe('ApplicationsListComponent', () => {
     /** A call from elsewhere (the phone menu) sends nothing either. */
     it('hides the export while mine is set', async () => {
       const { go, cmp, http } = await start();
-      expect(screen.getByRole('button', { name: 'Exportieren' })).toBeInTheDocument();
+      expect(screen.getByTestId('apps-more')).toBeInTheDocument();
       await go('/applications?mine=true');
-      expect(screen.queryByRole('button', { name: 'Exportieren' })).not.toBeInTheDocument();
+      expect(screen.queryByTestId('apps-more')).not.toBeInTheDocument();
       cmp.onExport();
       http.expectNone((r) => r.url === '/api/applications/export.xlsx');
     });
@@ -1113,12 +1261,15 @@ describe('ApplicationsListComponent', () => {
       cmp.onDecisionDone();
     });
 
+    /** Spec 001612: only a state with the flag `Bewilligt` shows the approved amount. */
     it('shows the approved amount over the struck requested one', async () => {
+      const approved = { ...SUBMITTED, id: 's9', key: 'approved', isApproved: true };
       const { harness } = await start('/applications', {
         rows: [
-          row({ amount: '1250.00', approvedAmount: '900.00' }),
-          row({ id: 'app-2', amount: '480.00', approvedAmount: '480.00' }),
-          row({ id: 'app-3', amount: null, approvedAmount: '1.00' }),
+          row({ amount: '1250.00', approvedAmount: '900.00', state: approved }),
+          row({ id: 'app-2', amount: '480.00', approvedAmount: '480.00', state: approved }),
+          row({ id: 'app-3', amount: null, approvedAmount: '1.00', state: approved }),
+          row({ id: 'app-4', amount: '700.00', approvedAmount: '600.00' }),
         ],
       });
       harness.detectChanges();
@@ -1154,12 +1305,10 @@ describe('ApplicationsListComponent', () => {
       http.verify();
     });
 
-    it('opens the row through "Öffnen"', async () => {
-      const { http, harness, router } = await start();
-      await openRowMenu(http, 'Flyer für die Hochschulgruppen-Messe', [], () => harness.detectChanges());
-      await userEvent.click(screen.getByRole('menuitem', { name: 'Öffnen' }));
-      await harness.fixture.whenStable();
-      expect(router.url).toBe('/applications/app-2');
+    /** § NF/usability/controls/001981: no ⋮ without an action of the menu. */
+    it('draws no row menu without a right for one of its actions', async () => {
+      await start('/applications', { perms: ['application.read'] });
+      expect(screen.queryByRole('button', { name: /^Aktionen für/ })).not.toBeInTheDocument();
     });
 
     it('opens "Status setzen" for the row and reloads after it', async () => {

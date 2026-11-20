@@ -1,0 +1,212 @@
+@use './graph-kinds' as kinds;
+
+// The drawing: the frame takes the pointer, the world carries the pan and the zoom, and the
+// nodes are buttons over the lines.
+
+:host {
+  position: relative;
+  display: block;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-sunken);
+}
+
+.gc {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  @include kinds.colors;
+}
+.gc:active {
+  cursor: grabbing;
+}
+
+.gc__world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.gc__lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  // The world has no width, and the base styles limit an SVG to the width of its parent.
+  max-width: none;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+.gc__line {
+  stroke: var(--color-border-strong);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  transition: opacity var(--motion-fast) var(--ease-standard);
+}
+// A relation of the data, not a link that a person made (spec 001424).
+.gc__line--builtin {
+  stroke-dasharray: 5 5;
+}
+.gc__line--dim {
+  opacity: 0.18;
+}
+
+.gc__node {
+  position: absolute;
+  top: -18px;
+  left: -18px;
+  display: block;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: opacity var(--motion-fast) var(--ease-standard);
+  -webkit-tap-highlight-color: transparent;
+}
+.gc__node:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 3px;
+}
+// A node that a drag moves is above the others (spec 001433).
+.gc__node--held {
+  z-index: 1;
+  cursor: grabbing;
+}
+.gc__node--dim {
+  opacity: 0.22;
+}
+// The chosen node and its neighbours lie over the other nodes, with their titles.
+.gc__node--lit {
+  z-index: 1;
+}
+.gc__node--chosen {
+  z-index: 2;
+}
+
+.gc__dot {
+  @include kinds.mark(36px);
+  box-shadow: 0 0 0 2px var(--color-surface-sunken);
+  animation: gc-pop var(--motion-base) var(--ease-standard) backwards;
+}
+.gc__node--muted .gc__dot {
+  @include kinds.mark-muted;
+}
+.gc__node--chosen .gc__dot {
+  box-shadow:
+    0 0 0 2px var(--color-surface-sunken),
+    0 0 0 4.5px var(--color-text);
+}
+.gc--still .gc__dot {
+  animation: none;
+}
+@media (hover: hover) {
+  .gc__node:hover .gc__dot {
+    filter: brightness(1.12);
+  }
+}
+
+@keyframes gc-pop {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+}
+
+// The title shows from a zoom at which the titles do not cover each other, and always for
+// the chosen node and its neighbours (spec 001430). It keeps its size at every zoom: the
+// scale takes the zoom of the world back.
+.gc__label {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 50%;
+  display: none;
+  width: max-content;
+  max-width: 9.5rem;
+  padding: 0 var(--space-1);
+  overflow: hidden;
+  transform: translateX(-50%) scale(calc(1 / var(--gc-zoom, 1)));
+  transform-origin: top center;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  color: var(--color-text);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.gc--labels .gc__label,
+.gc__node--lit .gc__label {
+  display: block;
+}
+// A dimmed node has no title: a dimmed text is below the contrast of a text.
+.gc__node--dim .gc__label {
+  display: none;
+}
+.gc__node--muted .gc__label {
+  color: var(--color-text-muted);
+}
+.gc__node--chosen .gc__label {
+  font-weight: var(--fw-semibold);
+}
+
+// The zoom tools: a connected button group (spec 001354) in the corner of the canvas.
+.gc__tools {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  cursor: default;
+}
+
+// "Hoher Kontrast": every mark in the text colour with an edge, the icon names the kind.
+:host-context([data-very-high-contrast='on']) {
+  border: 2px solid var(--color-text);
+  background: var(--color-bg);
+
+  .gc__line {
+    stroke: var(--color-text);
+    stroke-width: 2;
+  }
+  .gc__dot {
+    background: var(--color-text);
+    color: var(--color-bg);
+    box-shadow: 0 0 0 2px var(--color-bg);
+  }
+  .gc__node--muted .gc__dot {
+    background: var(--color-bg);
+    color: var(--color-text);
+    box-shadow: inset 0 0 0 2px var(--color-text);
+  }
+  .gc__node--chosen .gc__dot {
+    box-shadow:
+      0 0 0 3px var(--color-bg),
+      0 0 0 6px var(--color-text);
+  }
+  .gc__label {
+    background: var(--color-bg);
+  }
+  .gc__node--muted .gc__label {
+    color: var(--color-text);
+  }
+  // A dimmed node stays readable: it only steps back.
+  .gc__node--dim {
+    opacity: 0.5;
+  }
+  .gc__line--dim {
+    opacity: 0.45;
+  }
+}

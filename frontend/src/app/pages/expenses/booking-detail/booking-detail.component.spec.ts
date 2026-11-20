@@ -1,11 +1,11 @@
 import { provideRouter } from '@angular/router';
-import { render, screen } from '@testing-library/angular';
+import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { Application } from '@core/api/models';
 import type { BudgetTreeNode, Expense, Invoice } from '../../budget/budget-tree.api';
 import { costCentreIndex } from '../../budget/expense-display.util';
 import { BookingDetailComponent } from './booking-detail.component';
-import { NO_LINKED_TODOS } from '../../../../testing/todo-fixtures';
+import { NO_LINKED_TODOS, linksOf } from '../../../../testing/todo-fixtures';
 import { TodosApiService } from '@core/api/todos.service';
 import { of } from 'rxjs';
 
@@ -170,14 +170,18 @@ describe('BookingDetailComponent', () => {
   });
 
   it('lists the to-dos that link the booking', async () => {
-    const linked = jest.fn(() =>
-      of([{ id: 'k-1', boardId: 'b', boardName: 'StuPa', title: 'Beleg nachreichen', columnName: 'Offen', isDone: false, dueDate: null, assignees: [] }]),
+    const links = jest.fn(() =>
+      of(
+        linksOf([
+          { id: 'k-1', boardId: 'b', boardName: 'StuPa', title: 'Beleg nachreichen', columnName: 'Offen', isDone: false, dueDate: null, assignees: [] },
+        ]),
+      ),
     );
     await render(BookingDetailComponent, {
       inputs: { expense: EXPENSE },
-      providers: [provideRouter([]), { provide: TodosApiService, useValue: { linked, boards: () => of([]) } }],
+      providers: [provideRouter([]), { provide: TodosApiService, useValue: { links, boards: () => of([]) } }],
     });
-    expect(linked).toHaveBeenCalledWith('expense', EXPENSE.id);
+    expect(links).toHaveBeenCalledWith('expense', EXPENSE.id);
     expect(screen.getByRole('link', { name: 'Beleg nachreichen' })).toBeInTheDocument();
   });
 
@@ -224,6 +228,22 @@ describe('BookingDetailComponent', () => {
     expect(invLink.getAttribute('href')).toBe('/invoices?id=inv');
     expect(screen.getByText('Offen')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /900,00\s€ von 2\.890,00\s€ verbucht/ })).toBeInTheDocument();
+  });
+
+  it('keeps "Verknüpfen" in the head of "Verknüpft" when the booking has an invoice', async () => {
+    const { view } = await setup({ expense: { ...EXPENSE, invoiceId: 'inv' }, invoice: INVOICE });
+    const head = view.container.querySelector('.bd__linked') as HTMLElement;
+    const link = within(head).getByRole('button', { name: 'Verknüpfen' });
+    expect(within(head).queryByRole('button', { name: 'To-Do anlegen' })).toBeNull();
+    link.click();
+    view.detectChanges();
+    expect(view.container.querySelector('app-todo-linked-list')).not.toBeNull();
+  });
+
+  it('has no "Verknüpfen" in "Verknüpft" for a person who may not change the booking', async () => {
+    const { view } = await setup({ expense: { ...EXPENSE, invoiceId: 'inv' }, invoice: INVOICE, canManage: false });
+    const head = view.container.querySelector('.bd__linked') as HTMLElement;
+    expect(within(head).queryByRole('button', { name: 'Verknüpfen' })).toBeNull();
   });
 
   it('names a linked invoice by its number until it loads, and an application by its title', async () => {

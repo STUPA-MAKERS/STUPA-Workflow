@@ -13,12 +13,13 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   IconComponent,
   InputComponent,
-  SheetBarComponent,
-  SheetBarTitleDirective,
+  MetaLineComponent,
   SectionComponent,
 } from '@stupa-makers/ui-kit';
+import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
 import { CostCentreSelectComponent } from '../../budget/cost-centre-select/cost-centre-select.component';
 import type { BudgetTreeNode, Expense } from '../../budget/budget-tree.api';
 import {
@@ -33,7 +34,9 @@ import { formatMoney } from '@shared/format-money';
 
 /**
  * The bulk actions of the selected bookings. Side by side
- * the panel replaces the detail sheet: "n Buchungen ausgewählt", "Umbuchen" (cost centre
+ * the panel replaces the detail sheet. Its head is the bar of "Antrag bearbeiten"
+ * (specs 001890, 001811): the selection icon, the count, the common cost centre and the sum
+ * as the subtitle, "Abbrechen" at the end. The body: "n Buchungen ausgewählt", "Umbuchen" (cost centre
  * and category, "unverändert lassen" when empty), the selected rows with their sum, the
  * export and the delete (at most five).
  *
@@ -44,12 +47,13 @@ import { formatMoney } from '@shared/format-money';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    MetaLineComponent,
     SectionComponent,
     SumRowComponent,
     BookingRowComponent,
-    SheetBarComponent,
-    SheetBarTitleDirective,
+    PaneFormHeadComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     CostCentreSelectComponent,
     FormsModule,
     IconComponent,
@@ -100,6 +104,11 @@ export class BulkPanelComponent {
     if (!rows.every((r) => r.budgetId === first)) return null;
     return costCentreLabel(this.costCentres(), first, rows[0].pathKey).name;
   });
+
+  /** The quiet line after the count: the common cost centre, then the sum. */
+  protected readonly subtitle = computed(() =>
+    [this.commonCostCentre(), this.sum()].filter((part) => !!part).join(' · '),
+  );
 
   /** The rows bound to an application (or sub-bookings): they keep their cost centre. */
   protected readonly fixedRows = computed(() =>

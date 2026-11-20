@@ -6,13 +6,7 @@ import { SimplifyPathPipe } from '@shared/budget-path';
 import { shortDay } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
 import { flowColorKind } from '@shared/ui';
-import {
-  IconComponent,
-  type IconName,
-  ListItemComponent,
-  type StatusKind,
-  StatusTextComponent,
-} from '@stupa-makers/ui-kit';
+import { IconComponent, type IconName, ListItemComponent, MetaLineComponent, type StatusKind, StatusTextComponent } from '@stupa-makers/ui-kit';
 import { signedEur } from '../expense-display.util';
 import { type BudgetItem, budgetItemKey } from './budget-items';
 
@@ -49,7 +43,7 @@ interface ItemRow {
   selector: 'app-budget-item-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconComponent, ListItemComponent, SimplifyPathPipe, StatusTextComponent],
+  imports: [MetaLineComponent, IconComponent, ListItemComponent, SimplifyPathPipe, StatusTextComponent],
   templateUrl: './budget-item-list.component.html',
   styleUrl: './budget-item-list.component.scss',
 })

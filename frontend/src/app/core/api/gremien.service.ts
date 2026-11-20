@@ -1,6 +1,7 @@
 /**
  * API of the tab "Gremien" (`/api/committees`). Every call reads, except `saveInfo`, the
- * save of the Info tab (gremium permission `info.write`).
+ * save of the Info tab (gremium permission `info.write`), and `notify`, the message to the
+ * members (gremium permission `members.notify`).
  *
  * The server shows a gremium to an active member, to `gremium.view_all` and to the admin
  * role. Any other caller gets 404 for a gremium, so a hidden gremium looks like a missing
@@ -23,8 +24,17 @@ export type LocalizedText = Readonly<Record<string, string>>;
 
 export type GremiumMeetingStatus = 'planned' | 'live' | 'closed';
 export type GremiumProtocolStatus = 'draft' | 'rendering' | 'final';
-/** The state of one member in one closed meeting. */
-export type GremiumAttendanceState = 'present' | 'excused' | 'absent' | 'delegated';
+/**
+ * The state of one person in one closed meeting. `seat` and `noSeat` are the states of a
+ * pool substitute (§ 001310): a pool seat taken, or none.
+ */
+export type GremiumAttendanceState =
+  | 'present'
+  | 'excused'
+  | 'absent'
+  | 'delegated'
+  | 'seat'
+  | 'no_seat';
 /** `application`: a vote on an application; `motion`: a free motion; `election`. */
 export type GremiumDecisionKind = 'application' | 'election' | 'motion';
 /** `passed` includes an election with a winner; `rejected` includes a tie. */
@@ -100,8 +110,9 @@ export interface GremiumAttendanceMonth {
 /** The attendance of one person in one month. */
 export interface GremiumAttendanceCell {
   readonly month: string;
-  /** A membership overlaps the month. */
+  /** A membership overlaps the month; always true in a pool row. */
   readonly member: boolean;
+  /** Present meetings; in a pool row the pool seats. */
   readonly present: number;
   readonly excused: number;
   /** Meetings in which the person transferred the vote. */
@@ -119,6 +130,8 @@ export interface GremiumAttendanceRow {
   readonly unexcused: number;
   /** One cell per month of `months`, in the same order. */
   readonly cells: readonly GremiumAttendanceCell[];
+  /** The row of a pool substitute: the cells count pool seats (§ 001310). */
+  readonly pool?: boolean;
 }
 
 /** `GET /committees/{id}/attendance`: the matrix of a range of months. */
@@ -142,7 +155,7 @@ export interface GremiumMemberMeeting {
   readonly date: string | null;
   readonly startTime: string | null;
   readonly status: GremiumAttendanceState;
-  /** The person who received the vote, for `delegated`. */
+  /** The person who received the vote, for `delegated`; the represented member, for `seat`. */
   readonly delegateName: string | null;
   /** The end of the late-excuse window, only on an own `absent` row while it is open (§ 000922). */
   readonly lateExcuseUntil?: string | null;
@@ -228,6 +241,17 @@ export interface GremiumInfoSave {
   readonly version: number;
 }
 
+/** A message to the members (specs 001850-001854): a subject and a plain text. */
+export interface GremiumNotify {
+  readonly subject: string;
+  readonly message: string;
+}
+
+/** The result of a send: the number of recipients, never their addresses. */
+export interface GremiumNotifyResult {
+  readonly recipients: number;
+}
+
 /**
  * The API calls of the tab "Gremien". Every view of the tab has its own skeleton, so no call
  * shows the global overlay.
@@ -290,14 +314,17 @@ export class GremienApiService {
     });
   }
 
+  /** `pool`: read the person as a pool substitute (states `seat` and `no_seat`). */
   memberAttendance(
     gremiumId: Uuid,
     principalId: Uuid,
     month: string,
+    pool = false,
   ): Observable<GremiumMemberAttendance> {
+    const params = new HttpParams().set('month', month);
     return this.http.get<GremiumMemberAttendance>(
       `${this.base}/committees/${gremiumId}/attendance/${principalId}`,
-      { params: new HttpParams().set('month', month), context: skipLoading() },
+      { params: pool ? params.set('pool', 'true') : params, context: skipLoading() },
     );
   }
 
@@ -321,5 +348,10 @@ export class GremienApiService {
   /** Save text and links; a stale `version` gives 409 `gremium_info_version_conflict`. */
   saveInfo(gremiumId: Uuid, body: GremiumInfoSave): Observable<GremiumInfo> {
     return this.http.put<GremiumInfo>(`${this.base}/committees/${gremiumId}/info`, body);
+  }
+
+  /** Mail a message to the members and the pool of the gremium (`members.notify`). */
+  notify(gremiumId: Uuid, body: GremiumNotify): Observable<GremiumNotifyResult> {
+    return this.http.post<GremiumNotifyResult>(`${this.base}/committees/${gremiumId}/notify`, body);
   }
 }

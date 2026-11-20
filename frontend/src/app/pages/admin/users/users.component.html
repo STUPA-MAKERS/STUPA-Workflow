@@ -78,15 +78,17 @@
                 }}</app-status-text>
               }
               @if (!p.mergedIntoId) {
-                <app-row-menu
-                  trail
-                  [sections]="menuFor(p)"
-                  [label]="('admin.users.moreActions' | t) + ': ' + userLabel(p)"
-                  (selected)="onMenu($event, p)"
-                />
+                <app-button-group ngProjectAs="[trail]">
+                  <app-row-menu
+                    trail
+                    [sections]="menuFor(p)"
+                    [label]="('admin.users.moreActions' | t) + ': ' + userLabel(p)"
+                    (selected)="onMenu($event, p)"
+                  />
+                </app-button-group>
               }
               @if (openIds().has(p.id)) {
-                <dl class="kv au__kv">
+                <dl appFacts class="au__kv">
                   <div>
                     <dt>{{ 'admin.users.col.roles' | t }}</dt>
                     <dd>{{ roleText(p) || ('admin.users.noRoles' | t) }}</dd>
@@ -102,7 +104,7 @@
                       <dd>{{ p.lastLogin ? (p.lastLogin | ldate: 'medium') : ('admin.users.never' | t) }}</dd>
                     }
                   </div>
-                  <div class="kv__wide">
+                  <div class="facts__wide">
                     <dt>{{ 'admin.users.col.groups' | t }}</dt>
                     <dd class="au__tags">
                       @for (g of p.oidcGroups; track g) {
@@ -119,7 +121,7 @@
         }
       </ul>
     } @else {
-      <app-empty-state shape="person" [heading]="'admin.users.noResults' | t" />
+      <app-empty-state icon="searchOff" shape="person" [heading]="'admin.users.noResults' | t" />
       }
     </ng-template>
   </app-load-state>

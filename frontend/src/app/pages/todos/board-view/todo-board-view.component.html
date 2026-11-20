@@ -60,12 +60,14 @@
             </span>
           }
           @if (columnMenu(col).length) {
-            <app-row-menu
-              class="bv__menu"
-              [label]="'todos.column.menu' | t: { name: col.name }"
-              [sections]="columnMenu(col)"
-              (selected)="onColumnMenu(col, $event)"
-            />
+            <app-button-group>
+              <app-row-menu
+                class="bv__menu"
+                [label]="'todos.column.menu' | t: { name: col.name }"
+                [sections]="columnMenu(col)"
+                (selected)="onColumnMenu(col, $event)"
+              />
+            </app-button-group>
           }
         </header>
 
@@ -111,14 +113,11 @@
         </div>
 
         @if (col.isDone && (more(col) > 0 || board().archivedCount)) {
-          <p class="bv__doneFoot">
+          <p class="bv__doneFoot"><app-meta-line>
             @if (more(col) > 0) {
               <button type="button" class="bv__link" (click)="expand(col)">
                 {{ 'todos.board.more' | t: { n: more(col) } }}
               </button>
-            }
-            @if (more(col) > 0 && board().archivedCount) {
-              <span aria-hidden="true">·</span>
             }
             @if (board().archivedCount) {
               <button type="button" class="bv__link" (click)="archive.emit()">
@@ -126,7 +125,7 @@
                 <app-icon name="right" [size]="15" />
               </button>
             }
-          </p>
+          </app-meta-line></p>
         }
 
         @if (canWrite() && !col.isDone) {
@@ -143,9 +142,11 @@
                 (keydown)="onAddKey($event, col)"
               ></textarea>
               <div class="bv__quickFoot">
-                <app-button variant="fill" size="sm" [disabled]="!draft().trim()" (click)="submitAdd(col)">
-                  {{ 'todos.board.create' | t }}
-                </app-button>
+                <app-button-group [main]="true">
+                  <app-button variant="fill" [disabled]="!draft().trim()" (click)="submitAdd(col)">
+                    {{ 'todos.board.create' | t }}
+                  </app-button>
+                </app-button-group>
               </div>
             </div>
           } @else {

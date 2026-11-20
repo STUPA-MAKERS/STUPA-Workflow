@@ -65,6 +65,11 @@ describe('positions', () => {
     ]);
   });
 
+  it('keeps the id of a position', () => {
+    expect(normalizePositions([{ id: 'p-1', label: 'A', offers: [] }])[0].id).toBe('p-1');
+    expect(normalizePositions([{ id: 3, label: 'A', offers: [] }])[0].id).toBeUndefined();
+  });
+
   it('takes the value of a position from its preferred offer', () => {
     const p = { offers: [{ label: 'A', value: 5, preferred: false }, { label: 'B', value: 7, preferred: true }] };
     expect(preferredOffer(p)?.label).toBe('B');
