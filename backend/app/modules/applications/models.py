@@ -236,7 +236,13 @@ class Applicant(UUIDPkMixin, Base):
 
 
 class SubmissionVersion(UUIDPkMixin, Base):
-    """Versioned snapshot of the answer data plus diff."""
+    """Versioned snapshot of the answer data plus diff.
+
+    A change of the Antragsart writes a version that holds the old and the new type and
+    the form version of the old type (``from_*``/``to_type_id``). The old version keeps
+    every value, and ``from_form_version_id`` gives the labels of the fields that the new
+    form does not have. All three are NULL for every other version.
+    """
 
     __tablename__ = "submission_version"
 
@@ -248,6 +254,15 @@ class SubmissionVersion(UUIDPkMixin, Base):
     changed_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     diff: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    from_type_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("application_type.id", ondelete="SET NULL"), nullable=True
+    )
+    to_type_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("application_type.id", ondelete="SET NULL"), nullable=True
+    )
+    from_form_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("form_version.id", ondelete="SET NULL"), nullable=True
+    )
 
     __table_args__ = (UniqueConstraint("application_id", "version"),)
 

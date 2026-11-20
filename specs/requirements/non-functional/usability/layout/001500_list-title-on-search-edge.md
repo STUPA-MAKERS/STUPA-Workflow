@@ -25,16 +25,20 @@ and that control must end before the buttons. In the very high contrast the butt
 high as the yellow of the search bar. The buttons must stay beside the filter bar while the page
 scrolls. A head without buttons must take no room.
 
+A list column without a filter bar (no search bar and no filter chips, such as Konto) must keep
+its title line on a wide screen, because nothing else names the page there.
+
 On a phone the title line stays as it is.
 
 This applies to every list column with a pane header (Anträge, Meine Anträge, Sitzungen,
 Abstimmungen, Rechnungen, Buchungen, Tickets, Aktivität, Gremien, Aufgaben, Verwaltung). The
-desktop calendar is no list column and keeps its title.
+desktop calendar is no list column; it hides its title too and puts its buttons in its tools row
+(001771).
 
 Reason: The title stood 16px right of the search bar and the chips below it, and it repeated the
 name of the active item of the navigation. Without it, the column starts with the search, and the
 buttons, which act on the list, stand next to the search and the filters.
 
 Test: A unit test of the kit reads `list-detail.scss` and expects the title to be visually
-hidden, the buttons to be absolute at the end of the first filter line with the height of the
+hidden only in a column with a filter bar, the buttons to be absolute at the end of the first filter line with the height of the
 search bar, the search bar to end before them, and the lower height in the very high contrast.

@@ -60,6 +60,8 @@ from app.modules.applications.schemas import (
     CommentPatch,
     OnBehalfCreate,
     TimelineEventOut,
+    TypeChangeIn,
+    TypeChangePreviewOut,
     VersionOut,
 )
 from app.modules.applications.service import ApplicationsService
@@ -68,7 +70,8 @@ from app.modules.audit.service import record as audit_record
 from app.modules.auth.people import PersonRef
 from app.modules.files.service import FilesService
 from app.modules.flow.dispatch import ActionDispatcher
-from app.modules.flow.router import get_action_dispatcher
+from app.modules.flow.router import get_action_dispatcher, get_flow_service
+from app.modules.flow.service import FlowService
 from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.notifications.chat_mail import comment_mail_text
 from app.modules.notifications.provider import mail_queue_from_pool
@@ -107,6 +110,7 @@ def get_applications_service(session: DbSession) -> ApplicationsService:
 
 
 ServiceDep = Annotated[ApplicationsService, Depends(get_applications_service)]
+FlowServiceDep = Annotated[FlowService, Depends(get_flow_service)]
 
 
 async def _deliver_magic_link(
@@ -660,6 +664,64 @@ async def unarchive_application(
         actor=principal.sub,
         strip_pii_fields=not await _principal_reads_pii(service, application_id, principal),
     )
+
+
+#: Change the Antragsart of a submitted application (spec 001660).
+CHANGE_TYPE_PERMISSION = "application.change_type"
+
+TypeChanger = Annotated[Principal, Depends(require_principal(CHANGE_TYPE_PERMISSION))]
+
+
+@router.get(
+    "/applications/{application_id}/type-change",
+    response_model=TypeChangePreviewOut,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def preview_type_change(
+    application_id: UUID,
+    type_id: Annotated[UUID, Query(alias="typeId")],
+    service: ServiceDep,
+    flow: FlowServiceDep,
+    principal: TypeChanger,
+) -> TypeChangePreviewOut:
+    """Show what a change of the Antragsart to ``typeId`` does (spec 001661).
+
+    The answer lists the carried, the missing and the dropped fields. With a missing
+    required value it lists the manual transitions into a state with ``editAllowed``
+    that the caller may fire. The caller must read the application.
+    """
+    await resolve_app_read(service.session, application_id, principal, None)
+    return await service.type_change_preview(application_id, type_id, principal, flow)
+
+
+@router.post(
+    "/applications/{application_id}/type-change",
+    response_model=ApplicationOut,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def change_application_type(
+    application_id: UUID,
+    payload: TypeChangeIn,
+    service: ServiceDep,
+    flow: FlowServiceDep,
+    principal: TypeChanger,
+) -> ApplicationOut:
+    """Change the Antragsart of a submitted application (specs 001660-001663).
+
+    The change writes a new version in the form of the new type and keeps the old
+    version. With a missing required value it fires ``transitionId`` back to the
+    applicant, with the missing fields in the note. The caller must read the application.
+    """
+    await resolve_app_read(service.session, application_id, principal, None)
+    strip = not await _principal_reads_pii(service, application_id, principal)
+    staged = await service.stage_type_change(application_id, payload, principal, flow)
+    await service.session.commit()
+    if staged is not None:
+        await flow.after_commit(staged)
+    # The flow writes server-side values (updated_at) that the session does not hold, and
+    # reading such an expired column outside the greenlet raises MissingGreenlet.
+    service.session.expire_all()
+    return await service.get(application_id, include_pii=False, strip_pii_fields=strip)
 
 
 async def _principal_reads_pii(

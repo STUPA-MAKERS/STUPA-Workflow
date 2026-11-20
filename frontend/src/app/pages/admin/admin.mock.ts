@@ -61,6 +61,7 @@ export const MOCK_PERMISSIONS: readonly string[] = [
   'application.edit_any',
   'application.delete',
   'application.archive',
+  'application.change_type',
   'form.configure',
   'flow.configure',
   'meeting.view_all',
