@@ -128,12 +128,10 @@
   border: 0;
   background: none;
   font: inherit;
-  font-size: var(--fs-cap);
+  font-size: var(--fs-small);
   line-height: var(--lh-cap);
   font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-cap);
   text-align: left;
-  text-transform: uppercase;
   color: var(--color-accent-text);
   cursor: pointer;
 }
