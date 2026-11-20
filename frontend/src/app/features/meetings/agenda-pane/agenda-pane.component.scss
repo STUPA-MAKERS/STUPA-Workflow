@@ -317,6 +317,27 @@
 :host-context([data-very-high-contrast='on'] .mp__agenda) .ap__menu {
   border: var(--vh-edge) !important;
 }
+// The chosen TOP redefines the ink of very high contrast for its yellow fill, so the edge of
+// its menu box is taken from the row, and the chosen box itself drops the black ring of a
+// chosen row: a yellow edge on the yellow fill, so both boxes have the same outer size and
+// the same 3px gap (001443).
+:host-context([data-very-high-contrast='on'] .mp__agenda) .ap__row {
+  --ap-edge: var(--vh-edge);
+}
+:host-context([data-very-high-contrast='on'] .mp__agenda) .ap__menu {
+  border: var(--ap-edge) !important;
+}
+// The box of the menu sits in the item, which has the 2px edge here, so it reaches past that
+// edge to match the outer size of the item.
+:host-context([data-very-high-contrast='on'] .mp__agenda) .ap__row .ap__menu {
+  inset-block: -2px;
+  inset-inline-end: calc(-56px - 3px - 2px);
+}
+:host-context([data-very-high-contrast='on'] .mp__agenda) .ap__row ::ng-deep .li.li--on {
+  border: 2px solid var(--vh-hi) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
 :host-context([data-very-high-contrast='on'] .mp__agenda) .ap__add {
   border-radius: 6px var(--radius-2xl) 6px 6px !important;
   outline: none !important;
