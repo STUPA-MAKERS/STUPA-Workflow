@@ -63,4 +63,7 @@ EXPOSE 8000
 
 # Keep forwarded-allow-ips narrow. Never set it to "*". The default is
 # loopback. Production passes the Caddy network through FORWARDED_ALLOW_IPS.
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips \"${FORWARDED_ALLOW_IPS:-127.0.0.1}\""]
+# API_WORKERS processes serve the requests side by side (spec 002004), default 4, one per
+# vCPU of the VM. The live events, the locks and the rate limits go through Redis, so any
+# process can take any request. Each process has its own database pool (5 + 10).
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers \"${API_WORKERS:-4}\" --proxy-headers --forwarded-allow-ips \"${FORWARDED_ALLOW_IPS:-127.0.0.1}\""]
