@@ -152,6 +152,34 @@
 
       @if (app() || inv()) {
         <app-section class="fd__sec bd__linked" [heading]="'expenses.detail.linked' | t">
+          <!-- The section holds the Antrag, the Rechnung and the linked elements, so "Verknüpfen" and
+               "To-Do anlegen" stand in its head, as in the section of a booking without them. -->
+          @if (canManage() || todos.canAct()) {
+            <app-button-group sectionAction>
+              <app-button
+                variant="text"
+                size="sm"
+                [iconOnly]="true"
+                [ariaLabel]="'todos.linked.link' | t"
+                data-testid="bd-link"
+                (click)="todos.linkOpen.set(true)"
+              >
+                <app-icon name="link" />
+              </app-button>
+              @if (todos.canAct()) {
+                <app-button
+                  variant="text"
+                  size="sm"
+                  [iconOnly]="true"
+                  [ariaLabel]="'todos.linked.add' | t"
+                  data-testid="bd-new"
+                  (click)="todos.newOpen.set(true)"
+                >
+                  <app-icon name="plus" />
+                </app-button>
+              }
+            </app-button-group>
+          }
           <div class="rowgroup">
             @if (app(); as a) {
               <a class="fd__link" [routerLink]="['/applications', a.id]">
@@ -207,7 +235,7 @@
               }
             }
           </div>
-          <app-todo-linked-list class="bd__todos" kind="expense" headingId="bd-todos" [showTitle]="false" [targetId]="e.id" />
+          <app-todo-linked-list #todos class="bd__todos" kind="expense" headingId="bd-todos" [showTitle]="false" [targetId]="e.id" [headActions]="true" [linkLabel]="e.description" />
         </app-section>
       }
 
