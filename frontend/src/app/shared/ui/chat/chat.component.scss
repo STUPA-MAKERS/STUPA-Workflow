@@ -654,3 +654,14 @@
 .chat__row--own .chat__text ::ng-deep .chat__mention {
   color: inherit;
 }
+
+// A public draft of the guarded switch shows a solid frame, so it differs from an internal
+// draft without color alone (001692).
+.chat__box--public {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+// The attach button sits inside the field: a plain icon without the tonal group surface.
+.chat__box .btn-grp.btn-grp ::ng-deep .chat__attach .btn {
+  background-color: transparent;
+}

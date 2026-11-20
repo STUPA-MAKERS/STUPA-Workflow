@@ -27,6 +27,7 @@ export type {
   ChatRef,
   ChatSend,
   ChatVisibility,
+  ChatVisibilityGuard,
 } from './chat/chat.models';
 export { BodyPortalDirective } from './body-portal/body-portal.directive';
 export { PullRefreshDirective, rubberBand } from './pull-refresh/pull-refresh.directive';

@@ -24,11 +24,13 @@
                       [downDisabled]="g.id === groups()[groups().length - 1].id"
                       (move)="moveGroup(g, $event)"
                     />
-                    <app-row-menu
-                      [label]="('admin.common.actions' | t) + ': ' + groupName(g)"
-                      [sections]="groupMenu()"
-                      (selected)="groupAction(g, $event)"
-                    />
+                    <app-button-group>
+                      <app-row-menu
+                        [label]="('admin.common.actions' | t) + ': ' + groupName(g)"
+                        [sections]="groupMenu()"
+                        (selected)="groupAction(g, $event)"
+                      />
+                    </app-button-group>
                   </span>
                 }
                 @if (groupText(g); as html) {
@@ -37,7 +39,7 @@
                 @if (b.types.length) {
                   <ng-container *ngTemplateOutlet="typeTable; context: { $implicit: b.types }" />
                 } @else {
-                  <app-empty-state rows="1" [heading]="'admin.forms.groupEmpty' | t" />
+                  <app-empty-state icon="form" rows="1" [heading]="'admin.forms.groupEmpty' | t" />
                 }
               </app-section>
             } @else if (blockHeading(b)) {
@@ -50,7 +52,7 @@
           }
         </div>
       } @else {
-        <app-empty-state shape="table" [heading]="'admin.forms.overviewEmpty' | t" />
+        <app-empty-state icon="form" shape="table" [heading]="'admin.forms.overviewEmpty' | t" />
       }
     </ng-template>
   </app-load-state>
@@ -100,11 +102,13 @@
     <ng-template appCell="actions" let-t>
       @if (canCreate() || canDelete()) {
         <span class="fl__actions" role="presentation" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
-          <app-row-menu
-            [label]="('admin.common.actions' | t) + ': ' + name($any(t))"
-            [sections]="rowMenus().get($any(t).id) ?? []"
-            (selected)="typeAction($any(t), $event)"
-          />
+          <app-button-group>
+            <app-row-menu
+              [label]="('admin.common.actions' | t) + ': ' + name($any(t))"
+              [sections]="rowMenus().get($any(t).id) ?? []"
+              (selected)="typeAction($any(t), $event)"
+            />
+          </app-button-group>
         </span>
       }
     </ng-template>

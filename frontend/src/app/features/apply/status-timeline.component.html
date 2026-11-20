@@ -13,7 +13,9 @@
         <app-status-text kind="warn">{{ 'status.expired.badge' | t }}</app-status-text>
         <h1 class="sp__endTitle" id="sp-end-title">{{ 'status.expired.heading' | t }}</h1>
         <p class="sp__endText">{{ 'status.expired.body' | t }}</p>
-        <a class="sp__btn" appButton="outlined" routerLink="/">{{ 'status.home' | t }}</a>
+        <app-button-group>
+          <a class="sp__btn" appButton="outlined" routerLink="/">{{ 'status.home' | t }}</a>
+        </app-button-group>
       </article>
     </section>
   }
@@ -24,7 +26,9 @@
         <app-icon class="sp__endIcon" name="search" [size]="28" />
         <h1 class="sp__endTitle" id="sp-end-title">{{ 'status.error.heading' | t }}</h1>
         <p class="sp__endText">{{ 'status.error.body' | t }}</p>
-        <a class="sp__btn" appButton="outlined" routerLink="/">{{ 'status.home' | t }}</a>
+        <app-button-group>
+          <a class="sp__btn" appButton="outlined" routerLink="/">{{ 'status.home' | t }}</a>
+        </app-button-group>
       </article>
     </section>
   }
@@ -37,7 +41,9 @@
             <p class="sp__editText">
               <strong id="sp-edit-title" tabindex="-1" #editTitle>{{ 'status.edit.title' | t }}</strong>
             </p>
-            <app-button variant="text" (click)="cancelEdit()">{{ 'action.cancel' | t }}</app-button>
+            <app-button-group>
+              <app-button variant="text" (click)="cancelEdit()">{{ 'action.cancel' | t }}</app-button>
+            </app-button-group>
           </header>
           <div class="sp__edit fe-form">
             <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" (modelChange)="editDirty.set(true)" />
@@ -106,17 +112,48 @@
               </span>
             </p>
 
-            @if (actions().length) {
+            @for (r of replacedBy(); track r.id) {
+              <p class="sheet-line ad__replaced" data-testid="replaced-by">
+                <app-icon name="right" [size]="16" />
+                <span>{{ 'status.replacedBy' | t }}</span>
+                <a class="ad__replacedLink" [routerLink]="['/my-applications', r.id]">{{ r.title || ('applications.list.untitled' | t) }}</a>
+              </p>
+            }
+            @if (isDraft() && !observer()) {
+              <app-note class="ad__note" icon="info" role="status" data-testid="draft-note">
+                {{ 'status.draft.note' | t }}
+                @if (submitAction(); as submit) {
+                  <app-button-group noteAction class="ad__draftSubmit" [main]="true">
+                  <app-button
+                    variant="fill"
+                    size="sm"
+                    [loading]="firing() === submit.id"
+                    [disabled]="firing() !== null && firing() !== submit.id"
+                    (click)="onAction(submit)"
+                  >{{ 'status.draft.submit' | t }}</app-button>
+                  </app-button-group>
+                }
+              </app-note>
+            }
+            @if (shownActions().length || offersNewVersion()) {
               <app-button-group class="ad__transitionGroup" [label]="'status.actions.title' | t">
-                @for (t of actions(); track t.id) {
+                @for (t of shownActions(); track t.id) {
                   <app-button
                     [variant]="looks().get(t.id) ?? 'tonal'"
                     [loading]="firing() === t.id"
                     [disabled]="firing() !== null && firing() !== t.id"
-                    (click)="fireAction(t)"
+                    (click)="onAction(t)"
                   >
                     {{ t.label || ('status.actions.fallback' | t) }}
                   </app-button>
+                }
+                @if (offersNewVersion()) {
+                  <app-button
+                    variant="tonal"
+                    data-testid="new-version"
+                    [loading]="creatingVersion()"
+                    (click)="createNewVersion()"
+                  ><app-icon name="copy" />{{ 'status.newVersion.action' | t }}</app-button>
                 }
               </app-button-group>
             }
@@ -199,7 +236,7 @@
           @if (historyEntries().length) {
             <app-history [entries]="historyEntries()" />
           } @else {
-            <app-empty-state rows="1" [heading]="'status.history.empty' | t" />
+            <app-empty-state icon="history" rows="1" [heading]="'status.history.empty' | t" />
           }
         </app-section>
       </ng-template>
@@ -234,6 +271,15 @@
           (closed)="observersOpen.set(false)"
         />
       }
+
+      <app-confirm-dialog
+        [open]="confirmAction() !== null"
+        [title]="'status.actions.confirmTitle' | t: { action: confirmAction()?.label ?? '' }"
+        [body]="'status.actions.confirmBody' | t"
+        [confirmLabel]="confirmAction()?.label || ('status.actions.fallback' | t)"
+        (confirm)="confirmFire()"
+        (cancel)="confirmAction.set(null)"
+      />
 
       <app-confirm-dialog
         [open]="confirmErase()"

@@ -60,12 +60,12 @@
             <app-skeleton variant="items" [count]="6" [grouped]="!split()" [label]="'tasks.loading' | t" />
           </div>
         } @else if (query() && !rows().length && !todoRows().length) {
-          <app-empty-state rows="3" [heading]="'tasks.noMatch' | t" />
+          <app-empty-state icon="searchOff" rows="3" [heading]="'tasks.noMatch' | t" />
         } @else if (!rows().length && !hasTodos()) {
           @if (split()) {
-            <app-empty-state rows="3" [heading]="'tasks.empty' | t" />
+            <app-empty-state icon="tasks" rows="3" [heading]="'tasks.empty' | t" />
           } @else {
-            <app-empty-state
+            <app-empty-state icon="tasks"
               [heading]="'tasks.empty' | t"
               [body]="'tasks.emptyBody' | t"
             />
@@ -76,7 +76,7 @@
               {{ 'tasks.group.applications' | t }}
             </h2>
             @if (!rows().length) {
-              <app-empty-state rows="3" [heading]="(query() ? 'tasks.noMatch' : 'tasks.empty') | t" />
+              <app-empty-state [icon]="query() ? 'searchOff' : 'tasks'" rows="3" [heading]="(query() ? 'tasks.noMatch' : 'tasks.empty') | t" />
             }
           }
           @for (group of showApplications() ? groups() : []; track group.key + $index) {
@@ -125,7 +125,7 @@
                 {{ 'tasks.group.todos' | t }}
               </h2>
               @if (!todoRows().length) {
-                <app-empty-state rows="3" [heading]="'todos.noMatch' | t" />
+                <app-empty-state icon="searchOff" rows="3" [heading]="'todos.noMatch' | t" />
               } @else {
                 <div class="tasks__rows" [class.rowgroup]="!split()" role="list">
                   @for (row of todoRows(); track row.item.id) {

@@ -3,18 +3,20 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import and_, select
 
 from app.modules.applications.decision import (
     DecisionIn,
     record_decision,
 )
-from app.modules.applications.models import ApplicationDecision
+from app.modules.applications.models import Application, ApplicationDecision
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.principal import Principal
+from app.modules.flow.models import State, Transition
 from app.modules.flow.service import FlowService, StagedFire
 from app.modules.voting import circular as circular_mod
 from app.modules.voting import election as election_mod
@@ -404,20 +406,29 @@ class VoteCloseOps(VotePlanOps, VoteDeleteOps, VoteAccessOps):
     ) -> ApplicationDecision | None:
         """Write the proposal of a passed vote as the decision of its application.
 
-        A vote without a proposal writes nothing. When the application amount went
-        below the approved amount after the vote opened, the decision binds the
-        requested amount (``approvedAmount`` null) and keeps the conditions.
+        A `pass` branch into an approved state always writes a decision with an amount
+        (spec 001611): the amount of the proposal, else the requested amount at the
+        close. When the application amount went below the approved amount after the
+        vote opened, the decision binds the requested amount and keeps the conditions.
+        Any other vote without a proposal writes nothing, and its proposal keeps the
+        old rule: an amount above the request binds "as requested" (null).
         """
         proposal = DecisionIn.from_stored(getattr(vote, "proposal", None))
-        if proposal is None:
+        requested = await self._approval_amount(application_id)
+        if proposal is None and requested is None:
             return None
         application = await self._get_application(application_id)
-        approved = proposal.approved_amount
+        base = proposal or DecisionIn()
+        approved = base.approved_amount
+        too_high = approved is not None and (
+            application.amount is None or approved > application.amount
+        )
         binding = (
-            proposal.model_copy(update={"approved_amount": None})
-            if approved is not None
-            and (application.amount is None or approved > application.amount)
-            else proposal
+            base.model_copy(update={"approved_amount": application.amount})
+            if requested is not None and (approved is None or too_high)
+            else base.model_copy(update={"approved_amount": None})
+            if too_high
+            else base
         )
         return await record_decision(
             self.session,
@@ -428,6 +439,31 @@ class VoteCloseOps(VotePlanOps, VoteDeleteOps, VoteAccessOps):
             old_approved=application.approved_amount,
             vote_id=vote.id,
         )
+
+    async def _approval_amount(self, application_id: UUID) -> Decimal | None:
+        """Return the requested amount when the `pass` branch leads into an approved state.
+
+        None when the branch leads elsewhere, or the application has no amount.
+        """
+        branch = (
+            select(Application.amount)
+            .join(
+                Transition,
+                and_(
+                    Transition.flow_version_id == Application.flow_version_id,
+                    Transition.from_state_id == Application.current_state_id,
+                    Transition.branch == "pass",
+                ),
+            )
+            .join(State, State.id == Transition.to_state_id)
+            .where(
+                Application.id == application_id,
+                State.is_approved.is_(True),
+                Application.amount.is_not(None),
+            )
+            .limit(1)
+        )
+        return await self.session.scalar(branch)
 
     async def _close_election(
         self, vote: Vote, principal: Principal, *, now: datetime | None

@@ -1,0 +1,95 @@
+<app-dialog
+  [open]="open()"
+  [title]="title()"
+  [subtitle]="subtitle()"
+  [closeLabel]="'action.close' | t"
+  (closed)="close()"
+>
+  @if (results(); as lines) {
+    <div class="bkd">
+      <p class="bkd__lead" role="status">
+        {{ 'applications.bulk.summary' | t: { ok: okCount(), count: lines.length } }}
+      </p>
+      <ul class="bkd__list" appScrollFade="y" data-testid="bulk-results">
+        @for (r of lines; track r.id) {
+          <li class="bkd__row" [class.bkd__row--error]="!r.ok">
+            <app-icon [name]="r.ok ? 'check' : 'alert'" [size]="18" />
+            <span class="bkd__title ell" [title]="r.title">{{ r.title }}</span>
+            <span class="bkd__state">{{ r.text }}</span>
+          </li>
+        }
+      </ul>
+    </div>
+  } @else {
+    <form class="bkd" (submit)="$event.preventDefault(); submit()">
+      @if (mode() === 'transition') {
+        <div class="bkd__group">
+          <span class="cap" id="bkd-targets">{{ 'applications.bulk.pick' | t }}</span>
+          @if (loading()) {
+            <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />
+          } @else if (options().length) {
+            <div class="bkd__list" role="radiogroup" aria-labelledby="bkd-targets">
+              @for (o of options(); track o.toStateId) {
+                <label class="bkd__pick" [class.bkd__pick--on]="pick() === o.toStateId">
+                  <input
+                    class="bkd__radio"
+                    type="radio"
+                    name="bkd-target"
+                    [value]="o.toStateId"
+                    [checked]="pick() === o.toStateId"
+                    (change)="pick.set(o.toStateId)"
+                  />
+                  <span class="bkd__title">{{ o.label }}</span>
+                </label>
+              }
+            </div>
+          } @else if (!failed()) {
+            <app-empty-state icon="file" rows="1" [heading]="'applications.bulk.none' | t" />
+          }
+        </div>
+        @if (amounts().length) {
+          <div class="bkd__group" data-testid="bulk-amounts">
+            <span class="cap" id="bkd-amounts">{{ 'applications.bulk.amounts' | t }}</span>
+            <ul class="bkd__list" appScrollFade="y" aria-labelledby="bkd-amounts">
+              @for (a of amounts(); track a.id) {
+                <li class="bkd__row">
+                  <span class="bkd__title ell" [title]="a.title">{{ a.title }}</span>
+                  <span class="bkd__amount">{{ a.amount }}</span>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      } @else {
+        <label class="bkd__note">
+          <span class="bkd__noteLabel">{{ 'applications.bulk.body' | t }}</span>
+          <textarea
+            class="bkd__noteInput"
+            rows="5"
+            name="bkd-body"
+            maxlength="10000"
+            [ngModel]="body()"
+            (ngModelChange)="body.set($event)"
+          ></textarea>
+        </label>
+      }
+      @if (failed()) {
+        <p class="bkd__refusal" role="alert">{{ 'applications.actions.error' | t }}</p>
+      }
+      <button type="submit" hidden></button>
+    </form>
+  }
+  @if (results()) {
+    <app-button dialog-footer variant="fill" (click)="close()">{{ 'action.close' | t }}</app-button>
+  } @else {
+    <ng-container ngProjectAs="[dialog-footer]">
+      <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+      <app-button
+        variant="fill"
+        [disabled]="!canConfirm()"
+        [loading]="running()"
+        (click)="submit()"
+      >{{ (mode() === 'transition' ? 'applications.bulk.fire' : 'applications.bulk.send') | t }}</app-button>
+    </ng-container>
+  }
+</app-dialog>

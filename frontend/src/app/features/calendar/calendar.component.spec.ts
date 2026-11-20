@@ -122,7 +122,8 @@ function reload(view: View, items: readonly CalendarEntry[] = MONTH): TestReques
 
 const cell = (name: RegExp) => screen.getByRole('button', { name }).closest('.cal__cell') as HTMLElement;
 const panel = () => screen.getByRole('complementary');
-const cards = () => within(panel()).queryAllByRole('button').map((b) => b.querySelector('.cal__cardTitle')?.textContent);
+const cards = () => within(panel()).queryAllByRole('listitem').map((r) => r.querySelector('.li__title')?.textContent?.trim());
+const dayRow = (name: RegExp) => within(panel()).getByRole('button', { name }).closest('[role=listitem]') as HTMLElement;
 
 jest.setTimeout(20_000);
 
@@ -178,17 +179,21 @@ describe('CalendarComponent (desktop)', () => {
     expect(screen.getByRole('button', { name: 'Mittwoch, 18. November 2026, 1 Eintrag' })).toBeInTheDocument();
   });
 
-  it('shows the entries of the picked day as cards', async () => {
+  it('shows the entries of the picked day as the rows of one row group without a day label (001770)', async () => {
     const view = await setup();
     load(view);
     expect(panel()).toHaveAccessibleName('Mi, 11.11.2026 · Heute');
     expect(cards()).toEqual(['Angebot einholen', 'Zahnarzt', 'Jour fixe']);
-    const termin = within(panel()).getByRole('button', { name: /Jour fixe/ });
+    expect(panel().querySelectorAll('.rowgroup[role=list]').length).toBe(1);
+    expect(panel().querySelector('app-list-group')).toBeNull();
+    expect(within(panel()).queryByText('Mi, 11.11.2026 · Heute')).toBeNull();
+    const termin = dayRow(/Jour fixe/);
     expect(termin).toHaveTextContent('Termin');
     expect(termin).toHaveTextContent('14:00 – 15:30');
-    expect(termin).toHaveTextContent('Haushaltsausschuss · AStA-Büro');
+    expect(termin).toHaveTextContent('Haushaltsausschuss');
+    expect(termin).toHaveTextContent('AStA-Büro');
     expect(termin).toHaveTextContent('Zusage');
-    expect(within(panel()).getByRole('button', { name: /Angebot einholen/ })).not.toHaveTextContent('Ganztägig');
+    expect(dayRow(/Angebot einholen/)).not.toHaveTextContent('Ganztägig');
     await userEvent.click(screen.getByRole('button', { name: /14\. November/ }));
     expect(panel()).toHaveAccessibleName('Sa, 14.11.2026');
     expect(within(panel()).getByText('Keine Einträge an diesem Tag.')).toBeInTheDocument();
@@ -429,6 +434,19 @@ describe('CalendarComponent (desktop)', () => {
     expect(within(column()).getByRole('button', { name: '19:00 – 20:30 Infoabend' })).toBeInTheDocument();
     expect(view.cmp.visible().map((e) => e.id)).toEqual(['a-2', 'a-1', 'e-1', 'a-3']);
     expect(view.cmp.kindOptions().map((o) => o.value)).not.toContain('event');
+  });
+
+  it('puts Heute, Kalender-Abo and Termin anlegen in one group at the end of the tools row (001771)', async () => {
+    const view = await setup();
+    load(view);
+    const group = screen.getByRole('toolbar').querySelector('.cal__nav app-button-group.cal__actions') as HTMLElement;
+    expect(within(group).getAllByRole('button').map((b) => b.textContent?.trim() || b.getAttribute('aria-label'))).toEqual([
+      'Heute',
+      'Kalender-Abo',
+      'Termin anlegen',
+    ]);
+    expect(within(group).getByRole('button', { name: 'Termin anlegen' })).toBeInTheDocument();
+    expect(view.container.querySelector('app-fab')).toBeNull();
   });
 
   it('creates a Termin on the picked day and shows it at once', async () => {

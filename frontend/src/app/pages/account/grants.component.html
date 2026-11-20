@@ -17,10 +17,12 @@
         <div class="gr__mcpText">
           <h2 class="gr__h2" id="gr-mcp-title">{{ 'account.mcp.title' | t }}</h2>
         </div>
-        <app-button class="gr__download" variant="fill" [loading]="downloading()" (click)="downloadPackage()">
-          <app-icon name="download" />
-          {{ 'account.mcp.download' | t }}
-        </app-button>
+        <app-button-group [main]="true">
+          <app-button class="gr__download" variant="fill" [loading]="downloading()" (click)="downloadPackage()">
+            <app-icon name="download" />
+            {{ 'account.mcp.download' | t }}
+          </app-button>
+        </app-button-group>
       </div>
 
       @if (setup(); as s) {
@@ -61,9 +63,11 @@
     [heading]="'account.grants.active' | t"
   >
     @if (grants().length > 0) {
-      <app-button sectionAction variant="danger" size="sm" (click)="askRevokeAll()">
-        {{ 'account.grants.revokeAll' | t }}
-      </app-button>
+      <app-button-group ngProjectAs="[sectionAction]">
+        <app-button sectionAction variant="danger" size="sm" (click)="askRevokeAll()">
+          {{ 'account.grants.revokeAll' | t }}
+        </app-button>
+      </app-button-group>
     }
 
     @if (loadError()) {
@@ -71,7 +75,7 @@
     } @else if (loading() && grants().length === 0) {
       <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
     } @else if (grants().length === 0) {
-      <app-empty-state rows="3" [heading]="'account.grants.empty' | t" />
+      <app-empty-state icon="key" rows="3" [heading]="'account.grants.empty' | t" />
     } @else {
       <ul class="rowgroup gr__list" [attr.aria-label]="'account.grants.active' | t" [attr.aria-busy]="loading()">
         @for (g of grants(); track g.id) {
@@ -91,14 +95,16 @@
                 >
               </span>
             </div>
-            <app-button
-              variant="danger"
-              size="sm"
-              [ariaLabel]="('account.grants.revoke' | t) + ': ' + scopeLabels(g)"
-              (click)="askRevoke(g)"
-            >
-              {{ 'account.grants.revoke' | t }}
-            </app-button>
+            <app-button-group>
+              <app-button
+                variant="danger"
+                size="sm"
+                [ariaLabel]="('account.grants.revoke' | t) + ': ' + scopeLabels(g)"
+                (click)="askRevoke(g)"
+              >
+                {{ 'account.grants.revoke' | t }}
+              </app-button>
+            </app-button-group>
           </li>
         }
       </ul>

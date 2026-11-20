@@ -5,7 +5,7 @@
   @if (loading()) {
     <app-skeleton variant="lines" [count]="2" [label]="'gremien.attendance.detailLoading' | t" />
   } @else if (empty()) {
-    <app-empty-state rows="1" [heading]="'gremien.attendance.detailEmpty' | t" />
+    <app-empty-state icon="users" rows="1" [heading]="'gremien.attendance.detailEmpty' | t" />
   } @else {
     @for (g of groups(); track g.month) {
       @if (g.meetings.length) {
@@ -27,9 +27,11 @@
               </span>
               <app-status-text [kind]="state(m.status).kind">{{ state(m.status).key | t }}</app-status-text>
               @if (m.lateExcuseUntil) {
-                <app-button class="gad__excuse" variant="tonal" size="sm" (click)="askExcuse(m)">
-                  {{ 'meetings.lateExcuse.title' | t }}
-                </app-button>
+                <app-button-group>
+                  <app-button class="gad__excuse" variant="tonal" size="sm" (click)="askExcuse(m)">
+                    {{ 'meetings.lateExcuse.title' | t }}
+                  </app-button>
+                </app-button-group>
               }
             </li>
           }

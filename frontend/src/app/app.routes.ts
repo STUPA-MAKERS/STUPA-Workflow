@@ -394,6 +394,13 @@ export const routes: Routes = [
           import('./pages/activity/activity.component').then((m) => m.ActivityComponent),
       },
       {
+        /** The graph of the elements and their relations (spec 001420), behind `graph.view` (001421). */
+        path: 'graph',
+        data: { title: 'nav.graph', permission: 'graph.view', wide: true },
+        canActivate: [authGuard],
+        loadComponent: () => import('./pages/graph/graph.component').then((m) => m.GraphComponent),
+      },
+      {
         path: 'calendar',
         canMatch: [featureMatch('calendar')],
         data: { title: 'nav.calendar', wide: true },
@@ -657,6 +664,15 @@ export const routes: Routes = [
             canActivate: [authGuard],
             loadComponent: () =>
               import('./pages/admin/audit/audit-log.component').then((m) => m.AuditLogComponent),
+          },
+          {
+            path: 'forced-status',
+            data: { title: 'admin.forced.title', permission: 'audit.read', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/forced-status/forced-status.component').then(
+                (m) => m.ForcedStatusComponent,
+              ),
           },
           {
             path: 'delegations',

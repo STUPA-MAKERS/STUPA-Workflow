@@ -20,6 +20,7 @@ import {
   mapApplicationLinks,
   mapApplicationListItem,
   mapApplicationType,
+  mapBulkOption,
   mapAttachment,
   mapComment,
   mapMeeting,
@@ -34,6 +35,15 @@ import {
   toApplicationCreateBody,
 } from './mappers';
 import type {
+  BulkItemResult,
+  BulkTransitionOption,
+  BulkTransitionOptionWire,
+  NewVersionCreated,
+  AmendAmountBody,
+  AmendAmountResult,
+  ForcedEvent,
+  ForcedReport,
+  OutsideDecisionBody,
   ApplicantCandidate,
   OnBehalfApplication,
   CalendarFeed,
@@ -114,6 +124,8 @@ import type {
   TransitionOutWire,
   TransitionRequestBody,
   TransitionResult,
+  TypeChangeBody,
+  TypeChangePreview,
   Uuid,
   VersionOutWire,
   CircularCreateBody,
@@ -464,6 +476,41 @@ export class ApiClient {
     });
   }
 
+  /** POST /applications/{id}/new-version — create the new version of an Antrag (001720). */
+  newVersion(id: Uuid): Observable<NewVersionCreated> {
+    return this.http.post<NewVersionCreated>(`${this.base}/applications/${id}/new-version`, {});
+  }
+
+  /** POST /bulk/applications/transitions — the targets that every Antrag reaches (001701). */
+  bulkTransitions(ids: readonly Uuid[]): Observable<BulkTransitionOption[]> {
+    const lang = this.i18n.uiLocale();
+    return this.http
+      .post<BulkTransitionOptionWire[]>(`${this.base}/bulk/applications/transitions`, {
+        applicationIds: ids,
+      })
+      .pipe(map((list) => list.map((w) => mapBulkOption(w, lang))));
+  }
+
+  /** POST /bulk/applications/transition — move every Antrag into one state (001701). */
+  fireBulkTransition(ids: readonly Uuid[], toStateId: Uuid): Observable<readonly BulkItemResult[]> {
+    return this.http
+      .post<{ results: readonly BulkItemResult[] }>(`${this.base}/bulk/applications/transition`, {
+        applicationIds: ids,
+        toStateId,
+      })
+      .pipe(map((res) => res.results));
+  }
+
+  /** POST /bulk/applications/comments — one public comment on each Antrag (001702). */
+  bulkComment(ids: readonly Uuid[], body: string): Observable<readonly BulkItemResult[]> {
+    return this.http
+      .post<{ results: readonly BulkItemResult[] }>(`${this.base}/bulk/applications/comments`, {
+        applicationIds: ids,
+        body,
+      })
+      .pipe(map((res) => res.results));
+  }
+
   /** POST /applications/{id}/erasure-request — file a GDPR Art. 17 erasure request. */
   requestErasure(id: Uuid): Observable<void> {
     return this.http.post<void>(`${this.base}/applications/${id}/erasure-request`, {});
@@ -592,6 +639,67 @@ export class ApiClient {
    *  override bypasses guards and transitions. Needs `application.force_status`. */
   forceStatus(id: Uuid, req: ForceStatusBody): Observable<TransitionResult> {
     return this.http.post<TransitionResult>(`${this.base}/applications/${id}/force-status`, req);
+  }
+
+  /** POST /applications/{id}/outside-decision — record a decision that a Gremium made in
+   *  a meeting without a vote on the platform. Needs `application.record_decision`. */
+  recordOutsideDecision(id: Uuid, req: OutsideDecisionBody): Observable<TransitionResult> {
+    return this.http.post<TransitionResult>(
+      `${this.base}/applications/${id}/outside-decision`,
+      req,
+    );
+  }
+
+  /** POST /applications/{id}/approved-amount — change the approved amount of an
+   *  approved application. Needs `application.amend_decision`. */
+  amendApprovedAmount(id: Uuid, req: AmendAmountBody): Observable<AmendAmountResult> {
+    return this.http.post<AmendAmountResult>(
+      `${this.base}/applications/${id}/approved-amount`,
+      req,
+    );
+  }
+
+  /** GET /committees — every Gremium by id and name, the master data of a picker. */
+  committeeNames(): Observable<{ id: Uuid; name: string }[]> {
+    return this.http.get<{ id: Uuid; name: string }[]>(`${this.base}/committees`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** GET /admin/forced-status — the forced status changes per reason and per path. */
+  forcedReport(range: { from?: string; to?: string } = {}): Observable<ForcedReport> {
+    return this.http.get<ForcedReport>(`${this.base}/admin/forced-status`, {
+      params: httpParams(range),
+    });
+  }
+
+  /** GET /admin/forced-status/events — the forced changes behind one count. */
+  forcedEvents(filter: {
+    from?: string;
+    to?: string;
+    reason?: string;
+    fromKey?: string;
+    toKey?: string;
+  }): Observable<ForcedEvent[]> {
+    return this.http.get<ForcedEvent[]>(`${this.base}/admin/forced-status/events`, {
+      params: httpParams(filter),
+    });
+  }
+
+  /** What a change of the Antragsart to `typeId` carries, misses and drops (spec 001661). */
+  typeChangePreview(id: Uuid, typeId: Uuid): Observable<TypeChangePreview> {
+    return this.http.get<TypeChangePreview>(`${this.base}/applications/${id}/type-change`, {
+      params: { typeId },
+      context: skipLoading(),
+    });
+  }
+
+  /** Change the Antragsart of an application (`application.change_type`, spec 001660). */
+  changeType(id: Uuid, body: TypeChangeBody): Observable<Application> {
+    const lang = this.i18n.uiLocale();
+    return this.http
+      .post<ApplicationOutWire>(`${this.base}/applications/${id}/type-change`, body)
+      .pipe(map((wire) => mapApplication(wire, lang)));
   }
 
   /** Transitions the magic-link applicant may fire (actorIsApplicant gate). */

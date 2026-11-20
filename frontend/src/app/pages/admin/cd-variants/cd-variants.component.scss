@@ -75,9 +75,10 @@
   --button-height: 2.25rem;
   --button-hover-bg: var(--color-surface-3);
 }
+// The count takes the text colour of the button: the muted grey has too little contrast on
+// the tonal surface of the button group (spec 001354).
 .cdv__count {
   font-weight: var(--fw-regular);
-  color: var(--color-text-muted);
 }
 
 .cdv__body {

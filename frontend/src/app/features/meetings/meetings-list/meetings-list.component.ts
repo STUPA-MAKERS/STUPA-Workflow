@@ -18,6 +18,7 @@ import { meetingStatus, type StatusView } from '@shared/status-kind.util';
 import {
   FabComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   DateBlockComponent,
   EmptyStateComponent,
   FilterSelectComponent,
@@ -69,6 +70,7 @@ import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pu
     NgTemplateOutlet,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     DateBlockComponent,
     EmptyStateComponent,

@@ -106,12 +106,14 @@
                   <app-status-text [kind]="row.readOnly.kind">{{ row.readOnly.key | t }}</app-status-text>
                 }
                 @if (row.menu.length) {
-                  <app-row-menu
-                    class="as__menu"
-                    [sections]="row.menu"
-                    [label]="'meetings.attendanceSheet.rowMenu' | t: { name: row.name }"
-                    (selected)="onMenu(row, $event)"
-                  />
+                  <app-button-group>
+                    <app-row-menu
+                      class="as__menu"
+                      [sections]="row.menu"
+                      [label]="'meetings.attendanceSheet.rowMenu' | t: { name: row.name }"
+                      (selected)="onMenu(row, $event)"
+                    />
+                  </app-button-group>
                 } @else if (anyMenu()) {
                   <span class="as__menuGap" aria-hidden="true"></span>
                 }
@@ -122,9 +124,11 @@
                   <app-icon name="alert" [size]="16" />
                   <span>{{ 'meetings.attendanceSheet.delegationActive' | t }}</span>
                   @if (c !== 'unknown' && c.revocable) {
-                    <app-button variant="text" size="sm" [loading]="revoking() === c.id" (click)="revoke(c)">
-                      {{ 'meetings.attendanceSheet.revokeDelegation' | t }}
-                    </app-button>
+                    <app-button-group>
+                      <app-button variant="text" size="sm" [loading]="revoking() === c.id" (click)="revoke(c)">
+                        {{ 'meetings.attendanceSheet.revokeDelegation' | t }}
+                      </app-button>
+                    </app-button-group>
                   }
                 </p>
               }
@@ -132,7 +136,7 @@
           }
         </ul>
         } @else {
-          <app-empty-state shape="person" rows="3" [heading]="(query() ? 'meetings.dock.noMember' : 'meetings.attendance.empty') | t" />
+          <app-empty-state [icon]="query() ? 'searchOff' : 'users'" shape="person" rows="3" [heading]="(query() ? 'meetings.dock.noMember' : 'meetings.attendance.empty') | t" />
         }
 
         @if (meetingDelegations().length) {
@@ -147,9 +151,11 @@
                     <span class="as__muted as__nowrap">{{ 'meetings.attendanceSheet.withVote' | t }}</span>
                   }
                   @if (d.revocable) {
-                    <app-button variant="danger" size="sm" [loading]="revoking() === d.id" (click)="revoke(d)">
-                      {{ 'meetings.attendanceSheet.revoke' | t }}
-                    </app-button>
+                    <app-button-group>
+                      <app-button variant="danger" size="sm" [loading]="revoking() === d.id" (click)="revoke(d)">
+                        {{ 'meetings.attendanceSheet.revoke' | t }}
+                      </app-button>
+                    </app-button-group>
                   }
                 </li>
               }
@@ -173,7 +179,7 @@
                   }
                 </ul>
               } @else {
-                <app-empty-state shape="person" rows="2" [heading]="'meetings.viewers.empty' | t" />
+                <app-empty-state icon="eye" shape="person" rows="2" [heading]="'meetings.viewers.empty' | t" />
               }
             </div>
           </section>

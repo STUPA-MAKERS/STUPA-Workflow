@@ -26,12 +26,14 @@
                   >{{ scopeLabel(c) }} · {{ intervalLabel(c.intervalMinutes) }} ·
                   <span class="mono">{{ c.url }}</span></span
                 >
-                <app-row-menu
-                  trail
-                  [sections]="rowMenu()"
-                  [label]="('ui.rowMenu.trigger' | t) + ': ' + c.name"
-                  (selected)="onMenu($event.id, c)"
-                />
+                <app-button-group ngProjectAs="[trail]">
+                  <app-row-menu
+                    trail
+                    [sections]="rowMenu()"
+                    [label]="('ui.rowMenu.trigger' | t) + ': ' + c.name"
+                    (selected)="onMenu($event.id, c)"
+                  />
+                </app-button-group>
                 <app-section class="wh__status" [level]="2" [heading]="'admin.calendars.fetch.title' | t">
                   <dl class="kv wh__grid">
                     <div>
@@ -63,7 +65,7 @@
           }
         </ul>
       } @else {
-        <app-empty-state [heading]="'admin.calendars.none' | t" />
+        <app-empty-state icon="cal" [heading]="'admin.calendars.none' | t" />
       }
     </ng-template>
   </app-load-state>

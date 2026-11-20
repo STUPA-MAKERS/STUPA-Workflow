@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterOutlet } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
-import type { ApplicantApplications, Uuid } from '@core/api/models';
+import type { ApplicantApplicationItem, ApplicantApplications, Lang, Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { LOCATION } from '@core/browser/location.token';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -117,8 +117,7 @@ export class MyApplicationsComponent implements MyApplicationsPage {
         id: item.id,
         createdAt: item.createdAt,
         title: item.title?.trim() || untitled,
-        stateLabel: item.state ? resolveI18n(item.state.label, lang) : '',
-        stateKind: flowColorKind(item.state?.color),
+        ...this.stateOf(item.state, lang),
         typeLabel: this.typeNames().get(item.typeId) ?? '',
         amount: this.money(item.amount, item.currency),
         approved:
@@ -129,6 +128,20 @@ export class MyApplicationsComponent implements MyApplicationsPage {
       }))
       .filter((row) => !needle || row.title.toLocaleLowerCase().includes(needle));
   });
+
+  /** A draft says that it is not submitted yet (001710); every other state shows its label. */
+  private stateOf(
+    state: ApplicantApplicationItem['state'],
+    lang: Lang,
+  ): Pick<MyRow, 'stateLabel' | 'stateKind'> {
+    if (state?.isInitial) {
+      return { stateLabel: this.i18n.translate('status.draft.note'), stateKind: 'warn' };
+    }
+    return {
+      stateLabel: state ? resolveI18n(state.label, lang) : '',
+      stateKind: flowColorKind(state?.color),
+    };
+  }
 
   /** The rows by month of submission, as in the list "Anträge". */
   readonly groups = computed<MonthGroup<MyRow>[]>(() =>

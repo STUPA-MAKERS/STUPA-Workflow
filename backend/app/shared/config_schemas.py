@@ -320,6 +320,8 @@ class StateDef(FrozenStrictCamelModel, frozen=True):
         is_terminal: Retention and anonymization apply to an application in this state.
         is_approved: An application in this state is approved (spec 000571).
         is_denied: An application in this state is denied (spec 000571).
+        is_replaced_target: An Antrag goes into this state when its new version is
+            submitted (spec 001722). The state is terminal and denied.
     """
 
     key: str = Field(pattern=KEY_PATTERN)
@@ -330,6 +332,7 @@ class StateDef(FrozenStrictCamelModel, frozen=True):
     is_terminal: bool = Field(default=False, alias="isTerminal")
     is_approved: bool = Field(default=False, alias="isApproved")
     is_denied: bool = Field(default=False, alias="isDenied")
+    is_replaced_target: bool = Field(default=False, alias="isReplacedTarget")
     kind: StateKind = "normal"
     config: dict[str, Any] = Field(default_factory=dict)
 
@@ -343,6 +346,10 @@ class StateDef(FrozenStrictCamelModel, frozen=True):
             raise ValueError(f"state {self.key!r} cannot be approved and denied")
         if self.kind == "vote" and (self.is_approved or self.is_denied):
             raise ValueError(f"vote state {self.key!r} cannot be approved or denied")
+        if self.is_replaced_target and not (self.is_terminal and self.is_denied):
+            raise ValueError(
+                f"state {self.key!r} takes replaced Anträge, so it must be terminal and denied"
+            )
         return self
 
 
@@ -410,6 +417,9 @@ def validate_flow_graph(graph: FlowGraph) -> None:
         raise FlowValidationError(f"duplicate state keys: {sorted(duplicates)}")
     key_set = set(keys)
 
+    replaced = [s.key for s in states if s.is_replaced_target]
+    if len(replaced) > 1:
+        raise FlowValidationError(f"flow graph has more than one target for replaced: {replaced}")
     initials = [s.key for s in states if s.is_initial]
     if len(initials) == 0:
         raise FlowValidationError("flow graph has no initial state")
@@ -470,7 +480,7 @@ def validate_flow_graph(graph: FlowGraph) -> None:
             raise FlowValidationError(str(exc)) from exc
 
     _validate_state_kinds(graph, key_set)
-    _assert_all_reachable(initials[0], key_set, graph.transitions)
+    _assert_all_reachable((initials[0], *replaced), key_set, graph.transitions)
     _assert_no_automatic_cycle(key_set, graph.transitions)
 
 
@@ -546,11 +556,15 @@ def _validate_vote_gremium(state: StateDef) -> None:
 
 
 def _assert_all_reachable(
-    initial: str, key_set: set[str], transitions: list[TransitionDef]
+    starts: tuple[str, ...], key_set: set[str], transitions: list[TransitionDef]
 ) -> None:
-    """Raise FlowValidationError when a state is not reachable from the initial one."""
+    """Raise FlowValidationError when a state is not reachable from a start state.
+
+    The start states are the initial state and the target for replaced Anträge, because
+    the submit of a new version moves an Antrag into that target without a transition.
+    """
     adjacency = {k: tuple(t.to for t in transitions if t.from_ == k) for k in key_set}
-    seen = _reachable(initial, adjacency)
+    seen = frozenset[str]().union(*(_reachable(start, adjacency) for start in starts))
     unreachable = key_set - seen
     if unreachable:
         raise FlowValidationError(f"unreachable states: {sorted(unreachable)}")

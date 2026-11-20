@@ -1,7 +1,6 @@
 <app-dialog
   [open]="open()"
   [title]="confirmLabel()"
-  [subtitle]="applicationTitle()"
   [closeLabel]="'action.close' | t"
   (closed)="close()"
 >
@@ -11,6 +10,7 @@
       idPrefix="ddg"
       [requested]="requested()"
       [currency]="currency()"
+      [required]="required()"
       [(draft)]="draft"
     />
     @if (refusal()) {

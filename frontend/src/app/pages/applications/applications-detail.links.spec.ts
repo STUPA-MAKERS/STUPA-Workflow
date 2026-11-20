@@ -172,6 +172,22 @@ describe('ApplicationsDetailComponent — Folgeanträge', () => {
     expect(links[1].link).toBeNull();
   });
 
+  it('shows the old and the new version in "Verknüpft" and "Ersetzt durch" in the head (001721)', async () => {
+    await loaded({
+      ...EMPTY,
+      replaces: { id: 'old-1', title: 'Fest (alt)', createdAt: '2026-05-01T10:00:00Z' },
+      replacedBy: [{ id: 'new-1', title: 'Fest (neu)', createdAt: '2026-07-01T10:00:00Z' }],
+    });
+    const rows = screen.getAllByTestId('tl-row');
+    expect(rows.map((r) => r.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
+      'Fest (alt)Neue Fassung von',
+      'Fest (neu)Ersetzt durch',
+    ]);
+    const head = screen.getByTestId('replaced-by');
+    expect(head).toHaveTextContent('Ersetzt durch');
+    expect(head.querySelector('a')).toHaveAttribute('href', '/applications/new-1');
+  });
+
   it('offers "Verknüpfen" without a Vorgänger', async () => {
     await loaded(EMPTY);
     expect(screen.getByTestId('ad-predecessor')).toHaveTextContent('Verknüpfen');

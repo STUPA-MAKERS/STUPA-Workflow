@@ -54,6 +54,8 @@ import type {
   Transition,
   TransitionOutWire,
   VersionOutWire,
+  BulkTransitionOption,
+  BulkTransitionOptionWire,
 } from './models';
 
 export function mapState(
@@ -68,6 +70,10 @@ export function mapState(
     color: wire.color ?? null,
     editAllowed: wire.editAllowed,
     kind: wire.kind ?? 'normal',
+    ...(wire.isInitial ? { isInitial: true as const } : {}),
+    ...(wire.isTerminal ? { isTerminal: true as const } : {}),
+    ...(wire.isDenied ? { isDenied: true as const } : {}),
+    isApproved: wire.isApproved === true,
   };
 }
 
@@ -149,6 +155,11 @@ export function mapTimelineEvent(wire: TimelineEventOutWire, lang: string): Time
     voteId: wire.voteId ?? null,
     voteDeleted: wire.voteDeleted ?? false,
     decision: wire.decision ?? null,
+    kind: wire.kind ?? 'status',
+    forced: wire.forced === true,
+    forceReason: wire.forceReason ?? null,
+    outsideDecision: wire.outsideDecision ?? null,
+    amountChange: wire.amountChange ?? null,
   };
 }
 
@@ -202,6 +213,8 @@ export function mapTransition(wire: TransitionOutWire, lang: string): Transition
     addsToAgenda: wire.addsToAgenda === true,
     agendaGremiumId: wire.agendaGremiumId ?? null,
     allowsDecision: wire.allowsDecision === true,
+    ...(wire.toTerminal ? { toTerminal: true as const } : {}),
+    requiresAmount: wire.requiresAmount === true,
   };
 }
 
@@ -251,6 +264,7 @@ export function mapVersion(wire: VersionOutWire): ApplicationVersion {
     changedBy: wire.changedBy ?? null,
     changedByInfo: wire.changedByInfo ?? null,
     at: wire.at,
+    typeChange: wire.typeChange ?? null,
   };
 }
 
@@ -427,5 +441,20 @@ export function mapApplicationLinks(wire: ApplicationLinksWire, lang: string): A
       actorInfo: e.actorInfo ?? null,
       predecessor: linked(e.predecessor),
     })),
+    ...(wire.replaces ? { replaces: mapLinkedApplication(wire.replaces, lang) } : {}),
+    ...(wire.replacedBy?.length
+      ? { replacedBy: wire.replacedBy.map((w) => mapLinkedApplication(w, lang)) }
+      : {}),
+  };
+}
+
+/** Map a bulk target of `POST /bulk/applications/transitions`. */
+export function mapBulkOption(wire: BulkTransitionOptionWire, lang: string): BulkTransitionOption {
+  return {
+    toStateId: wire.toStateId,
+    label: resolveI18n(wire.label, lang),
+    color: wire.color ?? null,
+    approves: wire.approves === true,
+    amounts: wire.amounts ?? [],
   };
 }

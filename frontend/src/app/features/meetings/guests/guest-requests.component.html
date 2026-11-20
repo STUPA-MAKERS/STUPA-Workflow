@@ -2,10 +2,12 @@
   <section class="gr" [attr.aria-label]="'guests.request.title' | t">
     <div class="gr__head">
       <h3 class="gr__cap cap">{{ 'guests.request.title' | t }}</h3>
-      <app-button size="sm" variant="tonal" [loading]="guests.busy() === 'all'" [disabled]="!!guests.busy()" (click)="guests.admitAll()">
-        <app-icon name="check" />
-        {{ 'guests.request.admitAll' | t }}
-      </app-button>
+      <app-button-group>
+        <app-button size="sm" variant="tonal" [loading]="guests.busy() === 'all'" [disabled]="!!guests.busy()" (click)="guests.admitAll()">
+          <app-icon name="check" />
+          {{ 'guests.request.admitAll' | t }}
+        </app-button>
+      </app-button-group>
     </div>
     <ul class="g__rows rowgroup rowgroup--bg3" aria-live="polite">
       @for (row of rows(); track row.g.id) {
@@ -18,19 +20,21 @@
             </div>
           </div>
           <div class="g__ctl">
-            @if (phone()) {
-              <app-button variant="text" [iconOnly]="true" [ariaLabel]="'guests.request.rejectName' | t: { name: row.name }" [disabled]="!!guests.busy()" (click)="guests.reject(row.g)">
-                <app-icon name="x" />
+            <app-button-group [main]="true">
+              @if (phone()) {
+                <app-button variant="text" [iconOnly]="true" [ariaLabel]="'guests.request.rejectName' | t: { name: row.name }" [disabled]="!!guests.busy()" (click)="guests.reject(row.g)">
+                  <app-icon name="x" />
+                </app-button>
+              } @else {
+                <app-button size="sm" variant="text" class="g__reject" [ariaLabel]="'guests.request.rejectName' | t: { name: row.name }" [disabled]="!!guests.busy()" (click)="guests.reject(row.g)">
+                  {{ 'guests.request.reject' | t }}
+                </app-button>
+              }
+              <app-button size="sm" variant="fill" [ariaLabel]="'guests.request.admitName' | t: { name: row.name }" [loading]="guests.busy() === row.g.id" [disabled]="!!guests.busy()" (click)="guests.admit(row.g)">
+                <app-icon name="check" />
+                {{ 'guests.request.admit' | t }}
               </app-button>
-            } @else {
-              <app-button size="sm" variant="text" class="g__reject" [ariaLabel]="'guests.request.rejectName' | t: { name: row.name }" [disabled]="!!guests.busy()" (click)="guests.reject(row.g)">
-                {{ 'guests.request.reject' | t }}
-              </app-button>
-            }
-            <app-button size="sm" variant="fill" [ariaLabel]="'guests.request.admitName' | t: { name: row.name }" [loading]="guests.busy() === row.g.id" [disabled]="!!guests.busy()" (click)="guests.admit(row.g)">
-              <app-icon name="check" />
-              {{ 'guests.request.admit' | t }}
-            </app-button>
+            </app-button-group>
           </div>
         </li>
       }

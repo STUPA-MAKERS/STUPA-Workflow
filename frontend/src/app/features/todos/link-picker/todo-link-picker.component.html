@@ -15,16 +15,18 @@
       (keydown.enter)="search.flush()"
     />
     @if (!phone()) {
-      <app-button
-        class="lp__x"
-        variant="text"
-        size="sm"
-        [iconOnly]="true"
-        [ariaLabel]="'action.close' | t"
-        (click)="close()"
-      >
-        <app-icon name="x" />
-      </app-button>
+      <app-button-group>
+        <app-button
+          class="lp__x"
+          variant="text"
+          size="sm"
+          [iconOnly]="true"
+          [ariaLabel]="'action.close' | t"
+          (click)="close()"
+        >
+          <app-icon name="x" />
+        </app-button>
+      </app-button-group>
     }
   </div>
   <div class="lp__chips" role="group" [attr.aria-label]="'todos.picker.kind' | t">
@@ -44,7 +46,7 @@
     @if (failed()) {
       <p class="lp__note lp__note--error">{{ 'todos.picker.error' | t }}</p>
     } @else if (search.applied() && !search.pending() && !groups().length) {
-      <app-empty-state
+      <app-empty-state icon="searchOff"
         class="lp__empty"
         shape="file"
         rows="3"

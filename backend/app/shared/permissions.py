@@ -18,6 +18,12 @@ Keys that need a note:
   flow guards and the transitions. The log records every use as a forced
   status_change, and you can revert it. It stays SEPARATE from
   `application.transition`; grant it deliberately.
+- `application.record_decision`: record on an application in a vote state the
+  decision that a Gremium made in a meeting without a vote on the platform. It fires
+  the `pass` or `fail` branch of the vote state with its actions and mails. It stays
+  SEPARATE from `application.force_status`, because it follows the flow.
+- `application.amend_decision`: change the approved amount of an approved
+  application, with a reason and the decision that allows it. The state stays.
 - `application.edit_any`: edit application data in ANY flow state, overriding the
   state edit lock.
 - `application.delete`: delete an application permanently with its versions, comments
@@ -30,6 +36,9 @@ Keys that need a note:
   a guest. The application belongs to the applicant; the holder shows only in the
   history and the audit log. Global. Grant it deliberately, because the applicant
   search of the dialog exposes the names and e-mail addresses of ALL active accounts.
+- `application.change_type`: change the Antragsart of a submitted application. The
+  change writes a new version in the form of the new type and can send the application
+  back to the applicant. Global.
 - `meeting.view_all`: additive global read of every meeting (timeline, list, detail,
   agenda, protocol, vote results). The holder never writes and never votes.
 - `meeting.delete_finalized`: delete a meeting with a finalized protocol, separate
@@ -94,6 +103,9 @@ Keys that need a note:
 - `admin.features`: switch the features of the platform on and off (/admin/features).
   A switch changes the platform for every person, so the key is separate from
   `admin.site`. No OAuth scope carries it, so an agent token never switches a feature.
+- `graph.view`: open the page "Graph", which draws the elements of every area and their
+  relations at once. It opens the page only and gives no read access: each node keeps
+  the read rule of its kind. No seeded role but the admin holds it.
 """
 
 from __future__ import annotations
@@ -103,11 +115,14 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "application.read_all",
     "application.transition",
     "application.force_status",
+    "application.record_decision",
+    "application.amend_decision",
     "application.manage",
     "application.edit_any",
     "application.delete",
     "application.archive",
     "application.create_on_behalf",
+    "application.change_type",
     "form.configure",
     "flow.configure",
     "meeting.view_all",
@@ -149,4 +164,5 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "calendar.publish",
     "admin.calendars",
     "admin.features",
+    "graph.view",
 )

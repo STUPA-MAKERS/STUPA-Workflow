@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - backend/app/modules/applications/decision.py
+  - backend/app/modules/flow/service.py
+  - frontend/src/app/pages/applications/decision-dialog/decision-dialog.component.ts
 scope:
   - backend/app/modules/applications
   - frontend/src/app/pages/applications

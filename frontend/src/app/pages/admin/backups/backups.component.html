@@ -21,9 +21,11 @@
           [disabled]="!enabled()"
           name="createNote"
         />
-        <app-button type="submit" variant="fill" [disabled]="!enabled()" [loading]="creating()">
-          <app-icon name="db" /> {{ 'admin.backups.create' | t }}
-        </app-button>
+        <app-button-group [main]="true">
+          <app-button type="submit" variant="fill" [disabled]="!enabled()" [loading]="creating()">
+            <app-icon name="db" /> {{ 'admin.backups.create' | t }}
+          </app-button>
+        </app-button-group>
       </form>
     </app-section>
 
@@ -32,13 +34,15 @@
         <p class="bk__disabledHint" role="note">{{ 'admin.backups.noIdentity' | t }}</p>
       }
       <div>
-        <app-button
-          variant="outlined"
-          [disabled]="!restoreEnabled() || busy()"
-          (click)="picker.open()"
-        >
-          <app-icon name="upload" /> {{ 'admin.backups.import' | t }}
-        </app-button>
+        <app-button-group>
+          <app-button
+            variant="outlined"
+            [disabled]="!restoreEnabled() || busy()"
+            (click)="picker.open()"
+          >
+            <app-icon name="upload" /> {{ 'admin.backups.import' | t }}
+          </app-button>
+        </app-button-group>
         <app-file-picker
           #picker
           accept=".age,application/octet-stream"
@@ -97,16 +101,18 @@
 
         <ng-template appCell="actions" let-r>
           @if ($any(r).status === 'done') {
-            <app-row-menu
-              [label]="('admin.common.actions' | t) + ': ' + ($any(r).createdAt | ldate: 'medium')"
-              [sections]="rowMenu($any(r))"
-              (selected)="onRowMenu($any(r), $event)"
-            />
+            <app-button-group>
+              <app-row-menu
+                [label]="('admin.common.actions' | t) + ': ' + ($any(r).createdAt | ldate: 'medium')"
+                [sections]="rowMenu($any(r))"
+                (selected)="onRowMenu($any(r), $event)"
+              />
+            </app-button-group>
           }
         </ng-template>
       </app-data-table>
     } @else {
-      <app-empty-state shape="table" [heading]="'admin.backups.empty' | t" />
+      <app-empty-state icon="db" shape="table" [heading]="'admin.backups.empty' | t" />
     }
   </app-section>
 </section>

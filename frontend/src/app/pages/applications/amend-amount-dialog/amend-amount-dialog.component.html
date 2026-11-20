@@ -1,0 +1,71 @@
+<app-dialog
+  [open]="open()"
+  [title]="'amendAmount.title' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="close()"
+>
+  <form class="aad" (submit)="$event.preventDefault(); submit()">
+    <app-currency-input
+      name="aadAmount"
+      [label]="'amendAmount.amount' | t"
+      [required]="true"
+      [error]="amountError()"
+      [ngModel]="amount()"
+      (ngModelChange)="amount.set($event ?? '')"
+    />
+    @if (aboveRequested()) {
+      <app-note kind="warn" icon="alert" role="status">{{
+        'amendAmount.aboveRequested' | t
+      }}</app-note>
+    }
+    <div class="aad__note">
+      <app-textarea [label]="'amendAmount.reason' | t" [invalid]="reasonShort()">
+        <textarea
+          rows="3"
+          name="aadReason"
+          aria-required="true"
+          [attr.maxlength]="maxReason"
+          [placeholder]="'amendAmount.reasonPlaceholder' | t"
+          [ngModel]="reason()"
+          (ngModelChange)="reason.set($event)"
+        ></textarea>
+      </app-textarea>
+      @if (reasonShort()) {
+        <p class="aad__error" role="alert">{{ 'amendAmount.error.reasonShort' | t }}</p>
+      }
+    </div>
+    <div class="aad__pair">
+      <app-datepicker
+        name="aadDate"
+        [label]="'amendAmount.date' | t"
+        [required]="true"
+        [max]="today()"
+        [error]="dateError()"
+        [ngModel]="date()"
+        (ngModelChange)="date.set($event ?? '')"
+      />
+      <app-select
+        name="aadGremium"
+        [label]="'outsideDecision.gremium' | t"
+        [placeholder]="'outsideDecision.gremiumPick' | t"
+        [options]="gremiumOptions()"
+        [ngModel]="gremium()"
+        (ngModelChange)="gremium.set($event ?? '')"
+      />
+    </div>
+    @if (refusal()) {
+      <p class="aad__error" role="alert">{{ refusal() }}</p>
+    }
+    <button type="submit" hidden></button>
+  </form>
+  <app-button dialog-footer variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+  <app-button
+    dialog-footer
+    variant="fill"
+    [disabled]="!ready()"
+    [loading]="saving()"
+    (click)="submit()"
+  >
+    {{ 'amendAmount.confirm' | t }}
+  </app-button>
+</app-dialog>

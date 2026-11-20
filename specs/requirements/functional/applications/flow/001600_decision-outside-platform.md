@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - backend/app/modules/flow/outside_decision.py
+  - backend/app/modules/flow/router.py
+  - frontend/src/app/pages/applications/outside-decision-dialog/outside-decision-dialog.component.ts
 scope:
   - backend/app/modules/flow
   - frontend/src/app/pages/applications

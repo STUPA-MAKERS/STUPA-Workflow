@@ -3,6 +3,12 @@
 :host {
   display: contents;
 }
+// A segment of the dock group: the host is the box of the button and of its popover.
+:host(.btn-grp__seg) {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
 .jq {
   position: relative;
   flex: none;
@@ -31,7 +37,8 @@
   @include frosted-pop(var(--color-pop));
 }
 // In the dock at the foot of the page the code opens above the button.
-.jq--up .jq__pop {
+.jq--up .jq__pop,
+:host(.btn-grp__seg) .jq__pop {
   top: auto;
   bottom: calc(100% + var(--space-3));
 }

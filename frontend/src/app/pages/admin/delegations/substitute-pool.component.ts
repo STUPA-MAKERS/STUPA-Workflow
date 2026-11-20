@@ -17,6 +17,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   DialogComponent,
   EmptyStateComponent,
   IconComponent,
@@ -75,6 +76,7 @@ const SEARCH_LIMIT = 8;
     ListItemComponent,
     SearchPillComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     DialogComponent,
     IconComponent,
     RowMenuComponent,

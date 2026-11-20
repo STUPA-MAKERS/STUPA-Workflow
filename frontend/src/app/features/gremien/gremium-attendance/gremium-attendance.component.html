@@ -28,19 +28,21 @@
       [text]="sortText()"
     />
     <span class="gat__grow"></span>
-    @if (canExportList()) {
-      <app-button variant="text" [loading]="exporting()" [disabled]="loading()" (click)="exportList()">
-        <app-icon name="download" />
-        {{ 'gremien.attendance.exportList' | t }}
-      </app-button>
-    }
-    <app-button
-      variant="text"
-      [iconOnly]="true"
-      [ariaLabel]="'gremien.attendance.export' | t"
-      [disabled]="loading() || !rows().length"
-      (click)="exportCsv()"
-    ><app-icon name="download" /></app-button>
+    <app-button-group>
+      @if (canExportList()) {
+        <app-button variant="text" [loading]="exporting()" [disabled]="loading()" (click)="exportList()">
+          <app-icon name="download" />
+          {{ 'gremien.attendance.exportList' | t }}
+        </app-button>
+      }
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="'gremien.attendance.export' | t"
+        [disabled]="loading() || !rows().length"
+        (click)="exportCsv()"
+      ><app-icon name="download" /></app-button>
+    </app-button-group>
   }
 </div>
 
@@ -59,7 +61,7 @@
     }
   </div>
 } @else if (!rows().length) {
-  <app-empty-state shape="table" rows="3" [heading]="(role() ? 'gremien.attendance.noMatch' : 'gremien.attendance.empty') | t" />
+  <app-empty-state [icon]="role() ? 'searchOff' : 'users'" shape="table" rows="3" [heading]="(role() ? 'gremien.attendance.noMatch' : 'gremien.attendance.empty') | t" />
 } @else if (phone()) {
   <div class="gat__phoneHead" aria-hidden="true">
     @for (h of heads(); track h.month) {

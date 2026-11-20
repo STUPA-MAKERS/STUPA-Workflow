@@ -249,6 +249,12 @@ describe('ApplicationsListComponent', () => {
       expect(document.querySelector('.apps__dot')).toBeNull();
     });
 
+    it('says that a draft is not submitted yet (001710)', async () => {
+      await start('/applications', { rows: [row({ state: { ...SUBMITTED, isInitial: true } })] });
+      expect(screen.getByText('Noch nicht eingereicht')).toBeInTheDocument();
+      expect(screen.queryByText('Eingereicht')).toBeNull();
+    });
+
     it('marks an observed row "Beobachtet", with a dot only after a part before it', async () => {
       await start('/applications', {
         rows: [row({ observed: true }), row({ id: 'r-bare', typeId: 'unknown', state: null, observed: true })],
@@ -373,6 +379,110 @@ describe('ApplicationsListComponent', () => {
       cmp.total.set(0);
       cmp.loading.set(true);
       expect(cmp.searchPlaceholder()).toBe('Anträge durchsuchen');
+    });
+  });
+
+  describe('multiple selection (001700, 001701, 001703)', () => {
+    const MANAGE = [...ALL, 'application.manage'];
+
+    it('toggles rows, guards the bulk limit and starts from the row menu', async () => {
+      const { cmp } = await start('/applications', { perms: MANAGE });
+      expect(cmp.selectSections()).toHaveLength(1);
+      cmp.onHeaderMenu({ id: 'select' } as never);
+      expect(cmp.selecting()).toBe(true);
+      expect(cmp.selectSections()).toEqual([]);
+      cmp.toggleSelect('app-1', true);
+      cmp.toggleSelect('app-2', true);
+      cmp.toggleSelect('app-2', false);
+      expect(cmp.isSelected('app-1')).toBe(true);
+      expect(cmp.isSelected('app-2')).toBe(false);
+      expect(cmp.allSelected()).toBe(false);
+      cmp.onRowActivate({ id: 'app-1' } as never);
+      expect(cmp.selectedCount()).toBe(0);
+      cmp.openBulk('message');
+      expect(cmp.bulkMode()).toBeNull();
+      cmp.toggleSelectAll(true);
+      expect(cmp.allSelected()).toBe(true);
+      cmp.toggleSelectAll(false);
+      expect(cmp.selectedCount()).toBe(0);
+      cmp.selected.set(new Set(Array.from({ length: 101 }, (_, i) => `x-${i}`)));
+      expect(cmp.overMax()).toBe(true);
+      expect(cmp.selectionLabel()).toContain('100');
+      cmp.openBulk('transition');
+      expect(cmp.bulkMode()).toBeNull();
+      cmp.stopSelecting();
+      expect(cmp.selecting()).toBe(false);
+      expect(cmp.selectedCount()).toBe(0);
+      cmp.onRowActivate({ id: 'app-1' } as never);
+      expect(cmp.selectedCount()).toBe(0);
+    });
+
+    it('offers no selection without application.manage', async () => {
+      await start();
+      expect(screen.queryByTestId('apps-select')).toBeNull();
+    });
+
+    it('selects rows, lists the approved amounts and shows the result per Antrag', async () => {
+      const { http, settle } = await start('/applications', { perms: MANAGE });
+      await userEvent.click(screen.getByTestId('apps-select'));
+      await settle();
+      await userEvent.click(screen.getByRole('checkbox', { name: '„Zuschuss Kennenlernwochenende“ auswählen' }));
+      await userEvent.click(screen.getByRole('checkbox', { name: '„Trikots“ auswählen' }));
+      await settle();
+      const bar = screen.getByTestId('apps-selection');
+      expect(bar).toHaveTextContent('2 ausgewählt');
+
+      await userEvent.click(within(bar).getByRole('button', { name: 'Übergang auslösen' }));
+      const options = http.expectOne((r) => r.url === '/api/bulk/applications/transitions');
+      expect(options.request.body).toEqual({ applicationIds: ['app-1', 'app-3'] });
+      options.flush([
+        {
+          toStateId: 's-ok',
+          label: { de: 'Bewilligt' },
+          approves: true,
+          amounts: [
+            { applicationId: 'app-1', title: 'Zuschuss Kennenlernwochenende', amount: '1250.00' },
+            { applicationId: 'app-3', title: 'Trikots', amount: null },
+          ],
+        },
+      ]);
+      await settle();
+      await userEvent.click(screen.getByRole('radio', { name: 'Bewilligt' }));
+      await settle();
+      expect(screen.getByTestId('bulk-amounts')).toHaveTextContent('1.250,00 €');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Auslösen' }));
+      const fire = http.expectOne((r) => r.url === '/api/bulk/applications/transition');
+      expect(fire.request.body).toEqual({ applicationIds: ['app-1', 'app-3'], toStateId: 's-ok' });
+      fire.flush({
+        results: [
+          { applicationId: 'app-1', ok: true },
+          { applicationId: 'app-3', ok: false, code: 'transition_not_available', error: 'Übergang nicht verfügbar' },
+        ],
+      });
+      http.expectOne(LIST).flush(page(ROWS));
+      await settle();
+      const results = screen.getByTestId('bulk-results');
+      expect(within(results).getByText('Erledigt')).toBeInTheDocument();
+      expect(within(results).getByText('Übergang nicht verfügbar')).toBeInTheDocument();
+    });
+
+    it('sends one message to every selected Antrag', async () => {
+      const { http, settle } = await start('/applications', { perms: MANAGE });
+      await userEvent.click(screen.getByTestId('apps-select'));
+      await settle();
+      await userEvent.click(screen.getByRole('checkbox', { name: /^Alle wählen/ }));
+      await settle();
+      await userEvent.click(within(screen.getByTestId('apps-selection')).getByRole('button', { name: 'Mitteilung senden' }));
+      await settle();
+      await userEvent.type(screen.getByRole('textbox', { name: 'Mitteilung an die Antragsteller:innen' }), 'Hallo');
+      await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+      const send = http.expectOne((r) => r.url === '/api/bulk/applications/comments');
+      expect(send.request.body).toEqual({ applicationIds: ['app-1', 'app-2', 'app-3'], body: 'Hallo' });
+      send.flush({ results: ROWS.map((r) => ({ applicationId: r.id, ok: true })) });
+      http.expectOne(LIST).flush(page(ROWS));
+      await settle();
+      expect(screen.getByText('3 von 3 erledigt')).toBeInTheDocument();
     });
   });
 
@@ -1116,12 +1226,15 @@ describe('ApplicationsListComponent', () => {
       cmp.onDecisionDone();
     });
 
+    /** Spec 001612: only a state with the flag `Bewilligt` shows the approved amount. */
     it('shows the approved amount over the struck requested one', async () => {
+      const approved = { ...SUBMITTED, id: 's9', key: 'approved', isApproved: true };
       const { harness } = await start('/applications', {
         rows: [
-          row({ amount: '1250.00', approvedAmount: '900.00' }),
-          row({ id: 'app-2', amount: '480.00', approvedAmount: '480.00' }),
-          row({ id: 'app-3', amount: null, approvedAmount: '1.00' }),
+          row({ amount: '1250.00', approvedAmount: '900.00', state: approved }),
+          row({ id: 'app-2', amount: '480.00', approvedAmount: '480.00', state: approved }),
+          row({ id: 'app-3', amount: null, approvedAmount: '1.00', state: approved }),
+          row({ id: 'app-4', amount: '700.00', approvedAmount: '600.00' }),
         ],
       });
       harness.detectChanges();

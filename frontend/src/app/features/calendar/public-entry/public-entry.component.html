@@ -33,10 +33,12 @@
         </div>
       }
       @if (e.kind === 'meeting' && e.data.protocolId; as protocolId) {
-        <app-button class="pe__link" variant="tonal" (click)="openProtocol(protocolId)">
-          <app-icon name="archive" />
-          {{ 'calendar.public.protocol' | t }}
-        </app-button>
+        <app-button-group>
+          <app-button class="pe__link" variant="tonal" (click)="openProtocol(protocolId)">
+            <app-icon name="archive" />
+            {{ 'calendar.public.protocol' | t }}
+          </app-button>
+        </app-button-group>
       }
     </div>
   }

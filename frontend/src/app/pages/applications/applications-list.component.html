@@ -27,6 +27,16 @@
               [sections]="sortSections()"
               (selected)="onHeaderMenu($event)"
             />
+            @if (selectSections().length) {
+              <app-button
+                variant="text"
+                [iconOnly]="true"
+                data-testid="apps-select"
+                [ariaLabel]="'applications.bulk.start' | t"
+                [title]="'applications.bulk.start' | t"
+                (click)="selecting.set(true)"
+              ><app-icon name="boxok" /></app-button>
+            }
           }
         </ng-container>
       </app-page-header>
@@ -117,11 +127,45 @@
             unsetValue="false"
           />
           @if (activeFilterCount() > 0) {
-            <app-button variant="text" size="sm" (click)="reset()">
-              {{ 'applications.list.filter.reset' | t }}
-            </app-button>
+            <app-button-group>
+              <app-button variant="text" size="sm" (click)="reset()">
+                {{ 'applications.list.filter.reset' | t }}
+              </app-button>
+            </app-button-group>
           }
         </div>
+        @if (selecting()) {
+          <app-selection-bar
+            inline
+            data-testid="apps-selection"
+            [count]="selectedCount()"
+            [countLabel]="selectionLabel()"
+            [allSelected]="allSelected()"
+            [selectAllLabel]="'applications.bulk.selectAll' | t"
+            [clearLabel]="'applications.bulk.stop' | t"
+            (selectAll)="toggleSelectAll($event)"
+            (cleared)="stopSelecting()"
+          >
+            <app-button-group>
+            <app-button
+              variant="text"
+              [iconOnly]="true"
+              [ariaLabel]="'applications.bulk.transition' | t"
+              [title]="'applications.bulk.transition' | t"
+              [disabled]="!selectedCount() || overMax()"
+              (click)="openBulk('transition')"
+            ><app-icon name="flow" /></app-button>
+            <app-button
+              variant="text"
+              [iconOnly]="true"
+              [ariaLabel]="'applications.bulk.message' | t"
+              [title]="'applications.bulk.message' | t"
+              [disabled]="!selectedCount() || overMax()"
+              (click)="openBulk('message')"
+            ><app-icon name="mail" /></app-button>
+            </app-button-group>
+          </app-selection-bar>
+        }
         @if (reloading()) {
           <span class="skel-progress apps__progress" aria-hidden="true"></span>
         }
@@ -149,7 +193,7 @@
             />
           </div>
         } @else if (!rows().length) {
-          <app-empty-state [heading]="'applications.list.empty' | t" />
+          <app-empty-state [icon]="activeFilterCount() > 0 ? 'searchOff' : 'file'" [heading]="'applications.list.empty' | t" />
         } @else {
           <div class="apps__groups" animate.enter="motion-fade-in" [class.skel-stale]="reloading()" [attr.inert]="reloading() ? '' : null">
             @for (group of groups(); track group.key + $index) {
@@ -160,14 +204,27 @@
                       role="listitem"
                       class="apps__row"
                       [class.apps__row--busy]="busyRow() === row.item.id"
+                      [class.apps__row--checked]="selecting() && isSelected(row.item.id)"
                       [title]="row.title"
-                      [link]="['/applications', row.item.id]"
+                      [link]="selecting() ? null : ['/applications', row.item.id]"
                       linkQueryParamsHandling="preserve"
-                      [selected]="row.item.id === selectedId()"
-                      [swipeRight]="row.swipeRight"
-                      [swipeLeft]="row.swipeLeft"
+                      [selected]="!selecting() && row.item.id === selectedId()"
+                      [swipeRight]="selecting() ? null : row.swipeRight"
+                      [swipeLeft]="selecting() ? null : row.swipeLeft"
                       (swiped)="onRowSwiped(row.item, $event)"
+                      (activate)="onRowActivate(row.item)"
                     >
+                      @if (selecting()) {
+                        <app-checkbox
+                          lead
+                          class="apps__rowCheck"
+                          [ngModel]="isSelected(row.item.id)"
+                          (ngModelChange)="toggleSelect(row.item.id, $event)"
+                          ><span class="sr-only">{{
+                            'applications.bulk.selectRow' | t: { title: row.title }
+                          }}</span></app-checkbox
+                        >
+                      }
                       <span sub>
                         @if (row.stateLabel) {
                           <app-status-text [kind]="row.stateKind">{{ row.stateLabel }}</app-status-text>
@@ -221,9 +278,11 @@
           @if (hasMore()) {
             <div class="apps__sentinel" appInfiniteScroll (scrolledToEnd)="loadMore()" aria-hidden="true"></div>
             <div class="apps__more">
-              <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">
-                {{ 'applications.list.loadMore' | t }}
-              </app-button>
+              <app-button-group>
+                <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">
+                  {{ 'applications.list.loadMore' | t }}
+                </app-button>
+              </app-button-group>
             </div>
           }
         }
@@ -252,6 +311,16 @@
     </div>
   </app-list-detail>
 </div>
+
+@if (bulkMode(); as mode) {
+  <app-bulk-dialog
+    [open]="true"
+    (openChange)="$event ? null : bulkMode.set(null)"
+    [mode]="mode"
+    [targets]="bulkTargets()"
+    (done)="onBulkDone()"
+  />
+}
 
 @if (phone()) {
   <app-side-sheet
@@ -312,8 +381,10 @@
       />
     </div>
     <div class="apps__moreActions">
-      <app-button variant="text" (click)="clearMore()">{{ 'applications.list.filter.reset' | t }}</app-button>
-      <app-button variant="fill" (click)="applyMore()">{{ 'applications.list.filter.apply' | t }}</app-button>
+      <app-button-group [main]="true">
+        <app-button variant="text" (click)="clearMore()">{{ 'applications.list.filter.reset' | t }}</app-button>
+        <app-button variant="fill" (click)="applyMore()">{{ 'applications.list.filter.apply' | t }}</app-button>
+      </app-button-group>
     </div>
   </div>
 </app-side-sheet>
@@ -339,6 +410,8 @@
 <app-force-status-dialog
   [applicationId]="forceFor()?.id ?? null"
   [currentStateId]="forceFor()?.state?.id ?? null"
+  [requested]="forceFor()?.amount ?? null"
+  [currency]="forceFor()?.currency ?? 'EUR'"
   [(open)]="forceOpen"
   (done)="onForced()"
 />

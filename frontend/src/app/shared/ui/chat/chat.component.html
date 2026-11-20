@@ -55,20 +55,22 @@
               <div class="chat__line">
                 @if (canAct(m) && !touchMenu() && editingId() !== m.id) {
                   <span class="chat__acts">
-                    <app-button
-                      variant="text"
-                      size="sm"
-                      [iconOnly]="true"
-                      [ariaLabel]="'chat.edit' | t"
-                      (click)="startEdit(m)"
-                    ><app-icon name="edit" /></app-button>
-                    <app-button
-                      variant="text"
-                      size="sm"
-                      [iconOnly]="true"
-                      [ariaLabel]="'chat.delete' | t"
-                      (click)="askDelete(m)"
-                    ><app-icon name="trash" /></app-button>
+                    <app-button-group>
+                      <app-button
+                        variant="text"
+                        size="sm"
+                        [iconOnly]="true"
+                        [ariaLabel]="'chat.edit' | t"
+                        (click)="startEdit(m)"
+                      ><app-icon name="edit" /></app-button>
+                      <app-button
+                        variant="text"
+                        size="sm"
+                        [iconOnly]="true"
+                        [ariaLabel]="'chat.delete' | t"
+                        (click)="askDelete(m)"
+                      ><app-icon name="trash" /></app-button>
+                    </app-button-group>
                   </span>
                 }
                 @if (editingId() === m.id) {
@@ -168,7 +170,7 @@
           </div>
         }
       } @empty {
-        <app-empty-state shape="chat" class="chat__empty" rows="3" [heading]="'chat.empty' | t" />
+        <app-empty-state icon="chat" shape="chat" class="chat__empty" rows="3" [heading]="'chat.empty' | t" />
       }
     }
   </div>
@@ -233,7 +235,10 @@
         }
       </ul>
     }
-    <div class="chat__box">
+    <div
+      class="chat__box"
+      [class.chat__box--public]="guarded() && visibility() === 'public'"
+    >
       <ng-container
         *ngTemplateOutlet="mentionList; context: { $implicit: composerMentions, below: false }"
       />
@@ -259,14 +264,16 @@
         "
       ></textarea>
       @if (canAttach()) {
-        <app-button
-          class="chat__attach"
-          variant="text"
-          [iconOnly]="true"
-          [disabled]="full()"
-          [ariaLabel]="'chat.attach' | t"
-          (click)="pickFiles()"
-        ><app-icon name="clip" /></app-button>
+        <app-button-group>
+          <app-button
+            class="chat__attach"
+            variant="text"
+            [iconOnly]="true"
+            [disabled]="full()"
+            [ariaLabel]="'chat.attach' | t"
+            (click)="pickFiles()"
+          ><app-icon name="clip" /></app-button>
+        </app-button-group>
         <input
           #fileInput
           class="chat__fileInput"
@@ -278,14 +285,16 @@
           (change)="onPicked($event)"
         />
       }
-      <app-button
-        class="chat__send"
-        type="submit"
-        variant="fill"
-        [iconOnly]="true"
-        [disabled]="uploading()"
-        [ariaLabel]="'chat.send' | t"
-      ><app-icon name="send" /></app-button>
+      <app-button-group [main]="true">
+        <app-button
+          class="chat__send"
+          type="submit"
+          variant="fill"
+          [iconOnly]="true"
+          [disabled]="uploading()"
+          [ariaLabel]="'chat.send' | t"
+        ><app-icon name="send" /></app-button>
+      </app-button-group>
     </div>
   </form>
 }

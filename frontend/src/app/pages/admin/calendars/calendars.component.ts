@@ -15,6 +15,7 @@ import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
 import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   ConfirmDialogComponent,
   DialogComponent,
   EmptyStateComponent,
@@ -122,6 +123,7 @@ function withSaved(
     ExpandRowComponent,
     BreadcrumbsComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     ConfirmDialogComponent,
     DialogComponent,
     EmptyStateComponent,

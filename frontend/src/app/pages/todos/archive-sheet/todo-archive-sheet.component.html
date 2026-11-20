@@ -25,7 +25,7 @@
       </ul>
       <span class="sr-only" role="status">{{ 'todos.archive.loading' | t }}</span>
     } @else if (!items().length) {
-      <app-empty-state fill rows="3" [heading]="'todos.archive.empty' | t" />
+      <app-empty-state icon="archive" fill rows="3" [heading]="'todos.archive.empty' | t" />
     }
     @if (items().length) {
       <ul class="as__list">
@@ -37,22 +37,26 @@
                 <span class="as__sub">{{ doneOn(card) }}</span>
               }
             </button>
-            <app-button
-              class="as__restore"
-              variant="tonal"
-              size="sm"
-              [ariaLabel]="'todos.archive.restoreOne' | t: { title: card.title }"
-              (click)="restore(card)"
-            >
-              <app-icon name="undo" />
-              {{ 'todos.archive.restore' | t }}
-            </app-button>
+            <app-button-group>
+              <app-button
+                class="as__restore"
+                variant="tonal"
+                size="sm"
+                [ariaLabel]="'todos.archive.restoreOne' | t: { title: card.title }"
+                (click)="restore(card)"
+              >
+                <app-icon name="undo" />
+                {{ 'todos.archive.restore' | t }}
+              </app-button>
+            </app-button-group>
           </li>
         }
       </ul>
     }
     @if (items().length < total()) {
-      <app-button variant="text" size="sm" [loading]="loading()" (click)="more()">{{ 'todos.archive.more' | t }}</app-button>
+      <app-button-group>
+        <app-button variant="text" size="sm" [loading]="loading()" (click)="more()">{{ 'todos.archive.more' | t }}</app-button>
+      </app-button-group>
     }
   </div>
 </app-side-sheet>

@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - backend/app/modules/flow/service.py
+  - backend/app/shared/config_schemas.py
+  - frontend/src/app/pages/admin/flow/flow-graph-ops.util.ts
 scope:
   - backend/app/modules/applications
   - frontend/src/app/pages/applications

@@ -77,13 +77,14 @@ def _node(
     )
 
 
-def _state(label: dict[str, str] | None) -> StateOut:
+def _state(label: dict[str, str] | None, *, approved: bool = False) -> StateOut:
     return StateOut.model_validate(
         {
             "id": uuid4(),
             "key": "review",
             "label": label if label is not None else {},
             "editAllowed": True,
+            "isApproved": approved,
         }
     )
 
@@ -234,8 +235,22 @@ def test_applications_workbook_full_row() -> None:
     assert ws.cell(row=2, column=2).value == "Finanzantrag"
     assert ws.cell(row=2, column=3).value == "Prüfung"
     assert ws.cell(row=2, column=4).value == "StuPa"
+    assert ws.cell(row=1, column=5).value == "Beantragt"
+    assert ws.cell(row=1, column=6).value == "Genehmigt"
     assert ws.cell(row=2, column=5).value == 12.5
-    assert ws.cell(row=2, column=7).value == "2026-06-01 09:30"
+    assert ws.cell(row=2, column=6).value is None
+    assert ws.cell(row=2, column=8).value == "2026-06-01 09:30"
+
+
+def test_applications_workbook_approved_amount_only_when_approved() -> None:
+    """§ 001612: the approved amount shows only in an approved state; null = as requested."""
+    items = [
+        _list_item(state=_state({"de": "Bewilligt"}, approved=True), approvedAmount="10.00"),
+        _list_item(state=_state({"de": "Bewilligt"}, approved=True)),
+        _list_item(state=_state({"de": "Prüfung"}), approvedAmount="10.00"),
+    ]
+    ws = _load(xlsx.build_applications_workbook(items, type_names={}, gremium_names={}))["Anträge"]
+    assert [ws.cell(row=r, column=6).value for r in (2, 3, 4)] == [10.0, 12.5, None]
 
 
 def test_applications_workbook_locale_label_fallbacks() -> None:

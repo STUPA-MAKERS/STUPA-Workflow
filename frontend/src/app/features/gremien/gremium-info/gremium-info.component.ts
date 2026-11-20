@@ -7,6 +7,7 @@ import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component'
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   EmptyStateComponent,
   IconComponent,
   SectionComponent,
@@ -31,6 +32,7 @@ import { infoEmpty, infoUrlShown } from '../gremien.util';
   imports: [
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     EmptyStateComponent,
     IconComponent,
     SectionComponent,

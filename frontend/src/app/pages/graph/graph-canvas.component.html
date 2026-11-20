@@ -1,0 +1,68 @@
+<div
+  class="gc"
+  [class.gc--labels]="labels()"
+  [class.gc--still]="still()"
+  [style.--gc-zoom]="view().zoom"
+  (pointerdown)="onDown($event)"
+  (pointermove)="onMove($event)"
+  (pointerup)="onUp($event)"
+  (pointercancel)="onUp($event)"
+  (wheel)="onWheel($event)"
+>
+  <div class="gc__world" role="group" [attr.aria-label]="label()" [style.transform]="world()">
+    <svg class="gc__lines" aria-hidden="true" focusable="false">
+      @for (l of drawn(); track l.key) {
+        <line
+          class="gc__line"
+          [class.gc__line--builtin]="l.builtin"
+          [class.gc__line--dim]="l.dim"
+          [attr.x1]="l.x1"
+          [attr.y1]="l.y1"
+          [attr.x2]="l.x2"
+          [attr.y2]="l.y2"
+        />
+      }
+    </svg>
+    @for (n of nodes(); track n.key) {
+      <button
+        type="button"
+        class="gc__node"
+        [class.gc__node--muted]="n.muted"
+        [class.gc__node--dim]="isDim(n.key)"
+        [class.gc__node--lit]="isLit(n.key)"
+        [class.gc__node--chosen]="selected() === n.key"
+        [class.gc__node--held]="held() === n.key"
+        [attr.data-kind]="n.kind"
+        [attr.data-key]="n.key"
+        [attr.tabindex]="tabStop() === n.key ? 0 : -1"
+        [attr.aria-label]="n.name"
+        [attr.aria-pressed]="selected() === n.key"
+        [attr.aria-describedby]="n.near ? 'gc-near-' + n.key : null"
+        [style.transform]="at(n.key)"
+        (click)="choose(n.key)"
+        (keydown)="onKey($event, n.key)"
+        (focus)="focused.set(n.key)"
+      >
+        <span class="gc__dot" [style.animation-delay]="delay(n.key)">
+          <app-icon [name]="n.icon" [size]="16" />
+        </span>
+        <span class="gc__label" aria-hidden="true">{{ n.title }}</span>
+        @if (n.near) {
+          <span class="sr-only" [id]="'gc-near-' + n.key">{{ n.near }}</span>
+        }
+      </button>
+    }
+  </div>
+
+  <app-button-group class="gc__tools" [label]="'graph.zoom.group' | t">
+    <app-button variant="tonal" [iconOnly]="true" [ariaLabel]="'graph.zoom.in' | t" [title]="'graph.zoom.in' | t" (click)="zoomIn()">
+      <app-icon name="plus" />
+    </app-button>
+    <app-button variant="tonal" [iconOnly]="true" [ariaLabel]="'graph.zoom.out' | t" [title]="'graph.zoom.out' | t" (click)="zoomOut()">
+      <app-icon name="minus" />
+    </app-button>
+    <app-button variant="tonal" [iconOnly]="true" [ariaLabel]="'graph.zoom.all' | t" [title]="'graph.zoom.all' | t" (click)="showAll()">
+      <app-icon name="home" />
+    </app-button>
+  </app-button-group>
+</div>

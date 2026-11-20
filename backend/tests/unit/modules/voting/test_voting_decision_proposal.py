@@ -267,3 +267,46 @@ async def test_close_keeps_a_proposal_as_requested(
     db = fake_session(result(vote), result("yes"))
     await VotingService(db).close(vote.id, _voter())
     assert recorder.calls[0]["decision"].approved_amount is None
+
+
+def _approval_target(monkeypatch: pytest.MonkeyPatch, amount: Decimal | None) -> None:
+    """Let the `pass` branch lead into an approved state (spec 001611)."""
+
+    async def _amount(self: VotingService, application_id: UUID) -> Decimal | None:
+        return amount
+
+    monkeypatch.setattr(VotingService, "_approval_amount", _amount)
+
+
+@pytest.mark.parametrize(
+    ("proposal", "expected"),
+    [
+        (None, Decimal("1000.00")),
+        ({"approvedAmount": None, "conditions": ["A"]}, Decimal("1000.00")),
+        ({"approvedAmount": "1200.00", "conditions": []}, Decimal("1000.00")),
+        (PROPOSAL, Decimal("800.00")),
+    ],
+)
+async def test_close_into_an_approved_state_always_stores_an_amount(
+    _patch_flow: type[_FakeFlow],
+    monkeypatch: pytest.MonkeyPatch,
+    recorder: _Recorder,
+    proposal: dict[str, Any] | None,
+    expected: Decimal,
+) -> None:
+    """§ 001611: the proposal amount, else the requested amount, never empty."""
+    _branch(_patch_flow, monkeypatch)
+    _with_app(monkeypatch)
+    _approval_target(monkeypatch, Decimal("1000.00"))
+    vote = _vote(proposal=proposal) if proposal is not None else _vote()
+    db = fake_session(result(vote), result("yes"))
+    await VotingService(db).close(vote.id, _voter())
+    (call,) = recorder.calls
+    assert call["decision"].approved_amount == expected
+
+
+async def test_approval_amount_reads_the_branch_target() -> None:
+    db = fake_session()
+    db.scalar_results = [Decimal("12.00")]
+    assert await VotingService(db)._approval_amount(uuid4()) == Decimal("12.00")
+    assert await VotingService(db)._approval_amount(uuid4()) is None

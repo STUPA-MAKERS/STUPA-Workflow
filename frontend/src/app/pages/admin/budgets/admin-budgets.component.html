@@ -16,7 +16,7 @@
     </ng-template>
     <ng-template #content>
   @if (!budgets().length) {
-    <app-empty-state shape="table" [heading]="'admin.budgets.empty' | t" />
+    <app-empty-state icon="pie" shape="table" [heading]="'admin.budgets.empty' | t" />
   } @else {
     <app-data-table
       surface="rowgroup"
@@ -47,11 +47,13 @@
       </ng-template>
       <ng-template appCell="actions" let-row>
         <span class="ab__actions" role="presentation" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
-          <app-row-menu
-            [label]="('budget.tree.rowActions' | t) + ': ' + asBudget(row).name"
-            [sections]="rowMenu()"
-            (selected)="onRowMenu(asBudget(row), $event)"
-          />
+          <app-button-group>
+            <app-row-menu
+              [label]="('budget.tree.rowActions' | t) + ': ' + asBudget(row).name"
+              [sections]="rowMenu()"
+              (selected)="onRowMenu(asBudget(row), $event)"
+            />
+          </app-button-group>
         </span>
       </ng-template>
     </app-data-table>
@@ -185,15 +187,17 @@
                   />
                   <span class="ab__stepActions">
                     <app-move-buttons [upDisabled]="first" [downDisabled]="last" (move)="moveStep(i, $event)" />
-                    <app-button
-                      variant="text"
-                      [iconOnly]="true"
-                      [ariaLabel]="'admin.budgets.stepRemove' | t: { number: i + 1 }"
-                      [title]="'admin.budgets.stepRemove' | t: { number: i + 1 }"
-                      (click)="removeStep(i)"
-                    >
-                      <app-icon name="trash" />
-                    </app-button>
+                    <app-button-group>
+                      <app-button
+                        variant="text"
+                        [iconOnly]="true"
+                        [ariaLabel]="'admin.budgets.stepRemove' | t: { number: i + 1 }"
+                        [title]="'admin.budgets.stepRemove' | t: { number: i + 1 }"
+                        (click)="removeStep(i)"
+                      >
+                        <app-icon name="trash" />
+                      </app-button>
+                    </app-button-group>
                   </span>
                   <app-select
                     class="ab__stepGremium"
@@ -208,10 +212,12 @@
               }
             </ol>
           } @else {
-            <app-empty-state shape="table" rows="1" [heading]="'admin.budgets.stepsEmpty' | t" />
+            <app-empty-state icon="list" shape="table" rows="1" [heading]="'admin.budgets.stepsEmpty' | t" />
           }
           @if (canAddStep()) {
-            <app-button class="ab__stepAdd" variant="tonal" (click)="addStep()"><app-icon name="plus" /> {{ 'admin.budgets.stepAdd' | t }}</app-button>
+            <app-button-group>
+              <app-button class="ab__stepAdd" variant="tonal" (click)="addStep()"><app-icon name="plus" /> {{ 'admin.budgets.stepAdd' | t }}</app-button>
+            </app-button-group>
           }
             </ng-template>
           </app-load-state>
@@ -244,7 +250,9 @@
       <app-section [heading]="'budget.tree.fyNew' | t">
         <div class="ab__fyNew">
           <app-input type="number" [label]="'budget.tree.fyYear' | t" [required]="true" [error]="newFyError()" [ngModel]="newFyYear()" (ngModelChange)="newFyYear.set('' + ($event ?? ''))" name="fyYear" />
-          <app-button variant="tonal" type="submit" form="ab-fy-form" [disabled]="busy()">{{ 'budget.tree.create' | t }}</app-button>
+          <app-button-group>
+            <app-button variant="tonal" type="submit" form="ab-fy-form" [disabled]="busy()">{{ 'budget.tree.create' | t }}</app-button>
+          </app-button-group>
         </div>
       </app-section>
     </form>
@@ -272,16 +280,18 @@
         </ng-template>
         <ng-template appCell="actions" let-fy>
           <span class="ab__actions" role="presentation" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
-            <app-row-menu
-              [label]="('budget.tree.rowActions' | t) + ': ' + asYear(fy).display"
-              [sections]="fyMenu(asYear(fy))"
-              (selected)="onFyMenu(asYear(fy), $event)"
-            />
+            <app-button-group>
+              <app-row-menu
+                [label]="('budget.tree.rowActions' | t) + ': ' + asYear(fy).display"
+                [sections]="fyMenu(asYear(fy))"
+                (selected)="onFyMenu(asYear(fy), $event)"
+              />
+            </app-button-group>
           </span>
         </ng-template>
       </app-data-table>
     } @else {
-      <app-empty-state shape="table" rows="1" [heading]="'budget.tree.fyEmpty' | t" />
+      <app-empty-state icon="cal" shape="table" rows="1" [heading]="'budget.tree.fyEmpty' | t" />
     }
   </app-section>
   <div dialog-footer>

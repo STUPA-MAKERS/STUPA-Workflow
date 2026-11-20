@@ -33,6 +33,7 @@ import {
 } from '@shared/decision/decision.util';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   DialogComponent,
   EmptyStateComponent,
   IconComponent,
@@ -138,6 +139,7 @@ export interface CandidateDraft {
     TranslatePipe,
     DialogComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     InputComponent,
     SegmentedComponent,

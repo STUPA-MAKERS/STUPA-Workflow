@@ -5,7 +5,15 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+tests:
+  - "backend/tests/integration/modules/applications/test_type_change.py:test_change_with_missing_fields_sends_back"
+  - "backend/tests/integration/modules/applications/test_type_change.py:test_change_without_missing_fields_keeps_state"
+  - "backend/tests/integration/modules/applications/test_type_change.py:test_change_refusals"
+  - "backend/tests/unit/modules/applications/test_type_change_unit.py:test_carry_takes_same_key_same_type_and_valid_value"
+implementation:
+  - backend/app/modules/applications/service/type_change.py
+  - backend/app/modules/applications/router.py
+  - frontend/src/app/pages/applications/type-change-dialog
 scope:
   - backend/app/modules/applications
   - frontend/src/app/pages/applications

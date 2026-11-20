@@ -1,6 +1,6 @@
 import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
 import { LoadMoreComponent } from '@shared/ui/load-more/load-more.component';
-import { StickyBarComponent as _Sb, PageHeaderComponent } from '@stupa-makers/ui-kit';
+import { StickyBarComponent as _Sb, PageHeaderComponent, ButtonGroupComponent } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import {
   ChangeDetectionStrategy,
@@ -93,6 +93,7 @@ export const AUDIT_ACTIONS = [
   'application_create_on_behalf',
   'guest_application_discard',
   'application_update',
+  'application_type_change',
   'application_archive',
   'application_unarchive',
   'application_decision',
@@ -265,6 +266,7 @@ type VerifyState =
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     ConfigDiffComponent,
     ConfirmDialogComponent,
     IconComponent,

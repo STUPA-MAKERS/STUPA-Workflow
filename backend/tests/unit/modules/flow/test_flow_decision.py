@@ -141,14 +141,18 @@ async def test_fire_without_decision_records_nothing(calls: _Calls) -> None:
 
 async def test_available_flags_transitions_into_approved_states() -> None:
     flow_id, draft, ok_id, no_id = uuid4(), uuid4(), uuid4(), uuid4()
-    app = _app(draft, flow_id)
+    app = _decision_app(draft, flow_id)
     to_ok = _transition(flow_id=flow_id, from_id=draft, to_id=ok_id)
     to_no = _transition(flow_id=flow_id, from_id=draft, to_id=no_id)
     to_gone = _transition(flow_id=flow_id, from_id=draft, to_id=uuid4())
     db = fake_session(result(app), result(to_ok, to_no, to_gone))
     db.get_results = [
-        SimpleNamespace(id=ok_id, key="approved", kind="normal", config={}, is_approved=True),
-        SimpleNamespace(id=no_id, key="review", kind="normal", config={}, is_approved=False),
+        SimpleNamespace(
+            id=ok_id, key="approved", kind="normal", config={}, is_approved=True, is_terminal=True
+        ),
+        SimpleNamespace(
+            id=no_id, key="review", kind="normal", config={}, is_approved=False, is_terminal=False
+        ),
         None,
     ]
     out = {t.id: t for t in await FlowService(db).available_transitions(app.id, _principal())}

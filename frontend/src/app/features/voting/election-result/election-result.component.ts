@@ -17,6 +17,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   IconComponent,
   NoteComponent,
   SegBarComponent,
@@ -65,6 +66,7 @@ import {
   imports: [
     NgTemplateOutlet,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     NoteComponent,
     SegBarComponent,

@@ -108,7 +108,7 @@
               }
             }
             @if (query().trim() && !listRows().length) {
-              <app-empty-state rows="1" [heading]="'budget.dash.searchNone' | t" />
+              <app-empty-state icon="searchOff" rows="1" [heading]="'budget.dash.searchNone' | t" />
             }
           </nav>
         </div>
@@ -169,7 +169,9 @@
             @if (year()) {
               <app-empty-state plain icon="cal" fill [heading]="'budget.plan.none.title' | t">
                 @if (canWrite() && !year()?.closedAt && canCopy()) {
-                  <app-button variant="tonal" [disabled]="busy()" data-testid="bp-copy" (click)="createPlan(true)">{{ 'budget.plan.none.copy' | t }}</app-button>
+                  <app-button-group>
+                    <app-button variant="tonal" [disabled]="busy()" data-testid="bp-copy" (click)="createPlan(true)">{{ 'budget.plan.none.copy' | t }}</app-button>
+                  </app-button-group>
                 }
               </app-empty-state>
             } @else {
@@ -242,16 +244,18 @@
 
 <ng-template #actions>
   <div class="bd__actions">
-    @if (!phone()) {
-      @if (headPrimary(); as p) {
-        <app-button variant="text" [iconOnly]="true" [ariaLabel]="p.label" [title]="p.reason ?? p.label" [disabled]="!!p.reason || busy()" data-testid="bp-primary" (click)="onAction(p.id)">
-          <app-icon [name]="p.icon" />
-        </app-button>
+    <app-button-group>
+      @if (!phone()) {
+        @if (headPrimary(); as p) {
+          <app-button variant="text" [iconOnly]="true" [ariaLabel]="p.label" [title]="p.reason ?? p.label" [disabled]="!!p.reason || busy()" data-testid="bp-primary" (click)="onAction(p.id)">
+            <app-icon [name]="p.icon" />
+          </app-button>
+        }
       }
-    }
-    @if (menu().length) {
-      <app-row-menu class="bd__more" [sections]="menu()" [loading]="busy()" (selected)="onAction($event.id)" />
-    }
+      @if (menu().length) {
+        <app-row-menu class="bd__more" [sections]="menu()" [loading]="busy()" (selected)="onAction($event.id)" />
+      }
+    </app-button-group>
   </div>
 </ng-template>
 
@@ -319,7 +323,7 @@
       } @else if (sideRows.length) {
         <ng-container *ngTemplateOutlet="table; context: { $implicit: sideRows, nested: true }" />
       } @else {
-        <app-empty-state rows="1" [heading]="(query().trim() ? 'budget.dash.searchNone' : 'budget.plan.noLines') | t" />
+        <app-empty-state [icon]="query().trim() ? 'searchOff' : 'pie'" rows="1" [heading]="(query().trim() ? 'budget.dash.searchNone' : 'budget.plan.noLines') | t" />
       }
     </app-section>
   }

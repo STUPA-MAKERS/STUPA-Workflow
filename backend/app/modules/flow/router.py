@@ -26,8 +26,14 @@ from app.modules.applications.access import (
 from app.modules.applications.decision import not_allowed_problem
 from app.modules.applications.schemas import StateOut
 from app.modules.auth.principal import Principal
+from app.modules.flow.bulk import bulk_fire, bulk_options
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
+from app.modules.flow.outside_decision import OutsideDecisionIn, record_outside_decision
 from app.modules.flow.schemas import (
+    BulkResult,
+    BulkSelection,
+    BulkTransitionOption,
+    BulkTransitionRequest,
     ForceStatusRequest,
     TransitionOut,
     TransitionRequest,
@@ -48,6 +54,10 @@ MANAGE_PERMISSION = "application.transition"
 #: Force an application into any state, past guards and transitions. It is separate from
 #: `application.transition` because it is an audited override.
 FORCE_PERMISSION = "application.force_status"
+
+#: Record a decision that a Gremium made outside the platform (spec 001603). It follows
+#: the flow, so it is separate from `application.force_status`.
+RECORD_DECISION_PERMISSION = "application.record_decision"
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
@@ -108,8 +118,19 @@ async def require_force_principal(
     return principal
 
 
+async def require_record_principal(
+    application_id: UUID,
+    db: DbSession,
+    principal: Annotated[Principal, Depends(require_principal(RECORD_DECISION_PERMISSION))],
+) -> Principal:
+    """Admit a principal with `application.record_decision` who can read the application."""
+    await resolve_app_read(db, application_id, principal, None)
+    return principal
+
+
 PrincipalDep = Annotated[Principal, Depends(require_transition_principal)]
 ForcePrincipalDep = Annotated[Principal, Depends(require_force_principal)]
+RecordPrincipalDep = Annotated[Principal, Depends(require_record_principal)]
 
 
 @router.get(
@@ -185,15 +206,42 @@ async def force_status(
 
     The route returns 200 with `{newStateId}`. It returns 409 when the application has
     no current state, already sits in the target state, or a concurrent change moved it
-    first.
+    first. It returns 422 without a `reason`, or for `other` with a note shorter than
+    10 characters.
     """
     return await service.force_status(
         application_id,
         payload.state_id,
         principal,
-        note=payload.note,
+        reason=payload.reason,
+        note=payload.clean_note,
+        decision=payload.decision,
         allow_unconfirmed=False,
     )
+
+
+@router.post(
+    "/applications/{application_id}/outside-decision",
+    response_model=TransitionResult,
+    responses=_errors(400, 401, 403, 404, 409, 422),
+)
+async def outside_decision(
+    application_id: UUID,
+    payload: OutsideDecisionIn,
+    service: ServiceDep,
+    principal: RecordPrincipalDep,
+) -> TransitionResult:
+    """Record a decision made in a meeting without a vote on the platform.
+
+    The result fires the `pass` or the `fail` branch of the vote state with its
+    actions and mails and cancels the open votes. The route gives 409 outside a vote
+    state (`not_in_vote_state`) or without the branch (`no_branch`), and 422 for a
+    meeting date after today, an unknown Gremium or meeting, or an approval into an
+    approved state without the approved amount (`approved_amount_required`).
+    """
+    staged = await record_outside_decision(service, application_id, payload, principal)
+    await service.session.commit()
+    return await service.after_commit(staged)
 
 
 @router.get(
@@ -244,3 +292,52 @@ async def fire_applicant_transition(
         note=payload.note,
         allow_unconfirmed=False,
     )
+
+
+#: A bulk action of the Antrag list needs both rights: the selection is a step of the
+#: application management (spec 001700), and the fire is a transition.
+BulkPrincipalDep = Annotated[
+    Principal, Depends(require_principal("application.manage", MANAGE_PERMISSION))
+]
+
+
+@router.post(
+    "/bulk/applications/transitions",
+    response_model=list[BulkTransitionOption],
+    responses=_errors(400, 401, 403, 422),
+)
+async def list_bulk_transitions(
+    payload: BulkSelection,
+    service: ServiceDep,
+    principal: BulkPrincipalDep,
+) -> list[BulkTransitionOption]:
+    """List the targets that every selected Antrag reaches by a manual transition.
+
+    A target in an approved state lists the requested amount of each Antrag, which the
+    fire approves. An Antrag that the caller cannot read leaves an empty list. A
+    transition onto an agenda is not offered, because it needs a meeting per Antrag.
+    """
+    return await bulk_options(service, payload.application_ids, principal)
+
+
+@router.post(
+    "/bulk/applications/transition",
+    response_model=BulkResult,
+    responses=_errors(400, 401, 403, 422),
+)
+async def fire_bulk_transition(
+    payload: BulkTransitionRequest,
+    service: ServiceDep,
+    principal: BulkPrincipalDep,
+) -> BulkResult:
+    """Move every selected Antrag into ``toStateId``, each in its own transaction.
+
+    The route checks the read right, the transition and its guard of each Antrag again.
+    An error at one Antrag does not stop the others: its entry carries the code and the
+    text of the error (spec 001703). An approved target approves each Antrag with its
+    requested amount.
+    """
+    results = await bulk_fire(
+        service, payload.application_ids, payload.to_state_id, principal, note=payload.note
+    )
+    return BulkResult(results=tuple(results))

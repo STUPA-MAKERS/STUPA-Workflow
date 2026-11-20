@@ -81,7 +81,7 @@
             <p class="fe__pv-desc">{{ resolved(description()) }}</p>
           }
           @if (groups().length === 0) {
-            <app-empty-state rows="3" [heading]="'admin.forms.empty' | t" />
+            <app-empty-state icon="form" rows="3" [heading]="'admin.forms.empty' | t" />
           }
           @for (group of groups(); track $index; let gi = $index) {
             <section class="fe__pv-group">
@@ -142,11 +142,13 @@
                 <button type="button" class="fe__groupName ell" [attr.aria-current]="gi === groupIndex() ? 'true' : null" (click)="selectGroup(gi)">
                   {{ groupHeading(group, gi) }}
                 </button>
-                <app-row-menu
-                  [label]="('admin.form.groupMenu' | t: { n: gi + 1 })"
-                  [sections]="groupMenu(gi)"
-                  (selected)="onGroupMenu(gi, $event)"
-                />
+                <app-button-group>
+                  <app-row-menu
+                    [label]="('admin.form.groupMenu' | t: { n: gi + 1 })"
+                    [sections]="groupMenu(gi)"
+                    (selected)="onGroupMenu(gi, $event)"
+                  />
+                </app-button-group>
               </div>
 
               <ol class="fe__list">
@@ -189,21 +191,25 @@
               </ol>
 
               <div class="fe__add">
-                <app-button
-                  class="fe__addBtn"
-                  variant="text"
-                  size="sm"
-                  [attr.aria-expanded]="typeMenuGroup() === gi"
-                  (click)="toggleTypeMenu(gi, $event)"
-                >
-                  <app-icon name="plus" /> {{ 'admin.forms.addQuestion' | t }}
-                </app-button>
+                <app-button-group>
+                  <app-button
+                    class="fe__addBtn"
+                    variant="text"
+                    size="sm"
+                    [ariaExpanded]="typeMenuGroup() === gi"
+                    (click)="toggleTypeMenu(gi, $event)"
+                  >
+                    <app-icon name="plus" /> {{ 'admin.forms.addQuestion' | t }}
+                  </app-button>
+                </app-button-group>
               </div>
             </section>
           }
-          <app-button class="fe__addGroup" variant="tonal" size="sm" (click)="addGroup()">
-            <app-icon name="plus" /> {{ 'admin.form.addGroup' | t }}
-          </app-button>
+          <app-button-group>
+            <app-button class="fe__addGroup" variant="tonal" size="sm" (click)="addGroup()">
+              <app-icon name="plus" /> {{ 'admin.form.addGroup' | t }}
+            </app-button>
+          </app-button-group>
         </nav>
 
         <div class="fe__main" appScrollFade="y">
@@ -214,7 +220,7 @@
             <p class="fe__alert" role="alert">{{ issue | t }}</p>
           }
           @if (groups().length === 0) {
-            <app-empty-state [heading]="'admin.forms.empty' | t" />
+            <app-empty-state icon="form" [heading]="'admin.forms.empty' | t" />
           }
           @if (currentGroup(); as group) {
             @let gi = groupIndex();
@@ -231,7 +237,7 @@
             </section>
 
             @if (group.fields.length === 0) {
-              <app-empty-state rows="1" [heading]="'admin.form.groupEmpty' | t" />
+              <app-empty-state icon="form" rows="1" [heading]="'admin.form.groupEmpty' | t" />
             }
 
             @for (field of group.fields; track $index; let qi = $index) {
@@ -249,8 +255,10 @@
                 <div class="fe__cardHead">
                   <h3 class="cap fe__cardTitle ell">{{ resolved(field.label) || ('admin.forms.untitledQuestion' | t) }}</h3>
                   <app-move-buttons (click)="$event.stopPropagation()" (move)="moveQuestion(pos, $event)" />
-                  <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.forms.duplicate' | t" [title]="'admin.forms.duplicate' | t" (click)="$event.stopPropagation(); duplicateQuestion(pos)"><app-icon name="copy" /></app-button>
-                  <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.delete' | t" [title]="'admin.common.delete' | t" (click)="$event.stopPropagation(); removeQuestion(pos)"><app-icon name="trash" /></app-button>
+                  <app-button-group>
+                    <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.forms.duplicate' | t" [title]="'admin.forms.duplicate' | t" (click)="$event.stopPropagation(); duplicateQuestion(pos)"><app-icon name="copy" /></app-button>
+                    <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.delete' | t" [title]="'admin.common.delete' | t" (click)="$event.stopPropagation(); removeQuestion(pos)"><app-icon name="trash" /></app-button>
+                  </app-button-group>
                 </div>
 
                 <div class="fe__base">
@@ -290,12 +298,16 @@
                       <div class="fe__opt">
                         <app-input class="fe__mono" [label]="'admin.form.optionValue' | t" [(ngModel)]="opt.value" (ngModelChange)="touch()" />
                         <app-i18n-input [short]="true" [value]="opt.label" (valueChange)="setOptionLabel(pos, oi, $event)" />
-                        <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [title]="'admin.common.remove' | t" (click)="removeOption(pos, oi)"><app-icon name="trash" /></app-button>
+                        <app-button-group>
+                          <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [title]="'admin.common.remove' | t" (click)="removeOption(pos, oi)"><app-icon name="trash" /></app-button>
+                        </app-button-group>
                       </div>
                     }
-                    <app-button class="fe__inlineAdd" variant="text" size="sm" (click)="addOption(pos)">
-                      <app-icon name="plus" /> {{ 'admin.form.addOption' | t }}
-                    </app-button>
+                    <app-button-group>
+                      <app-button class="fe__inlineAdd" variant="text" size="sm" (click)="addOption(pos)">
+                        <app-icon name="plus" /> {{ 'admin.form.addOption' | t }}
+                      </app-button>
+                    </app-button-group>
                   </fieldset>
                 }
 

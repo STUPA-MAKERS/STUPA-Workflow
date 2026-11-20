@@ -1,7 +1,6 @@
 <app-dialog
   [open]="open()"
   [title]="'applications.agenda.title' | t"
-  [subtitle]="applicationTitle()"
   [closeLabel]="'action.close' | t"
   (closed)="close()"
 >
@@ -41,7 +40,7 @@
           }
         </div>
       } @else {
-        <app-empty-state shape="date" rows="3" [heading]="'applications.agenda.none' | t" />
+        <app-empty-state icon="list" shape="date" rows="3" [heading]="'applications.agenda.none' | t" />
       }
       @if (refusal(); as key) {
         <p class="agd__refusal" role="alert">{{ key | t }}</p>

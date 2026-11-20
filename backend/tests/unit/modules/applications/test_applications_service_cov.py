@@ -215,6 +215,9 @@ def _state(**over: Any) -> _Obj:
         "edit_allowed": True,
         "kind": "normal",
         "config": {},
+        "is_initial": False,
+        "is_terminal": False,
+        "is_denied": False,
     }
     base.update(over)
     return _Obj(**base)
@@ -995,6 +998,7 @@ async def test_timeline_links_the_vote_or_names_it_as_deleted() -> None:
         execute_results=[
             [(linked, None), (deleted, None)],
             [("approved", "#0f0")],
+            [],
             [(linked, None), (deleted, None)],
         ],
     )
@@ -1052,8 +1056,9 @@ async def test_timeline_missing_404() -> None:
 async def test_versions_resolves_names() -> None:
     """Resolve an editor without a display name to the email."""
     app = _app()
-    v1 = _Obj(version=1, data={"title": "a"}, diff=None, changed_by="sub-1", at=NOW)
-    v2 = _Obj(version=2, data={"title": "b"}, diff=None, changed_by=None, at=NOW)
+    no_change = {"from_type_id": None, "to_type_id": None, "from_form_version_id": None}
+    v1 = _Obj(version=1, data={"title": "a"}, diff=None, changed_by="sub-1", at=NOW, **no_change)
+    v2 = _Obj(version=2, data={"title": "b"}, diff=None, changed_by=None, at=NOW, **no_change)
     session = _Session(
         get_results=[app],
         execute_results=[[sub_ref("sub-1", None, "alice@x.de", AUTHOR_ID)]],

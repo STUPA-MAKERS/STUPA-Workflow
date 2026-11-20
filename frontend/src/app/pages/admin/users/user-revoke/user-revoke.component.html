@@ -46,14 +46,16 @@
           }
 
           @if (empty()) {
-            <app-empty-state rows="3" [heading]="'admin.users.revoke.nothing' | t" />
+            <app-empty-state icon="key" rows="3" [heading]="'admin.users.revoke.nothing' | t" />
           }
 
           @if (p.gremien.length) {
             <app-section class="ur__sec" [heading]="'admin.users.revoke.gremien' | t">
-              <app-button sectionAction variant="text" size="sm" [disabled]="p.isSelf" (click)="toggleAll()">{{
-                (allSelected() ? 'admin.users.revoke.deselectAll' : 'admin.users.revoke.selectAll') | t
-              }}</app-button>
+              <app-button-group ngProjectAs="[sectionAction]">
+                <app-button sectionAction variant="text" size="sm" [disabled]="p.isSelf" (click)="toggleAll()">{{
+                  (allSelected() ? 'admin.users.revoke.deselectAll' : 'admin.users.revoke.selectAll') | t
+                }}</app-button>
+              </app-button-group>
               <ul class="ur__items">
                 @for (g of p.gremien; track g.gremiumId) {
                   @let e = gEntry(g);

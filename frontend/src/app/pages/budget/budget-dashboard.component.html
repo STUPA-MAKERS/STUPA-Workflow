@@ -351,12 +351,14 @@
 
         <app-section class="bd__sec bd__sec--apps" size="lg" headingId="bd-apps" [heading]="itemsTitle()">
           @if (previewItems().length) {
-            <app-button sectionAction variant="text" size="sm" (click)="openItems()">{{ 'budget.dash.appsAll' | t }}</app-button>
+            <app-button-group ngProjectAs="[sectionAction]">
+              <app-button sectionAction variant="text" size="sm" (click)="openItems()">{{ 'budget.dash.appsAll' | t }}</app-button>
+            </app-button-group>
           }
           @if (apps() === null) {
             <app-skeleton variant="rows" [count]="3" [label]="(canSeeBookings() ? 'budget.dash.itemsLoading' : 'budget.dash.appsLoading') | t" />
           } @else if (!previewItems().length) {
-            <app-empty-state rows="1" [heading]="(canSeeBookings() ? 'budget.dash.itemsNone' : 'budget.dash.appsNone') | t" />
+            <app-empty-state icon="swap" rows="1" [heading]="(canSeeBookings() ? 'budget.dash.itemsNone' : 'budget.dash.appsNone') | t" />
           } @else {
             <app-budget-item-list [items]="previewItems()" [names]="nodeNames()" />
           }
@@ -446,7 +448,7 @@
             </button>
           </div>
         } @empty {
-          <app-empty-state rows="1" [heading]="'budget.dash.searchNone' | t" />
+          <app-empty-state icon="searchOff" rows="1" [heading]="'budget.dash.searchNone' | t" />
         }
       </nav>
     </div>
@@ -455,27 +457,31 @@
   <ng-template #actions>
     @if (phone()) {
       @if (actionSections()[0].items.length || actionSections().length > 1) {
-        <app-row-menu class="bd__more" [sections]="actionSections()" (selected)="onAction($event)" />
+        <app-button-group>
+          <app-row-menu class="bd__more" [sections]="actionSections()" (selected)="onAction($event)" />
+        </app-button-group>
       }
     } @else {
       <div class="bd__actions">
-        <!-- § 000670: the actions of a detail head are icon buttons, the rest is in the menu. -->
-        @if (canExport()) {
-          <app-button
-            variant="text"
-            [iconOnly]="true"
-            [ariaLabel]="'budget.dash.export' | t"
-            [title]="'budget.dash.export' | t"
-            [loading]="exporting()"
-            data-testid="bd-export"
-            (click)="onExport()"
-          >
-            <app-icon name="download" />
-          </app-button>
-        }
-        @if (moreSections().length) {
-          <app-row-menu class="bd__more" [sections]="moreSections()" (selected)="onAction($event)" />
-        }
+        <app-button-group>
+          <!-- § 000670: the actions of a detail head are icon buttons, the rest is in the menu. -->
+          @if (canExport()) {
+            <app-button
+              variant="text"
+              [iconOnly]="true"
+              [ariaLabel]="'budget.dash.export' | t"
+              [title]="'budget.dash.export' | t"
+              [loading]="exporting()"
+              data-testid="bd-export"
+              (click)="onExport()"
+            >
+              <app-icon name="download" />
+            </app-button>
+          }
+          @if (moreSections().length) {
+            <app-row-menu class="bd__more" [sections]="moreSections()" (selected)="onAction($event)" />
+          }
+        </app-button-group>
       </div>
     }
   </ng-template>

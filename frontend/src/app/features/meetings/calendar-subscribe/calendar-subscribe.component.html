@@ -32,10 +32,12 @@
       </div>
     } @else {
       <div class="cs__actions">
-        <app-button variant="danger" size="sm" (click)="askRotate()">
-          <app-icon name="repeat" />
-          {{ 'account.calendar.rotate' | t }}
-        </app-button>
+        <app-button-group>
+          <app-button variant="danger" size="sm" (click)="askRotate()">
+            <app-icon name="repeat" />
+            {{ 'account.calendar.rotate' | t }}
+          </app-button>
+        </app-button-group>
         <app-copy-button
           [text]="feedUrl"
           [share]="true"
@@ -46,14 +48,18 @@
     }
   } @else if (error()) {
     <div class="cs__actions">
-      <app-button variant="tonal" size="sm" (click)="load()">{{ 'meetings.overview.selRetry' | t }}</app-button>
+      <app-button-group>
+        <app-button variant="tonal" size="sm" (click)="load()">{{ 'meetings.overview.selRetry' | t }}</app-button>
+      </app-button-group>
     </div>
   } @else {
-    <app-empty-state rows="1" [heading]="'account.calendar.none' | t">
-      <app-button variant="tonal" size="sm" [loading]="busy()" (click)="rotate()">
-        <app-icon name="link" />
-        {{ 'account.calendar.generate' | t }}
-      </app-button>
+    <app-empty-state icon="cal" rows="1" [heading]="'account.calendar.none' | t">
+      <app-button-group>
+        <app-button variant="tonal" size="sm" [loading]="busy()" (click)="rotate()">
+          <app-icon name="link" />
+          {{ 'account.calendar.generate' | t }}
+        </app-button>
+      </app-button-group>
     </app-empty-state>
   }
 </ng-template>

@@ -43,6 +43,7 @@ import { POSITION_FILES, type PositionFiles } from '@shared/forms/position-files
 import { renderMarkdown } from '../meetings/meetings.util';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   ConfirmDialogComponent,
   EmptyStateComponent,
   FieldGroupComponent,
@@ -166,6 +167,7 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
     FieldGroupComponent,
     FieldRowComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     InputComponent,
     StepperComponent,

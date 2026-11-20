@@ -10,7 +10,13 @@ import { NgComponentOutlet } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
 import type { FormFieldDef } from '@core/api/models';
-import { ButtonComponent, IconComponent, SwitchComponent, parseMoney } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  ButtonGroupComponent,
+  IconComponent,
+  SwitchComponent,
+  parseMoney,
+} from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { formatMoney } from '@shared/format-money';
@@ -81,7 +87,13 @@ let nextUid = 0;
   selector: 'app-formly-positions',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonComponent, IconComponent, SwitchComponent, NgComponentOutlet],
+  imports: [
+    ButtonComponent,
+    ButtonGroupComponent,
+    IconComponent,
+    SwitchComponent,
+    NgComponentOutlet,
+  ],
   templateUrl: './formly-positions.type.html',
   styleUrl: './formly-positions.type.scss',
 })
@@ -110,9 +122,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
         this.positions.map((p) => (p.id ? p : { ...p, id: newPositionId() })),
       );
     }
-    this.open.set(
-      new Set(this.positions.flatMap((p, i) => (this.positionComplete(p) ? [] : [i]))),
-    );
+    this.open.set(new Set(this.positions.flatMap((p, i) => (this.positionComplete(p) ? [] : [i]))));
     queueMicrotask(() => this.revalidate(this.positions));
   }
 
@@ -176,8 +186,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
 
   /** The accessible name of the radio of an offer: "Bevorzugt: <supplier>". */
   protected radioLabel(o: Offer, oi: number): string {
-    const name =
-      o.label.trim() || this.i18n.translate('forms.positions.offerN', { n: oi + 1 });
+    const name = o.label.trim() || this.i18n.translate('forms.positions.offerN', { n: oi + 1 });
     return this.i18n.translate('forms.positions.preferOfferNamed', { name });
   }
 
@@ -247,7 +256,8 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     }
     if (!this.showError) return '';
     if (p.offers.length < this.requiredOffers(p)) return this.t('apply.positions.errMinOffers');
-    if (p.offers.filter((o) => o.preferred).length !== 1) return this.t('apply.positions.errPreferred');
+    if (p.offers.filter((o) => o.preferred).length !== 1)
+      return this.t('apply.positions.errPreferred');
     if (!p.label.trim()) return this.t('apply.positions.errLabel');
     if (p.offers.some((o) => !o.label.trim() || o.value === null || o.value < 0)) {
       return this.t('apply.positions.errOffers');
@@ -386,9 +396,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   setOfferLabel(pi: number, oi: number, label: string): void {
     this.commit(
       this.positions.map((p, i) =>
-        i === pi
-          ? { ...p, offers: p.offers.map((o, k) => (k === oi ? { ...o, label } : o)) }
-          : p,
+        i === pi ? { ...p, offers: p.offers.map((o, k) => (k === oi ? { ...o, label } : o)) } : p,
       ),
     );
   }
@@ -398,9 +406,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     const value = this.parseNum(raw);
     this.commit(
       this.positions.map((p, i) =>
-        i === pi
-          ? { ...p, offers: p.offers.map((o, k) => (k === oi ? { ...o, value } : o)) }
-          : p,
+        i === pi ? { ...p, offers: p.offers.map((o, k) => (k === oi ? { ...o, value } : o)) } : p,
       ),
     );
   }
@@ -482,9 +488,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   setPreferred(pi: number, oi: number): void {
     this.commit(
       this.positions.map((p, i) =>
-        i === pi
-          ? { ...p, offers: p.offers.map((o, k) => ({ ...o, preferred: k === oi })) }
-          : p,
+        i === pi ? { ...p, offers: p.offers.map((o, k) => ({ ...o, preferred: k === oi })) } : p,
       ),
     );
   }
@@ -518,8 +522,6 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   }
 
   setNoOffersReason(pi: number, reason: string): void {
-    this.commit(
-      this.positions.map((p, i) => (i === pi ? { ...p, noOffersReason: reason } : p)),
-    );
+    this.commit(this.positions.map((p, i) => (i === pi ? { ...p, noOffersReason: reason } : p)));
   }
 }

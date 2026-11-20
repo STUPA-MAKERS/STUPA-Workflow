@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -15,6 +16,7 @@ from fastapi.testclient import TestClient
 from app.deps import get_current_applicant, get_current_principal
 from app.main import create_app
 from app.modules.applications.access import require_app_applicant
+from app.modules.applications.decision import DecisionIn
 from app.modules.auth.principal import Principal
 from app.modules.flow import router as flow_router
 from app.modules.flow.dispatch import NullActionDispatcher
@@ -32,6 +34,8 @@ class _FakeService:
         """Record the `allow_unconfirmed` value of each call; every route passes False."""
         self.fired: dict[str, object] | None = None
         self.allow_unconfirmed: list[bool] = []
+        self.force_reasons: list[tuple[str, str | None]] = []
+        self.force_decisions: list[object] = []
 
     async def available_transitions(
         self,
@@ -118,10 +122,14 @@ class _FakeService:
         target_state_id,
         principal,
         *,
-        note,
+        reason,
+        note=None,
+        decision=None,
         allow_unconfirmed=True,
     ):
         self.allow_unconfirmed.append(allow_unconfirmed)
+        self.force_reasons.append((reason, note))
+        self.force_decisions.append(decision)
         return TransitionResult(
             newStateId=target_state_id, statusEventId=uuid4(), dispatchedActions=[]
         )
@@ -353,10 +361,30 @@ def test_force_routes_hide_unconfirmed(
     assert client.get(f"/api/applications/{app_id}/flow-states").status_code == 200
     r = client.post(
         f"/api/applications/{app_id}/force-status",
-        json={"stateId": str(uuid4()), "note": "Korrektur"},
+        json={"stateId": str(uuid4()), "reason": "error_correction", "note": "Korrektur"},
     )
     assert r.status_code == 200
     assert fake_service.allow_unconfirmed == [False, False]
+    assert fake_service.force_decisions == [None]
+
+
+def test_force_route_passes_the_decision(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """§ 001653: the force call carries the approved amount to the service."""
+    _as_principal(app, "application.force_status")
+    r = client.post(
+        f"/api/applications/{uuid4()}/force-status",
+        json={
+            "stateId": str(uuid4()),
+            "reason": "outside_decision",
+            "decision": {"approvedAmount": "80.00"},
+        },
+    )
+    assert r.status_code == 200
+    decision = fake_service.force_decisions[0]
+    assert isinstance(decision, DecisionIn)
+    assert decision.approved_amount == Decimal("80.00")
 
 
 def test_di_factories_build_real_objects() -> None:
@@ -411,7 +439,31 @@ def test_force_routes_check_read_access(
     assert client.get(f"/api/applications/{app_id}/flow-states").status_code == 403
     r = client.post(
         f"/api/applications/{app_id}/force-status",
-        json={"stateId": str(uuid4()), "note": "Korrektur"},
+        json={"stateId": str(uuid4()), "reason": "error_correction", "note": "Korrektur"},
     )
     assert r.status_code == 403
     assert fake_service.allow_unconfirmed == []
+
+
+def test_force_status_needs_a_reason(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """§ 001650: a reason is required, and `other` needs a note of 10 characters."""
+    _as_principal(app, "application.force_status")
+    url = f"/api/applications/{uuid4()}/force-status"
+    state = str(uuid4())
+    assert client.post(url, json={"stateId": state, "note": "Korrektur"}).status_code == 422
+    assert client.post(url, json={"stateId": state, "reason": "nope"}).status_code == 422
+    short = client.post(url, json={"stateId": state, "reason": "other", "note": " kurz     "})
+    assert short.status_code == 422
+    for body in (
+        {"reason": "other", "note": "Ein langer Grund"},
+        {"reason": "applicant_error"},
+        {"reason": "outside_decision", "note": "  "},
+    ):
+        assert client.post(url, json={"stateId": state, **body}).status_code == 200
+    assert fake_service.force_reasons == [
+        ("other", "Ein langer Grund"),
+        ("applicant_error", None),
+        ("outside_decision", None),
+    ]

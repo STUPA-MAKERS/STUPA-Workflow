@@ -14,6 +14,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   ConfirmDialogComponent,
   CopyButtonComponent,
   downloadBlob,
@@ -48,6 +49,7 @@ type Confirm = { readonly kind: 'one'; readonly grant: OAuthGrant } | { readonly
     SectionComponent,
     ConfirmDialogComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     CopyButtonComponent,
     EmptyStateComponent,
     IconComponent,

@@ -23,6 +23,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import type { AgendaItem, Meeting, Protocol, Uuid } from '@core/api/models';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   EmptyStateComponent,
   IconComponent,
   type IconName,
@@ -150,6 +151,7 @@ const TOOLS: readonly FormatTool[] = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ButtonComponent,
+    ButtonGroupComponent,
     EmptyStateComponent,
     FormsModule,
     NgTemplateOutlet,
@@ -229,6 +231,14 @@ export class TopSheetComponent {
 
 
   readonly tools = TOOLS;
+  /**
+   * The format tools as connected button groups (spec 001354): the inline marks (bold, italic,
+   * blackout) and the blocks (heading, list, quote). The insert tools are a third group.
+   */
+  readonly toolGroups: readonly (readonly FormatTool[])[] = [
+    TOOLS.filter((t) => ['bold', 'italic', 'blackout'].includes(t.format)),
+    TOOLS.filter((t) => ['heading', 'bulletList', 'blockquote'].includes(t.format)),
+  ];
 
   /**
    * The item whose rename started from this heading. The agenda pane shows its own field

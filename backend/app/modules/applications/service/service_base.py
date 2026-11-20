@@ -93,6 +93,10 @@ def _state_out(state: State | None, color_override: str | None = None) -> StateO
         color=color_override if color_override is not None else state.color,
         editAllowed=state.edit_allowed,
         kind=state.kind,
+        isInitial=state.is_initial,
+        isTerminal=state.is_terminal,
+        isDenied=state.is_denied,
+        isApproved=bool(getattr(state, "is_approved", False)),
     )
 
 

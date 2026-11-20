@@ -124,17 +124,19 @@
     <div class="ballot__spacer" aria-hidden="true" [style.height.px]="barHeight()"></div>
   }
   <div #bar class="ballot__bar">
-    <app-button
-      variant="fill"
-      [size]="compact() ? 'md' : 'lg'"
-      [block]="!columns()"
-      [disabled]="!canConfirm()"
-      [loading]="busy"
-      [ariaLabel]="confirmAria()"
-      (click)="confirm()"
-    >
-      {{ confirmLabel() }}
-    </app-button>
+    <app-button-group [main]="true">
+      <app-button
+        variant="fill"
+        [size]="compact() ? 'md' : 'lg'"
+        [block]="!columns()"
+        [disabled]="!canConfirm()"
+        [loading]="busy"
+        [ariaLabel]="confirmAria()"
+        (click)="confirm()"
+      >
+        {{ confirmLabel() }}
+      </app-button>
+    </app-button-group>
   </div>
 }
 
@@ -174,16 +176,18 @@
     @let abstain = isAbstain(row);
     @if (multi) {
       @if (!cast) {
-        <app-button
-          class="ballot__abstainAll"
-          variant="text"
-          size="sm"
-          [disabled]="busy"
-          [ariaPressed]="abstain"
-          (click)="abstainAll(row)"
-        >
-          {{ 'election.ballot.abstainAll' | t }}
-        </app-button>
+        <app-button-group>
+          <app-button
+            class="ballot__abstainAll"
+            variant="text"
+            size="sm"
+            [disabled]="busy"
+            [ariaPressed]="abstain"
+            (click)="abstainAll(row)"
+          >
+            {{ 'election.ballot.abstainAll' | t }}
+          </app-button>
+        </app-button-group>
       }
     } @else {
       <button

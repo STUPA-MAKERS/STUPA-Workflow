@@ -19,6 +19,7 @@ import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-up
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   DialogComponent,
   IconComponent,
   InputComponent,
@@ -91,6 +92,7 @@ export function draftLinks(drafts: readonly InfoLinkDraft[]): readonly GremiumIn
     FormsModule,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     DialogComponent,
     IconComponent,
     InputComponent,

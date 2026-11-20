@@ -23,6 +23,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   downloadBlob,
   EmptyStateComponent,
   FilterSelectComponent,
@@ -174,6 +175,7 @@ export interface RowModel {
     EmptyStateComponent,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     AvatarComponent,
     FilterSelectComponent,

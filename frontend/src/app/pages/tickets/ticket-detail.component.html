@@ -87,26 +87,28 @@
 
       @if (manager) {
         <div #actions class="td__actions" role="group" [attr.aria-label]="'tickets.detail.actions' | t">
-          @if (open()) {
-            <app-button
-              class="td__act"
-              variant="fill"
-              [loading]="saving() === 'status' && closing() === null"
-              [disabled]="saving() !== null"
-              (click)="close('done')"
-            >
-              <app-icon name="check" />
-              {{ 'tickets.detail.done' | t }}
-            </app-button>
-            <app-button class="td__act" variant="tonal" [disabled]="saving() !== null" (click)="close('rejected')">
-              {{ 'tickets.detail.reject' | t }}
-            </app-button>
-          } @else {
-            <app-button variant="tonal" [loading]="saving() === 'status'" (click)="reopen()">
-              <app-icon name="undo" />
-              {{ 'tickets.detail.reopen' | t }}
-            </app-button>
-          }
+          <app-button-group [main]="true">
+            @if (open()) {
+              <app-button
+                class="td__act"
+                variant="fill"
+                [loading]="saving() === 'status' && closing() === null"
+                [disabled]="saving() !== null"
+                (click)="close('done')"
+              >
+                <app-icon name="check" />
+                {{ 'tickets.detail.done' | t }}
+              </app-button>
+              <app-button class="td__act" variant="tonal" [disabled]="saving() !== null" (click)="close('rejected')">
+                {{ 'tickets.detail.reject' | t }}
+              </app-button>
+            } @else {
+              <app-button variant="tonal" [loading]="saving() === 'status'" (click)="reopen()">
+                <app-icon name="undo" />
+                {{ 'tickets.detail.reopen' | t }}
+              </app-button>
+            }
+          </app-button-group>
         </div>
       }
 
@@ -256,17 +258,19 @@
 
   @if (manager) {
     <app-section class="td__sec" [heading]="'tickets.todos.title' | t">
-      <app-button
-        sectionAction
-        variant="text"
-        size="sm"
-        [iconOnly]="true"
-        [ariaLabel]="'tickets.todos.add' | t"
-        data-testid="td-todo-add"
-        (click)="todoOpen.set(true)"
-      >
-        <app-icon name="plus" />
-      </app-button>
+      <app-button-group ngProjectAs="[sectionAction]">
+        <app-button
+          sectionAction
+          variant="text"
+          size="sm"
+          [iconOnly]="true"
+          [ariaLabel]="'tickets.todos.add' | t"
+          data-testid="td-todo-add"
+          (click)="todoOpen.set(true)"
+        >
+          <app-icon name="plus" />
+        </app-button>
+      </app-button-group>
       <app-todo-linked-list
         kind="ticket"
         avatarSize="xs"
@@ -383,7 +387,7 @@
         }
       </ul>
     } @else if (duplicateSearch.applied()) {
-      <app-empty-state rows="1" [heading]="'tickets.duplicate.none' | t" />
+      <app-empty-state icon="searchOff" rows="1" [heading]="'tickets.duplicate.none' | t" />
     }
   </div>
   <app-button dialog-footer variant="text" (click)="duplicateOpen.set(false)">{{ 'action.cancel' | t }}</app-button>

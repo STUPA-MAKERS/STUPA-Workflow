@@ -123,12 +123,29 @@ class ApplicationCreated(FrozenCamelModel, frozen=True):
     application_id: UUID = Field(alias="applicationId")
 
 
+class NewVersionCreated(FrozenCamelModel, frozen=True):
+    """201 response of ``POST /applications/{id}/new-version``.
+
+    Attributes:
+        link_sent: The caller's session does not reach the new draft (a link of one
+            Antrag), so a login link to it went out by mail.
+    """
+
+    application_id: UUID = Field(alias="applicationId")
+    link_sent: bool = Field(default=False, alias="linkSent")
+
+
 class StateOut(FrozenCamelModel, frozen=True):
     """A flow state as the application shows it.
 
     Attributes:
         kind: State kind. The frontend shows approve and reject actions for
             ``approval``.
+        is_initial: The initial state: an Antrag in it is a draft, not submitted yet.
+        is_terminal: A terminal state.
+        is_denied: An Antrag in this state is denied.
+        is_approved: The state carries the flag ``Bewilligt`` (spec 000571). The list,
+            the detail and the export show the approved amount only then (spec 001612).
     """
 
     id: UUID
@@ -137,6 +154,10 @@ class StateOut(FrozenCamelModel, frozen=True):
     color: str | None = None
     edit_allowed: bool = Field(alias="editAllowed")
     kind: str = "normal"
+    is_initial: bool = Field(default=False, alias="isInitial")
+    is_terminal: bool = Field(default=False, alias="isTerminal")
+    is_denied: bool = Field(default=False, alias="isDenied")
+    is_approved: bool = Field(default=False, alias="isApproved")
 
 
 class ApplicantOut(FrozenCamelModel, frozen=True):
@@ -236,6 +257,71 @@ class TimelineDecisionOut(FrozenCamelModel, frozen=True):
     condition_count: int = Field(default=0, alias="conditionCount")
 
 
+class TypeChangeIn(FrozenStrictCamelModel, frozen=True):
+    """Change the Antragsart of an application (spec 001660).
+
+    ``transitionId`` is required when the new form misses a required value
+    (spec 001661) and must be one of ``TypeChangePreviewOut.transitions``; without a
+    missing value it must be null. ``note`` adds a text to the note of that transition,
+    after the list of the missing fields.
+    """
+
+    type_id: UUID = Field(alias="typeId")
+    transition_id: UUID | None = Field(default=None, alias="transitionId")
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class TypeChangeFieldOut(FrozenCamelModel, frozen=True):
+    """One field of a change of the Antragsart: its key and its label."""
+
+    key: str
+    label: I18nMap
+
+
+class TypeChangeTransitionOut(FrozenCamelModel, frozen=True):
+    """A transition that sends the application back to the applicant (spec 001661)."""
+
+    id: UUID
+    label: I18nMap
+    to_state_id: UUID = Field(alias="toStateId")
+    to_state_label: I18nMap = Field(alias="toStateLabel")
+
+
+class TypeChangePreviewOut(FrozenCamelModel, frozen=True):
+    """What a change to the Antragsart ``typeId`` does, before the change.
+
+    Attributes:
+        carried: The fields whose value the new form takes (same key, same type).
+        missing: The required fields of the new form without a value after the change.
+        dropped: The fields with a value that the new form does not take. The old
+            version keeps their values (spec 001662).
+        transitions: With ``missing``: the manual transitions of the current state that
+            the caller may fire and that lead into a state with ``editAllowed``.
+        possible: False when ``missing`` is not empty and no transition fits.
+    """
+
+    type_id: UUID = Field(alias="typeId")
+    carried: tuple[TypeChangeFieldOut, ...] = ()
+    missing: tuple[TypeChangeFieldOut, ...] = ()
+    dropped: tuple[TypeChangeFieldOut, ...] = ()
+    transitions: tuple[TypeChangeTransitionOut, ...] = ()
+    possible: bool = True
+
+
+class VersionTypeChangeOut(FrozenCamelModel, frozen=True):
+    """The change of the Antragsart that wrote a version (spec 001663).
+
+    ``fieldLabels`` holds the labels of the old form for the fields that the new form
+    does not have, so the history names the removed values.
+    """
+
+    from_type_id: UUID | None = Field(default=None, alias="fromTypeId")
+    from_type: I18nMap | None = Field(default=None, alias="fromType")
+    to_type_id: UUID | None = Field(default=None, alias="toTypeId")
+    to_type: I18nMap | None = Field(default=None, alias="toType")
+    field_labels: dict[str, I18nMap] = Field(default_factory=dict, alias="fieldLabels")
+
+
 class ApplicationPatch(FrozenCamelModel, frozen=True):
     """Update the application data.
 
@@ -309,6 +395,37 @@ class CaptureOut(FrozenCamelModel, frozen=True):
     intake: str | None = None
 
 
+class OutsideDecisionOut(FrozenCamelModel, frozen=True):
+    """A decision made outside the platform, as the timeline shows it (spec 001602).
+
+    The applicant view leaves out the meeting link, because the applicant cannot open
+    a meeting.
+    """
+
+    result: Literal["passed", "failed"]
+    meeting_date: date = Field(alias="meetingDate")
+    gremium_id: UUID | None = Field(default=None, alias="gremiumId")
+    gremium_name: str | None = Field(default=None, alias="gremiumName")
+    yes: int | None = None
+    no: int | None = None
+    abstain: int | None = None
+    meeting_id: UUID | None = Field(default=None, alias="meetingId")
+    meeting_title: str | None = Field(default=None, alias="meetingTitle")
+
+
+class AmountChangeOut(FrozenCamelModel, frozen=True):
+    """A later change of the approved amount, as the timeline shows it (spec 001621).
+
+    The applicant view leaves out the reason, because it is an internal note.
+    """
+
+    previous_amount: Decimal | None = Field(default=None, alias="previousAmount")
+    approved_amount: Decimal | None = Field(default=None, alias="approvedAmount")
+    reason: str | None = None
+    decision_date: date | None = Field(default=None, alias="decisionDate")
+    gremium_name: str | None = Field(default=None, alias="gremiumName")
+
+
 class TimelineEventOut(FrozenCamelModel, frozen=True):
     """One status change of the timeline.
 
@@ -327,6 +444,14 @@ class TimelineEventOut(FrozenCamelModel, frozen=True):
             the status that the vote decided.
         decision: The decision that this status change carried (approved amount,
             number of conditions), else null.
+        kind: ``status`` for a status change, ``amountChange`` for a later change of
+            the approved amount. Such an entry changes no state: ``fromStateId`` and
+            ``toStateId`` both name the current state.
+        forced: A person forced this state. ``forceReason`` names the reason key, null
+            for an old forced change and in the applicant view.
+        outside_decision: The decision made outside the platform that fired this
+            branch, else null.
+        amount_change: The change of the approved amount of an ``amountChange`` entry.
     """
 
     from_state_id: UUID | None = Field(default=None, alias="fromStateId")
@@ -340,6 +465,11 @@ class TimelineEventOut(FrozenCamelModel, frozen=True):
     vote_id: UUID | None = Field(default=None, alias="voteId")
     vote_deleted: bool = Field(default=False, alias="voteDeleted")
     decision: TimelineDecisionOut | None = None
+    kind: Literal["status", "amountChange"] = "status"
+    forced: bool = False
+    force_reason: str | None = Field(default=None, alias="forceReason")
+    outside_decision: OutsideDecisionOut | None = Field(default=None, alias="outsideDecision")
+    amount_change: AmountChangeOut | None = Field(default=None, alias="amountChange")
 
 
 class VersionOut(FrozenCamelModel, frozen=True):
@@ -353,6 +483,7 @@ class VersionOut(FrozenCamelModel, frozen=True):
     Attributes:
         changed_by: Same rules as ``TimelineEventOut.actor``. The frontend renders
             ``changedByInfo``.
+        type_change: The change of the Antragsart that wrote this version, else null.
     """
 
     version: int
@@ -362,6 +493,7 @@ class VersionOut(FrozenCamelModel, frozen=True):
     changed_by: str | None = Field(default=None, alias="changedBy")
     changed_by_info: ActorOut | None = Field(default=None, alias="changedByInfo")
     at: datetime
+    type_change: VersionTypeChangeOut | None = Field(default=None, alias="typeChange")
 
 
 class ApplicationListItem(FrozenCamelModel, frozen=True):
@@ -529,11 +661,15 @@ class ApplicationLinksOut(FrozenCamelModel, frozen=True):
     Attributes:
         successors: The Folgeanträge, oldest first.
         events: The link changes, oldest first.
+        replaces: The Antrag that this one is a new version of ("Neue Fassung von").
+        replaced_by: The new versions of this Antrag, oldest first ("Ersetzt durch").
     """
 
     predecessor: LinkedApplicationOut | None = None
     successors: tuple[LinkedApplicationOut, ...] = ()
     events: tuple[LinkEventOut, ...] = ()
+    replaces: LinkedApplicationOut | None = None
+    replaced_by: tuple[LinkedApplicationOut, ...] = Field(default=(), alias="replacedBy")
 
 
 class PredecessorSet(FrozenStrictCamelModel, frozen=True):
@@ -577,3 +713,10 @@ class ObserverEnd(FrozenStrictCamelModel, frozen=True):
     """End an observation with the token of the end link of a mail."""
 
     token: str = Field(min_length=1, max_length=200)
+
+
+class BulkCommentCreate(FrozenStrictCamelModel, frozen=True):
+    """`POST /bulk/applications/comments`: one public comment on each selected Antrag."""
+
+    application_ids: list[UUID] = Field(alias="applicationIds", min_length=1, max_length=100)
+    body: str = Field(min_length=1, max_length=10_000)

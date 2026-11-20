@@ -52,6 +52,7 @@ import { chatPeople } from '@shared/ui/chat/chat-mentions';
 import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   CheckboxComponent,
   DialogComponent,
   EmptyStateComponent,
@@ -206,6 +207,7 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     ChatComponent,
     CheckboxComponent,
     DialogComponent,

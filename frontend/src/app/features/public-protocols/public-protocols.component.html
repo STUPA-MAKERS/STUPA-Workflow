@@ -15,7 +15,7 @@
 
   @if (!loading() && !error() && total() === 0 && !hasFilters()) {
     <div class="pp__none">
-      <app-empty-state shape="date"
+      <app-empty-state icon="file" shape="date"
         [heading]="'publicProtocols.empty.none' | t"
         [body]="'publicProtocols.empty.noneBody' | t"
       >
@@ -56,7 +56,9 @@
           [active]="semesterFilter() !== ''"
         />
         @if (hasFilters()) {
-          <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'publicProtocols.filter.resetAll' | t }}</app-button>
+          <app-button-group>
+            <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'publicProtocols.filter.resetAll' | t }}</app-button>
+          </app-button-group>
         }
         <span class="pp__spacer"></span>
         @if (!loading()) {
@@ -71,7 +73,7 @@
       <app-note kind="error" icon="alert" role="alert">{{ 'publicProtocols.error' | t }}</app-note>
     } @else if (items().length === 0) {
       <div class="pp__none">
-        <app-empty-state shape="date"
+        <app-empty-state icon="searchOff" shape="date"
           [heading]="'publicProtocols.empty.filtered' | t"
           [body]="'publicProtocols.empty.filteredBody' | t"
          />
@@ -141,9 +143,11 @@
         <app-note kind="error" icon="alert" role="alert">{{ 'publicProtocols.error' | t }}</app-note>
       }
       @if (hasMore()) {
-        <app-button class="pp__more" variant="tonal" [loading]="loadingMore()" (click)="loadMore()">
-          {{ 'publicProtocols.more' | t }}
-        </app-button>
+        <app-button-group>
+          <app-button class="pp__more" variant="tonal" [loading]="loadingMore()" (click)="loadMore()">
+            {{ 'publicProtocols.more' | t }}
+          </app-button>
+        </app-button-group>
       }
     }
   }

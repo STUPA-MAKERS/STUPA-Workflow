@@ -2,9 +2,11 @@
 @if (pageVote(); as v) {
   <section class="gv__vote" [attr.aria-label]="'voting.cast.heading' | t">
     <div class="gv__voteHead">
-      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'guests.vote.back' | t" (click)="openVoteId.set(null)">
-        <app-icon name="back" />
-      </app-button>
+      <app-button-group>
+        <app-button variant="text" [iconOnly]="true" [ariaLabel]="'guests.vote.back' | t" (click)="openVoteId.set(null)">
+          <app-icon name="back" />
+        </app-button>
+      </app-button-group>
       <span class="gv__voteTitles">
         <span class="gv__voteTitle">{{ 'voting.cast.heading' | t }}</span>
         <span class="gv__voteWhere ell" [title]="voteWhere()">{{ voteWhere() }}</span>
@@ -126,7 +128,7 @@
               <h3 class="gv__protoHead">{{ 'meetings.agenda.top' | t: { n: item.position } }} · {{ item.title }}</h3>
               <app-markdown-view [src]="item.body ?? ''" [imageSrc]="null" [documentSrc]="null" />
             } @empty {
-              <app-empty-state shape="text" rows="3" [heading]="'guests.view.protocolEmpty' | t" />
+              <app-empty-state icon="file" shape="text" rows="3" [heading]="'guests.view.protocolEmpty' | t" />
             }
           </section>
       </ng-template>

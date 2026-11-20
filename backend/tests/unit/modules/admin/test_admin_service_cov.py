@@ -841,6 +841,7 @@ def _flow_state_row(key: str, **kw: Any) -> Any:
         "is_terminal": False,
         "is_approved": False,
         "is_denied": False,
+        "is_replaced_target": False,
         "kind": "normal",
         "config": {},
         "flow_version_id": uuid.uuid4(),

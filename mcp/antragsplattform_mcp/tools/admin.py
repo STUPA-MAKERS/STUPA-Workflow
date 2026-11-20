@@ -669,6 +669,46 @@ async def list_audit(
 
 
 @group.tool
+async def get_forced_status_report(
+    date_from: str | None = None, date_to: str | None = None
+) -> dict:
+    """Count the forced status changes per reason and per path (from, to state).
+
+    `date_from` and `date_to` are ISO dates, both days included; the default is the
+    last 90 days. A forced change without a reason counts as `none`. A frequent path
+    is a way that the flow lacks. Requires audit.read.
+    """
+    return await api().get(
+        "/admin/forced-status", params=params(**{"from": date_from, "to": date_to})
+    )
+
+
+@group.tool
+async def list_forced_status_changes(
+    date_from: str | None = None,
+    date_to: str | None = None,
+    reason: str | None = None,
+    from_key: str | None = None,
+    to_key: str | None = None,
+) -> list:
+    """List the forced status changes behind a count of `get_forced_status_report`.
+
+    `reason` narrows to one reason key (`none` for no reason); `from_key` and `to_key`
+    (state keys) narrow to one path. The newest first, at most 500. Requires
+    audit.read.
+    """
+    return await api().get(
+        "/admin/forced-status/events",
+        params=params(
+            **{"from": date_from, "to": date_to},
+            reason=reason,
+            fromKey=from_key,
+            toKey=to_key,
+        ),
+    )
+
+
+@group.tool
 async def verify_audit_chain() -> dict:
     """Verify the hash chain of the audit log to find tampering. Requires audit.verify.
 

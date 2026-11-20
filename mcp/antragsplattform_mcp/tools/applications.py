@@ -42,8 +42,15 @@ async def list_applications(
     return await api().get(
         "/applications",
         params=params(
-            state=states or None, gremium=gremium, type=type, q=q,
-            sort=sort, order=order, limit=limit, offset=offset, archived=archived,
+            state=states or None,
+            gremium=gremium,
+            type=type,
+            q=q,
+            sort=sort,
+            order=order,
+            limit=limit,
+            offset=offset,
+            archived=archived,
         ),
     )
 
@@ -112,8 +119,11 @@ async def create_application(
     return await api().post(
         "/applications",
         json=params(
-            typeId=type_id, data=data, applicantEmail=applicant_email,
-            applicantName=applicant_name, lang=lang,
+            typeId=type_id,
+            data=data,
+            applicantEmail=applicant_email,
+            applicantName=applicant_name,
+            lang=lang,
         ),
     )
 
@@ -163,9 +173,14 @@ async def create_application_on_behalf(
     return await api().post(
         "/applications/on-behalf",
         json=params(
-            typeId=type_id, data=data, applicantPrincipalId=applicant_principal_id,
-            applicantName=applicant_name, applicantEmail=applicant_email,
-            receivedOn=received_on, intake=intake, lang=lang,
+            typeId=type_id,
+            data=data,
+            applicantPrincipalId=applicant_principal_id,
+            applicantName=applicant_name,
+            applicantEmail=applicant_email,
+            receivedOn=received_on,
+            intake=intake,
+            lang=lang,
         ),
     )
 
@@ -273,9 +288,11 @@ async def fire_transition(
     `meeting_id` the server picks the next planned meeting after the step.
 
     A transition with `allowsDecision` (into an accepted state of the cost center)
-    takes a decision: `approved_amount` (decimal string, greater than 0 and not above
-    the requested amount; omit it for "as requested") and `conditions` (at most 20).
-    Any other transition answers 422 `decision_not_allowed` to a decision.
+    takes a decision: `approved_amount` (decimal string, at least 0 and not above
+    the requested amount) and `conditions` (at most 20). A transition with
+    `requiresAmount` needs `approved_amount` (422 `approved_amount_required`); confirm
+    the amount with the user, the requested amount is the usual value. Any other
+    transition answers 422 `decision_not_allowed` to a decision.
     """
     decision = (
         params(approvedAmount=approved_amount, conditions=conditions)
@@ -349,17 +366,145 @@ async def list_application_flow_states(application_id: str) -> list:
 
 
 @group.tool
-async def force_application_status(application_id: str, state_id: str, note: str) -> dict:
+async def force_application_status(
+    application_id: str,
+    state_id: str,
+    reason: Literal["outside_decision", "applicant_error", "error_correction", "other"],
+    note: str | None = None,
+    approved_amount: str | None = None,
+    conditions: list[str] | None = None,
+) -> dict:
     """Put an application directly into a state, past the transitions and their guards.
 
-    Requires the right to force a status. `note` (required) says why; the audit log
-    records it. 409 when the application has no current state, already sits in the
-    target state, or a concurrent change moved it first. Prefer `fire_transition`, and
-    ask the user before you force a status.
+    Requires the right to force a status. `reason` (required) names why:
+    `outside_decision` (a Gremium decided outside the platform), `applicant_error`,
+    `error_correction` or `other`; `other` needs a `note` of at least 10 characters.
+    The audit log records it. 409 when the application has no current state, already
+    sits in the target state, or a concurrent change moved it first. Prefer
+    `fire_transition` or `record_outside_decision`, and ask the user before you force
+    a status.
+
+    A move into an approved state (`isApproved` in `list_application_flow_states`) from
+    one that is not approved needs `approved_amount` (decimal string; 422
+    `approved_amount_required`); confirm it with the user. `conditions` are optional.
+    Any other target ignores the decision.
     """
+    decision = (
+        params(approvedAmount=approved_amount, conditions=conditions)
+        if approved_amount is not None or conditions is not None
+        else None
+    )
     return await api().post(
         f"/applications/{application_id}/force-status",
-        json={"stateId": state_id, "note": note},
+        json=params(stateId=state_id, reason=reason, note=note, decision=decision),
+    )
+
+
+@group.tool
+async def record_outside_decision(
+    application_id: str,
+    result: Literal["passed", "failed"],
+    meeting_date: str,
+    gremium_id: str,
+    yes: int | None = None,
+    no: int | None = None,
+    abstain: int | None = None,
+    meeting_id: str | None = None,
+    approved_amount: str | None = None,
+    conditions: list[str] | None = None,
+) -> dict:
+    """Record a decision that a Gremium made in a meeting without a vote on the platform.
+
+    Only for an application in a vote state. Requires the right to record decisions.
+    `passed` fires the pass branch, `failed` the fail branch, with their actions and
+    mails; open votes of the application are cancelled. `meeting_date` is an ISO date,
+    not later than today. `yes`/`no`/`abstain` and `meeting_id` (a meeting of the
+    platform) are optional. A pass into an approved state needs `approved_amount`
+    (decimal string, not above the requested amount); `conditions` are optional.
+    Ask the user before you record a decision.
+    """
+    decision = (
+        params(approvedAmount=approved_amount, conditions=conditions)
+        if approved_amount is not None or conditions is not None
+        else None
+    )
+    return await api().post(
+        f"/applications/{application_id}/outside-decision",
+        json=params(
+            result=result,
+            meetingDate=meeting_date,
+            gremiumId=gremium_id,
+            yes=yes,
+            no=no,
+            abstain=abstain,
+            meetingId=meeting_id,
+            decision=decision,
+        ),
+    )
+
+
+@group.tool
+async def change_approved_amount(
+    application_id: str,
+    approved_amount: str,
+    reason: str,
+    decision_date: str,
+    gremium_id: str,
+) -> dict:
+    """Change the approved amount of an approved application; the state stays.
+
+    Requires the right to change approved amounts. `approved_amount` is a decimal
+    string, at least 0; it may be above the requested amount (tell the user). `reason`
+    holds 10 to 2000 characters. `decision_date` (ISO date, not later than today) and
+    `gremium_id` name the decision that allows the change. The applicant gets a mail
+    with the old and the new amount. 409 `application_not_approved` outside an
+    approved state. Ask the user before you change an amount.
+    """
+    return await api().post(
+        f"/applications/{application_id}/approved-amount",
+        json={
+            "approvedAmount": approved_amount,
+            "reason": reason,
+            "decisionDate": decision_date,
+            "gremiumId": gremium_id,
+        },
+    )
+
+
+@group.tool
+async def preview_application_type_change(application_id: str, type_id: str) -> dict:
+    """Show what a change of the Antragsart of an application to `type_id` does.
+
+    The answer lists the fields whose values move (`carried`), the required fields of the
+    new form that stay empty (`missing`) and the values that only the old version keeps
+    (`dropped`). With a missing field it lists the transitions back to the applicant
+    (`transitions`); `possible` is false when none fits. Requires the right to change
+    the type of an application.
+    """
+    return await api().get(
+        f"/applications/{application_id}/type-change", params=params(typeId=type_id)
+    )
+
+
+@group.tool
+async def change_application_type(
+    application_id: str,
+    type_id: str,
+    transition_id: str | None = None,
+    note: str | None = None,
+) -> dict:
+    """Change the Antragsart of a submitted application.
+
+    The change writes a new version in the form of the new type; the old version keeps
+    every value. When `preview_application_type_change` lists a missing field, pass one
+    of its `transitions` as `transition_id`: the change then sends the application back
+    to the applicant, the note names the missing fields, and `note` adds a message. Else
+    leave `transition_id` empty. 409 in the initial state or without a transition back.
+    Ask the user before you change the type.
+    """
+    return await api().post(
+        f"/applications/{application_id}/type-change",
+        json={"typeId": type_id, "transitionId": transition_id, "note": note},
     )
 
 
@@ -387,9 +532,7 @@ async def add_application_observer(application_id: str, email: str) -> dict:
     applicant address gives 422 `observer_is_applicant`, an address that observes
     already 409 `observer_exists`.
     """
-    return await api().post(
-        f"/applications/{application_id}/observers", json={"email": email}
-    )
+    return await api().post(f"/applications/{application_id}/observers", json={"email": email})
 
 
 @group.tool
@@ -406,9 +549,7 @@ async def get_application_links(application_id: str) -> dict:
 
 
 @group.tool
-async def set_application_predecessor(
-    application_id: str, predecessor_id: str | None
-) -> dict:
+async def set_application_predecessor(application_id: str, predecessor_id: str | None) -> dict:
     """Set, change or remove (`None`) the Vorgänger of an application.
 
     The caller needs the edit right on the application and on the Vorgänger. The
@@ -479,3 +620,57 @@ async def export_applications_xlsx(
 def register(mcp: FastMCP) -> None:
     """Register the applications tool group."""
     group.register(mcp)
+
+
+@group.tool
+async def create_application_new_version(application_id: str) -> dict:
+    """Create the new version ("Neue Fassung") of a denied or returned application.
+
+    The new draft has the type, the applicant and the answers of the old application
+    (no files) and names it. Submitting the draft closes the old application in the
+    state that the flow marks as the target for replaced applications. Only the
+    applicant and a holder of `application.manage` may; a state that offers no new
+    version answers 409 `new_version_not_allowed`. Returns `applicationId`.
+    """
+    return await api().post(f"/applications/{application_id}/new-version")
+
+
+@group.tool
+async def list_bulk_transitions(application_ids: list[str]) -> list[dict]:
+    """List the target states that every given application reaches by a transition.
+
+    Needs `application.manage` and `application.transition`, at most 100 ids. A target
+    with `approves` lists the requested amount of each application, which the bulk
+    fire approves. A transition onto an agenda is not offered.
+    """
+    return await api().post(
+        "/bulk/applications/transitions", json={"applicationIds": application_ids}
+    )
+
+
+@group.tool
+async def fire_bulk_transition(
+    application_ids: list[str], to_state_id: str, note: str | None = None
+) -> dict:
+    """Move every given application into `to_state_id`, each on its own.
+
+    Read the targets from `list_bulk_transitions`. The result lists each application
+    with `ok`, or with the code and the text of its error; one error does not stop the
+    others. An approved target approves each application with its requested amount.
+    """
+    return await api().post(
+        "/bulk/applications/transition",
+        json=params(applicationIds=application_ids, toStateId=to_state_id, note=note),
+    )
+
+
+@group.tool
+async def send_bulk_message(application_ids: list[str], body: str) -> dict:
+    """Add the same public comment to each given application (at most 100).
+
+    Each applicant reads the comment and gets the normal comment mail. The result lists
+    each application with `ok`, or with the code and the text of its error.
+    """
+    return await api().post(
+        "/bulk/applications/comments", json={"applicationIds": application_ids, "body": body}
+    )

@@ -48,9 +48,6 @@
   }
 
   <div class="mp__main">
-    @if (top(); as t) {
-      <app-todo-linked-list class="mp__linked" kind="agenda_item" headingId="mp-todos" [showTitle]="false" [targetId]="t.id" [lead]="applicationLead()" />
-    }
     <!-- On a phone an open vote takes the place of the text (spec 001461); the sheet stays
          alive behind it, so the editor keeps its state. -->
     @if (phoneVote(); as v) {
@@ -178,12 +175,8 @@
 <ng-template #votesTpl>
   @for (vote of votes(); track vote.id) {
     <ng-container [ngTemplateOutlet]="voteCardTpl" [ngTemplateOutletContext]="{ $implicit: vote }" />
-  }
-  @if (canAddVote() && top(); as t) {
-    <app-button class="mp__addVote" variant="tonal" [block]="true" (click)="voteDialog.emit(t)">
-      <app-icon name="plus" />
-      {{ (t.applicationId || t.planVersionId ? addVoteKey() : 'meetings.vote.addQuestion') | t }}
-    </app-button>
+  } @empty {
+    <app-empty-state icon="vote" shape="row" rows="1" [heading]="'voting.list.empty' | t" />
   }
 </ng-template>
 
@@ -217,17 +210,18 @@
 </ng-template>
 
 <app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'todos.meeting.sheet' | t" [(open)]="todosOpen">
+  <!-- One projected group, so the buttons join the head group of the close button. -->
   @if (todoList()?.canAct() || todoList()?.canLink()) {
-    <span sheet-actions class="mp__sheet-actions">
-      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.link' | t" (click)="todoList()?.linkOpen?.set(true)">
+    <ng-container ngProjectAs="[sheet-actions]">
+      <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.link' | t" (click)="todoList()?.linkOpen?.set(true)">
         <app-icon name="link" />
       </app-button>
       @if (todoList()?.canAct()) {
-        <app-button variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.add' | t" (click)="todoList()?.newOpen?.set(true)">
+        <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.add' | t" (click)="todoList()?.newOpen?.set(true)">
           <app-icon name="plus" />
         </app-button>
       }
-    </span>
+    </ng-container>
   }
   @if (todosOpen()) {
     <app-todo-linked-list
@@ -244,26 +238,93 @@
   }
 </app-side-sheet>
 
-<!-- Above the phone width a small tab at the end edge opens the votes for everybody but the
-     minute-taker, who has the vote button in the dock (spec 001460). -->
-@if (!phone() && showVotes() && !votesOpen() && dockVotes() === null) {
-  <button
-    type="button"
-    class="mp__edgeTab"
-    [class.mp__edgeTab--live]="!!openVote()"
-    [attr.aria-label]="'meetings.vote.count' | t"
-    [title]="'meetings.vote.count' | t"
-    (click)="votesOpen.set(true)"
-  >
-    <app-icon name="left" [size]="16" />
-    <app-icon name="vote" [size]="20" />
-    @if (votes().length) {
-      <span class="mp__edgeBadge num" aria-hidden="true">{{ votes().length }}</span>
+<!-- Above the phone width small tabs at the end edge open the sheets: the votes for everybody
+     but the minute-taker, who has the vote button in the dock (spec 001460), and the linked rows
+     of the item and the attendance (spec 001800). They stand one above the other. -->
+@if (!phone() && (showVoteTab() || showLinkTab() || showAttendanceTab())) {
+  <div class="mp__edgeTabs">
+    @if (showLinkTab()) {
+      <button
+        type="button"
+        class="mp__edgeTab mp__edgeTab--links"
+        [attr.aria-label]="'todos.linked.title' | t"
+        [title]="'todos.linked.title' | t"
+        (click)="linksOpen.set(true)"
+      >
+        <app-icon name="left" [size]="16" />
+        <app-icon name="link" [size]="20" />
+      </button>
     }
-  </button>
+    @if (showVoteTab()) {
+      <button
+        type="button"
+        class="mp__edgeTab mp__edgeTab--votes"
+        [class.mp__edgeTab--live]="!!openVote()"
+        [attr.aria-label]="'meetings.vote.count' | t"
+        [title]="'meetings.vote.count' | t"
+        (click)="votesOpen.set(true)"
+      >
+        <app-icon name="left" [size]="16" />
+        <app-icon name="vote" [size]="20" />
+        @if (votes().length) {
+          <span class="mp__edgeBadge num" aria-hidden="true">{{ votes().length }}</span>
+        }
+      </button>
+    }
+    @if (showAttendanceTab()) {
+      <button
+        type="button"
+        class="mp__edgeTab mp__edgeTab--attendance"
+        [attr.aria-label]="'meetings.attendance.title' | t"
+        [title]="'meetings.attendance.title' | t"
+        (click)="panel.set('attendance')"
+      >
+        <app-icon name="left" [size]="16" />
+        <app-icon name="users" [size]="20" />
+      </button>
+    }
+  </div>
 }
 
+<!-- The linked rows of the open item: the Antrag or the Haushaltsplan first, then the links
+     (spec 001800). -->
+<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'todos.linked.title' | t" [(open)]="linksOpen">
+  <!-- One projected group, so the buttons join the head group of the close button. -->
+  @if (topLinks()?.canAct() || topLinks()?.canLink()) {
+    <ng-container ngProjectAs="[sheet-actions]">
+      <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.link' | t" (click)="topLinks()?.linkOpen?.set(true)">
+        <app-icon name="link" />
+      </app-button>
+      @if (topLinks()?.canAct()) {
+        <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.add' | t" (click)="topLinks()?.newOpen?.set(true)">
+          <app-icon name="plus" />
+        </app-button>
+      }
+    </ng-container>
+  }
+  @if (linksOpen() && top(); as t) {
+    <app-todo-linked-list
+      #topLinks
+      kind="agenda_item"
+      headingId="mp-top-links"
+      [showTitle]="false"
+      [targetId]="t.id"
+      [gremiumId]="m.gremiumId"
+      [linkLabel]="t.title ?? ''"
+      [lead]="applicationLead()"
+      [emptyHeading]="'todos.linked.empty' | t"
+      [headActions]="true"
+    />
+  }
+</app-side-sheet>
+
 <app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'meetings.vote.count' | t" [(open)]="votesOpen">
+  <!-- "Abstimmung vorbereiten" stands in the head, in one group with the close button (spec 001802). -->
+  @if (canAddVote() && top(); as t) {
+    <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="addVoteLabel() | t" (click)="voteDialog.emit(t)">
+      <app-icon name="plus" />
+    </app-button>
+  }
   @if (votesOpen()) {
     <div class="mp__votes mp__votes--sheet">
       <ng-container [ngTemplateOutlet]="votesTpl" />
@@ -275,32 +336,60 @@
      the text, so the tool applies at the cursor. -->
 <ng-template #formatTpl>
   @if (sheet(); as ts) {
-    @for (tool of ts.tools; track tool.format) {
-      <button
-        type="button"
-        class="mp__tool"
-        [class.mp__tool--on]="ts.activeFormats().has(tool.format)"
-        [attr.aria-pressed]="ts.activeFormats().has(tool.format)"
-        [attr.aria-label]="tool.label | t"
+    @for (group of ts.toolGroups; track $index) {
+      <app-button-group>
+        @for (tool of group; track tool.format) {
+          <app-button
+            variant="tonal"
+            [iconOnly]="true"
+            [ariaPressed]="ts.activeFormats().has(tool.format)"
+            [ariaLabel]="tool.label | t"
+            [title]="tool.label | t"
+            (pointerdown)="$event.preventDefault()"
+            (mousedown)="$event.preventDefault()"
+            (click)="ts.toggleFormat(tool.format)"
+          ><app-icon [name]="tool.icon" /></app-button>
+        }
+      </app-button-group>
+    }
+    <app-button-group>
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="'meetings.editor.table' | t"
+        [title]="'meetings.editor.table' | t"
         (pointerdown)="$event.preventDefault()"
         (mousedown)="$event.preventDefault()"
-        (click)="ts.toggleFormat(tool.format)"
-      >
-        <app-icon [name]="tool.icon" [size]="20" />
-      </button>
-    }
-    <button type="button" class="mp__tool" [attr.aria-label]="'meetings.editor.table' | t" (pointerdown)="$event.preventDefault()" (mousedown)="$event.preventDefault()" (click)="ts.insertTable()">
-      <app-icon name="table" [size]="20" />
-    </button>
-    <button type="button" class="mp__tool" [attr.aria-label]="'meetings.editor.image' | t" (pointerdown)="$event.preventDefault()" (mousedown)="$event.preventDefault()" (click)="ts.insertImage()">
-      <app-icon name="image" [size]="20" />
-    </button>
-    <button type="button" class="mp__tool" [attr.aria-label]="'meetings.editor.document' | t" (pointerdown)="$event.preventDefault()" (mousedown)="$event.preventDefault()" (click)="ts.insertDocument()">
-      <app-icon name="file" [size]="20" />
-    </button>
-    <button type="button" class="mp__tool" [attr.aria-label]="'meetings.editor.timeNote' | t" (pointerdown)="$event.preventDefault()" (mousedown)="$event.preventDefault()" (click)="ts.insertTimeNote()">
-      <app-icon name="clock" [size]="20" />
-    </button>
+        (click)="ts.insertTable()"
+      ><app-icon name="table" /></app-button>
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="'meetings.editor.image' | t"
+        [title]="'meetings.editor.image' | t"
+        (pointerdown)="$event.preventDefault()"
+        (mousedown)="$event.preventDefault()"
+        (click)="ts.insertImage()"
+      ><app-icon name="image" /></app-button>
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="'meetings.editor.document' | t"
+        [title]="'meetings.editor.document' | t"
+        (pointerdown)="$event.preventDefault()"
+        (mousedown)="$event.preventDefault()"
+        (click)="ts.insertDocument()"
+      ><app-icon name="file" /></app-button>
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="'meetings.editor.timeNote' | t"
+        [title]="'meetings.editor.timeNote' | t"
+        (pointerdown)="$event.preventDefault()"
+        (mousedown)="$event.preventDefault()"
+        (click)="ts.insertTimeNote()"
+      ><app-icon name="clock" /></app-button>
+    </app-button-group>
   }
 </ng-template>
 
@@ -335,10 +424,14 @@
 
 <!-- The QR code and the beamer as icon buttons of the dock on a wider screen. -->
 <ng-template #showTpl>
-  <app-join-qr [meeting]="meeting()" [iconOnly]="true" [(open)]="qrOpen" />
-  @if (wide() && meeting().status !== 'closed' && meeting().canManage) {
-    <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.beamer.enter' | t" (click)="toggleBeamer.emit()">
-      <app-icon name="monitor" />
-    </app-button>
-  }
+  <ng-container btnGrpContent>
+    @if (meeting().publicJoin && meeting().canManage && meeting().status !== 'closed') {
+      <app-join-qr [meeting]="meeting()" [iconOnly]="true" [(open)]="qrOpen" />
+    }
+    @if (wide() && meeting().status !== 'closed' && meeting().canManage) {
+      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.beamer.enter' | t" (click)="toggleBeamer.emit()">
+        <app-icon name="monitor" />
+      </app-button>
+    }
+  </ng-container>
 </ng-template>

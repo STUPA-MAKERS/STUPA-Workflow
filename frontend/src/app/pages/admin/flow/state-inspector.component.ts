@@ -5,6 +5,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   IconComponent,
   InputComponent,
   MoveButtonsComponent,
@@ -39,6 +40,7 @@ export interface GuardPriorityRow {
     FormsModule,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     InputComponent,
     SelectFieldComponent,
@@ -65,6 +67,8 @@ export class StateInspectorComponent {
   readonly terminalChange = output<boolean>();
   /** The flag `Bewilligt` or `Abgelehnt` of a normal state (spec 000571). */
   readonly outcomeChange = output<{ outcome: 'approved' | 'denied'; on: boolean }>();
+  /** "Ziel für ersetzte Anträge" (001722) was switched. */
+  readonly replacedTargetChange = output<boolean>();
   readonly kindChange = output<string>();
   readonly gremiumChange = output<string>();
   readonly gremiumSourceChange = output<'fixed' | 'budget'>();

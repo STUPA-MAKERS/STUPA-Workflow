@@ -5,7 +5,7 @@ import { TodosApiService, type TodoBoardSummary } from '@core/api/todos.service'
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, ConfirmDialogComponent, DialogComponent, IconComponent, ToastService } from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, ConfirmDialogComponent, DialogComponent, IconComponent, ToastService } from '@stupa-makers/ui-kit';
 
 /**
  * "Archivierte Boards" (spec 001068): the archived free boards that the person reads. A
@@ -16,7 +16,7 @@ import { ButtonComponent, ConfirmDialogComponent, DialogComponent, IconComponent
   selector: 'app-todo-archived-boards',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonComponent, ConfirmDialogComponent, DialogComponent, IconComponent, TranslatePipe],
+  imports: [ButtonComponent, ButtonGroupComponent, ConfirmDialogComponent, DialogComponent, IconComponent, TranslatePipe],
   templateUrl: './todo-archived-boards.component.html',
   styleUrl: './todo-archived-boards.component.scss',
 })

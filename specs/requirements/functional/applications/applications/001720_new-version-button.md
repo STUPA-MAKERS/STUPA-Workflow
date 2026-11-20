@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - backend/app/modules/applications/service/new_version.py
+  - backend/app/modules/applications/links_router.py
+  - frontend/src/app/features/apply/status-timeline.component.ts
 scope:
   - backend/app/modules/applications
   - frontend/src/app/pages/applications

@@ -1,0 +1,196 @@
+<div class="gr">
+  <section class="gr__pane" aria-labelledby="gr-title">
+    <h1 id="gr-title" class="sr-only">{{ 'graph.title' | t }}</h1>
+    <div class="gr__float">
+      <div class="gr__bar">
+        <div class="gr__search" role="search">
+          <app-search-pill
+            size="md"
+            [clearable]="true"
+            [placeholder]="'graph.search.placeholder' | t"
+            [label]="'graph.search.label' | t"
+            [value]="searchText()"
+            (valueChange)="setSearch($event)"
+          />
+        </div>
+        <div class="gr__chips" role="group" [attr.aria-label]="'graph.filter.group' | t">
+          <app-filter-select
+            class="gr__chip"
+            icon="funnel"
+            [label]="'graph.filter.kind' | t"
+            [multiple]="true"
+            [options]="kindOptions()"
+            [values]="filters().kinds"
+            (valuesChange)="setKinds($event)"
+            [active]="filters().kinds.length > 0"
+          />
+          <app-range-chip
+            kind="date"
+            [label]="'graph.filter.period' | t"
+            [from]="filters().from"
+            [to]="filters().to"
+            (applied)="setPeriod($event)"
+          />
+          <app-filter-select
+            class="gr__chip"
+            icon="landmark"
+            [label]="'graph.filter.gremium' | t"
+            [options]="gremiumOptions()"
+            [value]="filters().gremiumId"
+            (valueChange)="setGremium($event)"
+            [text]="gremiumText()"
+            [active]="filters().gremiumId !== ''"
+          />
+          <app-filter-select
+            class="gr__chip"
+            icon="link"
+            [label]="'graph.filter.relations' | t"
+            [options]="relationOptions()"
+            [value]="filters().relations"
+            (valueChange)="setRelations($event)"
+            [text]="relationsText()"
+            [active]="filters().relations !== 'links'"
+            unsetValue="all"
+          />
+          <button
+            type="button"
+            class="chip gr__switch"
+            data-testid="gr-single"
+            [class.on]="filters().single"
+            [attr.aria-pressed]="filters().single"
+            (click)="toggleSingle()"
+          >
+            {{ 'graph.filter.single' | t }}
+          </button>
+          <button
+            type="button"
+            class="chip gr__switch"
+            data-testid="gr-no-access"
+            [class.on]="filters().noAccess"
+            [attr.aria-pressed]="filters().noAccess"
+            (click)="toggleNoAccess()"
+          >
+            {{ 'graph.filter.noAccess' | t }}
+          </button>
+          @if (filtered()) {
+            <app-button-group>
+              <app-button variant="text" size="sm" data-testid="gr-reset" (click)="reset()">
+                <app-icon name="reset" />
+                {{ 'graph.filter.reset' | t }}
+              </app-button>
+            </app-button-group>
+          }
+        </div>
+      </div>
+      @if (!phone()) {
+        @if (chosen(); as c) {
+          <aside class="gr__panel" aria-labelledby="gr-panel-title" [attr.data-kind]="c.node.kind">
+            <header class="gr__panelHead">
+              <span class="gr__mark" [class.gr__mark--muted]="!c.node.accessible">
+                <app-icon [name]="c.icon" [size]="18" />
+              </span>
+              <ng-container *ngTemplateOutlet="action; context: { $implicit: c, close: true }" />
+            </header>
+            <div class="gr__panelText">
+              <h2 id="gr-panel-title" class="gr__panelTitle">{{ c.title }}</h2>
+              <ng-container *ngTemplateOutlet="lines; context: { $implicit: c }" />
+            </div>
+          </aside>
+        }
+      }
+      @if (drawing() && (growing() || cursor())) {
+        <div class="gr__foot">
+          @if (growing()) {
+            <p class="gr__growing gr__pill" role="status">{{ 'graph.growing' | t }}</p>
+          } @else {
+            <div class="gr__more gr__pill">
+              <app-button-group>
+                <app-button variant="text" size="sm" data-testid="gr-more" (click)="loadMore()">
+                  <app-icon name="down" />
+                  {{ 'graph.loadMore' | t }}
+                </app-button>
+              </app-button-group>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="gr__body" [attr.aria-busy]="loading() || null">
+      @if (loading()) {
+        <div class="gr__skel skel-in">
+          <app-skeleton variant="items" [count]="8" [lead]="true" [grouped]="true" [label]="'graph.loading' | t" />
+        </div>
+      } @else if (error()) {
+        <app-load-error [message]="'graph.loadError' | t" (retry)="retry()" />
+      } @else if (empty()) {
+        @if (filtered()) {
+          <app-empty-state icon="searchOff" [heading]="'graph.emptyFiltered' | t" />
+        } @else {
+          <app-empty-state icon="shapes" [heading]="'graph.empty' | t" [body]="'graph.emptyBody' | t" />
+        }
+      } @else {
+        <app-graph-canvas
+          class="gr__canvas"
+          [nodes]="canvasNodes()"
+          [lines]="graph().lines"
+          [selected]="selected()"
+          [label]="canvasLabel()"
+          [focusAt]="focusAt()"
+          [edge]="80"
+          (chosen)="choose($event)"
+        />
+      }
+    </div>
+  </section>
+</div>
+
+<!-- On a phone the chosen element shows in a sheet. -->
+@if (phone()) {
+  <app-side-sheet
+    side="bottom"
+    [heading]="sheetRow()?.title ?? ''"
+    [open]="chosen() !== null"
+    (openChange)="$event ? null : choose(null)"
+  >
+    @if (sheetRow(); as c) {
+      <div class="gr__sheet">
+        <div class="gr__sheetHead" [attr.data-kind]="c.node.kind">
+          <span class="gr__mark" [class.gr__mark--muted]="!c.node.accessible">
+            <app-icon [name]="c.icon" [size]="18" />
+          </span>
+          <div class="gr__panelText">
+            <ng-container *ngTemplateOutlet="lines; context: { $implicit: c }" />
+          </div>
+        </div>
+        <ng-container *ngTemplateOutlet="action; context: { $implicit: c }" />
+      </div>
+    }
+  </app-side-sheet>
+}
+
+<ng-template #lines let-c>
+  <p class="gr__panelSub">{{ facts(c) }}</p>
+  @if (dateLine(c); as day) {
+    <p class="gr__panelSub">{{ day }}</p>
+  }
+  @if (!c.route && c.node.granted) {
+    <p class="gr__hint">{{ 'graph.panel.granted' | t }}</p>
+  }
+</ng-template>
+
+<ng-template #action let-c let-close="close">
+  <app-button-group class="gr__actions" [main]="true">
+    @if (c.route; as to) {
+      <a class="gr__open" appButton="fill" [routerLink]="to.path" [queryParams]="to.query">
+        {{ 'graph.panel.open' | t }}
+        <app-icon name="arrow" />
+      </a>
+    }
+    @if (close) {
+      <app-button [iconOnly]="true" [ariaLabel]="'graph.panel.close' | t" (click)="choose(null)">
+        <app-icon name="x" />
+      </app-button>
+    }
+  </app-button-group>
+</ng-template>
