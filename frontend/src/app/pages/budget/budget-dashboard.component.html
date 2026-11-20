@@ -488,22 +488,8 @@
     } @else {
       <div class="bd__actions">
         <app-button-group>
-          <!-- § 000670: the actions of a detail head are icon buttons, the rest is in the menu. -->
-          @if (canExport()) {
-            <app-button
-              variant="text"
-              [iconOnly]="true"
-              [ariaLabel]="'budget.dash.export' | t"
-              [title]="'budget.dash.export' | t"
-              [loading]="exporting()"
-              data-testid="bd-export"
-              (click)="onExport()"
-            >
-              <app-icon name="download" />
-            </app-button>
-          }
           @if (moreSections().length) {
-            <app-row-menu class="bd__more" [sections]="moreSections()" (selected)="onAction($event)" />
+            <app-row-menu class="bd__more" data-testid="bd-more" [sections]="moreSections()" (selected)="onAction($event)" />
           }
         </app-button-group>
       </div>

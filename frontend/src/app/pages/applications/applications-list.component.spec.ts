@@ -463,6 +463,7 @@ describe('ApplicationsListComponent', () => {
       await settle();
       const bar = screen.getByTestId('apps-selection');
       expect(bar).toHaveTextContent('2 ausgewählt');
+      expect(screen.getByTestId('apps-select').querySelector('button')).toHaveAttribute('aria-pressed', 'true');
 
       await userEvent.click(within(bar).getByRole('button', { name: 'Status setzen' }));
       const options = http.expectOne((r) => r.url === '/api/bulk/applications/transitions');
@@ -947,7 +948,7 @@ describe('ApplicationsListComponent', () => {
       try {
         const { go, http, cmp } = await start();
         await go('/applications?state=s1&state=s2&q=fest&sort=amount&order=asc');
-        await userEvent.click(screen.getByRole('button', { name: 'Exportieren' }));
+        expect(cmp.moreSections()[0].items.map((i) => i.id)).toEqual(['export']);
         cmp.onExport();
         const req = http.expectOne((r) => r.url === '/api/applications/export.xlsx');
         const p = req.request.params;
@@ -973,8 +974,9 @@ describe('ApplicationsListComponent', () => {
     });
 
     it('hides the export without the right', async () => {
-      await start('/applications', { perms: ['application.read'] });
-      expect(screen.queryByRole('button', { name: 'Exportieren' })).not.toBeInTheDocument();
+      const { cmp } = await start('/applications', { perms: ['application.read'] });
+      expect(cmp.moreSections()).toEqual([]);
+      expect(screen.queryByTestId('apps-more')).not.toBeInTheDocument();
     });
 
     it('exports the archived rows when the list shows them', async () => {
@@ -982,7 +984,7 @@ describe('ApplicationsListComponent', () => {
       try {
         const { go, http, cmp } = await start();
         await go('/applications?archived=all');
-        expect(screen.getByRole('button', { name: 'Exportieren' })).toBeInTheDocument();
+        expect(cmp.moreSections().length).toBe(1);
         cmp.onExport();
         const req = http.expectOne((r) => r.url === '/api/applications/export.xlsx');
         expect(req.request.params.get('archived')).toBe('all');
@@ -995,9 +997,9 @@ describe('ApplicationsListComponent', () => {
     /** A call from elsewhere (the phone menu) sends nothing either. */
     it('hides the export while mine is set', async () => {
       const { go, cmp, http } = await start();
-      expect(screen.getByRole('button', { name: 'Exportieren' })).toBeInTheDocument();
+      expect(screen.getByTestId('apps-more')).toBeInTheDocument();
       await go('/applications?mine=true');
-      expect(screen.queryByRole('button', { name: 'Exportieren' })).not.toBeInTheDocument();
+      expect(screen.queryByTestId('apps-more')).not.toBeInTheDocument();
       cmp.onExport();
       http.expectNone((r) => r.url === '/api/applications/export.xlsx');
     });

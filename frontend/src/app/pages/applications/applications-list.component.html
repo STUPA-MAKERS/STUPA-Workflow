@@ -10,16 +10,16 @@
               (selected)="onHeaderMenu($event)"
             />
           } @else {
-            @if (exportShown()) {
+            @if (canBulk()) {
               <app-button
                 variant="text"
                 [iconOnly]="true"
-                [loading]="exporting()"
-                [ariaLabel]="'applications.list.export' | t"
-                (click)="onExport()"
-              >
-                <app-icon name="download" />
-              </app-button>
+                data-testid="apps-select"
+                [ariaLabel]="'applications.bulk.start' | t"
+                [title]="'applications.bulk.start' | t"
+                [ariaPressed]="selecting()"
+                (click)="toggleSelecting()"
+              ><app-icon name="boxok" /></app-button>
             }
             <app-row-menu
               icon="sort"
@@ -27,15 +27,13 @@
               [sections]="sortSections()"
               (selected)="onHeaderMenu($event)"
             />
-            @if (selectSections().length) {
-              <app-button
-                variant="text"
-                [iconOnly]="true"
-                data-testid="apps-select"
-                [ariaLabel]="'applications.bulk.start' | t"
-                [title]="'applications.bulk.start' | t"
-                (click)="selecting.set(true)"
-              ><app-icon name="boxok" /></app-button>
+            @if (moreSections().length) {
+              <app-row-menu
+                data-testid="apps-more"
+                [label]="'applications.list.more' | t"
+                [sections]="moreSections()"
+                (selected)="onHeaderMenu($event)"
+              />
             }
           }
         </ng-container>

@@ -1693,6 +1693,12 @@ describe('InvoicesComponent (multi-select)', () => {
     expect(c.selectedCount()).toBe(0);
     c.stopSelecting();
     expect(c.selecting()).toBe(false);
+    c.toggleSelecting();
+    expect(c.selecting()).toBe(true);
+    c.onRowActivate(c.items()[0]);
+    c.toggleSelecting();
+    expect(c.selecting()).toBe(false);
+    expect(c.selectedCount()).toBe(0);
   });
 
   it('starts with a row on a long press or a swipe, and toggles it inside the selection', async () => {
@@ -1711,7 +1717,12 @@ describe('InvoicesComponent (multi-select)', () => {
 
   it('offers the selection in the menu of a phone and lets no reader select', async () => {
     const { c } = await setup();
-    expect(c.phoneMenu()[0].items.map((i: { id: string }) => i.id)).toEqual(['import', 'select']);
+    expect(c.phoneMenu().flatMap((s: { items: { id: string }[] }) => s.items.map((i) => i.id))).toEqual([
+      'import',
+      'select',
+      'refresh',
+    ]);
+    expect(c.moreMenu()[0].items.map((i: { id: string }) => i.id)).toEqual(['import']);
     c.onHeaderMenu({ id: 'select', label: '' });
     expect(c.selecting()).toBe(true);
     TestBed.resetTestingModule();

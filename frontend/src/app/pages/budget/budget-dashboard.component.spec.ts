@@ -498,12 +498,14 @@ describe('BudgetDashboardComponent', () => {
       expect(view.container.querySelectorAll('#bd-title')).toHaveLength(1);
       expect(view.container.querySelector('.sheet-bar__kicker')).toBeNull();
       const actions = bar.querySelector(':scope > .sheet-bar__actions > .bd__actions') as HTMLElement;
-      // § 000670: one icon button for the export, "Buchungen ansehen" in the ⋮ menu, no text button.
-      const exportButton = within(actions).getByRole('button', { name: /Exportieren/ });
-      expect(exportButton.textContent?.trim()).toBe('');
+      // Spec 001812: the export and "Buchungen ansehen" sit in the ⋮ menu, no button of their own.
+      expect(within(actions).queryByRole('button', { name: /Exportieren/ })).toBeNull();
       expect(within(actions).queryByRole('button', { name: 'Buchungen ansehen' })).toBeNull();
       expect(actions.querySelector('app-row-menu')).not.toBeNull();
-      expect(view.fixture.componentInstance.moreSections()[0].items.map((i) => i.label)).toEqual(['Buchungen ansehen']);
+      expect(view.fixture.componentInstance.moreSections()[0].items.map((i) => i.label)).toEqual([
+        'Exportieren',
+        'Buchungen ansehen',
+      ]);
       expect(view.container.querySelector('.bd__sheetBody')?.firstElementChild).toHaveClass('bd__figs');
     });
 
@@ -532,7 +534,7 @@ describe('BudgetDashboardComponent', () => {
     it('opens the bookings of the cost centre and the year from the menu (§ 001872)', async () => {
       const view = await setup({ apps: [app({ applicationId: 'a-1' })] });
       const nav = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-      view.fixture.componentInstance.onAction(view.fixture.componentInstance.moreSections()[0].items[0]);
+      view.fixture.componentInstance.onAction({ id: 'bookings', label: '' });
       expect(nav).toHaveBeenCalledWith(['/expenses'], { queryParams: { budget: 'b-vs', fiscalYear: 'fy-1' } });
     });
 
@@ -569,7 +571,7 @@ describe('BudgetDashboardComponent', () => {
       jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
       jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
       const { c, http } = await setup();
-      screen.getByRole('button', { name: /Exportieren/ }).click();
+      c.onAction({ id: 'export', label: '' });
       expect(c.exporting()).toBe(true);
       c.onExport();
       const req = http.expectOne((r) => r.url.includes('/budget/export.xlsx'));
@@ -1708,7 +1710,11 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
       expect(screen.queryByRole('heading', { name: 'Kostenstelle' })).toBeNull();
       expect(screen.getByRole('heading', { name: 'Auslastung' })).toBeInTheDocument();
       await userEvent.click(within(view.container.querySelector('.bd__head') as HTMLElement).getByRole('button', { name: 'Weitere Aktionen' }));
-      expect((await screen.findAllByRole('menuitem')).map((i) => i.textContent?.trim())).toEqual(['Buchungen ansehen', 'Kostenstelle löschen']);
+      expect((await screen.findAllByRole('menuitem')).map((i) => i.textContent?.trim())).toEqual([
+        'Exportieren',
+        'Buchungen ansehen',
+        'Kostenstelle löschen',
+      ]);
     });
 
     it('§F/finance/budget/000877: locks the key and the name of a Kostenstelle in a budget with a Haushaltsplan', async () => {

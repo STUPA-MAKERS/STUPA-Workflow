@@ -359,8 +359,9 @@ export class ExpensesComponent implements OnDestroy {
     ];
   });
 
-  /** The page actions in the ⋮ menu of the header. On a phone the sort, the export and
-   *  "Mehrere auswählen" join them; a wider screen has a button for each (spec 001811). */
+  /** The page actions in the ⋮ menu of the header: the transfer and the export (spec 001812).
+   *  On a phone the sort and "Mehrere auswählen" join them; a wider screen has a button for
+   *  each (spec 001811). */
   readonly headerMenu = computed<RowMenuSection[]>(() => {
     const manage = this.canManage();
     const bookings = this.tab() === 'bookings';
@@ -374,27 +375,23 @@ export class ExpensesComponent implements OnDestroy {
       label: this.i18n.translate('expenses.bulk.start'),
       icon: 'check',
     };
+    const exportItem: RowMenuItem = {
+      id: 'export',
+      label: this.i18n.translate('expenses.exportAction'),
+      icon: 'download',
+    };
     const items: RowMenuItem[] = [
       ...(manage ? [transfer] : []),
-      ...(manage && bookings && this.phone() ? [select] : []),
+      ...(this.canExport() && bookings ? [exportItem] : []),
     ];
-    return [
-      ...(items.length ? [{ items }] : []),
-      ...(this.phone() ? this.phoneSections(bookings) : []),
-    ];
-  });
-
-  /** The sections only a phone adds to the header menu: the sort, the export and "Aktualisieren". */
-  private phoneSections(bookings: boolean): RowMenuSection[] {
-    const exportSection: RowMenuSection = {
-      items: [{ id: 'export', label: this.i18n.translate('expenses.export'), icon: 'download' }],
-    };
+    if (!this.phone()) return items.length ? [{ items }] : [];
     return [
       ...(bookings ? this.sortSections() : []),
-      ...(this.canExport() ? [exportSection] : []),
+      ...(items.length ? [{ items }] : []),
+      ...(manage && bookings ? [{ items: [select] }] : []),
       refreshMenuSection((key) => this.i18n.translate(key)),
     ];
-  }
+  });
 
   onHeaderMenu(item: RowMenuItem): void {
     if (isRefreshItem(item)) return reloadLikePull(() => this.refreshList());
@@ -1074,6 +1071,12 @@ export class ExpensesComponent implements OnDestroy {
   startSelecting(): void {
     if (!this.canManage()) return;
     this.selecting.set(true);
+  }
+
+  /** The head button "Mehrere auswählen" is a toggle: a second press ends the selection (spec 001811). */
+  toggleSelecting(): void {
+    if (this.selecting()) this.stopSelecting();
+    else this.startSelecting();
   }
 
   stopSelecting(): void {

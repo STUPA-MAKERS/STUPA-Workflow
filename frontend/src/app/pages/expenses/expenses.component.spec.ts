@@ -2857,7 +2857,7 @@ describe('ExpensesComponent (list/detail)', () => {
 
   it('builds the header menu from the rights, the view and the viewport', () => {
     const { cmp } = build();
-    expect(cmp.headerMenu().flatMap((s) => s.items.map((i) => i.id))).toEqual(['transfer']);
+    expect(cmp.headerMenu().flatMap((s) => s.items.map((i) => i.id))).toEqual(['transfer', 'export']);
     TestBed.resetTestingModule();
     setViewport(PHONE);
     const phone = build();
@@ -3225,6 +3225,12 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(cmp.selecting()).toBe(false);
     expect(cmp.selectedCount()).toBe(0);
     expect(cmp.bulkReassignOpen()).toBe(false);
+    cmp.toggleSelecting();
+    expect(cmp.selecting()).toBe(true);
+    cmp.toggleSelect('e-2', true);
+    cmp.toggleSelecting();
+    expect(cmp.selecting()).toBe(false);
+    expect(cmp.selectedCount()).toBe(0);
     TestBed.resetTestingModule();
     const reader = build({ perms: ['budget.view'] });
     reader.cmp.startSelecting();
