@@ -155,7 +155,9 @@
       <div class="bd__top">
         <div class="bd__topRow">
           <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
-          <ng-container *ngTemplateOutlet="actions" />
+          @if (phone()) {
+            <ng-container *ngTemplateOutlet="actions" />
+          }
         </div>
         <ng-container *ngTemplateOutlet="modes" />
         <div class="bd__chips">
@@ -181,6 +183,9 @@
           >
             <app-icon name="grid" [size]="15" /><span class="chip__text">{{ 'budget.overview.button' | t }}</span>
           </button>
+          @if (!phone()) {
+            <div class="bd__chipActions"><ng-container *ngTemplateOutlet="actions" /></div>
+          }
         </div>
       </div>
     }

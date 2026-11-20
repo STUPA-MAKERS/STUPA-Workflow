@@ -127,12 +127,17 @@
       <div class="bd__top">
         <div class="bd__topRow">
           <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
-          <ng-container *ngTemplateOutlet="actions" />
+          @if (phone()) {
+            <ng-container *ngTemplateOutlet="actions" />
+          }
         </div>
         <ng-container *ngTemplateOutlet="modes" />
         <app-search-pill size="lg" [placeholder]="'budget.dash.search' | t" [(value)]="query" />
         <div class="bd__chips">
           <ng-container *ngTemplateOutlet="pickers" />
+          @if (!phone()) {
+            <div class="bd__chipActions"><ng-container *ngTemplateOutlet="actions" /></div>
+          }
         </div>
       </div>
     }
