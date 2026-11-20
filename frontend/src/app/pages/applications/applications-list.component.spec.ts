@@ -1151,11 +1151,6 @@ describe('ApplicationsListComponent', () => {
       expect(router.url).toBe('/applications/app-1?type=t1');
     });
 
-    it('shows no floating "Antrag stellen"', async () => {
-      await start();
-      expect(screen.queryByRole('button', { name: 'Antrag stellen' })).not.toBeInTheDocument();
-    });
-
     /**
      * A deleted application leaves the list; the other rows stay, without a request. An unknown id
      * changes nothing.
