@@ -431,8 +431,15 @@ export class ChatComponent {
     });
     afterNextRender(() => {
       const observer = new ResizeObserver(() => this.follow());
-      observer.observe(this.log().nativeElement);
-      this.destroyRef.onDestroy(() => observer.disconnect());
+      const log = this.log().nativeElement;
+      observer.observe(log);
+      // A native listener: a template `(scroll)` would check the app on each event (002160).
+      const scroll = (): void => this.onScroll();
+      log.addEventListener('scroll', scroll, { passive: true });
+      this.destroyRef.onDestroy(() => {
+        observer.disconnect();
+        log.removeEventListener('scroll', scroll);
+      });
     });
   }
 
@@ -583,7 +590,7 @@ export class ChatComponent {
     this.markSeen();
   }
 
-  protected onScroll(): void {
+  private onScroll(): void {
     const el = this.log().nativeElement;
     this.stick = el.scrollHeight - el.scrollTop - el.clientHeight <= BOTTOM_SLACK;
     this.atBottom.set(this.stick);

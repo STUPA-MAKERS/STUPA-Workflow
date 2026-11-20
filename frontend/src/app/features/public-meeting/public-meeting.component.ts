@@ -70,7 +70,6 @@ export function normalizeJoinCode(raw: string): string {
     SiteFooterComponent,
     LanguageSelectComponent,
   ],
-  host: { '(window:scroll)': 'onScroll()' },
   templateUrl: './public-meeting.component.html',
   styleUrl: './public-meeting.component.scss',
 })
@@ -178,6 +177,10 @@ export class PublicMeetingComponent {
   });
 
   constructor() {
+    // A native listener: a host `window:scroll` would check the app on each event (002160).
+    const scroll = (): void => this.onScroll();
+    window.addEventListener('scroll', scroll, { passive: true });
+    this.destroyRef.onDestroy(() => window.removeEventListener('scroll', scroll));
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       const code = normalizeJoinCode(pm.get('code') ?? '');
       this.renaming.set(false);
@@ -247,7 +250,7 @@ export class PublicMeetingComponent {
     return weekdayDate(at, this.i18n.formatLocale(), { time: !!time }) || isoDate;
   }
 
-  protected onScroll(): void {
+  private onScroll(): void {
     this.scrolled.set(window.scrollY > 0);
   }
 }
