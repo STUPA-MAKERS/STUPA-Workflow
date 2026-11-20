@@ -103,8 +103,8 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: python3 scripts/check_functional.py
-      # Service commits, fake sessions, import exceptions and the own styles of the frontend
-      # can only go down (specs 000640, 000642, 000651, ui-kit 002213).
+      # Service commits, fake sessions and import exceptions can only go down
+      # (specs 000640, 000642, 000651).
       - run: python3 scripts/check_ratchets.py
       # Images and actions are pinned, and a build download repeats (specs 000978, 000981).
       - run: python3 scripts/check_build_pins.py
