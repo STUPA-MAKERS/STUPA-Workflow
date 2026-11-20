@@ -61,7 +61,8 @@
                     class="act__row"
                     role="listitem"
                     [title]="title(e)"
-                    [link]="e.url"
+                    [link]="path(e)"
+                    [linkQueryParams]="query(e)"
                     [wrap]="phone()"
                     [subWrap]="phone()"
                   >

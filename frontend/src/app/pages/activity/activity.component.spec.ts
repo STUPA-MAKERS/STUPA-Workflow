@@ -14,7 +14,7 @@ import {
 import type { TranslationKey } from '@core/i18n/translations';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { retryLoadError } from '../../../testing/load-error';
-import { ActivityComponent, KIND_ICON, groupByDay } from './activity.component';
+import { ActivityComponent, KIND_ICON, groupByDay, splitUrl } from './activity.component';
 
 const NOW = new Date();
 const at = (daysAgo: number, hour = 10): string =>
@@ -110,6 +110,7 @@ describe('ActivityComponent', () => {
             entry({ isNew: true }),
             entry({ id: 'e2', at: at(1), itemKind: 'application', itemTitle: null, change: 'application.edited', actor: { kind: 'system' } }),
             entry({ id: 'e3', at: at(9), itemKind: 'ticket', change: 'ticket.status', status: 'new', actor: { kind: 'person', name: null } }),
+            entry({ id: 'e4', at: at(9), itemTitle: 'Ersti-Gruppe anlegen', url: '/todos?card=c9', change: 'todo.archived' }),
           ]),
         ),
     ]);
@@ -120,6 +121,7 @@ describe('ActivityComponent', () => {
     expect(screen.getByText('System · Angaben geändert')).toBeInTheDocument();
     expect(screen.getByText('Ohne Namen · Status: Neu')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /Flyer drucken/ })[0]).toHaveAttribute('href', '/tasks/todo/c1');
+    expect(screen.getAllByRole('link', { name: /Ersti-Gruppe anlegen/ })[0]).toHaveAttribute('href', '/todos?card=c9');
     expect(screen.getAllByText(/Neu:/).length).toBe(1);
     expect(rail.activitySeen).toHaveBeenCalledTimes(1);
     expect(api.markSeen).toHaveBeenCalledWith('2026-11-17T10:00:00Z');
@@ -223,6 +225,13 @@ describe('ActivityComponent', () => {
       get.mockRestore();
       set.mockRestore();
     }
+  });
+});
+
+describe('splitUrl', () => {
+  it('splits the query off the path', () => {
+    expect(splitUrl('/todos?card=c9')).toEqual({ path: '/todos', query: { card: 'c9' } });
+    expect(splitUrl('/meetings/m1')).toEqual({ path: '/meetings/m1', query: null });
   });
 });
 
