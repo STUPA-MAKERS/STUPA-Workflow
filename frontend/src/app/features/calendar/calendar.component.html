@@ -21,7 +21,7 @@
           (valueChange)="onQuery($event)"
         />
         <div class="cal-list__chips">
-          <ng-container *ngTemplateOutlet="chips; context: { size: 'sm' }" />
+          <ng-container *ngTemplateOutlet="chips" />
         </div>
       </app-sticky-bar>
       <div class="cal-list__scroll" appScrollFade="y" [attr.aria-busy]="loading() ? 'true' : null">
@@ -185,7 +185,7 @@
             </div>
           }
         </div>
-        <ng-container *ngTemplateOutlet="chips; context: { size: 'md' }" />
+        <ng-container *ngTemplateOutlet="chips" />
       </div>
     </div>
 
@@ -305,12 +305,11 @@
   @if (e.myAnswer) {<span aria-hidden="true">·</span><app-status-text [kind]="answerKind(e.myAnswer)">{{ answerKey(e.myAnswer) | t }}</app-status-text>}
 </ng-template>
 
-<ng-template #chips let-size="size">
+<ng-template #chips>
   @if (!isPublic) {
   <app-filter-select
     class="cal__chip"
     icon="funnel"
-    [size]="size"
     [label]="'calendar.filter.kind' | t"
     [multiple]="true"
     [options]="kindOptions()"
@@ -323,8 +322,7 @@
     <app-filter-select
       class="cal__chip"
       icon="building"
-      [size]="size"
-      [label]="'calendar.filter.gremium' | t"
+        [label]="'calendar.filter.gremium' | t"
       [options]="gremiumOptions()"
       [value]="gremium()"
       (valueChange)="gremium.set($event)"
@@ -336,12 +334,11 @@
   <app-filter-select
     class="cal__chip"
     icon="user"
-    [size]="size"
     [label]="'calendar.filter.assigned' | t"
     [options]="mineOptions()"
     [value]="mine()"
     (valueChange)="mine.set($event)"
-    [text]="(mine() ? 'calendar.filter.mine' : 'calendar.filter.all') | t"
+    [text]="mineText()"
     [active]="mine() !== ''"
   />
   }

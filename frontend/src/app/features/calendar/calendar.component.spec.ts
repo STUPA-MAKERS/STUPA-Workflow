@@ -347,15 +347,15 @@ describe('CalendarComponent (desktop)', () => {
     const view = await setup();
     load(view);
     expect(view.cmp.gremiumOptions().map((o) => o.label)).toEqual(['Alle Gremien', 'Studierendenparlament', 'Haushaltsausschuss']);
-    expect(view.cmp.gremiumText()).toBe('Alle Gremien');
+    expect(view.cmp.gremiumText()).toBe('Gremium');
     expect(cards()).toContain('Zahnarzt');
     view.cmp.gremium.set('g-2');
     view.fixture.detectChanges();
-    expect(view.cmp.gremiumText()).toBe('Haushaltsausschuss');
+    expect(view.cmp.gremiumText()).toBe('Gremium: Haushaltsausschuss');
     expect(cards()).toEqual(['Jour fixe']);
     expect(view.container.querySelector('.cal__bar')).toBeNull();
     view.cmp.gremium.set('gone');
-    expect(view.cmp.gremiumText()).toBe('');
+    expect(view.cmp.gremiumText()).toBe('Gremium');
     expect(view.http.match(() => true).length).toBe(0);
   });
 
@@ -373,6 +373,7 @@ describe('CalendarComponent (desktop)', () => {
     load(view);
     expect(view.cmp.kindOptions().map((o) => o.label)).toEqual(['Sitzung', 'Karte', 'Termin', 'Extern']);
     expect(view.cmp.mineOptions().map((o) => o.label)).toEqual(['Alle Einträge', 'Nur meine']);
+    expect(view.cmp.mineText()).toBe('Zuständig');
     view.cmp.kinds.set(['card']);
     view.fixture.detectChanges();
     expect(cards()).toEqual(['Angebot einholen']);
@@ -382,7 +383,18 @@ describe('CalendarComponent (desktop)', () => {
     view.fixture.detectChanges();
     const req = reload(view, [CARD, TERMIN]);
     expect(req.request.params.get('mine')).toBe('true');
+    expect(view.cmp.mineText()).toBe('Zuständig: Nur meine');
     expect(cards()).toEqual(['Angebot einholen', 'Jour fixe']);
+  });
+
+  /** Spec 001892: the filter row uses the one filter chip of the kit, also beside the search. */
+  it('draws every filter chip in the one chip size', async () => {
+    const view = await setup();
+    load(view);
+    const chips = view.container.querySelectorAll('app-filter-select .fs__chip');
+    expect(chips.length).toBeGreaterThan(0);
+    expect(view.container.querySelector('.fs__chip--md')).toBeNull();
+    for (const chip of Array.from(chips)) expect(chip.textContent ?? '').not.toMatch(/^\s*Alle/);
   });
 
   it('shows no Gremium filter to a person without a Gremium', async () => {
