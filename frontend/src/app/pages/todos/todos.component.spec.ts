@@ -1279,6 +1279,13 @@ describe('TodosComponent', () => {
     expect(screen.getByRole('dialog', { name: 'Board-Einstellungen' })).toBeInTheDocument();
   });
 
+  /** 001500: a pane header over the filter bar, so the kit hides the title beyond a phone. */
+  it('gives the board a pane header over its filter bar', async () => {
+    await start('/todos/b-1');
+    const pane = document.querySelector('.td.ld-pane') as HTMLElement;
+    expect(pane.querySelector(':scope > app-page-header.ph--pane + .ld-pane__filters')).toBeTruthy();
+  });
+
   it('shows the archive button in the header also for a board with no archived card', async () => {
     const { cmp, harness } = await start('/todos/b-1', { board: board({ archivedCount: 0 }) });
     const archive = screen.getByTestId('td-archive');

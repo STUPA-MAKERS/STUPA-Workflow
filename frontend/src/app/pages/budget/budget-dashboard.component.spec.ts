@@ -266,11 +266,20 @@ describe('BudgetDashboardComponent', () => {
      * The year, the overview and the search are outside the scrolling list. The pane sits on the
      * page, so the search field keeps its own surface.
      */
+    /** 001500: the kit hides the title of a column whose filter bar is its direct child. */
+    it('puts the filters of the tree in the filter bar of the column', async () => {
+      const view = await setup();
+      const pane = view.container.querySelector('.bd__pane') as HTMLElement;
+      expect(pane.querySelector(':scope > app-page-header + .ld-pane__filters > app-search-pill')).toBeTruthy();
+      expect(pane.querySelector(':scope > .ld-pane__filters .bd__chips')).toBeTruthy();
+      expect(pane.querySelector(':scope > .bd__tree')).toBeTruthy();
+      expect(pane.querySelector('.bd__paneBody')).toBeNull();
+    });
+
     it('scrolls only the tree and fades an end only where more rows are', async () => {
       const view = await setup();
       const tree = view.container.querySelector('.bd__pane .bd__tree') as HTMLElement;
       expect(tree.querySelector('app-search-pill, .chip')).toBeNull();
-      expect(view.container.querySelector('.bd__pane .bd__paneBody')).not.toHaveClass('bd__paneBody--side');
       const geometry = (scrollHeight: number, scrollTop: number) => {
         Object.defineProperty(tree, 'scrollHeight', { value: scrollHeight, configurable: true });
         Object.defineProperty(tree, 'clientHeight', { value: 300, configurable: true });
@@ -1057,11 +1066,13 @@ describe('BudgetDashboardComponent', () => {
       view.http.match(() => true);
     });
 
-    it('names the sheet after the path and puts the actions beside the title', async () => {
+    /** 001500: no visible title beyond a phone; the actions end the line of the chips. */
+    it('names the sheet after the path and puts the actions at the end of the chips', async () => {
       const view = await setup({ wide: false });
       const article = view.container.querySelector('article.bd__sheet');
       expect(article?.getAttribute('aria-label')).toBe('VS-Mittel');
-      expect(view.container.querySelector('.bd__topRow .bd__actions')).toBeTruthy();
+      expect(view.container.querySelector('.bd__chips > .bd__chipActions .bd__actions')).toBeTruthy();
+      expect(view.container.querySelector('.bd__topRow .bd__actions')).toBeNull();
       expect(view.container.querySelector('app-sheet-bar')).toBeNull();
     });
   });
