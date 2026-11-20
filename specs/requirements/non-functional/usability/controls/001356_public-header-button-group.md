@@ -2,7 +2,7 @@
 id: "001356"
 title: The buttons of the public header are one button group
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:
