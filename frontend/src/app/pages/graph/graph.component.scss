@@ -73,9 +73,10 @@
 // as on a page.
 .gr__bar {
   display: flex;
-  flex-wrap: wrap;
+  // One line (spec 001425): the search narrows first, then the filters scroll sideways.
+  flex-wrap: nowrap;
   align-items: center;
-  gap: var(--space-2) var(--space-3);
+  gap: var(--space-3);
   min-width: 0;
   // More room at the end: a chip has small corners and would touch the round corner.
   padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
@@ -87,16 +88,24 @@
 .gr__search {
   flex: 1 1 14rem;
   max-width: 22rem;
-  min-width: 0;
+  min-width: 11rem;
 }
 // The filters are at the end edge, the search at the start edge.
 .gr__chips {
   @include lp.chips;
-  flex: 1 1 auto;
-  justify-content: flex-end;
+  flex: 0 1 auto;
+  flex-wrap: nowrap;
+  margin-inline-start: auto;
+  overflow-x: auto;
+  // Room for the focus ring of a chip inside the scroll area.
+  padding: 3px;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
-.gr__chip {
-  max-width: 100%;
+.gr__chips > * {
+  flex: none;
 }
 
 .gr__mark {
