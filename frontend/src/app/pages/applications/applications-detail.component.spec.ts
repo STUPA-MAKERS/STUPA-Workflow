@@ -451,7 +451,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(busy).toHaveAttribute('aria-busy', 'true');
     expect(busy.querySelector('.ad__head .ad__title .skel-text')).not.toBeNull();
     expect(busy.querySelectorAll('.ad__head .ad__line .skel-chip')).toHaveLength(2);
-    expect(busy.querySelectorAll('.ad__head .skel-grp > .skel-btn')).toHaveLength(3);
+    expect(busy.querySelectorAll('.ad__head .skel-grp:not(.ad__transitionGroup) > .skel-btn')).toHaveLength(3);
     expect(busy.querySelectorAll('.ad__transitionGroup .skel-btn')).toHaveLength(2);
     expect(busy.querySelectorAll('.ad__cols > .ad__col')).toHaveLength(2);
     expect(within(busy as HTMLElement).getByText('Details')).toBeInTheDocument();
