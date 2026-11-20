@@ -185,7 +185,9 @@
             </div>
           }
         </div>
-        <ng-container *ngTemplateOutlet="chips" />
+        <div class="cal__chips" role="group" [attr.aria-label]="'calendar.filter.group' | t">
+          <ng-container *ngTemplateOutlet="chips" />
+        </div>
       </div>
     </div>
 
