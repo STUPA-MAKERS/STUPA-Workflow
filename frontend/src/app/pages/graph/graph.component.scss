@@ -343,6 +343,13 @@
   .gr__depth {
     color: var(--color-text);
   }
+  // A control shows yellow (000614): the field has the yellow edge of a chip.
+  .gr__depthInput {
+    width: 2.5rem;
+    height: var(--control-height-sm);
+    border-radius: var(--radius-md);
+    box-shadow: inset 0 0 0 2px var(--vh-hi);
+  }
   .gr__bar,
   .gr__panel,
   .gr__pill {
