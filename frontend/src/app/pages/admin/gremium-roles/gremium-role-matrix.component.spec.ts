@@ -110,6 +110,7 @@ describe('GremiumRoleMatrixComponent', () => {
       'Protokoll führen',
       'Protokoll finalisieren & senden',
       'Info bearbeiten',
+      'Mitglieder benachrichtigen',
       'Aktionen',
     ]);
     const keys = [...document.querySelectorAll('.rm__colKey')].map((k) => k.textContent);
