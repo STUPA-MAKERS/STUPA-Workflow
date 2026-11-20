@@ -69,3 +69,68 @@ def test_fire_transition_with_decision(fake_api: _FakeApi) -> None:
 def test_fire_transition_with_conditions_only(fake_api: _FakeApi) -> None:
     asyncio.run(applications.fire_transition("a1", "t1", conditions=["A"]))
     assert fake_api.calls[0][1]["decision"] == {"conditions": ["A"]}
+
+
+def test_force_status_sends_the_reason(fake_api: _FakeApi) -> None:
+    asyncio.run(applications.force_application_status("a1", "s1", "applicant_error"))
+    asyncio.run(applications.force_application_status("a1", "s1", "other", note="ten chars!"))
+    assert fake_api.calls == [
+        ("/applications/a1/force-status", {"stateId": "s1", "reason": "applicant_error"}),
+        (
+            "/applications/a1/force-status",
+            {"stateId": "s1", "reason": "other", "note": "ten chars!"},
+        ),
+    ]
+
+
+def test_force_status_sends_the_decision(fake_api: _FakeApi) -> None:
+    """§ 001653: a forced approval carries the approved amount."""
+    asyncio.run(
+        applications.force_application_status(
+            "a1", "s1", "outside_decision", approved_amount="80.00"
+        )
+    )
+    assert fake_api.calls[0][1]["decision"] == {"approvedAmount": "80.00"}
+
+
+def test_record_outside_decision(fake_api: _FakeApi) -> None:
+    asyncio.run(
+        applications.record_outside_decision(
+            "a1", "passed", "2026-11-18", "g1", yes=5, no=1, approved_amount="100.00"
+        )
+    )
+    asyncio.run(applications.record_outside_decision("a1", "failed", "2026-11-18", "g1"))
+    assert fake_api.calls == [
+        (
+            "/applications/a1/outside-decision",
+            {
+                "result": "passed",
+                "meetingDate": "2026-11-18",
+                "gremiumId": "g1",
+                "yes": 5,
+                "no": 1,
+                "decision": {"approvedAmount": "100.00"},
+            },
+        ),
+        (
+            "/applications/a1/outside-decision",
+            {"result": "failed", "meetingDate": "2026-11-18", "gremiumId": "g1"},
+        ),
+    ]
+
+
+def test_change_approved_amount(fake_api: _FakeApi) -> None:
+    asyncio.run(
+        applications.change_approved_amount("a1", "122.00", "Mehrkosten Druck", "2026-11-18", "g1")
+    )
+    assert fake_api.calls == [
+        (
+            "/applications/a1/approved-amount",
+            {
+                "approvedAmount": "122.00",
+                "reason": "Mehrkosten Druck",
+                "decisionDate": "2026-11-18",
+                "gremiumId": "g1",
+            },
+        )
+    ]

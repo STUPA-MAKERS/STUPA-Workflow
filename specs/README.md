@@ -227,8 +227,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/flow/001602](requirements/functional/applications/flow/001602_outside-decision-timeline.md) | The timeline shows a decision made outside the platform | approved |
 | [F/applications/flow/001603](requirements/functional/applications/flow/001603_record-decision-permission.md) | Recording a decision made outside the platform needs its own permission | approved |
 | [F/applications/flow/001650](requirements/functional/applications/flow/001650_force-status-reason.md) | A forced status needs a reason from a list | approved |
-| [F/applications/flow/001651](requirements/functional/applications/flow/001651_force-status-report.md) | An admin page counts the forced status changes | approved |
+| [F/applications/flow/001651](requirements/functional/applications/flow/001651_force-status-report.md) | An admin page lists the forced status changes | approved |
 | [F/applications/flow/001652](requirements/functional/applications/flow/001652_force-status-old-reason.md) | A forced change without a reason counts as Ohne Grund | approved |
+| [F/applications/flow/001653](requirements/functional/applications/flow/001653_force-approval-asks-amount.md) | A forced approval asks for the approved amount | approved |
 | [F/applications/forms/000133](requirements/functional/applications/forms/000133_positions-shape.md) | A positions answer has label and offers | approved |
 | [F/applications/forms/000134](requirements/functional/applications/forms/000134_offer-limits.md) | Offer counts have limits | approved |
 | [F/applications/forms/000135](requirements/functional/applications/forms/000135_funding-field.md) | The requested funding is separate from the costs | approved |
@@ -645,6 +646,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/001462](requirements/functional/meetings/meetings/001462_sheet-opens-for-voters.md) | The vote sheet opens by itself for a voter | approved |
 | [F/meetings/meetings/001738](requirements/functional/meetings/meetings/001738_live-channel-reconnects.md) | The meeting page opens a dropped live channel again | approved |
 | [F/meetings/meetings/001739](requirements/functional/meetings/meetings/001739_live-resync-on-return.md) | A live meeting page connects and reads again when the page returns | approved |
+| [F/meetings/meetings/001800](requirements/functional/meetings/meetings/001800_linked-items-in-side-sheet.md) | The linked rows of an item are in a side sheet | approved |
+| [F/meetings/meetings/001801](requirements/functional/meetings/meetings/001801_attendance-edge-tab.md) | A tab at the end edge opens the attendance | approved |
+| [F/meetings/meetings/001802](requirements/functional/meetings/meetings/001802_vote-sheet-head-add.md) | The vote sheet has its add button in the head and an empty state | approved |
+| [F/meetings/meetings/001804](requirements/functional/meetings/meetings/001804_vote-tab-final-protocol.md) | A closed meeting keeps the vote tab | approved |
 | [F/meetings/protocols/000115](requirements/functional/meetings/protocols/000115_keeper-permission.md) | The keeper holds protocol.write | approved |
 | [F/meetings/protocols/000116](requirements/functional/meetings/protocols/000116_finalize.md) | Finalize needs a closed meeting and protocol.finalize | approved |
 | [F/meetings/protocols/000117](requirements/functional/meetings/protocols/000117_delete-draft-only.md) | Only a draft protocol is deleted | approved |
@@ -948,6 +953,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/001363](requirements/non-functional/usability/controls/001363_empty-state-no-reset.md) | An empty state has no reset button | approved |
 | [NF/usability/controls/001790](requirements/non-functional/usability/controls/001790_pick-dialog-select-rows.md) | A pick dialog lists its choices as the select sheet does | approved |
 | [NF/usability/controls/001791](requirements/non-functional/usability/controls/001791_pick-dialog-empty-centred.md) | The empty state of a pick dialog is centred in the list area | approved |
+| [NF/usability/controls/001803](requirements/non-functional/usability/controls/001803_empty-state-face-room-above.md) | The empty-state face has room above and below | approved |
 | [NF/usability/layout/000192](requirements/non-functional/usability/layout/000192_one-geometry.md) | All list and detail pages share one geometry | approved |
 | [NF/usability/layout/000193](requirements/non-functional/usability/layout/000193_scroll-edges.md) | A scroll area cuts at the edge of a surface | approved |
 | [NF/usability/layout/000194](requirements/non-functional/usability/layout/000194_phone-breakpoint.md) | The phone layout starts below 768 px | approved |
@@ -1003,6 +1009,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/001440](requirements/non-functional/usability/layout/001440_agenda-pane-split-head.md) | The agenda beside the protocol is a split head over its list | approved |
 | [NF/usability/layout/001441](requirements/non-functional/usability/layout/001441_rail-scroll-surface.md) | The scroll part of the navigation rail is a surface | approved |
 | [NF/usability/layout/001442](requirements/non-functional/usability/layout/001442_board-own-surface.md) | Each board lies on a surface of its own | approved |
+| [NF/usability/layout/001443](requirements/non-functional/usability/layout/001443_agenda-items-split-boxes.md) | The TOPs beside the protocol are split boxes like the agenda head | approved |
 | [NF/usability/layout/001480](requirements/non-functional/usability/layout/001480_admin-list-detail.md) | Verwaltung and Konto are ordinary list/detail pages | approved |
 | [NF/usability/layout/001481](requirements/non-functional/usability/layout/001481_admin-list-rows.md) | A row of the Verwaltung list is an ordinary list row | approved |
 | [NF/usability/layout/001482](requirements/non-functional/usability/layout/001482_admin-editors-full-width.md) | The form editor and the flow editor open without the list | approved |

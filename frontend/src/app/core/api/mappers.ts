@@ -73,6 +73,7 @@ export function mapState(
     ...(wire.isInitial ? { isInitial: true as const } : {}),
     ...(wire.isTerminal ? { isTerminal: true as const } : {}),
     ...(wire.isDenied ? { isDenied: true as const } : {}),
+    isApproved: wire.isApproved === true,
   };
 }
 
@@ -154,6 +155,11 @@ export function mapTimelineEvent(wire: TimelineEventOutWire, lang: string): Time
     voteId: wire.voteId ?? null,
     voteDeleted: wire.voteDeleted ?? false,
     decision: wire.decision ?? null,
+    kind: wire.kind ?? 'status',
+    forced: wire.forced === true,
+    forceReason: wire.forceReason ?? null,
+    outsideDecision: wire.outsideDecision ?? null,
+    amountChange: wire.amountChange ?? null,
   };
 }
 
@@ -208,6 +214,7 @@ export function mapTransition(wire: TransitionOutWire, lang: string): Transition
     agendaGremiumId: wire.agendaGremiumId ?? null,
     allowsDecision: wire.allowsDecision === true,
     ...(wire.toTerminal ? { toTerminal: true as const } : {}),
+    requiresAmount: wire.requiresAmount === true,
   };
 }
 

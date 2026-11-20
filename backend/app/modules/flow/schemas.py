@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Literal, get_args
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from app.modules.applications.decision import DecisionIn
 from app.shared.i18n import I18nMap
@@ -29,6 +30,10 @@ class TransitionOut(FrozenCamelModel, frozen=True):
             UI then opens the decision dialog.
         to_terminal: The target is a terminal state. The applicant page asks before
             such a transition fires, and a draft does not offer it to the applicant.
+        requires_amount: The fire must name the approved amount (spec 001610): the
+            target is an approved state, the current state is not, and the
+            application has an amount. The dialog then shows the amount without the
+            switch.
     """
 
     id: UUID
@@ -41,6 +46,7 @@ class TransitionOut(FrozenCamelModel, frozen=True):
     agenda_gremium_id: UUID | None = Field(default=None, alias="agendaGremiumId")
     allows_decision: bool = Field(default=False, alias="allowsDecision")
     to_terminal: bool = Field(default=False, alias="toTerminal")
+    requires_amount: bool = Field(default=False, alias="requiresAmount")
 
 
 class TransitionRequest(FrozenCamelModel, frozen=True):
@@ -64,15 +70,43 @@ class TransitionRequest(FrozenCamelModel, frozen=True):
     decision: DecisionIn | None = None
 
 
+#: The reasons of a forced status (spec 001650), as keys. The report counts per key.
+ForceReason = Literal["outside_decision", "applicant_error", "error_correction", "other"]
+FORCE_REASONS: tuple[ForceReason, ...] = get_args(ForceReason)
+
+#: The reason `other` needs a text of at least this many characters after the trim.
+MIN_OTHER_NOTE = 10
+
+
 class ForceStatusRequest(FrozenCamelModel, frozen=True):
     """`POST /applications/{id}/force-status` — force a status directly.
 
-    This is the privileged `application.force_status` override. The `note` gives the
-    reason. It is mandatory because the change bypasses the flow and gets audited.
+    This is the privileged `application.force_status` override. The `reason` names why
+    from a fixed list, because the report of the forced changes counts per reason and
+    shows the ways that the flow lacks. The `note` is optional, except for `other`,
+    which needs at least 10 characters after the trim. A move into an approved state
+    from one that is not approved needs the `decision` with the approved amount (spec
+    001653).
     """
 
     state_id: UUID = Field(alias="stateId")
-    note: str = Field(min_length=1)
+    reason: ForceReason
+    note: str | None = None
+    decision: DecisionIn | None = None
+
+    @model_validator(mode="after")
+    def _note_for_other(self) -> ForceStatusRequest:
+        """Refuse `other` without a note of at least 10 characters."""
+        text = (self.note or "").strip()
+        if self.reason == "other" and len(text) < MIN_OTHER_NOTE:
+            raise ValueError(f"the reason 'other' needs a note of {MIN_OTHER_NOTE} characters")
+        return self
+
+    @property
+    def clean_note(self) -> str | None:
+        """Return the trimmed note, or None for an empty one."""
+        text = (self.note or "").strip()
+        return text or None
 
 
 class TransitionResult(FrozenCamelModel, frozen=True):

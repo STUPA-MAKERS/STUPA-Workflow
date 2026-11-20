@@ -439,7 +439,7 @@ describe('CalendarComponent (desktop)', () => {
   it('puts Heute, Kalender-Abo and Termin anlegen in one group at the end of the tools row (001771)', async () => {
     const view = await setup();
     load(view);
-    const group = screen.getByRole('toolbar').querySelector('.cal__nav app-button-group') as HTMLElement;
+    const group = screen.getByRole('toolbar').querySelector('.cal__nav app-button-group.cal__actions') as HTMLElement;
     expect(within(group).getAllByRole('button').map((b) => b.textContent?.trim() || b.getAttribute('aria-label'))).toEqual([
       'Heute',
       'Kalender-Abo',

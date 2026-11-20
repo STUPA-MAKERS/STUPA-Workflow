@@ -345,7 +345,7 @@ async def test_fail_closed_without_a_deciding_gremium(
             await flow.fire(app_id, world.to_vote, ADMIN)
         assert fired.value.code == "no_vote_gremium"
         with pytest.raises(ConflictError) as forced:
-            await flow.force_status(app_id, world.states["gvote"], ADMIN, note="x")
+            await flow.force_status(app_id, world.states["gvote"], ADMIN, reason="other", note="x")
         assert forced.value.code == "no_vote_gremium"
         state = await session.scalar(
             select(Application.current_state_id)
@@ -385,7 +385,7 @@ async def test_force_and_revert_follow_the_snapshot(
     async with maker() as session:
         app_id = await _app(session, world, budget=world.leaf)
         flow = FlowService(session)
-        await flow.force_status(app_id, world.states["gvote"], ADMIN, note="x")
+        await flow.force_status(app_id, world.states["gvote"], ADMIN, reason="other", note="x")
         assert await _snapshot(session, app_id) == world.g_a
         await flow.fire(app_id, world.escalate, world.member_a)
         assert await _snapshot(session, app_id) is None
@@ -475,7 +475,7 @@ async def test_a_stale_vote_of_another_gremium_never_decides(
             update(Meeting).where(Meeting.id == meeting_a).values(status="live")
         )
         await session.commit()
-        await flow.force_status(app_id, world.states["gvote"], ADMIN, note="back")
+        await flow.force_status(app_id, world.states["gvote"], ADMIN, reason="other", note="back")
         assert await _snapshot(session, app_id) == world.g_b
 
         config = VoteConfig.model_validate(

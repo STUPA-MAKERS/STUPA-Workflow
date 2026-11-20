@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import type { GraphKind } from '@core/api/graph.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { IconComponent, type IconName, reducedMotion } from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, IconComponent, type IconName, reducedMotion } from '@stupa-makers/ui-kit';
 import {
   ALPHA_DECAY,
   ALPHA_MIN,
@@ -101,7 +101,7 @@ const ARROWS: Readonly<Record<string, Direction>> = {
   selector: 'app-graph-canvas',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconComponent, TranslatePipe],
+  imports: [ButtonComponent, ButtonGroupComponent, IconComponent, TranslatePipe],
   templateUrl: './graph-canvas.component.html',
   styleUrl: './graph-canvas.component.scss',
 })

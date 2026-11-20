@@ -96,6 +96,7 @@ def _state_out(state: State | None, color_override: str | None = None) -> StateO
         isInitial=state.is_initial,
         isTerminal=state.is_terminal,
         isDenied=state.is_denied,
+        isApproved=bool(getattr(state, "is_approved", False)),
     )
 
 

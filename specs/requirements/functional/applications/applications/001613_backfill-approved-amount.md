@@ -5,7 +5,8 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - backend/migrations/versions/c5e19a7d3b42_decisions_outside_and_amend.py
 scope:
   - backend/app/modules/applications
   - frontend/src/app/pages/applications

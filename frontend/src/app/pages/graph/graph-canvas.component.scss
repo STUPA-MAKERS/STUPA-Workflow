@@ -1,4 +1,3 @@
-@use 'press';
 @use './graph-kinds' as kinds;
 
 // The drawing: the frame takes the pointer, the world carries the pan and the zoom, and the
@@ -160,40 +159,12 @@
   font-weight: var(--fw-semibold);
 }
 
+// The zoom tools: a connected button group (spec 001354) in the corner of the canvas.
 .gc__tools {
   position: absolute;
   right: var(--space-3);
   bottom: var(--space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-1);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-1);
-  box-shadow: var(--shadow-md);
   cursor: default;
-}
-.gc__tool {
-  display: grid;
-  place-items: center;
-  width: var(--control-height);
-  height: var(--control-height);
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  color: var(--color-text);
-  cursor: pointer;
-  @include press.press;
-}
-.gc__tool:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 1px;
-}
-@media (hover: hover) {
-  .gc__tool:hover {
-    background-color: var(--color-surface-2);
-  }
 }
 
 // "Hoher Kontrast": every mark in the text colour with an edge, the icon names the kind.
@@ -232,9 +203,5 @@
   }
   .gc__line--dim {
     opacity: 0.45;
-  }
-  .gc__tools {
-    border: 2px solid var(--color-text);
-    box-shadow: none;
   }
 }

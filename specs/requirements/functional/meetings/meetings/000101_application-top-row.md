@@ -4,7 +4,7 @@ title: A TOP with an Antrag shows the Antrag as its first row
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-16
+updated: 2026-11-19
 implementation:
   - frontend/src/app/features/meetings/top-sheet/top-sheet.component.ts
   - frontend/src/app/features/meetings/top-application-lead.util.ts
@@ -19,6 +19,6 @@ scope:
 A TOP that links an Antrag must show the Antrag as the first row of its to-do list, as a card.
 The title of such a TOP must be renamable.
 
-The linked rows (the Antrag, the Haushaltsplan and the to-dos) must stand above the title of the
-TOP, for a manager and for a member, in a live and in a closed meeting, on a desktop and on a
-phone.
+In the follow view of a member, the linked rows (the Antrag, the Haushaltsplan and the to-dos)
+must stand above the title of the TOP, in a live and in a closed meeting, on a desktop and on a
+phone. On the meeting page they are in the side sheet "Verknüpft" (spec 001800).

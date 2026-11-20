@@ -1566,6 +1566,30 @@
           "type": "DATETIME"
         },
         {
+          "name": "amend_reason",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "previous_amount",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "basis_date",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "basis_gremium_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
           "name": "id",
           "nullable": false,
           "primaryKey": true,
@@ -5988,6 +6012,24 @@
           "nullable": true,
           "primaryKey": false,
           "type": "CHAR(32)"
+        },
+        {
+          "name": "forced",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "force_reason",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "outside_decision",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "JSONB"
         },
         {
           "name": "id",

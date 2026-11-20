@@ -968,6 +968,7 @@ async def test_timeline_links_the_vote_or_names_it_as_deleted() -> None:
         execute_results=[
             [(linked, None), (deleted, None)],
             [("approved", "#0f0")],
+            [],
             [(linked, None), (deleted, None)],
         ],
     )

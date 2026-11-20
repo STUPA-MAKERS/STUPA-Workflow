@@ -127,11 +127,6 @@
 }
 // The application and the to-dos of the item sit above the sheet, so the sheet holds only
 // the protocol.
-.mp__linked {
-  flex: none;
-  margin-bottom: var(--space-3);
-}
-
 .mp__body--wide {
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
@@ -247,37 +242,20 @@
   }
 }
 
-
-// The format tools in the phone dock (`#formatTpl`), like the tools of the sheet bar.
-.mp__tool {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: var(--control-height);
-  height: var(--control-height);
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--color-text);
-  cursor: pointer;
-}
-.mp__tool--on {
-  background: var(--color-selected);
-  color: var(--color-accent-text);
-}
-.mp__tool:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
-}
-
-// The tab at the end edge that opens the votes above the phone width (spec 001460): a small
-// half pill on the edge of the window, accent while a vote of the item is open.
-.mp__edgeTab {
+// The tabs at the end edge that open the votes (spec 001460) and the linked rows (spec 001800)
+// above the phone width: small half pills on the edge of the window, one above the other. The
+// vote tab takes the accent while a vote of the item is open.
+.mp__edgeTabs {
   position: fixed;
   top: 50%;
   inset-inline-end: 0;
   z-index: var(--z-sticky, 10);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  transform: translateY(-50%);
+}
+.mp__edgeTab {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -291,7 +269,6 @@
   background: var(--color-surface-2);
   color: var(--color-text);
   box-shadow: var(--shadow-md);
-  transform: translateY(-50%);
   cursor: pointer;
 }
 .mp__edgeTab--live {
@@ -312,14 +289,6 @@
   font-size: 0.75rem;
   font-weight: var(--fw-semibold);
   line-height: 1;
-}
-
-/* "Verknüpfen" and "To-Do anlegen" of the sheet To-Dos sit in its head, before the close button. */
-.mp__sheet-actions {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: var(--space-1);
 }
 
 /* Highlighted fields (000598): a chip button of the dock is a pill button, black on yellow

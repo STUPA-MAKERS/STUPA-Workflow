@@ -93,6 +93,10 @@
 .sd__tools {
   gap: var(--space-1);
 }
+// The format tools are three connected button groups (spec 001354), 8px apart.
+.sd__format {
+  gap: var(--space-2);
+}
 .sd__chips {
   display: flex;
   flex: 0 1 auto;
