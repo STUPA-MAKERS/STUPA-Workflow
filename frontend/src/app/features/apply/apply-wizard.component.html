@@ -87,6 +87,7 @@
           <div class="fe-form">
             <formly-form [form]="detailsForm" [fields]="detailsFields()" [model]="model" />
           </div>
+          <ng-container [ngTemplateOutlet]="ruleNotes" />
           <app-draft-files
             class="wz__files"
             [heading]="'apply.files.title' | t"
@@ -137,6 +138,7 @@
               [data]="answers()"
               [context]="formContext()"
               [skipKeys]="[]"
+              [files]="drafts.usable()"
               [emptyText]="'apply.review.empty' | t"
             />
             <app-section class="wz__block" [heading]="'apply.review.applicant' | t">
@@ -168,6 +170,12 @@
                 </ul>
               </app-section>
             }
+            <ng-container [ngTemplateOutlet]="ruleNotes" />
+            @if (fileMissing()) {
+              <app-note class="wz__rule" kind="error" icon="clip" role="alert">{{
+                'apply.files.requiredByType' | t
+              }}</app-note>
+            }
             @if (!loggedIn()) {
               @for (round of [altchaRound()]; track round) {
                 <app-altcha (solved)="onAltchaSolved($event)" (unavailable)="onAltchaUnavailable()" />
@@ -180,8 +188,8 @@
 
     <footer class="wz__nav">
       @if (effForm()) {
-        <app-button-group>
-          <app-button class="wz__discard" variant="danger" (click)="confirmDiscard.set(true)">
+        <app-button-group class="wz__discard">
+          <app-button variant="danger" (click)="confirmDiscard.set(true)">
             {{ 'apply.nav.discard' | t }}
           </app-button>
         </app-button-group>
@@ -225,6 +233,15 @@
 </div>
 
 <app-confirm-dialog
+  [open]="confirmNoFile()"
+  [title]="'apply.files.noneTitle' | t"
+  [body]="'apply.files.noneBody' | t"
+  [confirmLabel]="'apply.files.noneConfirm' | t"
+  (confirm)="submit(true)"
+  (cancel)="confirmNoFile.set(false)"
+/>
+
+<app-confirm-dialog
   [open]="confirmDiscard()"
   [title]="'apply.discard.title' | t"
   [body]="'apply.discard.body' | t"
@@ -232,3 +249,12 @@
   (confirm)="discardDraft()"
   (cancel)="confirmDiscard.set(false)"
 />
+
+<ng-template #ruleNotes>
+  @for (msg of ruleMessages().block; track $index) {
+    <app-note class="wz__rule" kind="error" icon="alert" role="alert">{{ msg }}</app-note>
+  }
+  @for (msg of ruleMessages().warn; track $index) {
+    <app-note class="wz__rule" kind="warn" icon="alert" role="status">{{ msg }}</app-note>
+  }
+</ng-template>

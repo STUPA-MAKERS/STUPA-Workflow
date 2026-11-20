@@ -70,6 +70,7 @@ export class ExpenseTransfersState {
   private filterParams() {
     return {
       budget: this.list.budgetId() || undefined,
+      fiscalYear: this.list.fiscalYearId() || undefined,
       q: this.list.q().trim() || undefined,
       amountMin: this.list.amountMin().trim() || undefined,
       amountMax: this.list.amountMax().trim() || undefined,

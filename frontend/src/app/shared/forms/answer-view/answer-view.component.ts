@@ -5,7 +5,10 @@ import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component'
 import { formatAnswer, formatFieldValue, isEmptyAnswer } from '../answer-format';
 import { langAttr, resolvedI18nLang, resolveI18n } from '../i18n-text';
 import { evalJsonLogic, isFieldVisible } from '../jsonlogic';
-import { PositionsViewComponent } from '../positions-view/positions-view.component';
+import {
+  PositionsViewComponent,
+  type PositionFile,
+} from '../positions-view/positions-view.component';
 import { runs } from '@shared/util/immutable';
 import { FieldGroupComponent, FieldRowComponent, SectionComponent } from '@stupa-makers/ui-kit';
 
@@ -84,7 +87,8 @@ const OPTION: ReadonlySet<FieldType> = new Set(['select', 'gremium_select', 'bud
  *   multiselect a comma list, an amount euro, a checkbox Ja or Nein.
  * - A computed field says "berechnet" after its label. Without a stored value the
  *   view computes it, as the form does.
- * - The cost positions get their own block (`app-positions-view`).
+ * - The cost positions get their own block (`app-positions-view`), with the files of
+ *   each position (`files`, spec 001730). The last one gets the cost line (spec 001632).
  * - Not shown: display texts (`markdown`), files (block "Anhänge"), empty answers and
  *   fields that `visibleIf` hides. A PII field that the server left out of `data`
  *   is an empty answer, so it shows nothing.
@@ -117,6 +121,8 @@ export class AnswerViewComponent {
   readonly emptyText = input('');
   /** The surface of the rows; see `app-field-group`. */
   readonly surface = input<1 | 2 | 3>(2);
+  /** The files of the application: a position lists its own (spec 001730). */
+  readonly files = input<readonly PositionFile[]>([]);
 
   /** Answers without a field come from an older form version and show last, as plain text. */
   readonly blocks = computed<readonly AnswerBlock[]>(() => {
@@ -134,7 +140,9 @@ export class AnswerViewComponent {
       key: section.key,
       label: resolveI18n(section.label, lang),
       labelLang: langAttr(resolvedI18nLang(section.label, lang), lang),
-      chunks: chunksOf(section.fields.filter(shown).flatMap((f) => this.piece(f, data, ctx, lang))),
+      chunks: chunksOf(
+        section.fields.filter(shown).flatMap((f) => this.piece(f, data, ctx, lang)),
+      ),
     }));
     const otherChunks = chunksOf(
       Object.entries(data)
@@ -173,7 +181,12 @@ export class AnswerViewComponent {
     const labelLang = langAttr(resolvedI18nLang(f.label, lang), lang);
     switch (f.type) {
       case 'positions':
-        return [{ kind: 'positions', chunk: { kind: 'positions', key: f.key, label, value: raw } }];
+        return [
+          {
+            kind: 'positions',
+            chunk: { kind: 'positions', key: f.key, label, value: raw },
+          },
+        ];
       case 'table':
         return [
           {

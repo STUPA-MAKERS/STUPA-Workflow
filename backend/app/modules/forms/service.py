@@ -31,7 +31,7 @@ from app.modules.forms.validation import (
     effective_form,
 )
 from app.modules.gremien.models import Gremium
-from app.shared.config_schemas import FieldOption, FormFieldDef
+from app.shared.config_schemas import FieldOption, FormFieldDef, FormRule
 from app.shared.errors import NotFoundError, ValidationProblem
 
 
@@ -55,6 +55,11 @@ def _row_to_field_def(row: FormField) -> FormFieldDef:
     )
 
 
+def _rules_of(version: FormVersion | None) -> tuple[FormRule, ...]:
+    """Return the rules of a form version (spec 001670), none for a missing version."""
+    return tuple(FormRule.model_validate(r) for r in (version.rules or [])) if version else ()
+
+
 #: The read of the cost-center options of a `budget_select` field.
 BudgetOptions = Callable[[AsyncSession], Awaitable[list[FieldOption]]]
 
@@ -68,15 +73,48 @@ def _inject_dynamic_options(
     """Set the server-side options on the dynamic picker fields.
 
     ``options_by_type`` maps a field type to its options. ``gremium_select`` gets the
-    Gremien, ``budget_select`` gets the budget tree. The function keeps every other field
-    as it is. It copies only the affected fields, because ``FormFieldDef`` is immutable.
+    Gremien, ``budget_select`` gets the budget tree, or only the subtree below the root of
+    the field (`below_root`). The function keeps every other field as it is. It copies
+    only the affected fields, because ``FormFieldDef`` is immutable.
     """
     return tuple(
-        f.model_copy(update={"options": options_by_type[f.type]})
+        f.model_copy(update={"options": _field_options(f, options_by_type[f.type])})
         if f.type in options_by_type
         else f
         for f in fields
     )
+
+
+def _field_options(field: FormFieldDef, options: list[FieldOption]) -> list[FieldOption]:
+    """Return the options of one picker field: all of them, or those below its root."""
+    root = field.validation.root_path if field.validation is not None else None
+    return below_root(options, root) if root else options
+
+
+def below_root(options: Sequence[FieldOption], root: str) -> list[FieldOption]:
+    """Return the cost centers below the cost center with the path key ``root`` (001680).
+
+    The root itself is not among them, and neither is anything outside its subtree. An
+    unknown root gives no option, so the picker is empty and the server refuses every
+    value: a wrong root must not open the whole tree. The first level below the root has
+    no parent in the result, so the picker shows it at the top.
+    """
+    roots = {o.value for o in options if o.path_key == root}
+    by_parent = {
+        parent: [o for o in options if o.parent_id == parent]
+        for parent in {o.parent_id for o in options}
+    }
+
+    def descend(ids: frozenset[str]) -> frozenset[str]:
+        children = frozenset(o.value for i in ids for o in by_parent.get(i, []))
+        return ids | descend(children) if children - ids else ids
+
+    below = descend(frozenset(roots)) - roots
+    return [
+        o.model_copy(update={"parent_id": None}) if o.parent_id in roots else o
+        for o in options
+        if o.value in below
+    ]
 
 
 def field_def_to_row_kwargs(field: FormFieldDef, order: int) -> dict[str, Any]:
@@ -156,6 +194,7 @@ class FormsService:
 
         type_fields = await self._fields_of_version(version_id)
         sections = effective_form(type_fields)
+        version = await self.session.get(FormVersion, version_id)
 
         present = {f.type for s in sections for f in s.fields} & DYNAMIC_OPTION_TYPES
         gremium_options = (
@@ -175,6 +214,8 @@ class FormsService:
             applicationTypeId=type_id,
             formVersionId=version_id,
             hasBudget=app_type.has_budget,
+            rules=_rules_of(version),
+            attachmentRequired=bool(app_type.attachment_required),
             sections=tuple(
                 FormSectionOut(
                     key=s.key,
@@ -270,4 +311,5 @@ class FormsService:
             active=version.active,
             description=version.description_i18n,
             fields=list(fields),
+            rules=_rules_of(version),
         )

@@ -99,6 +99,10 @@ _REASONS: dict[str, dict[str, str]] = {
         "eine Idee gemeldet haben.",
         "en": "You are receiving this email because you reported a problem, a question or an idea.",
     },
+    "gremium_message": {
+        "de": "Sie erhalten diese E-Mail, weil Sie Mitglied in diesem Gremium sind.",
+        "en": "You are receiving this email because you are a member of this committee.",
+    },
     "appointment": {
         "de": "Sie erhalten diese E-Mail, weil Sie zu einem Termin eingeladen sind.",
         "en": "You are receiving this email because you are invited to an appointment.",

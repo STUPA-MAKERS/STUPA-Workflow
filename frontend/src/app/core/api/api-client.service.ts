@@ -727,11 +727,12 @@ export class ApiClient {
   uploadAttachment(
     id: Uuid,
     file: File,
-    opts: { fieldKey?: string | null } = {},
+    opts: { fieldKey?: string | null; positionId?: string | null } = {},
   ): Observable<Attachment> {
     const form = new FormData();
     form.append('file', file);
     if (opts.fieldKey) form.append('field_key', opts.fieldKey);
+    if (opts.fieldKey && opts.positionId) form.append('position_id', opts.positionId);
     return this.http
       .post<AttachmentOutWire>(`${this.base}/applications/${id}/attachments`, form)
       .pipe(map(mapAttachment));
@@ -752,11 +753,13 @@ export class ApiClient {
       token?: string | null;
       altcha?: string | null;
       fieldKey?: string | null;
+      positionId?: string | null;
     } = {},
   ): Observable<DraftUpload> {
     const form = new FormData();
     form.append('file', file);
     if (opts.fieldKey) form.append('field_key', opts.fieldKey);
+    if (opts.fieldKey && opts.positionId) form.append('position_id', opts.positionId);
     if (!opts.token && opts.altcha) form.append('altcha', opts.altcha);
     const headers = opts.token ? new HttpHeaders({ [DRAFT_TOKEN_HEADER]: opts.token }) : undefined;
     return this.http

@@ -1877,7 +1877,7 @@ describe('ExpensesComponent (batch/bulk)', () => {
     expect(nav).toHaveBeenLastCalledWith(
       [],
       expect.objectContaining({
-        queryParams: { budget: null, kind: null, q: null, view: null, new: null, invoice: null },
+        queryParams: { budget: null, fiscalYear: null, kind: null, q: null, view: null, new: null, invoice: null },
         queryParamsHandling: 'merge',
         replaceUrl: true,
       }),
@@ -1891,6 +1891,7 @@ describe('ExpensesComponent (batch/bulk)', () => {
       expect.objectContaining({
         queryParams: {
           budget: 'b-1',
+          fiscalYear: null,
           kind: 'income',
           q: 'flyer',
           view: null,
@@ -1986,6 +1987,22 @@ describe('ExpensesComponent (query-param adoption)', () => {
     expect(cmp.budgetId()).toBe('b-1');
     expect(cmp.kind()).toBe('income');
     expect(cmp.q()).toBe('foo');
+  });
+
+  it('adopts the fiscal year with a cost centre and sends it (§ 001874)', () => {
+    const { cmp } = buildWithQuery([
+      ['budget', 'b-1'],
+      ['fiscalYear', 'fy-1'],
+    ]);
+    expect(cmp.fiscalYearId()).toBe('fy-1');
+    expect(cmp.showYearChip()).toBe(true);
+    expect(cmp.activeFilterCount()).toBe(2);
+  });
+
+  it('drops a fiscal year without a cost centre', () => {
+    const { cmp } = buildWithQuery([['fiscalYear', 'fy-1']]);
+    expect(cmp.fiscalYearId()).toBe('');
+    expect(cmp.showYearChip()).toBe(false);
   });
 
   it('ignores an unrecognised kind but still adopts the other filters', () => {
@@ -2964,6 +2981,36 @@ describe('ExpensesComponent (list/detail)', () => {
     flushList(http, page([EXPENSE]));
     expect(nav).not.toHaveBeenCalled();
     nav.mockRestore();
+  });
+
+  /** § 001874: the chip offers the years of the top cost centre of the filter. */
+  it('filters by the fiscal year of the cost centre and drops it with another top cost centre', () => {
+    const tree: BudgetTreeNode[] = [...ROOT_TREE, { ...ROOT_TREE[0], id: 'top-2', key: 'QS', children: [] }];
+    const { cmp, http } = build({ tree, perms: ['budget.view'] });
+    cmp.selectBudget('child-1');
+    flushList(http, page([]));
+    TestBed.tick();
+    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE, FY_OLD]);
+    expect(cmp.yearOptions().map((o) => o.label)).toEqual(['Alle Jahre', '2026', '2025']);
+    expect(cmp.yearChipLabel()).toBe('Haushaltsjahr');
+    cmp.selectFiscalYear('fy-old');
+    const req = http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET');
+    expect(req.request.params.get('fiscalYear')).toBe('fy-old');
+    expect(req.request.params.get('budget')).toBe('child-1');
+    req.flush(page([]));
+    expect(cmp.yearChipLabel()).toContain('2025');
+    cmp.selectBudget('top-1');
+    flushList(http, page([]));
+    expect(cmp.fiscalYearId()).toBe('fy-old');
+    cmp.selectBudget('top-2');
+    flushList(http, page([]));
+    expect(cmp.fiscalYearId()).toBe('');
+    TestBed.tick();
+    http.match((r) => r.url.includes('/fiscal-years')).forEach((r) => r.flush([]));
+    expect(cmp.yearOptions().map((o) => o.value)).toEqual(['']);
+    cmp.selectBudget('');
+    flushList(http, page([]));
+    expect(cmp.showYearChip()).toBe(false);
   });
 
   /** The year labels load once per top cost centre. */

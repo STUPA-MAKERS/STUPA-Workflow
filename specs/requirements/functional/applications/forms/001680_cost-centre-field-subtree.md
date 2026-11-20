@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - backend/app/modules/forms/service.py
+  - backend/app/modules/budget/form_options.py
+  - frontend/src/app/pages/admin/forms/form-editor.component.ts
 scope:
   - backend/app/modules/forms
   - backend/app/modules/budget

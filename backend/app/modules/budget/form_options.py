@@ -49,6 +49,7 @@ async def budget_field_options(session: AsyncSession) -> list[FieldOption]:
             label={"de": f"{name} ({path})", "en": f"{name} ({path})"},
             parentId=str(parent) if parent is not None else None,
             key=key,
+            pathKey=path,
             color=color,
         )
         for bid, name, path, parent, key, color, tree_path in rows

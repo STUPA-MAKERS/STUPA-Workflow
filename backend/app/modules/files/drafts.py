@@ -156,6 +156,7 @@ class DraftAttachments:
         data: bytes,
         by: str,
         field_key: str | None = None,
+        position_id: str | None = None,
     ) -> DraftAttachmentOut:
         """Store a draft upload and enqueue its scan.
 
@@ -204,6 +205,7 @@ class DraftAttachments:
             id=attachment_id,
             application_id=None,
             field_key=field_key,
+            position_id=position_id if field_key else None,
             filename=display_name,
             mime=mime,
             size=len(data),
@@ -230,6 +232,8 @@ class DraftAttachments:
             mime=mime,
             size=len(data),
             scanned=False,
+            fieldKey=field_key,
+            positionId=attachment.position_id,
             draftToken=plain,
             draftExpiresAt=expires_at,
         )

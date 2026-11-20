@@ -18,6 +18,8 @@ export interface PositionOffer {
 
 /** One cost position with its offers. */
 export interface CostPosition {
+  /** The stable id of the position; its files name it (spec 001730). Older answers have none. */
+  readonly id?: string;
   readonly label: string;
   readonly offers: readonly PositionOffer[];
   /** The position has no comparison offers; `noOffersReason` says why. */
@@ -40,6 +42,7 @@ export function normalizePositions(raw: unknown): readonly CostPosition[] {
   return raw
     .filter((p): p is Record<string, unknown> => typeof p === 'object' && p !== null)
     .map((p) => ({
+      ...(typeof p['id'] === 'string' && p['id'] ? { id: p['id'] } : {}),
       label: typeof p['label'] === 'string' ? p['label'] : '',
       offers: (Array.isArray(p['offers']) ? p['offers'] : [])
         .filter((o): o is Record<string, unknown> => typeof o === 'object' && o !== null)

@@ -1,8 +1,9 @@
 """Routes of the tab "Gremien" under ``/api/committees``.
 
 Every route reads, except ``PUT /committees/{id}/info``, the save of the Info tab
-(gremium permission ``info.write``, see ``info``). The attendance export writes one
-``export`` audit entry and nothing else.
+(gremium permission ``info.write``, see ``info``), and ``POST /committees/{id}/notify``,
+the message to the members (gremium permission ``members.notify``, see ``notify``). The
+attendance export writes one ``export`` audit entry and nothing else.
 
 ``GET /committees/overview`` lists the gremien that the caller sees. Every route of one
 gremium (``/committees/{id}/...``) first runs the gate ``access.require_gremium``: an
@@ -15,7 +16,7 @@ from datetime import date
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 
 from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.audit.actions import AuditAction
@@ -23,6 +24,7 @@ from app.modules.audit.service import record as audit_record
 from app.modules.auth.policy import has_gremium_permission
 from app.modules.gremien.access import require_gremium
 from app.modules.gremien_overview import info as gremium_info
+from app.modules.gremien_overview import notify as gremium_notify
 from app.modules.gremien_overview.attendance_export import attendance_export, export_workbook
 from app.modules.gremien_overview.schemas import (
     AttendanceOut,
@@ -33,10 +35,14 @@ from app.modules.gremien_overview.schemas import (
     GremiumInfoOut,
     GremiumMeetingOut,
     GremiumMemberOut,
+    GremiumNotifyIn,
+    GremiumNotifyOut,
     GremiumOverviewOut,
     MemberAttendanceOut,
 )
 from app.modules.gremien_overview.service import GremienService
+from app.modules.notifications.provider import mail_queue_from_pool
+from app.modules.notifications.queue import MailQueue
 from app.shared.errors import ForbiddenError, ProblemDetail, ValidationProblem
 from app.shared.xlsx import XLSX_MEDIA_TYPE
 
@@ -59,6 +65,14 @@ def _service(db: DbSession, settings: SettingsDep) -> GremienService:
 
 
 ServiceDep = Annotated[GremienService, Depends(_service)]
+
+
+def get_notify_queue(request: Request) -> MailQueue | None:
+    """Return the mail queue of the app, ``None`` without Redis; a test overrides it."""
+    return mail_queue_from_pool(getattr(request.app.state, "arq_pool", None))
+
+
+NotifyQueueDep = Annotated[MailQueue | None, Depends(get_notify_queue)]
 
 
 @router.get("/overview", response_model=list[GremiumOverviewOut], responses=_errors(401))
@@ -268,3 +282,30 @@ async def save_gremium_info(
     saved = await gremium_info.save_info(db, principal, gremium_id, body)
     await db.commit()
     return saved
+
+
+@router.post(
+    "/{gremium_id}/notify",
+    response_model=GremiumNotifyOut,
+    responses=_errors(401, 403, 404, 422),
+)
+async def notify_gremium_members(
+    gremium_id: UUID,
+    body: GremiumNotifyIn,
+    principal: ReaderDep,
+    db: DbSession,
+    settings: SettingsDep,
+    queue: NotifyQueueDep,
+) -> GremiumNotifyOut:
+    """Send a message by mail to each member and pool substitute, the sender included.
+
+    The caller needs ``members.notify`` in the gremium (403). The subject holds 1 to 200
+    characters and the message 1 to 10000 characters (422). The answer tells the number
+    of recipients only. The send writes a ``gremium_notify`` audit entry.
+    """
+    await require_gremium(db, principal, gremium_id)
+    sent = await gremium_notify.notify_members(
+        db, principal, gremium_id, body, queue=queue, settings=settings
+    )
+    await db.commit()
+    return sent

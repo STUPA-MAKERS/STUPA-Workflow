@@ -502,7 +502,7 @@ describe('ApplicationCaptureComponent', () => {
 
   it('close discards the draft files and emits closed', async () => {
     const s = await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Schließen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
     expect(s.drafts.discard).toHaveBeenCalled();
     expect(s.closed).toHaveBeenCalled();
   });

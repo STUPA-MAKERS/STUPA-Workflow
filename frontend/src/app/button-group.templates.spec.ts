@@ -1,7 +1,7 @@
 /**
  * Button group contract of the app templates (spec 001354). jsdom renders no layout, so this
  * spec reads the HTML. Every button of the app (`app-button`, `a[appButton]`,
- * `button[appButton]`, `app-row-menu`) stands in a button group: in `app-button-group`, in an
+ * `button[appButton]`, `app-row-menu`, `app-copy-button`) stands in a button group: in `app-button-group`, in an
  * element with the class `btn-grp`, or in a slot that the kit draws as a group (the actions of
  * `app-sheet-bar`, `app-page-header`, the bar of the list/detail layout, the footer of
  * `app-dialog`, the head of `app-side-sheet` and the head of a meeting). A single button
@@ -72,6 +72,7 @@ const attrNames = (attrs: string): string[] =>
 
 const isButton = (tag: Tag): boolean =>
   tag.name === 'app-button' ||
+  tag.name === 'app-copy-button' ||
   tag.name === 'app-row-menu' ||
   ((tag.name === 'a' || tag.name === 'button') && attrNames(tag.attrs).includes('appbutton'));
 

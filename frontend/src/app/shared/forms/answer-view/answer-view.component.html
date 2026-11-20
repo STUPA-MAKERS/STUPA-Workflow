@@ -2,7 +2,12 @@
   <app-section class="av__sec" [heading]="block.label" [headingLang]="block.labelLang">
     @for (chunk of block.chunks; track chunk.key) {
       @if (chunk.kind === 'positions') {
-        <app-positions-view [label]="chunk.label" [value]="chunk.value" [surface]="surface()" />
+        <app-positions-view
+          [label]="chunk.label"
+          [value]="chunk.value"
+          [surface]="surface()"
+          [files]="files()"
+        />
       } @else {
         <app-field-group [surface]="surface()">
           @for (row of chunk.rows; track $index) {

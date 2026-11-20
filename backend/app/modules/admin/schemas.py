@@ -366,6 +366,8 @@ class ApplicationTypeOut(FrozenCamelModel, frozen=True):
     name_i18n: I18nMap = Field(serialization_alias="nameI18n")
     has_budget: bool = Field(serialization_alias="hasBudget")
     pdf_signatures: bool = Field(default=False, serialization_alias="pdfSignatures")
+    #: The Antrag needs a file before the submit (spec 001732).
+    attachment_required: bool = Field(default=False, serialization_alias="attachmentRequired")
     comparison_offers: dict[Any, Any] | None = Field(serialization_alias="comparisonOffers")
     retention_months: int | None = Field(default=None, serialization_alias="retentionMonths")
     #: The group in step 1 of the apply wizard (spec 001180), ``None`` = no group.
@@ -385,6 +387,7 @@ class ApplicationTypeCreate(FrozenCamelModel, frozen=True):
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     has_budget: bool = Field(default=False, alias="hasBudget")
     pdf_signatures: bool = Field(default=False, alias="pdfSignatures")
+    attachment_required: bool = Field(default=False, alias="attachmentRequired")
     comparison_offers: ComparisonOffers | None = Field(default=None, alias="comparisonOffers")
     retention_months: int | None = Field(default=None, alias="retentionMonths", ge=1)
     group_id: UUID | None = Field(default=None, alias="groupId")
@@ -397,6 +400,7 @@ class ApplicationTypeUpdate(FrozenCamelModel, frozen=True):
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     has_budget: bool | None = Field(default=None, alias="hasBudget")
     pdf_signatures: bool | None = Field(default=None, alias="pdfSignatures")
+    attachment_required: bool | None = Field(default=None, alias="attachmentRequired")
     comparison_offers: ComparisonOffers | None = Field(default=None, alias="comparisonOffers")
     retention_months: int | None = Field(default=None, alias="retentionMonths", ge=1)
     #: A sent null takes the type out of its group. An omitted field keeps the group.

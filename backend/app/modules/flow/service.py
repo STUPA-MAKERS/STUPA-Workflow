@@ -65,6 +65,7 @@ from app.modules.applications.schemas import StateOut
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import AuditService
 from app.modules.auth.principal import Principal
+from app.modules.files.service import ATTACHMENT_REQUIRED
 from app.modules.flow import context as flow_context
 from app.modules.flow.dispatch import (
     ActionDispatcher,
@@ -457,6 +458,8 @@ class FlowService:
         holds one. The graph validator rejects such an exit on save. Otherwise the application
         would be approved at once without any vote. An automatic transition into a vote state
         without a resolvable Gremium does not fire either. The next candidate may still fire.
+        An Antrag that lacks the file of its Antragsart stays in the initial state (spec
+        001732), so the create of such an Antrag never fails after its commit.
 
         Returns:
             The result of the fired transition, or `None` when none fired.
@@ -466,6 +469,8 @@ class FlowService:
             return None
         state = await self._load_state(app.current_state_id)
         if state is not None and state.kind == "vote":
+            return None
+        if await flow_context.missing_required_file(self.session, app):
             return None
         ctx = await flow_context.build_context(self.session, app, principal, manual=False)
         for t in await self._outgoing(app):
@@ -867,7 +872,9 @@ class FlowService:
             NotFoundError: The application or the transition does not exist (404).
             ConflictError: The state does not match, the guard fails, or another
                 transition won the race (409).
-            ValidationProblem: `meeting_id` does not fit the transition (422).
+            ValidationProblem: `meeting_id` does not fit the transition (422), or the
+                Antrag leaves the initial state without the file that its Antragsart
+                requires (422 `attachment_required`, spec 001732).
         """
         app = await self._load_app(application_id, allow_unconfirmed=allow_unconfirmed)
         transition = await self._load_transition(transition_id)
@@ -901,6 +908,12 @@ class FlowService:
         )
         if not eval_guard(transition.guard, ctx):
             raise ConflictError("Transition guard not satisfied.", code="guard_failed")
+        if await flow_context.missing_required_file(self.session, app):
+            raise ValidationProblem(
+                "This Antragsart needs a file before the Antrag leaves its first state.",
+                code=ATTACHMENT_REQUIRED,
+                errors=[{"field": "attachments", "msg": "a file is required"}],
+            )
         target = await self.session.get(State, transition.to_state_id)
         if manual and not as_applicant:
             check_amount_given(

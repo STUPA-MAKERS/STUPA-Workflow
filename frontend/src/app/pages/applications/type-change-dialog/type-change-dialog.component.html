@@ -11,6 +11,9 @@
     [ngModel]="typeId()"
     (ngModelChange)="pickType($event)"
   />
+  @if (previewError(); as error) {
+    <p class="tcd__blocked" role="alert">{{ error | t }}</p>
+  }
   @if (preview(); as p) {
     <dl class="tcd__fields">
       @if (missing().length) {

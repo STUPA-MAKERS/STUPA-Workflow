@@ -283,6 +283,17 @@ describe('toFormlyFields', () => {
     expect(cfg.props?.['minPositions']).toBe(3);
   });
 
+  it('gives the cost line to the last positions field only (spec 001630)', () => {
+    const fields: FormFieldDef[] = [
+      { key: 'a', type: 'positions', label: { de: 'A' } },
+      { key: 'b', type: 'positions', label: { de: 'B' } },
+    ];
+    const [first, last] = toFormlyFields(fields, 'de');
+    expect(first.props?.['costLine']).toBeUndefined();
+    expect(last.props?.['costLine']).toBe(true);
+    expect(last.props?.['costFields']).toBe(fields);
+  });
+
   it('omits positions min props when validation does not set them', () => {
     const fields: FormFieldDef[] = [
       { key: 'costs', type: 'positions', label: { de: 'Kosten' }, validation: {} },

@@ -38,13 +38,16 @@
         <div class="gr__config">
           <div class="gr__configHead">
             <span class="cap gr__configTitle" id="gr-config-title">{{ 'account.mcp.config' | t }}</span>
-            <app-copy-button
-              variant="text"
-              [text]="setupJson()"
-              [label]="'action.copy' | t"
-              [copiedLabel]="'account.mcp.copied' | t"
-              [ariaLabel]="'account.mcp.copyConfig' | t"
-            />
+            <app-button-group>
+              <app-copy-button
+                class="btn-grp__seg"
+                variant="text"
+                [text]="setupJson()"
+                [label]="'action.copy' | t"
+                [copiedLabel]="'account.mcp.copied' | t"
+                [ariaLabel]="'account.mcp.copyConfig' | t"
+              />
+            </app-button-group>
           </div>
           <pre class="gr__json mono"><code>{{ setupJson() }}</code></pre>
         </div>

@@ -20,6 +20,7 @@ from app.modules.applications.schemas import (
     VersionOut,
     VersionTypeChangeOut,
 )
+from app.modules.applications.service.form_checks import check_form_rules
 from app.modules.applications.service.service_base import (
     ApplicationsServiceBase,
     _amount_currency,
@@ -29,7 +30,9 @@ from app.modules.applications.service.service_base import (
 )
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
+from app.modules.budget.form_options import budget_field_options
 from app.modules.forms.models import FormField
+from app.modules.forms.service import FormsService
 from app.modules.forms.validation import (
     SYSTEM_TITLE_KEY,
     AnswerValidationError,
@@ -109,6 +112,16 @@ class EditOps(ApplicationsServiceBase):
                     errors=[{"field": e.field, "msg": e.msg} for e in errors],
                 ) from exc
 
+        effective = await FormsService(self.session, budget_field_options).get_effective_form(
+            app.type_id, form_version_id=app.form_version_id
+        )
+        diff: DataDiff = compute_diff(app.data, clean)
+        check_form_rules(
+            effective,
+            clean,
+            changed=frozenset({*diff["added"], *diff["removed"], *diff["changed"]}),
+        )
+
         new_amount, new_currency = _amount_currency(fields, clean)
         if app.approved_amount is not None and (
             new_amount is None or new_amount < app.approved_amount
@@ -119,7 +132,6 @@ class EditOps(ApplicationsServiceBase):
                 errors=[{"field": "amount", "msg": "below the approved amount"}],
             )
 
-        diff: DataDiff = compute_diff(app.data, clean)
         next_version = await self._current_version(application_id) + 1
         self.session.add(
             SubmissionVersion(

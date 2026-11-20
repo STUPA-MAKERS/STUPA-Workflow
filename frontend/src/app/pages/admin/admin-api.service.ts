@@ -13,7 +13,7 @@ import { API_BASE_URL, USE_MOCK_API } from '@core/api/api.config';
 import { I18nService } from '@core/i18n/i18n.service';
 import { mapDiff } from '@core/api/mappers';
 import type { I18nMap, Page, Uuid } from '@core/api/models';
-import type { FormFieldDef } from '@core/api/models';
+import type { FormFieldDef, FormRule } from '@core/api/models';
 import {
   BACKUP_RESTORE_CONFIRMATION,
   type AdminPrincipal,
@@ -150,6 +150,7 @@ interface ApplicationTypeOutWire {
   readonly gremiumId?: Uuid | null;
   readonly hasBudget?: boolean;
   readonly pdfSignatures?: boolean;
+  readonly attachmentRequired?: boolean;
   readonly retentionMonths?: number | null;
   readonly activeFormVersionId?: Uuid | null;
   readonly activeFormVersion?: number | null;
@@ -172,6 +173,7 @@ function mapTypeFull(t: ApplicationTypeOutWire): ApplicationTypeFull {
     gremiumId: t.gremiumId ?? null,
     hasBudget: t.hasBudget ?? false,
     pdfSignatures: t.pdfSignatures ?? false,
+    attachmentRequired: t.attachmentRequired ?? false,
     retentionMonths: t.retentionMonths ?? null,
     activeFormVersionId: t.activeFormVersionId ?? null,
     activeFormVersion: t.activeFormVersion ?? null,
@@ -1013,6 +1015,9 @@ export class AdminApiService {
       ...(body.gremiumId !== undefined ? { gremiumId: body.gremiumId } : {}),
       ...(body.hasBudget !== undefined ? { hasBudget: body.hasBudget } : {}),
       ...(body.pdfSignatures !== undefined ? { pdfSignatures: body.pdfSignatures } : {}),
+      ...(body.attachmentRequired !== undefined
+        ? { attachmentRequired: body.attachmentRequired }
+        : {}),
       ...(body.groupId !== undefined ? { groupId: body.groupId } : {}),
     };
     return this.http
@@ -1049,6 +1054,7 @@ export class AdminApiService {
     typeId: Uuid,
     fields: FormFieldDef[],
     description?: I18nMap | null,
+    rules: readonly FormRule[] = [],
   ): Observable<{ id: Uuid }> {
     if (this.mock) {
       const id = `formver-${fields.length}`;
@@ -1059,6 +1065,7 @@ export class AdminApiService {
         active: true,
         description: description ?? null,
         fields: mockTable(fields),
+        rules: mockTable([...rules]),
       };
       const t = this.store.appTypes.find((x) => x.id === typeId);
       if (t) t.activeFormVersionId = id;
@@ -1066,7 +1073,7 @@ export class AdminApiService {
     }
     return this.http.post<{ id: Uuid }>(
       `${this.base}/admin/application-types/${typeId}/form-versions`,
-      { fields, description: description ?? null },
+      { fields, description: description ?? null, rules },
     );
   }
 

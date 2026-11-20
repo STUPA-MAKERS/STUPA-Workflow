@@ -39,6 +39,7 @@ class AttachmentService(FilesService):
         data: bytes,
         by: str,
         field_key: str | None = None,
+        position_id: str | None = None,
     ) -> AttachmentOut:
         """Upload a file to an application that exists (see ``FilesService.upload``).
 
@@ -48,7 +49,13 @@ class AttachmentService(FilesService):
         if await self.session.get(Application, application_id) is None:
             raise NotFoundError(f"application {application_id} not found")
         return await FilesService.upload(
-            self, application_id, filename=filename, data=data, by=by, field_key=field_key
+            self,
+            application_id,
+            filename=filename,
+            data=data,
+            by=by,
+            field_key=field_key,
+            position_id=position_id,
         )
 
     async def assert_app_visible(

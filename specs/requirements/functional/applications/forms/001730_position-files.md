@@ -5,7 +5,12 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - backend/app/modules/files/service.py
+  - backend/app/modules/files/drafts.py
+  - frontend/src/app/features/apply/draft-attachments.service.ts
+  - frontend/src/app/shared/formly/types/formly-positions.type.ts
+  - frontend/src/app/shared/forms/positions-view/positions-view.component.ts
 scope:
   - backend/app/modules/files
   - backend/app/modules/forms

@@ -3,10 +3,12 @@
     <app-page-header [pane]="true" titleId="act-title" [title]="'activity.title' | t">
       @if (!phone()) {
         <ng-container ngProjectAs="[actions]">
-          <a appButton routerLink="/apply">
-            <app-icon name="plus" [size]="16" />
-            {{ 'fab.application' | t }}
-          </a>
+          <app-button-group>
+            <a appButton routerLink="/apply">
+              <app-icon name="plus" [size]="16" />
+              {{ 'fab.application' | t }}
+            </a>
+          </app-button-group>
         </ng-container>
       }
     </app-page-header>
@@ -61,7 +63,8 @@
                     class="act__row"
                     role="listitem"
                     [title]="title(e)"
-                    [link]="e.url"
+                    [link]="path(e)"
+                    [linkQueryParams]="query(e)"
                     [wrap]="phone()"
                     [subWrap]="phone()"
                   >

@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from app.modules.auth.principal import Principal
 from app.modules.todos.link_service import LinkService
 from app.modules.todos.links import Resolved
 from app.modules.todos.models import Link
@@ -30,6 +31,8 @@ from tests.unit.modules.todos.fakes import (
 APP = uuid.UUID(int=11)
 INVOICE = uuid.UUID(int=12)
 TICKET = uuid.UUID(int=13)
+COST_CENTRE = uuid.UUID(int=14)
+BOOKER = Principal(sub="me-sub", permissions={"todo.write", "budget.book"})
 
 
 class _Rights:
@@ -291,6 +294,50 @@ async def test_targets_leave_out_the_element_and_its_links() -> None:
     session.execute_q.append([])
     await service.targets("", "todo", USER, exclude=("todo", card_id))
     assert todos.links.searched[-1] == ("", "todo", card_id)
+
+
+async def test_a_cost_centre_link_needs_a_budget_write_right() -> None:
+    """§F/collaboration/links/001410: the change right on the other end is not enough."""
+    session = ScriptedSession()
+    app, budget = ("application", APP), ("budget", COST_CENTRE)
+    service, _ = _service(session, readable=[app, budget], change=[app])
+    with pytest.raises(ForbiddenError) as forbidden:
+        await service.add(app, budget, USER)
+    assert forbidden.value.code == "link_forbidden" and session.added == []
+    session.scalar_q.append(None)
+    await service.add(app, budget, BOOKER)
+    assert session.added != []
+    row = link_row(app, budget)
+    session.put(row)
+    with pytest.raises(ForbiddenError):
+        await service.remove(row.id, USER)
+    await service.remove(row.id, BOOKER)
+    assert session.deleted == [row]
+
+
+async def test_without_a_budget_write_right_a_cost_centre_is_no_hit_and_stays() -> None:
+    """§F/collaboration/links/001410: no search hit, no remove button, no link from it."""
+    session = ScriptedSession()
+    service, todos = _service(session, readable=[("invoice", INVOICE), ("budget", COST_CENTRE)])
+    hits = [
+        TodoLinkTarget(kind="budget", target_id=COST_CENTRE, title="KS"),
+        TodoLinkTarget(kind="ticket", target_id=TICKET, title="T"),
+    ]
+    todos.links.hits = hits
+    assert [t.kind for t in await service.targets("ks", "all", USER)] == ["ticket"]
+    assert await service.targets("ks", "all", BOOKER) == hits
+    service = replace(service, rights=_Rights(("invoice", INVOICE), ("budget", COST_CENTRE)))
+    me = ("invoice", INVOICE)
+    session.execute_q.append([_edge(me, ("budget", COST_CENTRE), NOW)])
+    service.todos.links.resolved = {  # type: ignore[attr-defined]
+        ("budget", COST_CENTRE): Resolved(True, "KS", "/budget"),
+    }
+    out = await service.of(*me, USER)
+    assert out.can_link is True and out.links[0].removable is False
+    session.execute_q.append([_edge(me, ("budget", COST_CENTRE), NOW)])
+    assert (await service.of(*me, BOOKER)).links[0].removable is True
+    session.execute_q.append([])
+    assert (await service.of("budget", COST_CENTRE, USER)).can_link is False
 
 
 def test_the_stored_order_is_stable() -> None:
