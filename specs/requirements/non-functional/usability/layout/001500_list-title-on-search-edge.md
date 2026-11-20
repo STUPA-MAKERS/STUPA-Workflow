@@ -4,7 +4,7 @@ title: A wide list column has no visible title and puts its buttons beside the s
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-19
+updated: 2026-11-20
 tests:
   - "frontend/vendor/ui-kit/src/styles/styles.spec.ts:WideListHead"
 implementation:
@@ -23,7 +23,8 @@ the filter bar, after a gap of 12px. That line is the search bar, or the filter 
 column has no search bar. The buttons must be as high as the control at the start of that line,
 and that control must end before the buttons. In the very high contrast the buttons must be as
 high as the yellow of the search bar. The buttons must stay beside the filter bar while the page
-scrolls. A head without buttons must take no room.
+scrolls, level with the control at the start of the line, so they keep the same gap to the top
+edge of the screen as that control. A head without buttons must take no room.
 
 A list column without a filter bar (no search bar and no filter chips, such as Konto) must keep
 its title line on a wide screen, because nothing else names the page there.
@@ -41,4 +42,6 @@ buttons, which act on the list, stand next to the search and the filters.
 
 Test: A unit test of the kit reads `list-detail.scss` and expects the title to be visually
 hidden only in a column with a filter bar, the buttons to be absolute at the end of the first filter line with the height of the
-search bar, the search bar to end before them, and the lower height in the very high contrast.
+search bar, the search bar to end before them, the lower height in the very high contrast, and the
+sticky top of the head 8px (`--space-2`, the gap of the sticky bar) below the sticky top of the
+filter bar. A screenshot of Aktivität scrolled on a wide screen shows the button level with the chips.
