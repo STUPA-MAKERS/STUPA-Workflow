@@ -11,6 +11,13 @@
   border-radius: var(--radius-xl);
   background: var(--color-surface-1);
 }
+/* Light theme: the card is the opaque first glass level (white), also on the glass of the
+   votes sheet, where `glass-content` makes `--color-surface-1` a grey overlay and the pale
+   ballot buttons lose their contrast to it (spec 002070). Very high contrast sets
+   `--color-glass-1` to the page colour, so it keeps its black card. */
+:host-context([data-theme='light']) .vc {
+  background: var(--color-glass-1);
+}
 .vc__head {
   display: flex;
   align-items: flex-start;
