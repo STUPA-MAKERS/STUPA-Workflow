@@ -4,7 +4,7 @@ title: The graph shows only what the person reads
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-19
+updated: 2026-11-20
 implementation:
   - backend/app/modules/graph/service.py
   - frontend/src/app/pages/graph
@@ -24,7 +24,7 @@ relation to it and no count of hidden elements. With the switch on, an element t
 does not read and that has a relation to a node the person reads must show as a grey node
 "<Art> (kein Zugriff)" (`<Kind> (no access)`), without title, date, URL or detail. The grey
 node must show only its relations to nodes that the person reads. A press on it must not open
-anything. The filters "Zeitraum", "Gremium" and the search must not apply to a grey node.
+anything. The filter "Zeitraum" and the search must not apply to a grey node.
 
 Reason: The section `Verknüpft` already tells a reader that an unreadable element is linked
 (F/collaboration/links/001405), so the grey node tells nothing new about one element. The

@@ -5,13 +5,13 @@ description: The graph page backend — GET /api/graph answers the elements a pe
 
 # Graph — `backend/app/modules/graph`
 
-**Does:** Answers the page "Graph" (`/graph`, specs 001420-001432): every element of the eleven link kinds (spec 001400) that the caller reads, with the links of the table `link` and the built-in relations of the data as edges. The module stores nothing. It has NO read rule of its own: `LinkResolver.resolve` (be-todos) decides per element, with the same gates as the "Verknüpft" lists.
+**Does:** Answers the page "Graph" (`/graph`, specs 001420-001434): every element of the eleven link kinds (spec 001400) that the caller reads, with the links of the table `link` and the built-in relations of the data as edges. The module stores nothing. It has NO read rule of its own: `LinkResolver.resolve` (be-todos) decides per element, with the same gates as the "Verknüpft" lists.
 
 **Key files:**
-- `router.py` — `GET /graph` behind `require_principal(GRAPH_VIEW)` (`graph.view`). Query: `kinds` (repeatable), `from`, `to`, `gremiumId`, `relations` (`all|links|builtin`), `q`, `single`, `noAccess`, `cursor`.
+- `router.py` — `GET /graph` behind `require_principal(GRAPH_VIEW)` (`graph.view`). Query: `kinds` (repeatable), `from`, `to`, `relations` (`all|links|builtin`), `q`, `depth` (0-5, default 2), `single`, `noAccess`, `cursor`.
 - `service.py` — `GraphService.page(principal, filters, cursor)`: reads the relations, resolves every ref once, builds the nodes (`node_of`) and hands them to the pure functions. `offset_of` turns the cursor into a node offset (422 `graph_cursor_invalid`).
-- `build.py` — pure: `Relation`, `Node`, `Filters`, `merged` (a link and a built-in relation of one pair give one `link` line), `passes`, `shown` (filters, the search with its neighbours, the rule "only with a relation"), `page_of` (60 nodes per page, each edge between a node of the page and a node of this or an earlier page). `UNDATED` = Gremium and cost centre: they pass every period and take the date of their newest neighbour for the order.
-- `relations.py` — `link_relations` (table `link`), `builtin_reads()` (one select per built-in relation of spec 001424), `facts` (date and Gremium of each element, spec 001425).
+- `build.py` — pure: `Relation`, `Node`, `Filters`, `merged` (a link and a built-in relation of one pair give one `link` line), `passes`, `shown` (the hits of the filters and the search, their neighbours up to `Filters.depth` lines away through `_within` (spec 001434; a neighbour skips kind, period and search), the rule "only with a relation"), `page_of` (60 nodes per page, each edge between a node of the page and a node of this or an earlier page). `UNDATED` = Gremium and cost centre: they pass every period and take the date of their newest neighbour for the order.
+- `relations.py` — `link_relations` (table `link`), `builtin_reads()` (one select per built-in relation of spec 001424), `dates` (the date of each element, spec 001425).
 - `schemas.py` — `GraphNode` (`kind`, `id`, `title`, `date`, `url`, `granted`, `accessible`, `detail`), `GraphEdge` (`a`, `b`, `source`), `GraphPage` (`nodes`, `edges`, `nextCursor`).
 - Migration `b7e3d9a41c62` seeds `graph.view` for the admin role only (spec 001421). The scope `read` of an OAuth token covers it (`auth/oauth.py`).
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -17,9 +18,6 @@ from app.modules.graph.build import (
     passes,
     shown,
 )
-
-G1 = uuid.UUID(int=901)
-G2 = uuid.UUID(int=902)
 
 
 def _ref(kind: str, number: int) -> Ref:
@@ -142,19 +140,6 @@ def test_the_period_keeps_dated_nodes_inside_and_undated_kinds(
     assert set(_refs(nodes)) == expected
 
 
-def test_the_gremium_filter_reads_the_gremien_of_a_node() -> None:
-    """Spec 001425: only nodes of the Gremium show."""
-    candidates = _nodes(
-        _node(APP, date(2026, 5, 1), gremien=frozenset({G1})),
-        _node(TOP, date(2026, 6, 1), gremien=frozenset({G1, G2})),
-        _node(MEETING, date(2026, 6, 1), gremien=frozenset({G2})),
-    )
-    relations = [Relation(APP, TOP, "builtin"), Relation(TOP, MEETING, "builtin")]
-    nodes, lines = shown(candidates, relations, Filters(gremium=G1))
-    assert set(_refs(nodes)) == {APP, TOP}
-    assert _pairs(lines) == {frozenset((APP, TOP))}
-
-
 @pytest.mark.parametrize(
     ("choice", "expected"),
     [
@@ -174,7 +159,7 @@ def test_the_relation_filter(choice: str, expected: set[frozenset[Ref]]) -> None
 
 
 def test_the_search_shows_the_hits_and_their_neighbours() -> None:
-    """Spec 001425: a hit, its neighbours and the lines of the hit."""
+    """Specs 001425, 001434: a hit and its neighbours one step away."""
     candidates = _nodes(
         Node(ref=APP, accessible=True, title="Erstiparty", date=date(2026, 5, 1)),
         Node(ref=TOP, accessible=True, title="TOP 3", date=date(2026, 6, 1)),
@@ -188,15 +173,67 @@ def test_the_search_shows_the_hits_and_their_neighbours() -> None:
         Relation(APP, INVOICE, "link"),
     ]
 
-    nodes, lines = shown(candidates, relations, Filters(q="  PARTY "))
+    nodes, lines = shown(candidates, relations, Filters(q="  PARTY ", depth=1))
     assert set(_refs(nodes)) == {APP, TOP}
     assert _pairs(lines) == {frozenset((APP, TOP))}
 
-    with_single, _ = shown(candidates, relations, Filters(q="party", single=True))
+    with_single, _ = shown(candidates, relations, Filters(q="party", single=True, depth=1))
     assert set(_refs(with_single)) == {APP, TOP, LONELY}
 
-    grey, _ = shown(candidates, relations, Filters(q="party", no_access=True))
+    grey, _ = shown(candidates, relations, Filters(q="party", no_access=True, depth=1))
     assert set(_refs(grey)) == {APP, TOP, INVOICE}
+
+
+def test_the_neighbours_of_a_hit_show_up_to_the_steps() -> None:
+    """Spec 001434: a neighbour shows also when it does not pass the filters."""
+    candidates = _nodes(
+        Node(ref=APP, accessible=True, title="Erstiparty", date=date(2026, 5, 1)),
+        Node(ref=TOP, accessible=True, title="TOP 3", date=date(2020, 6, 1)),
+        Node(ref=MEETING, accessible=True, title="Sitzung", date=date(2020, 6, 1)),
+        Node(ref=GREMIUM, accessible=True, title="StuPa"),
+        Node(ref=CARD, accessible=True, title="Karte", date=date(2020, 1, 1)),
+        Node(ref=INVOICE, accessible=False),
+        Node(ref=LONELY, accessible=True, title="Ticket", date=date(2020, 1, 1)),
+    )
+    relations = [
+        Relation(APP, TOP, "link"),
+        Relation(TOP, MEETING, "link"),
+        Relation(MEETING, CARD, "link"),
+        Relation(TOP, GREMIUM, "builtin"),
+        Relation(APP, INVOICE, "link"),
+        Relation(INVOICE, LONELY, "link"),
+    ]
+    hit = Filters(kinds=frozenset({"application"}), start=date(2026, 1, 1), q="party")
+    links = replace(hit, relations="links")
+
+    def refs(filters: Filters) -> set[Ref]:
+        nodes, _ = shown(candidates, relations, filters)
+        return set(_refs(nodes))
+
+    assert refs(links) == set()
+    assert refs(replace(links, single=True)) == {APP}
+    assert refs(replace(links, depth=1)) == {APP, TOP}
+    assert refs(replace(links, depth=2)) == {APP, TOP, MEETING}
+    assert refs(replace(links, depth=3)) == {APP, TOP, MEETING, CARD}
+    # A neighbour without a line is no hit: the switch does not add it.
+    assert refs(replace(links, depth=1, single=True)) == {APP, TOP}
+    # An element that the reader does not read shows with its switch only, and a step
+    # leads through it.
+    assert refs(replace(links, depth=2, no_access=True)) == {
+        APP,
+        TOP,
+        MEETING,
+        INVOICE,
+        LONELY,
+    }
+
+    every, lines = shown(candidates, relations, replace(hit, depth=2))
+    assert set(_refs(every)) == {APP, TOP, MEETING, GREMIUM}
+    assert _pairs(lines) == {
+        frozenset((APP, TOP)),
+        frozenset((TOP, MEETING)),
+        frozenset((TOP, GREMIUM)),
+    }
 
 
 def test_a_node_without_a_date_comes_with_its_newest_neighbour() -> None:
@@ -247,9 +284,9 @@ def test_a_page_holds_each_line_once_and_never_before_its_nodes() -> None:
     assert page_of(nodes, lines, 9) == ((), (), None)
 
 
-def test_an_unreadable_node_skips_the_period_and_the_gremium() -> None:
-    """Spec 001422: these filters would tell the facts of a hidden element."""
+def test_an_unreadable_node_skips_the_period() -> None:
+    """Spec 001422: the period would tell the facts of a hidden element."""
     hidden = Node(ref=INVOICE, accessible=False)
     assert passes(hidden, Filters()) is False
-    assert passes(hidden, Filters(no_access=True, start=date(2026, 1, 1), gremium=G1)) is True
+    assert passes(hidden, Filters(no_access=True, start=date(2026, 1, 1))) is True
     assert passes(hidden, Filters(no_access=True, kinds=frozenset({"todo"}))) is False

@@ -68,14 +68,19 @@ export interface GraphPage {
   readonly nextCursor: string | null;
 }
 
-/** The filters of the page (spec 001425) and its two switches. */
+/** The steps from a hit to the farthest neighbour that shows (spec 001434). */
+export const GRAPH_DEPTH_DEFAULT = 2;
+export const GRAPH_DEPTH_MAX = 5;
+
+/** The filters of the page (spec 001425), the steps (spec 001434) and its two switches. */
 export interface GraphFilters {
   readonly kinds: readonly GraphKind[];
   readonly from: string;
   readonly to: string;
-  readonly gremiumId: string;
   readonly relations: GraphRelations;
   readonly q: string;
+  /** The steps from a hit to the farthest neighbour that shows, 0 to 5. */
+  readonly depth: number;
   readonly single: boolean;
   readonly noAccess: boolean;
 }
@@ -91,9 +96,9 @@ export class GraphApiService {
       kinds: filters.kinds.length ? filters.kinds : undefined,
       from: filters.from || undefined,
       to: filters.to || undefined,
-      gremiumId: filters.gremiumId || undefined,
       relations: filters.relations === 'all' ? undefined : filters.relations,
       q: filters.q.trim() || undefined,
+      depth: filters.depth === GRAPH_DEPTH_DEFAULT ? undefined : filters.depth,
       single: filters.single ? true : undefined,
       noAccess: filters.noAccess ? true : undefined,
       cursor: cursor ?? undefined,

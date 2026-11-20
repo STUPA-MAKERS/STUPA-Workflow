@@ -18,11 +18,13 @@ The page must have these filters:
 
 | Filter | Effect |
 | --- | --- |
-| "Art" (`Kind`) | several kinds; only nodes of these kinds show |
-| "Zeitraum" (`Period`) | from and to; only nodes with their date in the period show |
-| "Gremium" | only nodes that belong to the Gremium show |
+| "Art" (`Kind`) | several kinds; only nodes of these kinds are hits |
+| "Zeitraum" (`Period`) | from and to; only nodes with their date in the period are hits |
 | "Beziehungen" (`Relations`) | the choices of F/collaboration/graph/001424 |
-| search | only nodes with the term in their title show, and their neighbours |
+| search | only nodes with the term in their title are hits |
+
+The hits show, and their neighbours up to the count of steps (F/collaboration/graph/001434).
+The page must have no filter for a Gremium.
 
 The date of a node must be: the date of a meeting and of its TOPs, the start of a Termin, the
 invoice date of an invoice, the invoice date of a Buchung and else its creation, the due date of
@@ -46,7 +48,8 @@ strip from edge to edge at the top of the drawing, with the search in its full w
 
 Reason: A graph of every year is too large to read. The person narrows it to the question at
 hand, and the URL keeps the view for a reload or for a colleague. The work of the last weeks is
-the usual question. The relations of the data are many and tie the whole drawing into one
+the usual question. A Gremium is a node of the graph, so the search for its name with the
+steps shows what belongs to it, and a filter would say the same twice. The relations of the data are many and tie the whole drawing into one
 knot, and they say what the detail pages say already; the links are what a person decided to
 connect.
 

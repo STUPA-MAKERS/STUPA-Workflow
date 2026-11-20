@@ -11,13 +11,12 @@ from __future__ import annotations
 
 from datetime import date
 from typing import Annotated, Any
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 
 from app.deps import DbSession, require_principal
 from app.modules.auth.principal import Principal
-from app.modules.graph.build import Filters
+from app.modules.graph.build import DEFAULT_DEPTH, MAX_DEPTH, Filters
 from app.modules.graph.schemas import GraphPage, RelationFilter
 from app.modules.graph.service import GraphService
 from app.modules.todos.schemas import TodoLinkKind
@@ -44,18 +43,19 @@ async def read_graph(
     kinds: Annotated[list[TodoLinkKind] | None, Query()] = None,
     start: Annotated[date | None, Query(alias="from")] = None,
     end: Annotated[date | None, Query(alias="to")] = None,
-    gremium_id: Annotated[UUID | None, Query(alias="gremiumId")] = None,
     relations: RelationFilter = "all",
     q: Annotated[str, Query(max_length=200)] = "",
     single: bool = False,
     no_access: Annotated[bool, Query(alias="noAccess")] = False,
+    depth: Annotated[int, Query(ge=0, le=MAX_DEPTH)] = DEFAULT_DEPTH,
     cursor: Annotated[str | None, Query(max_length=12)] = None,
 ) -> GraphPage:
     """Read one page of the graph, the newest nodes first, 60 nodes per page.
 
-    ``kinds`` limits the nodes to these kinds, ``from`` and ``to`` to a period,
-    ``gremiumId`` to a Gremium and ``q`` to the nodes with the term in the title and their
-    neighbours. ``relations`` picks the links, the built-in relations or both. ``single``
+    ``kinds`` limits the hits to these kinds, ``from`` and ``to`` to a period and
+    ``q`` to the nodes with the term in the title. ``depth``
+    adds the neighbours of the hits, up to this count of lines away (0 to 5, 2 without the
+    parameter). ``relations`` picks the links, the built-in relations or both. ``single``
     adds the elements without a relation, ``noAccess`` the elements that the caller does
     not read, as nodes with their kind only. ``cursor`` is the ``nextCursor`` of the page
     before.
@@ -66,11 +66,11 @@ async def read_graph(
             kinds=frozenset(kinds) if kinds else None,
             start=start,
             end=end,
-            gremium=gremium_id,
             relations=relations,
             q=q,
             single=single,
             no_access=no_access,
+            depth=depth,
         ),
         cursor,
     )

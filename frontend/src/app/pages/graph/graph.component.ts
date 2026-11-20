@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  Renderer2,
   computed,
   effect,
   inject,
@@ -14,6 +15,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import type { Subscription } from 'rxjs';
 import {
+  GRAPH_DEPTH_MAX,
   GRAPH_KINDS,
   GRAPH_RELATIONS,
   GraphApiService,
@@ -22,7 +24,6 @@ import {
   type GraphNode,
   type GraphRelations,
 } from '@core/api/graph.service';
-import { GremienApiService, type GremiumOverview } from '@core/api/gremien.service';
 import { FeatureService } from '@core/features/feature.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -52,6 +53,7 @@ import {
   type Graph,
   KIND_FEATURE,
   defaultFilters,
+  depthOf,
   filtersOf,
   isFiltered,
   localDay,
@@ -84,7 +86,8 @@ export interface GraphRow {
  * The server applies the read rules and every filter. The page loads 60 nodes per step and
  * adds each step to the drawing, by itself until 300 nodes show; then "Mehr laden" loads
  * the next 300. The filters are in the query of the URL. The drawing fills the page, and the
- * filters float over it. A press on a node chooses it: the panel shows its facts and
+ * filters float over it. The field "Schritte" beside the search sets how far the neighbours of
+ * the hits show (spec 001434). A press on a node chooses it: the panel shows its facts and
  * "Öffnen", on a phone in a sheet. For a screen reader each node names its neighbours.
  */
 @Component({
@@ -121,8 +124,11 @@ export class GraphComponent {
     { x: -90, y: 40, w: 4.5 },
   ] as const;
 
+  /** The most steps of the field "Schritte" (spec 001434). */
+  protected readonly maxDepth = GRAPH_DEPTH_MAX;
+
   private readonly api = inject(GraphApiService);
-  private readonly gremienApi = inject(GremienApiService);
+  private readonly renderer = inject(Renderer2);
   private readonly i18n = inject(I18nService);
   private readonly features = inject(FeatureService);
   private readonly route = inject(ActivatedRoute);
@@ -145,7 +151,6 @@ export class GraphComponent {
   /** The nodes up to which the page loads by itself (spec 001426). */
   readonly limit = signal(AUTO_NODES);
   readonly selected = signal<string | null>(null);
-  readonly gremien = signal<readonly GremiumOverview[]>([]);
 
   private request: Subscription | null = null;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -159,19 +164,10 @@ export class GraphComponent {
   );
 
   readonly kindOptions = computed(() => this.kinds().map((k) => ({ value: k, label: this.kindLabel(k) })));
-  readonly gremiumOptions = computed(() => [
-    { value: '', label: this.i18n.translate('graph.filter.allGremien') },
-    ...this.gremien().map((g) => ({ value: g.id, label: g.name })),
-  ]);
-  /** The chip text (spec 000663): the name, then name and value. */
-  readonly gremiumText = computed(() => {
-    const name = this.i18n.translate('graph.filter.gremium');
-    const hit = this.gremien().find((g) => g.id === this.filters().gremiumId);
-    return hit ? `${name}: ${hit.name}` : name;
-  });
   readonly relationOptions = computed(() =>
     GRAPH_RELATIONS.map((r) => ({ value: r, label: this.i18n.translate(`graph.relations.${r}` as TranslationKey) })),
   );
+  /** The chip text (spec 000663): the name, then name and value. */
   readonly relationsText = computed(() => {
     const name = this.i18n.translate('graph.filter.relations');
     const relations = this.filters().relations;
@@ -230,11 +226,6 @@ export class GraphComponent {
   );
 
   constructor() {
-    this.gremienApi
-      .overview()
-      .pipe(takeUntilDestroyed())
-      .subscribe({ next: (list) => this.gremien.set(list), error: () => undefined });
-
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((query) => {
       const filters = filtersOf(query, this.today);
       if (!sameFilters(filters, this.filters())) {
@@ -275,12 +266,20 @@ export class GraphComponent {
     this.patch({ from: range.from, to: range.to });
   }
 
-  setGremium(value: string): void {
-    this.patch({ gremiumId: value });
-  }
-
   setRelations(value: string): void {
     this.patch({ relations: (GRAPH_RELATIONS as readonly string[]).includes(value) ? (value as GraphRelations) : 'all' });
+  }
+
+  /** Set the steps from a hit to the farthest neighbour that shows (spec 001434). */
+  setDepth(value: number): void {
+    this.patch({ depth: depthOf(value) });
+  }
+
+  /** The field "Schritte" changed: take the count and write the count that holds back. */
+  onDepth(event: Event): void {
+    const field = event.target as HTMLInputElement;
+    this.setDepth(field.value.trim() === '' ? Number.NaN : Number(field.value));
+    this.renderer.setProperty(field, 'value', String(this.filters().depth));
   }
 
   toggleSingle(): void {

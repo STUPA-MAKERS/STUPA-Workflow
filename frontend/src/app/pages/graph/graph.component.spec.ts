@@ -15,7 +15,6 @@ import {
   type GraphNode,
   type GraphPage,
 } from '@core/api/graph.service';
-import { GremienApiService } from '@core/api/gremien.service';
 import { MEDIA } from '@stupa-makers/ui-kit';
 import { loadErrorToast, retryLoadError } from '../../../testing/load-error';
 import { matchMediaQueries } from '../../../testing/meeting-fixtures';
@@ -87,7 +86,6 @@ type Answer = () => Observable<GraphPage>;
 async function start(
   url = '/graph',
   answers: Answer[] = [],
-  gremien: Observable<unknown> = of([{ id: 'g1', name: 'StuPa' }]),
   stub = false,
 ) {
   localStorage.setItem('ap.locale', 'de');
@@ -110,7 +108,6 @@ async function start(
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
       { provide: GraphApiService, useValue: api },
-      { provide: GremienApiService, useValue: { overview: jest.fn(() => gremien) } },
     ],
   });
   if (stub) {
@@ -193,7 +190,6 @@ describe('GraphComponent', () => {
         () => of(cards(240, 60, '300')),
         () => of(cards(300, 10, null)),
       ],
-      undefined,
       true,
     );
     expect(calls.map((c) => c.cursor)).toEqual([null, '60', '120', '180', '240']);
@@ -217,7 +213,7 @@ describe('GraphComponent', () => {
 
   it('shows that a later page loads, and keeps the graph when that page fails', async () => {
     const second = new Subject<GraphPage>();
-    const { calls, cmp, settle, el } = await start('/graph', [() => of(cards(0, 60, '60')), () => second], undefined, true);
+    const { calls, cmp, settle, el } = await start('/graph', [() => of(cards(0, 60, '60')), () => second], true);
     expect(cmp.growing()).toBe(true);
     expect(el.querySelector('.gr__growing')).toHaveTextContent('Weitere Elemente werden geladen …');
     expect(el.querySelector('.gr__growing')).toHaveAttribute('role', 'status');
@@ -277,20 +273,19 @@ describe('GraphComponent', () => {
   /** § F/collaboration/graph/001425: the filters are in the query of the URL, the server applies them. */
   it('reads the filters from the URL and resets them', async () => {
     const { calls, cmp, settle, router } = await start(
-      '/graph?kinds=meeting,todo&from=2026-01-01&to=2026-12-31&gremium=g1&rel=links&q=Haushalt&single=1&noaccess=1',
+      '/graph?kinds=meeting,todo&from=2026-01-01&to=2026-12-31&rel=links&q=Haushalt&single=1&noaccess=1',
     );
     expect(calls[0].filters).toEqual({
       kinds: ['meeting', 'todo'],
       from: '2026-01-01',
       to: '2026-12-31',
-      gremiumId: 'g1',
       relations: 'links',
       q: 'Haushalt',
+      depth: 2,
       single: true,
       noAccess: true,
     });
     expect(cmp.searchText()).toBe('Haushalt');
-    expect(cmp.gremiumText()).toBe('Gremium: StuPa');
     expect(cmp.relationsText()).toBe('Beziehungen');
     expect(screen.getByTestId('gr-single')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('gr-no-access')).toHaveAttribute('aria-pressed', 'true');
@@ -311,7 +306,6 @@ describe('GraphComponent', () => {
     expect(router.parseUrl(router.url).queryParams).toEqual({ kinds: 'meeting,todo' });
 
     cmp.setPeriod({ from: '2026-01-01', to: '2026-06-30' });
-    cmp.setGremium('g1');
     cmp.setRelations('builtin');
     await settle();
     expect(last(calls).filters).toEqual({
@@ -319,14 +313,12 @@ describe('GraphComponent', () => {
       kinds: ['meeting', 'todo'],
       from: '2026-01-01',
       to: '2026-06-30',
-      gremiumId: 'g1',
       relations: 'builtin',
     });
     expect(router.parseUrl(router.url).queryParams).toEqual({
       kinds: 'meeting,todo',
       from: '2026-01-01',
       to: '2026-06-30',
-      gremium: 'g1',
       rel: 'builtin',
     });
 
@@ -345,9 +337,56 @@ describe('GraphComponent', () => {
 
     // A value that changes nothing does not load again.
     const count = calls.length;
-    cmp.setGremium('g1');
+    cmp.setRelations('all');
     await settle();
     expect(calls).toHaveLength(count);
+  });
+
+  /** § F/collaboration/graph/001434: "Schritte" sets how far the neighbours of the hits show. */
+  it('sets the steps with the field and its buttons, from 0 to 5', async () => {
+    const { calls, settle, router } = await start('/graph?depth=4');
+    const field = screen.getByTestId<HTMLInputElement>('gr-depth');
+    const less = within(screen.getByTestId('gr-depth-less')).getByRole('button');
+    const more = within(screen.getByTestId('gr-depth-more')).getByRole('button');
+    expect(calls[0].filters.depth).toBe(4);
+    expect(field.value).toBe('4');
+    expect(screen.getByLabelText('Schritte')).toBe(field);
+
+    more.click();
+    await settle();
+    expect(last(calls).filters.depth).toBe(5);
+    expect(router.parseUrl(router.url).queryParams).toEqual({ depth: '5' });
+    expect(more).toBeDisabled();
+
+    less.click();
+    less.click();
+    less.click();
+    await settle();
+    // 2 is the count of a fresh page: the URL has no parameter.
+    expect(last(calls).filters).toEqual(FRESH);
+    expect(router.url).toBe('/graph');
+    expect(screen.queryByTestId('gr-reset')).toBeNull();
+
+    const type = async (text: string): Promise<void> => {
+      field.value = text;
+      field.dispatchEvent(new Event('change'));
+      await settle();
+    };
+    await type('0');
+    expect(last(calls).filters.depth).toBe(0);
+    expect(less).toBeDisabled();
+    await type('9');
+    expect(last(calls).filters.depth).toBe(5);
+    expect(field.value).toBe('5');
+    // An empty field means the count of a fresh page.
+    await type('');
+    expect(last(calls).filters.depth).toBe(2);
+    expect(field.value).toBe('2');
+
+    await type('3');
+    screen.getByTestId('gr-reset').click();
+    await settle();
+    expect(last(calls).filters.depth).toBe(2);
   });
 
   it('adopts the filters when the URL changes', async () => {
@@ -466,20 +505,12 @@ describe('GraphComponent', () => {
     }
   });
 
-  it('offers the Gremien of the person in the filter, and none when they do not load', async () => {
-    const ok = await start();
-    expect(ok.cmp.gremiumOptions()).toEqual([
-      { value: '', label: 'Alle Gremien' },
-      { value: 'g1', label: 'StuPa' },
-    ]);
-    expect(ok.cmp.gremiumText()).toBe('Gremium');
-    expect(ok.cmp.relationOptions().map((o) => o.label)).toEqual([
+  it('offers the choices of the relations', async () => {
+    const { cmp } = await start();
+    expect(cmp.relationOptions().map((o) => o.label)).toEqual([
       'Alle Beziehungen',
       'Nur Verknüpfungen',
       'Nur feste Beziehungen',
     ]);
-    TestBed.resetTestingModule();
-    const failed = await start('/graph', [], throwError(() => new Error('offline')));
-    expect(failed.cmp.gremiumOptions()).toEqual([{ value: '', label: 'Alle Gremien' }]);
   });
 });

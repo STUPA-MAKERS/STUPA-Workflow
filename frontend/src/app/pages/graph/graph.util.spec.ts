@@ -7,6 +7,7 @@ import {
   NO_FILTERS,
   daysBefore,
   defaultFilters,
+  depthOf,
   filtersOf,
   isFiltered,
   localDay,
@@ -90,10 +91,11 @@ describe('graph util', () => {
       { from: '2026-01-01' },
       { from: '' },
       { to: '2026-12-31' },
-      { gremiumId: 'g1' },
       { relations: 'all' as const },
       { relations: 'builtin' as const },
       { q: 'x' },
+      { depth: 0 },
+      { depth: 3 },
       { single: true },
       { noAccess: true },
     ]) {
@@ -108,9 +110,9 @@ describe('graph util', () => {
       kinds: 'todo,bogus,meeting',
       from: '2026-01-01',
       to: '2026-12-31',
-      gremium: 'g1',
       rel: 'builtin',
       q: 'Haushalt',
+      depth: '4',
       single: '1',
       noaccess: '1',
     });
@@ -118,15 +120,30 @@ describe('graph util', () => {
       kinds: ['meeting', 'todo'],
       from: '2026-01-01',
       to: '2026-12-31',
-      gremiumId: 'g1',
       relations: 'builtin',
       q: 'Haushalt',
+      depth: 4,
       single: true,
       noAccess: true,
     });
     // `all` stands for every day and for every relation; an end alone has no start.
     expect(filtersOf(convertToParamMap({ period: 'all', rel: 'all' }), TODAY)).toEqual(NO_FILTERS);
     expect(filtersOf(convertToParamMap({ to: '2026-12-31' }), TODAY)).toEqual({ ...FRESH, from: '', to: '2026-12-31' });
+  });
+
+  /** § F/collaboration/graph/001434: the steps are `depth` in the query; a fresh page has 2. */
+  it('reads the steps from the query and keeps them in their range', () => {
+    expect(FRESH.depth).toBe(2);
+    const read = (depth: string): number => filtersOf(convertToParamMap({ depth }), TODAY).depth;
+    expect(read('0')).toBe(0);
+    expect(read('5')).toBe(5);
+    expect(read('9')).toBe(5);
+    expect(read('-3')).toBe(0);
+    expect(read('1.8')).toBe(1);
+    expect(read('viele')).toBe(2);
+    expect(depthOf(Number.NaN)).toBe(2);
+    expect(queryOf({ ...FRESH, depth: 3 }, TODAY)['depth']).toBe('3');
+    expect(queryOf(FRESH, TODAY)['depth']).toBeNull();
   });
 
   it('drops unknown values of the query', () => {
@@ -138,16 +155,26 @@ describe('graph util', () => {
   });
 
   it('writes the filters to the query and back', () => {
-    const none = { kinds: null, from: null, to: null, period: null, gremium: null, rel: null, q: null, single: null, noaccess: null };
+    const none = {
+      kinds: null,
+      from: null,
+      to: null,
+      period: null,
+      rel: null,
+      q: null,
+      depth: null,
+      single: null,
+      noaccess: null,
+    };
     expect(queryOf(FRESH, TODAY)).toEqual(none);
     expect(queryOf(NO_FILTERS, TODAY)).toEqual({ ...none, period: 'all', rel: 'all' });
     const filters = {
       kinds: ['meeting', 'todo'] as const,
       from: '2026-01-01',
       to: '2026-12-31',
-      gremiumId: 'g1',
       relations: 'builtin' as const,
       q: ' Haushalt ',
+      depth: 0,
       single: true,
       noAccess: true,
     };
@@ -157,9 +184,9 @@ describe('graph util', () => {
       from: '2026-01-01',
       to: '2026-12-31',
       period: null,
-      gremium: 'g1',
       rel: 'builtin',
       q: 'Haushalt',
+      depth: '0',
       single: '1',
       noaccess: '1',
     });
