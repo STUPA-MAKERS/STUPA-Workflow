@@ -222,22 +222,32 @@ describe('TypeChangeDialogComponent', () => {
     expect(error).toHaveBeenCalledTimes(1);
   });
 
-  it('reports a failed preview and keeps the change off', async () => {
-    const { http, cmp, toast, openIt } = await setup();
+  it.each([
+    [500, null, 'applications.typeChange.error.load'],
+    [409, 'type_change_not_submitted', 'applications.typeChange.error.notSubmitted'],
+    [422, 'type_change_type_not_submittable', 'applications.typeChange.error.noForm'],
+    [403, null, 'applications.transitions.forbidden'],
+  ])('shows why a %s preview failed and keeps the change off', async (status, code, key) => {
+    const { http, cmp, toast, openIt, detectChanges } = await setup();
     const error = jest.spyOn(toast, 'error');
     openIt();
     cmp.pickType('t2');
     expect(cmp.loading()).toBe(true);
     expect(cmp.canSubmit()).toBe(false);
-    http.expectOne(PREVIEW_URL('t2')).flush({}, { status: 500, statusText: 'x' });
+    http.expectOne(PREVIEW_URL('t2')).flush(code ? { code } : {}, { status, statusText: 'x' });
+    detectChanges();
     expect(cmp.loading()).toBe(false);
     expect(cmp.preview()).toBeNull();
-    expect(error).toHaveBeenCalledTimes(1);
+    expect(cmp.previewError()).toBe(key);
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(error).not.toHaveBeenCalled();
+    cmp.pickType('t4');
+    expect(cmp.previewError()).toBeNull();
+    http.expectOne(PREVIEW_URL('t4')).flush(PLAIN);
   });
 
   it('drops the answer of an earlier pick', async () => {
-    const { http, cmp, toast, openIt, detectChanges } = await setup();
-    const error = jest.spyOn(toast, 'error');
+    const { http, cmp, openIt, detectChanges } = await setup();
     openIt();
     cmp.pickType('t2');
     const first = http.expectOne(PREVIEW_URL('t2'));
@@ -245,13 +255,15 @@ describe('TypeChangeDialogComponent', () => {
     first.flush(SEND_BACK);
     expect(cmp.preview()).toBeNull();
     http.expectOne(PREVIEW_URL('t4')).flush({}, { status: 500, statusText: 'x' });
+    expect(cmp.previewError()).toBe('applications.typeChange.error.load');
     cmp.pickType('t2');
+    expect(cmp.previewError()).toBeNull();
     const third = http.expectOne(PREVIEW_URL('t2'));
     cmp.close();
     detectChanges();
     openIt();
     third.flush({}, { status: 500, statusText: 'x' });
-    expect(error).toHaveBeenCalledTimes(1);
+    expect(cmp.previewError()).toBeNull();
     expect(cmp.loading()).toBe(false);
   });
 

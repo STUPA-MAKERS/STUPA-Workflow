@@ -47,15 +47,33 @@ import { resolveI18n, langAttr } from '@shared/forms/i18n-text';
 import { actorLabel } from '@shared/actor-label.util';
 import { toFormlySections } from '@shared/forms/formly-mapper';
 import { formatAnswer, formatFieldValue } from '@shared/forms/answer-format';
-import {
-  normalizePositions,
-  positionValue,
-  positionsTotal,
-} from '@shared/forms/positions';
+import { normalizePositions, positionValue, positionsTotal } from '@shared/forms/positions';
 import { applyServerErrors, clearServerErrors } from '@shared/forms/server-errors';
 import { AnswerViewComponent } from '@shared/forms/answer-view/answer-view.component';
 import { PredecessorFieldComponent } from '../../features/apply/predecessor-field/predecessor-field.component';
-import { ChatComponent, ChatDrafts, ChatOutbox, appendOnce, withScanStates, draftDropper, filesRefused, sendErrorKey, toChatAttachments, HistoryComponent, flowColorKind, chatPeople, type ChatEdit, type ChatPerson, type ChatMessage, type ChatRef, type ChatSend, type ChatVisibility, type ChatVisibilityGuard, type HistoryChange, type HistoryEntry } from '@shared/ui';
+import {
+  ChatComponent,
+  ChatDrafts,
+  ChatOutbox,
+  appendOnce,
+  withScanStates,
+  draftDropper,
+  filesRefused,
+  sendErrorKey,
+  toChatAttachments,
+  HistoryComponent,
+  flowColorKind,
+  chatPeople,
+  type ChatEdit,
+  type ChatPerson,
+  type ChatMessage,
+  type ChatRef,
+  type ChatSend,
+  type ChatVisibility,
+  type ChatVisibilityGuard,
+  type HistoryChange,
+  type HistoryEntry,
+} from '@shared/ui';
 import {
   ButtonComponent,
   ButtonGroupComponent,
@@ -106,7 +124,11 @@ import { AgendaDialogComponent } from './agenda-dialog/agenda-dialog.component';
 import { DecisionDialogComponent } from './decision-dialog/decision-dialog.component';
 import { DecisionSectionComponent } from '@shared/decision/decision-section.component';
 import { decisionHistoryLine } from '@shared/decision/decision.util';
-import { amountChangeLines, forcedLine, outsideDecisionLines } from '@shared/decision/timeline-lines';
+import {
+  amountChangeLines,
+  forcedLine,
+  outsideDecisionLines,
+} from '@shared/decision/timeline-lines';
 import { ApplicationsPageService } from './applications-page.service';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
 import { OutsideDecisionDialogComponent } from './outside-decision-dialog/outside-decision-dialog.component';
@@ -307,9 +329,7 @@ export class ApplicationsDetailComponent {
   readonly formFields = computed<FormFieldDef[]>(() => this.sections().flatMap((s) => s.fields));
   /** The same field definitions by key. The data rows and the version diff both
    *  look a key up, so they share one map. */
-  private readonly fieldByKey = computed(
-    () => new Map(this.formFields().map((f) => [f.key, f])),
-  );
+  private readonly fieldByKey = computed(() => new Map(this.formFields().map((f) => [f.key, f])));
 
   /** The composer offers the internal visibility only with `application.manage`, first. */
   readonly chatVisibilities = computed<ChatVisibility[]>(() =>
@@ -360,7 +380,9 @@ export class ApplicationsDetailComponent {
    * Files dropped anywhere on the application become its attachments. Not while another
    * application loads, and not while the comments are open: the chat takes its own drop.
    */
-  readonly takesDrop = computed(() => this.canUploadFiles() && !this.switching() && !this.commentsOpen());
+  readonly takesDrop = computed(
+    () => this.canUploadFiles() && !this.switching() && !this.commentsOpen(),
+  );
 
   /** Upload attachments: as the server's `require_app_edit`, a manager, a holder of
    *  `application.edit_any` or the creator, in every state. */
@@ -492,7 +514,10 @@ export class ApplicationsDetailComponent {
   readonly canForceStatus = computed(() => this.auth.can('application.force_status'));
   readonly forceDialogOpen = signal(false);
   /** "Antragsart ändern" needs `application.change_type` and a submitted application (001660). */
-  readonly canChangeType = computed(() => this.auth.can('application.change_type'));
+  readonly canChangeType = computed(() => {
+    const state = this.app()?.state;
+    return Boolean(state) && !state?.isInitial && this.auth.can('application.change_type');
+  });
   readonly typeDialogOpen = signal(false);
 
   /**
@@ -501,7 +526,12 @@ export class ApplicationsDetailComponent {
    */
   readonly canRecordDecision = computed(() => {
     const app = this.app();
-    return !!app && !app.observer && app.state?.kind === 'vote' && this.auth.can('application.record_decision');
+    return (
+      !!app &&
+      !app.observer &&
+      app.state?.kind === 'vote' &&
+      this.auth.can('application.record_decision')
+    );
   });
   readonly outsideOpen = signal(false);
 
@@ -802,52 +832,52 @@ export class ApplicationsDetailComponent {
           ]
         : [],
     );
-    const statusEntries: HistoryEntry[] = events.filter((e) => e.kind !== 'amountChange').map((e, i) => {
-      const first = i === 0;
-      const intake = capture?.intake
-        ? [t('applications.history.intake', { intake: capture.intake })]
-        : [];
-      const decision = e.decision
-        ? decisionHistoryLine(
-            e.decision,
-            locale,
-            currency,
-            t,
-          )
-        : null;
-      const lines = [
-        ...(first && firstVersion ? [t('applications.history.version', { version: 1 })] : []),
-        ...(first && capture ? [t('applications.history.captured'), ...intake] : []),
-        ...(e.transitionLabel
-          ? [t('applications.history.transition', { label: e.transitionLabel })]
-          : []),
-        ...(e.outsideDecision
-          ? [t('outsideDecision.historyTitle'), ...outsideDecisionLines(e.outsideDecision, locale, t)]
-          : []),
-        ...(e.forced ? [forcedLine(e.forceReason, t)] : []),
-        ...(e.note && !e.note.startsWith('vote:') && !e.note.startsWith('outside:') ? [e.note] : []),
-        ...(decision ? [decision] : []),
-        ...(e.voteDeleted ? [t('applications.history.voteDeleted')] : []),
-      ];
-      return {
-        at: e.at,
-        icon: i === 0 ? 'send' : 'flow',
-        title: e.toState?.label || e.label,
-        kind: flowColorKind(e.toState?.color),
-        actor: this.actor(e.actorInfo, e.actor),
-        body: lines.join('\n') || null,
-        link: e.voteId
-          ? { label: t('applications.history.voteLink'), route: ['/voting', e.voteId] }
-          : e.outsideDecision?.meetingId
-            ? {
-                label: e.outsideDecision.meetingTitle
-                  ? t('outsideDecision.meetingLink', { title: e.outsideDecision.meetingTitle })
-                  : t('outsideDecision.meetingLinkPlain'),
-                route: ['/meetings', e.outsideDecision.meetingId],
-              }
-            : null,
-      };
-    });
+    const statusEntries: HistoryEntry[] = events
+      .filter((e) => e.kind !== 'amountChange')
+      .map((e, i) => {
+        const first = i === 0;
+        const intake = capture?.intake
+          ? [t('applications.history.intake', { intake: capture.intake })]
+          : [];
+        const decision = e.decision ? decisionHistoryLine(e.decision, locale, currency, t) : null;
+        const lines = [
+          ...(first && firstVersion ? [t('applications.history.version', { version: 1 })] : []),
+          ...(first && capture ? [t('applications.history.captured'), ...intake] : []),
+          ...(e.transitionLabel
+            ? [t('applications.history.transition', { label: e.transitionLabel })]
+            : []),
+          ...(e.outsideDecision
+            ? [
+                t('outsideDecision.historyTitle'),
+                ...outsideDecisionLines(e.outsideDecision, locale, t),
+              ]
+            : []),
+          ...(e.forced ? [forcedLine(e.forceReason, t)] : []),
+          ...(e.note && !e.note.startsWith('vote:') && !e.note.startsWith('outside:')
+            ? [e.note]
+            : []),
+          ...(decision ? [decision] : []),
+          ...(e.voteDeleted ? [t('applications.history.voteDeleted')] : []),
+        ];
+        return {
+          at: e.at,
+          icon: i === 0 ? 'send' : 'flow',
+          title: e.toState?.label || e.label,
+          kind: flowColorKind(e.toState?.color),
+          actor: this.actor(e.actorInfo, e.actor),
+          body: lines.join('\n') || null,
+          link: e.voteId
+            ? { label: t('applications.history.voteLink'), route: ['/voting', e.voteId] }
+            : e.outsideDecision?.meetingId
+              ? {
+                  label: e.outsideDecision.meetingTitle
+                    ? t('outsideDecision.meetingLink', { title: e.outsideDecision.meetingTitle })
+                    : t('outsideDecision.meetingLinkPlain'),
+                  route: ['/meetings', e.outsideDecision.meetingId],
+                }
+              : null,
+        };
+      });
     const versionEntries: HistoryEntry[] = versions
       .filter((v) => !(v.version === 1 && events.length))
       .map((v) => {
@@ -880,10 +910,14 @@ export class ApplicationsDetailComponent {
       at: e.at,
       icon: 'link',
       title: t(
-        e.action === 'set' ? 'applications.history.predecessorSet' : 'applications.history.predecessorRemoved',
+        e.action === 'set'
+          ? 'applications.history.predecessorSet'
+          : 'applications.history.predecessorRemoved',
       ),
       actor: this.actor(e.actorInfo, null),
-      body: e.predecessor ? e.predecessor.title || untitled : t('applications.history.predecessorHidden'),
+      body: e.predecessor
+        ? e.predecessor.title || untitled
+        : t('applications.history.predecessorHidden'),
       link: e.predecessor
         ? { label: t('applications.predecessor.open'), route: ['/applications', e.predecessor.id] }
         : null,
@@ -938,7 +972,9 @@ export class ApplicationsDetailComponent {
   /** The creator and a holder of `application.manage` manage the observers (spec 000751). */
   readonly canManageObservers = computed(() => {
     const app = this.app();
-    return !!app && !app.observer && !app.applicant?.anonymized && (app.isOwner || this.canManage());
+    return (
+      !!app && !app.observer && !app.applicant?.anonymized && (app.isOwner || this.canManage())
+    );
   });
   /** The dialog "Beobachter:innen" is open. */
   readonly observersOpen = signal(false);
@@ -1427,7 +1463,9 @@ export class ApplicationsDetailComponent {
 
   amount(app: Application): string {
     if (app.amount === null) return this.i18n.translate('applications.detail.notProvided');
-    return formatMoney(app.amount, this.i18n.formatLocale(), { currency: app.currency }) || app.amount;
+    return (
+      formatMoney(app.amount, this.i18n.formatLocale(), { currency: app.currency }) || app.amount
+    );
   }
 
   /**
@@ -1437,7 +1475,8 @@ export class ApplicationsDetailComponent {
    */
   approvedAmount(app: Application): string {
     if (!app.state?.isApproved) return '';
-    if (app.approvedAmount === null || app.approvedAmount === undefined || app.amount === null) return '';
+    if (app.approvedAmount === null || app.approvedAmount === undefined || app.amount === null)
+      return '';
     if (Number(app.approvedAmount) === Number(app.amount)) return '';
     return formatMoney(app.approvedAmount, this.i18n.formatLocale(), { currency: app.currency });
   }
@@ -1600,7 +1639,8 @@ export class ApplicationsDetailComponent {
   /** Display name of a comment: the author, or a fallback based on the role. */
   protected authorName(comment: ApplicationComment): string {
     const info =
-      comment.authorInfo ?? (comment.authorKind === 'applicant' ? { kind: 'applicant' as const } : null);
+      comment.authorInfo ??
+      (comment.authorKind === 'applicant' ? { kind: 'applicant' as const } : null);
     return (
       this.actor(info, comment.author) ??
       this.i18n.translate('applications.comments.author.committee')
@@ -1776,13 +1816,18 @@ function rowLines(value: unknown): string {
 }
 
 /** The text of a refused Vorgänger change, by the status and the problem code. */
-export function predecessorErrorKey(status: number | undefined, code: string | null | undefined): TranslationKey {
+export function predecessorErrorKey(
+  status: number | undefined,
+  code: string | null | undefined,
+): TranslationKey {
   switch (code) {
     case 'predecessor_cycle':
       return 'applications.predecessor.errorCycle';
     case 'predecessor_type_mismatch':
       return 'applications.predecessor.errorType';
     default:
-      return status === 403 ? 'applications.predecessor.errorForbidden' : 'applications.predecessor.error';
+      return status === 403
+        ? 'applications.predecessor.errorForbidden'
+        : 'applications.predecessor.error';
   }
 }
