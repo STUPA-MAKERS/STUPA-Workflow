@@ -4872,5 +4872,21 @@
   "admin.forced.noState": "Ohne Zustand",
   "admin.forced.loadError": "Die Liste konnte nicht geladen werden.",
   "admin.forced.empty": "Keine erzwungenen Status im Zeitraum",
-  "admin.mailTemplates.key.approved_amount_changed": "Genehmigter Betrag geändert"
+  "admin.mailTemplates.key.approved_amount_changed": "Genehmigter Betrag geändert",
+  "invoices.bulk.start": "Mehrere auswählen",
+  "invoices.bulk.pick": "Auswählen",
+  "invoices.bulk.stop": "Auswahl beenden",
+  "invoices.bulk.selectAll": "Alle wählen",
+  "invoices.bulk.selectedCount": "{count} ausgewählt",
+  "invoices.bulk.selectRow": "„{name}“ auswählen",
+  "invoices.bulk.markPaid": "Als bezahlt markieren",
+  "invoices.bulk.paidDone": "{count} Rechnung(en) als bezahlt markiert.",
+  "invoices.bulk.delete": "Löschen",
+  "invoices.bulk.deleteTitle": "Rechnungen löschen?",
+  "invoices.bulk.deleteBody": "{count} ausgewählte Rechnung(en) werden gelöscht. Das lässt sich nicht rückgängig machen.",
+  "invoices.bulk.deleteDone": "{count} Rechnung(en) gelöscht.",
+  "invoices.bulk.deleteMax": "Löschen: max. {max}",
+  "invoices.bulk.deleteMaxBlocked": "Sammel-Löschen gilt für höchstens {max} Rechnungen — Auswahl verkleinern.",
+  "invoices.bulk.deleteAllBlocked": "Sammel-Löschen ist bei „Alle auswählen“ gesperrt — Zeilen gezielt auswählen.",
+  "invoices.bulk.failed": "Sammelaktion fehlgeschlagen."
 }
