@@ -22,6 +22,21 @@
   padding-bottom: var(--space-6);
 }
 
+// Beside the rail the page is a pane page: it is one window high, so the list has to scroll
+// inside itself. A list that grows past the window lets the window scroll, and then the rail,
+// which sticks only inside the one window high frame, scrolls away with the page (001930).
+:host(.pane-page) .act,
+:host(.pane-page) .act > .ld-pane {
+  flex: 1 1 0;
+  min-height: 0;
+}
+:host(.pane-page) .act__scroll {
+  @include lp.split-scroll(--act-fade);
+}
+:host(.pane-page) .act__scroll > * {
+  flex: none;
+}
+
 .act__groups,
 .act__rows {
   @include lp.stack;
