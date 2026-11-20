@@ -144,6 +144,10 @@ describe('todos.util', () => {
         `Buchung · VS-800 · ${eur('42.50')}`,
       );
       expect(sub(link({ kind: 'expense', detail: {} }))).toBe('Buchung');
+      expect(sub(link({ kind: 'budget', title: 'Lerncafé', detail: { costCentre: 'VS-800' } }))).toBe(
+        'Kostenstelle · VS-800',
+      );
+      expect(sub(link({ kind: 'budget', detail: {} }))).toBe('Kostenstelle');
       expect(linkTitle(link({ kind: 'invoice', accessible: false, title: null }), t)).toBe('Rechnung (kein Zugriff)');
       expect(linkTitle(link({ kind: 'gremium', accessible: false, title: null }), t)).toBe('Gremium (kein Zugriff)');
     });
