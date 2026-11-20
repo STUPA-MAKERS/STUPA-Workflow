@@ -460,7 +460,7 @@ describe('ApplicationsListComponent', () => {
       const bar = screen.getByTestId('apps-selection');
       expect(bar).toHaveTextContent('2 ausgewählt');
 
-      await userEvent.click(within(bar).getByRole('button', { name: 'Übergang auslösen' }));
+      await userEvent.click(within(bar).getByRole('button', { name: 'Status setzen' }));
       const options = http.expectOne((r) => r.url === '/api/bulk/applications/transitions');
       expect(options.request.body).toEqual({ applicationIds: ['app-1', 'app-3'] });
       options.flush([
@@ -472,6 +472,7 @@ describe('ApplicationsListComponent', () => {
             { applicationId: 'app-1', title: 'Zuschuss Kennenlernwochenende', amount: '1250.00' },
             { applicationId: 'app-3', title: 'Trikots', amount: null },
           ],
+          applicationIds: ['app-1', 'app-3'],
         },
       ]);
       await settle();
@@ -479,7 +480,7 @@ describe('ApplicationsListComponent', () => {
       await settle();
       expect(screen.getByTestId('bulk-amounts')).toHaveTextContent('1.250,00 €');
 
-      await userEvent.click(screen.getByRole('button', { name: 'Auslösen' }));
+      await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Status setzen' }));
       const fire = http.expectOne((r) => r.url === '/api/bulk/applications/transition');
       expect(fire.request.body).toEqual({ applicationIds: ['app-1', 'app-3'], toStateId: 's-ok' });
       fire.flush({

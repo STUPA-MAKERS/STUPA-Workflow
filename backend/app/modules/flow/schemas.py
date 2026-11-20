@@ -143,11 +143,14 @@ class BulkAmountOut(FrozenCamelModel, frozen=True):
 
 
 class BulkTransitionOption(FrozenCamelModel, frozen=True):
-    """A transition target that every selected Antrag reaches by a manual transition.
+    """A target status that at least one selected Antrag reaches by a manual transition.
 
     Attributes:
+        label: The name of the target state (spec 001704).
         approves: The target is an approved state. The fire then approves each Antrag
             with its requested amount, and ``amounts`` lists them.
+        application_ids: The selected Anträge that reach the target. The fire skips the
+            others with ``transition_not_available``.
     """
 
     to_state_id: UUID = Field(alias="toStateId")
@@ -155,6 +158,7 @@ class BulkTransitionOption(FrozenCamelModel, frozen=True):
     color: str | None = None
     approves: bool = False
     amounts: tuple[BulkAmountOut, ...] = ()
+    application_ids: tuple[UUID, ...] = Field(default=(), alias="applicationIds")
 
 
 class BulkItemResult(FrozenCamelModel, frozen=True):

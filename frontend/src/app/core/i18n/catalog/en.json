@@ -582,14 +582,14 @@
   "applications.bulk.selectedCount": "{count} selected",
   "applications.bulk.max": "at most {max}",
   "applications.bulk.selectRow": "Select “{title}”",
-  "applications.bulk.transition": "Fire transition",
+  "applications.bulk.transition": "Set status",
   "applications.bulk.message": "Send message",
   "applications.bulk.count": "{count} applications",
   "applications.bulk.pick": "New status",
-  "applications.bulk.none": "No transition fits all selected applications",
+  "applications.bulk.none": "No status fits the selected applications",
   "applications.bulk.amounts": "The requested amount is approved",
   "applications.bulk.body": "Message to the applicants",
-  "applications.bulk.fire": "Fire",
+  "applications.bulk.fire": "Set status",
   "applications.bulk.send": "Send",
   "applications.bulk.ok": "Done",
   "applications.bulk.summary": "{ok} of {count} done",
@@ -4889,5 +4889,8 @@
   "invoices.bulk.deleteMax": "Delete: max. {max}",
   "invoices.bulk.deleteMaxBlocked": "Bulk delete takes at most {max} invoices — shorten the selection.",
   "invoices.bulk.deleteAllBlocked": "Bulk delete is locked for “select all” — pick rows individually.",
-  "invoices.bulk.failed": "Bulk action failed."
+  "invoices.bulk.failed": "Bulk action failed.",
+  "applications.bulk.reach": "{count} of {total}",
+  "applications.bulk.skippedHead": "Skipped, because the status is not allowed there",
+  "applications.bulk.skipped": "Skipped: status not allowed"
 }

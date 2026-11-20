@@ -186,9 +186,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/applications/001691](requirements/functional/applications/applications/001691_comment-visibility-labels.md) | The visibility switch names who reads the comment | approved |
 | [F/applications/applications/001692](requirements/functional/applications/applications/001692_comment-visibility-visible.md) | The chosen visibility shows before sending | approved |
 | [F/applications/applications/001700](requirements/functional/applications/applications/001700_list-multi-select.md) | The Antrag list has a multiple selection | approved |
-| [F/applications/applications/001701](requirements/functional/applications/applications/001701_bulk-transition.md) | A bulk transition offers only transitions allowed for every selected Antrag | approved |
+| [F/applications/applications/001701](requirements/functional/applications/applications/001701_bulk-transition.md) | A bulk status change uses only transitions allowed for each selected Antrag | approved |
 | [F/applications/applications/001702](requirements/functional/applications/applications/001702_bulk-message.md) | A bulk message adds one public comment to each Antrag | approved |
 | [F/applications/applications/001703](requirements/functional/applications/applications/001703_bulk-result.md) | The bulk result shows success or error per Antrag | approved |
+| [F/applications/applications/001704](requirements/functional/applications/applications/001704_bulk-set-status.md) | The bulk action of the Antrag list sets a status and skips the Anträge that cannot take it | approved |
 | [F/applications/applications/001710](requirements/functional/applications/applications/001710_draft-not-submitted.md) | A draft says that it is not submitted | approved |
 | [F/applications/applications/001711](requirements/functional/applications/applications/001711_draft-reminder-mail.md) | A draft without a change for 7 days gets one reminder mail | approved |
 | [F/applications/applications/001712](requirements/functional/applications/applications/001712_withdraw-confirm.md) | A withdrawal asks first and does not show in a draft | approved |

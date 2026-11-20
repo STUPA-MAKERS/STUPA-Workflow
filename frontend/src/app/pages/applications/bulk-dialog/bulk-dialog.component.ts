@@ -26,7 +26,7 @@ import {
   SkeletonComponent,
 } from '@stupa-makers/ui-kit';
 
-/** The two bulk actions of the Antrag list (001700). */
+/** The two bulk actions of the Antrag list (001700): "Status setzen" and the message. */
 export type BulkMode = 'transition' | 'message';
 
 /** One selected Antrag, as the list shows it. */
@@ -49,8 +49,10 @@ export const BULK_MAX = 100;
 /**
  * A bulk action on the selected Anträge of the list.
  *
- * `transition` (001701) loads the targets that every selected Antrag reaches and lists the
- * requested amounts of an approving target before the confirm. `message` (001702) sends
+ * `transition` is "Status setzen" (001701, 001704): it loads every target status that at
+ * least one selected Antrag reaches, says for each how many of the selection reach it, and
+ * names the Anträge that the chosen status skips. It lists the requested amounts of an
+ * approving target before the confirm. `message` (001702) sends
  * one public comment to each Antrag. Both end in the result list of 001703: the server runs
  * each Antrag on its own, so one error does not stop the others. `done` fires after the
  * action ran, so the list can load again.
@@ -100,6 +102,8 @@ export class BulkDialogComponent {
   readonly subtitle = computed(() =>
     this.i18n.translate('applications.bulk.count', { count: String(this.snapshot().length) }),
   );
+  /** The size of the selection, for "3 von 5" at a status that not every Antrag reaches. */
+  readonly total = computed(() => this.snapshot().length);
   readonly chosen = computed(() => this.options().find((o) => o.toStateId === this.pick()) ?? null);
   /** The requested amounts that an approving target approves, by Antrag (001701). */
   readonly amounts = computed(() =>
@@ -109,6 +113,13 @@ export class BulkDialogComponent {
       amount: a.amount === null ? '' : formatMoney(a.amount, this.i18n.formatLocale()) || a.amount,
     })),
   );
+  /** The selected Anträge that the chosen status skips, because they do not reach it. */
+  readonly skipped = computed(() => {
+    const choice = this.chosen();
+    if (!choice) return [];
+    const reach = new Set(choice.applicationIds);
+    return this.snapshot().filter((t) => !reach.has(t.id));
+  });
   readonly canConfirm = computed(() => {
     if (this.running() || this.results()) return false;
     return this.mode() === 'transition' ? this.chosen() !== null : this.body().trim() !== '';
@@ -191,7 +202,9 @@ export class BulkDialogComponent {
   private line(r: BulkItemResult): ResultLine {
     const text = r.ok
       ? this.i18n.translate('applications.bulk.ok')
-      : r.error || this.i18n.translate('applications.actions.error');
+      : r.code === 'transition_not_available'
+        ? this.i18n.translate('applications.bulk.skipped')
+        : r.error || this.i18n.translate('applications.actions.error');
     return { id: r.applicationId, title: this.titleOf(r.applicationId), ok: r.ok, text };
   }
 }

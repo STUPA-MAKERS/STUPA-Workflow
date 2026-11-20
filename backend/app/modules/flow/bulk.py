@@ -1,8 +1,9 @@
-"""Bulk transitions of the Antrag list (specs 001700, 001701, 001703).
+"""Bulk "Status setzen" of the Antrag list (specs 001700, 001701, 001703, 001704).
 
-A person with ``application.manage`` selects up to `BULK_MAX` Anträge and moves them
-into one target state. The options are the targets that every selected Antrag reaches
-by a manual transition that the person may fire (`FlowService.available_transitions`).
+A person with ``application.manage`` selects up to `BULK_MAX` Anträge and sets them to
+one target status. The options are the targets that at least one selected Antrag reaches
+by a manual transition that the person may fire (`FlowService.available_transitions`),
+each with the Anträge that reach it; the others are skipped.
 A transition that puts the Antrag on an agenda needs a meeting per Antrag, so a bulk
 action does not offer it.
 
@@ -24,6 +25,7 @@ from app.modules.applications.access import resolve_app_read
 from app.modules.applications.decision import DecisionIn
 from app.modules.applications.models import Application
 from app.modules.auth.principal import Principal
+from app.modules.flow.models import State
 from app.modules.flow.schemas import (
     BulkAmountOut,
     BulkItemResult,
@@ -32,6 +34,7 @@ from app.modules.flow.schemas import (
 )
 from app.modules.flow.service import FlowService
 from app.shared.errors import AppError, ConflictError
+from app.shared.i18n import I18nMap
 
 #: The error code of an Antrag that has no transition into the chosen target.
 BULK_NOT_AVAILABLE = "transition_not_available"
@@ -52,39 +55,62 @@ async def _offered(
     return {t.to_state_id: t for t in reversed(found) if not t.adds_to_agenda}
 
 
+async def _offered_or_none(
+    service: FlowService, application_id: UUID, principal: Principal
+) -> dict[UUID, TransitionOut]:
+    """Return the bulk transitions of one Antrag, or none when the person cannot read it."""
+    try:
+        return await _offered(service, application_id, principal)
+    except AppError:
+        return {}
+
+
+async def _state_label(session: AsyncSession, state_id: UUID, fallback: I18nMap) -> I18nMap:
+    """Return the name of a state, or the label of the transition when it has none."""
+    state = await session.get(State, state_id)
+    label = getattr(state, "label_i18n", None)
+    return label if isinstance(label, dict) and label else fallback
+
+
 async def bulk_options(
     service: FlowService, application_ids: Sequence[UUID], principal: Principal
 ) -> list[BulkTransitionOption]:
-    """List the targets that every selected Antrag reaches.
+    """List every target status that at least one selected Antrag reaches (spec 001704).
 
-    An Antrag that the person cannot read leaves no common target.
+    Each option names the Anträge that reach it, so the dialog can say which ones the
+    action skips. An Antrag that the person cannot read reaches no target. The label is
+    the name of the target state.
     """
     session = service.session
     ids = list(dict.fromkeys(application_ids))
-    try:
-        per_app = [await _offered(service, i, principal) for i in ids]
-    except AppError:
-        return []
-    common = set.intersection(*(set(m) for m in per_app))
-    first = per_app[0]
-    approving = any(first[t].allows_decision for t in common)
-    apps = [await session.get(Application, i) for i in ids] if approving else []
-    amounts = tuple(
-        BulkAmountOut(applicationId=a.id, title=_title(a), amount=a.amount)
-        for a in apps
-        if a is not None
-    )
+    per_app = [(i, await _offered_or_none(service, i, principal)) for i in ids]
+    order = list(dict.fromkeys(target for _, offered in per_app for target in offered))
+    first = {t: next(o[t] for _, o in per_app if t in o) for t in order}
+    reach = {t: tuple(i for i, o in per_app if t in o) for t in order}
+    approving = any(t.allows_decision for t in first.values())
+    apps = {i: await session.get(Application, i) for i in ids} if approving else {}
     return [
         BulkTransitionOption(
-            toStateId=t.to_state_id,
-            label=t.label,
-            color=t.color,
-            approves=t.allows_decision,
-            amounts=amounts if t.allows_decision else (),
+            toStateId=target,
+            label=await _state_label(session, target, first[target].label),
+            color=first[target].color,
+            approves=first[target].allows_decision,
+            amounts=_amounts(apps, reach[target]) if first[target].allows_decision else (),
+            applicationIds=reach[target],
         )
-        for t in first.values()
-        if t.to_state_id in common
+        for target in order
     ]
+
+
+def _amounts(
+    apps: dict[UUID, Application | None], reach: tuple[UUID, ...]
+) -> tuple[BulkAmountOut, ...]:
+    """Return the requested amounts of the Anträge that reach an approving target."""
+    return tuple(
+        BulkAmountOut(applicationId=a.id, title=_title(a), amount=a.amount)
+        for a in (apps.get(i) for i in reach)
+        if a is not None
+    )
 
 
 async def _fire_one(

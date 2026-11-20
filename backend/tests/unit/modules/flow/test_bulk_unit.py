@@ -1,9 +1,11 @@
 """Bulk transitions without a database (specs 001700, 001701, 001703).
 
-§ 001701 the options are the targets that every selected Antrag reaches, an Antrag that
-the person cannot read leaves no option, an agenda transition is never offered, and an
-approving target lists the requested amounts. § 001703 each Antrag runs on its own: an
-error rolls back that Antrag and names the code, the others go on.
+§ 001704 the options are the targets that at least one selected Antrag reaches, each
+with the Anträge that reach it; an Antrag that the person cannot read reaches none, an
+agenda transition is never offered, and an approving target lists the requested amounts
+of the Anträge that reach it; the label is the name of the target state. § 001703 each
+Antrag runs on its own: an error rolls back that Antrag and names the code, the others
+go on.
 """
 
 from __future__ import annotations
@@ -112,7 +114,9 @@ async def test_options_are_the_common_targets_with_the_amounts(unreadable: set[U
     )
     out = await bulk.bulk_options(cast(Any, service), [a, b, c, a], _PRINCIPAL)
     by_target = {o.to_state_id: o for o in out}
-    assert set(by_target) == {ok, back}
+    assert [o.to_state_id for o in out] == [ok, back, other]
+    assert by_target[other].application_ids == (a,)
+    assert by_target[back].application_ids == (a, b, c)
     approve = by_target[ok]
     assert approve.approves is True
     assert [(x.application_id, x.title, x.amount) for x in approve.amounts] == [
@@ -132,11 +136,26 @@ async def test_options_without_an_approving_target_load_no_amounts(
     assert [(o.to_state_id, o.approves, o.amounts) for o in out] == [(back, False, ())]
 
 
-async def test_an_unreadable_antrag_leaves_no_option(unreadable: set[UUID]) -> None:
+async def test_an_unreadable_antrag_reaches_no_target(unreadable: set[UUID]) -> None:
     a, b = uuid4(), uuid4()
     unreadable.add(b)
-    service = _Service(offered={a: [_t(uuid4())], b: [_t(uuid4())]})
-    assert await bulk.bulk_options(cast(Any, service), [a, b], _PRINCIPAL) == []
+    target = uuid4()
+    service = _Service(offered={a: [_t(target)], b: [_t(uuid4())]})
+    out = await bulk.bulk_options(cast(Any, service), [a, b], _PRINCIPAL)
+    assert [(o.to_state_id, o.application_ids) for o in out] == [(target, (a,))]
+
+
+async def test_the_label_is_the_name_of_the_target_state(unreadable: set[UUID]) -> None:
+    a, named, bare = uuid4(), uuid4(), uuid4()
+    service = _Service(
+        offered={a: [_t(named), _t(bare)]},
+        apps={
+            named: SimpleNamespace(label_i18n={"de": "Bewilligt"}),
+            bare: SimpleNamespace(label_i18n={}),
+        },
+    )
+    out = await bulk.bulk_options(cast(Any, service), [a], _PRINCIPAL)
+    assert [o.label for o in out] == [{"de": "Bewilligt"}, {"de": "Ziel"}]
 
 
 async def test_fire_runs_each_antrag_on_its_own(unreadable: set[UUID]) -> None:

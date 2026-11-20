@@ -83,6 +83,13 @@
   font-size: 0.8125rem;
   text-align: end;
 }
+// "3 von 5": a status that not every selected Antrag reaches (001704).
+.bkd__reach {
+  flex: none;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
 .bkd__row--error .bkd__state {
   color: var(--color-danger);
 }

@@ -40,6 +40,11 @@
                     (change)="pick.set(o.toStateId)"
                   />
                   <span class="bkd__title">{{ o.label }}</span>
+                  @if (o.applicationIds.length < total()) {
+                    <span class="bkd__reach">{{
+                      'applications.bulk.reach' | t: { count: o.applicationIds.length, total: total() }
+                    }}</span>
+                  }
                 </label>
               }
             </div>
@@ -47,6 +52,18 @@
             <app-empty-state icon="file" rows="1" [heading]="'applications.bulk.none' | t" />
           }
         </div>
+        @if (skipped().length) {
+          <div class="bkd__group" data-testid="bulk-skipped">
+            <span class="cap" id="bkd-skipped">{{ 'applications.bulk.skippedHead' | t }}</span>
+            <ul class="bkd__list" appScrollFade="y" aria-labelledby="bkd-skipped">
+              @for (s of skipped(); track s.id) {
+                <li class="bkd__row">
+                  <span class="bkd__title ell" [title]="s.title">{{ s.title }}</span>
+                </li>
+              }
+            </ul>
+          </div>
+        }
         @if (amounts().length) {
           <div class="bkd__group" data-testid="bulk-amounts">
             <span class="cap" id="bkd-amounts">{{ 'applications.bulk.amounts' | t }}</span>

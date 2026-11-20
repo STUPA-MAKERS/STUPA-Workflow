@@ -101,7 +101,7 @@ async def test_a_bulk_transition_runs_per_antrag(
     maker: async_sessionmaker[AsyncSession],
     seed: GuestSeed,
 ) -> None:
-    """§ 001701, § 001703: one Antrag that moved before the fire fails on its own."""
+    """§ 001701, § 001703, § 001704: an Antrag that moved before is skipped on its own."""
     ids = [await _create(maker, seed, n) for n in range(3)]
     client = _client(migrated, settings, monkeypatch, _MANAGER)
     body = {"applicationIds": [str(i) for i in ids]}
@@ -115,7 +115,10 @@ async def test_a_bulk_transition_runs_per_antrag(
         json={"applicationIds": [str(ids[0])], "toStateId": str(seed.locked_state_id)},
     )
     assert first.json()["results"][0]["ok"] is True
-    assert client.post("/api/bulk/applications/transitions", json=body).json() == []
+    after = client.post("/api/bulk/applications/transitions", json=body).json()
+    assert [(o["toStateId"], o["applicationIds"]) for o in after] == [
+        (str(seed.locked_state_id), [str(ids[1]), str(ids[2])])
+    ]
 
     res = client.post(
         "/api/bulk/applications/transition",
