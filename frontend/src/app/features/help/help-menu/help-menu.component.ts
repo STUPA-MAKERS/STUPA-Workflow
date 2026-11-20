@@ -37,7 +37,9 @@ import { HelpService } from '../help.service';
  * `rail`: an entry at the foot of the navigation rail; the menu opens beside it.
  * `header`: a button of the public header; the menu opens below it, and on a
  *   phone as the shared bottom sheet, because a popover under a button near the left edge
- *   does not fit beside it.
+ *   does not fit beside it. The host is a segment of the button group of the header
+ *   (`btn-grp__seg`, spec 001356), and the trigger is a `.btn`, so the group draws it as
+ *   one of its buttons; on a phone it is an icon button (`btn--icon`).
  * `sheet`: the entries only, inline in the "Mehr" sheet of the phone bar. In "Barrierefreiheit"
  *   the caption of "Darstellung" says "Barrierefreiheit", so the sheet shows one caption,
  *   not two stacked ones, and the reset stays on the caption row.
@@ -102,6 +104,7 @@ let nextId = 0;
   imports: [NgTemplateOutlet, RouterLink, TranslatePipe, IconComponent, SideSheetComponent, SwitchComponent],
   templateUrl: './help-menu.component.html',
   styleUrl: './help-menu.component.scss',
+  host: { '[class.btn-grp__seg]': "variant() === 'header'" },
 })
 export class HelpMenuComponent {
   private readonly auth = inject(AuthService);
@@ -125,7 +128,7 @@ export class HelpMenuComponent {
   readonly open = signal(false);
   /** The phone sheet of the `header` variant is open. */
   readonly sheetOpen = signal(false);
-  private readonly phone = mediaQuery(MEDIA.phone);
+  protected readonly phone = mediaQuery(MEDIA.phone);
   private readonly injector = inject(Injector);
   /** The top-layer box of the phone sheet, so the glass of the header does not clip it. */
   private readonly layer = viewChild<ElementRef<HTMLElement>>('layer');

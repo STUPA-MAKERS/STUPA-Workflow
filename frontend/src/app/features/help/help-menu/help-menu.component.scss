@@ -69,42 +69,26 @@
   }
 }
 
+// The trigger of the `header` variant is a segment of the button group of the public header
+// (001356): the group (`button-group.scss` of the kit) gives it the height, the padding, the
+// corners and the tonal or selected surface, so this rule holds only what a native button
+// lacks.
 .hm__head {
   display: inline-flex;
   flex: none;
   align-items: center;
-  gap: 6px;
-  height: 40px;
-  padding: 0 var(--space-3);
+  justify-content: center;
   border: 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--color-text);
   font: inherit;
-  font-size: var(--fs-body);
-  font-weight: var(--fw-semibold);
   white-space: nowrap;
   cursor: pointer;
   @include f.highlight-surface;
-}
-.hm__head.is-open {
-  background: var(--color-surface-2);
-}
-@media (hover: hover) {
-  .hm__head:hover {
-    background: var(--color-surface-2);
-  }
 }
 .hm__head:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 @include bp.phone {
-  .hm__head {
-    justify-content: center;
-    width: 40px;
-    padding: 0;
-  }
   .hm__headLabel {
     position: absolute;
     width: 1px;

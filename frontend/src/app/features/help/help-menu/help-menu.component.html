@@ -76,7 +76,8 @@
     <button
       #trigger
       type="button"
-      [class]="variant() === 'header' ? 'hm__head' : 'hm__rail'"
+      [class]="variant() === 'header' ? 'hm__head btn btn--tonal' : 'hm__rail'"
+      [class.btn--icon]="variant() === 'header' && phone()"
       [class.is-open]="open() || sheetOpen()"
       [attr.aria-expanded]="open() || sheetOpen()"
       [attr.aria-controls]="open() ? panelId : null"
