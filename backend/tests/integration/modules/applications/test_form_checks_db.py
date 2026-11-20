@@ -212,7 +212,18 @@ async def test_a_file_of_a_position_keeps_its_position(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
     seed = await seed_guest_flow(maker)
-    await _form(maker, seed, [{"key": "kosten", "type": "positions", "label": {"de": "K"}}])
+    await _form(
+        maker,
+        seed,
+        [
+            {
+                "key": "kosten",
+                "type": "positions",
+                "label": {"de": "K"},
+                "validation": {"minOffers": 1},
+            }
+        ],
+    )
     async with maker() as session:
         files = AttachmentService(session, storage=_MemoryStorage(), settings=settings)  # type: ignore[arg-type]
         draft = await DraftAttachments(files).upload(
