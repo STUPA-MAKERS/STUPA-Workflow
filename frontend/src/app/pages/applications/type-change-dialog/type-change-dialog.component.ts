@@ -15,6 +15,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { ApplicationType, TypeChangeField, TypeChangePreview, Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { TranslationKey } from '@core/i18n/translations';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import {
   ButtonComponent,
@@ -23,6 +24,26 @@ import {
   type SelectOption,
   ToastService,
 } from '@stupa-makers/ui-kit';
+
+/** A failed request: its status and the problem body of the server. */
+interface FailedRequest {
+  readonly status?: number;
+  readonly error?: { readonly code?: string } | null;
+}
+
+/** The text of a failed preview: the reason of the server where the dialog knows it. */
+function previewErrorKey(err: FailedRequest): TranslationKey {
+  switch (err.error?.code) {
+    case 'type_change_not_submitted':
+      return 'applications.typeChange.error.notSubmitted';
+    case 'type_change_type_not_submittable':
+      return 'applications.typeChange.error.noForm';
+    default:
+      return err.status === 403
+        ? 'applications.transitions.forbidden'
+        : 'applications.typeChange.error.load';
+  }
+}
 
 /**
  * "Antragsart ändern" (`application.change_type`, specs 001660-001663).
@@ -61,6 +82,8 @@ export class TypeChangeDialogComponent {
   readonly preview = signal<TypeChangePreview | null>(null);
   readonly loading = signal(false);
   readonly saving = signal(false);
+  /** The i18n key of why the preview failed, shown in the dialog. */
+  readonly previewError = signal<TranslationKey | null>(null);
 
   /** Every active Antragsart except the current one. */
   readonly typeOptions = computed<SelectOption[]>(() => {
@@ -118,6 +141,7 @@ export class TypeChangeDialogComponent {
     this.transitionId.set('');
     this.note.set('');
     this.preview.set(null);
+    this.previewError.set(null);
     this.loading.set(false);
   }
 
@@ -126,6 +150,7 @@ export class TypeChangeDialogComponent {
     this.typeId.set(typeId);
     this.transitionId.set('');
     this.preview.set(null);
+    this.previewError.set(null);
     const id = this.applicationId();
     if (!id || !typeId) return;
     this.seq = this.seq + 1;
@@ -139,10 +164,10 @@ export class TypeChangeDialogComponent {
         const only = preview.transitions.length === 1 ? preview.transitions[0].id : '';
         this.transitionId.set(only);
       },
-      error: () => {
+      error: (err: FailedRequest) => {
         if (seq !== this.seq) return;
         this.loading.set(false);
-        this.toast.error(this.i18n.translate('applications.actions.error'));
+        this.previewError.set(previewErrorKey(err));
       },
     });
   }
@@ -175,7 +200,7 @@ export class TypeChangeDialogComponent {
               ? 'applications.transitions.forbidden'
               : err.status === 409
                 ? 'applications.actions.conflict'
-                : 'applications.actions.error';
+                : 'applications.typeChange.error.save';
           this.toast.error(this.i18n.translate(key));
         },
       });
