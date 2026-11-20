@@ -146,7 +146,7 @@ describe('InvoiceFormComponent', () => {
     expect(h.newStatus()).toBe('open');
     view.fixture.componentInstance.submit(new Event('submit'));
     expect(h.calls).toContain('create');
-    await user.click(screen.getByRole('button', { name: 'Schließen' }));
+    await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
     expect(h.createOpen()).toBe(false);
   });
 

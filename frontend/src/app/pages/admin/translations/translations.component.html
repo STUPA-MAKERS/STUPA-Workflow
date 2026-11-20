@@ -30,14 +30,14 @@
                   (checkedChange)="setActive(l, $event)"
                   >{{ 'admin.translations.active' | t }}</app-switch
                 >
-                <app-button-group>
-                  <app-row-menu
-                    [sections]="languageMenu()"
-                    [label]="('ui.rowMenu.trigger' | t) + ': ' + l.name"
-                    (selected)="onLanguageMenu($event, l)"
-                  />
-                </app-button-group>
               </span>
+              <app-button-group menu>
+                <app-row-menu
+                  [sections]="languageMenu()"
+                  [label]="('ui.rowMenu.trigger' | t) + ': ' + l.name"
+                  (selected)="onLanguageMenu($event, l)"
+                />
+              </app-button-group>
             </app-list-item>
           }
         </div>

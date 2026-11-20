@@ -12,6 +12,7 @@
     <header
       class="mf__head"
       appPaneFormHead
+      [icon]="mode() === 'create' ? 'repeat' : 'edit'"
       [heading]="
         (mode() === 'create' ? 'expenses.transferNew' : 'expenses.transfers.editTitle') | t
       "

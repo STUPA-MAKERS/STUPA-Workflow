@@ -151,26 +151,21 @@
                     </span>
                     <span trail class="inv__trail">
                       <span class="mono inv__amount">{{ money(i.grossAmount) }}</span>
-                      @if (menu.length || !split()) {
-                        <span class="inv__menuSlot">
-                          @if (!split()) {
-                            <span class="inv__chev" aria-hidden="true">
-                              <app-icon name="right" [size]="17" />
-                            </span>
-                          }
-                          @if (menu.length) {
-                            <app-button-group>
-                              <app-row-menu
-                                class="inv__menu"
-                                [label]="rowMenuLabel(i)"
-                                [sections]="menu"
-                                (selected)="onRowMenu($event, i)"
-                              />
-                            </app-button-group>
-                          }
+                      @if (!split()) {
+                        <span class="inv__chev" aria-hidden="true">
+                          <app-icon name="right" [size]="17" />
                         </span>
                       }
                     </span>
+                    @if (menu.length) {
+                      <app-button-group menu>
+                        <app-row-menu
+                          [label]="rowMenuLabel(i)"
+                          [sections]="menu"
+                          (selected)="onRowMenu($event, i)"
+                        />
+                      </app-button-group>
+                    }
                   </app-list-item>
                 }
               </div>

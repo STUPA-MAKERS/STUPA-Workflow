@@ -130,14 +130,42 @@ export function fundingProblem(
 }
 
 /**
+ * The problem of the field for the number of participants, or null. Mirrors
+ * `validate_definition` (spec 001631): at most one field of a form has the switch.
+ */
+export function participantsProblem(
+  fields: readonly FormFieldDef[],
+): 'admin.form.participantsTwice' | null {
+  const count = fields.filter((f) => f.type === 'number' && f.validation?.participants).length;
+  return count > 1 ? 'admin.form.participantsTwice' : null;
+}
+
+/**
+ * The validation settings that belong to the type of the field. The switch for the number
+ * of participants belongs to `number`, the root of the picker to `budget_select`; the
+ * server refuses them on another type, so a changed type drops them.
+ */
+function typeValidation(field: FormFieldDef): FormFieldDef['validation'] {
+  const v = field.validation;
+  if (!v) return v;
+  const { participants, rootPath, ...rest } = v;
+  return {
+    ...rest,
+    ...(field.type === 'number' && participants ? { participants: true } : {}),
+    ...(field.type === 'budget_select' && rootPath?.trim() ? { rootPath: rootPath.trim() } : {}),
+  };
+}
+
+/**
  * Canonical form: drop empty optionals. This is the stored definition.
  *
  * Only a numeric field may carry `isPromoted`, because the backend sends 422 for other types. A
  * `positions` or `funding` field promotes into `amount` automatically, without a flag.
  */
 export function normalizeFormField(field: FormFieldDef): FormFieldDef {
+  const validation = typeValidation(field);
   const hasValidation =
-    !!field.validation && Object.values(field.validation).some((v) => v != null && v !== '');
+    !!validation && Object.values(validation).some((v) => v != null && v !== '');
   const promoted = !!field.isPromoted && (field.type === 'number' || field.type === 'currency');
   return {
     key: field.key,
@@ -145,7 +173,7 @@ export function normalizeFormField(field: FormFieldDef): FormFieldDef {
     label: field.label,
     ...(field.help && Object.keys(field.help).length > 0 ? { help: field.help } : {}),
     ...(field.required ? { required: true } : {}),
-    ...(hasValidation ? { validation: field.validation } : {}),
+    ...(hasValidation ? { validation } : {}),
     ...(field.options && field.options.length > 0 ? { options: field.options } : {}),
     ...(field.visibleIf ? { visibleIf: field.visibleIf } : {}),
     ...(field.compute ? { compute: field.compute } : {}),

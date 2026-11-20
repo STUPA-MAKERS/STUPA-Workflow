@@ -33,6 +33,12 @@ def _set_pdf_signatures(row: ApplicationType, wanted: bool | None) -> None:
         row.pdf_signatures = wanted
 
 
+def _set_attachment_required(row: ApplicationType, wanted: bool | None) -> None:
+    """Set the switch "Anhang Pflicht" (spec 001732); ``None`` keeps it."""
+    if wanted is not None:
+        row.attachment_required = wanted
+
+
 def _type_out(row: ApplicationType, version: int | None = None) -> ApplicationTypeOut:
     """Map a type row to its DTO. ``version`` is the number of the active form version."""
     return ApplicationTypeOut(
@@ -42,6 +48,7 @@ def _type_out(row: ApplicationType, version: int | None = None) -> ApplicationTy
         name_i18n=row.name_i18n,
         has_budget=row.has_budget,
         pdf_signatures=row.pdf_signatures,
+        attachment_required=row.attachment_required,
         comparison_offers=row.comparison_offers,
         retention_months=row.retention_months,
         group_id=row.group_id,
@@ -119,6 +126,7 @@ class ApplicationTypeOps(ConfigServiceBase):
             gremium_id=payload.gremium_id,
             has_budget=payload.has_budget,
             pdf_signatures=payload.pdf_signatures,
+            attachment_required=payload.attachment_required,
             comparison_offers=(
                 payload.comparison_offers.model_dump(by_alias=True)
                 if payload.comparison_offers is not None
@@ -163,6 +171,7 @@ class ApplicationTypeOps(ConfigServiceBase):
         if payload.has_budget is not None:
             row.has_budget = payload.has_budget
         _set_pdf_signatures(row, payload.pdf_signatures)
+        _set_attachment_required(row, payload.attachment_required)
         if payload.comparison_offers is not None:
             row.comparison_offers = payload.comparison_offers.model_dump(by_alias=True)
         if "retention_months" in payload.model_fields_set:

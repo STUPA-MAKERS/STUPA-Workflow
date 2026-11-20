@@ -204,13 +204,16 @@
                       role="listitem"
                       class="apps__row"
                       [class.apps__row--busy]="busyRow() === row.item.id"
-                      [class.apps__row--checked]="selecting() && isSelected(row.item.id)"
+                      [checked]="selecting() && isSelected(row.item.id)"
                       [title]="row.title"
                       [link]="selecting() ? null : ['/applications', row.item.id]"
                       linkQueryParamsHandling="preserve"
                       [selected]="!selecting() && row.item.id === selectedId()"
                       [swipeRight]="selecting() ? null : row.swipeRight"
                       [swipeLeft]="selecting() ? null : row.swipeLeft"
+                      appLongPress
+                      [appLongPressOff]="!canBulk()"
+                      (appLongPress)="selectWith(row.item)"
                       (swiped)="onRowSwiped(row.item, $event)"
                       (activate)="onRowActivate(row.item)"
                     >
@@ -254,20 +257,18 @@
                       </span>
                       <span trail class="apps__trail">
                         <app-amount [amount]="row.amount" [approved]="row.approved" layout="stack" />
-                        <span class="apps__menuSlot">
-                          @if (!split()) {
-                            <span class="apps__chev" aria-hidden="true">
-                              <app-icon name="right" [size]="17" />
-                            </span>
-                          }
-                          <app-row-transitions-menu
-                            class="apps__menu"
-                            [item]="row.item"
-                            [title]="row.title"
-                            (action)="onRowAction(row.item, $event)"
-                          />
-                        </span>
+                        @if (!split()) {
+                          <span class="apps__chev" aria-hidden="true">
+                            <app-icon name="right" [size]="17" />
+                          </span>
+                        }
                       </span>
+                      <app-row-transitions-menu
+                        menu
+                        [item]="row.item"
+                        [title]="row.title"
+                        (action)="onRowAction(row.item, $event)"
+                      />
                     </app-list-item>
                   }
                 </div>

@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - frontend/src/app/shared/forms/form-rules.ts
+  - frontend/src/app/shared/formly/types/formly-positions.type.ts
 scope:
   - backend/app/modules/forms
   - frontend/src/app/features/apply
@@ -21,7 +23,11 @@ The form must show a warning at an offer of a position when one of these conditi
 - two or more offers of the same position have the same label, compared without case and
   without leading or trailing spaces.
 
-When the field allows the opt-out (`allowNoOffers`, 000134), the warning must name the switch
+The warning must show at the field it concerns: a ring in the warning colour around the
+field, and a short line under it. A short label or a repeated label marks the supplier field;
+a value of 0 € or 1 € marks the amount field.
+
+When the field allows the opt-out (`allowNoOffers`, 000134), a line below the offers of the position must name the switch
 `Für diese Position sind keine Vergleichsangebote möglich`
 (`No comparison offers are possible for this position`).
 

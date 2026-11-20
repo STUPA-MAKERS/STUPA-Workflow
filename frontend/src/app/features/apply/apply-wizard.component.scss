@@ -287,3 +287,9 @@
     border-radius: 0 0 var(--radius-xl) var(--radius-xl);
   }
 }
+
+/* The messages of the form rules and the missing file (specs 001671, 001732). */
+.wz__rule {
+  display: block;
+  margin-top: var(--space-3);
+}
