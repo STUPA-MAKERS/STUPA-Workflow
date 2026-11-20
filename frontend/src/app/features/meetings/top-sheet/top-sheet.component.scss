@@ -114,43 +114,12 @@
   min-height: var(--control-height);
   padding: 0 28px 10px 14px;
 }
+// The format tools are three connected button groups (spec 001354): text, blocks, insert.
 .ts__tools {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 2px;
-}
-.ts__tool {
-  display: grid;
-  place-items: center;
-  width: var(--control-height);
-  height: var(--control-height);
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-}
-@media (hover: hover) {
-  .ts__tool:hover {
-    background: var(--color-surface-2);
-    color: var(--color-text);
-  }
-}
-.ts__tool--on {
-  background: var(--color-selected);
-  color: var(--color-accent-text);
-}
-@media (hover: hover) {
-  .ts__tool--on:hover {
-    background: var(--color-selected);
-    color: var(--color-accent-text);
-  }
-}
-.ts__tool:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
+  gap: var(--space-2);
 }
 .ts__spacer {
   flex: 1 1 auto;
