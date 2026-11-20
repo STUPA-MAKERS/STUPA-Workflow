@@ -2,7 +2,7 @@
 id: "001364"
 title: The icon of an empty state names what is missing
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:
