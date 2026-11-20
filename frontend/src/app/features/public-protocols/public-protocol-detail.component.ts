@@ -9,6 +9,8 @@ import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component'
 import {
   EmptyStateComponent,
   formatBytes,
+  ButtonGroupComponent,
+  ButtonLinkComponent,
   IconComponent,
   NoteComponent,
   SkeletonComponent,
@@ -39,6 +41,8 @@ import { langAttr } from '@shared/forms/i18n-text';
     NgTemplateOutlet,
     RouterLink,
     TranslatePipe,
+    ButtonGroupComponent,
+    ButtonLinkComponent,
     IconComponent,
     EmptyStateComponent,
     MarkdownViewComponent,

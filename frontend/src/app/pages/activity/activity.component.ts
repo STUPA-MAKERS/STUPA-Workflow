@@ -18,6 +18,7 @@ import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.componen
 import { RouterLink, type Params } from '@angular/router';
 import { FabLinkDirective } from '@stupa-makers/ui-kit/shell';
 import { LiveCardsComponent } from '../../features/meetings/live-cards/live-cards.component';
+import { injectPanePage } from '../admin/pane-page';
 import { RailStatusService } from '../../layout/rail-status.service';
 import {
   ButtonComponent,
@@ -79,6 +80,7 @@ export interface ActivityDay {
 @Component({
   selector: 'app-activity',
   standalone: true,
+  host: { '[class.pane-page]': '!phone()' },
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     TranslatePipe,
@@ -148,6 +150,10 @@ export class ActivityComponent {
   );
 
   constructor() {
+    // Beside the rail the page fills the window and only the list scrolls, so the head and the
+    // filters keep their place (`pane-page`): without it the window scrolls by the bottom
+    // padding of the page as well.
+    injectPanePage(computed(() => !this.phone()));
     effect(() => {
       const kinds = this.kinds();
       const own = this.own();

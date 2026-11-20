@@ -59,13 +59,13 @@
     <div #lotActions class="er__actions">
       @if (lotArmed()) {
         <p class="er__hint">{{ 'election.lot.confirmHint' | t }}</p>
-        <app-button-group>
-          <app-button variant="text" (click)="cancelLot()">
-            {{ 'election.lot.cancel' | t }}
-          </app-button>
-        </app-button-group>
       }
       <app-button-group [main]="true">
+        @if (lotArmed()) {
+          <app-button variant="text" [block]="inCard()" (click)="cancelLot()">
+            {{ 'election.lot.cancel' | t }}
+          </app-button>
+        }
         <app-button
           class="er__lot"
           variant="fill"
