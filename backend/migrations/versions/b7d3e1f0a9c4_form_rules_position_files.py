@@ -8,7 +8,7 @@ Idempotent. A fresh database already has the columns from the ``create_all`` bas
 (0001).
 
 Revision ID: b7d3e1f0a9c4
-Revises: d7e2a9c41b38
+Revises: c4e8a1f07b52
 Create Date: 2026-11-19 23:30:00
 """
 
@@ -19,7 +19,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "b7d3e1f0a9c4"
-down_revision: str | None = "d7e2a9c41b38"
+down_revision: str | None = "c4e8a1f07b52"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
