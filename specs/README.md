@@ -196,7 +196,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/applications/001720](requirements/functional/applications/applications/001720_new-version-button.md) | A denied or returned Antrag offers a new version | approved |
 | [F/applications/applications/001721](requirements/functional/applications/applications/001721_new-version-link.md) | A new version links to the old Antrag | approved |
 | [F/applications/applications/001722](requirements/functional/applications/applications/001722_new-version-closes-old.md) | Submitting the new version closes the old Antrag | approved |
-| [F/applications/applications/001982](requirements/functional/applications/applications/001982_applications-list-two-fabs.md) | The Anträge list has the FABs Antrag stellen and Antrag erfassen | draft |
+| [F/applications/applications/001982](requirements/functional/applications/applications/001982_applications-list-two-fabs.md) | The Anträge list has the FABs Antrag stellen and Antrag erfassen | approved |
 | [F/applications/dashboard/000421](requirements/functional/applications/dashboard/000421_dashboard.md) | The start page is a work list with a side sheet | replaced |
 | [F/applications/dashboard/000550](requirements/functional/applications/dashboard/000550_start-due-cards.md) | Start shows the due cards of the person | replaced |
 | [F/applications/dashboard/000650](requirements/functional/applications/dashboard/000650_start-apply-button-tab-line.md) | Antrag stellen stands in the tab line of the desktop start page | replaced |

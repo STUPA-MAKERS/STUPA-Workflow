@@ -2,7 +2,7 @@
 id: "001982"
 title: The Anträge list has the FABs Antrag stellen and Antrag erfassen
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:
