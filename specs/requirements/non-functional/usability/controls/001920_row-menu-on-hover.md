@@ -2,7 +2,7 @@
 id: "001920"
 title: The ⋮ of a list row shows only for the row in use
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:
