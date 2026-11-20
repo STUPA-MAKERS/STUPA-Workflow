@@ -66,6 +66,9 @@ class Attachment(UUIDPkMixin, Base):
 
     Attributes:
         field_key: Optional link to a form field.
+        position_id: Optional link to one position of the ``positions`` field that
+            ``field_key`` names: the ``id`` of the position (spec 001730). The id stays
+            the same when positions move, while an index would not.
         draft_token_hash: HMAC-SHA256 of the draft token. Set on a draft only. The
             foreign key to ``attachment_draft_token`` cascades, and the end of the token
             is the end of the draft.
@@ -92,6 +95,7 @@ class Attachment(UUIDPkMixin, Base):
         ForeignKey("comment.id", ondelete="CASCADE"), nullable=True
     )
     field_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    position_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     filename: Mapped[str] = mapped_column(Text)
     mime: Mapped[str] = mapped_column(Text)
     size: Mapped[int] = mapped_column(BigInteger)

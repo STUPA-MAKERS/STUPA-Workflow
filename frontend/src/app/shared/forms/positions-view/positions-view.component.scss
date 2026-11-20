@@ -180,3 +180,24 @@ a.pv__offerName {
 .pv--bg3 .pv__total {
   background: var(--color-surface-3);
 }
+
+/* The files of a position (spec 001730). */
+.pv__files {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pv__file {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  overflow-wrap: anywhere;
+}
+.pv__fileIcon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-text-muted);
+}

@@ -50,6 +50,7 @@ import { GremiumInfoComponent } from '../gremium-info/gremium-info.component';
 import { GremiumLogoComponent } from '../gremium-logo/gremium-logo.component';
 import { GremiumMeetingsComponent } from '../gremium-meetings/gremium-meetings.component';
 import { GremiumMembersComponent } from '../gremium-members/gremium-members.component';
+import { GremiumNotifyDialogComponent } from '../gremium-notify-dialog/gremium-notify-dialog.component';
 import { GremiumTodosComponent } from '../gremium-todos/gremium-todos.component';
 
 /** The sub-tabs of a gremium, as they stand in `?tab=`. */
@@ -72,6 +73,8 @@ export type GremiumTab = (typeof GREMIUM_TABS)[number];
  * the gremium, because an empty Info hides its tab from a reader (spec 001015).
  *
  * On a phone the header holds the title and one action; the rest moves into the ⋮ menu.
+ * The ⋮ menu holds "Mitglieder benachrichtigen" for a holder of `members.notify` from the
+ * own gremium role (spec 001850); the admin role does not pass, like on the server.
  */
 @Component({
   selector: 'app-gremium-detail',
@@ -101,6 +104,7 @@ export type GremiumTab = (typeof GREMIUM_TABS)[number];
     GremiumAttendanceComponent,
     GremiumDecisionsComponent,
     GremiumInfoComponent,
+    GremiumNotifyDialogComponent,
   ],
   templateUrl: './gremium-detail.component.html',
   styleUrl: './gremium-detail.component.scss',
@@ -233,6 +237,12 @@ export class GremiumDetailComponent {
     return !!id && this.features.isOn('meetings') && this.auth.canInGremium(id, 'session.manage');
   });
   readonly canAdmin = computed(() => this.auth.can('admin.gremien'));
+  /** "Mitglieder benachrichtigen": `members.notify` from the own gremium role, no bypass. */
+  readonly canNotify = computed(() => {
+    const id = this.id();
+    return !!id && (this.auth.gremiumPermissions()[id] ?? []).includes('members.notify');
+  });
+  readonly notifyOpen = signal(false);
   /** The phone shows one main action: "Sitzung planen", else "Nächste Sitzung öffnen". */
   readonly showNext = computed(
     () =>
@@ -256,6 +266,9 @@ export class GremiumDetailComponent {
     const phoneItems = this.phone() ? this.phoneMenu(g, t) : [];
     const items: RowMenuItem[] = [
       ...phoneItems,
+      ...(this.canNotify()
+        ? [{ id: 'notify', label: t('gremien.detail.notify'), icon: 'mail' as const }]
+        : []),
       ...(this.boardId() ? [{ id: 'board', label: t('gremien.detail.openBoard'), icon: 'kanban' as const }] : []),
       ...(this.features.isOn('meetings')
         ? [{ id: 'meetings', label: t('gremien.detail.allMeetings'), icon: 'users' as const }]
@@ -350,11 +363,14 @@ export class GremiumDetailComponent {
       case 'admin':
         this.openAdmin();
         break;
+      case 'notify':
+        this.notifyOpen.set(true);
+        break;
       case 'board':
         void this.router.navigate(['/todos', this.boardId()]);
         break;
       case 'meetings':
-        void this.router.navigate(['/meetings']);
+        void this.router.navigate(['/meetings'], { queryParams: { committee: this.id() } });
         break;
       case 'votes':
         void this.router.navigate(['/voting'], { queryParams: { committee: this.id() } });

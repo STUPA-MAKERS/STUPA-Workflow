@@ -186,6 +186,7 @@ const BACKEND_AUDIT_ACTIONS = [
   'guest_renamed',
   'guest_admit_all',
   'gremium_info_update',
+  'gremium_notify',
   'pii_export',
   'anonymization',
   'erasure_requested',

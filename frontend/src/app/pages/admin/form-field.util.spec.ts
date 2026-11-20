@@ -8,6 +8,7 @@ import {
   groupsToFields,
   moveQuestionTo,
   normalizeFormField,
+  participantsProblem,
   type QuestionGroup,
   validateFormField,
   validateJsonLogic,
@@ -364,6 +365,37 @@ describe('moveQuestionTo (drag and drop in the outline of the form editor)', () 
     expect(moveQuestionTo(before, { gi: 0, qi: 7 }, { gi: 0, qi: 0 })).toBeNull();
     expect(moveQuestionTo(before, { gi: 0, qi: -1 }, { gi: 0, qi: 0 })).toBeNull();
     expect(moveQuestionTo(before, { gi: 0, qi: 0 }, { gi: 3, qi: 0 })).toBeNull();
+  });
+});
+
+describe('participantsProblem and the type settings (specs 001631, 001680)', () => {
+  const field = (key: string, type: FormFieldDef['type'], validation = {}): FormFieldDef => ({
+    key,
+    type,
+    label: { de: key },
+    validation,
+  });
+
+  it('allows one field for the number of participants', () => {
+    expect(participantsProblem([field('n', 'number', { participants: true })])).toBeNull();
+    expect(
+      participantsProblem([
+        field('n', 'number', { participants: true }),
+        field('m', 'number', { participants: true }),
+      ]),
+    ).toBe('admin.form.participantsTwice');
+  });
+
+  it('keeps the settings only on their own type', () => {
+    expect(normalizeFormField(field('n', 'number', { participants: true })).validation).toEqual({
+      participants: true,
+    });
+    expect(normalizeFormField(field('t', 'text', { participants: true })).validation).toBeUndefined();
+    expect(
+      normalizeFormField(field('k', 'budget_select', { rootPath: ' QSM ' })).validation,
+    ).toEqual({ rootPath: 'QSM' });
+    expect(normalizeFormField(field('k', 'budget_select', { rootPath: ' ' })).validation).toBeUndefined();
+    expect(normalizeFormField(field('s', 'select', { rootPath: 'QSM' })).validation).toBeUndefined();
   });
 });
 

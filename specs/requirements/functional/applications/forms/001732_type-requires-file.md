@@ -5,7 +5,12 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-19
-implementation: null
+implementation:
+  - backend/app/modules/applications/service/create.py
+  - backend/app/modules/flow/context.py
+  - backend/app/modules/flow/service.py
+  - frontend/src/app/features/apply/apply-wizard.component.ts
+  - frontend/src/app/pages/admin/forms/form-editor.component.ts
 scope:
   - backend/app/modules/files
   - backend/app/modules/forms

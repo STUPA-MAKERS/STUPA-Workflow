@@ -272,6 +272,27 @@ export class ExpensesComponent implements OnDestroy {
   readonly linkedApplication = signal<Application | null>(null);
   /** The fiscal-year labels ("2026", "2025/26") by id, loaded per top cost centre. */
   readonly fyLabels = signal<ReadonlyMap<string, string>>(new Map());
+  /** The fiscal years by top cost centre, for the options of the Haushaltsjahr chip. */
+  private readonly fysByTop = signal<ReadonlyMap<string, readonly FiscalYear[]>>(new Map());
+  readonly fiscalYearId = this.list.fiscalYearId;
+  /**
+   * The Haushaltsjahr chip shows with a cost centre, because a fiscal year belongs to one top
+   * cost centre (§ 001874). Its options are the years of that top cost centre.
+   */
+  readonly showYearChip = computed(() => !!this.budgetId());
+  readonly yearOptions = computed<FilterSelectOption[]>(() => {
+    const top = findTopBudgetNode(this.budgetTree(), this.budgetId());
+    const fys = top ? (this.fysByTop().get(top.id) ?? []) : [];
+    return [
+      { value: '', label: this.i18n.translate('expenses.filter.allYears') },
+      ...fys.map((f) => ({ value: f.id, label: f.display })),
+    ];
+  });
+  readonly yearChipLabel = computed(() => {
+    const id = this.fiscalYearId();
+    const hit = id ? this.yearOptions().find((o) => o.value === id) : undefined;
+    return filterChipText(this.i18n.translate('expenses.filter.fiscalYear'), hit?.label);
+  });
   /** The ids of the closed fiscal years among the loaded ones. Their bookings are frozen. */
   readonly closedFys = signal<ReadonlySet<string>>(new Set());
   private readonly fyRequested = new Set<string>();
@@ -557,6 +578,7 @@ export class ExpensesComponent implements OnDestroy {
     effect(() => {
       const queryParams = {
         budget: this.budgetId() || null,
+        fiscalYear: this.fiscalYearId() || null,
         kind: this.kind() || null,
         q: this.q().trim() || null,
         view: this.tab() === 'transfers' ? 'transfers' : null,
@@ -621,6 +643,13 @@ export class ExpensesComponent implements OnDestroy {
         if (this.canManage()) for (const top of tree) this.loadFyLabels(top.id, tree);
       });
     });
+    effect(() => {
+      const id = this.budgetId();
+      const tree = this.budgetTree();
+      untracked(() => {
+        if (id) this.loadFyLabels(id, tree);
+      });
+    });
   }
 
   /**
@@ -635,9 +664,15 @@ export class ExpensesComponent implements OnDestroy {
     const raw = qp.get('kind');
     const kind: '' | ExpenseKind = raw === 'expense' || raw === 'income' ? raw : '';
     const budgetId = qp.get('budget') ?? '';
+    const fiscalYearId = budgetId ? (qp.get('fiscalYear') ?? '') : '';
     const q = qp.get('q') ?? '';
-    const changed = budgetId !== this.budgetId() || kind !== this.kind() || q !== this.q();
+    const changed =
+      budgetId !== this.budgetId() ||
+      fiscalYearId !== this.fiscalYearId() ||
+      kind !== this.kind() ||
+      q !== this.q();
     this.budgetId.set(budgetId);
+    this.fiscalYearId.set(fiscalYearId);
     this.kind.set(kind);
     this.q.set(q);
     const view: ExpensesTab =
@@ -751,6 +786,7 @@ export class ExpensesComponent implements OnDestroy {
     this.api.listFiscalYears(top.id).subscribe({
       next: (fys) => {
         this.fyLabels.update((m) => new Map([...m, ...fys.map((f) => [f.id, f.display] as const)]));
+        this.fysByTop.update((m) => new Map([...m, [top.id, fys]]));
         this.closedFys.update((c) => withClosedYears(c, fys));
       },
       error: () => this.fyRequested.delete(top.id),
@@ -842,6 +878,11 @@ export class ExpensesComponent implements OnDestroy {
 
   selectBudget(id: string): void {
     this.list.selectBudget(id);
+    if (this.tab() === 'transfers') this.transfers.reload();
+  }
+
+  selectFiscalYear(id: string): void {
+    this.list.selectFiscalYear(id);
     if (this.tab() === 'transfers') this.transfers.reload();
   }
 

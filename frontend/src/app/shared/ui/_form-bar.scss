@@ -1,0 +1,31 @@
+// The head bar of a form that takes the place of a detail (spec 001890): the icon and the
+// title at the start, "Abbrechen" at the end, one line on a surface one step up.
+//
+// `$side` is the inset of the icon from the side edge. The label of "Abbrechen" ends at
+// the same inset from the other edge (spec 001891), so the pill of the text button, which
+// has 12px around its label, stands 12px closer to the edge.
+
+// The 12px of a medium text button around its label (`.btn--text.btn--md`).
+$text-button-pad: var(--space-3);
+
+@mixin bar($side) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 60px;
+  padding-block: var(--space-2);
+  padding-inline: $side calc(#{$side} - #{$text-button-pad});
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+@mixin icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+
+@mixin text {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-md);
+}

@@ -203,6 +203,7 @@ def type_row(**kw: Any) -> Any:
         "name_i18n": {"de": "Antrag"},
         "has_budget": False,
         "pdf_signatures": False,
+        "attachment_required": False,
         "comparison_offers": None,
         "retention_months": None,
         "active_form_version_id": None,

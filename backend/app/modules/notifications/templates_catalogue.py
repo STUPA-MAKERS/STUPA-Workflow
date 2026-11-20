@@ -22,6 +22,7 @@ from app.modules.notifications.texts import (
     calendar,
     captured,
     comments,
+    committees,
     decisions,
     drafts,
     meetings,
@@ -381,6 +382,13 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         polls.CIRCULAR_OPEN_SUBJECT,
         polls.CIRCULAR_OPEN_BODY,
         polls.CIRCULAR_PLACEHOLDERS,
+    ),
+    MailTemplateSpec(
+        committees.GREMIUM_MESSAGE_KEY,
+        committees.GREMIUM_MESSAGE_KEY,
+        committees.GREMIUM_MESSAGE_SUBJECT,
+        committees.GREMIUM_MESSAGE_BODY,
+        committees.GREMIUM_MESSAGE_PLACEHOLDERS,
     ),
     MailTemplateSpec(
         polls.CIRCULAR_REMINDER_KEY,

@@ -35,12 +35,14 @@ def branded_mail(
     html: str | None = None,
     link: MailLink | None = None,
     attachments: tuple[MailAttachment, ...] = (),
+    reply_to: str | None = None,
 ) -> MailMessage:
     """Return the mail for a rendered subject and body.
 
     ``html`` is the safe inner HTML of a template. Without it the frame escapes and wraps
     ``text``. The HTML comes from the text before the link line, so the HTML shows the
-    link as a button only. ``reason`` is the mail kind of the footer hint.
+    link as a button only. ``reason`` is the mail kind of the footer hint. ``reply_to``
+    sets the Reply-To header.
     """
     base_url = settings.public_base_url
     with_link = append_link_text(text, link.url, link.label(lang)) if link is not None else text
@@ -61,6 +63,7 @@ def branded_mail(
         idempotency_key=idempotency_key,
         from_name=brand.name,
         attachments=attachments,
+        reply_to=reply_to,
         inline=(
             (MailInline(cid=LOGO_CID, mime="image/png", content=brand.logo.png),)
             if brand.logo is not None

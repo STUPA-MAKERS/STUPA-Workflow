@@ -172,6 +172,7 @@ export const AUDIT_ACTIONS = [
   'backup_import',
   'backup_restore',
   'gremium_info_update',
+  'gremium_notify',
 ] as const;
 
 /** Target type to router target: the detail page or the admin list that owns the target. */
