@@ -2,7 +2,7 @@
 id: "002003"
 title: The Markdown editor and the DE texts load in chunks of their own
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:

@@ -2,7 +2,7 @@
 id: "002001"
 title: The marks of the navigation come in one read, not on every page change
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:

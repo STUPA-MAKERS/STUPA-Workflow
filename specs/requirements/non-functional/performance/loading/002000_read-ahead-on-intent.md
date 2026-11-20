@@ -2,7 +2,7 @@
 id: "002000"
 title: A list reads the details of a row ahead only on a sign of intent
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:

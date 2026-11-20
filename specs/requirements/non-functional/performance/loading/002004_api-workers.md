@@ -2,7 +2,7 @@
 id: "002004"
 title: The API serves requests in four processes
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:

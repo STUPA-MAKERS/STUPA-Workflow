@@ -2,7 +2,7 @@
 id: "002002"
 title: The app runs its change detection without zone.js
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:
