@@ -273,6 +273,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/committees/001013](requirements/functional/collaboration/committees/001013_info-markdown.md) | The Info text is sanitized Markdown | approved |
 | [F/collaboration/committees/001014](requirements/functional/collaboration/committees/001014_info-save.md) | An Info save is versioned and audited | approved |
 | [F/collaboration/committees/001015](requirements/functional/collaboration/committees/001015_info-empty.md) | An empty Info tab shows only to its editors | approved |
+| [F/collaboration/committees/001850](requirements/functional/collaboration/committees/001850_notify-members.md) | A Gremium notifies its members | draft |
+| [F/collaboration/committees/001851](requirements/functional/collaboration/committees/001851_notify-permission.md) | Only members.notify sends a message to the members | draft |
+| [F/collaboration/committees/001852](requirements/functional/collaboration/committees/001852_notify-recipients.md) | The message goes to the active members | draft |
+| [F/collaboration/committees/001853](requirements/functional/collaboration/committees/001853_notify-template.md) | The members message is a mail template | draft |
+| [F/collaboration/committees/001854](requirements/functional/collaboration/committees/001854_notify-checks.md) | A members message is checked and audited | draft |
 | [F/collaboration/graph/001420](requirements/functional/collaboration/graph/001420_graph-page.md) | The page Graph shows the elements of a person and their relations | approved |
 | [F/collaboration/graph/001421](requirements/functional/collaboration/graph/001421_graph-permission.md) | The graph needs its own permission | approved |
 | [F/collaboration/graph/001422](requirements/functional/collaboration/graph/001422_graph-read-rules.md) | The graph shows only what the person reads | approved |
