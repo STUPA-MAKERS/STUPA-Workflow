@@ -9,6 +9,8 @@ import {
   type ExpenseKind,
   flattenBudgetOptions,
 } from '../budget/budget-tree.api';
+import { findTopBudgetNode } from '../budget/expense-display.util';
+import type { Uuid } from '@core/api/models';
 import { debounced } from '@shared/debounced';
 
 export type ExpenseSortField = 'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate';
@@ -48,6 +50,8 @@ export class ExpensesListState {
   readonly createdFrom = signal('');
   readonly createdTo = signal('');
   readonly budgetId = signal('');
+  /** The Haushaltsjahr filter (§ 001874). It belongs to the top cost centre of `budgetId`. */
+  readonly fiscalYearId = signal('');
   readonly sortField = signal<ExpenseSortField>('paymentDate');
   readonly sortOrder = signal<'asc' | 'desc'>('desc');
 
@@ -80,8 +84,20 @@ export class ExpensesListState {
     this.reload();
   }
 
+  /**
+   * A cost centre of another top cost centre has other fiscal years, so the year filter
+   * drops with it. No cost centre drops the year too, because the chip of the year shows
+   * only with a cost centre.
+   */
   selectBudget(id: string): void {
+    const top = (x: string) => (x ? (findTopBudgetNode(this.budgetTree(), x)?.id ?? x) : '');
+    if (!id || top(id) !== top(this.budgetId())) this.fiscalYearId.set('');
     this.budgetId.set(id);
+    this.reload();
+  }
+
+  selectFiscalYear(id: string): void {
+    this.fiscalYearId.set(id);
     this.reload();
   }
 
@@ -132,6 +148,7 @@ export class ExpensesListState {
     { signal: this.createdTo, clearedByReset: true },
     { signal: this.q, clearedByReset: true },
     { signal: this.budgetId, clearedByReset: true },
+    { signal: this.fiscalYearId, clearedByReset: true },
   ];
 
   resetFilters(): void {
@@ -185,6 +202,7 @@ export class ExpensesListState {
   private filterParams() {
     return {
       budget: this.budgetId() || undefined,
+      fiscalYear: (this.fiscalYearId() || undefined) as Uuid | undefined,
       kind: this.kind() || undefined,
       q: this.q().trim() || undefined,
       amountMin: this.amountMin().trim() ? Number(this.amountMin()) : undefined,
@@ -249,6 +267,7 @@ export class ExpensesListState {
       () =>
         this.api.exportExpensesXlsx({
           budget: this.budgetId() || undefined,
+          fiscalYear: this.fiscalYearId() || undefined,
           kind: this.kind() || undefined,
           q: this.q().trim() || undefined,
           amountMin: this.amountMin().trim() || undefined,

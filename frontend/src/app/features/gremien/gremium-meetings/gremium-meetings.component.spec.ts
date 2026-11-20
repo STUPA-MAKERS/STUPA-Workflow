@@ -76,7 +76,7 @@ describe('GremiumMeetingsComponent', () => {
     ]);
     expect(view.cmp.groups()[3].rows[0].status.key).toBe('gremien.meetings.protocolMissing');
     expect(view.cmp.groups()[0].rows[0].status.key).toBe('meetings.status.planned');
-    expect(screen.getByRole('link', { name: /In „Sitzungen“ öffnen/ }).getAttribute('href')).toBe('/meetings');
+    expect(screen.getByRole('link', { name: /In „Sitzungen“ öffnen/ }).getAttribute('href')).toBe('/meetings?committee=g-1');
     expect(await runAxe(view.container)).toHaveNoViolations();
   });
 

@@ -292,24 +292,30 @@
   gap: var(--space-3);
 }
 
+// The figures stand in a grid of equal columns, each as wide as the longest amount at least
+// (`--fig-min`), spread evenly over the rows (`--fig-cols`, both set by the page), so a second
+// row lines up with the first. The line
+// between two tiles is a shadow on the start of each tile; the box cuts the shadow of the
+// first tile of each row, so a row has lines only between its tiles.
 .bd__figs {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(var(--fig-cols, auto-fit), minmax(min(100%, var(--fig-min, 9rem)), 1fr));
   row-gap: var(--space-3);
   margin: 0;
   padding: var(--space-4) 0;
+  overflow: hidden;
+  // The box cuts its content, so in the column of the sheet it would shrink below its rows.
+  flex-shrink: 0;
   border-radius: var(--radius-lg);
   background: var(--color-surface-2);
 }
 .bd__fig {
   display: flex;
-  flex: 1 1 auto;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
   padding: 0 var(--space-3);
-}
-.bd__fig + .bd__fig {
-  border-inline-start: 1px solid var(--color-border);
+  box-shadow: -1px 0 0 var(--color-border);
 }
 .bd__figLabel {
   font-size: 0.78125rem;
@@ -456,10 +462,10 @@
     padding: 0;
     background: none;
   }
-  .bd__fig,
-  .bd__fig + .bd__fig {
+  .bd__fig {
     padding: 14px 18px;
     border: 0;
+    box-shadow: none;
     border-radius: var(--radius-lg);
     background: var(--color-surface-1);
   }

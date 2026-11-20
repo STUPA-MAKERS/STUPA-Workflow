@@ -2,12 +2,10 @@
 id: "000144"
 title: The cost centre card lists Anträge and bookings
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation:
-  - frontend/src/app/pages/budget/budget-dashboard.component.html
-  - frontend/src/app/pages/budget/budget-items
+updated: 2026-11-20
+replaced_by: F/finance/budget/001873
 scope:
   - backend/app/modules/budget
   - frontend/src/app/pages/budget

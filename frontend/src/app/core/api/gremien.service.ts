@@ -1,6 +1,7 @@
 /**
  * API of the tab "Gremien" (`/api/committees`). Every call reads, except `saveInfo`, the
- * save of the Info tab (gremium permission `info.write`).
+ * save of the Info tab (gremium permission `info.write`), and `notify`, the message to the
+ * members (gremium permission `members.notify`).
  *
  * The server shows a gremium to an active member, to `gremium.view_all` and to the admin
  * role. Any other caller gets 404 for a gremium, so a hidden gremium looks like a missing
@@ -240,6 +241,17 @@ export interface GremiumInfoSave {
   readonly version: number;
 }
 
+/** A message to the members (specs 001850-001854): a subject and a plain text. */
+export interface GremiumNotify {
+  readonly subject: string;
+  readonly message: string;
+}
+
+/** The result of a send: the number of recipients, never their addresses. */
+export interface GremiumNotifyResult {
+  readonly recipients: number;
+}
+
 /**
  * The API calls of the tab "Gremien". Every view of the tab has its own skeleton, so no call
  * shows the global overlay.
@@ -336,5 +348,10 @@ export class GremienApiService {
   /** Save text and links; a stale `version` gives 409 `gremium_info_version_conflict`. */
   saveInfo(gremiumId: Uuid, body: GremiumInfoSave): Observable<GremiumInfo> {
     return this.http.put<GremiumInfo>(`${this.base}/committees/${gremiumId}/info`, body);
+  }
+
+  /** Mail a message to the members and the pool of the gremium (`members.notify`). */
+  notify(gremiumId: Uuid, body: GremiumNotify): Observable<GremiumNotifyResult> {
+    return this.http.post<GremiumNotifyResult>(`${this.base}/committees/${gremiumId}/notify`, body);
   }
 }

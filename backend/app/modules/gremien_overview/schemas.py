@@ -258,3 +258,25 @@ class GremiumInfoOut(_GremienOut, frozen=True):
     updated_at: _datetime | None
     updated_by_name: str | None
     can_edit: bool
+
+
+#: The limits of a message to the members (spec 001854).
+NOTIFY_MAX_SUBJECT: Final = 200
+NOTIFY_MAX_MESSAGE: Final = 10_000
+
+
+class GremiumNotifyIn(_GremienOut, frozen=True):
+    """A message to the members: a subject and a plain text, both not blank."""
+
+    subject: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=NOTIFY_MAX_SUBJECT)
+    ]
+    message: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=NOTIFY_MAX_MESSAGE)
+    ]
+
+
+class GremiumNotifyOut(_GremienOut, frozen=True):
+    """The result of a send: the number of recipients, never their addresses."""
+
+    recipients: int

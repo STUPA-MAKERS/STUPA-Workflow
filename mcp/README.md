@@ -111,8 +111,8 @@ neighbors), `todo_comment`, `todo_board_create` (a free board), `todo_board_entr
 Links between any two elements (spec 001409): `link_list`, `link_add`, `link_remove`,
 `link_targets`, `link_view`.
 Gremien and Kalender: `gremien_overview`, `gremium_members`, `gremium_decisions`,
-`gremium_attendance`, `get_gremium_info`, `set_gremium_info`, `calendar_entries`,
-`create_appointment`, `answer_appointment`.
+`gremium_attendance`, `get_gremium_info`, `set_gremium_info`, `notify_gremium_members`,
+`calendar_entries`, `create_appointment`, `answer_appointment`.
 Search and profile: `search`, `get_profile`.
 Activity: `list_activity`, `get_activity_status`, `mark_activity_seen`.
 

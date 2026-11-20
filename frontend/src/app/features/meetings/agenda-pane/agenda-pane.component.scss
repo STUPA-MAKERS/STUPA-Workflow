@@ -219,6 +219,11 @@
 :host-context(.mp__agenda) .ap__row ::ng-deep .li__trail {
   position: static;
 }
+// The menu stands outside the item, so a trail without a badge is empty: it takes back the gap
+// in front of it, and the title reaches the end of the item.
+:host-context(.mp__agenda) .ap__trail:not(:has(app-badge)) {
+  margin-inline-start: -14px;
+}
 :host-context(.mp__agenda) .ap__menu,
 :host-context(.mp__agenda) .ap__row:focus-within .ap__menu {
   position: absolute;
@@ -268,11 +273,10 @@
     margin: 0;
   }
   // A TOP at rest is one box over the full width: the split and the box of the menu show only
-  // with the ⋮ (001443). At rest the item keeps the room of the menu as padding, so its text
-  // does not move when the box splits.
+  // with the ⋮ (001443). At rest the title uses the full width of the box, so it gives room to
+  // the menu only while the ⋮ shows.
   :host-context(.mp__agenda) .ap__row:not(:hover):not(:focus-within):not(:has([aria-expanded='true'])) ::ng-deep .li {
     margin-inline-end: 0;
-    padding-inline-end: calc(var(--space-3) + 56px + 3px);
   }
   :host-context(.mp__agenda) .ap__row:last-child:not(:hover):not(:focus-within):not(:has([aria-expanded='true'])) ::ng-deep .li {
     border-end-end-radius: var(--radius-2xl);

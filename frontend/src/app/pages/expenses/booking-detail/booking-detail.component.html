@@ -4,13 +4,21 @@
     <app-sheet-bar [bleed]="split()">
       <h2 appSheetBarTitle id="bd-title" class="sheet-title fd__title">{{ e.description }}</h2>
       @if (canManage()) {
-        <app-sheet-action
-          icon="edit"
-          [label]="'action.edit' | t"
-          [ariaLabel]="'expenses.edit' | t"
-          [phone]="phone()"
-          (pressed)="edit.emit(e)"
-        />
+        <!-- On a phone the edit button shows its text; elsewhere it is an icon button with a tooltip.
+             It stands right in the group of the sheet bar, so it joins the shape of the group (001350). -->
+        @if (phone()) {
+          <app-button variant="tonal" (click)="edit.emit(e)">
+            <span class="fd__btn"><app-icon name="edit" />{{ 'action.edit' | t }}</span>
+          </app-button>
+        } @else {
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="'expenses.edit' | t"
+            [title]="'expenses.edit' | t"
+            (click)="edit.emit(e)"
+          ><app-icon name="edit" /></app-button>
+        }
       }
       @if (menu().length) {
         <app-row-menu [label]="'expenses.detail.menu' | t" [sections]="menu()" (selected)="onMenu($event)" />
@@ -144,6 +152,34 @@
 
       @if (app() || inv()) {
         <app-section class="fd__sec bd__linked" [heading]="'expenses.detail.linked' | t">
+          <!-- The section holds the Antrag, the Rechnung and the linked elements, so "Verknüpfen" and
+               "To-Do anlegen" stand in its head, as in the section of a booking without them. -->
+          @if (canManage() || todos.canAct()) {
+            <app-button-group sectionAction>
+              <app-button
+                variant="text"
+                size="sm"
+                [iconOnly]="true"
+                [ariaLabel]="'todos.linked.link' | t"
+                data-testid="bd-link"
+                (click)="todos.linkOpen.set(true)"
+              >
+                <app-icon name="link" />
+              </app-button>
+              @if (todos.canAct()) {
+                <app-button
+                  variant="text"
+                  size="sm"
+                  [iconOnly]="true"
+                  [ariaLabel]="'todos.linked.add' | t"
+                  data-testid="bd-new"
+                  (click)="todos.newOpen.set(true)"
+                >
+                  <app-icon name="plus" />
+                </app-button>
+              }
+            </app-button-group>
+          }
           <div class="rowgroup">
             @if (app(); as a) {
               <a class="fd__link" [routerLink]="['/applications', a.id]">
@@ -199,7 +235,7 @@
               }
             }
           </div>
-          <app-todo-linked-list class="bd__todos" kind="expense" headingId="bd-todos" [showTitle]="false" [targetId]="e.id" />
+          <app-todo-linked-list #todos class="bd__todos" kind="expense" headingId="bd-todos" [showTitle]="false" [targetId]="e.id" [headActions]="true" [linkLabel]="e.description" />
         </app-section>
       }
 

@@ -139,6 +139,14 @@
     </ng-template>
   </article>
 
+  @if (canNotify()) {
+    <app-gremium-notify-dialog
+      [open]="notifyOpen()"
+      [gremiumId]="g.id"
+      [gremiumName]="g.name"
+      (closed)="notifyOpen.set(false)"
+    />
+  }
   @if (canPlan()) {
     <app-create-meeting-dialog [open]="createOpen()" [gremiumId]="g.id" (closed)="createOpen.set(false)" />
   }

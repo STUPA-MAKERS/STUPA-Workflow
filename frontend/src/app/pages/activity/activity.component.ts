@@ -15,7 +15,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { clock, isoDay, localToday, weekdayDate } from '@shared/date-format';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
-import { RouterLink } from '@angular/router';
+import { RouterLink, type Params } from '@angular/router';
 import { FabLinkDirective } from '@stupa-makers/ui-kit/shell';
 import { LiveCardsComponent } from '../../features/meetings/live-cards/live-cards.component';
 import { RailStatusService } from '../../layout/rail-status.service';
@@ -188,6 +188,21 @@ export class ActivityComponent {
     return KIND_ICON[e.itemKind];
   }
 
+  /** The row link of each entry, split once, so a link keeps its query object. */
+  private readonly links = computed(
+    () => new Map(this.entries().map((e) => [e.id, splitUrl(e.url)] as const)),
+  );
+
+  /** The path of the entry's URL, for the row link. */
+  path(e: ActivityEntry): string {
+    return (this.links().get(e.id) ?? splitUrl(e.url)).path;
+  }
+
+  /** The query of the entry's URL (`/todos?card=<id>`), for the row link. */
+  query(e: ActivityEntry): Readonly<Params> | null {
+    return (this.links().get(e.id) ?? splitUrl(e.url)).query;
+  }
+
   title(e: ActivityEntry): string {
     return e.itemTitle || this.i18n.translate('activity.untitled');
   }
@@ -301,4 +316,15 @@ function writeOwn(own: boolean): void {
   } catch {
     // Storage blocked: the choice lasts for this visit only.
   }
+}
+
+/**
+ * Split an app URL into its path and its query params. A router link takes a path only and
+ * encodes a `?` in it, so `/todos?card=<id>` as one string opens the 404 page.
+ */
+export function splitUrl(url: string): { readonly path: string; readonly query: Readonly<Params> | null } {
+  const at = url.indexOf('?');
+  return at < 0
+    ? { path: url, query: null }
+    : { path: url.slice(0, at), query: Object.fromEntries(new URLSearchParams(url.slice(at + 1))) };
 }

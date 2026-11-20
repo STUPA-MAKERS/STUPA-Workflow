@@ -180,8 +180,8 @@
 
     <footer class="wz__nav">
       @if (effForm()) {
-        <app-button-group>
-          <app-button class="wz__discard" variant="danger" (click)="confirmDiscard.set(true)">
+        <app-button-group class="wz__discard">
+          <app-button variant="danger" (click)="confirmDiscard.set(true)">
             {{ 'apply.nav.discard' | t }}
           </app-button>
         </app-button-group>

@@ -30,7 +30,6 @@ import {
 } from '../../budget/expense-display.util';
 import { bookedOn } from '../invoice-figures';
 import { TodoLinkedListComponent } from '../../../features/todos/linked-list/todo-linked-list.component';
-import { SheetActionComponent } from '../../budget/sheet-action/sheet-action.component';
 import { dayMonth, daysUntil } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
 
@@ -49,7 +48,6 @@ import { formatMoney } from '@shared/format-money';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     SectionComponent,
-    SheetActionComponent,
     NoteComponent,
     EmptyStateComponent,
     SheetBarComponent,

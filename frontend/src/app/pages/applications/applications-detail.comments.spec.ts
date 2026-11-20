@@ -6,10 +6,7 @@
  * under `--coverage`.
  */
 import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -20,7 +17,12 @@ import { RailStatusService } from '../../layout/rail-status.service';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ToastService } from '@stupa-makers/ui-kit';
-import type { ApplicationOutWire, CommentOutWire, StateOutWire, VersionOutWire } from '@core/api/models';
+import type {
+  ApplicationOutWire,
+  CommentOutWire,
+  StateOutWire,
+  VersionOutWire,
+} from '@core/api/models';
 import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
 
 const SUBMITTED: StateOutWire = {
@@ -125,11 +127,13 @@ const url =
 
 /** Flush the effective-form request used for data-field labels. */
 function flushForm(http: HttpTestingController, id = 'app-1') {
-  http.expectOne((r) => r.url === `/api/applications/${id}/form`).flush({
-    applicationTypeId: 't1',
-    formVersionId: 'fv1',
-    sections: [],
-  });
+  http
+    .expectOne((r) => r.url === `/api/applications/${id}/form`)
+    .flush({
+      applicationTypeId: 't1',
+      formVersionId: 'fv1',
+      sections: [],
+    });
 }
 
 /** The attachments panel loads on render. An empty answer is fine. */
@@ -155,7 +159,15 @@ function openComments(detectChanges: () => void) {
 function flushTypes(http: HttpTestingController) {
   for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/application-types')) {
     req.flush({
-      items: [{ id: 't1', name: 'Finanzantrag', hasBudget: true, active: true, activeFormVersionId: 'v1' }],
+      items: [
+        {
+          id: 't1',
+          name: 'Finanzantrag',
+          hasBudget: true,
+          active: true,
+          activeFormVersionId: 'v1',
+        },
+      ],
       total: 1,
       limit: 20,
       offset: 0,
@@ -177,7 +189,8 @@ async function loaded(
   ctx.http.expectOne(url('')).flush(appWire());
   ctx.http.expectOne(url('/versions')).flush(VERSIONS);
   ctx.http.expectOne(url('/comments')).flush(comments);
-  for (const req of ctx.http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) req.flush([]);
+  for (const req of ctx.http.match((r) => r.method === 'GET' && r.url === '/api/budgets'))
+    req.flush([]);
   flushForm(ctx.http);
   ctx.detectChanges();
   flushAttachments(ctx.http);
@@ -253,7 +266,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     const sheet = screen.getByRole('dialog', { name: 'Kommentare' });
     expect(sheet).toHaveAttribute('aria-modal', 'true');
     expect(within(sheet).getByText('Bitte Kostenplan ergänzen.')).toBeInTheDocument();
-    expect(within(sheet).getByRole('radio', { name: 'Intern (nur Gremien)' })).toBeChecked();
+    expect(within(sheet).getByRole('radio', { name: 'Intern' })).toBeChecked();
     fireEvent.keyDown(sheet, { key: 'Escape' });
     detectChanges();
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -355,11 +368,11 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     );
     const box = input() as HTMLTextAreaElement;
     const group = screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
-    await userEvent.click(within(group).getByRole('radio', { name: 'Öffentlich (Antragsteller:in liest mit und bekommt eine Mail)' }));
+    await userEvent.click(within(group).getByRole('radio', { name: 'Öffentlich' }));
     fireEvent.input(box, { target: { value: 'Hallo @sel', selectionStart: 10 } });
     detectChanges();
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
-    await userEvent.click(within(group).getByRole('radio', { name: 'Intern (nur Gremien)' }));
+    await userEvent.click(within(group).getByRole('radio', { name: 'Intern' }));
     fireEvent.input(box, { target: { value: 'Hallo @sel', selectionStart: 10 } });
     detectChanges();
     const list = screen.getByRole('listbox', { name: 'Personen erwähnen' });
@@ -420,7 +433,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
   it('starts each comment of a member as internal', async () => {
     const { http, type, detectChanges } = await loaded();
     const group = screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
-    expect(within(group).getByRole('radio', { name: 'Intern (nur Gremien)' })).toBeChecked();
+    expect(within(group).getByRole('radio', { name: 'Intern' })).toBeChecked();
     expect(document.querySelector('.chat__box--public')).toBeNull();
     type('Nur für uns');
     const post = http.expectOne(url('/comments'));
@@ -435,7 +448,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
   it('shows a public choice before the send and resets it after the send', async () => {
     const { http, type, detectChanges } = await loaded();
     const group = screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
-    await userEvent.click(within(group).getByRole('radio', { name: 'Öffentlich (Antragsteller:in liest mit und bekommt eine Mail)' }));
+    await userEvent.click(within(group).getByRole('radio', { name: 'Öffentlich' }));
     detectChanges();
     expect(document.querySelector('.chat__box--public')).not.toBeNull();
     type('An alle');
@@ -443,7 +456,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     expect(post.request.body).toEqual({ body: 'An alle', visibility: 'public' });
     post.flush({ ...OWN, body: 'An alle', visibility: 'public' });
     detectChanges();
-    expect(within(group).getByRole('radio', { name: 'Intern (nur Gremien)' })).toBeChecked();
+    expect(within(group).getByRole('radio', { name: 'Intern' })).toBeChecked();
     expect(document.querySelector('.chat__box--public')).toBeNull();
     http.verify();
   });
@@ -452,10 +465,21 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
   it('sends a comment with a file only, and shows the files of the comments', async () => {
     const withFile: CommentOutWire = {
       ...COMMENTS[0],
-      attachments: [{ id: 'f1', filename: 'kosten.pdf', mime: 'application/pdf', size: 2048, scanState: 'clean' }],
+      attachments: [
+        {
+          id: 'f1',
+          filename: 'kosten.pdf',
+          mime: 'application/pdf',
+          size: 2048,
+          scanState: 'clean',
+        },
+      ],
     };
     const { http, input, detectChanges, fixture } = await loaded(undefined, [withFile]);
-    expect(screen.getByRole('link', { name: /kosten\.pdf/ })).toHaveAttribute('href', '/api/attachments/f1/download');
+    expect(screen.getByRole('link', { name: /kosten\.pdf/ })).toHaveAttribute(
+      'href',
+      '/api/attachments/f1/download',
+    );
 
     const box = fixture.nativeElement.querySelector('.chat__fileInput') as HTMLInputElement;
     const file = new File(['%PDF'], 'angebot.pdf', { type: 'application/pdf' });
@@ -479,7 +503,12 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     fireEvent.keyDown(input(), { key: 'Enter' });
     detectChanges();
     const post = http.expectOne(url('/comments'));
-    expect(post.request.body).toEqual({ body: '', visibility: 'internal', attachmentIds: ['d1'], draftToken: 'tok' });
+    expect(post.request.body).toEqual({
+      body: '',
+      visibility: 'internal',
+      attachmentIds: ['d1'],
+      draftToken: 'tok',
+    });
     expect(screen.getByText('In Prüfung')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'angebot.pdf entfernen' })).not.toBeInTheDocument();
     post.flush({
@@ -487,7 +516,15 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
       id: 'c3',
       body: '',
       visibility: 'public',
-      attachments: [{ id: 'd1', filename: 'angebot.pdf', mime: 'application/pdf', size: 4, scanState: 'scanning' }],
+      attachments: [
+        {
+          id: 'd1',
+          filename: 'angebot.pdf',
+          mime: 'application/pdf',
+          size: 4,
+          scanState: 'scanning',
+        },
+      ],
     });
     detectChanges();
     expect(screen.queryByRole('link', { name: /angebot\.pdf/ })).not.toBeInTheDocument();
@@ -497,7 +534,9 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
   it('keeps a failed comment and sends it again', async () => {
     const { http, type, detectChanges } = await loaded();
     type('Hmm');
-    http.expectOne(url('/comments')).flush({ title: 'Boom' }, { status: 500, statusText: 'Server Error' });
+    http
+      .expectOne(url('/comments'))
+      .flush({ title: 'Boom' }, { status: 500, statusText: 'Server Error' });
     detectChanges();
     expect(screen.getByText('Nicht gesendet')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Erneut senden' }));
@@ -552,7 +591,9 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     http.expectOne(url('/comments/c1')).flush({ title: 'e' }, { status: 500, statusText: 'x' });
     detectChanges();
     await fixture.whenStable();
-    expect(screen.getByRole('textbox', { name: 'Nachricht bearbeiten' })).toHaveValue('Lange neue Fassung');
+    expect(screen.getByRole('textbox', { name: 'Nachricht bearbeiten' })).toHaveValue(
+      'Lange neue Fassung',
+    );
     http.verify();
   });
 

@@ -45,13 +45,6 @@
   overflow-x: auto;
   scrollbar-width: none;
 }
-.td__filter {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: 36px;
-  padding-inline: var(--space-3);
-}
 .td__chips > * {
   flex: none;
 }
@@ -89,7 +82,7 @@
 }
 .td__skelChip--filter {
   width: 6rem;
-  height: 36px;
+  height: var(--control-height-sm);
 }
 
 .td__body {

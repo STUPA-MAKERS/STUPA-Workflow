@@ -4,7 +4,7 @@ title: The visibility switch names who reads the comment
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-19
+updated: 2026-11-20
 implementation:
   - frontend/src/app/shared/ui/chat/chat.component.ts
   - frontend/src/app/pages/applications/applications-detail.component.ts
@@ -17,10 +17,12 @@ scope:
 
 The visibility switch of the comment field must have these two options:
 
-- `Intern (nur Gremien)` (`Internal (committees only)`),
-- `Öffentlich (Antragsteller:in liest mit und bekommt eine Mail)`
-  (`Public (the applicant reads it and gets an e-mail)`).
+- `Intern` (`Internal`),
+- `Öffentlich` (`Public`).
 
-Reason: The words 'intern' and 'öffentlich' alone do not say that a public comment sends a mail to the applicant.
+The labels have no explanation in brackets.
+
+Reason: The switch is a segment selector, and a long label wraps onto two lines in it. The
+solid frame of a public draft (001692) shows that the applicant reads the comment.
 
 Test: A frontend unit test checks the two labels in German and in English.
