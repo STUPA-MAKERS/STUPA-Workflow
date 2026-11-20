@@ -385,6 +385,38 @@ describe('ApplicationsListComponent', () => {
   describe('multiple selection (001700, 001701, 001703)', () => {
     const MANAGE = [...ALL, 'application.manage'];
 
+    it('toggles rows, guards the bulk limit and starts from the row menu', async () => {
+      const { cmp } = await start('/applications', { perms: MANAGE });
+      expect(cmp.selectSections()).toHaveLength(1);
+      cmp.onHeaderMenu({ id: 'select' } as never);
+      expect(cmp.selecting()).toBe(true);
+      expect(cmp.selectSections()).toEqual([]);
+      cmp.toggleSelect('app-1', true);
+      cmp.toggleSelect('app-2', true);
+      cmp.toggleSelect('app-2', false);
+      expect(cmp.isSelected('app-1')).toBe(true);
+      expect(cmp.isSelected('app-2')).toBe(false);
+      expect(cmp.allSelected()).toBe(false);
+      cmp.onRowActivate({ id: 'app-1' } as never);
+      expect(cmp.selectedCount()).toBe(0);
+      cmp.openBulk('message');
+      expect(cmp.bulkMode()).toBeNull();
+      cmp.toggleSelectAll(true);
+      expect(cmp.allSelected()).toBe(true);
+      cmp.toggleSelectAll(false);
+      expect(cmp.selectedCount()).toBe(0);
+      cmp.selected.set(new Set(Array.from({ length: 101 }, (_, i) => `x-${i}`)));
+      expect(cmp.overMax()).toBe(true);
+      expect(cmp.selectionLabel()).toContain('100');
+      cmp.openBulk('transition');
+      expect(cmp.bulkMode()).toBeNull();
+      cmp.stopSelecting();
+      expect(cmp.selecting()).toBe(false);
+      expect(cmp.selectedCount()).toBe(0);
+      cmp.onRowActivate({ id: 'app-1' } as never);
+      expect(cmp.selectedCount()).toBe(0);
+    });
+
     it('offers no selection without application.manage', async () => {
       await start();
       expect(screen.queryByTestId('apps-select')).toBeNull();
