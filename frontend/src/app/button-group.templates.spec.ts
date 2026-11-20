@@ -20,8 +20,11 @@ const SRC = join(__dirname, '..');
 const GROUP_SLOTS = ['dialog-footer', 'sheet-actions', 'actions'];
 /** The elements whose content the kit draws as a group. */
 const GROUP_TAGS = ['app-button-group', 'app-sheet-bar', 'app-list-detail-bar'];
-/** The heads of the app that put their content in a group (the head of a meeting). */
-const GROUP_ATTRS = ['appmeetinghead'];
+/**
+ * The elements whose content stands in a group: the head of a meeting, and an `ng-container`
+ * marked `btnGrpContent` in a template that a group renders (the dock tools of a page).
+ */
+const GROUP_ATTRS = ['appmeetinghead', 'btngrpcontent'];
 /** The slots of the shell chrome, which hold navigation and not actions. */
 const CHROME_SLOTS = [
   'accountitems',
@@ -43,7 +46,10 @@ const CHROME_SLOTS = [
   'shellrailtools',
 ];
 /** The templates whose host is a segment of the group of the parent (`btn-grp__seg`). */
-const SEGMENT_HOSTS = ['app/features/meetings/protocol-bar/protocol-bar.component.html'];
+const SEGMENT_HOSTS = [
+  'app/features/meetings/protocol-bar/protocol-bar.component.html',
+  'app/features/meetings/public-join/join-qr.component.html',
+];
 const VOID = new Set(['input', 'img', 'br', 'hr', 'meta', 'link', 'source', 'col', 'area', 'wbr']);
 
 interface Tag {
@@ -119,6 +125,9 @@ describe('ButtonGroupTemplates', () => {
       loneButtons('<ng-container ngProjectAs="[actions]"><app-row-menu /></ng-container>'),
     ).toEqual([]);
     expect(loneButtons('<!-- <app-button>A</app-button> -->')).toEqual([]);
+    expect(
+      loneButtons('<ng-container btnGrpContent><app-button>A</app-button></ng-container>'),
+    ).toEqual([]);
   });
 
   it('puts every button of the app in a button group (001354)', () => {

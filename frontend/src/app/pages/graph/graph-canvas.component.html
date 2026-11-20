@@ -53,15 +53,15 @@
     }
   </div>
 
-  <div class="gc__tools" role="group" [attr.aria-label]="'graph.zoom.group' | t">
-    <button type="button" class="gc__tool" [attr.aria-label]="'graph.zoom.in' | t" (click)="zoomIn()">
-      <app-icon name="plus" [size]="16" />
-    </button>
-    <button type="button" class="gc__tool" [attr.aria-label]="'graph.zoom.out' | t" (click)="zoomOut()">
-      <app-icon name="minus" [size]="16" />
-    </button>
-    <button type="button" class="gc__tool" [attr.aria-label]="'graph.zoom.all' | t" (click)="showAll()">
-      <app-icon name="home" [size]="16" />
-    </button>
-  </div>
+  <app-button-group class="gc__tools" [label]="'graph.zoom.group' | t">
+    <app-button variant="tonal" [iconOnly]="true" [ariaLabel]="'graph.zoom.in' | t" [title]="'graph.zoom.in' | t" (click)="zoomIn()">
+      <app-icon name="plus" />
+    </app-button>
+    <app-button variant="tonal" [iconOnly]="true" [ariaLabel]="'graph.zoom.out' | t" [title]="'graph.zoom.out' | t" (click)="zoomOut()">
+      <app-icon name="minus" />
+    </app-button>
+    <app-button variant="tonal" [iconOnly]="true" [ariaLabel]="'graph.zoom.all' | t" [title]="'graph.zoom.all' | t" (click)="showAll()">
+      <app-icon name="home" />
+    </app-button>
+  </app-button-group>
 </div>

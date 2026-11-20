@@ -231,6 +231,11 @@ export class TopSheetComponent {
 
 
   readonly tools = TOOLS;
+  /**
+   * The format tools as connected button groups (spec 001354): the text (heading, bold,
+   * italic) and the blocks (list, quote, blackout). The insert tools are a third group.
+   */
+  readonly toolGroups: readonly (readonly FormatTool[])[] = [TOOLS.slice(0, 3), TOOLS.slice(3)];
 
   /**
    * The item whose rename started from this heading. The agenda pane shows its own field
