@@ -23,7 +23,6 @@
           "builder": "@angular/build:application",
           "options": {
             "browser": "src/main.ts",
-            "polyfills": ["zone.js"],
             "tsConfig": "tsconfig.app.json",
             "inlineStyleLanguage": "scss",
             "assets": [
@@ -55,13 +54,19 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "1MB",
-                  "maximumError": "1.2MB"
+                  "maximumWarning": "900kB",
+                  "maximumError": "1MB"
                 },
                 {
                   "type": "anyComponentStyle",
                   "maximumWarning": "20kB",
                   "maximumError": "28kB"
+                },
+                {
+                  "type": "bundle",
+                  "name": "meetings-component",
+                  "maximumWarning": "600kB",
+                  "maximumError": "700kB"
                 }
               ],
               "outputHashing": "all",

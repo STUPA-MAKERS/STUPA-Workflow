@@ -84,6 +84,18 @@ export interface ActivityQuery {
   readonly lang?: string;
 }
 
+/**
+ * The marks of the navigation (`GET /navigation/status`, spec 002001): the open tasks
+ * (applications to act on plus my open To-Dos), the new tickets (`null` without
+ * `ticket.manage` or with tickets off), a live meeting I can read, a waiting event.
+ */
+export interface NavigationStatus {
+  readonly tasks: number;
+  readonly tickets: number | null;
+  readonly live: boolean;
+  readonly activity: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ActivityApiService {
   private readonly http = inject(HttpClient);
@@ -103,6 +115,11 @@ export class ActivityApiService {
   /** Whether an event of another person waits after the last visit (the dot). */
   status(): Observable<{ readonly hasNew: boolean }> {
     return this.http.get<{ hasNew: boolean }>(`${this.base}/activity/status`, { context: skipLoading() });
+  }
+
+  /** The four marks of the navigation in one read (spec 002001). */
+  navigationStatus(): Observable<NavigationStatus> {
+    return this.http.get<NavigationStatus>(`${this.base}/navigation/status`, { context: skipLoading() });
   }
 
   /** Store `at` (the `readAt` of a step) as the last visit. */

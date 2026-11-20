@@ -161,6 +161,19 @@ describe('TodosComponent', () => {
     expect(router.url).toBe('/todos/b-2?card=k-7');
   });
 
+  /** The card-only route and the board route are two routes: a drawer on both slides in twice. */
+  it('opens the drawer of a card-only link once, on the board of the card', async () => {
+    const read = new Subject<TodoCardDetail>();
+    const { router, settle, harness } = await start('/todos?card=k-7', { cardRead: () => read });
+    expect(document.querySelector('.td__drawer')).toBeNull();
+    read.next(detail({ id: 'k-7', boardId: 'b-2' }));
+    read.complete();
+    await settle();
+    harness.detectChanges();
+    expect(router.url).toBe('/todos/b-2?card=k-7');
+    expect(document.querySelector('.td__drawer')).not.toBeNull();
+  });
+
   it('opens the default board when the card of a card link does not read', async () => {
     const { router, settle } = await start('/todos?card=k-7', {
       cardRead: () => throwError(() => new HttpErrorResponse({ status: 404 })),

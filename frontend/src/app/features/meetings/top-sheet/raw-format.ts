@@ -1,10 +1,12 @@
+import type { MarkdownFormat } from '@stupa-makers/ui-kit/markdown-editor';
+// The names helpers come from their own file: a value import of the editor entry would pull
+// the whole editor (tiptap, KaTeX) into the meeting chunk and undo its `@defer` (002003).
 import {
   type KnownName,
   MASK,
-  type MarkdownFormat,
   type NameMatch,
   matchKnownName,
-} from '@stupa-makers/ui-kit/markdown-editor';
+} from '@stupa-makers/ui-kit/markdown-editor/known-names';
 
 /** A text with a selection, as a textarea holds it. */
 export interface RawText {

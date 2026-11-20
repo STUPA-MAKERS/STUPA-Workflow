@@ -7,6 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-20
 tests:
   - "backend/tests/unit/modules/graph/test_graph_build.py:test_the_neighbours_of_a_hit_show_up_to_the_steps"
+  - "backend/tests/unit/modules/graph/test_graph_build.py:test_a_hit_of_the_search_shows_without_a_line"
   - "frontend/src/app/pages/graph/graph.component.spec.ts:GraphComponent"
 implementation:
   - backend/app/modules/graph/build.py
@@ -29,6 +30,11 @@ the read rules (F/collaboration/graph/001422) and the features (F/collaboration/
 an element that the person does not read shows only with "Ohne Zugriff zeigen", and then with
 its kind only. "Auch ohne Verknüpfung" adds only hits without a line.
 
+A hit of the search must show also when it has no line to another node that shows: with a term
+in the search, each hit that the person reads shows at every count of steps, also at 0 and
+also without "Auch ohne Verknüpfung". Without a term a node without a line shows only with
+"Auch ohne Verknüpfung" (F/collaboration/graph/001423).
+
 A fresh page must have 2 steps. The count must be in the query of the URL as `depth`; a query
 without it means 2. The route `GET /api/graph` must take `depth`, and the server must apply
 it. "Zurücksetzen" must set 2 again.
@@ -40,7 +46,9 @@ change the count with the keyboard (arrow up and down) and with a minus and a pl
 Reason: A hit alone does not answer the question of the person. The person searches an Antrag
 and wants to see its meeting, its vote and its Buchung, which the period or the search would
 hide. The count sets how far the view reaches: a small count for one element, a large count
-for a whole matter.
+for a whole matter. A search that finds one element and shows an empty page at 0 steps looks
+like a search without a hit, and the count then seems to be wrong by one.
 
-Test: A backend unit test with a chain of nodes and the counts 0, 1 and 2; a frontend unit
-test that reads the count from the URL and writes it back.
+Test: A backend unit test with a chain of nodes and the counts 0, 1 and 2; a backend unit test
+with a hit of the search that has no line to another hit, at 0 steps; a frontend unit test that
+reads the count from the URL and writes it back.

@@ -1,91 +1,67 @@
+import { DOCUMENT } from '@angular/common';
 import { Injectable, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { NavigationEnd, Router } from '@angular/router';
 import {
   EMPTY,
-  Observable,
   Subject,
   catchError,
   debounceTime,
   distinctUntilChanged,
-  expand,
   filter,
-  forkJoin,
+  fromEvent,
   interval,
-  map,
   merge,
-  of,
-  reduce,
   switchMap,
 } from 'rxjs';
 import { ActivityApiService } from '@core/api/activity.service';
-import { ApiClient } from '@core/api/api-client.service';
-import { TicketsApiService } from '@core/api/tickets.service';
-import { TodosApiService } from '@core/api/todos.service';
-import { FeatureService } from '@core/features/feature.service';
 import { AuthService } from '@core/auth/auth.service';
+import { HttpCacheService } from '@core/cache/http-cache.service';
 import { WsService } from '@core/ws/ws.service';
-import { NavService } from './nav.service';
 
-/** Navigations and live events in this window give one request, not one each. */
+/** Live events and returns to the app in this window give one request, not one each. */
 export const RAIL_STATUS_DEBOUNCE_MS = 400;
 
 /**
- * The slowest the marks can go stale without a navigation. A faster poll would put load
- * on the server for every open tab; the navigation and the meeting events already
- * cover the moments that matter.
+ * Writes in this window give one request. A protocol autosaves about once a second while
+ * someone types, so a short window would read the marks at that rate.
+ */
+export const RAIL_STATUS_WRITE_DEBOUNCE_MS = 2_000;
+
+/**
+ * The slowest the marks can go stale without a change of this tab. A faster poll would put
+ * load on the server for every open tab; the writes, the meeting events and the return to
+ * the app already cover the moments that matter.
  */
 export const RAIL_STATUS_POLL_MS = 60_000;
 
-/**
- * The upcoming timeline sorts by the planned date, not by the status. A live meeting
- * normally comes first (its date is before now), but a meeting that started before its
- * planned time, or one without a date, sorts after the planned meetings in front of it.
- * The service therefore reads page after page until it sees a live meeting or the end.
- * The upcoming list is short in practice, so one page is almost always enough.
- */
-export const LIVE_PAGE_LIMIT = 50;
-
-/** The most pages one refresh reads; a guard against an endless cursor chain. */
-export const LIVE_MAX_PAGES = 4;
+/** The reads of this service, which change no mark, so a write there starts no refresh. */
+const OWN_WRITES = ['/api/activity/seen'];
 
 /**
- * The marks of the navigation: the number of open tasks and whether a meeting runs now.
+ * The marks of the navigation: the number of open tasks and of new tickets, and the dots
+ * for a running meeting and for a waiting event (spec 002001).
  *
- * Sources:
- * - tasks: `GET /applications/tasks` (the length of the list) plus the items of
- *   `GET /todos/mine` (my open To-Dos: assigned to me, not done, not archived), the same
- *   two groups as the "Aufgaben" page. A failed To-Do read counts 0; a failed task read
- *   gives no count;
- * - tickets: `GET /tickets/counts` (the new tickets), only with `ticket.manage`;
- * - activity: `GET /activity/status`, whether an event of another person waits after
- *   the last visit of the activity page (spec 001275). A failed read shows no dot;
- * - live: `GET /meetings/timeline?direction=upcoming`, where every live meeting is
- *   upcoming (backend `listing.py`), only if the principal sees the meetings entry. The
- *   service follows `nextCursor` until a live meeting shows up (see
- *   {@link LIVE_PAGE_LIMIT}).
- *
- * A source of a feature that is off is not asked: the To-Dos count 0, the tickets give no
- * count, and the meetings entry does not show, so no meeting is live.
- *
- * Both requests skip the global loading overlay (`skipLoading` in `ApiClient`): a mark in
+ * One read, `GET /navigation/status`, gives all four. The server applies the gate of each
+ * module: the tasks are the applications to act on plus my open To-Dos (the two groups of
+ * the "Aufgaben" page), the tickets need `ticket.manage`, the live dot needs a meeting
+ * that the meetings timeline shows, and a feature that is off gives an empty mark. A
+ * failed read clears the counts and the dots. The read skips the loading bar: a mark in
  * the rail must never cover the page.
  *
- * Refresh: at sign-in, after a navigation, after a `meeting_state` frame of an open
- * meeting channel that changes the status, and every {@link RAIL_STATUS_POLL_MS} while the
- * tab is visible. A debounce folds a burst into one request. A `meeting_state` with the same
- * status (a TOP switch, a handover, a prepared vote) does not refresh: the live mark follows
- * the status only, and every viewer of a meeting gets the frame at the same moment.
+ * Refresh: at sign-in, after each write that the server answered (debounced
+ * {@link RAIL_STATUS_WRITE_DEBOUNCE_MS}), after a `meeting_state` frame that changes the
+ * status, when the app becomes visible again, and every {@link RAIL_STATUS_POLL_MS} while
+ * the tab is visible. A navigation alone does not refresh: it changes no mark, and its
+ * reads would stand beside the reads of the new page (spec 002001). A `meeting_state` with
+ * the same status (a TOP switch, a handover, a prepared vote) does not refresh: the live
+ * mark follows the status only, and every viewer of a meeting gets the frame at the same
+ * moment.
  */
 @Injectable({ providedIn: 'root' })
 export class RailStatusService {
-  private readonly api = inject(ApiClient);
   private readonly auth = inject(AuthService);
-  private readonly nav = inject(NavService);
-  private readonly tickets = inject(TicketsApiService);
-  private readonly todos = inject(TodosApiService);
-  private readonly features = inject(FeatureService);
   private readonly activity = inject(ActivityApiService);
+  private readonly document = inject(DOCUMENT);
 
   private readonly _taskCount = signal<number | null>(null);
   private readonly _ticketCount = signal<number | null>(null);
@@ -104,19 +80,31 @@ export class RailStatusService {
   private readonly manual = new Subject<void>();
 
   constructor() {
-    const router = inject(Router);
     const ws = inject(WsService);
+    const writes = inject(HttpCacheService).written.pipe(
+      filter((path) => !OWN_WRITES.includes(path)),
+      debounceTime(RAIL_STATUS_WRITE_DEBOUNCE_MS),
+    );
+    const back = fromEvent(this.document, 'visibilitychange').pipe(filter(() => this.pageVisible()));
 
     merge(
       this.manual,
-      router.events.pipe(filter((e) => e instanceof NavigationEnd)),
+      writes,
+      back,
       ws.meetingStates$.pipe(distinctUntilChanged((a, b) => a.status === b.status)),
       interval(RAIL_STATUS_POLL_MS).pipe(filter(() => this.pageVisible())),
     )
       .pipe(
         debounceTime(RAIL_STATUS_DEBOUNCE_MS),
         filter(() => this.auth.isAuthenticated()),
-        switchMap(() => this.load()),
+        switchMap(() =>
+          this.activity.navigationStatus().pipe(
+            catchError(() => {
+              this.clear();
+              return EMPTY;
+            }),
+          ),
+        ),
         takeUntilDestroyed(),
       )
       .subscribe(({ tasks, tickets, live, activity }) => {
@@ -132,10 +120,7 @@ export class RailStatusService {
         if (signedIn) {
           this.manual.next();
         } else {
-          this._taskCount.set(null);
-          this._ticketCount.set(null);
-          this._live.set(false);
-          this._activityNew.set(false);
+          this.clear();
         }
       });
     });
@@ -154,53 +139,14 @@ export class RailStatusService {
     this._activityNew.set(false);
   }
 
-  private load(): Observable<{
-    tasks: number | null;
-    tickets: number | null;
-    live: boolean;
-    activity: boolean;
-  }> {
-    const todos = this.features.isOn('todos')
-      ? this.todos.mine().pipe(
-          map((m) => m.items.length),
-          catchError(() => of(0)),
-        )
-      : of(0);
-    const tasks = forkJoin({ items: this.api.listTasks(), todos }).pipe(
-      map(({ items, todos: open }) => items.length + open),
-      catchError(() => of(null)),
-    );
-    const tickets = this.features.isOn('tickets') && this.auth.can('ticket.manage')
-      ? this.tickets.counts().pipe(
-          map((c) => c.new),
-          catchError(() => of(null)),
-        )
-      : of(null);
-    const live = this.nav.meetingsVisible() ? this.anyLive() : of(false);
-    const activity = this.activity.status().pipe(
-      map((s) => s.hasNew),
-      catchError(() => of(false)),
-    );
-    return forkJoin({ tasks, tickets, live, activity });
-  }
-
-  /** `true` as soon as one page of the upcoming timeline holds a live meeting. */
-  private anyLive(): Observable<boolean> {
-    const page = (cursor: string | null) =>
-      this.api.listMeetingsTimeline({ direction: 'upcoming', limit: LIVE_PAGE_LIMIT, cursor });
-    return page(null).pipe(
-      expand((p, i) =>
-        p.nextCursor && i + 1 < LIVE_MAX_PAGES && !p.items.some((m) => m.status === 'live')
-          ? page(p.nextCursor)
-          : EMPTY,
-      ),
-      map((p) => p.items.some((m) => m.status === 'live')),
-      reduce((seen, hit) => seen || hit, false),
-      catchError(() => of(false)),
-    );
+  private clear(): void {
+    this._taskCount.set(null);
+    this._ticketCount.set(null);
+    this._live.set(false);
+    this._activityNew.set(false);
   }
 
   private pageVisible(): boolean {
-    return typeof document === 'undefined' || document.visibilityState !== 'hidden';
+    return this.document.visibilityState !== 'hidden';
   }
 }

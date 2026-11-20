@@ -99,6 +99,17 @@ async def get_activity_status() -> dict:
 
 
 @group.tool
+async def get_navigation_status() -> dict:
+    """Read the marks of the navigation in one call.
+
+    ``tasks`` counts the applications to act on plus the open to-dos of the caller,
+    ``tickets`` the new tickets (``null`` without ``ticket.manage``), ``live`` tells whether
+    a readable meeting runs, ``activity`` whether an event of another person waits.
+    """
+    return await api().get("/navigation/status")
+
+
+@group.tool
 async def mark_activity_seen(at: str) -> dict:
     """Mark the activity page as seen up to ``at`` (the ``readAt`` of a step).
 
@@ -135,7 +146,8 @@ async def graph_read(
         date_from: Only hits with their date on or after this day (``YYYY-MM-DD``).
         date_to: Only hits with their date on or before this day.
         relations: ``all`` (default), ``links`` or ``builtin``.
-        q: Only hits with the term in their title.
+        q: Only hits with the term in their title. A hit of the search shows also
+            without a relation.
         depth: Add the neighbours of the hits, up to this count of lines away (0 to 5,
             default 2). A neighbour shows also when it does not pass the filters.
         single: Add the elements without a relation.

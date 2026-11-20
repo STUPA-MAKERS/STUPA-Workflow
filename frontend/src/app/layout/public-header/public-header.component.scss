@@ -74,10 +74,7 @@
   flex: 1 1 auto;
 }
 
-.pub__help {
-  flex: none;
-}
-
-.pub__login {
+// "Barrierefreiheit", "Hilfe" and "Anmelden" are one button group (001356).
+.pub__actions {
   flex: none;
 }

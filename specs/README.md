@@ -26,7 +26,7 @@ specs/
     non-functional/
       accessibility/  conformance, documents, interaction, language, perception, settings, statement
       compatibility/  deploy, links, pwa
-      performance/    loading
+      performance/    loading, rendering
       privacy/        personal-data
       security/       access, files, integrity, network
       usability/      controls, layout
@@ -196,6 +196,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/applications/001720](requirements/functional/applications/applications/001720_new-version-button.md) | A denied or returned Antrag offers a new version | approved |
 | [F/applications/applications/001721](requirements/functional/applications/applications/001721_new-version-link.md) | A new version links to the old Antrag | approved |
 | [F/applications/applications/001722](requirements/functional/applications/applications/001722_new-version-closes-old.md) | Submitting the new version closes the old Antrag | approved |
+| [F/applications/applications/001982](requirements/functional/applications/applications/001982_applications-list-two-fabs.md) | The Anträge list has the FABs Antrag stellen and Antrag erfassen | approved |
 | [F/applications/dashboard/000421](requirements/functional/applications/dashboard/000421_dashboard.md) | The start page is a work list with a side sheet | replaced |
 | [F/applications/dashboard/000550](requirements/functional/applications/dashboard/000550_start-due-cards.md) | Start shows the due cards of the person | replaced |
 | [F/applications/dashboard/000650](requirements/functional/applications/dashboard/000650_start-apply-button-tab-line.md) | Antrag stellen stands in the tab line of the desktop start page | replaced |
@@ -843,6 +844,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/performance/loading/000847](requirements/non-functional/performance/loading/000847_read-after-write-is-fresh.md) | A read after a write does not stand on a read from before it | approved |
 | [NF/performance/loading/000893](requirements/non-functional/performance/loading/000893_skeleton-shape.md) | A skeleton has the shape of the loaded page | approved |
 | [NF/performance/loading/001280](requirements/non-functional/performance/loading/001280_skeleton-until-logos.md) | The Gremien list shows its skeleton until the logos have loaded | approved |
+| [NF/performance/loading/002000](requirements/non-functional/performance/loading/002000_read-ahead-on-intent.md) | A list reads the details of a row ahead only on a sign of intent | approved |
+| [NF/performance/loading/002001](requirements/non-functional/performance/loading/002001_navigation-marks-one-read.md) | The marks of the navigation come in one read, not on every page change | approved |
+| [NF/performance/loading/002003](requirements/non-functional/performance/loading/002003_lazy-editor-and-texts.md) | The Markdown editor and the DE texts load in chunks of their own | approved |
+| [NF/performance/loading/002004](requirements/non-functional/performance/loading/002004_api-workers.md) | The API serves requests in four processes | approved |
+| [NF/performance/rendering/002002](requirements/non-functional/performance/rendering/002002_zoneless.md) | The app runs its change detection without zone.js | approved |
 | [NF/privacy/personal-data/000185](requirements/non-functional/privacy/personal-data/000185_no-raw-ids.md) | The UI shows no raw IDs | approved |
 | [NF/privacy/personal-data/000186](requirements/non-functional/privacy/personal-data/000186_no-plain-ip.md) | The login audit has no plain IP address | approved |
 | [NF/privacy/personal-data/000187](requirements/non-functional/privacy/personal-data/000187_guest-pseudonyms.md) | Guests get pseudonyms | replaced |
@@ -963,6 +969,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/001353](requirements/non-functional/usability/controls/001353_confirm-row-button-group.md) | The buttons of a dialog footer form a button group with a filled main action | approved |
 | [NF/usability/controls/001354](requirements/non-functional/usability/controls/001354_every-button-in-a-group.md) | Every button of the app stands in a button group | approved |
 | [NF/usability/controls/001355](requirements/non-functional/usability/controls/001355_selection-bar-grey-inset.md) | The selection bar in a list is a grey surface with an inset around its actions | approved |
+| [NF/usability/controls/001356](requirements/non-functional/usability/controls/001356_public-header-button-group.md) | The buttons of the public header are one button group | approved |
 | [NF/usability/controls/001360](requirements/non-functional/usability/controls/001360_empty-list-face.md) | An empty list shows a face in a ring of dots | approved |
 | [NF/usability/controls/001361](requirements/non-functional/usability/controls/001361_empty-state-face-motion.md) | The face of an empty state moves until motion is reduced | approved |
 | [NF/usability/controls/001362](requirements/non-functional/usability/controls/001362_empty-state-face-very-high-contrast.md) | The face of an empty state is white in very high contrast | approved |

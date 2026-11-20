@@ -1,21 +1,22 @@
-import { provideHttpClient } from '@angular/common/http';
+import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
-import { type Observable, Subject, of, throwError } from 'rxjs';
-import { ActivityApiService } from '@core/api/activity.service';
+import { Subject } from 'rxjs';
 import { USE_MOCK_API } from '@core/api/api.config';
 import type { Principal } from '@core/api/models';
+import type { NavigationStatus } from '@core/api/activity.service';
 import { AuthService } from '@core/auth/auth.service';
+import { cacheInterceptor } from '@core/cache/cache.interceptor';
 import { SKIP_LOADING } from '@stupa-makers/ui-kit';
 import type { MeetingStateMsg } from '@core/ws/ws-messages';
 import { WsService } from '@core/ws/ws.service';
 import { createLocationMock, provideLocationMock } from '../../testing/location-mock';
 import {
-  LIVE_MAX_PAGES,
   RAIL_STATUS_DEBOUNCE_MS,
   RAIL_STATUS_POLL_MS,
+  RAIL_STATUS_WRITE_DEBOUNCE_MS,
   RailStatusService,
 } from './rail-status.service';
 
@@ -32,57 +33,50 @@ const MEMBER: Principal = {
   gremien: [{ id: 'g1', name: 'StuPa', slug: 'stupa' }],
 };
 
-const TASKS = '/api/applications/tasks';
-const TIMELINE = '/api/meetings/timeline';
-const MINE = '/api/todos/mine';
+const STATUS = '/api/navigation/status';
 
-const meeting = (status: string) => ({
-  id: 'm1',
-  title: 'Sitzung',
-  status,
-  gremiumId: 'g1',
-  scheduledAt: null,
-  votes: [],
+const marks = (over: Partial<NavigationStatus> = {}): NavigationStatus => ({
+  tasks: 3,
+  tickets: null,
+  live: false,
+  activity: false,
+  ...over,
 });
-
-/** The answer of `GET /activity/status`; each test may set its own. */
-let activityStatus: () => Observable<{ hasNew: boolean }> = () => of({ hasNew: false });
 
 function setup() {
   const states = new Subject<MeetingStateMsg>();
   TestBed.configureTestingModule({
     providers: [
-      provideRouter([{ path: 'a', component: StubPage }, { path: 'b', component: StubPage }]),
-      provideHttpClient(),
+      provideRouter([
+        { path: 'a', component: StubPage },
+        { path: 'b', component: StubPage },
+      ]),
+      provideHttpClient(withInterceptors([cacheInterceptor])),
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
       provideLocationMock(createLocationMock()),
       { provide: WsService, useValue: { meetingStates$: states.asObservable() } },
-      { provide: ActivityApiService, useValue: { status: () => activityStatus() } },
     ],
   });
   const http = TestBed.inject(HttpTestingController);
   const auth = TestBed.inject(AuthService);
   const svc = TestBed.inject(RailStatusService);
   const router = TestBed.inject(Router);
-  return { http, auth, svc, router, states };
+  return { http, auth, svc, router, states, client: TestBed.inject(HttpClient) };
 }
 
-/** Sign in and let the first load go out. */
-function signIn(env: ReturnType<typeof setup>, principal: Principal = MEMBER): void {
+type Env = ReturnType<typeof setup>;
+
+/** Sign in, let the first read go out and answer it. */
+function signIn(env: Env, answer: NavigationStatus = marks()): void {
   env.auth.ensureLoaded().subscribe();
-  env.http.expectOne('/api/auth/me').flush(principal);
+  env.http.expectOne('/api/auth/me').flush(MEMBER);
   TestBed.tick();
+  jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+  env.http.expectOne(STATUS).flush(answer);
 }
 
-/** Answer one round of the requests; `todos` is the number of my open To-Dos. */
-function answer(env: ReturnType<typeof setup>, tasks: number, status = 'planned', todos = 0): void {
-  env.http
-    .expectOne((r) => r.url === MINE)
-    .flush({ items: Array.from({ length: todos }, (_, i) => ({ id: `k${i}` })), dueSoonCount: 0 });
-  env.http.expectOne((r) => r.url === TASKS).flush(Array.from({ length: tasks }, (_, i) => ({ id: `t${i}` })));
-  env.http.expectOne((r) => r.url === TIMELINE).flush({ items: [meeting(status)], nextCursor: null });
-}
+const state = (status: string): MeetingStateMsg => ({ type: 'meeting_state', status }) as unknown as MeetingStateMsg;
 
 describe('RailStatusService', () => {
   beforeEach(() => jest.useFakeTimers());
@@ -91,260 +85,100 @@ describe('RailStatusService', () => {
   it('asks nothing and shows no marks while nobody is signed in', () => {
     const env = setup();
     jest.advanceTimersByTime(RAIL_STATUS_POLL_MS * 2);
-    env.http.expectNone((r) => r.url === TASKS);
+    env.http.expectNone(STATUS);
     expect(env.svc.taskCount()).toBeNull();
     expect(env.svc.live()).toBe(false);
   });
 
-  it('loads the task count and the live flag at sign-in, without the loading overlay', () => {
+  it('reads all four marks in one request at sign-in, without the loading bar', () => {
     const env = setup();
-    signIn(env);
+    env.auth.ensureLoaded().subscribe();
+    env.http.expectOne('/api/auth/me').flush(MEMBER);
+    TestBed.tick();
     jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    const mine = env.http.expectOne((r) => r.url === MINE);
-    expect(mine.request.context.get(SKIP_LOADING)).toBe(true);
-    mine.flush({ items: [], dueSoonCount: 0 });
-    const tasks = env.http.expectOne((r) => r.url === TASKS);
-    const timeline = env.http.expectOne((r) => r.url === TIMELINE);
-    expect(tasks.request.context.get(SKIP_LOADING)).toBe(true);
-    expect(timeline.request.context.get(SKIP_LOADING)).toBe(true);
-    expect(timeline.request.params.get('direction')).toBe('upcoming');
-    tasks.flush([{ id: 'a' }, { id: 'b' }, { id: 'c' }]);
-    timeline.flush({ items: [meeting('planned'), meeting('live')], nextCursor: null });
-    expect(env.svc.taskCount()).toBe(3);
+    const read = env.http.expectOne(STATUS);
+    expect(read.request.context.get(SKIP_LOADING)).toBe(true);
+    read.flush(marks({ tasks: 4, tickets: 2, live: true, activity: true }));
+    expect(env.svc.taskCount()).toBe(4);
+    expect(env.svc.ticketCount()).toBe(2);
     expect(env.svc.live()).toBe(true);
+    expect(env.svc.activityNew()).toBe(true);
+    env.http.verify();
   });
 
-  /**
-   * A meeting that started before its planned time sorts after earlier planned ones. A live meeting
-   * ends the walk, even when more pages exist.
-   */
-  it('reads the next page while no live meeting has shown up', () => {
+  it('does not read again on a navigation', async () => {
     const env = setup();
     signIn(env);
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    env.http.expectOne((r) => r.url === MINE).flush({ items: [], dueSoonCount: 0 });
-    env.http.expectOne((r) => r.url === TASKS).flush([]);
-    const first = env.http.expectOne((r) => r.url === TIMELINE);
-    expect(first.request.params.get('cursor')).toBeNull();
-    first.flush({ items: [meeting('planned')], nextCursor: 'c1' });
-    const second = env.http.expectOne((r) => r.url === TIMELINE);
-    expect(second.request.params.get('cursor')).toBe('c1');
-    second.flush({ items: [meeting('live')], nextCursor: 'c2' });
-    env.http.expectNone((r) => r.url === TIMELINE);
-    expect(env.svc.live()).toBe(true);
+    await env.router.navigateByUrl('/a');
+    await env.router.navigateByUrl('/b');
+    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS * 2);
+    env.http.expectNone(STATUS);
   });
 
-  it('stops after a fixed number of pages', () => {
+  it('reads again once after a burst of writes, but not after its own mark of the activity page', () => {
     const env = setup();
     signIn(env);
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    env.http.expectOne((r) => r.url === MINE).flush({ items: [], dueSoonCount: 0 });
-    env.http.expectOne((r) => r.url === TASKS).flush([]);
-    for (let i = 0; i < LIVE_MAX_PAGES; i++) {
-      env.http.expectOne((r) => r.url === TIMELINE).flush({ items: [meeting('planned')], nextCursor: `c${i}` });
+    env.client.post('/api/activity/seen', {}).subscribe();
+    env.http.expectOne('/api/activity/seen').flush(null);
+    jest.advanceTimersByTime(RAIL_STATUS_WRITE_DEBOUNCE_MS + RAIL_STATUS_DEBOUNCE_MS);
+    env.http.expectNone(STATUS);
+
+    for (const id of ['x', 'y']) {
+      env.client.post(`/api/applications/${id}/transitions`, {}).subscribe();
+      env.http.expectOne(`/api/applications/${id}/transitions`).flush({});
     }
-    env.http.expectNone((r) => r.url === TIMELINE);
-    expect(env.svc.live()).toBe(false);
-    expect(env.svc.taskCount()).toBe(0);
+    jest.advanceTimersByTime(RAIL_STATUS_WRITE_DEBOUNCE_MS + RAIL_STATUS_DEBOUNCE_MS);
+    env.http.expectOne(STATUS).flush(marks({ tasks: 1 }));
+    expect(env.svc.taskCount()).toBe(1);
   });
 
-  it('does not ask for the live flag when the principal cannot see meetings', () => {
-    const env = setup();
-    signIn(env, { ...MEMBER, gremien: [] } as Principal);
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    env.http.expectOne((r) => r.url === MINE).flush({ items: [], dueSoonCount: 0 });
-    env.http.expectOne((r) => r.url === TASKS).flush([]);
-    env.http.expectNone((r) => r.url === TIMELINE);
-    expect(env.svc.taskCount()).toBe(0);
-    expect(env.svc.live()).toBe(false);
-  });
-
-  it('folds a burst of navigations into one request after the debounce', async () => {
+  it('reads again when a meeting changes its status, not on another frame of the same status', () => {
     const env = setup();
     signIn(env);
+    env.states.next(state('live'));
     jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    answer(env, 1);
-
-    const nav1 = env.router.navigateByUrl('/a');
-    const nav2 = env.router.navigateByUrl('/b');
-    await jest.advanceTimersByTimeAsync(10);
-    await Promise.all([nav1, nav2]);
-    env.http.expectNone((r) => r.url === TASKS);
+    env.http.expectOne(STATUS).flush(marks({ live: true }));
+    env.states.next(state('live'));
     jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    answer(env, 2);
-    expect(env.svc.taskCount()).toBe(2);
-  });
-
-  it('refreshes on a meeting_state frame of an open meeting channel', () => {
-    const env = setup();
-    signIn(env);
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    answer(env, 1, 'planned');
-    expect(env.svc.live()).toBe(false);
-
-    env.states.next({ type: 'meeting_state', activeApplicationId: null, status: 'live' });
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    answer(env, 1, 'live');
+    env.http.expectNone(STATUS);
     expect(env.svc.live()).toBe(true);
-
-    env.states.next({ type: 'meeting_state', activeApplicationId: 'a-1', status: 'live' });
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    env.http.expectNone((r) => r.url === TASKS);
   });
 
-  it('polls no faster than once a minute', () => {
+  it('polls while the tab is visible, skips the poll while hidden, and reads on the return', () => {
     const env = setup();
     signIn(env);
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    answer(env, 1);
-
-    jest.advanceTimersByTime(RAIL_STATUS_POLL_MS - RAIL_STATUS_DEBOUNCE_MS - 1);
-    env.http.expectNone((r) => r.url === TASKS);
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS + 1);
-    answer(env, 5);
-    expect(env.svc.taskCount()).toBe(5);
-  });
-
-  it('skips the poll while the tab is hidden', () => {
-    const env = setup();
-    signIn(env);
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    answer(env, 1);
+    jest.advanceTimersByTime(RAIL_STATUS_POLL_MS + RAIL_STATUS_DEBOUNCE_MS);
+    env.http.expectOne(STATUS).flush(marks());
 
     const visibility = jest.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
     jest.advanceTimersByTime(RAIL_STATUS_POLL_MS + RAIL_STATUS_DEBOUNCE_MS);
-    env.http.expectNone((r) => r.url === TASKS);
+    env.http.expectNone(STATUS);
+    visibility.mockReturnValue('visible');
+    document.dispatchEvent(new Event('visibilitychange'));
+    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    env.http.expectOne(STATUS).flush(marks());
     visibility.mockRestore();
   });
 
-  /** The stream survives the failure, so the next refresh asks again. */
-  it('keeps the count empty when the task request fails and the live flag off when the timeline fails', () => {
+  it('clears the marks on a failed read and at sign-out', () => {
     const env = setup();
-    signIn(env);
+    signIn(env, marks({ tasks: 3, tickets: 1, live: true, activity: true }));
+    env.svc.refresh();
     jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    env.http.expectOne((r) => r.url === MINE).flush({ items: [{ id: 'k0' }], dueSoonCount: 0 });
-    env.http.expectOne((r) => r.url === TASKS).flush(null, { status: 500, statusText: 'Error' });
-    env.http.expectOne((r) => r.url === TIMELINE).flush(null, { status: 500, statusText: 'Error' });
+    env.http.expectOne(STATUS).flush(null, { status: 500, statusText: 'x' });
     expect(env.svc.taskCount()).toBeNull();
+    expect(env.svc.ticketCount()).toBeNull();
     expect(env.svc.live()).toBe(false);
 
     env.svc.refresh();
     jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    answer(env, 2);
-    expect(env.svc.taskCount()).toBe(2);
-  });
-
-  it('forgets the marks at sign-out', () => {
-    const env = setup();
-    signIn(env);
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    answer(env, 3, 'live');
+    env.http.expectOne(STATUS).flush(marks({ activity: true }));
     expect(env.svc.taskCount()).toBe(3);
-
-    env.auth.handleUnauthorized();
-    TestBed.tick();
-    expect(env.svc.taskCount()).toBeNull();
-    expect(env.svc.live()).toBe(false);
-  });
-
-  /** A failed count shows no badge, and the other marks stay. */
-  it('counts the new tickets only with ticket.manage, and forgets them at sign-out', () => {
-    const env = setup();
-    signIn(env, { ...MEMBER, permissions: ['ticket.manage'] } as Principal);
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    const counts = env.http.expectOne((r) => r.url === '/api/tickets/counts');
-    expect(counts.request.context.get(SKIP_LOADING)).toBe(true);
-    counts.flush({ new: 2, inProgress: 1, done: 0, rejected: 0 });
-    answer(env, 1);
-    expect(env.svc.ticketCount()).toBe(2);
-
-    env.svc.refresh();
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    env.http.expectOne((r) => r.url === '/api/tickets/counts').flush({}, { status: 500, statusText: 'x' });
-    answer(env, 4);
-    expect(env.svc.ticketCount()).toBeNull();
-    expect(env.svc.taskCount()).toBe(4);
-
-    env.svc.refresh();
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    env.http.expectOne((r) => r.url === '/api/tickets/counts').flush({ new: 5, inProgress: 0, done: 0, rejected: 0 });
-    answer(env, 4);
-    env.auth.handleUnauthorized();
-    TestBed.tick();
-    expect(env.svc.ticketCount()).toBeNull();
-  });
-
-  it('does not ask for the tickets without ticket.manage', () => {
-    const env = setup();
-    signIn(env);
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    answer(env, 0);
-    env.http.expectNone((r) => r.url === '/api/tickets/counts');
-    expect(env.svc.ticketCount()).toBeNull();
-  });
-
-  /** dueSoonCount plays no part: only the open items count. */
-  it('adds all my open To-Dos to the task count, due or not; a failed read counts 0', () => {
-    const env = setup();
-    signIn(env);
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    answer(env, 2, 'planned', 3);
-    expect(env.svc.taskCount()).toBe(5);
-
-    env.svc.refresh();
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    env.http.expectOne((r) => r.url === MINE).flush({ items: [{ id: 'k0' }], dueSoonCount: 4 });
-    env.http.expectOne((r) => r.url === TASKS).flush([]);
-    env.http.expectOne((r) => r.url === TIMELINE).flush({ items: [], nextCursor: null });
-    expect(env.svc.taskCount()).toBe(1);
-
-    env.svc.refresh();
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    env.http.expectOne((r) => r.url === MINE).flush(null, { status: 403, statusText: 'Forbidden' });
-    env.http.expectOne((r) => r.url === TASKS).flush([{ id: 'a' }]);
-    env.http.expectOne((r) => r.url === TIMELINE).flush({ items: [], nextCursor: null });
-    expect(env.svc.taskCount()).toBe(1);
-  });
-
-  /** Spec 000758: a source of a feature that is off is not asked. */
-  it('does not ask for the To-Dos and the tickets while they are off', () => {
-    localStorage.setItem('ap.features.off', JSON.stringify(['todos', 'tickets', 'meetings']));
-    const env = setup();
-    localStorage.removeItem('ap.features.off');
-    signIn(env, { ...MEMBER, permissions: ['ticket.manage'] } as Principal);
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    env.http.expectNone((r) => r.url === MINE);
-    env.http.expectNone((r) => r.url === '/api/tickets/counts');
-    env.http.expectNone((r) => r.url === TIMELINE);
-    env.http.expectOne((r) => r.url === TASKS).flush([{ id: 't1' }]);
-    expect(env.svc.taskCount()).toBe(1);
-    expect(env.svc.ticketCount()).toBeNull();
-    expect(env.svc.live()).toBe(false);
-  });
-
-  /** Spec 001275: a dot for a waiting event; a failed read and a seen page show none. */
-  it('shows the activity dot, clears it when the page is seen, and hides it on a failed read', () => {
-    activityStatus = () => of({ hasNew: true });
-    const env = setup();
-    signIn(env);
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    answer(env, 0);
-    expect(env.svc.activityNew()).toBe(true);
-
     env.svc.activitySeen();
     expect(env.svc.activityNew()).toBe(false);
 
-    activityStatus = () => of({ hasNew: true });
-    env.svc.refresh();
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    answer(env, 0);
-    expect(env.svc.activityNew()).toBe(true);
-
-    activityStatus = () => throwError(() => new Error('down'));
-    env.svc.refresh();
-    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    answer(env, 0);
-    expect(env.svc.activityNew()).toBe(false);
-    activityStatus = () => of({ hasNew: false });
+    env.auth.handleUnauthorized();
+    TestBed.tick();
+    expect(env.svc.taskCount()).toBeNull();
   });
 });

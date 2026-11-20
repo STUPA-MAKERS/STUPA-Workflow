@@ -1,3 +1,4 @@
+import { Subject } from 'rxjs';
 import { Injectable } from '@angular/core';
 
 /** One cached response, with the time it arrived. */
@@ -35,6 +36,12 @@ export class HttpCacheService {
   }
 
   private running = 0;
+
+  /**
+   * The path of each write that the server answered, for a state that follows every change
+   * (the marks of the navigation, spec 002001).
+   */
+  readonly written = new Subject<string>();
 
   /** A write is on its way. */
   writeStarts(): void {

@@ -279,7 +279,7 @@ async def test_a_termin_a_ticket_and_a_card_take_their_dates(
     assert _refs(found) == {termin_ref, card, ("gremium", gremium_id), ("gremium", other_id)}
 
     # Spec 001434: a neighbour shows also when it does not pass the filters.
-    assert _refs(await _page(maker, admin, Filters(q="sommer"))) == set()
+    assert _refs(await _page(maker, admin, Filters(q="sommer"))) == {termin_ref}
     two = await _page(maker, admin, Filters(q="sommer", depth=2))
     assert _refs(two) == _refs(found) | {ticket_ref}
     by_kind = await _page(maker, admin, Filters(kinds=frozenset({"ticket"}), depth=1))

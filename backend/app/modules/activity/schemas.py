@@ -101,6 +101,20 @@ class ActivityStatus(FrozenCamelModel, frozen=True):
     has_new: bool = Field(alias="hasNew")
 
 
+class NavigationStatus(FrozenCamelModel, frozen=True):
+    """The four marks of the navigation (spec 002001).
+
+    ``tasks`` counts the applications to act on and the open to-dos of the caller,
+    ``tickets`` the new tickets (``None`` without ``ticket.manage`` or with tickets off),
+    ``live`` whether a readable meeting runs, ``activity`` whether an event waits.
+    """
+
+    tasks: int
+    tickets: int | None
+    live: bool
+    activity: bool
+
+
 class ActivitySeen(FrozenCamelModel, frozen=True):
     """The body of ``POST /activity/seen``: the time up to which the reader has seen."""
 

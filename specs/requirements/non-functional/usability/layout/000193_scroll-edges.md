@@ -8,6 +8,8 @@ updated: 2026-11-20
 implementation:
   - frontend/src/app/pages/admin/admin-list/admin-list.component.scss
   - frontend/src/app/features/todos/card-detail/todo-card-detail.component.scss
+  - frontend/src/app/pages/graph/graph.component.scss
+  - frontend/vendor/ui-kit/src/styles/_list-pane.scss
   - frontend/vendor/ui-kit/src/styles/_frosted.scss
   - frontend/vendor/ui-kit/src/styles/list-detail.scss
   - frontend/vendor/ui-kit/src/lib/sticky-bar/sticky-bar.component.scss
@@ -33,7 +35,7 @@ see. At each kind of place, the content must cut as this table says:
 | A list inside a dialog or a sheet, for example the bookings of a cost centre or the attendance | At the rounded frame of the list itself. The rows run to the sides of the frame, without side padding. |
 | The page body of the administration sheet on a wide screen | At a rounded frame that is exactly as wide as the fields, 24 px inside the sheet, so that a field that scrolls past an end keeps its rounded corners. |
 | The scroll part of the navigation rail | The scroll part lies on a surface of its own with rounded corners (001441). |
-| A row of chips that scrolls sideways on a phone | At the edge of the screen. The row runs from screen edge to screen edge. |
+| A row of chips that scrolls sideways on a phone, for example the filters of Anträge or of the graph | At the edge of the screen. The row runs from screen edge to screen edge, also where it is a line of its own in a bar. |
 | The message log of a chat | At its rounded frame. |
 | The rows of a list column on a wide screen | At the lower edge of the list head (000527). |
 | The rows of a one-column list below its filter bar on a wide screen, for example Aktivität or Sitzungen | At the lower edge of the filter bar, with round inner corners at both sides, while rows are under the bar. |
