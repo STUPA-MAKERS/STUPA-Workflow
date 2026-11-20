@@ -42,7 +42,8 @@ import { ButtonComponent, ButtonGroupComponent, dockInListDetailBar, IconCompone
   // eslint-disable-next-line @angular-eslint/component-selector -- the host is the header of the page, which keeps its frame rules
   selector: 'header[appMeetingHead]',
   standalone: true,
-  imports: [MetaLineComponent, 
+  imports: [
+    MetaLineComponent,
     ButtonComponent,
     ButtonGroupComponent,
     IconComponent,

@@ -51,7 +51,7 @@
     <p class="df__summary">{{ summaryText() }}</p>
   }
   @if (error(); as e) {
-    <p class="df__error" role="alert">{{ e }}</p>
+    <app-error-text class="df__error">{{ e }}</app-error-text>
   }
 </app-section>
 

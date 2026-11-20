@@ -67,7 +67,7 @@
         />
       </div>
       @if (countError(); as err) {
-        <p class="odd__error" role="alert">{{ err }}</p>
+        <app-error-text>{{ err }}</app-error-text>
       }
     </div>
     <app-select
@@ -80,7 +80,7 @@
       (ngModelChange)="meeting.set($event ?? '')"
     />
     @if (refusal()) {
-      <p class="odd__error" role="alert">{{ refusal() }}</p>
+      <app-error-text>{{ refusal() }}</app-error-text>
     }
     <button type="submit" hidden></button>
   </form>

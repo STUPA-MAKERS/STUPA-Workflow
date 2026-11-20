@@ -30,7 +30,8 @@ import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-stat
   selector: 'app-version-history',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MetaLineComponent, 
+  imports: [
+    MetaLineComponent,
     LoadStateComponent,
     SectionComponent,
     EmptyStateComponent,

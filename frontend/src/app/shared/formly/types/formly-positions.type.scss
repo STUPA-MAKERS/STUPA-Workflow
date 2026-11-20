@@ -116,7 +116,6 @@
   flex: none;
 }
 
-
 .pos__icon {
   display: inline-flex;
   flex: none;
@@ -222,11 +221,6 @@
 }
 .pos__link:focus-visible {
   outline: 2px solid var(--color-focus-ring);
-}
-.pos__error {
-  margin: 0;
-  color: var(--color-danger);
-  font-size: var(--fs-small);
 }
 .pos__add {
   align-self: flex-start;

@@ -56,7 +56,7 @@
           </div>
         }
         @if (listError(); as err) {
-          <p class="dec__error" role="alert">{{ err }}</p>
+          <app-error-text>{{ err }}</app-error-text>
         }
         <app-button-group class="dec__add">
           <app-button variant="tonal" size="sm" [disabled]="!canAdd()" (click)="addCondition()">

@@ -54,7 +54,9 @@ interface MyRow {
   providers: [{ provide: MY_APPLICATIONS_PAGE, useExisting: forwardRef(() => MyApplicationsComponent) }],
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RowChevronComponent, MetaLineComponent, 
+  imports: [
+    RowChevronComponent,
+    MetaLineComponent,
     RouterOutlet,
     TranslatePipe,
     AmountComponent,

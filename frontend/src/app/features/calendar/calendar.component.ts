@@ -109,7 +109,8 @@ const KEY_STEPS: Readonly<Record<string, number>> = {
   selector: 'app-calendar',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MetaLineComponent, 
+  imports: [
+    MetaLineComponent,
     NgTemplateOutlet,
     AppointmentDetailComponent,
     AppointmentDialogComponent,

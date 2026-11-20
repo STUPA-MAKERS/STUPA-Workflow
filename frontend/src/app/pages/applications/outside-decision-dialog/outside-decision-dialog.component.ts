@@ -34,6 +34,7 @@ import {
   SelectFieldComponent,
   type SelectOption,
   ToastService,
+  ErrorTextComponent,
 } from '@stupa-makers/ui-kit';
 
 /** The result of a decision made outside the platform. */
@@ -77,6 +78,7 @@ function countOf(text: string): number | null | undefined {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ErrorTextComponent,
     FormsModule,
     TranslatePipe,
     ButtonComponent,

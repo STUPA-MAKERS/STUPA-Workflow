@@ -133,7 +133,8 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
   host: { '[class.pane-page]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RowChevronComponent, 
+  imports: [
+    RowChevronComponent,
     PullRefreshDirective,
     InfiniteScrollDirective,
     DetailNoneComponent,

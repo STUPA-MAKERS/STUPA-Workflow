@@ -56,7 +56,8 @@ import { formatBytes } from './applications.util';
   selector: 'app-attachments-panel',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MetaLineComponent, 
+  imports: [
+    MetaLineComponent,
     SectionComponent,
     DropOverlayComponent,
     EmptyStateComponent,

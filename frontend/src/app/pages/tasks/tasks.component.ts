@@ -101,7 +101,9 @@ interface TaskRow {
   selector: 'app-tasks',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RowChevronComponent, MetaLineComponent, 
+  imports: [
+    RowChevronComponent,
+    MetaLineComponent,
     RowMenuComponent,
     PullRefreshDirective,
     LoadErrorComponent,

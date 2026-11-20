@@ -106,7 +106,9 @@ const SORTS: readonly {
   host: { '[class.pane-page]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RowChevronComponent, MetaLineComponent, 
+  imports: [
+    RowChevronComponent,
+    MetaLineComponent,
     PullRefreshDirective,
     InfiniteScrollDirective,
     CostCentreLabelComponent,

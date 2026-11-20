@@ -33,7 +33,9 @@ import { RowChevronComponent } from '../../../shared/ui/row-chevron/row-chevron.
   selector: 'app-invoice-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RowChevronComponent, MetaLineComponent, 
+  imports: [
+    RowChevronComponent,
+    MetaLineComponent,
     SectionComponent,
     NoteComponent,
     EmptyStateComponent,

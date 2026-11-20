@@ -24,11 +24,6 @@
   --kv-gap: var(--space-3) var(--space-4);
   --kv-item-gap: 0;
 }
-.wh__dead {
-  margin: 0;
-  font-size: var(--fs-sm);
-  color: var(--color-danger);
-}
 .wh__form {
   display: flex;
   flex-direction: column;

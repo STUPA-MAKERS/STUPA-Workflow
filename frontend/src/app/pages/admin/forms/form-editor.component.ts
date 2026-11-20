@@ -98,7 +98,8 @@ type QPos = QuestionPos;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ContentLangState],
-  imports: [MetaLineComponent, 
+  imports: [
+    MetaLineComponent,
     ContentLangSwitchComponent,
     MoveButtonsComponent,
     I18nInputComponent,

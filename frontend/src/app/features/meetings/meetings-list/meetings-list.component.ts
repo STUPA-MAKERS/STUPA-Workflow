@@ -44,7 +44,8 @@ import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pu
   selector: 'app-meetings-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MetaLineComponent, 
+  imports: [
+    MetaLineComponent,
     PullRefreshDirective,
     RowChevronComponent,
     PageHeaderComponent,

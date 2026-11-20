@@ -106,15 +106,6 @@
   overflow-wrap: anywhere;
 }
 
-.hd__error {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0;
-  font-size: var(--fs-small);
-  color: var(--color-danger);
-}
-
 @include bp.phone {
   .hd__pair {
     flex-wrap: wrap;

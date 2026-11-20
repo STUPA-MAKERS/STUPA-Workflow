@@ -257,7 +257,8 @@ type VerifyState =
   selector: 'app-audit-log',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MetaLineComponent, 
+  imports: [
+    MetaLineComponent,
     LoadStateComponent,
     ExpandRowComponent,
     LoadMoreComponent,

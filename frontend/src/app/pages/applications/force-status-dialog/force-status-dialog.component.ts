@@ -24,6 +24,7 @@ import {
   type SelectOption,
   TextareaComponent,
   ToastService,
+  ErrorTextComponent,
 } from '@stupa-makers/ui-kit';
 
 /** The shortest note of the reason `other` (spec 001650, as the server). */
@@ -45,6 +46,7 @@ export const MIN_OTHER_NOTE = 10;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ErrorTextComponent,
     FormsModule,
     TranslatePipe,
     ButtonComponent,

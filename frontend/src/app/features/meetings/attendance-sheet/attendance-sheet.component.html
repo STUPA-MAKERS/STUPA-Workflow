@@ -120,7 +120,7 @@
               </div>
 
               @if (row.conflict; as c) {
-                <p class="as__conflict" role="alert">
+                <app-error-text class="as__conflict">
                   <app-icon name="alert" [size]="16" />
                   <span>{{ 'meetings.attendanceSheet.delegationActive' | t }}</span>
                   @if (c !== 'unknown' && c.revocable) {
@@ -130,7 +130,7 @@
                       </app-button>
                     </app-button-group>
                   }
-                </p>
+                </app-error-text>
               }
             </li>
           }

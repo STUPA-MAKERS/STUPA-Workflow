@@ -73,11 +73,6 @@
 .dec__add {
   align-self: flex-start;
 }
-.dec__error {
-  margin: 0;
-  font-size: var(--fs-small);
-  color: var(--color-danger);
-}
 
 @media (max-width: 599.98px) {
   .dec__row {

@@ -40,7 +40,7 @@
           </button>
         </div>
         @if (cardError(p, pi); as msg) {
-          <p class="pos__error" role="alert">{{ msg }}</p>
+          <app-error-text>{{ msg }}</app-error-text>
         }
       } @else {
         <div class="pos__row pos__row--top">
@@ -186,7 +186,7 @@
             <ng-container *ngComponentOutlet="positionFiles.component; inputs: filesInputs(p)" />
           }
           @if (cardError(p, pi); as msg) {
-            <p class="pos__error" role="alert">{{ msg }}</p>
+            <app-error-text>{{ msg }}</app-error-text>
           }
         </div>
       }
@@ -204,10 +204,10 @@
     </app-button>
   </app-button-group>
   @if (showError && positions.length < minPositions) {
-    <p class="pos__error" role="alert">{{ t('apply.positions.errMinPositions') }}</p>
+    <app-error-text>{{ t('apply.positions.errMinPositions') }}</app-error-text>
   }
   @if (serverError(-1); as msg) {
-    <p class="pos__error" role="alert">{{ msg }}</p>
+    <app-error-text>{{ msg }}</app-error-text>
   }
   </div>
 </fieldset>

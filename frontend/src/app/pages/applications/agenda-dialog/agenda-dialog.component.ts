@@ -26,6 +26,7 @@ import {
   SkeletonComponent,
   SwitchComponent,
   ToastService,
+  ErrorTextComponent,
 } from '@stupa-makers/ui-kit';
 import { localToday, weekdayName } from '@shared/date-format';
 
@@ -60,6 +61,7 @@ interface MeetingChoice {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ErrorTextComponent,
     EmptyStateComponent,
     ScrollFadeDirective,
     FormsModule,

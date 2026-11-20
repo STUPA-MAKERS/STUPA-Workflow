@@ -20,6 +20,7 @@ import {
   EmptyStateComponent,
   SelectFieldComponent,
   type SelectOption,
+  ErrorTextComponent,
 } from '@stupa-makers/ui-kit';
 import { canTransfer, sortedColumns } from '../todos.util';
 
@@ -44,7 +45,7 @@ export interface TodoTransferTarget {
   selector: 'app-todo-transfer-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, DialogComponent, EmptyStateComponent, SelectFieldComponent],
+  imports: [ErrorTextComponent, FormsModule, TranslatePipe, ButtonComponent, DialogComponent, EmptyStateComponent, SelectFieldComponent],
   templateUrl: './todo-transfer-dialog.component.html',
   styleUrl: './todo-transfer-dialog.component.scss',
 })

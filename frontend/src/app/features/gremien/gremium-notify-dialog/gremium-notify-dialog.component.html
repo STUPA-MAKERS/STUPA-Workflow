@@ -29,7 +29,7 @@
         ></textarea>
       </app-textarea>
       @if (messageErr(); as err) {
-        <p id="gnd-message-error" class="gnd__error text-danger" role="alert">{{ text(err) }}</p>
+        <app-error-text id="gnd-message-error" [inset]="true">{{ text(err) }}</app-error-text>
       }
     </div>
   </form>

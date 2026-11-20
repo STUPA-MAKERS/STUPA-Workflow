@@ -93,7 +93,8 @@ function emptyForm(): VariantForm {
   selector: 'app-admin-cd-variants',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MetaLineComponent, 
+  imports: [
+    MetaLineComponent,
     LoadStateComponent,
     FilePickerComponent,
     FabComponent,

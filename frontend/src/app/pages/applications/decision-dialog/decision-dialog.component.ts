@@ -21,7 +21,7 @@ import {
   emptyDraft,
   toProposal,
 } from '@shared/decision/decision.util';
-import { ButtonComponent, DialogComponent, ToastService } from '@stupa-makers/ui-kit';
+import { ButtonComponent, DialogComponent, ToastService, ErrorTextComponent } from '@stupa-makers/ui-kit';
 
 /** The server refused the decision: the codes of the 422 answers. */
 const DECISION_CODES: Record<string, Parameters<I18nService['translate']>[0]> = {
@@ -45,7 +45,7 @@ const DECISION_CODES: Record<string, Parameters<I18nService['translate']>[0]> = 
   selector: 'app-decision-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ButtonComponent, DialogComponent, DecisionEditorComponent],
+  imports: [ErrorTextComponent, TranslatePipe, ButtonComponent, DialogComponent, DecisionEditorComponent],
   templateUrl: './decision-dialog.component.html',
   styleUrl: './decision-dialog.component.scss',
 })

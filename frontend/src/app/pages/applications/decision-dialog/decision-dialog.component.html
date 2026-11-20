@@ -14,7 +14,7 @@
       [(draft)]="draft"
     />
     @if (refusal()) {
-      <p class="ddg__refusal" role="alert">{{ refusal() }}</p>
+      <app-error-text>{{ refusal() }}</app-error-text>
     }
     <button type="submit" hidden></button>
   </form>

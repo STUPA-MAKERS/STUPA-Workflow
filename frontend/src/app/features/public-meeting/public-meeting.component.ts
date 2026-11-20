@@ -53,7 +53,8 @@ export function normalizeJoinCode(raw: string): string {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [GuestSessionService],
-  imports: [MetaLineComponent, 
+  imports: [
+    MetaLineComponent,
     NgTemplateOutlet,
     FormsModule,
     TranslatePipe,

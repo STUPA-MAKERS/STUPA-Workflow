@@ -29,6 +29,7 @@ import {
   type SegmentedOption,
   TextareaComponent,
   ToastService,
+  ErrorTextComponent,
 } from '@stupa-makers/ui-kit';
 import { INFO_MAX_LABEL, INFO_MAX_LINKS, INFO_MAX_TEXT, infoUrlValid } from '../gremien.util';
 
@@ -89,6 +90,7 @@ export function draftLinks(drafts: readonly InfoLinkDraft[]): readonly GremiumIn
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ErrorTextComponent,
     FormsModule,
     TranslatePipe,
     ButtonComponent,

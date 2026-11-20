@@ -36,6 +36,7 @@ import {
   StatusTextComponent,
   ToastService,
   TruncatedDirective,
+  ErrorTextComponent,
 } from '@stupa-makers/ui-kit';
 import {
   type DelegationCardChange,
@@ -136,6 +137,7 @@ const SELF_CHOICES: readonly { readonly value: Choice; readonly label: Translati
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ErrorTextComponent,
     EmptyStateComponent,
     TruncatedDirective,
     SearchPillComponent,

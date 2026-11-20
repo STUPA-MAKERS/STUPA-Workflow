@@ -44,6 +44,7 @@ import {
   type SelectOption,
   TextareaComponent,
   ToastService,
+  ErrorTextComponent,
 } from '@stupa-makers/ui-kit';
 import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-upload.directive';
 import { TodoLinkPickerComponent, linkKey } from '../link-picker/todo-link-picker.component';
@@ -91,6 +92,7 @@ export interface TodoCardCopy {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ErrorTextComponent,
     TextareaComponent,
     ChipComponent,
     FormsModule,

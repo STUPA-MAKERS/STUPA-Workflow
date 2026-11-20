@@ -162,7 +162,8 @@ function writeStore(key: string, value: string | null): void {
   selector: 'app-chat',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MetaLineComponent, 
+  imports: [
+    MetaLineComponent,
     ChipComponent,
     ConfirmDialogComponent,
     DropOverlayComponent,

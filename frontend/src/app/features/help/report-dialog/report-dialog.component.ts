@@ -41,6 +41,7 @@ import {
   type SegmentedOption,
   TextareaComponent,
   ToastService,
+  ErrorTextComponent,
 } from '@stupa-makers/ui-kit';
 import { scanStatus } from '@shared/status-kind.util';
 import { AltchaComponent } from '../../apply/altcha.component';
@@ -97,6 +98,7 @@ const KIND_LABEL: Record<TicketKind, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ErrorTextComponent,
     TextareaComponent,
     ChipComponent,
     FormsModule,

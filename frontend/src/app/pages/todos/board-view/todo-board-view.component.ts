@@ -74,7 +74,8 @@ export interface BoardMove {
   selector: 'app-todo-board-view',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MetaLineComponent, 
+  imports: [
+    MetaLineComponent,
     CdkDrag,
     CdkDropList,
     CdkDropListGroup,

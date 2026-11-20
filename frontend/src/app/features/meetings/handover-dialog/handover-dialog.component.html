@@ -53,10 +53,10 @@
       </div>
 
       @if (refusalKey(); as key) {
-        <p class="hd__error" role="alert">
+        <app-error-text>
           <app-icon name="alert" [size]="16" />
           <span>{{ key | t }}</span>
-        </p>
+        </app-error-text>
       }
     </div>
   }

@@ -8,7 +8,7 @@
 >
   <form class="gid" (submit)="$event.preventDefault(); save()">
     @if (conflict()) {
-      <p class="gid__error" role="alert">{{ 'gremien.info.conflict' | t }}</p>
+      <app-error-text>{{ 'gremien.info.conflict' | t }}</app-error-text>
     }
     <app-segmented
       width="fill"

@@ -108,7 +108,8 @@ interface BeamerText {
   selector: 'app-meeting-beamer',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MetaLineComponent, 
+  imports: [
+    MetaLineComponent,
     TranslatePipe,
     IconComponent,
     QrCodeComponent,

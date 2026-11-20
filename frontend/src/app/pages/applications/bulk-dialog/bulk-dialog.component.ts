@@ -24,6 +24,7 @@ import {
   IconComponent,
   ScrollFadeDirective,
   SkeletonComponent,
+  ErrorTextComponent,
 } from '@stupa-makers/ui-kit';
 
 /** The two bulk actions of the Antrag list (001700). */
@@ -60,6 +61,7 @@ export const BULK_MAX = 100;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ErrorTextComponent,
     FormsModule,
     TranslatePipe,
     ButtonComponent,

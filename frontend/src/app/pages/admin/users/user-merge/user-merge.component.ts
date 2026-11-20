@@ -98,7 +98,8 @@ import { RowChevronComponent } from '../../../../shared/ui/row-chevron/row-chevr
   selector: 'app-user-merge',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RowChevronComponent, 
+  imports: [
+    RowChevronComponent,
     LoadStateComponent,
     SectionComponent,
     EmptyStateComponent,

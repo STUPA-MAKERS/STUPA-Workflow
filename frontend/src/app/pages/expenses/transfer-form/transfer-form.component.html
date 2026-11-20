@@ -82,7 +82,7 @@
             </app-cost-centre-select>
           </div>
           @if (d.tFromId() && d.tFromId() === d.tToId()) {
-            <p class="mf__error" role="alert">{{ 'expenses.transfers.samePair' | t }}</p>
+            <app-error-text [inset]="true">{{ 'expenses.transfers.samePair' | t }}</app-error-text>
           }
           <app-button-group>
             <app-button class="tf__swap" variant="text" (click)="d.swapTransfer()">

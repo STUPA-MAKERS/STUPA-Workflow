@@ -134,7 +134,7 @@
       </details>
 
       @if (error(); as e) {
-        <p class="rd__error" role="alert">{{ e | t }}</p>
+        <app-error-text>{{ e | t }}</app-error-text>
       }
       <button type="submit" hidden aria-hidden="true" tabindex="-1"></button>
     </form>

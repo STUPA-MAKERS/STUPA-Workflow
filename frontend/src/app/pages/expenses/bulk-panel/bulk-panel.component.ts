@@ -46,7 +46,8 @@ import { formatMoney } from '@shared/format-money';
   selector: 'app-bulk-panel',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MetaLineComponent, 
+  imports: [
+    MetaLineComponent,
     SectionComponent,
     SumRowComponent,
     BookingRowComponent,

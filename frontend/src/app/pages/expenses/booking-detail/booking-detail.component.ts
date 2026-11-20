@@ -39,7 +39,9 @@ import { RowChevronComponent } from '../../../shared/ui/row-chevron/row-chevron.
   selector: 'app-booking-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RowChevronComponent, MetaLineComponent, 
+  imports: [
+    RowChevronComponent,
+    MetaLineComponent,
     SectionComponent,
     SumRowComponent,
     BookingRowComponent,
