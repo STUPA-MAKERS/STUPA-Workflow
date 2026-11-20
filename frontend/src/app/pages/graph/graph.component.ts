@@ -167,7 +167,8 @@ export class GraphComponent {
   readonly relationsText = computed(() => {
     const name = this.i18n.translate('graph.filter.relations');
     const relations = this.filters().relations;
-    if (relations === NO_FILTERS.relations) return name;
+    // The default of a fresh page (spec 001425) is no choice: the chip shows only its name.
+    if (relations === 'links') return name;
     return `${name}: ${this.i18n.translate(`graph.relations.${relations}` as TranslationKey)}`;
   });
 
