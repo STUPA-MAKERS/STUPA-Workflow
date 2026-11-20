@@ -93,6 +93,18 @@ describe('ruleMet', () => {
   it('counts an expression that cannot be evaluated as met', () => {
     expect(ruleMet({ logic: { eval: ['x'] } }, {})).toBe(true);
   });
+
+  it('passes on an error that is not about the expression', () => {
+    const broken = new Proxy(
+      {},
+      {
+        ownKeys: () => {
+          throw new TypeError('boom');
+        },
+      },
+    );
+    expect(() => ruleMet({ logic: broken }, {})).toThrow('boom');
+  });
 });
 
 describe('costLine (specs 001630, 001631)', () => {
