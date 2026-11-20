@@ -19,7 +19,7 @@ scope:
 
 When an API request gets no answer or the answer 502, 503 or 504, the app must request
 `GET /api/health` at once. When that request fails too, the app must show the offline bar of
-000222, also while the browser has network. In this state the bar must say "Server nicht
+002153, also while the browser has network. In this state the bar must say "Server nicht
 erreichbar".
 
 While the bar shows, the app must request `GET /api/health` every 5 seconds. After the first

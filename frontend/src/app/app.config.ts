@@ -30,12 +30,9 @@ import {
   providePressRipple,
 } from '@stupa-makers/ui-kit';
 import { provideRouteMotion, watchUAVisualTransitions } from '@stupa-makers/ui-kit/shell';
-import {
-  IS_INSTALLED_APP,
-  lockInstalledAppZoom,
-  OfflineService,
-  SwUpdateService,
-} from '@stupa-makers/ui-kit/pwa';
+import { IS_INSTALLED_APP, lockInstalledAppZoom, OfflineService } from '@stupa-makers/ui-kit/pwa';
+import { AppVersionService } from '@core/pwa/app-version.service';
+import { appVersionInterceptor } from '@core/pwa/app-version.interceptor';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { LIVE_VOTE_SOURCE } from '@core/ws/live-vote.source';
 import { MockLiveVoteSource } from '@core/ws/mock-live-vote.source';
@@ -56,7 +53,8 @@ import { provideServiceWorker } from '@angular/service-worker';
  * browser animated gets no second view transition. English lives in a lazy chunk, so the app waits
  * for it and the first paint is not German.
  *
- * Interceptor order: loading (outermost, measures the full duration) → cache → reachability
+ * Interceptor order: loading (outermost, measures the full duration) → cache → app version
+ * (a header `X-App-Version` that is not the own build reloads the app, § 002151) → reachability
  * (a 502/503/504 or no answer starts the "Server nicht erreichbar" check) → auth
  * (credentials and bearer) → mock response. The cache sits inside the loading interceptor,
  * because a served-from-cache answer still counts as a completed request for the loading
@@ -90,8 +88,21 @@ export const appConfig: ApplicationConfig = {
       withXhr(),
       withInterceptors(
         isDevMode()
-          ? [loadingInterceptor, cacheInterceptor, reachabilityInterceptor, authInterceptor, lazyMockApiInterceptor]
-          : [loadingInterceptor, cacheInterceptor, reachabilityInterceptor, authInterceptor],
+          ? [
+              loadingInterceptor,
+              cacheInterceptor,
+              appVersionInterceptor,
+              reachabilityInterceptor,
+              authInterceptor,
+              lazyMockApiInterceptor,
+            ]
+          : [
+              loadingInterceptor,
+              cacheInterceptor,
+              appVersionInterceptor,
+              reachabilityInterceptor,
+              authInterceptor,
+            ],
       ),
     ),
     provideDetailPrefetch(),
@@ -111,7 +122,7 @@ export const appConfig: ApplicationConfig = {
       const i18n = inject(I18nService);
       inject(BrandingService).init();
       inject(AuthService).ensureLoaded().subscribe();
-      inject(SwUpdateService).init();
+      inject(AppVersionService).init();
       inject(OfflineService).init();
       guardTouchContextMenu(inject(DOCUMENT));
       lockInstalledAppZoom(inject(DOCUMENT), inject(IS_INSTALLED_APP)());
