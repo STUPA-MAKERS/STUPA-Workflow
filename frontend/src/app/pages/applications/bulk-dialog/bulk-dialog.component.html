@@ -44,7 +44,7 @@
               }
             </div>
           } @else if (!failed()) {
-            <app-empty-state rows="1" [heading]="'applications.bulk.none' | t" />
+            <app-empty-state icon="file" rows="1" [heading]="'applications.bulk.none' | t" />
           }
         </div>
         @if (amounts().length) {

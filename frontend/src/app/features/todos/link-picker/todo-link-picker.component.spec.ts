@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/angular';
 import { of, throwError } from 'rxjs';
 import { TodosApiService, type TodoLinkTarget } from '@core/api/todos.service';
+import { AuthService } from '@core/auth/auth.service';
 import { MEDIA } from '@stupa-makers/ui-kit';
 import { asPhone } from '../../../../testing/todo-fixtures';
 import { TodoLinkPickerComponent, linkKey } from './todo-link-picker.component';
@@ -12,13 +13,18 @@ const HITS: TodoLinkTarget[] = [
   { kind: 'todo', targetId: 'k-2', title: 'Haushalt Kapitel 3', detail: { boardName: 'StuPa' } },
 ];
 
-async function setup(opts: { fail?: boolean; linked?: string[] } = {}) {
+async function setup(opts: { fail?: boolean; linked?: string[]; budgetWrite?: boolean } = {}) {
   const linkTargets = jest.fn(() => (opts.fail ? throwError(() => new Error('x')) : of(HITS)));
   const picked = jest.fn();
   const view = await render(TodoLinkPickerComponent, {
     inputs: { open: false, exclude: { kind: 'todo', id: 'k-1' }, linked: new Set(opts.linked ?? []) },
     on: { picked },
-    providers: [{ provide: TodosApiService, useValue: { linkTargets } }],
+    providers: [
+      { provide: TodosApiService, useValue: { linkTargets } },
+      ...(opts.budgetWrite === undefined
+        ? []
+        : [{ provide: AuthService, useValue: { can: () => opts.budgetWrite } }]),
+    ],
   });
   const open = async () => {
     view.fixture.componentInstance.open.set(true);
@@ -262,5 +268,14 @@ describe('TodoLinkPickerComponent', () => {
     expect(chips).not.toContain('Kostenstellen');
     expect(chips).not.toContain('Buchungen');
   });
-});
 
+  it.each([
+    [true, true],
+    [false, false],
+  ])('§F/collaboration/links/001410: a budget write right %s shows cost centres: %s', async (budgetWrite, shown) => {
+    const { open } = await setup({ budgetWrite });
+    await open();
+    const chips = screen.getAllByRole('button', { pressed: false }).map((b) => b.textContent?.trim());
+    expect(chips.includes('Kostenstellen')).toBe(shown);
+  });
+});

@@ -39,7 +39,7 @@
                 @if (b.types.length) {
                   <ng-container *ngTemplateOutlet="typeTable; context: { $implicit: b.types }" />
                 } @else {
-                  <app-empty-state rows="1" [heading]="'admin.forms.groupEmpty' | t" />
+                  <app-empty-state icon="form" rows="1" [heading]="'admin.forms.groupEmpty' | t" />
                 }
               </app-section>
             } @else if (blockHeading(b)) {
@@ -52,7 +52,7 @@
           }
         </div>
       } @else {
-        <app-empty-state shape="table" [heading]="'admin.forms.overviewEmpty' | t" />
+        <app-empty-state icon="form" shape="table" [heading]="'admin.forms.overviewEmpty' | t" />
       }
     </ng-template>
   </app-load-state>

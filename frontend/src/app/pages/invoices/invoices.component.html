@@ -114,7 +114,7 @@
             />
           </div>
         } @else if (!items().length) {
-          <app-empty-state [heading]="'invoices.empty' | t" />
+          <app-empty-state [icon]="activeFilterCount() > 0 ? 'searchOff' : 'receipt'" [heading]="'invoices.empty' | t" />
         } @else {
           <div class="inv__groups" [class.skel-stale]="reloading()" [attr.inert]="reloading() ? '' : null">
           @for (group of groups(); track group.key + $index) {

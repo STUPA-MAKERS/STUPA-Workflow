@@ -243,9 +243,16 @@ export class CalendarComponent implements OnDestroy {
     { value: '', label: this.i18n.translate('calendar.filter.allGremien') },
     ...this.gremien().map((g) => ({ value: g.id, label: g.name })),
   ]);
-  readonly gremiumText = computed(
-    () => this.gremiumOptions().find((o) => o.value === this.gremium())?.label ?? '',
-  );
+  /** The chip text (spec 000663): the name, then name and value. */
+  readonly gremiumText = computed(() => {
+    const name = this.i18n.translate('calendar.filter.gremium');
+    const hit = this.gremium() ? this.gremien().find((g) => g.id === this.gremium()) : undefined;
+    return hit ? `${name}: ${hit.name}` : name;
+  });
+  readonly mineText = computed(() => {
+    const name = this.i18n.translate('calendar.filter.assigned');
+    return this.mine() ? `${name}: ${this.i18n.translate('calendar.filter.mine')}` : name;
+  });
 
   readonly items = signal<readonly CalendarEntry[]>([]);
   readonly loading = signal(true);

@@ -16,7 +16,7 @@
     </ng-template>
     <ng-template #content>
   @if (!budgets().length) {
-    <app-empty-state shape="table" [heading]="'admin.budgets.empty' | t" />
+    <app-empty-state icon="pie" shape="table" [heading]="'admin.budgets.empty' | t" />
   } @else {
     <app-data-table
       surface="rowgroup"
@@ -212,7 +212,7 @@
               }
             </ol>
           } @else {
-            <app-empty-state shape="table" rows="1" [heading]="'admin.budgets.stepsEmpty' | t" />
+            <app-empty-state icon="list" shape="table" rows="1" [heading]="'admin.budgets.stepsEmpty' | t" />
           }
           @if (canAddStep()) {
             <app-button-group>
@@ -291,7 +291,7 @@
         </ng-template>
       </app-data-table>
     } @else {
-      <app-empty-state shape="table" rows="1" [heading]="'budget.tree.fyEmpty' | t" />
+      <app-empty-state icon="cal" shape="table" rows="1" [heading]="'budget.tree.fyEmpty' | t" />
     }
   </app-section>
   <div dialog-footer>

@@ -25,6 +25,7 @@ import {
   adjacency,
   bounds,
   fit,
+  hold,
   keep,
   nearestIn,
   place,
@@ -71,6 +72,10 @@ export const FIT_PAD = 56;
 export const LABEL_ZOOM = 0.75;
 /** A pointer that travels less is a press, not a drag, in px. */
 export const PRESS_TRAVEL = 4;
+/** The px that Alt and an arrow key move a node (spec 001433). */
+export const NUDGE = 24;
+/** The least `alpha` while a node moves, so its neighbours follow. */
+const DRAG_ALPHA = 0.3;
 /** The factor of one press on "+" or "−". */
 export const ZOOM_STEP = 1.3;
 /** The most nodes of one page that appear one after the other (spec 001426). */
@@ -93,7 +98,8 @@ const ARROWS: Readonly<Record<string, Direction>> = {
  * settling. With reduced motion the layout runs to its end before the paint and nothing
  * moves. The view follows the drawing until the person moves or zooms it: a drag on the
  * empty drawing moves it, the wheel, a pinch and the buttons zoom it. A press on a node
- * chooses it, a press on the empty drawing ends the choice. The view goes to the chosen
+ * chooses it, a press on the empty drawing ends the choice. A drag on a node moves the
+ * node, and it stays where the person lets go (spec 001433); Alt and an arrow key do the same. The view goes to the chosen
  * node when it is outside the frame or too small to read. Tab moves to one node, the arrow
  * keys to the nearest node in that direction.
  */
@@ -183,6 +189,13 @@ export class GraphCanvasComponent {
   private free = false;
   private pointers: ReadonlyMap<number, Point> = new Map();
   private travel = 0;
+  /** The node under a pointer that went down on it; `moved` after the travel of a press. */
+  private grab: { readonly key: string; readonly pointer: number; readonly last: Point; readonly travel: number } | null =
+    null;
+  /** True right after a drag of a node: the click that follows is no press. */
+  private dragged = false;
+  /** The key of the node that a drag moves, for its look. */
+  readonly held = signal<string | null>(null);
 
   constructor() {
     const observer = new ResizeObserver(() => this.measure());
@@ -224,6 +237,10 @@ export class GraphCanvasComponent {
   }
 
   choose(key: string): void {
+    if (this.dragged) {
+      this.dragged = false;
+      return;
+    }
     this.focused.set(key);
     this.chosen.emit(key);
   }
@@ -232,6 +249,14 @@ export class GraphCanvasComponent {
     const direction = ARROWS[event.key];
     if (!direction) return;
     event.preventDefault();
+    if (event.altKey) {
+      const body = this.places().get(key);
+      const dx = direction === 'left' ? -NUDGE : direction === 'right' ? NUDGE : 0;
+      const dy = direction === 'up' ? -NUDGE : direction === 'down' ? NUDGE : 0;
+      if (body) this.moveNode(key, body.x + dx, body.y + dy);
+      this.reveal(key);
+      return;
+    }
     const next = nearestIn(this.bodies(), key, direction);
     if (next === null) return;
     this.focused.set(next);
@@ -242,13 +267,26 @@ export class GraphCanvasComponent {
   }
 
   onDown(event: PointerEvent): void {
-    if ((event.target as Element).closest('.gc__node, .gc__tools')) return;
+    const target = event.target as Element;
+    const node = target.closest<HTMLElement>('.gc__node');
+    if (node) {
+      const key = node.dataset['key'];
+      if (key !== undefined && this.grab === null && this.pointers.size === 0) {
+        this.grab = { key, pointer: event.pointerId, last: { x: event.clientX, y: event.clientY }, travel: 0 };
+      }
+      return;
+    }
+    if (target.closest('.gc__tools')) return;
     (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
     if (this.pointers.size === 0) this.travel = 0;
     this.pointers = new Map(this.pointers).set(event.pointerId, { x: event.clientX, y: event.clientY });
   }
 
   onMove(event: PointerEvent): void {
+    if (this.grab?.pointer === event.pointerId) {
+      this.drag(event, this.grab);
+      return;
+    }
     const last = this.pointers.get(event.pointerId);
     if (!last) return;
     const point: Point = { x: event.clientX, y: event.clientY };
@@ -270,6 +308,15 @@ export class GraphCanvasComponent {
   }
 
   onUp(event: PointerEvent): void {
+    if (this.grab?.pointer === event.pointerId) {
+      this.grab = null;
+      if (this.held() !== null) {
+        this.held.set(null);
+        this.dragged = true;
+        setTimeout(() => (this.dragged = false));
+      }
+      return;
+    }
     if (!this.pointers.has(event.pointerId)) return;
     this.pointers = new Map(Array.from(this.pointers).filter(([id]) => id !== event.pointerId));
     if (this.pointers.size === 0 && this.travel <= PRESS_TRAVEL && event.type === 'pointerup') {
@@ -305,6 +352,30 @@ export class GraphCanvasComponent {
   showAll(): void {
     this.free = false;
     this.refit();
+  }
+
+  /** A pointer that went down on a node moves: after the travel of a press, the node follows it. */
+  private drag(event: PointerEvent, grab: NonNullable<GraphCanvasComponent['grab']>): void {
+    const point: Point = { x: event.clientX, y: event.clientY };
+    const travel = grab.travel + Math.hypot(point.x - grab.last.x, point.y - grab.last.y);
+    this.grab = { ...grab, last: point, travel };
+    if (travel <= PRESS_TRAVEL) return;
+    if (this.held() === null) {
+      this.held.set(grab.key);
+      (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
+    }
+    const frame = this.host.nativeElement.getBoundingClientRect();
+    const v = this.view();
+    this.moveNode(grab.key, (point.x - frame.left - v.x) / v.zoom, (point.y - frame.top - v.y) / v.zoom);
+  }
+
+  /** Put a node at a place of the layout and hold it; its neighbours follow unless nothing may move. */
+  private moveNode(key: string, x: number, y: number): void {
+    this.free = true;
+    this.bodies.set(hold(this.bodies(), key, x, y));
+    if (this.still()) return;
+    this.alpha = Math.max(this.alpha, DRAG_ALPHA);
+    this.run();
   }
 
   private measure(): void {

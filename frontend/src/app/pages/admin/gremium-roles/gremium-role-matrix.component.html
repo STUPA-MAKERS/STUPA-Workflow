@@ -22,7 +22,7 @@
     </ng-template>
     <ng-template #content>
       @if (!sorted().length) {
-      <app-empty-state shape="table" rows="3" [heading]="'admin.gremiumRoles.empty' | t" />
+      <app-empty-state icon="shield" shape="table" rows="3" [heading]="'admin.gremiumRoles.empty' | t" />
     } @else {
       <div
         class="rowgroup rm__table"

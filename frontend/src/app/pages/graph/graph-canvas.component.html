@@ -31,6 +31,7 @@
         [class.gc__node--dim]="isDim(n.key)"
         [class.gc__node--lit]="isLit(n.key)"
         [class.gc__node--chosen]="selected() === n.key"
+        [class.gc__node--held]="held() === n.key"
         [attr.data-kind]="n.kind"
         [attr.data-key]="n.key"
         [attr.tabindex]="tabStop() === n.key ? 0 : -1"

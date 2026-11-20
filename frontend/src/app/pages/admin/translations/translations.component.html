@@ -131,7 +131,7 @@
             <app-load-more [label]="'admin.translations.more' | t" (more)="more()" />
           }
         } @else {
-          <app-empty-state rows="3" [heading]="'admin.translations.noMatch' | t" />
+          <app-empty-state icon="searchOff" rows="3" [heading]="'admin.translations.noMatch' | t" />
         }
       </app-section>
     </ng-template>

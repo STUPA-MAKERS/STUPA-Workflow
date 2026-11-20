@@ -21,7 +21,10 @@ import { loadErrorToast, retryLoadError } from '../../../testing/load-error';
 import { matchMediaQueries } from '../../../testing/meeting-fixtures';
 import { type CanvasNode, GraphCanvasComponent } from './graph-canvas.component';
 import { GraphComponent, SEARCH_PAUSE } from './graph.component';
-import { AUTO_NODES, NO_FILTERS } from './graph.util';
+import { AUTO_NODES, defaultFilters, localDay } from './graph.util';
+
+/** The filters of a fresh page (spec 001425): the last 30 days, only the links of persons. */
+const FRESH = defaultFilters(localDay(new Date()));
 
 @Component({ standalone: true, template: '<p>Ziel</p>' })
 class TargetStub {}
@@ -140,7 +143,7 @@ describe('GraphComponent', () => {
   /** § F/collaboration/graph/001420 and 001428: the drawing with its nodes, lines and label. */
   it('draws the first page and names the drawing for a screen reader', async () => {
     const { calls, el, router } = await start('/graph', [() => of(FULL)]);
-    expect(calls).toEqual([{ filters: NO_FILTERS, cursor: null }]);
+    expect(calls).toEqual([{ filters: FRESH, cursor: null }]);
     // § 001425: no title shows, and the filters are in the layer over the drawing.
     expect(el.querySelector('#gr-title')).toHaveTextContent('Graph');
     expect(el.querySelector('#gr-title')).toHaveClass('sr-only');
@@ -286,14 +289,14 @@ describe('GraphComponent', () => {
       noAccess: true,
     });
     expect(cmp.searchText()).toBe('Haushalt');
-    expect(cmp.gremiumText()).toBe('StuPa');
-    expect(cmp.relationsText()).toBe('Nur Verknüpfungen');
+    expect(cmp.gremiumText()).toBe('Gremium: StuPa');
+    expect(cmp.relationsText()).toBe('Beziehungen');
     expect(screen.getByTestId('gr-single')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('gr-no-access')).toHaveAttribute('aria-pressed', 'true');
 
     screen.getByTestId('gr-reset').click();
     await settle();
-    expect(last(calls).filters).toEqual(NO_FILTERS);
+    expect(last(calls).filters).toEqual(FRESH);
     expect(cmp.searchText()).toBe('');
     expect(router.url).toBe('/graph');
     expect(screen.queryByTestId('gr-reset')).toBeNull();
@@ -311,7 +314,7 @@ describe('GraphComponent', () => {
     cmp.setRelations('builtin');
     await settle();
     expect(last(calls).filters).toEqual({
-      ...NO_FILTERS,
+      ...FRESH,
       kinds: ['meeting', 'todo'],
       from: '2026-01-01',
       to: '2026-06-30',
@@ -329,7 +332,7 @@ describe('GraphComponent', () => {
     cmp.setRelations('unknown');
     await settle();
     expect(last(calls).filters.relations).toBe('all');
-    expect(cmp.relationsText()).toBe('Alle Beziehungen');
+    expect(cmp.relationsText()).toBe('Beziehungen: Alle Beziehungen');
 
     screen.getByTestId('gr-single').click();
     await settle();
@@ -352,7 +355,7 @@ describe('GraphComponent', () => {
     await settle();
     expect(cmp.filters().relations).toBe('links');
     expect(cmp.searchText()).toBe('Fest');
-    expect(last(calls).filters).toEqual({ ...NO_FILTERS, relations: 'links', q: 'Fest' });
+    expect(last(calls).filters).toEqual({ ...FRESH, relations: 'links', q: 'Fest' });
   });
 
   it('searches after a pause, with the last text only', async () => {
@@ -371,7 +374,7 @@ describe('GraphComponent', () => {
     cmp.reset();
     await new Promise((done) => setTimeout(done, SEARCH_PAUSE + 60));
     await settle();
-    expect(last(calls).filters).toEqual(NO_FILTERS);
+    expect(last(calls).filters).toEqual(FRESH);
     const count = calls.length;
     cmp.setSearch('Ende');
     TestBed.resetTestingModule();

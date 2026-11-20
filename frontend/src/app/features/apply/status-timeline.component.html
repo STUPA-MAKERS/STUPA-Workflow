@@ -236,7 +236,7 @@
           @if (historyEntries().length) {
             <app-history [entries]="historyEntries()" />
           } @else {
-            <app-empty-state rows="1" [heading]="'status.history.empty' | t" />
+            <app-empty-state icon="history" rows="1" [heading]="'status.history.empty' | t" />
           }
         </app-section>
       </ng-template>

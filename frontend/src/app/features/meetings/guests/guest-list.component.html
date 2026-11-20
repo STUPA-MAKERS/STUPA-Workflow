@@ -26,7 +26,7 @@
     }
   </ul>
 } @else {
-  <app-empty-state shape="person" rows="3" [heading]="(query() ? 'meetings.dock.noMember' : 'guests.list.empty') | t" />
+  <app-empty-state [icon]="query() ? 'searchOff' : 'users'" shape="person" rows="3" [heading]="(query() ? 'meetings.dock.noMember' : 'guests.list.empty') | t" />
 }
 
 <app-dialog
