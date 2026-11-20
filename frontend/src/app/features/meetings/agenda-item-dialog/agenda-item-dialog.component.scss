@@ -60,6 +60,10 @@
   min-width: 0;
   min-height: 0;
 }
+// The empty state sits in the middle of the free height of the list area (001791).
+.aid__slot > app-empty-state {
+  margin-block: auto;
+}
 
 // The choice list: the rows of the select sheet with a subtitle (001790).
 .aid__list {

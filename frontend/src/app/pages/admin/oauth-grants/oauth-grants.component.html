@@ -60,13 +60,15 @@
               </div>
               @if (canRevoke()) {
                 <div class="og__act">
-                  <app-button
-                    size="sm"
-                    variant="danger"
-                    [ariaLabel]="('admin.oauthGrants.revoke' | t) + ': ' + ownerName(g)"
-                    (click)="askRevoke(g)"
-                    >{{ 'admin.oauthGrants.revoke' | t }}</app-button
-                  >
+                  <app-button-group>
+                    <app-button
+                      size="sm"
+                      variant="danger"
+                      [ariaLabel]="('admin.oauthGrants.revoke' | t) + ': ' + ownerName(g)"
+                      (click)="askRevoke(g)"
+                      >{{ 'admin.oauthGrants.revoke' | t }}</app-button
+                    >
+                  </app-button-group>
                 </div>
               }
             </li>
@@ -79,12 +81,14 @@
       @if (total() > 0) {
         <nav class="og__pager" [attr.aria-label]="'admin.oauthGrants.pager' | t">
           <span class="og__range">{{ rangeLabel() }}</span>
-          <app-button variant="outlined" size="sm" [disabled]="!hasPrev()" (click)="prevPage()">{{
-            'admin.oauthGrants.prevPage' | t
-          }}</app-button>
-          <app-button variant="outlined" size="sm" [disabled]="!hasNext()" (click)="nextPage()">{{
-            'admin.oauthGrants.nextPage' | t
-          }}</app-button>
+          <app-button-group>
+            <app-button variant="outlined" size="sm" [disabled]="!hasPrev()" (click)="prevPage()">{{
+              'admin.oauthGrants.prevPage' | t
+            }}</app-button>
+            <app-button variant="outlined" size="sm" [disabled]="!hasNext()" (click)="nextPage()">{{
+              'admin.oauthGrants.nextPage' | t
+            }}</app-button>
+          </app-button-group>
         </nav>
       }
     </ng-template>

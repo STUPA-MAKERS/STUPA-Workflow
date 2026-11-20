@@ -55,20 +55,22 @@
               <div class="chat__line">
                 @if (canAct(m) && !touchMenu() && editingId() !== m.id) {
                   <span class="chat__acts">
-                    <app-button
-                      variant="text"
-                      size="sm"
-                      [iconOnly]="true"
-                      [ariaLabel]="'chat.edit' | t"
-                      (click)="startEdit(m)"
-                    ><app-icon name="edit" /></app-button>
-                    <app-button
-                      variant="text"
-                      size="sm"
-                      [iconOnly]="true"
-                      [ariaLabel]="'chat.delete' | t"
-                      (click)="askDelete(m)"
-                    ><app-icon name="trash" /></app-button>
+                    <app-button-group>
+                      <app-button
+                        variant="text"
+                        size="sm"
+                        [iconOnly]="true"
+                        [ariaLabel]="'chat.edit' | t"
+                        (click)="startEdit(m)"
+                      ><app-icon name="edit" /></app-button>
+                      <app-button
+                        variant="text"
+                        size="sm"
+                        [iconOnly]="true"
+                        [ariaLabel]="'chat.delete' | t"
+                        (click)="askDelete(m)"
+                      ><app-icon name="trash" /></app-button>
+                    </app-button-group>
                   </span>
                 }
                 @if (editingId() === m.id) {
@@ -259,14 +261,16 @@
         "
       ></textarea>
       @if (canAttach()) {
-        <app-button
-          class="chat__attach"
-          variant="text"
-          [iconOnly]="true"
-          [disabled]="full()"
-          [ariaLabel]="'chat.attach' | t"
-          (click)="pickFiles()"
-        ><app-icon name="clip" /></app-button>
+        <app-button-group>
+          <app-button
+            class="chat__attach"
+            variant="text"
+            [iconOnly]="true"
+            [disabled]="full()"
+            [ariaLabel]="'chat.attach' | t"
+            (click)="pickFiles()"
+          ><app-icon name="clip" /></app-button>
+        </app-button-group>
         <input
           #fileInput
           class="chat__fileInput"
@@ -278,14 +282,16 @@
           (change)="onPicked($event)"
         />
       }
-      <app-button
-        class="chat__send"
-        type="submit"
-        variant="fill"
-        [iconOnly]="true"
-        [disabled]="uploading()"
-        [ariaLabel]="'chat.send' | t"
-      ><app-icon name="send" /></app-button>
+      <app-button-group [main]="true">
+        <app-button
+          class="chat__send"
+          type="submit"
+          variant="fill"
+          [iconOnly]="true"
+          [disabled]="uploading()"
+          [ariaLabel]="'chat.send' | t"
+        ><app-icon name="send" /></app-button>
+      </app-button-group>
     </div>
   </form>
 }

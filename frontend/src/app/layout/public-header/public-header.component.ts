@@ -4,7 +4,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ThemeService, ButtonComponent, ButtonLinkComponent } from '@stupa-makers/ui-kit';
+import { ThemeService, ButtonComponent, ButtonGroupComponent, ButtonLinkComponent } from '@stupa-makers/ui-kit';
 import { HelpMenuComponent } from '../../features/help/help-menu/help-menu.component';
 import { LanguageSelectComponent } from '../language-select/language-select.component';
 
@@ -29,6 +29,7 @@ import { LanguageSelectComponent } from '../language-select/language-select.comp
     RouterLink,
     TranslatePipe,
     ButtonComponent,
+    ButtonGroupComponent,
     ButtonLinkComponent,
     HelpMenuComponent,
     LanguageSelectComponent,

@@ -28,6 +28,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import {
   ThemeService,
   ButtonComponent,
+  ButtonGroupComponent,
   ChipComponent,
   ConfirmDialogComponent,
   DialogComponent,
@@ -102,6 +103,7 @@ const KIND_LABEL: Record<TicketKind, TranslationKey> = {
     TranslatePipe,
     AltchaComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     ConfirmDialogComponent,
     DialogComponent,
     IconComponent,

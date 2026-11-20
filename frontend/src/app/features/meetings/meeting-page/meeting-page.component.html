@@ -398,8 +398,10 @@
 <ng-template #showTpl>
   <app-join-qr [meeting]="meeting()" [iconOnly]="true" [(open)]="qrOpen" />
   @if (wide() && meeting().status !== 'closed' && meeting().canManage) {
-    <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.beamer.enter' | t" (click)="toggleBeamer.emit()">
-      <app-icon name="monitor" />
-    </app-button>
+    <app-button-group>
+      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.beamer.enter' | t" (click)="toggleBeamer.emit()">
+        <app-icon name="monitor" />
+      </app-button>
+    </app-button-group>
   }
 </ng-template>

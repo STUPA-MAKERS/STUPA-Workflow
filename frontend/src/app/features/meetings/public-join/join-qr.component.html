@@ -1,26 +1,28 @@
 @if (link(); as l) {
   <div class="jq" [class.jq--up]="iconOnly()">
-    @if (button() && iconOnly()) {
-      <app-button
-        [variant]="open() ? 'tonal' : 'text'"
-        [iconOnly]="true"
-        [ariaLabel]="'guests.qr.title' | t"
-        [attr.aria-expanded]="open()"
-        aria-haspopup="dialog"
-        (click)="open.set(!open())"
-      ><app-icon name="grid" /></app-button>
-    } @else if (button()) {
-      <app-button
-        variant="outlined"
-        [class.jq__trigger--on]="open()"
-        [attr.aria-expanded]="open()"
-        aria-haspopup="dialog"
-        (click)="open.set(!open())"
-      >
-        <app-icon name="grid" />
-        {{ 'guests.qr.button' | t }}
-      </app-button>
-    }
+    <app-button-group>
+      @if (button() && iconOnly()) {
+        <app-button
+          [variant]="open() ? 'tonal' : 'text'"
+          [iconOnly]="true"
+          [ariaLabel]="'guests.qr.title' | t"
+          [ariaExpanded]="open()"
+          aria-haspopup="dialog"
+          (click)="open.set(!open())"
+        ><app-icon name="grid" /></app-button>
+      } @else if (button()) {
+        <app-button
+          variant="outlined"
+          [class.jq__trigger--on]="open()"
+          [ariaExpanded]="open()"
+          aria-haspopup="dialog"
+          (click)="open.set(!open())"
+        >
+          <app-icon name="grid" />
+          {{ 'guests.qr.button' | t }}
+        </app-button>
+      }
+    </app-button-group>
     @if (phone()) {
       <app-side-sheet side="bottom" [heading]="'guests.qr.title' | t" [(open)]="open">
         @if (open()) {

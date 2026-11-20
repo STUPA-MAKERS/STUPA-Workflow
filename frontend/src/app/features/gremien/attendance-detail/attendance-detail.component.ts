@@ -25,6 +25,7 @@ import type { StatusView } from '@shared/status-kind.util';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   EmptyStateComponent,
   FocusDialogDirective,
   MEDIA,
@@ -103,6 +104,7 @@ export const ATTENDANCE_STATE: Record<GremiumAttendanceState, StatusView> = {
     TranslatePipe,
     AvatarComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     LateExcuseDialogComponent,
     SideSheetComponent,
     SkeletonComponent,

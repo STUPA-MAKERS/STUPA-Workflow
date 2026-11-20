@@ -147,7 +147,9 @@
       <app-empty-state shape="choice"
         [heading]="listText().none | t"
       >
-        <app-button variant="tonal" size="sm" (click)="asFreetext()">{{ 'meetings.agenda.asFreetext' | t }}</app-button>
+        <app-button-group>
+          <app-button variant="tonal" size="sm" (click)="asFreetext()">{{ 'meetings.agenda.asFreetext' | t }}</app-button>
+        </app-button-group>
       </app-empty-state>
     }
   </ng-template>

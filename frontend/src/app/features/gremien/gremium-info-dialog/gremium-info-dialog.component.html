@@ -67,21 +67,25 @@
               [downDisabled]="last"
               (move)="moveLink(i, $event)"
             />
-            <app-button
-              variant="text"
-              size="sm"
-              [iconOnly]="true"
-              [ariaLabel]="'gremien.info.removeLink' | t: { label: link.label }"
-              (click)="removeLink(link.key)"
-            ><app-icon name="trash" /></app-button>
+            <app-button-group>
+              <app-button
+                variant="text"
+                size="sm"
+                [iconOnly]="true"
+                [ariaLabel]="'gremien.info.removeLink' | t: { label: link.label }"
+                (click)="removeLink(link.key)"
+              ><app-icon name="trash" /></app-button>
+            </app-button-group>
           </div>
         </div>
       }
       <div class="gid__add">
-        <app-button variant="text" size="sm" [disabled]="full()" (click)="addLink()">
-          <app-icon name="plus" />
-          {{ 'gremien.info.addLink' | t }}
-        </app-button>
+        <app-button-group>
+          <app-button variant="text" size="sm" [disabled]="full()" (click)="addLink()">
+            <app-icon name="plus" />
+            {{ 'gremien.info.addLink' | t }}
+          </app-button>
+        </app-button-group>
       </div>
     </fieldset>
   </form>

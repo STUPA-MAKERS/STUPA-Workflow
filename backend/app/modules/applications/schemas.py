@@ -236,6 +236,71 @@ class TimelineDecisionOut(FrozenCamelModel, frozen=True):
     condition_count: int = Field(default=0, alias="conditionCount")
 
 
+class TypeChangeIn(FrozenStrictCamelModel, frozen=True):
+    """Change the Antragsart of an application (spec 001660).
+
+    ``transitionId`` is required when the new form misses a required value
+    (spec 001661) and must be one of ``TypeChangePreviewOut.transitions``; without a
+    missing value it must be null. ``note`` adds a text to the note of that transition,
+    after the list of the missing fields.
+    """
+
+    type_id: UUID = Field(alias="typeId")
+    transition_id: UUID | None = Field(default=None, alias="transitionId")
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class TypeChangeFieldOut(FrozenCamelModel, frozen=True):
+    """One field of a change of the Antragsart: its key and its label."""
+
+    key: str
+    label: I18nMap
+
+
+class TypeChangeTransitionOut(FrozenCamelModel, frozen=True):
+    """A transition that sends the application back to the applicant (spec 001661)."""
+
+    id: UUID
+    label: I18nMap
+    to_state_id: UUID = Field(alias="toStateId")
+    to_state_label: I18nMap = Field(alias="toStateLabel")
+
+
+class TypeChangePreviewOut(FrozenCamelModel, frozen=True):
+    """What a change to the Antragsart ``typeId`` does, before the change.
+
+    Attributes:
+        carried: The fields whose value the new form takes (same key, same type).
+        missing: The required fields of the new form without a value after the change.
+        dropped: The fields with a value that the new form does not take. The old
+            version keeps their values (spec 001662).
+        transitions: With ``missing``: the manual transitions of the current state that
+            the caller may fire and that lead into a state with ``editAllowed``.
+        possible: False when ``missing`` is not empty and no transition fits.
+    """
+
+    type_id: UUID = Field(alias="typeId")
+    carried: tuple[TypeChangeFieldOut, ...] = ()
+    missing: tuple[TypeChangeFieldOut, ...] = ()
+    dropped: tuple[TypeChangeFieldOut, ...] = ()
+    transitions: tuple[TypeChangeTransitionOut, ...] = ()
+    possible: bool = True
+
+
+class VersionTypeChangeOut(FrozenCamelModel, frozen=True):
+    """The change of the Antragsart that wrote a version (spec 001663).
+
+    ``fieldLabels`` holds the labels of the old form for the fields that the new form
+    does not have, so the history names the removed values.
+    """
+
+    from_type_id: UUID | None = Field(default=None, alias="fromTypeId")
+    from_type: I18nMap | None = Field(default=None, alias="fromType")
+    to_type_id: UUID | None = Field(default=None, alias="toTypeId")
+    to_type: I18nMap | None = Field(default=None, alias="toType")
+    field_labels: dict[str, I18nMap] = Field(default_factory=dict, alias="fieldLabels")
+
+
 class ApplicationPatch(FrozenCamelModel, frozen=True):
     """Update the application data.
 
@@ -353,6 +418,7 @@ class VersionOut(FrozenCamelModel, frozen=True):
     Attributes:
         changed_by: Same rules as ``TimelineEventOut.actor``. The frontend renders
             ``changedByInfo``.
+        type_change: The change of the Antragsart that wrote this version, else null.
     """
 
     version: int
@@ -362,6 +428,7 @@ class VersionOut(FrozenCamelModel, frozen=True):
     changed_by: str | None = Field(default=None, alias="changedBy")
     changed_by_info: ActorOut | None = Field(default=None, alias="changedByInfo")
     at: datetime
+    type_change: VersionTypeChangeOut | None = Field(default=None, alias="typeChange")
 
 
 class ApplicationListItem(FrozenCamelModel, frozen=True):

@@ -26,7 +26,8 @@ a gremium role grants them, and the scope only lets them through. The meeting le
 (``session.manage``) includes the votes of the gremium, so a ``meetings:write`` token of a
 lead can manage those votes without ``votes:write``. ``read`` holds the global read keys
 ``meeting.view_all``, ``gremium.view_all`` and ``todo.read_all``, so an admin token keeps
-the view over every gremium. ``todos:write`` holds ``todo.all``, the global write key of
+the view over every gremium. ``read`` also holds ``graph.view``, the page "Graph".
+``todos:write`` holds ``todo.all``, the global write key of
 the to-do cards. The to-dos read with any of ``todo.write``, ``todo.all`` and
 ``todo.read_all`` in the scope and write with ``todo.write`` or ``todo.all``. Through
 ``todo.all`` or ``todo.read_all`` a team board also needs its own permission in the scope,
@@ -58,10 +59,16 @@ SCOPES: dict[str, frozenset[str]] = {
             "meeting.view_all",
             "gremium.view_all",
             "todo.read_all",
+            "graph.view",
         }
     ),
     "applications:write": frozenset(
-        {"application.transition", "application.manage", "application.create_on_behalf"}
+        {
+            "application.transition",
+            "application.manage",
+            "application.create_on_behalf",
+            "application.change_type",
+        }
     ),
     "votes:write": frozenset({"vote.manage"}),
     "budget:write": frozenset({"budget.structure", "budget.book"}),

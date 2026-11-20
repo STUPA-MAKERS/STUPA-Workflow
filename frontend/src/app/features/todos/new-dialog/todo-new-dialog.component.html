@@ -131,10 +131,12 @@
         </app-chip>
       }
       <div class="tn__add">
-        <app-button variant="text" size="sm" (click)="pickerOpen.set(!pickerOpen())">
-          <app-icon name="link" />
-          {{ 'todos.new.link' | t }}
-        </app-button>
+        <app-button-group>
+          <app-button variant="text" size="sm" (click)="pickerOpen.set(!pickerOpen())">
+            <app-icon name="link" />
+            {{ 'todos.new.link' | t }}
+          </app-button>
+        </app-button-group>
       </div>
       <div class="tn__picker">
         <app-todo-link-picker [(open)]="pickerOpen" [linked]="linkedKeys()" (picked)="pickLink($event)" />

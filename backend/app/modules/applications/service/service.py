@@ -11,6 +11,7 @@ exactly this class. The implementation lives in the ops classes:
 * `comments.CommentOps`: internal and public comments
 * `anonymize.AnonymizeOps`: GDPR anonymization
 * `links.LinkOps`: the Vorgänger link of a Folgeantrag and the prefill
+* `type_change.TypeChangeOps`: the change of the Antragsart
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from app.modules.applications.service.links import LinkOps
 from app.modules.applications.service.listing import ListingOps
 from app.modules.applications.service.on_behalf import OnBehalfOps
 from app.modules.applications.service.reads import ReadOps
+from app.modules.applications.service.type_change import TypeChangeOps
 
 
 class ApplicationsService(
@@ -34,5 +36,6 @@ class ApplicationsService(
     CommentOps,
     AnonymizeOps,
     LinkOps,
+    TypeChangeOps,
 ):
     """DB-backed application operations, bound to one `AsyncSession`."""

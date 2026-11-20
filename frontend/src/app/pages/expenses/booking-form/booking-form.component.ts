@@ -6,6 +6,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   AutocompleteComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   ChipGroupComponent,
   CurrencyInputComponent,
   DatepickerComponent,
@@ -100,6 +101,7 @@ const PAYMENT_METHODS: readonly ('' | PaymentMethod)[] = [
     PaneFormHeadComponent,
     AutocompleteComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     ChipGroupComponent,
     BudgetYearSelectComponent,
     CostCentreSelectComponent,

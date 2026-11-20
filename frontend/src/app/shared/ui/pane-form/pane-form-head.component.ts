@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, IconComponent, ListDetailNav, type ListDetailTask } from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, IconComponent, ListDetailNav, type ListDetailTask } from '@stupa-makers/ui-kit';
 
 /**
  * The head of a form that replaces a detail sheet (a booking, a transfer, an invoice, a
@@ -34,7 +34,7 @@ import { ButtonComponent, IconComponent, ListDetailNav, type ListDetailTask } fr
   selector: 'header[appPaneFormHead]',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ButtonComponent, IconComponent],
+  imports: [TranslatePipe, ButtonComponent, ButtonGroupComponent, IconComponent],
   host: { '[class.pfh--docked]': 'docked()' },
   templateUrl: './pane-form-head.component.html',
   styleUrl: './pane-form-head.component.scss',

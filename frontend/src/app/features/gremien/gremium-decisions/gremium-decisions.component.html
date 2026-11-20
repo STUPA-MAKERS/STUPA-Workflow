@@ -94,9 +94,11 @@
       @if (moreError()) {
         <app-load-error [message]="'gremien.decisions.moreError' | t" (retry)="loadMore()" />
       } @else {
-        <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">
-          {{ 'gremien.decisions.more' | t }}
-        </app-button>
+        <app-button-group>
+          <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">
+            {{ 'gremien.decisions.more' | t }}
+          </app-button>
+        </app-button-group>
       }
     </div>
   }

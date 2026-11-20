@@ -9,7 +9,9 @@
         <span class="km__name ell" [appTruncated]="plan.name ?? ''" #cut="appTruncated" [attr.title]="cut.truncated() ? plan.name ?? '' : null">{{ plan.name }}</span>
         <span class="km__sub">{{ plannedSub() }}</span>
       </span>
-      <app-button variant="text" size="sm" (click)="discard.emit()">{{ 'meetings.handover.discard' | t }}</app-button>
+      <app-button-group>
+        <app-button variant="text" size="sm" (click)="discard.emit()">{{ 'meetings.handover.discard' | t }}</app-button>
+      </app-button-group>
     </div>
   </section>
   <hr class="km__rule" />

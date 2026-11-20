@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Set
+from collections.abc import Mapping, Sequence, Set
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -14,7 +14,12 @@ from app.modules.application_types.models import ApplicationType
 from app.modules.applications.decision import CODE_AMOUNT_EXCEEDS
 from app.modules.applications.diff import DataDiff, compute_diff, is_empty_diff
 from app.modules.applications.models import MagicLink, SubmissionVersion
-from app.modules.applications.schemas import ActorOut, ApplicationOut, VersionOut
+from app.modules.applications.schemas import (
+    ActorOut,
+    ApplicationOut,
+    VersionOut,
+    VersionTypeChangeOut,
+)
 from app.modules.applications.service.service_base import (
     ApplicationsServiceBase,
     _amount_currency,
@@ -24,6 +29,7 @@ from app.modules.applications.service.service_base import (
 )
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
+from app.modules.forms.models import FormField
 from app.modules.forms.validation import (
     SYSTEM_TITLE_KEY,
     AnswerValidationError,
@@ -278,15 +284,67 @@ class EditOps(ApplicationsServiceBase):
             applicant_view=applicant_view,
             magic_link_view=magic_link_view,
         )
+        changes = await self._type_changes(rows, hidden)
         return [
             _version_out(
                 r,
                 actors.get(r.changed_by) if r.changed_by else None,
                 hidden,
                 applicant_view=applicant_view,
+                type_change=changes.get(r.version),
             )
             for r in rows
         ]
+
+    async def _type_changes(
+        self, rows: Sequence[SubmissionVersion], hidden: Set[str]
+    ) -> dict[int, VersionTypeChangeOut]:
+        """Map each version that changed the Antragsart to its old and new type (001663).
+
+        ``fieldLabels`` holds the labels of the old form for the removed fields, because the
+        form of the application no longer has them. A hidden ``isPII`` key stays out.
+        """
+        changed = [r for r in rows if r.to_type_id is not None or r.from_type_id is not None]
+        if not changed:
+            return {}
+        type_ids = {t for r in changed for t in (r.from_type_id, r.to_type_id) if t is not None}
+        names = dict(
+            (
+                await self.session.execute(
+                    select(ApplicationType.id, ApplicationType.name_i18n).where(
+                        ApplicationType.id.in_(type_ids)
+                    )
+                )
+            ).all()
+        )
+        form_ids = {r.from_form_version_id for r in changed if r.from_form_version_id}
+        label_rows = (
+            await self.session.execute(
+                select(FormField.form_version_id, FormField.key, FormField.label_i18n).where(
+                    FormField.form_version_id.in_(form_ids)
+                )
+            )
+        ).all()
+        labels: dict[UUID, dict[str, Any]] = {
+            form_id: {key: label for fid, key, label in label_rows if fid == form_id}
+            for form_id in form_ids
+        }
+        return {
+            r.version: VersionTypeChangeOut(
+                fromTypeId=r.from_type_id,
+                fromType=names.get(r.from_type_id) if r.from_type_id else None,
+                toTypeId=r.to_type_id,
+                toType=names.get(r.to_type_id) if r.to_type_id else None,
+                fieldLabels={
+                    key: label
+                    for key, label in labels.get(r.from_form_version_id, {}).items()
+                    if key in (r.diff or {}).get("removed", {}) and key not in hidden
+                }
+                if r.from_form_version_id
+                else {},
+            )
+            for r in changed
+        }
 
 
 def _with_stored_pii(
@@ -305,6 +363,7 @@ def _version_out(
     hidden: Set[str],
     *,
     applicant_view: bool,
+    type_change: VersionTypeChangeOut | None = None,
 ) -> VersionOut:
     """Build one version of the history from its row and its resolved editor."""
     diff = _scrub_diff(row.diff, hidden) if row.diff else None
@@ -317,4 +376,5 @@ def _version_out(
         changedBy=info.legacy(row.changed_by) if info and row.changed_by else None,
         changedByInfo=info,
         at=row.at,
+        typeChange=type_change,
     )

@@ -41,6 +41,7 @@ import { applyServerErrors, clearServerErrors } from '@shared/forms/server-error
 import { renderMarkdown } from '../meetings/meetings.util';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   ConfirmDialogComponent,
   EmptyStateComponent,
   FieldGroupComponent,
@@ -162,6 +163,7 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
     FieldGroupComponent,
     FieldRowComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     IconComponent,
     InputComponent,
     StepperComponent,

@@ -176,7 +176,9 @@
               </app-section>
 
               <app-section class="br__sec" [level]="2" [heading]="'admin.brand.legal' | t">
-                <app-button sectionAction variant="text" size="sm" (click)="addLegalLink()"><app-icon name="plus" /> {{ 'admin.brand.addLink' | t }}</app-button>
+                <app-button-group ngProjectAs="[sectionAction]">
+                  <app-button sectionAction variant="text" size="sm" (click)="addLegalLink()"><app-icon name="plus" /> {{ 'admin.brand.addLink' | t }}</app-button>
+                </app-button-group>
                 @if (d.legalLinks.length) {
                   <ul class="br__links">
                     @for (link of d.legalLinks; track $index; let li = $index) {
@@ -201,7 +203,9 @@
                             [name]="'legal-url-' + li"
                           />
                         </label>
-                        <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.brand.removeLink' | t) + ': ' + (link.label[lang()] || link.url)" (click)="removeLegalLink(li)"><app-icon name="trash" /></app-button>
+                        <app-button-group>
+                          <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.brand.removeLink' | t) + ': ' + (link.label[lang()] || link.url)" (click)="removeLegalLink(li)"><app-icon name="trash" /></app-button>
+                        </app-button-group>
                       </li>
                     }
                   </ul>
@@ -253,9 +257,11 @@
                     name="accentColor"
                   />
                   @if (customAccent()) {
-                    <app-button variant="text" size="sm" (click)="setAccent(null)">
-                      <app-icon name="undo" /> {{ 'admin.brand.accent.reset' | t }}
-                    </app-button>
+                    <app-button-group>
+                      <app-button variant="text" size="sm" (click)="setAccent(null)">
+                        <app-icon name="undo" /> {{ 'admin.brand.accent.reset' | t }}
+                      </app-button>
+                    </app-button-group>
                   }
                 </div>
                 @if (accentIssues().length > 0) {
@@ -291,33 +297,37 @@
                           <span class="br__logoName">{{ slotLabel(slot) }}</span>
                           <span class="br__logoFile mono">{{ asset.filename }} · {{ size(asset.size) }}</span>
                         </span>
-                        <app-button
-                          variant="text"
-                          size="sm"
-                          [iconOnly]="true"
-                          [ariaLabel]="('admin.brand.replaceLogo' | t) + ': ' + slotLabel(slot)"
-                          [title]="'admin.brand.replaceLogo' | t"
-                          (click)="logo.open()"
-                          ><app-icon name="upload"
-                        /></app-button>
-                        <app-button
-                          variant="text"
-                          size="sm"
-                          [iconOnly]="true"
-                          [ariaLabel]="('admin.brand.removeLogo' | t) + ': ' + slotLabel(slot)"
-                          [title]="'admin.brand.removeLogo' | t"
-                          (click)="removeLogo(slot)"
-                          ><app-icon name="trash"
-                        /></app-button>
+                        <app-button-group>
+                          <app-button
+                            variant="text"
+                            size="sm"
+                            [iconOnly]="true"
+                            [ariaLabel]="('admin.brand.replaceLogo' | t) + ': ' + slotLabel(slot)"
+                            [title]="'admin.brand.replaceLogo' | t"
+                            (click)="logo.open()"
+                            ><app-icon name="upload"
+                          /></app-button>
+                          <app-button
+                            variant="text"
+                            size="sm"
+                            [iconOnly]="true"
+                            [ariaLabel]="('admin.brand.removeLogo' | t) + ': ' + slotLabel(slot)"
+                            [title]="'admin.brand.removeLogo' | t"
+                            (click)="removeLogo(slot)"
+                            ><app-icon name="trash"
+                          /></app-button>
+                        </app-button-group>
                       } @else {
                         <span class="br__thumb" [class.br__thumb--wide]="slot === 'wordmark'"><img [src]="defaultLogo(slot)" alt="" /></span>
                         <span class="br__logoText">
                           <span class="br__logoName">{{ slotLabel(slot) }}</span>
                           <span class="br__logoFile br__logoFile--default">{{ 'admin.brand.logo.default' | t }}</span>
                         </span>
-                        <app-button variant="outlined" size="sm" [ariaLabel]="('admin.brand.pick' | t) + ': ' + slotLabel(slot)" (click)="logo.open()">{{
-                          'admin.brand.pick' | t
-                        }}</app-button>
+                        <app-button-group>
+                          <app-button variant="outlined" size="sm" [ariaLabel]="('admin.brand.pick' | t) + ': ' + slotLabel(slot)" (click)="logo.open()">{{
+                            'admin.brand.pick' | t
+                          }}</app-button>
+                        </app-button-group>
                       }
                     </li>
                   }
@@ -348,47 +358,49 @@
                           <span class="br__logoFile mono">{{ asset.fileName }} · {{ size(asset.size ?? 0) }}</span>
                         }
                       </span>
-                      @if (asset) {
-                        <app-button
-                          variant="text"
-                          size="sm"
-                          [iconOnly]="true"
-                          [ariaLabel]="('admin.brand.replaceLogo' | t) + ': ' + pdfLabel(slot)"
-                          [title]="'admin.brand.replaceLogo' | t"
-                          (click)="pdfFile.open()"
-                          ><app-icon name="upload"
-                        /></app-button>
-                      }
-                      @if (!asset?.builtin) {
-                        <app-button
-                          variant="text"
-                          size="sm"
-                          [iconOnly]="true"
-                          [ariaLabel]="('admin.brand.pdf.reset' | t) + ': ' + pdfLabel(slot)"
-                          [title]="'admin.brand.pdf.reset' | t"
-                          (click)="resetPdfAsset(slot)"
-                          ><app-icon name="undo"
-                        /></app-button>
-                      }
-                      @if (asset) {
-                        <app-button
-                          variant="text"
-                          size="sm"
-                          [iconOnly]="true"
-                          [ariaLabel]="('admin.brand.pdf.remove' | t) + ': ' + pdfLabel(slot)"
-                          [title]="'admin.brand.pdf.remove' | t"
-                          (click)="removePdfAsset(slot)"
-                          ><app-icon name="trash"
-                        /></app-button>
-                      } @else {
-                        <app-button
-                          variant="outlined"
-                          size="sm"
-                          [ariaLabel]="('admin.brand.pick' | t) + ': ' + pdfLabel(slot)"
-                          (click)="pdfFile.open()"
-                          >{{ 'admin.brand.pick' | t }}</app-button
-                        >
-                      }
+                      <app-button-group>
+                        @if (asset) {
+                          <app-button
+                            variant="text"
+                            size="sm"
+                            [iconOnly]="true"
+                            [ariaLabel]="('admin.brand.replaceLogo' | t) + ': ' + pdfLabel(slot)"
+                            [title]="'admin.brand.replaceLogo' | t"
+                            (click)="pdfFile.open()"
+                            ><app-icon name="upload"
+                          /></app-button>
+                        }
+                        @if (!asset?.builtin) {
+                          <app-button
+                            variant="text"
+                            size="sm"
+                            [iconOnly]="true"
+                            [ariaLabel]="('admin.brand.pdf.reset' | t) + ': ' + pdfLabel(slot)"
+                            [title]="'admin.brand.pdf.reset' | t"
+                            (click)="resetPdfAsset(slot)"
+                            ><app-icon name="undo"
+                          /></app-button>
+                        }
+                        @if (asset) {
+                          <app-button
+                            variant="text"
+                            size="sm"
+                            [iconOnly]="true"
+                            [ariaLabel]="('admin.brand.pdf.remove' | t) + ': ' + pdfLabel(slot)"
+                            [title]="'admin.brand.pdf.remove' | t"
+                            (click)="removePdfAsset(slot)"
+                            ><app-icon name="trash"
+                          /></app-button>
+                        } @else {
+                          <app-button
+                            variant="outlined"
+                            size="sm"
+                            [ariaLabel]="('admin.brand.pick' | t) + ': ' + pdfLabel(slot)"
+                            (click)="pdfFile.open()"
+                            >{{ 'admin.brand.pick' | t }}</app-button
+                          >
+                        }
+                      </app-button-group>
                     </li>
                   }
                 </ul>

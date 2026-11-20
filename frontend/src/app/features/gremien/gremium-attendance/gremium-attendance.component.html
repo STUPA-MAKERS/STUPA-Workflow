@@ -28,19 +28,21 @@
       [text]="sortText()"
     />
     <span class="gat__grow"></span>
-    @if (canExportList()) {
-      <app-button variant="text" [loading]="exporting()" [disabled]="loading()" (click)="exportList()">
-        <app-icon name="download" />
-        {{ 'gremien.attendance.exportList' | t }}
-      </app-button>
-    }
-    <app-button
-      variant="text"
-      [iconOnly]="true"
-      [ariaLabel]="'gremien.attendance.export' | t"
-      [disabled]="loading() || !rows().length"
-      (click)="exportCsv()"
-    ><app-icon name="download" /></app-button>
+    <app-button-group>
+      @if (canExportList()) {
+        <app-button variant="text" [loading]="exporting()" [disabled]="loading()" (click)="exportList()">
+          <app-icon name="download" />
+          {{ 'gremien.attendance.exportList' | t }}
+        </app-button>
+      }
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="'gremien.attendance.export' | t"
+        [disabled]="loading() || !rows().length"
+        (click)="exportCsv()"
+      ><app-icon name="download" /></app-button>
+    </app-button-group>
   }
 </div>
 

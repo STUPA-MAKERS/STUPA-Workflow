@@ -7,6 +7,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonGroupComponent,
   ConfirmDialogComponent,
   DialogComponent,
   EmptyStateComponent,
@@ -47,6 +48,7 @@ interface GuestRow {
     TranslatePipe,
     AvatarComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     DialogComponent,
     InputComponent,
     RowMenuComponent,

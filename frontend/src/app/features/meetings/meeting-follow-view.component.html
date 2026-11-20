@@ -48,7 +48,9 @@
         </span>
         <h2 class="fv__phoneTitle">{{ top.title || ('meetings.agenda.untitled' | t) }}</h2>
         @if (nowElsewhere()) {
-          <app-button class="fv__toNow" variant="tonal" size="sm" (click)="backToNow()">{{ 'meetings.dock.backToNow' | t }}</app-button>
+          <app-button-group>
+            <app-button class="fv__toNow" variant="tonal" size="sm" (click)="backToNow()">{{ 'meetings.dock.backToNow' | t }}</app-button>
+          </app-button-group>
         }
       </div>
     } @else if (m.status === 'planned') {
@@ -82,9 +84,11 @@
           <p class="fv__excerptText fv__muted">{{ 'participant.top.empty' | t }}</p>
         }
         @if (fullText() || excerpt().cut) {
-          <app-button class="fv__readAll" variant="text" size="sm" (click)="fullText.set(!fullText())">
-            {{ (fullText() ? 'participant.top.readLess' : 'participant.top.readAll') | t }}
-          </app-button>
+          <app-button-group>
+            <app-button class="fv__readAll" variant="text" size="sm" (click)="fullText.set(!fullText())">
+              {{ (fullText() ? 'participant.top.readLess' : 'participant.top.readAll') | t }}
+            </app-button>
+          </app-button-group>
         }
       </section>
     }
@@ -179,7 +183,9 @@
         </span>
       } @else if (nowElsewhere(); as now) {
         <span class="fv__dockNow ell" [title]="now">{{ 'meetings.dock.nowRunning' | t: { top: now } }}</span>
-        <app-button size="sm" variant="tonal" (click)="backToNow()">{{ 'meetings.dock.backToNow' | t }}</app-button>
+        <app-button-group>
+          <app-button size="sm" variant="tonal" (click)="backToNow()">{{ 'meetings.dock.backToNow' | t }}</app-button>
+        </app-button-group>
       } @else if (top && (wide() || !dockDelegation())) {
         <span class="fv__dockTop">
           <app-icon name="list" [size]="18" />
@@ -242,10 +248,12 @@
 
 <ng-template #rosterButtonTpl>
   @if (attendance().length) {
-    <app-button class="fv__roster" variant="text" size="sm" (click)="rosterOpen.set(true)">
-      <app-icon name="users" />
-      {{ 'participant.roster.show' | t }}
-    </app-button>
+    <app-button-group>
+      <app-button class="fv__roster" variant="text" size="sm" (click)="rosterOpen.set(true)">
+        <app-icon name="users" />
+        {{ 'participant.roster.show' | t }}
+      </app-button>
+    </app-button-group>
   }
 </ng-template>
 
@@ -290,10 +298,12 @@
     <h2 class="fv__startTitle">{{ 'participant.wait.live' | t }}</h2>
     <p class="fv__muted">{{ (agenda().length ? 'participant.wait.liveLead' : 'participant.wait.liveEmpty') | t }}</p>
     @if (!wide() && agenda().length) {
-      <app-button variant="tonal" size="sm" (click)="agendaOpen.set(true)">
-        <app-icon name="list" />
-        {{ 'meetings.dock.agenda' | t }}
-      </app-button>
+      <app-button-group>
+        <app-button variant="tonal" size="sm" (click)="agendaOpen.set(true)">
+          <app-icon name="list" />
+          {{ 'meetings.dock.agenda' | t }}
+        </app-button>
+      </app-button-group>
     }
   } @else {
     <app-empty-state plain icon="list" class="fv__empty" level="2" [heading]="'participant.wait.closedEmpty' | t" />

@@ -8,6 +8,7 @@ import { EMPTY, type Observable, forkJoin, of } from 'rxjs';
 import { catchError, finalize, tap } from 'rxjs/operators';
 import {
   ButtonComponent,
+  ButtonGroupComponent,
   CellDirective,
   type ColumnDef,
   ConfirmDialogComponent,
@@ -203,6 +204,7 @@ type YearBeforeField = 'prevAmount' | 'prevActual';
     SimplifyPathPipe,
     LoadErrorComponent,
     ButtonComponent,
+    ButtonGroupComponent,
     CellDirective,
     ConfirmDialogComponent,
     CostCentreCreateComponent,

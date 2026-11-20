@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { RouterLink } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, ButtonLinkComponent, IconComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, ButtonLinkComponent, IconComponent } from '@stupa-makers/ui-kit';
 
 /** The state of the page: the ask, the end in flight, the result. */
 type Phase = 'ask' | 'busy' | 'done' | 'invalid';
@@ -23,7 +23,7 @@ export function endToken(fragment: string): string {
   selector: 'app-stop-observing',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslatePipe, ButtonComponent, ButtonLinkComponent, IconComponent],
+  imports: [RouterLink, TranslatePipe, ButtonComponent, ButtonGroupComponent, ButtonLinkComponent, IconComponent],
   templateUrl: './stop-observing.component.html',
   styleUrl: '../apply-confirmation.component.scss',
 })

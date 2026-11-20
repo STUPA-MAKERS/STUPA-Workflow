@@ -112,12 +112,16 @@
 
             <div class="mt__actions">
               @if (d.source === 'override') {
-                <app-button variant="danger" [loading]="resetting()" (click)="reset()">{{ 'admin.mailTemplates.reset' | t }}</app-button>
+                <app-button-group>
+                  <app-button variant="danger" [loading]="resetting()" (click)="reset()">{{ 'admin.mailTemplates.reset' | t }}</app-button>
+                </app-button-group>
               }
               <span class="mt__actionsEnd">
-                <app-button variant="outlined" [loading]="previewing()" (click)="runPreview()">
-                  <app-icon name="eye" /> {{ 'admin.mailTemplates.preview' | t }}
-                </app-button>
+                <app-button-group>
+                  <app-button variant="outlined" [loading]="previewing()" (click)="runPreview()">
+                    <app-icon name="eye" /> {{ 'admin.mailTemplates.preview' | t }}
+                  </app-button>
+                </app-button-group>
               </span>
             </div>
           </section>

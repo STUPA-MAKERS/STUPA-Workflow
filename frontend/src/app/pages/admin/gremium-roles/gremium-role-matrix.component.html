@@ -6,9 +6,11 @@
   [hideHeading]="!heading()"
 >
   @if (canEdit() && !fab()) {
-    <app-button sectionAction size="sm" variant="tonal" (click)="openAdd()">
-      <app-icon name="plus" /> {{ 'admin.gremiumRoles.create' | t }}
-    </app-button>
+    <app-button-group ngProjectAs="[sectionAction]">
+      <app-button sectionAction size="sm" variant="tonal" (click)="openAdd()">
+        <app-icon name="plus" /> {{ 'admin.gremiumRoles.create' | t }}
+      </app-button>
+    </app-button-group>
   }
   @if (canEdit() && fab()) {
     <app-fab [label]="'fab.gremiumRole' | t" (activate)="openAdd()" />
@@ -101,11 +103,13 @@
             }
             <div class="rm__act hitrow__keep" role="cell">
               @if (canEdit()) {
-                <app-row-menu
-                  [sections]="rowMenu(r)"
-                  [label]="('ui.rowMenu.trigger' | t) + ': ' + (label(r) | capitalize)"
-                  (selected)="askDelete(r)"
-                />
+                <app-button-group>
+                  <app-row-menu
+                    [sections]="rowMenu(r)"
+                    [label]="('ui.rowMenu.trigger' | t) + ': ' + (label(r) | capitalize)"
+                    (selected)="askDelete(r)"
+                  />
+                </app-button-group>
               }
             </div>
           </div>

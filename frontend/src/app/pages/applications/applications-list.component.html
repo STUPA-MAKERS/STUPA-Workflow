@@ -117,9 +117,11 @@
             unsetValue="false"
           />
           @if (activeFilterCount() > 0) {
-            <app-button variant="text" size="sm" (click)="reset()">
-              {{ 'applications.list.filter.reset' | t }}
-            </app-button>
+            <app-button-group>
+              <app-button variant="text" size="sm" (click)="reset()">
+                {{ 'applications.list.filter.reset' | t }}
+              </app-button>
+            </app-button-group>
           }
         </div>
         @if (reloading()) {
@@ -221,9 +223,11 @@
           @if (hasMore()) {
             <div class="apps__sentinel" appInfiniteScroll (scrolledToEnd)="loadMore()" aria-hidden="true"></div>
             <div class="apps__more">
-              <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">
-                {{ 'applications.list.loadMore' | t }}
-              </app-button>
+              <app-button-group>
+                <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">
+                  {{ 'applications.list.loadMore' | t }}
+                </app-button>
+              </app-button-group>
             </div>
           }
         }
@@ -312,8 +316,10 @@
       />
     </div>
     <div class="apps__moreActions">
-      <app-button variant="text" (click)="clearMore()">{{ 'applications.list.filter.reset' | t }}</app-button>
-      <app-button variant="fill" (click)="applyMore()">{{ 'applications.list.filter.apply' | t }}</app-button>
+      <app-button-group [main]="true">
+        <app-button variant="text" (click)="clearMore()">{{ 'applications.list.filter.reset' | t }}</app-button>
+        <app-button variant="fill" (click)="applyMore()">{{ 'applications.list.filter.apply' | t }}</app-button>
+      </app-button-group>
     </div>
   </div>
 </app-side-sheet>
