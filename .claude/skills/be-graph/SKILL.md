@@ -18,6 +18,7 @@ description: The graph page backend — GET /api/graph answers the elements a pe
 **Conventions & gotchas:**
 - **Stateless paging.** Each page computes the whole graph again and cuts it by the offset. The order is stable (date, kind, id), so a page never repeats a node. A change of the data between two pages can shift a node; the client then shows it once, by its key.
 - **An unreadable element** shows only with `noAccess`, as a node with its kind and id (spec 001422). Without the switch its edges go too. A cost centre shows with a budget read right or as `granted` through a readable card.
+- **A hit of the search** that the caller reads shows also without a line, at every `depth` (spec 001434); without a term a node without a line needs `single` (spec 001423). The service reads `all_refs` for both.
 - **A kind of a feature that is off** has no node and no edge (`link_kinds_on`, spec 001432).
 - **A new built-in relation** is one entry in `builtin_reads()` and one row in spec 001424. A vote with a TOP has no line to the meeting.
 - **Layer:** `graph` sits beside `search` in `pyproject.toml` (import-linter), above `todos`.
