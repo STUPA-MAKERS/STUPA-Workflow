@@ -2,7 +2,7 @@
 id: "001433"
 title: A drag moves a node of the graph
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:

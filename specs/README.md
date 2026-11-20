@@ -286,7 +286,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/graph/001430](requirements/functional/collaboration/graph/001430_graph-node-look.md) | A node shows the icon and the colour of its kind | approved |
 | [F/collaboration/graph/001431](requirements/functional/collaboration/graph/001431_graph-api.md) | The graph has its own API | approved |
 | [F/collaboration/graph/001432](requirements/functional/collaboration/graph/001432_graph-features.md) | A kind of a feature that is off does not show in the graph | approved |
-| [F/collaboration/graph/001433](requirements/functional/collaboration/graph/001433_graph-node-drag.md) | A drag moves a node of the graph | draft |
+| [F/collaboration/graph/001433](requirements/functional/collaboration/graph/001433_graph-node-drag.md) | A drag moves a node of the graph | approved |
 | [F/collaboration/links/001400](requirements/functional/collaboration/links/001400_any-to-any.md) | Any two elements can link to each other | approved |
 | [F/collaboration/links/001401](requirements/functional/collaboration/links/001401_no-direction.md) | A link has no direction | approved |
 | [F/collaboration/links/001402](requirements/functional/collaboration/links/001402_one-row-two-ends.md) | A link is one row with two typed ends | approved |
