@@ -1305,12 +1305,10 @@ describe('ApplicationsListComponent', () => {
       http.verify();
     });
 
-    it('opens the row through "Öffnen"', async () => {
-      const { http, harness, router } = await start();
-      await openRowMenu(http, 'Flyer für die Hochschulgruppen-Messe', [], () => harness.detectChanges());
-      await userEvent.click(screen.getByRole('menuitem', { name: 'Öffnen' }));
-      await harness.fixture.whenStable();
-      expect(router.url).toBe('/applications/app-2');
+    /** § NF/usability/controls/001981: no ⋮ without an action of the menu. */
+    it('draws no row menu without a right for one of its actions', async () => {
+      await start('/applications', { perms: ['application.read'] });
+      expect(screen.queryByRole('button', { name: /^Aktionen für/ })).not.toBeInTheDocument();
     });
 
     it('opens "Status setzen" for the row and reloads after it', async () => {

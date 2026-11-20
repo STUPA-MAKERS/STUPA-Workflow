@@ -536,7 +536,6 @@
   "applications.list.deleteConfirm": "“{title}” is deleted. This cannot be undone.",
   "applications.list.none": "No application open",
   "applications.row.menu": "Actions for {title}",
-  "applications.row.open": "Open",
   "applications.row.archive": "Archive",
   "applications.row.unarchive": "Restore from archive",
   "applications.detail.menu": "More actions",
