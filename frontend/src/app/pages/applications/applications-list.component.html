@@ -254,20 +254,18 @@
                       </span>
                       <span trail class="apps__trail">
                         <app-amount [amount]="row.amount" [approved]="row.approved" layout="stack" />
-                        <span class="apps__menuSlot">
-                          @if (!split()) {
-                            <span class="apps__chev" aria-hidden="true">
-                              <app-icon name="right" [size]="17" />
-                            </span>
-                          }
-                          <app-row-transitions-menu
-                            class="apps__menu"
-                            [item]="row.item"
-                            [title]="row.title"
-                            (action)="onRowAction(row.item, $event)"
-                          />
-                        </span>
+                        @if (!split()) {
+                          <span class="apps__chev" aria-hidden="true">
+                            <app-icon name="right" [size]="17" />
+                          </span>
+                        }
                       </span>
+                      <app-row-transitions-menu
+                        menu
+                        [item]="row.item"
+                        [title]="row.title"
+                        (action)="onRowAction(row.item, $event)"
+                      />
                     </app-list-item>
                   }
                 </div>
