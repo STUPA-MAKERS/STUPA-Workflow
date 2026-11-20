@@ -750,7 +750,8 @@ describe('MeetingPageComponent', () => {
       await userEvent.click(screen.getByTitle('Protokollführung übergeben'));
       await userEvent.click(screen.getByRole('button', { name: /Mika Mitglied/ }));
       expect(on.pickHandover).toHaveBeenCalledWith('pr-2');
-      await userEvent.click(screen.getByTitle('Anwesenheit'));
+      // The dock chip; the edge tab of spec 001801 has the same title.
+      await userEvent.click(within(document.querySelector('app-session-dock') as HTMLElement).getByTitle('Anwesenheit'));
       const sheet = screen.getByRole('dialog', { name: 'Anwesenheit' });
       const mika = within(sheet).getByRole('radiogroup', { name: 'Anwesenheit von Mika Mitglied' });
       await userEvent.click(within(mika).getByRole('radio', { name: 'Unentschuldigt' }));
@@ -764,7 +765,8 @@ describe('MeetingPageComponent', () => {
 
     it('passes the end of an attendance conflict on', async () => {
       const { on, http, fixture } = await setup({ attendanceConflict: 'pr-2' });
-      await userEvent.click(screen.getByTitle('Anwesenheit'));
+      // The dock chip; the edge tab of spec 001801 has the same title.
+      await userEvent.click(within(document.querySelector('app-session-dock') as HTMLElement).getByTitle('Anwesenheit'));
       http.match((r) => r.url.includes('/delegations/')).forEach((req) => req.flush(DELEGATION_CONTEXT));
       http.match((r) => r.url.endsWith('/delegations')).forEach((req) =>
         req.flush([
