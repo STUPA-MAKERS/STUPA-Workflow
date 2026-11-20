@@ -57,6 +57,8 @@ interface StartOptions {
   media?: string[];
   plan?: boolean;
   admin?: boolean;
+  /** The own gremium role in g-1 holds `members.notify`. */
+  notify?: boolean;
   overview?: jest.Mock;
   /** The boards the person reads in the Gremium. */
   boards?: readonly Partial<TodoBoardSummary>[];
@@ -70,6 +72,7 @@ async function start(url: string, opts: StartOptions = {}) {
   const auth = {
     can: jest.fn((p: string) => (p === 'admin.gremien' && opts.admin === true) || p === 'gremium.view_all'),
     canInGremium: jest.fn((_id: string, p: string) => opts.plan === true && p === 'session.manage'),
+    gremiumPermissions: jest.fn(() => (opts.notify === true ? { 'g-1': ['members.notify'] } : {})),
   };
   const todos = {
     boards: jest.fn(() => of(opts.boards ?? [])),
@@ -244,6 +247,31 @@ describe('GremiumDetailComponent', () => {
     s.detail().onMenu({ id: 'meetings', label: '' }, abo);
     await s.settle();
     expect(s.router.url).toBe('/meetings?committee=g-1');
+  });
+
+  /** § 001850: "Mitglieder benachrichtigen" for `members.notify`, not for the admin. */
+  it('offers "Mitglieder benachrichtigen" to a holder of members.notify only', async () => {
+    const s = await start('/committees/g-1', { media: [MEDIA.wide], notify: true });
+    restore = s.restore;
+    const d = s.detail();
+    expect(d.canNotify()).toBe(true);
+    expect(d.menu()[0].items.map((i) => i.id)).toEqual(['notify', 'meetings', 'votes']);
+    const abo = { open: jest.fn() } as unknown as CalendarSubscribeComponent;
+    d.onMenu({ id: 'notify', label: '' }, abo);
+    await s.settle();
+    expect(d.notifyOpen()).toBe(true);
+    expect(s.harness.fixture.nativeElement.querySelector('app-gremium-notify-dialog')).toBeTruthy();
+
+    await s.router.navigateByUrl('/committees/g-2');
+    await s.settle();
+    expect(s.detail().canNotify()).toBe(false);
+  });
+
+  it('keeps "Mitglieder benachrichtigen" from an admin without the gremium role', async () => {
+    const s = await start('/committees/g-1', { media: [MEDIA.wide], admin: true });
+    restore = s.restore;
+    expect(s.detail().canNotify()).toBe(false);
+    expect(s.detail().menu()[0].items.map((i) => i.id)).not.toContain('notify');
   });
 
   it('moves the actions into the ⋮ menu on a phone', async () => {

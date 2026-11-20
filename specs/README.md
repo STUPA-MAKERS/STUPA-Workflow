@@ -273,6 +273,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/committees/001013](requirements/functional/collaboration/committees/001013_info-markdown.md) | The Info text is sanitized Markdown | approved |
 | [F/collaboration/committees/001014](requirements/functional/collaboration/committees/001014_info-save.md) | An Info save is versioned and audited | approved |
 | [F/collaboration/committees/001015](requirements/functional/collaboration/committees/001015_info-empty.md) | An empty Info tab shows only to its editors | approved |
+| [F/collaboration/committees/001850](requirements/functional/collaboration/committees/001850_notify-members.md) | A Gremium notifies its members | approved |
+| [F/collaboration/committees/001851](requirements/functional/collaboration/committees/001851_notify-permission.md) | Only members.notify sends a message to the members | approved |
+| [F/collaboration/committees/001852](requirements/functional/collaboration/committees/001852_notify-recipients.md) | The message goes to the members and the substitute pool | approved |
+| [F/collaboration/committees/001853](requirements/functional/collaboration/committees/001853_notify-template.md) | The members message is a mail template | approved |
+| [F/collaboration/committees/001854](requirements/functional/collaboration/committees/001854_notify-checks.md) | A members message is checked and audited | approved |
 | [F/collaboration/graph/001420](requirements/functional/collaboration/graph/001420_graph-page.md) | The page Graph shows the elements of a person and their relations | approved |
 | [F/collaboration/graph/001421](requirements/functional/collaboration/graph/001421_graph-permission.md) | The graph needs its own permission | approved |
 | [F/collaboration/graph/001422](requirements/functional/collaboration/graph/001422_graph-read-rules.md) | The graph shows only what the person reads | approved |
@@ -297,6 +302,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/links/001407](requirements/functional/collaboration/links/001407_one-linked-section.md) | Each element shows all its links in Verknüpft | approved |
 | [F/collaboration/links/001408](requirements/functional/collaboration/links/001408_one-picker.md) | Verknüpfen searches every kind | approved |
 | [F/collaboration/links/001409](requirements/functional/collaboration/links/001409_links-api.md) | The links have their own API | approved |
+| [F/collaboration/links/001410](requirements/functional/collaboration/links/001410_cost-centre-needs-budget-write.md) | A cost centre link needs a budget write right | approved |
 | [F/collaboration/notifications/000151](requirements/functional/collaboration/notifications/000151_task-mail-recipients.md) | Task mails go only to who can act | approved |
 | [F/collaboration/notifications/000152](requirements/functional/collaboration/notifications/000152_team-mails-opt-in.md) | Team mails about Anträge are off by default | approved |
 | [F/collaboration/notifications/000153](requirements/functional/collaboration/notifications/000153_sandboxed-templates.md) | Mail placeholders use camelCase | approved |
@@ -952,6 +958,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/001351](requirements/non-functional/usability/controls/001351_selected-group-button.md) | A selected button of a group is filled and fully round | approved |
 | [NF/usability/controls/001353](requirements/non-functional/usability/controls/001353_confirm-row-button-group.md) | The buttons of a dialog footer form a button group with a filled main action | approved |
 | [NF/usability/controls/001354](requirements/non-functional/usability/controls/001354_every-button-in-a-group.md) | Every button of the app stands in a button group | approved |
+| [NF/usability/controls/001355](requirements/non-functional/usability/controls/001355_selection-bar-grey-inset.md) | The selection bar in a list is a grey surface with an inset around its actions | approved |
 | [NF/usability/controls/001360](requirements/non-functional/usability/controls/001360_empty-list-face.md) | An empty list shows a face in a ring of dots | approved |
 | [NF/usability/controls/001361](requirements/non-functional/usability/controls/001361_empty-state-face-motion.md) | The face of an empty state moves until motion is reduced | approved |
 | [NF/usability/controls/001362](requirements/non-functional/usability/controls/001362_empty-state-face-very-high-contrast.md) | The face of an empty state is white in very high contrast | approved |
@@ -961,6 +968,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/001791](requirements/non-functional/usability/controls/001791_pick-dialog-empty-centred.md) | The empty state of a pick dialog is centred in the list area | approved |
 | [NF/usability/controls/001803](requirements/non-functional/usability/controls/001803_empty-state-face-room-above.md) | The empty-state face has room above and below | approved |
 | [NF/usability/controls/001870](requirements/non-functional/usability/controls/001870_open-in-link-filters.md) | A link to a list page opens the list filtered to its source | approved |
+| [NF/usability/controls/001892](requirements/non-functional/usability/controls/001892_one-filter-chip-size.md) | Every filter chip has the one chip look | approved |
 | [NF/usability/layout/000192](requirements/non-functional/usability/layout/000192_one-geometry.md) | All list and detail pages share one geometry | approved |
 | [NF/usability/layout/000193](requirements/non-functional/usability/layout/000193_scroll-edges.md) | A scroll area cuts at the edge of a surface | approved |
 | [NF/usability/layout/000194](requirements/non-functional/usability/layout/000194_phone-breakpoint.md) | The phone layout starts below 768 px | approved |

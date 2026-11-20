@@ -883,6 +883,7 @@ export const GREMIUM_PERMISSIONS = [
   'protocol.write',
   'protocol.finalize',
   'info.write',
+  'members.notify',
 ] as const;
 
 /**
