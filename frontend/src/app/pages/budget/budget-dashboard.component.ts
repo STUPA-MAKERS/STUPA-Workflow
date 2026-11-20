@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, type ParamMap, Router, RouterLink } from '@angular/router';
 import { NgTemplateOutlet } from '@angular/common';
@@ -16,6 +16,7 @@ import {
   ConfirmDialogComponent,
   CurrencyInputComponent,
   DialogComponent,
+  elementSize,
   EmptyStateComponent,
   FilterSelectComponent,
   IconComponent,
@@ -43,6 +44,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { exportDownload } from '@shared/download.util';
 import { SimplifyPathPipe } from '@shared/budget-path';
 import { BUDGET_PERMISSIONS } from '../../layout/nav.service';
+import { figureColumns, figureMinRem } from './figure-grid.util';
 import {
   BudgetTreeApi,
   type BudgetAllocationView,
@@ -533,6 +535,23 @@ export class BudgetDashboardComponent {
           tiles[5]!,
         ]
       : tiles;
+  });
+
+  /** The figure grid of the loaded sheet, for its width. */
+  private readonly figsEl = viewChild<ElementRef<HTMLElement>>('figs');
+  private readonly figsSize = elementSize(() => this.figsEl()?.nativeElement);
+
+  /** The narrowest column of the figure grid, in rem: the longest amount at least. */
+  private readonly figMinRem = computed(() => {
+    const currency = this.current()?.currency;
+    return figureMinRem(Math.max(...this.figureList().map((f) => this.money(f.value, currency).length)));
+  });
+  /** The narrowest column of the figure grid, as a CSS length. */
+  readonly figMin = computed(() => `${this.figMinRem().toFixed(2)}rem`);
+  /** The columns of the figure grid, spread evenly over its rows (see figureColumns). */
+  readonly figCols = computed(() => {
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    return figureColumns(this.figureList().length, this.figsSize().width, this.figMinRem() * rem);
   });
 
   /** The amount of a year is the Ansatz when the Haushalt has a Haushaltsplan, else the Zuteilung. */

@@ -37,7 +37,6 @@ import { TodoLinkedListComponent } from '../../../features/todos/linked-list/tod
 import { CostCentreLabelComponent } from '../../budget/cost-centre-label/cost-centre-label.component';
 import { BookingRowComponent } from '../../budget/booking-row/booking-row.component';
 import { SumRowComponent } from '../../budget/booking-row/sum-row.component';
-import { SheetActionComponent } from '../../budget/sheet-action/sheet-action.component';
 import { dayMonth } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
 
@@ -55,7 +54,6 @@ import { formatMoney } from '@shared/format-money';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     SectionComponent,
-    SheetActionComponent,
     SumRowComponent,
     BookingRowComponent,
     CostCentreLabelComponent,
