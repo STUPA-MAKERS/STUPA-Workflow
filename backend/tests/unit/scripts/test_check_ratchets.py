@@ -89,3 +89,22 @@ def test_repository_equals_its_baselines() -> None:
         for name in ratchets.NAMES
         for line in ratchets.compare(name, ratchets.measure(name), ratchets._read(name))
     ] == []
+
+
+def test_app_styles_are_counted(tmp_path: Path) -> None:
+    """§ui-kit:S/framework/architecture/002213: stylesheet lines and class or style hooks count."""
+    app = tmp_path / "frontend" / "src" / "app"
+    app.mkdir(parents=True)
+    (app / "a.component.scss").write_text(
+        "@use 'x';\n// note\n\n.a {\n  color: red;\n}\n", encoding="utf-8"
+    )
+    (app / "a.component.html").write_text(
+        '<div class="a" [class.b]="c" style="x"></div>', encoding="utf-8"
+    )
+    (app / "a.component.ts").write_text("styleUrl: './a.component.scss'", encoding="utf-8")
+    (app / "a.component.spec.ts").write_text('class="a"', encoding="utf-8")
+    assert ratchets.measure("app-styles", tmp_path) == {
+        "frontend/src/app/a.component.html": 3,
+        "frontend/src/app/a.component.scss": 3,
+        "frontend/src/app/a.component.ts": 1,
+    }
