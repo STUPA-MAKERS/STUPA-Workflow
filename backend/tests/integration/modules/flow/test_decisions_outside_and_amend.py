@@ -300,7 +300,7 @@ async def test_outside_needs_a_vote_state_with_the_branch(
 async def test_manual_approval_needs_the_amount_once(session: AsyncSession) -> None:
     """§ 001610: draft → approved asks for the amount, approved → approved2 does not."""
     world = await _seed(session)
-    app = await _app(session, world, "draft")
+    app_id = (await _app(session, world, "draft")).id
     flow = FlowService(session)
     principal = Principal(sub="m", roles=[], permissions={"application.transition"})
     to_approved = await session.scalar(
@@ -310,16 +310,16 @@ async def test_manual_approval_needs_the_amount_once(session: AsyncSession) -> N
         )
     )
     assert to_approved is not None
-    offered = {t.id: t for t in await flow.available_transitions(app.id, principal)}
+    offered = {t.id: t for t in await flow.available_transitions(app_id, principal)}
     assert offered[to_approved].requires_amount is True
     with pytest.raises(ValidationProblem) as err:
-        await flow.fire(app.id, to_approved, principal)
+        await flow.fire(app_id, to_approved, principal)
     assert err.value.code == "approved_amount_required"
     await session.rollback()
     await flow.fire(
-        app.id, to_approved, principal, decision=DecisionIn(approvedAmount=Decimal("100.00"))
+        app_id, to_approved, principal, decision=DecisionIn(approvedAmount=Decimal("100.00"))
     )
-    onward = await flow.available_transitions(app.id, principal)
+    onward = await flow.available_transitions(app_id, principal)
     assert [t.requires_amount for t in onward] == [False]
 
 
@@ -327,14 +327,15 @@ async def test_forced_approval_needs_the_amount(session: AsyncSession) -> None:
     """§ 001653: a forced move into an approved state names the approved amount."""
     world = await _seed(session)
     app = await _app(session, world, "draft")
+    app_id = app.id
     flow = FlowService(session)
     approved = world.states["approved"].id
     with pytest.raises(ValidationProblem) as err:
-        await flow.force_status(app.id, approved, _clerk(), reason="outside_decision")
+        await flow.force_status(app_id, approved, _clerk(), reason="outside_decision")
     assert err.value.code == "approved_amount_required"
     await session.rollback()
     await flow.force_status(
-        app.id,
+        app_id,
         approved,
         _clerk(),
         reason="outside_decision",
@@ -343,7 +344,7 @@ async def test_forced_approval_needs_the_amount(session: AsyncSession) -> None:
     await session.refresh(app)
     assert app.approved_amount == Decimal("80.00")
     row = await session.scalar(
-        select(ApplicationDecision).where(ApplicationDecision.application_id == app.id)
+        select(ApplicationDecision).where(ApplicationDecision.application_id == app_id)
     )
     assert row is not None
     assert row.status_event_id is not None
