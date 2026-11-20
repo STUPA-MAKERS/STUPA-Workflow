@@ -267,6 +267,23 @@
     width: 56px;
     margin: 0;
   }
+  // A TOP at rest is one box over the full width: the split and the box of the menu show only
+  // with the ⋮ (001443). At rest the item keeps the room of the menu as padding, so its text
+  // does not move when the box splits.
+  :host-context(.mp__agenda) .ap__row:not(:hover):not(:focus-within):not(:has([aria-expanded='true'])) ::ng-deep .li {
+    margin-inline-end: 0;
+    padding-inline-end: calc(var(--space-3) + 56px + 3px);
+  }
+  :host-context(.mp__agenda) .ap__row:last-child:not(:hover):not(:focus-within):not(:has([aria-expanded='true'])) ::ng-deep .li {
+    border-end-end-radius: var(--radius-2xl);
+  }
+  :host-context(.mp__agenda) .ap__row:not(:hover):not(:focus-within):not(:has([aria-expanded='true'])) .ap__menu {
+    inset-inline-end: 0;
+    background: transparent;
+  }
+  :host-context([data-very-high-contrast='on'] .mp__agenda) .ap__row:not(:hover):not(:focus-within):not(:has([aria-expanded='true'])) .ap__menu {
+    border-color: transparent !important;
+  }
 }
 :host-context(.mp__agenda) .ap__row:last-child .ap__menu {
   border-end-end-radius: var(--radius-2xl);
