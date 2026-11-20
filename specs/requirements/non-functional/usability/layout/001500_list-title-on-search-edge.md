@@ -7,8 +7,8 @@ owner: frederikbeimgraben
 updated: 2026-11-20
 tests:
   - "frontend/vendor/ui-kit/src/styles/styles.spec.ts:WideListHead"
-  - "frontend/src/app/pages/budget/budget-dashboard.component.spec.ts:puts the filters of the tree in the filter bar of the column"
-  - "frontend/src/app/pages/todos/todos.component.spec.ts:gives the board a pane header over its filter bar"
+  - "frontend/src/app/pages/budget/budget-dashboard.component.spec.ts:BudgetDashboardComponent"
+  - "frontend/src/app/pages/todos/todos.component.spec.ts:TodosComponent"
 implementation:
   - frontend/vendor/ui-kit/src/styles/list-detail.scss
   - frontend/vendor/ui-kit/src/lib/page-header/page-header.component.ts
