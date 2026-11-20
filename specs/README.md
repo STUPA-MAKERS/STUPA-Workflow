@@ -184,7 +184,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/applications/001663](requirements/functional/applications/applications/001663_change-type-timeline.md) | The timeline and the audit show the old and the new Antragsart | approved |
 | [F/applications/applications/001690](requirements/functional/applications/applications/001690_member-comment-internal.md) | A member comment is internal by default | approved |
 | [F/applications/applications/001691](requirements/functional/applications/applications/001691_comment-visibility-labels.md) | The visibility switch names who reads the comment | approved |
-| [F/applications/applications/001692](requirements/functional/applications/applications/001692_comment-visibility-visible.md) | The chosen visibility shows before sending | approved |
+| [F/applications/applications/001692](requirements/functional/applications/applications/001692_comment-visibility-visible.md) | The chosen visibility shows before sending | draft |
 | [F/applications/applications/001700](requirements/functional/applications/applications/001700_list-multi-select.md) | The Antrag list has a multiple selection | approved |
 | [F/applications/applications/001701](requirements/functional/applications/applications/001701_bulk-transition.md) | A bulk transition offers only transitions allowed for every selected Antrag | approved |
 | [F/applications/applications/001702](requirements/functional/applications/applications/001702_bulk-message.md) | A bulk message adds one public comment to each Antrag | approved |

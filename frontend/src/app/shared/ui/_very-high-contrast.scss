@@ -53,6 +53,13 @@
     border: var(--vh-edge);
     box-shadow: none !important;
   }
+  // A public draft of the guarded switch (001692): the yellow field gets a white ring outside
+  // its edge, because the black ring that every field draws inside its edge looks the same
+  // for both choices.
+  app-chat .chat__box.chat__box--public {
+    outline: 2px solid var(--vh-fg) !important;
+    outline-offset: 3px !important;
+  }
 
   // The work list of the start page scrolls inside its panel, and the column header sticks
   // to the top of the panel. The edge of the table scrolls away with the rows, so the panel
