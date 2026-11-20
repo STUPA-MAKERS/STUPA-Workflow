@@ -79,8 +79,6 @@ describe('BulkDialogComponent (001700-001704)', () => {
     const { cmp, view } = await setup('transition', {
       bulkTransitions: jest.fn(() => of([APPROVE, half])),
     });
-    expect(screen.getByText('1 von 2')).toBeTruthy();
-    expect(screen.queryByText('2 von 2')).toBeNull();
     expect(cmp.skipped()).toEqual([]);
     cmp.pick.set('s-back');
     view.fixture.detectChanges();

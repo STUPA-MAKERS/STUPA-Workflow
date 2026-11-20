@@ -23,6 +23,7 @@ import {
   EmptyStateComponent,
   IconComponent,
   ScrollFadeDirective,
+  SectionComponent,
   SkeletonComponent,
 } from '@stupa-makers/ui-kit';
 
@@ -50,8 +51,7 @@ export const BULK_MAX = 100;
  * A bulk action on the selected Anträge of the list.
  *
  * `transition` is "Status setzen" (001701, 001704): it loads every target status that at
- * least one selected Antrag reaches, says for each how many of the selection reach it, and
- * names the Anträge that the chosen status skips. It lists the requested amounts of an
+ * least one selected Antrag reaches, and names the Anträge that the chosen status skips. It lists the requested amounts of an
  * approving target before the confirm. `message` (001702) sends
  * one public comment to each Antrag. Both end in the result list of 001703: the server runs
  * each Antrag on its own, so one error does not stop the others. `done` fires after the
@@ -69,6 +69,7 @@ export const BULK_MAX = 100;
     EmptyStateComponent,
     IconComponent,
     ScrollFadeDirective,
+    SectionComponent,
     SkeletonComponent,
   ],
   templateUrl: './bulk-dialog.component.html',
@@ -102,8 +103,6 @@ export class BulkDialogComponent {
   readonly subtitle = computed(() =>
     this.i18n.translate('applications.bulk.count', { count: String(this.snapshot().length) }),
   );
-  /** The size of the selection, for "3 von 5" at a status that not every Antrag reaches. */
-  readonly total = computed(() => this.snapshot().length);
   readonly chosen = computed(() => this.options().find((o) => o.toStateId === this.pick()) ?? null);
   /** The requested amounts that an approving target approves, by Antrag (001701). */
   readonly amounts = computed(() =>

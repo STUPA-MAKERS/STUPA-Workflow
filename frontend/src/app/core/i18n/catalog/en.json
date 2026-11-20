@@ -4890,7 +4890,6 @@
   "invoices.bulk.deleteMaxBlocked": "Bulk delete takes at most {max} invoices — shorten the selection.",
   "invoices.bulk.deleteAllBlocked": "Bulk delete is locked for “select all” — pick rows individually.",
   "invoices.bulk.failed": "Bulk action failed.",
-  "applications.bulk.reach": "{count} of {total}",
-  "applications.bulk.skippedHead": "Skipped, because the status is not allowed there",
+  "applications.bulk.skippedHead": "Skipped",
   "applications.bulk.skipped": "Skipped: status not allowed"
 }

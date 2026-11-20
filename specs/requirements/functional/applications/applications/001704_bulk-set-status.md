@@ -23,9 +23,10 @@ The bulk action of the selection bar of the Anträge is `Status setzen` (`Set st
 icon of `Status setzen` of one Antrag. It replaces `Übergang auslösen`.
 
 The dialog must offer every target status that at least one selected Antrag reaches by a manual
-transition that the person may fire. The label is the name of the target status. A status that
-not every selected Antrag reaches shows how many reach it (`3 von 5`). When the person picks such
-a status, the dialog must name the Anträge that it skips.
+transition that the person may fire. The label is the name of the target status, and the
+statuses are rows of the select sheet (001380). When the person picks a status that not every
+selected Antrag reaches, the dialog must name the Anträge that it skips. It shows no count per
+status.
 
 The workflow rules stay: the server sets the status only through the transition of each Antrag,
 and it checks the read right, the transition and its guard of each Antrag again. An Antrag

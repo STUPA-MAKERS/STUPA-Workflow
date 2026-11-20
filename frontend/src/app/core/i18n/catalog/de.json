@@ -4890,7 +4890,6 @@
   "invoices.bulk.deleteMaxBlocked": "Sammel-Löschen gilt für höchstens {max} Rechnungen — Auswahl verkleinern.",
   "invoices.bulk.deleteAllBlocked": "Sammel-Löschen ist bei „Alle auswählen“ gesperrt — Zeilen gezielt auswählen.",
   "invoices.bulk.failed": "Sammelaktion fehlgeschlagen.",
-  "applications.bulk.reach": "{count} von {total}",
-  "applications.bulk.skippedHead": "Übersprungen, weil der Status dort nicht erlaubt ist",
+  "applications.bulk.skippedHead": "Übersprungen",
   "applications.bulk.skipped": "Übersprungen: Status nicht erlaubt"
 }

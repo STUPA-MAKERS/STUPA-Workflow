@@ -1,5 +1,6 @@
 @use '../../../shared/ui/dialog-form' as df;
 @use 'field' as f;
+@use 'option-menu' as om;
 
 @include df.host;
 
@@ -7,12 +8,6 @@
   @include df.form;
 }
 
-.bkd__group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
 .bkd__lead {
   margin: 0;
 }
@@ -28,8 +23,7 @@
   border-radius: var(--radius-lg);
   list-style: none;
 }
-.bkd__row,
-.bkd__pick {
+.bkd__row {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -38,34 +32,40 @@
   border-radius: 4px;
   background: var(--color-surface-3);
 }
-.bkd__pick {
-  cursor: pointer;
-}
-.bkd__row:first-child,
-.bkd__pick:first-child {
+.bkd__row:first-child {
   border-top-left-radius: var(--radius-lg);
   border-top-right-radius: var(--radius-lg);
 }
-.bkd__row:last-child,
-.bkd__pick:last-child {
+.bkd__row:last-child {
   border-bottom-left-radius: var(--radius-lg);
   border-bottom-right-radius: var(--radius-lg);
 }
+/* The target status as rows of the select sheet (specs 001380, 001704): tiles of a row
+   group on surface 3, the chosen row with the check mark at its end. */
+.bkd__pick {
+  @include om.option;
+  @include om.option-sheet;
+}
+@media (hover: hover) {
+  .bkd__pick:hover {
+    @include om.option-hover;
+  }
+}
+.bkd__pick:focus-visible {
+  @include om.option-focus;
+}
 .bkd__pick--on {
-  background: var(--color-selected);
-  color: var(--color-on-selected);
   @include f.highlight-chosen;
 }
-.bkd__radio {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  accent-color: var(--color-accent);
+.bkd__pick--on .bkd__name {
+  font-weight: var(--fw-semibold);
 }
-.bkd__radio:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
+.bkd__name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.bkd__check {
+  @include om.check;
 }
 .bkd__title {
   flex: 1 1 auto;
@@ -82,13 +82,6 @@
   color: var(--color-text-muted);
   font-size: 0.8125rem;
   text-align: end;
-}
-// "3 von 5": a status that not every selected Antrag reaches (001704).
-.bkd__reach {
-  flex: none;
-  font-size: 0.8125rem;
-  font-variant-numeric: tabular-nums;
-  opacity: 0.8;
 }
 .bkd__row--error .bkd__state {
   color: var(--color-danger);
