@@ -345,7 +345,11 @@
     color: var(--color-text);
     box-shadow: inset 0 0 0 2px var(--color-text);
   }
+  // The filled buttons stay inside the edge of the field.
   .gr__depth {
+    height: auto;
+    padding-block: 2px;
+    padding-inline-end: 2px;
     border-color: var(--color-text);
     color: var(--color-text);
   }
