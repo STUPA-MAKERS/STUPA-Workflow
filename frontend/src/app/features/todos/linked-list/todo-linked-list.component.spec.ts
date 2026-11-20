@@ -284,11 +284,11 @@ describe('TodoLinkedListComponent actions (specs 000547, 001404, 001408)', () =>
   it('reads no boards without actions, and shows the empty state it is given', async () => {
     const api = { links: jest.fn(() => of(linksOf())), boards: jest.fn(() => of([])) };
     await render(TodoLinkedListComponent, {
-      inputs: { kind: 'meeting', targetId: 'm-1', emptyHeading: 'Keine To-Dos zu dieser Sitzung' },
+      inputs: { kind: 'meeting', targetId: 'm-1', emptyHeading: 'Nichts mit dieser Sitzung verknüpft' },
       providers: [provideRouter([]), { provide: TodosApiService, useValue: api }],
     });
     expect(api.boards).not.toHaveBeenCalled();
-    expect(screen.getByText('Keine To-Dos zu dieser Sitzung')).toBeInTheDocument();
+    expect(screen.getByText('Nichts mit dieser Sitzung verknüpft')).toBeInTheDocument();
   });
 
   it('reads the list again after a new card', async () => {

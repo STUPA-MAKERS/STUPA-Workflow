@@ -247,8 +247,8 @@
       <button
         type="button"
         class="mp__edgeTab mp__edgeTab--links"
-        [attr.aria-label]="'todos.linked.title' | t"
-        [title]="'todos.linked.title' | t"
+        [attr.aria-label]="'todos.linked.top' | t"
+        [title]="'todos.linked.top' | t"
         (click)="linksOpen.set(true)"
       >
         <app-icon name="left" [size]="16" />
@@ -288,7 +288,7 @@
 
 <!-- The linked rows of the open item: the Antrag or the Haushaltsplan first, then the links
      (spec 001800). -->
-<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'todos.linked.title' | t" [(open)]="linksOpen">
+<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'todos.linked.top' | t" [(open)]="linksOpen">
   <!-- One projected group, so the buttons join the head group of the close button. -->
   @if (topLinks()?.canAct() || topLinks()?.canLink()) {
     <ng-container ngProjectAs="[sheet-actions]">

@@ -277,7 +277,7 @@ describe('MeetingPageComponent', () => {
     it('opens the cards that link the meeting in a sheet from the menu (spec 000551)', async () => {
       const { http, fixture } = await setup({}, [MEDIA.wide]);
       const menu = await openMenu();
-      await userEvent.click(within(menu).getByRole('menuitem', { name: 'To-Dos' }));
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'Verknüpft' }));
       fixture.detectChanges();
       const linked = http.expectOne((r) => r.url.endsWith('/api/links') && r.params.get('kind') === 'meeting');
       linked.flush(linksOf([
@@ -296,7 +296,7 @@ describe('MeetingPageComponent', () => {
       ]));
       http.expectOne((r) => r.url.endsWith('/api/todos/boards')).flush([{ id: 'b-1', name: 'StuPa', kind: 'gremium', gremiumId: 'g-1', canWrite: true }]);
       fixture.detectChanges();
-      const sheet = await screen.findByRole('dialog', { name: 'To-Dos' });
+      const sheet = await screen.findByRole('dialog', { name: 'Verknüpft' });
       expect(within(sheet).getByRole('link', { name: 'Raum für die Sitzung buchen' })).toHaveAttribute('href', '/todos?card=k-1');
       expect(within(sheet).getByRole('button', { name: 'Verknüpfen' })).toBeInTheDocument();
       expect(within(sheet).getByRole('button', { name: 'To-Do anlegen' })).toBeInTheDocument();
@@ -1056,14 +1056,14 @@ describe('MeetingPageComponent', () => {
       const host = fixture.nativeElement as HTMLElement;
       expect(host.querySelector('.mp__main app-todo-linked-list')).toBeNull();
       http.expectNone((r) => r.url.endsWith('/api/links') && r.params.get('kind') === 'agenda_item');
-      const tab = screen.getByRole('button', { name: 'Verknüpft' });
+      const tab = screen.getByRole('button', { name: 'Verknüpft mit TOP' });
       expect(tab).toHaveClass('mp__edgeTab--links');
       await userEvent.click(tab);
       fixture.detectChanges();
       http.expectOne((r) => r.url.endsWith('/api/links') && r.params.get('kind') === 'agenda_item').flush(linksOf([], [], true));
       http.match((r) => r.url.endsWith('/api/todos/boards')).forEach((req) => req.flush([{ id: 'b-1', name: 'StuPa', kind: 'gremium', gremiumId: 'g-1', canWrite: true }]));
       fixture.detectChanges();
-      const sheet = await screen.findByRole('dialog', { name: 'Verknüpft' });
+      const sheet = await screen.findByRole('dialog', { name: 'Verknüpft mit TOP' });
       expect(sheet).toHaveClass('ss--end');
       expect(within(sheet).getByText('Nichts verknüpft')).toBeInTheDocument();
       expect(within(sheet).getByRole('button', { name: 'Verknüpfen' })).toBeInTheDocument();
@@ -1090,13 +1090,13 @@ describe('MeetingPageComponent', () => {
 
     it('opens the linked rows from the phone menu, and offers no entry without an item', async () => {
       const { fixture } = await setup({}, [MEDIA.phone]);
-      expect(screen.queryByRole('button', { name: 'Verknüpft' })).toBeNull();
-      await userEvent.click(within(await openMenu()).getByRole('menuitem', { name: 'Verknüpft' }));
-      expect(await screen.findByRole('dialog', { name: 'Verknüpft' })).toHaveClass('ss--bottom');
+      expect(screen.queryByRole('button', { name: 'Verknüpft mit TOP' })).toBeNull();
+      await userEvent.click(within(await openMenu()).getByRole('menuitem', { name: 'Verknüpft mit TOP' }));
+      expect(await screen.findByRole('dialog', { name: 'Verknüpft mit TOP' })).toHaveClass('ss--bottom');
       await userEvent.keyboard('{Escape}');
       fixture.componentRef.setInput('top', null);
       fixture.detectChanges();
-      expect(within(await openMenu()).queryByRole('menuitem', { name: 'Verknüpft' })).toBeNull();
+      expect(within(await openMenu()).queryByRole('menuitem', { name: 'Verknüpft mit TOP' })).toBeNull();
     });
 
     it('opens the votes from the phone menu for a person who does not keep the minutes', async () => {

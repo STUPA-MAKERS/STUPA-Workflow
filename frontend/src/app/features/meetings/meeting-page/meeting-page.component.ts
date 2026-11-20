@@ -450,9 +450,9 @@ export class MeetingPageComponent {
       ...when(!this.wide(), { id: 'agenda', label: t('meetings.agenda.title'), icon: 'list' }),
       // The cards that link the meeting: a sheet, because a long agenda would push them out
       // of sight (spec 000551).
-      { id: 'todos', label: t('todos.meeting.sheet'), icon: 'kanban' },
+      { id: 'todos', label: t('todos.meeting.sheet'), icon: 'link' },
       // The linked rows of the open item; above the phone width the edge tab opens them (spec 001800).
-      ...when(this.phone() && !!this.top(), { id: 'links', label: t('todos.linked.title'), icon: 'link' }),
+      ...when(this.phone() && !!this.top(), { id: 'links', label: t('todos.linked.top'), icon: 'link' }),
       ...when(m.canManage, { id: 'settings', label: t('meetings.settings.title'), icon: 'edit' }),
       ...when(!this.phone() || noDock, {
         id: 'attendance',
