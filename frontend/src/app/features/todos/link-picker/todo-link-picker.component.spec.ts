@@ -211,6 +211,35 @@ describe('TodoLinkPickerComponent', () => {
    * A second closing in the fade starts no second fade. An opening in the fade stops it. A fade
    * that ends after an opening in it leaves the panel.
    */
+  it('drops the layer at once under reduced motion, without asking for animations', async () => {
+    document.documentElement.setAttribute('data-display-motion', 'reduce');
+    try {
+      const { open, fixture } = await setup();
+      await open();
+      const anims = jest.fn(() => [{ finished: new Promise<void>(() => undefined) } as unknown as Animation]);
+      Object.defineProperty(screen.getByRole('dialog'), 'getAnimations', { value: anims, configurable: true });
+      fixture.componentInstance.open.set(false);
+      fixture.detectChanges();
+      expect(anims).not.toHaveBeenCalled();
+      expect(document.querySelector('.lp-layer')).toBeNull();
+    } finally {
+      document.documentElement.removeAttribute('data-display-motion');
+    }
+  });
+
+  it('closes without moving the focus when the element it came from is gone', async () => {
+    const { open, fixture } = await setup();
+    const before = document.createElement('button');
+    document.body.appendChild(before);
+    before.focus();
+    await open();
+    before.remove();
+    fixture.componentInstance.open.set(false);
+    fixture.detectChanges();
+    expect(document.activeElement).not.toBe(before);
+    expect(document.querySelector('.lp-layer')).toBeNull();
+  });
+
   it('fades the panel out before the layer goes, and keeps it on an opening in the fade', async () => {
     let finish: () => void = () => undefined;
     const fading = () => [{ finished: new Promise<void>((r) => (finish = r)) } as unknown as Animation];
