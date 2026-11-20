@@ -188,14 +188,19 @@ export class ActivityComponent {
     return KIND_ICON[e.itemKind];
   }
 
+  /** The row link of each entry, split once, so a link keeps its query object. */
+  private readonly links = computed(
+    () => new Map(this.entries().map((e) => [e.id, splitUrl(e.url)] as const)),
+  );
+
   /** The path of the entry's URL, for the row link. */
   path(e: ActivityEntry): string {
-    return splitUrl(e.url).path;
+    return (this.links().get(e.id) ?? splitUrl(e.url)).path;
   }
 
   /** The query of the entry's URL (`/todos?card=<id>`), for the row link. */
-  query(e: ActivityEntry): Params | null {
-    return splitUrl(e.url).query;
+  query(e: ActivityEntry): Readonly<Params> | null {
+    return (this.links().get(e.id) ?? splitUrl(e.url)).query;
   }
 
   title(e: ActivityEntry): string {
@@ -313,21 +318,13 @@ function writeOwn(own: boolean): void {
   }
 }
 
-/** The split URLs, so a row link keeps the same query object between change detections. */
-const SPLIT = new Map<string, { path: string; query: Params | null }>();
-
 /**
  * Split an app URL into its path and its query params. A router link takes a path only and
  * encodes a `?` in it, so `/todos?card=<id>` as one string opens the 404 page.
  */
-export function splitUrl(url: string): { path: string; query: Params | null } {
-  const held = SPLIT.get(url);
-  if (held) return held;
+export function splitUrl(url: string): { readonly path: string; readonly query: Readonly<Params> | null } {
   const at = url.indexOf('?');
-  const query: Params = {};
-  if (at >= 0) new URLSearchParams(url.slice(at + 1)).forEach((value, key) => (query[key] = value));
-  const split = at < 0 ? { path: url, query: null } : { path: url.slice(0, at), query };
-  SPLIT.set(url, split);
-  return split;
+  return at < 0
+    ? { path: url, query: null }
+    : { path: url.slice(0, at), query: Object.fromEntries(new URLSearchParams(url.slice(at + 1))) };
 }
-
