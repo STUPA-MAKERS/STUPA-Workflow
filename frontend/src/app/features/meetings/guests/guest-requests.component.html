@@ -26,11 +26,11 @@
                   <app-icon name="x" />
                 </app-button>
               } @else {
-                <app-button size="sm" variant="text" class="g__reject" [ariaLabel]="'guests.request.rejectName' | t: { name: row.name }" [disabled]="!!guests.busy()" (click)="guests.reject(row.g)">
+                <app-button variant="text" class="g__reject" [ariaLabel]="'guests.request.rejectName' | t: { name: row.name }" [disabled]="!!guests.busy()" (click)="guests.reject(row.g)">
                   {{ 'guests.request.reject' | t }}
                 </app-button>
               }
-              <app-button size="sm" variant="fill" [ariaLabel]="'guests.request.admitName' | t: { name: row.name }" [loading]="guests.busy() === row.g.id" [disabled]="!!guests.busy()" (click)="guests.admit(row.g)">
+              <app-button variant="fill" [ariaLabel]="'guests.request.admitName' | t: { name: row.name }" [loading]="guests.busy() === row.g.id" [disabled]="!!guests.busy()" (click)="guests.admit(row.g)">
                 <app-icon name="check" />
                 {{ 'guests.request.admit' | t }}
               </app-button>

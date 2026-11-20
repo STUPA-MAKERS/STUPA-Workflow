@@ -146,7 +146,7 @@
               ></textarea>
               <div class="bv__quickFoot">
                 <app-button-group [main]="true">
-                  <app-button variant="fill" size="sm" [disabled]="!draft().trim()" (click)="submitAdd(col)">
+                  <app-button variant="fill" [disabled]="!draft().trim()" (click)="submitAdd(col)">
                     {{ 'todos.board.create' | t }}
                   </app-button>
                 </app-button-group>

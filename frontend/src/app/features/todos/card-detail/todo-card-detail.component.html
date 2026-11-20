@@ -752,7 +752,7 @@
           (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); cancelRename(item)"
         />
         <app-button-group [main]="true">
-          <app-button variant="fill" size="sm" (click)="renameItem(item)">{{ 'action.save' | t }}</app-button>
+          <app-button variant="fill" (click)="renameItem(item)">{{ 'action.save' | t }}</app-button>
         </app-button-group>
       </form>
     } @else {

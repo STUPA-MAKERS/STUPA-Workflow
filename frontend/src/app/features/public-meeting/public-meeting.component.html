@@ -116,7 +116,7 @@
             <app-note kind="error" icon="alert" role="alert">{{ e | t }}</app-note>
           }
           <app-button-group [main]="true">
-            <app-button variant="fill" size="lg" [block]="true" [loading]="guest.joining()" [disabled]="!nameValid()" (click)="join()">
+            <app-button variant="fill" [block]="true" [loading]="guest.joining()" [disabled]="!nameValid()" (click)="join()">
               <app-icon name="arrow" />
               {{ 'guests.join.submit' | t }}
             </app-button>
