@@ -2,7 +2,7 @@
 @use 'frosted' as *;
 
 // The bar sticks to the top of the window. It is solid (`bar`, spec 002010): the page colour
-// at rest, the bar colour while content runs under it, as the bar of a detail.
+// at rest and while content runs under it, as the bar of a detail.
 :host {
   position: sticky;
   top: 0;

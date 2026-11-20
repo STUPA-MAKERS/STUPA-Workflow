@@ -254,8 +254,8 @@
 @include bp.phone {
   // The protocol is the page there, not a card on it: no surface, no clip, and the format
   // bar sticks below the bar of the page (`--ld-bar-height`) while the text scrolls. It is
-  // solid like that bar (`bar`, spec 002010), and takes the bar colour with it once the
-  // page has scrolled, so the two read as one head.
+  // solid in the colour of that bar (`bar`, spec 002010), at rest and once the page has
+  // scrolled, so the two read as one head.
   .ts {
     border-radius: 0;
     background: transparent;

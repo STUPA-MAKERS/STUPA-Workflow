@@ -109,7 +109,7 @@ export class TodoBoardViewComponent {
 
   /**
    * A phone column page has scrolled, so cards run under the head and the tab line: the tab
-   * line then takes the bar colour (spec 002010). Scroll events do not bubble, so the host
+   * line then has the edge of very high contrast at its foot (spec 002010). Scroll events do not bubble, so the host
    * listens in the capture phase. A page of the pager is the scroller with the role tabpanel.
    */
   protected readonly pageScrolled = signal(false);
