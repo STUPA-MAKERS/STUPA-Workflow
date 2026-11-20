@@ -23,7 +23,7 @@
     }
     <div class="bp__end">
       <app-button-group [main]="true">
-        <app-button variant="fill" size="sm" [disabled]="!canReassign() || busy()" [loading]="busy()" (click)="reassign.emit()">
+        <app-button variant="fill" [disabled]="!canReassign() || busy()" [loading]="busy()" (click)="reassign.emit()">
           <span class="ff__btn"><app-icon name="repeat" />{{ 'expenses.bulk.reassignConfirm' | t }}</span>
         </app-button>
       </app-button-group>
@@ -85,7 +85,7 @@
             <div class="bp__action">
               <span>{{ 'expenses.bulk.exportLine' | t: { count: rows().length } }}</span>
               <app-button-group [main]="true">
-                <app-button variant="fill" size="sm" [disabled]="busy()" (click)="exported.emit()">
+                <app-button variant="fill" [disabled]="busy()" (click)="exported.emit()">
                   <span class="ff__btn"><app-icon name="download" />{{ 'expenses.bulk.exportConfirm' | t }}</span>
                 </app-button>
               </app-button-group>

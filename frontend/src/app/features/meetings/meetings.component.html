@@ -117,16 +117,16 @@
               <div class="mtg__voteActions">
                 <app-button-group [main]="true">
                   @if (vote.applicationId) {
-                    <app-button variant="text" size="sm" [disabled]="vote.applicationId === m.activeApplicationId" (click)="setActive(vote.applicationId)">{{ 'meetings.vote.setActive' | t }}</app-button>
+                    <app-button variant="text" [disabled]="vote.applicationId === m.activeApplicationId" (click)="setActive(vote.applicationId)">{{ 'meetings.vote.setActive' | t }}</app-button>
                   }
                   @if (vote.status !== 'open') {
                     @if (m.isProtokollant) {
-                      <app-button variant="fill" size="sm" [disabled]="vote.status === 'closed'" (click)="openVote(vote.id)">{{ 'meetings.vote.open' | t }}</app-button>
+                      <app-button variant="fill" [disabled]="vote.status === 'closed'" (click)="openVote(vote.id)">{{ 'meetings.vote.open' | t }}</app-button>
                     }
                   } @else {
                     @if (m.isProtokollant) {
-                      <app-button variant="danger" size="sm" (click)="closeVote(vote.id)">{{ 'meetings.vote.close' | t }}</app-button>
-                      <app-button variant="danger" size="sm" (click)="cancelVote(vote.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
+                      <app-button variant="danger" (click)="closeVote(vote.id)">{{ 'meetings.vote.close' | t }}</app-button>
+                      <app-button variant="danger" (click)="cancelVote(vote.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
                     }
                   }
                 </app-button-group>

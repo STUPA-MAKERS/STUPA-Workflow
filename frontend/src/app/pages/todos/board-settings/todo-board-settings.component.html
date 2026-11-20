@@ -46,7 +46,7 @@
                   (keydown.escape)="renaming.set(null)"
                 />
                 <app-button-group [main]="true">
-                  <app-button variant="fill" size="sm" (click)="saveRename(col)">{{ 'action.save' | t }}</app-button>
+                  <app-button variant="fill" (click)="saveRename(col)">{{ 'action.save' | t }}</app-button>
                 </app-button-group>
               </form>
             } @else {
@@ -78,8 +78,8 @@
             (keydown.escape)="newColumn.set(null)"
           />
           <app-button-group [main]="true">
-            <app-button variant="text" size="sm" (click)="newColumn.set(null)">{{ 'action.cancel' | t }}</app-button>
-            <app-button variant="fill" size="sm" [disabled]="!newColumn()?.trim()" (click)="addColumn()">
+            <app-button variant="text" (click)="newColumn.set(null)">{{ 'action.cancel' | t }}</app-button>
+            <app-button variant="fill" [disabled]="!newColumn()?.trim()" (click)="addColumn()">
               {{ 'todos.settings.add' | t }}
             </app-button>
           </app-button-group>
@@ -96,9 +96,9 @@
             (ngModelChange)="moveTo.set($event)"
           />
           <div class="bs__confirmFoot">
-            <app-button-group>
-              <app-button variant="text" size="sm" (click)="deleting.set(null)">{{ 'action.cancel' | t }}</app-button>
-              <app-button variant="danger" size="sm" [disabled]="!moveTo()" (click)="confirmDelete()">
+            <app-button-group [main]="true">
+              <app-button variant="text" (click)="deleting.set(null)">{{ 'action.cancel' | t }}</app-button>
+              <app-button variant="danger" [disabled]="!moveTo()" (click)="confirmDelete()">
                 {{ 'todos.settings.deleteColumn' | t }}
               </app-button>
             </app-button-group>
@@ -161,10 +161,10 @@
           <div class="bs__confirmFoot">
             <app-button-group [main]="true">
               @if (labelEdit()) {
-                <app-button variant="danger" size="sm" (click)="deleteLabel()">{{ 'todos.settings.deleteLabel' | t }}</app-button>
+                <app-button variant="danger" (click)="deleteLabel()">{{ 'todos.settings.deleteLabel' | t }}</app-button>
               }
-              <app-button variant="text" size="sm" (click)="labelEdit.set(null)">{{ 'action.cancel' | t }}</app-button>
-              <app-button variant="fill" size="sm" [disabled]="!labelName().trim()" (click)="saveLabel()">
+              <app-button variant="text" (click)="labelEdit.set(null)">{{ 'action.cancel' | t }}</app-button>
+              <app-button variant="fill" [disabled]="!labelName().trim()" (click)="saveLabel()">
                 {{ 'action.save' | t }}
               </app-button>
             </app-button-group>

@@ -106,8 +106,8 @@
                     </div>
                     <ng-container *ngTemplateOutlet="msgFiles; context: { $implicit: m }" />
                     <app-button-group class="chat__editActions" [main]="true">
-                      <app-button variant="text" size="sm" (click)="cancelEdit()">{{ 'action.cancel' | t }}</app-button>
-                      <app-button type="submit" variant="fill" size="sm" [disabled]="!editDraft().trim()">{{
+                      <app-button variant="text" (click)="cancelEdit()">{{ 'action.cancel' | t }}</app-button>
+                      <app-button type="submit" variant="fill" [disabled]="!editDraft().trim()">{{
                         'chat.save' | t
                       }}</app-button>
                     </app-button-group>
