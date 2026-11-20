@@ -162,14 +162,7 @@ type DetailTab = 'app' | 'history' | 'files';
 
 /** The comment switch: who reads each choice, and the short text next to the send button. */
 const COMMENT_VISIBILITY_GUARD: ChatVisibilityGuard = {
-  labels: {
-    internal: 'applications.comments.vis.internal',
-    public: 'applications.comments.vis.public',
-  },
-  hints: {
-    internal: 'applications.comments.hint.internal',
-    public: 'applications.comments.hint.public',
-  },
+  labels: { internal: 'applications.comments.vis.internal', public: 'applications.comments.vis.public' },
 };
 
 /** A link to the comments: `#comments`, or `#comment-<id>` for one comment. */

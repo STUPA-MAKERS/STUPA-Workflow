@@ -57,7 +57,7 @@
             @if (p.markdown) {
               <app-markdown-view [src]="p.markdown" [imageSrc]="imageSrc()" [documentSrc]="documentSrc()" [attr.lang]="textLang()" />
             } @else {
-              <app-empty-state shape="text" rows="3" [heading]="'publicProtocols.detail.noText' | t" />
+              <app-empty-state icon="file" shape="text" rows="3" [heading]="'publicProtocols.detail.noText' | t" />
             }
           </div>
         } @else {

@@ -421,8 +421,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     const { http, type, detectChanges } = await loaded();
     const group = screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
     expect(within(group).getByRole('radio', { name: 'Intern (nur Gremien)' })).toBeChecked();
-    expect(screen.getByTestId('chat-vis-hint')).toHaveTextContent('Intern');
-    expect(document.querySelector('.chat__box--internal')).not.toBeNull();
+    expect(document.querySelector('.chat__box--public')).toBeNull();
     type('Nur für uns');
     const post = http.expectOne(url('/comments'));
     expect(post.request.body).toEqual({ body: 'Nur für uns', visibility: 'internal' });
@@ -438,7 +437,6 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     const group = screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
     await userEvent.click(within(group).getByRole('radio', { name: 'Öffentlich (Antragsteller:in liest mit und bekommt eine Mail)' }));
     detectChanges();
-    expect(screen.getByTestId('chat-vis-hint')).toHaveTextContent('Öffentlich · Mail');
     expect(document.querySelector('.chat__box--public')).not.toBeNull();
     type('An alle');
     const post = http.expectOne(url('/comments'));

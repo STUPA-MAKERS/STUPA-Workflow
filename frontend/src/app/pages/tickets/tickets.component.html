@@ -80,9 +80,9 @@
           </div>
         } @else if (!hasRows()) {
           @if (activeFilterCount() > 0) {
-            <app-empty-state [heading]="'tickets.list.noMatch' | t" />
+            <app-empty-state icon="searchOff" [heading]="'tickets.list.noMatch' | t" />
           } @else {
-            <app-empty-state [heading]="'tickets.list.empty' | t" />
+            <app-empty-state icon="ticket" [heading]="'tickets.list.empty' | t" />
           }
         } @else {
           @for (group of groups(); track group.key) {

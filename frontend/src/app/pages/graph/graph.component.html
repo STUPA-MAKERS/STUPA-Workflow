@@ -49,7 +49,7 @@
             [value]="filters().relations"
             (valueChange)="setRelations($event)"
             [text]="relationsText()"
-            [active]="filters().relations !== 'all'"
+            [active]="filters().relations !== 'links'"
             unsetValue="all"
           />
           <button
@@ -125,7 +125,7 @@
         <app-load-error [message]="'graph.loadError' | t" (retry)="retry()" />
       } @else if (empty()) {
         @if (filtered()) {
-          <app-empty-state icon="shapes" [heading]="'graph.emptyFiltered' | t" />
+          <app-empty-state icon="searchOff" [heading]="'graph.emptyFiltered' | t" />
         } @else {
           <app-empty-state icon="shapes" [heading]="'graph.empty' | t" [body]="'graph.emptyBody' | t" />
         }

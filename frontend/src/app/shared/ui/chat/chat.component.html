@@ -170,7 +170,7 @@
           </div>
         }
       } @empty {
-        <app-empty-state shape="chat" class="chat__empty" rows="3" [heading]="'chat.empty' | t" />
+        <app-empty-state icon="chat" shape="chat" class="chat__empty" rows="3" [heading]="'chat.empty' | t" />
       }
     }
   </div>
@@ -188,26 +188,7 @@
     (dragover)="onComposerDragOver($event)"
     (drop)="onComposerDrop($event)"
   >
-    @if (visibilityGuard(); as guard) {
-      @if (guarded()) {
-        <div class="chat__visList" role="radiogroup" [attr.aria-label]="'chat.visibility' | t">
-          @for (v of visibilityOptions(); track v) {
-            <label class="chat__visRow" [class.chat__visRow--on]="visibility() === v">
-              <input
-                class="chat__visRadio"
-                type="radio"
-                [name]="'chat-vis-' + draftKey()"
-                [value]="v"
-                [checked]="visibility() === v"
-                (change)="setVisibility(v)"
-              />
-              <app-icon [name]="v === 'internal' ? 'lock' : 'mail'" [size]="17" />
-              <span class="chat__visLabel">{{ guard.labels[v] | t }}</span>
-            </label>
-          }
-        </div>
-      }
-    } @else if (segmentOptions().length > 1) {
+    @if (segmentOptions().length > 1) {
       <app-segmented
         class="chat__vis"
         width="fill"
@@ -257,7 +238,6 @@
     <div
       class="chat__box"
       [class.chat__box--public]="guarded() && visibility() === 'public'"
-      [class.chat__box--internal]="guarded() && visibility() === 'internal'"
     >
       <ng-container
         *ngTemplateOutlet="mentionList; context: { $implicit: composerMentions, below: false }"
@@ -304,11 +284,6 @@
           [accept]="accept"
           (change)="onPicked($event)"
         />
-      }
-      @if (visibilityHint(); as hint) {
-        <span class="chat__visHint" data-testid="chat-vis-hint">
-          <app-icon [name]="visibility() === 'internal' ? 'lock' : 'mail'" [size]="15" />{{ hint | t }}
-        </span>
       }
       <app-button-group [main]="true">
         <app-button
