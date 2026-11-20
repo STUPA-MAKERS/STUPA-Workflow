@@ -1,6 +1,7 @@
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { of } from 'rxjs';
 import { TestBed } from '@angular/core/testing';
 import { LoadingService, loadingInterceptor } from '@stupa-makers/ui-kit';
 import { cacheInterceptor, detailContext } from './cache.interceptor';
@@ -19,7 +20,11 @@ class ListHost {
     prefetchDetails({
       items: this.rows,
       key: (id) => id,
-      reads: (id) => [this.read(id), this.http.get(`/api/things/${id}/more`, { context: detailContext() })],
+      reads: (id) => {
+        if (id === 'none') return [];
+        if (id === 'sync') return [of({ id })];
+        return [this.read(id), this.http.get(`/api/things/${id}/more`, { context: detailContext() })];
+      },
       when: this.allowed,
     });
   }
@@ -31,12 +36,12 @@ class ListHost {
 describe('prefetchDetails', () => {
   let mock: HttpTestingController;
 
-  function setup() {
+  function setup(prefetch = true) {
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([loadingInterceptor, cacheInterceptor])),
         provideHttpClientTesting(),
-        provideDetailPrefetch(),
+        ...(prefetch ? [provideDetailPrefetch()] : []),
       ],
     });
     mock = TestBed.inject(HttpTestingController);
@@ -110,6 +115,30 @@ describe('prefetchDetails', () => {
     expect(pending()).toHaveLength(0);
     press(row(fixture, 'g'), 'pointerover', 'mouse');
     expect(pending().map((r) => r.request.url)).toEqual(['/api/things/g', '/api/things/g/more']);
+  });
+
+  it('skips a row without reads, a read that ends at once, a press beside a link and an unknown link', async () => {
+    const { fixture, host } = setup();
+    host.rows.set(['none', 'sync', 'a']);
+    fixture.detectChanges();
+    expect(pending().map((r) => r.request.url)).toEqual(['/api/things/a']);
+    await tick();
+
+    press(fixture.nativeElement as HTMLElement, 'pointerdown');
+    expect(pending()).toHaveLength(0);
+    const foreign = document.createElement('a');
+    foreign.setAttribute('href', '/things/zzz');
+    (fixture.nativeElement as HTMLElement).appendChild(foreign);
+    press(foreign, 'pointerdown');
+    expect(pending()).toHaveLength(0);
+  });
+
+  it('reads nothing ahead where the app did not turn it on', () => {
+    const { fixture, host } = setup(false);
+    host.rows.set(['a']);
+    fixture.detectChanges();
+    press(row(fixture, 'a'), 'pointerdown');
+    expect(pending()).toHaveLength(0);
   });
 
   it('joins a read ahead still in flight instead of reading twice', () => {

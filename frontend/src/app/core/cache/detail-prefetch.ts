@@ -122,9 +122,9 @@ export function prefetchDetails<T>(spec: DetailPrefetch<T>): void {
   const intent = (event: Event): void => {
     if (stopped || (spec.when && !spec.when())) return;
     if (event.type === 'pointerover' && (event as PointerEvent).pointerType !== 'mouse') return;
-    const link = (event.target as Element | null)?.closest?.('a[href]');
-    if (!link || !host.contains(link)) return;
-    const path = (link.getAttribute('href') ?? '').split(/[?#]/)[0];
+    const link = (event.target as Element).closest('a[href]');
+    if (!link) return;
+    const path = (link.getAttribute('href') as string).split(/[?#]/)[0];
     const item = untracked(spec.items).find((i) => path.split('/').includes(spec.key(i)));
     if (item === undefined) return;
     const key = spec.key(item);
