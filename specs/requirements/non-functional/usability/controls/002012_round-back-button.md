@@ -2,7 +2,7 @@
 id: "002012"
 title: Every back button of a head is a round tonal button
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 implementation:

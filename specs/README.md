@@ -995,7 +995,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/001965](requirements/non-functional/usability/controls/001965_fact-list-component.md) | A list of facts comes from one kit component | approved |
 | [NF/usability/controls/001977](requirements/non-functional/usability/controls/001977_link-picker-like-global-search.md) | The link picker looks like the global search | approved |
 | [NF/usability/controls/001981](requirements/non-functional/usability/controls/001981_no-open-in-row-menu.md) | The ⋮ of a list row has no "Öffnen" | approved |
-| [NF/usability/controls/002012](requirements/non-functional/usability/controls/002012_round-back-button.md) | Every back button of a head is a round tonal button | draft |
+| [NF/usability/controls/002012](requirements/non-functional/usability/controls/002012_round-back-button.md) | Every back button of a head is a round tonal button | approved |
 | [NF/usability/layout/000192](requirements/non-functional/usability/layout/000192_one-geometry.md) | All list and detail pages share one geometry | approved |
 | [NF/usability/layout/000193](requirements/non-functional/usability/layout/000193_scroll-edges.md) | A scroll area cuts at the edge of a surface | approved |
 | [NF/usability/layout/000194](requirements/non-functional/usability/layout/000194_phone-breakpoint.md) | The phone layout starts below 768 px | approved |
@@ -1064,8 +1064,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/001930](requirements/non-functional/usability/layout/001930_pane-page-rail-stays.md) | A pane page scrolls inside itself, so the rail stays in place | approved |
 | [NF/usability/layout/001931](requirements/non-functional/usability/layout/001931_wide-list-head-solid.md) | The head of a wide list column stays solid, also on a fast scroll | replaced |
 | [NF/usability/layout/001946](requirements/non-functional/usability/layout/001946_calendar-chips-below-search.md) | The Kalender filter chips stand in a row of their own below the search | approved |
-| [NF/usability/layout/002010](requirements/non-functional/usability/layout/002010_solid-bars.md) | Bars and heads are solid, and only floating boxes are glass | draft |
-| [NF/usability/layout/002011](requirements/non-functional/usability/layout/002011_bar-edge-visible.md) | No resting surface at the edge of a bar has the bar colour | draft |
+| [NF/usability/layout/002010](requirements/non-functional/usability/layout/002010_solid-bars.md) | Bars and heads are solid, and only floating boxes are glass | approved |
+| [NF/usability/layout/002011](requirements/non-functional/usability/layout/002011_bar-edge-visible.md) | No resting surface at the edge of a bar has the bar colour | approved |
 | [P/integrations/webhooks/000963](protocols/integrations/webhooks/000963_webhook-delivery.md) | A webhook delivery is a signed JSON POST | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |
