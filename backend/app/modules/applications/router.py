@@ -718,6 +718,9 @@ async def change_application_type(
     await service.session.commit()
     if staged is not None:
         await flow.after_commit(staged)
+    # The flow writes server-side values (updated_at) that the session does not hold, and
+    # reading such an expired column outside the greenlet raises MissingGreenlet.
+    service.session.expire_all()
     return await service.get(application_id, include_pii=False, strip_pii_fields=strip)
 
 
