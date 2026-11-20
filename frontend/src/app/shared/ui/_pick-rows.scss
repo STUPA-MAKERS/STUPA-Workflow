@@ -5,7 +5,6 @@
 // screen reader, but it is invisible.
 // Emulated encapsulation scopes styles per component, so each dialog includes the mixins.
 //   @use '../../shared/ui/pick-rows' as pr;
-@use 'field' as f;
 @use 'option-menu' as om;
 
 @mixin list {
@@ -33,10 +32,6 @@
 
 @mixin row-focus {
   @include om.option-focus;
-}
-
-@mixin row-on {
-  @include f.highlight-chosen;
 }
 
 @mixin radio {

@@ -1,5 +1,6 @@
 @use 'breakpoints' as bp;
 @use '../../../shared/ui/dialog-form' as df;
+@use 'field' as f;
 @use '../../../shared/ui/pick-rows' as pr;
 
 @include df.host;
@@ -47,7 +48,7 @@
   }
 }
 .pd__row--on {
-  @include pr.row-on;
+  @include f.highlight-chosen;
 }
 .pd__row:has(.pd__radio:focus-visible) {
   @include pr.row-focus;
