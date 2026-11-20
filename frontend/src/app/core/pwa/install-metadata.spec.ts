@@ -62,7 +62,9 @@ describe('install metadata', () => {
    */
   it('gives every iPhone screen a launch image in the light and the dark theme', () => {
     const links = [
-      ...indexHtml().matchAll(/<link rel="apple-touch-startup-image" media="([^"]+)" href="([^"]+)"/g),
+      ...indexHtml().matchAll(
+        /<link rel="apple-touch-startup-image" media="([^"]+)" href="([^"]+)"/g,
+      ),
     ];
     const screens = new Map<string, Set<string>>();
     for (const [, media, href] of links) {
@@ -71,7 +73,11 @@ describe('install metadata', () => {
       const ratio = Number(/\(-webkit-device-pixel-ratio: (\d)\)/.exec(media)?.[1]);
       const scheme = /\(prefers-color-scheme: (light|dark)\)/.exec(media)?.[1] as string;
       expect(media).toContain('(orientation: portrait)');
-      expect(png(join(PUBLIC, href))).toEqual({ width: w * ratio, height: h * ratio, alpha: false });
+      expect(png(join(PUBLIC, href))).toEqual({
+        width: w * ratio,
+        height: h * ratio,
+        alpha: false,
+      });
       const key = `${w}x${h}@${ratio}`;
       screens.set(key, (screens.get(key) ?? new Set()).add(scheme));
     }

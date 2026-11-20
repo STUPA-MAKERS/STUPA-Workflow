@@ -2,13 +2,10 @@
 id: "000222"
 title: The app shows update and offline bars
 kind: non-functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation:
-  - frontend/vendor/ui-kit/pwa/src/sw-update.service.ts
-  - frontend/vendor/ui-kit/pwa/src/offline.service.ts
-  - frontend/src/app/layout/shell.component.ts
+updated: 2026-11-20
+replaced_by: NF/compatibility/pwa/002151
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit
