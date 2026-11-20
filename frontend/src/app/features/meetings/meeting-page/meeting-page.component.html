@@ -210,17 +210,18 @@
 </ng-template>
 
 <app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'todos.meeting.sheet' | t" [(open)]="todosOpen">
+  <!-- One projected group, so the buttons join the head group of the close button. -->
   @if (todoList()?.canAct() || todoList()?.canLink()) {
-    <span sheet-actions class="mp__sheet-actions">
-      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.link' | t" (click)="todoList()?.linkOpen?.set(true)">
+    <ng-container ngProjectAs="[sheet-actions]">
+      <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.link' | t" (click)="todoList()?.linkOpen?.set(true)">
         <app-icon name="link" />
       </app-button>
       @if (todoList()?.canAct()) {
-        <app-button variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.add' | t" (click)="todoList()?.newOpen?.set(true)">
+        <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.add' | t" (click)="todoList()?.newOpen?.set(true)">
           <app-icon name="plus" />
         </app-button>
       }
-    </span>
+    </ng-container>
   }
   @if (todosOpen()) {
     <app-todo-linked-list
@@ -288,17 +289,18 @@
 <!-- The linked rows of the open item: the Antrag or the Haushaltsplan first, then the links
      (spec 001800). -->
 <app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'todos.linked.title' | t" [(open)]="linksOpen">
+  <!-- One projected group, so the buttons join the head group of the close button. -->
   @if (topLinks()?.canAct() || topLinks()?.canLink()) {
-    <span sheet-actions class="mp__sheet-actions">
-      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.link' | t" (click)="topLinks()?.linkOpen?.set(true)">
+    <ng-container ngProjectAs="[sheet-actions]">
+      <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.link' | t" (click)="topLinks()?.linkOpen?.set(true)">
         <app-icon name="link" />
       </app-button>
       @if (topLinks()?.canAct()) {
-        <app-button variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.add' | t" (click)="topLinks()?.newOpen?.set(true)">
+        <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.add' | t" (click)="topLinks()?.newOpen?.set(true)">
           <app-icon name="plus" />
         </app-button>
       }
-    </span>
+    </ng-container>
   }
   @if (linksOpen() && top(); as t) {
     <app-todo-linked-list
@@ -319,11 +321,9 @@
 <app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'meetings.vote.count' | t" [(open)]="votesOpen">
   <!-- "Abstimmung vorbereiten" stands in the head, in one group with the close button (spec 001802). -->
   @if (canAddVote() && top(); as t) {
-    <span sheet-actions class="mp__sheet-actions">
-      <app-button variant="text" [iconOnly]="true" [ariaLabel]="addVoteLabel() | t" (click)="voteDialog.emit(t)">
-        <app-icon name="plus" />
-      </app-button>
-    </span>
+    <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="addVoteLabel() | t" (click)="voteDialog.emit(t)">
+      <app-icon name="plus" />
+    </app-button>
   }
   @if (votesOpen()) {
     <div class="mp__votes mp__votes--sheet">

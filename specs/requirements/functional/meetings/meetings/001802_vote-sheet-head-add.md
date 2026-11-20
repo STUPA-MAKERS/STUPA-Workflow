@@ -18,7 +18,8 @@ scope:
 
 The button that adds a vote to the open item ("Abstimmung vorbereiten", "Abstimmung öffnen" or
 "Beschlussfrage hinzufügen") must be an icon button in the head of the side sheet
-"Abstimmungen", in one group with the close button. It shows only to a person who may add a
+"Abstimmungen", in one connected button group with the close button. The same holds for
+"Verknüpfen" and "To-Do anlegen" in the sheets "Verknüpft" and "To-Dos". It shows only to a person who may add a
 vote.
 
 When the item has no vote, the sheet must show the empty state "Keine Abstimmungen".

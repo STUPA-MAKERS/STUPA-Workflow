@@ -315,14 +315,6 @@
   line-height: 1;
 }
 
-/* "Verknüpfen" and "To-Do anlegen" of the sheet To-Dos sit in its head, before the close button. */
-.mp__sheet-actions {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: var(--space-1);
-}
-
 /* Highlighted fields (000598): a chip button of the dock is a pill button, black on yellow
    with the black edge; open, it is yellow on black. Its count badge is black with yellow. */
 @include d.host-on(fields) {

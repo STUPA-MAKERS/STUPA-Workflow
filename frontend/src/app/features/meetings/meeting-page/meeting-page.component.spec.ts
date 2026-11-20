@@ -1027,7 +1027,7 @@ describe('MeetingPageComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Abstimmungen' }));
       const sheet = screen.getByRole('dialog', { name: 'Abstimmungen' });
       expect(within(sheet).getByText('Keine Abstimmungen')).toBeInTheDocument();
-      const head = sheet.querySelector('.mp__sheet-actions') as HTMLElement;
+      const head = sheet.querySelector('.ss__actions') as HTMLElement;
       const add = within(head).getByRole('button', { name: /Abstimmung|Beschlussfrage/ });
       await userEvent.click(add);
       expect(on.voteDialog).toHaveBeenCalled();
