@@ -199,12 +199,9 @@
   margin-top: auto;
   padding: 14px 24px;
   border-radius: 0 0 var(--radius-2xl) var(--radius-2xl);
-  // Glass in the colour of the sheet: the fields that scroll under the sticky bar show
-  // through blurred, and at the end of the step the bar is one with the sheet.
-  @include frosted(var(--color-surface-1), top, $tint: 70%);
-}
-.wz__nav::before {
-  border-radius: inherit;
+  // Solid in the colour of the sheet (`bar`, spec 002010), so at the end of the step the bar
+  // is one with the sheet.
+  @include bar(var(--color-surface-1));
 }
 .wz__navGap {
   flex: 1 1 auto;

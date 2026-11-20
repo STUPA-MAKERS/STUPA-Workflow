@@ -37,7 +37,7 @@ see. At each kind of place, the content must cut as this table says:
 | The scroll part of the navigation rail | The scroll part lies on a surface of its own with rounded corners (001441). |
 | A row of chips that scrolls sideways on a phone, for example the filters of Anträge or of the graph | At the edge of the screen. The row runs from screen edge to screen edge, also where it is a line of its own in a bar. |
 | The message log of a chat | At its rounded frame. |
-| The rows of a list column on a wide screen | At the lower edge of the list head (000527). |
+| The rows of a list column on a wide screen | At the lower edge of the list head (002010), with round inner corners at both sides while rows are under it. |
 | The rows of a one-column list below its filter bar on a wide screen, for example Aktivität or Sitzungen | At the lower edge of the filter bar, with round inner corners at both sides, while rows are under the bar. |
 | A real line, for example a tab line on the phone | At that line. |
 
