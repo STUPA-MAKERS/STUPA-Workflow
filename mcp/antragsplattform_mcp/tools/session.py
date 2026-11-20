@@ -109,6 +109,54 @@ async def mark_activity_seen(at: str) -> dict:
 
 
 @group.tool
+async def graph_read(
+    kinds: list[str] | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    gremium_id: str | None = None,
+    relations: str | None = None,
+    q: str | None = None,
+    single: bool = False,
+    no_access: bool = False,
+    cursor: str | None = None,
+) -> dict:
+    """Read one page of the graph: the elements that the caller reads as ``nodes`` and
+    the relations between them as ``edges``, the newest nodes first, 60 per page.
+
+    An edge has the ``source`` ``link`` (a link that a person made) or ``builtin`` (a
+    relation of the data, for example a meeting and its TOP). The answer holds each
+    edge between a node of the page and a node of this page or of an earlier page.
+    Needs the permission ``graph.view``.
+
+    Args:
+        kinds: Limit to ``application``, ``meeting``, ``agenda_item``, ``vote``,
+            ``appointment``, ``gremium``, ``invoice``, ``expense``, ``budget``,
+            ``ticket`` and/or ``todo``.
+        date_from: Only nodes with their date on or after this day (``YYYY-MM-DD``).
+        date_to: Only nodes with their date on or before this day.
+        gremium_id: Only nodes of this Gremium.
+        relations: ``all`` (default), ``links`` or ``builtin``.
+        q: Only nodes with the term in their title, and their neighbours.
+        single: Add the elements without a relation.
+        no_access: Add the elements that the caller does not read, as nodes with their
+            kind only.
+        cursor: The ``nextCursor`` of the page before.
+    """
+    query = {
+        "kinds": kinds,
+        "from": date_from,
+        "to": date_to,
+        "gremiumId": gremium_id,
+        "relations": relations,
+        "q": q,
+        "single": single or None,
+        "noAccess": no_access or None,
+        "cursor": cursor,
+    }
+    return await api().get("/graph", params=params(**query))
+
+
+@group.tool
 async def list_my_agent_grants() -> list:
     """List the own agent tokens (OAuth grants) that are not revoked."""
     return await api().get("/oauth/grants")

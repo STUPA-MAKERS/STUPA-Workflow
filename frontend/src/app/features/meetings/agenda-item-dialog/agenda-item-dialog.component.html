@@ -28,7 +28,7 @@
           @if (loading()) {
             <app-skeleton variant="rows" [count]="4" [label]="'common.loading' | t" />
           } @else if (shown().length) {
-            <div class="aid__list" appScrollFade="y" role="radiogroup" [attr.aria-label]="listText().label | t">
+            <div class="aid__list rowgroup rowgroup--bg3" appScrollFade="y" role="radiogroup" [attr.aria-label]="listText().label | t">
               @for (a of shown(); track a.id) {
                 @let on = pick() === a.id;
                 <label class="aid__row" [class.aid__row--on]="on">
@@ -40,13 +40,15 @@
                     [checked]="on"
                     (change)="pick.set(a.id)"
                   />
-                  <app-icon class="aid__mark" [name]="on ? 'circleok' : 'circle'" [size]="20" />
                   <span class="aid__text">
                     <span class="aid__title ell" [appTruncated]="a.title" #cut="appTruncated" [attr.title]="cut.truncated() ? a.title : null">{{ a.title }}</span>
                     @if (a.sub) {
                       <span class="aid__sub ell">{{ a.sub }}</span>
                     }
                   </span>
+                  @if (on) {
+                    <app-icon class="aid__check" name="check" [size]="18" />
+                  }
                 </label>
               }
             </div>
@@ -66,7 +68,7 @@
           @if (todosLoading()) {
             <app-skeleton variant="rows" [count]="4" [label]="'common.loading' | t" />
           } @else if (shownTodos().length) {
-            <div class="aid__list" appScrollFade="y" role="radiogroup" [attr.aria-label]="'meetings.agenda.openTodosLabel' | t">
+            <div class="aid__list rowgroup rowgroup--bg3" appScrollFade="y" role="radiogroup" [attr.aria-label]="'meetings.agenda.openTodosLabel' | t">
               @for (c of shownTodos(); track c.id) {
                 @let on = todoPick() === c.id;
                 <label class="aid__row" [class.aid__row--on]="on">
@@ -78,11 +80,13 @@
                     [checked]="on"
                     (change)="todoPick.set(c.id)"
                   />
-                  <app-icon class="aid__mark" [name]="on ? 'circleok' : 'circle'" [size]="20" />
                   <span class="aid__text">
                     <span class="aid__title ell" [appTruncated]="c.title" #cut2="appTruncated" [attr.title]="cut2.truncated() ? c.title : null">{{ c.title }}</span>
                     <span class="aid__sub ell">{{ c.sub }}</span>
                   </span>
+                  @if (on) {
+                    <app-icon class="aid__check" name="check" [size]="18" />
+                  }
                 </label>
               }
             </div>

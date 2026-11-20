@@ -1,32 +1,23 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { EmptyStateComponent } from '@stupa-makers/ui-kit';
+import { DetailNoneComponent } from '@stupa-makers/ui-kit';
 
 /**
- * The page pane of `/admin` before an admin page is open.
- *
- * The admin frame shows the navigation beside it, so this pane is the empty sheet of
- * the other list/detail pages ("Keine Seite geöffnet"), on the same surface as an open
- * admin page. The pane does not jump when an entry opens. Only the side-by-side layout
- * shows it; one column at a time, the navigation fills the screen.
+ * The detail pane of `/admin` before an admin page is open: the empty sheet of every
+ * list/detail page ("Keine Seite geöffnet", spec 000665). Only the side-by-side layout
+ * shows it; one pane at a time, the list of Verwaltung fills the screen.
  */
 @Component({
   selector: 'app-admin-home',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, EmptyStateComponent],
-  template: `
-    <app-empty-state plain icon="shield" fill [heading]="'admin.home.none' | t" />
+  imports: [TranslatePipe, DetailNoneComponent],
+  template: `<app-detail-none icon="shield" [heading]="'admin.home.none' | t" />`,
+  styles: `
+    @use 'detail-none-host' as dnh;
+    :host {
+      @include dnh.host;
+    }
   `,
-  styles: [
-    `
-      :host {
-        display: flex;
-        flex: 1 1 auto;
-        flex-direction: column;
-        min-height: 0;
-      }
-    `,
-  ],
 })
 export class AdminHomeComponent {}

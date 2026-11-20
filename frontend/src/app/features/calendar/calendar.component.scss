@@ -45,7 +45,8 @@
   gap: 0 6px;
 }
 
-// The desktop: the title and the tools over both columns, then the grid and the cards.
+// The desktop: the tools over both columns, then the grid and the day list. The title is only
+// for a screen reader; the actions stand at the end of the first tools row (spec 001771).
 .cal {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -55,10 +56,9 @@
 :host(.cal--wide) .cal {
   flex: 1 1 0;
   grid-template-columns: minmax(0, 1fr) 380px;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
 }
-:host(.cal--wide) .cal > app-page-header,
 :host(.cal--wide) .cal__tools {
   grid-column: 1 / -1;
 }
@@ -73,8 +73,12 @@
 }
 .cal__nav {
   display: flex;
+  flex: 1 1 100%;
   align-items: center;
   gap: var(--space-1);
+}
+.cal__actions {
+  margin-inline-start: auto;
 }
 .cal__month {
   min-width: 10.5rem;
@@ -84,11 +88,8 @@
   text-align: center;
   white-space: nowrap;
 }
-.cal__today {
-  margin-inline-start: var(--space-2);
-}
 .cal__view {
-  margin-inline-start: var(--space-3);
+  margin-inline-start: var(--space-2);
 }
 .cal__filters {
   display: flex;
@@ -379,7 +380,8 @@
   }
 }
 
-// The entries of the picked day, each a card that is pressable as a whole.
+// The entries of the picked day: one row group under the day, like the list of Aktivität
+// (spec 001770). The column has no surface and no frame of its own.
 :host(:not(.cal--wide)) .cal__panel {
   margin-top: var(--space-3);
 }
@@ -389,75 +391,20 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border-radius: var(--radius-2xl);
-  background: var(--color-surface-1);
 }
 .cal__panelScroll {
   --cal-fade: var(--space-3);
   flex: 1 1 auto;
   min-height: 0;
-  padding: var(--space-3);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-.cal__cards {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+.cal__rows {
+  @include lp.stack;
 }
-.cal__card {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  padding: var(--space-4);
-  border: 0;
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-2);
-  color: inherit;
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
-}
-.cal__card:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-.cal__cardIcon {
-  flex: none;
-  align-self: flex-start;
+// The row lies on surface 2, so the lead icon takes surface 3 to stand out.
+.cal__rowIcon {
   background: var(--color-surface-3);
-}
-.cal__cardText {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.cal__cardKind {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 6px;
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
-.cal__cardTitle {
-  font-weight: var(--fw-semibold);
-  overflow-wrap: anywhere;
-}
-.cal__cardSrc {
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-  overflow-wrap: anywhere;
-}
-.cal__cardState {
-  margin-top: 4px;
-  font-size: var(--fs-small);
-}
-.cal__go {
-  flex: none;
-  color: var(--color-text-muted);
 }
 
 @include d.host-on(veryHigh) {
