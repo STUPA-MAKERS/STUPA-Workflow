@@ -3851,6 +3851,7 @@
   "calendar.kind.card": "Card",
   "calendar.kind.appointment": "Appointment",
   "calendar.kind.external": "External",
+  "calendar.filter.group": "Calendar filters",
   "calendar.filter.kind": "Kind",
   "calendar.filter.gremium": "Committee",
   "calendar.filter.allGremien": "All committees",

@@ -3851,6 +3851,7 @@
   "calendar.kind.card": "Karte",
   "calendar.kind.appointment": "Termin",
   "calendar.kind.external": "Extern",
+  "calendar.filter.group": "Filter des Kalenders",
   "calendar.filter.kind": "Art",
   "calendar.filter.gremium": "Gremium",
   "calendar.filter.allGremien": "Alle Gremien",

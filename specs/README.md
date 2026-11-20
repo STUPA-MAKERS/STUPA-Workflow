@@ -1041,6 +1041,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/001895](requirements/non-functional/usability/layout/001895_scroll-lock-any-close-order.md) | The page scrolls again when the last overlay closes, in any order | approved |
 | [NF/usability/layout/001930](requirements/non-functional/usability/layout/001930_pane-page-rail-stays.md) | A pane page scrolls inside itself, so the rail stays in place | approved |
 | [NF/usability/layout/001931](requirements/non-functional/usability/layout/001931_wide-list-head-solid.md) | The head of a wide list column stays solid, also on a fast scroll | approved |
+| [NF/usability/layout/001946](requirements/non-functional/usability/layout/001946_calendar-chips-below-search.md) | The Kalender filter chips stand in a row of their own below the search | approved |
 | [P/integrations/webhooks/000963](protocols/integrations/webhooks/000963_webhook-delivery.md) | A webhook delivery is a signed JSON POST | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |
