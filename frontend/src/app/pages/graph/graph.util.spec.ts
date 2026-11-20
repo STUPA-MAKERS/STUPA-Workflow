@@ -2,7 +2,6 @@ import { convertToParamMap } from '@angular/router';
 import type { GraphEdge, GraphNode, GraphPage } from '@core/api/graph.service';
 import {
   AUTO_NODES,
-  DEFAULT_KINDS,
   EMPTY_GRAPH,
   KIND_FEATURE,
   NO_FILTERS,
@@ -75,14 +74,12 @@ describe('graph util', () => {
   const TODAY = '2026-03-10';
   const FRESH = defaultFilters(TODAY);
 
-  /** § F/collaboration/graph/001425: a fresh page shows the last 30 days without the cost centres. */
-  it('starts with the last 30 days and without the cost centres', () => {
+  /** § F/collaboration/graph/001425: a fresh page shows the last 30 days and only the links of persons. */
+  it('starts with the last 30 days and the links of persons', () => {
     expect(localDay(new Date(2026, 2, 5, 23, 59))).toBe('2026-03-05');
     expect(daysBefore(TODAY, 30)).toBe('2026-02-08');
     expect(daysBefore('2026-01-10', 30)).toBe('2025-12-11');
-    expect(DEFAULT_KINDS).not.toContain('budget');
-    expect(DEFAULT_KINDS).toHaveLength(10);
-    expect(FRESH).toEqual({ ...NO_FILTERS, kinds: DEFAULT_KINDS, from: '2026-02-08', relations: 'links' });
+    expect(FRESH).toEqual({ ...NO_FILTERS, from: '2026-02-08', relations: 'links' });
   });
 
   it('knows when a filter or a switch differs from the fresh page', () => {
@@ -90,7 +87,6 @@ describe('graph util', () => {
     expect(isFiltered({ ...FRESH, q: '  ' }, TODAY)).toBe(false);
     for (const change of [
       { kinds: ['todo'] as const },
-      { kinds: [] },
       { from: '2026-01-01' },
       { from: '' },
       { to: '2026-12-31' },
@@ -128,8 +124,8 @@ describe('graph util', () => {
       single: true,
       noAccess: true,
     });
-    // `all` stands for every kind and for every day; an end alone has no start.
-    expect(filtersOf(convertToParamMap({ kinds: 'all', period: 'all', rel: 'all' }), TODAY)).toEqual(NO_FILTERS);
+    // `all` stands for every day and for every relation; an end alone has no start.
+    expect(filtersOf(convertToParamMap({ period: 'all', rel: 'all' }), TODAY)).toEqual(NO_FILTERS);
     expect(filtersOf(convertToParamMap({ to: '2026-12-31' }), TODAY)).toEqual({ ...FRESH, from: '', to: '2026-12-31' });
   });
 
@@ -144,7 +140,7 @@ describe('graph util', () => {
   it('writes the filters to the query and back', () => {
     const none = { kinds: null, from: null, to: null, period: null, gremium: null, rel: null, q: null, single: null, noaccess: null };
     expect(queryOf(FRESH, TODAY)).toEqual(none);
-    expect(queryOf(NO_FILTERS, TODAY)).toEqual({ ...none, kinds: 'all', period: 'all', rel: 'all' });
+    expect(queryOf(NO_FILTERS, TODAY)).toEqual({ ...none, period: 'all', rel: 'all' });
     const filters = {
       kinds: ['meeting', 'todo'] as const,
       from: '2026-01-01',

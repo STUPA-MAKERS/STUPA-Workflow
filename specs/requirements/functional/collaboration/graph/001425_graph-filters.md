@@ -31,11 +31,10 @@ a cost centre have no date and must pass every period. The filters must be in th
 URL. The server must apply the filters.
 
 A fresh page must show the last 30 days: the period starts 30 days before today and has no
-end. A fresh page must show every kind but the cost centres. A fresh page must show only the
-links that a person made ("Nur Verknüpfungen"), not the relations of the data. The person can
-choose every day, every kind and every relation; the query then holds `period=all`, `kinds=all`
-and `rel=all`. A query without a period, without kinds or without relations means the fresh
-page. "Zurücksetzen" (`Reset`) must go back to the fresh page, and
+end. A fresh page must show every kind. A fresh page must show only the links that a person
+made ("Nur Verknüpfungen"), not the relations of the data. The person can choose every day and
+every relation; the query then holds `period=all` and `rel=all`. A query without a period or
+without relations means the fresh page. "Zurücksetzen" (`Reset`) must go back to the fresh page, and
 it must show only while a filter differs from the fresh page.
 
 The drawing must fill the height of the page. The filters and the panel of the chosen node
@@ -47,9 +46,9 @@ strip from edge to edge at the top of the drawing, with the search in its full w
 
 Reason: A graph of every year is too large to read. The person narrows it to the question at
 hand, and the URL keeps the view for a reload or for a colleague. The work of the last weeks is
-the usual question, and the cost centres connect to almost every element, so they tie the
-whole drawing into one knot. The relations of the data are many and say what the detail pages
-say already; the links are what a person decided to connect.
+the usual question. The relations of the data are many and tie the whole drawing into one
+knot, and they say what the detail pages say already; the links are what a person decided to
+connect.
 
 Test: A backend unit test per filter, and a frontend unit test that reads the filters from the
 URL.

@@ -96,9 +96,7 @@ export const NO_FILTERS: GraphFilters = {
 
 /** The days that the period reaches back when the person chose none (spec 001425). */
 export const DEFAULT_DAYS = 30;
-/** The kinds that show when the person chose none: every kind but the cost centres (spec 001425). */
-export const DEFAULT_KINDS: readonly GraphKind[] = GRAPH_KINDS.filter((k) => k !== 'budget');
-/** The value of `kinds` and of `period` in the query that stands for "everything". */
+/** The value of `period` in the query that stands for every day. */
 const ALL = 'all';
 
 /** The local day of a moment as `YYYY-MM-DD`. */
@@ -112,9 +110,9 @@ export function daysBefore(day: string, days: number): string {
   return new Date(Date.parse(`${day}T00:00:00Z`) - days * 86_400_000).toISOString().slice(0, 10);
 }
 
-/** The filters of a fresh page: the last 30 days, no cost centres, only the links of persons (spec 001425). */
+/** The filters of a fresh page: the last 30 days and only the links of persons (spec 001425). */
 export function defaultFilters(today: string): GraphFilters {
-  return { ...NO_FILTERS, kinds: DEFAULT_KINDS, from: daysBefore(today, DEFAULT_DAYS), relations: 'links' };
+  return { ...NO_FILTERS, from: daysBefore(today, DEFAULT_DAYS), relations: 'links' };
 }
 
 function plain(f: GraphFilters): string {
@@ -139,18 +137,17 @@ function day(value: string | null): string {
 
 /**
  * The filters from the query of the URL (spec 001425). Unknown values drop. A query without
- * kinds or without a period means the fresh page; `all` means every kind or every day.
+ * a period or without relations means the fresh page; `all` means every day or every relation.
  */
 export function filtersOf(query: ParamMap, today: string): GraphFilters {
   const fresh = defaultFilters(today);
-  const kinds = query.get('kinds');
-  const named = (kinds ?? '').split(',');
+  const kinds = (query.get('kinds') ?? '').split(',');
   const relations = query.get('rel') as GraphRelations | null;
   const from = day(query.get('from'));
   const to = day(query.get('to'));
   const own = from !== '' || to !== '' || query.get('period') === ALL;
   return {
-    kinds: kinds === null ? fresh.kinds : kinds === ALL ? [] : GRAPH_KINDS.filter((k) => named.includes(k)),
+    kinds: GRAPH_KINDS.filter((k) => kinds.includes(k)),
     from: own ? from : fresh.from,
     to,
     gremiumId: query.get('gremium') ?? '',
@@ -164,10 +161,9 @@ export function filtersOf(query: ParamMap, today: string): GraphFilters {
 /** The query of the URL for the filters; null removes a parameter. The fresh page has none. */
 export function queryOf(f: GraphFilters, today: string): Readonly<Record<string, string | null>> {
   const fresh = defaultFilters(today);
-  const freshKinds = f.kinds.length === fresh.kinds.length && fresh.kinds.every((k) => f.kinds.includes(k));
   const freshPeriod = f.from === fresh.from && f.to === '';
   return {
-    kinds: freshKinds ? null : f.kinds.length ? f.kinds.join(',') : ALL,
+    kinds: f.kinds.length ? f.kinds.join(',') : null,
     from: freshPeriod ? null : f.from || null,
     to: f.to || null,
     period: f.from === '' && f.to === '' ? ALL : null,

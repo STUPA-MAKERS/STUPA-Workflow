@@ -22,7 +22,7 @@
             [options]="kindOptions()"
             [values]="filters().kinds"
             (valuesChange)="setKinds($event)"
-            [active]="kindsSet()"
+            [active]="filters().kinds.length > 0"
           />
           <app-range-chip
             kind="date"

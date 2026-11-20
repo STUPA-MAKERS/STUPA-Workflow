@@ -23,7 +23,7 @@ import { type CanvasNode, GraphCanvasComponent } from './graph-canvas.component'
 import { GraphComponent, SEARCH_PAUSE } from './graph.component';
 import { AUTO_NODES, defaultFilters, localDay } from './graph.util';
 
-/** The filters of a fresh page (spec 001425): the last 30 days, without the cost centres. */
+/** The filters of a fresh page (spec 001425): the last 30 days, only the links of persons. */
 const FRESH = defaultFilters(localDay(new Date()));
 
 @Component({ standalone: true, template: '<p>Ziel</p>' })

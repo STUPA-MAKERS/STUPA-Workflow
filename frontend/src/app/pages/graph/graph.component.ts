@@ -124,8 +124,6 @@ export class GraphComponent {
   /** The day of the fresh filters (spec 001425): the day on which the page opened. */
   private readonly today = localDay(new Date());
   readonly filters = signal<GraphFilters>(filtersOf(this.route.snapshot.queryParamMap, this.today));
-  /** True while the kinds differ from the fresh page. */
-  readonly kindsSet = computed(() => queryOf(this.filters(), this.today)['kinds'] !== null);
   /** The text of the search field; it reaches the filters after a pause. */
   readonly searchText = signal(this.filters().q);
 
