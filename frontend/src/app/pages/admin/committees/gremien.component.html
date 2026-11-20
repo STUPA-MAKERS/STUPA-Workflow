@@ -37,8 +37,9 @@
               @if (g.protocolsPublic) {
                 <app-status-text status kind="accent">{{ 'admin.gremien.publicTag' | t }}</app-status-text>
               }
-              <app-button-group menu>
+              <app-button-group ngProjectAs="[trail]">
                 <app-row-menu
+                  trail
                   [sections]="rowMenu()"
                   [label]="('ui.rowMenu.trigger' | t) + ': ' + g.name"
                   (selected)="onRowMenu($event, g)"

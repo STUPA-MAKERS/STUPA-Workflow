@@ -13,7 +13,7 @@ implementation:
   - frontend/src/app/pages/applications
   - frontend/src/app/pages/expenses
   - frontend/src/app/pages/invoices
-  - frontend/src/app/pages/admin
+  - frontend/src/app/pages/admin/translations
 scope:
   - frontend/vendor/ui-kit/src/lib/list-item
   - frontend/src/app/
