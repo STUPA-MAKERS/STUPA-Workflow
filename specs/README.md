@@ -976,6 +976,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/001910](requirements/non-functional/usability/controls/001910_field-button-same-height.md) | A button beside a field is as high as the field | approved |
 | [NF/usability/controls/001911](requirements/non-functional/usability/controls/001911_dialog-no-footer-close.md) | A dialog has no footer button that only closes it | approved |
 | [NF/usability/controls/001920](requirements/non-functional/usability/controls/001920_row-menu-on-hover.md) | The ⋮ of a list row shows only for the row in use | approved |
+| [NF/usability/controls/001977](requirements/non-functional/usability/controls/001977_link-picker-like-global-search.md) | The link picker looks like the global search | approved |
 | [NF/usability/layout/000192](requirements/non-functional/usability/layout/000192_one-geometry.md) | All list and detail pages share one geometry | approved |
 | [NF/usability/layout/000193](requirements/non-functional/usability/layout/000193_scroll-edges.md) | A scroll area cuts at the edge of a surface | approved |
 | [NF/usability/layout/000194](requirements/non-functional/usability/layout/000194_phone-breakpoint.md) | The phone layout starts below 768 px | approved |

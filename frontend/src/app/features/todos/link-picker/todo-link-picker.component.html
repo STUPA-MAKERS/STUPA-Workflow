@@ -1,6 +1,6 @@
 <ng-template #body>
   <div class="lp__search">
-    <app-icon name="search" [size]="17" />
+    <app-icon class="lp__glass" name="search" [size]="phone() ? 17 : 22" />
     <input
       #field
       class="lp__field"
@@ -15,18 +15,16 @@
       (keydown.enter)="search.flush()"
     />
     @if (!phone()) {
-      <app-button-group>
-        <app-button
-          class="lp__x"
-          variant="text"
-          size="sm"
-          [iconOnly]="true"
-          [ariaLabel]="'action.close' | t"
-          (click)="close()"
-        >
-          <app-icon name="x" />
-        </app-button>
-      </app-button-group>
+      <!-- The key of the global search: "Esc" closes the dialog (spec 001977). -->
+      <button
+        type="button"
+        class="lp__close"
+        [attr.aria-label]="'action.close' | t"
+        [title]="'action.close' | t"
+        (click)="close()"
+      >
+        <span class="kbd lp__esc" aria-hidden="true">{{ escLabel }}</span>
+      </button>
     }
   </div>
   <div class="lp__chips" role="group" [attr.aria-label]="'todos.picker.kind' | t">
