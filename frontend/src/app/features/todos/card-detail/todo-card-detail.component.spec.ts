@@ -406,7 +406,7 @@ describe('TodoCardDetailComponent', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Karte wird geladen');
     expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
     expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
-    expect(document.querySelectorAll('.cd__skelIcon')).toHaveLength(2);
+    expect(document.querySelectorAll('.cd__head .skel-grp > .skel-btn')).toHaveLength(2);
     expect(document.querySelector('.cd__chat .sk__composer')).not.toBeNull();
     expect(document.querySelectorAll('.cd__fields dt').length).toBe(4);
     fireEvent.click(screen.getByRole('button', { name: 'Schließen' }));

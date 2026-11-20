@@ -518,22 +518,12 @@ button.cd__linkOpen {
   --chat-composer-bleed: var(--space-4);
 }
 // The places of the 40px icon buttons of the sheet bar.
-.cd__skelIcon {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-}
-.cd__skelIcon .skel-box {
-  width: 20px;
-  height: 20px;
-}
+// rem widths: the title shrinks to its content, so a percentage of it is nothing.
 .cd__skelTitle {
-  width: 68%;
+  width: 14rem;
 }
 .cd__skelTitle--second {
-  width: 40%;
+  width: 8rem;
 }
 .cd__skelCreated {
   width: 14rem;

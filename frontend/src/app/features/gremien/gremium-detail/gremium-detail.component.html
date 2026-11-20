@@ -150,11 +150,30 @@
           <span class="skel-box gd__skelLogo" [class.gd__skelLogo--lg]="!phone()"></span>
           <span class="sheet-title gd__title"><span class="skel-text gd__skelTitle"></span></span>
         </div>
+        <span class="skel-grp">
+          @if (!phone()) {
+            <span class="skel-box skel-btn"></span>
+            <span class="skel-box skel-btn"></span>
+          }
+          <span class="skel-box skel-btn"></span>
+        </span>
       </app-sheet-bar>
-      <p class="sheet-line gd__line"><span class="skel-text skel-text--muted gd__skelLine"></span></p>
+      <p class="sheet-line gd__line">
+        <span class="skel-chips">
+          <span class="skel-box skel-chip" style="--skel-w: 6.5rem"></span>
+          <span class="skel-box skel-chip" style="--skel-w: 5.5rem"></span>
+        </span>
+      </p>
     </header>
+    <!-- The tab bar: the tabs depend on the Gremium (an info text, a board), so bars stand in
+         for the labels. -->
+    <div class="gd__tabs gd__skelTabs skel-in" aria-hidden="true">
+      @for (w of skelTabs; track $index) {
+        <span class="gd__skelTab"><span class="skel-text skel-text--muted" [style.width]="w"></span></span>
+      }
+    </div>
     <div class="gd__body">
-      <app-skeleton variant="items" [count]="5" [grouped]="true" [label]="'gremien.detail.loading' | t" />
+      <app-skeleton variant="lines" [count]="4" [label]="'gremien.detail.loading' | t" />
     </div>
   </article>
 } @else {

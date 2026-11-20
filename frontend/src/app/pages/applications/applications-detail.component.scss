@@ -24,43 +24,18 @@
   border-radius: var(--radius-2xl);
   background: var(--color-surface-1);
 }
-.ad__skelIcon {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-}
-.ad__skelIcon .skel-box {
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
-}
+// The comments button of the head: a label and a count on a wide screen, an icon on a phone.
 .ad__skelComments {
-  width: auto;
-  padding-inline: 12px;
-}
-.ad__skelComments .skel-box {
-  width: 7.25rem;
+  --skel-w: 8.5rem;
 }
 @include bp.phone {
-  .ad__skelComments .skel-box {
-    width: 3rem;
+  .ad__skelComments {
+    --skel-w: 48px;
   }
 }
+// A rem width: the title shrinks to its content, so a percentage of it is nothing.
 .ad__skelTitle {
-  width: 60%;
-}
-.ad__skelLine {
-  width: 6rem;
-}
-// The size of an `app-button` of size md, and of a typical label.
-.ad__skelButton {
-  width: 11rem;
-  height: var(--control-height);
-  border-radius: 999px;
-}
-.ad__skelButton--short {
-  width: 7rem;
+  width: 16rem;
 }
 .ad__skelAnswers {
   display: flex;
@@ -156,12 +131,6 @@
 }
 .ad__transitionGroup {
   flex-wrap: wrap;
-  margin-top: var(--space-2);
-}
-.ad__transitions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
   margin-top: var(--space-2);
 }
 .ad__archived {

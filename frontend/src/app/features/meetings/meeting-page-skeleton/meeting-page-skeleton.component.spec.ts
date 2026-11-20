@@ -35,6 +35,15 @@ describe('MeetingPageSkeletonComponent', () => {
     expect(container.querySelectorAll('.mps__row')).toHaveLength(5);
   });
 
+  /** The head and the dock hold their buttons as connected groups, like the page (spec 000893). */
+  it('draws the agenda head, the head buttons and the dock as the page does', async () => {
+    setViewport(true);
+    const { container } = await render(MeetingPageSkeletonComponent);
+    expect(container.querySelector('.mps__agendaHead .mps__agendaAdd')).toBeTruthy();
+    expect(container.querySelectorAll('.mps__head .skel-btn').length).toBeGreaterThanOrEqual(3);
+    expect(container.querySelectorAll('.mps__dock .skel-grp').length).toBeGreaterThanOrEqual(3);
+  });
+
   it('draws only the sheet below the wide layout', async () => {
     setViewport(false);
     const { container } = await render(MeetingPageSkeletonComponent);

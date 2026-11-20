@@ -450,8 +450,9 @@ describe('ApplicationsDetailComponent', () => {
     expect(busy).toHaveClass('ad--split');
     expect(busy).toHaveAttribute('aria-busy', 'true');
     expect(busy.querySelector('.ad__head .ad__title .skel-text')).not.toBeNull();
-    expect(busy.querySelector('.ad__head .ad__line .skel-text')).not.toBeNull();
-    expect(busy.querySelectorAll('.ad__transitions .ad__skelButton')).toHaveLength(2);
+    expect(busy.querySelectorAll('.ad__head .ad__line .skel-chip')).toHaveLength(2);
+    expect(busy.querySelectorAll('.ad__head .skel-grp > .skel-btn')).toHaveLength(3);
+    expect(busy.querySelectorAll('.ad__transitionGroup .skel-btn')).toHaveLength(2);
     expect(busy.querySelectorAll('.ad__cols > .ad__col')).toHaveLength(2);
     expect(within(busy as HTMLElement).getByText('Details')).toBeInTheDocument();
     expect(within(busy as HTMLElement).getByText('Verlauf')).toBeInTheDocument();
@@ -485,7 +486,7 @@ describe('ApplicationsDetailComponent', () => {
     const busy = view.container.querySelector('article.ad--busy')!;
     expect(busy).not.toHaveClass('ad--split');
     expect(busy.querySelector('app-tabs')).not.toBeNull();
-    expect(busy.querySelector('.ad__transitions, .ad__transitionGroup')).toBeNull();
+    expect(busy.querySelector('.ad__transitionGroup')).toBeNull();
     const http = view.fixture.debugElement.injector.get(HttpTestingController);
     for (const req of http.match(() => true)) req.flush(null, { status: 404, statusText: 'x' });
   });
@@ -562,7 +563,7 @@ describe('ApplicationsDetailComponent', () => {
     detectChanges();
     const req = http.expectOne(url('/transitions'));
     expect(cmp.transitionsLoading()).toBe(true);
-    expect(container.querySelectorAll('.ad__head .ad__skelButton')).toHaveLength(2);
+    expect(container.querySelectorAll('.ad__transitionGroup .skel-btn')).toHaveLength(2);
     req.flush([]);
     detectChanges();
     expect(cmp.transitionsLoading()).toBe(false);
