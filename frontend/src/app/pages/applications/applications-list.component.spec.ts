@@ -263,13 +263,14 @@ describe('ApplicationsListComponent', () => {
       expect(document.querySelectorAll('.apps__dot')).toHaveLength(2);
     });
 
-    /** The chevron is decoration, and the row menu stays the control. */
-    it('puts a chevron in the place of the row menu in the full-width list', async () => {
+    /** The chevron is decoration, and the row menu in the menu slot stays the control (001920). */
+    it('puts a chevron at the end of the trail and the row menu in the menu slot in the full-width list', async () => {
       const { cmp } = await start();
       expect(cmp.split()).toBe(false);
-      const chevrons = document.querySelectorAll('.apps__menuSlot .apps__chev');
+      const chevrons = document.querySelectorAll('.apps__trail .apps__chev');
       expect(chevrons).toHaveLength(ROWS.length);
       expect(chevrons[0].getAttribute('aria-hidden')).toBe('true');
+      expect(document.querySelectorAll('.li__menu app-row-transitions-menu')).toHaveLength(ROWS.length);
     });
 
     it('formats an amount without a currency as euros', async () => {

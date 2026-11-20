@@ -42,10 +42,14 @@ describe('the list pane pages', () => {
     expect(src).not.toContain('fade.fade-y');
   });
 
+  /** The ⋮ of a row sits in the menu slot of the list item, which hides it at rest (001920). */
   it('shares the row menu of the applications, the bookings and the invoices', () => {
     for (const [scss, block] of PAGES.slice(0, 3)) {
       expect(read(scss)).toContain(`@include lp.hover-menu(${block});`);
       expect(read(scss)).not.toContain(`.${block}__menuSlot {`);
+      const html = read(scss.replace(/\.scss$/, '.html'));
+      expect(html).not.toContain('__menuSlot');
+      expect(html).toMatch(/<app-button-group menu>|<app-row-transitions-menu\s+menu\b/);
     }
   });
 
