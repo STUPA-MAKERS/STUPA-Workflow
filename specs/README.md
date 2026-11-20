@@ -845,6 +845,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/performance/loading/001280](requirements/non-functional/performance/loading/001280_skeleton-until-logos.md) | The Gremien list shows its skeleton until the logos have loaded | approved |
 | [NF/performance/loading/002000](requirements/non-functional/performance/loading/002000_read-ahead-on-intent.md) | A list reads the details of a row ahead only on a sign of intent | draft |
 | [NF/performance/loading/002001](requirements/non-functional/performance/loading/002001_navigation-marks-one-read.md) | The marks of the navigation come in one read, not on every page change | draft |
+| [NF/performance/loading/002003](requirements/non-functional/performance/loading/002003_lazy-editor-and-texts.md) | The Markdown editor and the DE texts load in chunks of their own | draft |
 | [NF/performance/rendering/002002](requirements/non-functional/performance/rendering/002002_zoneless.md) | The app runs its change detection without zone.js | draft |
 | [NF/privacy/personal-data/000185](requirements/non-functional/privacy/personal-data/000185_no-raw-ids.md) | The UI shows no raw IDs | approved |
 | [NF/privacy/personal-data/000186](requirements/non-functional/privacy/personal-data/000186_no-plain-ip.md) | The login audit has no plain IP address | approved |
