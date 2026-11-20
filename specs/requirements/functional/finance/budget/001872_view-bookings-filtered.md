@@ -2,7 +2,7 @@
 id: "001872"
 title: Buchungen ansehen opens the bookings of the cost centre and the year
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:

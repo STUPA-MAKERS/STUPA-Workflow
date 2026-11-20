@@ -2,7 +2,7 @@
 id: "001873"
 title: The cost centre card lists Anträge and bookings and links to both lists
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:

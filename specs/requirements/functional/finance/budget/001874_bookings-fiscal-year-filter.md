@@ -2,7 +2,7 @@
 id: "001874"
 title: The bookings list filters by Haushaltsjahr
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:

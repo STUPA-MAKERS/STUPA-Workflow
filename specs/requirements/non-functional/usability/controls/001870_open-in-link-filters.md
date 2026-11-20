@@ -2,7 +2,7 @@
 id: "001870"
 title: A link to a list page opens the list filtered to its source
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:

@@ -2,7 +2,7 @@
 id: "001871"
 title: The meeting list reads the Gremium filter from the URL
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:
