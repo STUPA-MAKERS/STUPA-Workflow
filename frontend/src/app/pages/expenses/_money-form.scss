@@ -76,14 +76,6 @@
   --chip-group-height: var(--control-height);
 }
 
-.mf__error {
-  margin: 0;
-  padding: 0 var(--space-4);
-  color: var(--color-danger);
-  font-size: var(--fs-small);
-}
-
-
 // One view: the form docks in the bar of the layout and fills the page like a detail.
 .mf--page .mf__body {
   padding: var(--space-4) 0 var(--mf-fab-room);

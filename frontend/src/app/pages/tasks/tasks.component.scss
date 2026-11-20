@@ -32,10 +32,6 @@
   @include lp.stack;
 }
 
-.tasks__dot {
-  margin-inline: 6px;
-  color: var(--color-text-subtle);
-}
 
 .tasks__trail {
   display: flex;
@@ -57,12 +53,6 @@
   font-size: 0.75rem;
   white-space: nowrap;
 }
-.tasks__chev {
-  display: inline-flex;
-  margin-inline-end: calc(-1 * var(--space-2));
-  color: var(--color-text-muted);
-}
-
 .tasks__detail {
   @include lp.detail;
 }

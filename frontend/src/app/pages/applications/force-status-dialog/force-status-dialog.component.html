@@ -48,7 +48,7 @@
       ></textarea>
     </app-textarea>
     @if (noteRequired() && note().length > 0 && noteMissing()) {
-      <p class="fsd__error" role="alert">{{ 'applications.detail.forceStatusNoteShort' | t }}</p>
+      <app-error-text [inset]="true">{{ 'applications.detail.forceStatusNoteShort' | t }}</app-error-text>
     }
   </div>
   <app-button dialog-footer variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>

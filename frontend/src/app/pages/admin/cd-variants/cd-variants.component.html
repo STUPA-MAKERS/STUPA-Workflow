@@ -66,11 +66,10 @@
                               <span class="cdv__thumb" aria-hidden="true"><app-icon [name]="logo.vendoredName ? 'pin' : 'file'" [size]="18" /></span>
                             }
                             <span class="cdv__logoText">
-                              <span class="cdv__logoHead">
+                              <span class="cdv__logoHead"><app-meta-line>
                                 <strong>{{ slotLabel(slot) }}</strong>
-                                <span class="cdv__dot" aria-hidden="true">·</span>
                                 <span class="cdv__muted">{{ (logo.vendoredName ? 'admin.cdVariants.sourceVendored' : 'admin.cdVariants.sourceUpload') | t }}</span>
-                              </span>
+                              </app-meta-line></span>
                               <span class="cdv__logoName mono">{{ logoDetail(logo) }}</span>
                               @if (logo.vendoredName) {
                                 <span class="cdv__logoHint">{{ 'admin.cdVariants.vendoredHint' | t }}</span>

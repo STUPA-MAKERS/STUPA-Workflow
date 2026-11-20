@@ -17,11 +17,10 @@
                   <app-status-text kind="accent">{{ 'admin.config.history.current' | t }}</app-status-text>
                 }
               </span>
-              <span class="vh__meta">
+              <span class="vh__meta"><app-meta-line>
                 <time class="mono" [attr.datetime]="rev.at">{{ rev.at | ldate: 'short' }}</time>
-                <span aria-hidden="true">·</span>
                 <span class="vh__actor ell" [appTruncated]="actor(rev)" #cut="appTruncated" [attr.title]="cut.truncated() ? actor(rev) : null">{{ actor(rev) }}</span>
-              </span>
+              </app-meta-line></span>
               <span class="vh__actions">
                 <app-button-group>
                   <app-button

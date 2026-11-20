@@ -23,42 +23,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { searchPlaceholder } from '@shared/util/search-placeholder';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import {
-  ButtonComponent,
-  ButtonGroupComponent,
-  CheckboxComponent,
-  ConfirmDialogComponent,
-  downloadBlob,
-  EmptyStateComponent,
-  FilterSelectComponent,
-  type FilterSelectOption,
-  filterChipText,
-  IconComponent,
-  InfiniteScrollDirective,
-  ListDetailLayoutComponent,
-  ListGroupComponent,
-  ListItemComponent,
-  LongPressDirective,
-  MEDIA,
-  mediaQuery,
-  RangeChipComponent,
-  type RangeValue,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-  type RowSwipeAction,
-  ScrollFadeDirective,
-  SearchPillComponent,
-  SelectionBarComponent,
-  SideSheetComponent,
-  SkeletonComponent,
-  StatusTextComponent,
-  StickyBarComponent,
-  ToastService,
-  DetailNoneComponent,
-  FabComponent,
-  PageHeaderComponent,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, CheckboxComponent, ConfirmDialogComponent, DetailNoneComponent, downloadBlob, EmptyStateComponent, FabComponent, filterChipText, FilterSelectComponent, type FilterSelectOption, IconComponent, InfiniteScrollDirective, ListDetailLayoutComponent, ListGroupComponent, ListItemComponent, LongPressDirective, MEDIA, mediaQuery, MetaLineComponent, PageHeaderComponent, RangeChipComponent, type RangeValue, RowMenuComponent, type RowMenuItem, type RowMenuSection, type RowSwipeAction, ScrollFadeDirective, SearchPillComponent, SelectionBarComponent, SideSheetComponent, SkeletonComponent, StatusTextComponent, StickyBarComponent, ToastService } from '@stupa-makers/ui-kit';
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { CostCentreSelectComponent } from '../budget/cost-centre-select/cost-centre-select.component';
 import {
@@ -96,6 +61,7 @@ import { TodosApiService } from '@core/api/todos.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
+import { RowChevronComponent } from '../../shared/ui/row-chevron/row-chevron.component';
 
 /** The two views of the page. Bookings are the default. */
 export type ExpensesTab = 'bookings' | 'transfers';
@@ -141,6 +107,8 @@ const SORTS: readonly {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowChevronComponent,
+    MetaLineComponent,
     PullRefreshDirective,
     InfiniteScrollDirective,
     CostCentreLabelComponent,

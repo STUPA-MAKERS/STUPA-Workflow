@@ -43,7 +43,7 @@
         <app-empty-state icon="list" shape="date" rows="3" [heading]="'applications.agenda.none' | t" />
       }
       @if (refusal(); as key) {
-        <p class="agd__refusal" role="alert">{{ key | t }}</p>
+        <app-error-text class="agd__refusal">{{ key | t }}</app-error-text>
       }
     </div>
 

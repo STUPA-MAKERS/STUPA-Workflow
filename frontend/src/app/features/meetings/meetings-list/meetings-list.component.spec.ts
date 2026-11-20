@@ -395,7 +395,7 @@ describe('MeetingsListComponent', () => {
       const view = await setup({ media: [MEDIA.phone], canCreate: false });
       load(view);
       const [liveRow] = screen.getAllByRole('listitem');
-      expect(liveRow.querySelector('.mtl__sub')?.textContent?.replace(/\s*·\s*/g, ' · ').trim()).toBe(
+      expect([...liveRow.querySelectorAll('.mtl__sub .ml__parts > *')].map((p) => p.textContent?.trim()).join(' · ')).toBe(
         'Live · seit 18:04 · 8 TOPs',
       );
       expect(liveRow.querySelector('.li')).toHaveClass('li--wrap');

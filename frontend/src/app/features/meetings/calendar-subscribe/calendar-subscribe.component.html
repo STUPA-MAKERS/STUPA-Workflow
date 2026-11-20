@@ -1,9 +1,9 @@
 <ng-template #body>
   @if (error()) {
-    <p class="cs__error" role="alert">{{ 'account.calendar.error' | t }}</p>
+    <app-error-text>{{ 'account.calendar.error' | t }}</app-error-text>
   }
   @if (rotateError()) {
-    <p class="cs__error" role="alert">{{ 'account.calendar.rotateError' | t }}</p>
+    <app-error-text>{{ 'account.calendar.rotateError' | t }}</app-error-text>
   }
   @if (fixedUrl(); as openUrl) {
     <span class="cs__label" id="{{ headingId }}-url">{{ 'account.calendar.urlLabel' | t }}</span>

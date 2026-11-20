@@ -26,6 +26,10 @@ import { ApplicationsListComponent, actionErrorKey } from './applications-list.c
 import { ApplicationsPageService } from './applications-page.service';
 import { loadErrorToast } from '../../../testing/load-error';
 
+/** The dots of the meta lines: one between two parts (001961). */
+const dots = (root: ParentNode = document) =>
+  [...root.querySelectorAll('.ml__parts')].reduce((n, l) => n + Math.max(0, l.children.length - 1), 0);
+
 /** The detail of the outlet. The detail has its own spec; here only the route matters. */
 @Component({
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -238,7 +242,7 @@ describe('ApplicationsListComponent', () => {
       });
       expect(screen.getByRole('link', { name: 'Ohne Titel' })).toBeInTheDocument();
       expect(screen.getByText('abc')).toBeInTheDocument();
-      expect(document.querySelector('.apps__dot')).toBeNull();
+      expect(dots()).toBe(0);
     });
 
     it('starts an archived row without state and type with the marker, not with a dot', async () => {
@@ -246,7 +250,7 @@ describe('ApplicationsListComponent', () => {
         rows: [row({ typeId: 'unknown', state: null, archivedAt: '2026-09-01T10:00:00Z' })],
       });
       expect(screen.getByText('Archiviert')).toBeInTheDocument();
-      expect(document.querySelector('.apps__dot')).toBeNull();
+      expect(dots()).toBe(0);
     });
 
     it('says that a draft is not submitted yet (001710)', async () => {
@@ -260,7 +264,7 @@ describe('ApplicationsListComponent', () => {
         rows: [row({ observed: true }), row({ id: 'r-bare', typeId: 'unknown', state: null, observed: true })],
       });
       expect(screen.getAllByText('Beobachtet')).toHaveLength(2);
-      expect(document.querySelectorAll('.apps__dot')).toHaveLength(2);
+      expect(dots()).toBe(2);
     });
 
     /** The chevron is decoration, and the row menu in the menu slot stays the control (001920). */

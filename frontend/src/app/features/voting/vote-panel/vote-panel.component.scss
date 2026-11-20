@@ -72,11 +72,9 @@
   background: none;
 }
 .vpn__cap {
-  font-size: var(--fs-cap);
+  font-size: var(--fs-small);
   line-height: 1rem;
   font-weight: var(--fw-semibold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 :host(.vpn--phone) .vpn__bar + .vpn__meta {
   margin-top: calc(-1 * var(--space-3));

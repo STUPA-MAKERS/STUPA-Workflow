@@ -7,15 +7,14 @@
           <app-icon class="df__icon" name="clip" [size]="18" />
           <div class="df__text">
             <span class="df__name" [title]="file.filename">{{ file.filename }}</span>
-            <span class="df__sub">
+            <span class="df__sub"><app-meta-line>
               <span>{{ size(file.size) }}</span>
-              <span class="df__sep" aria-hidden="true">·</span>
               @if (file.failed) {
                 <app-status-text kind="error">{{ 'apply.files.lost' | t }}</app-status-text>
               } @else {
                 <app-status-text [kind]="scan(file).kind">{{ scan(file).key | t }}</app-status-text>
               }
-            </span>
+            </app-meta-line></span>
           </div>
           <button
             type="button"
@@ -52,7 +51,7 @@
     <p class="df__summary">{{ summaryText() }}</p>
   }
   @if (error(); as e) {
-    <p class="df__error" role="alert">{{ e }}</p>
+    <app-error-text class="df__error">{{ e }}</app-error-text>
   }
 </app-section>
 

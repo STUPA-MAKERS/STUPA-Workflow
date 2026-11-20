@@ -5,21 +5,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import {
-  ButtonComponent,
-  ButtonGroupComponent,
-  EmptyStateComponent,
-  IconComponent,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-  SegBarComponent,
-  SheetBarComponent,
-  SheetBarTitleDirective,
-  SkeletonComponent,
-  StatusTextComponent,
-  SectionComponent,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, EmptyStateComponent, IconComponent, MetaLineComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, SectionComponent, SegBarComponent, SheetBarComponent, SheetBarTitleDirective, SkeletonComponent, StatusTextComponent } from '@stupa-makers/ui-kit';
 import { flowColorKind, invoiceStatus } from '@shared/ui';
 import { simplifyPathKey } from '@shared/budget-path';
 import type { BudgetTreeNode, Expense, Invoice } from '../../budget/budget-tree.api';
@@ -39,6 +25,7 @@ import { BookingRowComponent } from '../../budget/booking-row/booking-row.compon
 import { SumRowComponent } from '../../budget/booking-row/sum-row.component';
 import { dayMonth } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
+import { RowChevronComponent } from '../../../shared/ui/row-chevron/row-chevron.component';
 
 /**
  * The detail of a booking:
@@ -53,6 +40,8 @@ import { formatMoney } from '@shared/format-money';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowChevronComponent,
+    MetaLineComponent,
     SectionComponent,
     SumRowComponent,
     BookingRowComponent,

@@ -94,10 +94,10 @@
               @for (s of subRows(); track s.id) {
                 <app-booking-row mark [title]="s.description" [amount]="signed(s)">
                   <span meta
-                    ><span class="mono">{{ s.paymentDate ? (s.paymentDate | ldate: 'mediumDate') : '—' }}</span>
+                    ><app-meta-line><span class="mono">{{ s.paymentDate ? (s.paymentDate | ldate: 'mediumDate') : '—' }}</span>
                     @if (s.correspondent) {
-                      <span class="fd__dot" aria-hidden="true">·</span>{{ s.correspondent }}
-                    }</span
+                      <span>{{ s.correspondent }}</span>
+                    }</app-meta-line></span
                   >
                   @if (canManage()) {
                     <app-button-group>
@@ -124,13 +124,12 @@
         <dl class="fd__card fd__stack">
           <div>
             <dt>{{ 'expenses.detail.costCentreFy' | t }}</dt>
-            <dd class="fd__ccLine">
+            <dd class="fd__ccLine"><app-meta-line>
               <app-cost-centre-label [name]="ccTrail()" [color]="cc().color" />
               @if (fyLabel(); as fy) {
-                <span class="fd__dot" aria-hidden="true">·</span>
                 <span>{{ 'expenses.detail.fy' | t: { fy } }}</span>
               }
-            </dd>
+            </app-meta-line></dd>
           </div>
           <div>
             <dt>{{ 'expenses.detail.created' | t }}</dt>
@@ -194,7 +193,7 @@
                 @if (a.amount) {
                   <span class="mono fd__linkAmount">{{ a.amount }}</span>
                 }
-                <app-icon class="fd__chev" name="right" [size]="17" />
+                <app-row-chevron />
               </a>
             }
             @if (inv(); as i) {
@@ -204,20 +203,19 @@
                   <span class="fd__linkKind">{{ 'expenses.field.invoice' | t }}</span>
                   <span class="fd__linkTitle">{{ i.title || ('expenses.field.invoice' | t) }}</span>
                   @if (i.loaded; as loaded) {
-                    <span class="fd__linkMeta">
+                    <span class="fd__linkMeta"><app-meta-line>
                       @let st = invoiceStatus(loaded.status);
                       <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
                       @if (loaded.dueDate) {
-                        <span class="fd__dot" aria-hidden="true">·</span>
                         <span class="mono">{{ 'invoices.dueLine' | t: { date: (loaded.dueDate | ldate: 'mediumDate') } }}</span>
                       }
-                    </span>
+                    </app-meta-line></span>
                   }
                 </span>
                 @if (i.loaded; as loaded) {
                   <span class="mono fd__linkAmount">{{ money(loaded.grossAmount) }}</span>
                 }
-                <app-icon class="fd__chev" name="right" [size]="17" />
+                <app-row-chevron />
               </a>
               @if (i.booked; as b) {
                 <div class="fd__booked">

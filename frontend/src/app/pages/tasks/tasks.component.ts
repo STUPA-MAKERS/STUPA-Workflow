@@ -18,29 +18,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate, TranslationKey } from '@core/i18n/translations';
 import type { ApplicationListItem, ApplicationType, IsoDateTime, Uuid } from '@core/api/models';
 import { TodosApiService, type TodoMineItem } from '@core/api/todos.service';
-import {
-  EmptyStateComponent,
-  FilterSelectComponent,
-  type FilterSelectOption,
-  filterChipText,
-  IconComponent,
-  ListDetailLayoutComponent,
-  ListGroupComponent,
-  ListItemComponent,
-  liveSearch,
-  ScrollFadeDirective,
-  SearchPillComponent,
-  SkeletonComponent,
-  type StatusKind,
-  StatusTextComponent,
-  StickyBarComponent,
-  PageHeaderComponent,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-  MEDIA,
-  mediaQuery,
-} from '@stupa-makers/ui-kit';
+import { EmptyStateComponent, filterChipText, FilterSelectComponent, type FilterSelectOption, IconComponent, ListDetailLayoutComponent, ListGroupComponent, ListItemComponent, liveSearch, MEDIA, mediaQuery, MetaLineComponent, PageHeaderComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, ScrollFadeDirective, SearchPillComponent, SkeletonComponent, type StatusKind, StatusTextComponent, StickyBarComponent } from '@stupa-makers/ui-kit';
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import {
   flowColorKind,
@@ -55,6 +33,7 @@ import { applicationReads } from '../applications/application-reads';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import { RowChevronComponent } from '../../shared/ui/row-chevron/row-chevron.component';
 
 /** "Anzeigen": both groups, or one of them. */
 export type TasksShow = 'all' | 'applications' | 'todos';
@@ -123,6 +102,8 @@ interface TaskRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowChevronComponent,
+    MetaLineComponent,
     RowMenuComponent,
     PullRefreshDirective,
     LoadErrorComponent,

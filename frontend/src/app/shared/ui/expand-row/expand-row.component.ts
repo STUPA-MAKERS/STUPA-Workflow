@@ -9,6 +9,7 @@ import {
   output,
 } from '@angular/core';
 import { ButtonComponent, ButtonGroupComponent, IconComponent, ListItemComponent } from '@stupa-makers/ui-kit';
+import { RowChevronComponent } from '../row-chevron/row-chevron.component';
 
 let nextId = 0;
 
@@ -47,7 +48,7 @@ let nextId = 0;
   selector: 'app-expand-row',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonComponent, ButtonGroupComponent, IconComponent, ListItemComponent],
+  imports: [RowChevronComponent, ButtonComponent, ButtonGroupComponent, IconComponent, ListItemComponent],
   host: { '[class.xr--open]': 'open()' },
   templateUrl: './expand-row.component.html',
   styleUrl: './expand-row.component.scss',

@@ -17,6 +17,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
   DialogComponent,
+  ErrorTextComponent,
   InputComponent,
   TextareaComponent,
   ToastService,
@@ -48,7 +49,15 @@ export function messageError(message: string): TranslationKey | null {
   selector: 'app-gremium-notify-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, DialogComponent, InputComponent, TextareaComponent],
+  imports: [
+    FormsModule,
+    TranslatePipe,
+    ButtonComponent,
+    DialogComponent,
+    ErrorTextComponent,
+    InputComponent,
+    TextareaComponent,
+  ],
   templateUrl: './gremium-notify-dialog.component.html',
   styleUrl: './gremium-notify-dialog.component.scss',
 })

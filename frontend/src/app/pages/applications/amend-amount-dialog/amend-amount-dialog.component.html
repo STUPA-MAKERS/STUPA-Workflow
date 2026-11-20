@@ -31,7 +31,7 @@
         ></textarea>
       </app-textarea>
       @if (reasonShort()) {
-        <p class="aad__error" role="alert">{{ 'amendAmount.error.reasonShort' | t }}</p>
+        <app-error-text [inset]="true">{{ 'amendAmount.error.reasonShort' | t }}</app-error-text>
       }
     </div>
     <div class="aad__pair">
@@ -54,7 +54,7 @@
       />
     </div>
     @if (refusal()) {
-      <p class="aad__error" role="alert">{{ refusal() }}</p>
+      <app-error-text [inset]="true">{{ refusal() }}</app-error-text>
     }
     <button type="submit" hidden></button>
   </form>

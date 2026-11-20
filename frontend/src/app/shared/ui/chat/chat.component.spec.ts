@@ -17,6 +17,13 @@ import { I18nService } from '@core/i18n/i18n.service';
 import type { ChatEvent, ChatMessage, ChatVisibility, ChatVisibilityGuard } from './chat.models';
 import type { ChatPerson } from './chat-mentions';
 
+/** The text of `el` with a space between the parts of each meta line (the dots are CSS). */
+function spaced(el: Element | null | undefined): string {
+  const copy = el?.cloneNode(true) as Element | undefined;
+  copy?.querySelectorAll('.ml__parts > *').forEach((part) => part.before(' '));
+  return (copy?.textContent ?? '').replace(/\s+/g, ' ').trim();
+}
+
 /** A time today, so the day separator reads "Heute". */
 function today(h: number, m = 0): string {
   const d = new Date();
@@ -509,12 +516,10 @@ describe('ChatComponent', () => {
         msg('f', today(10), { own: true, state: 'failed' }),
       ],
     });
-    const metas = [...view.container.querySelectorAll('.chat__meta')].map((m) =>
-      m.textContent?.replace(/\s+/g, ' ').trim(),
-    );
+    const metas = [...view.container.querySelectorAll('.chat__meta')].map((m) => spaced(m));
     expect(metas).toEqual([
       'bearbeitet',
-      '09:01·bearbeitet',
+      '09:01 bearbeitet',
       'wird gesendet …',
       'Nicht gesendet Erneut senden Bearbeiten Verwerfen',
     ]);

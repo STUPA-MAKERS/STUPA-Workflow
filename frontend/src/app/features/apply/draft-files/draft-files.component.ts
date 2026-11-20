@@ -2,15 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output, si
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { scanStatus } from '@shared/status-kind.util';
-import {
-  ConfirmDialogComponent,
-  FileDropZoneComponent,
-  formatBytes,
-  IconComponent,
-  StatusTextComponent,
-  ToastService,
-  SectionComponent,
-} from '@stupa-makers/ui-kit';
+import { ConfirmDialogComponent, FileDropZoneComponent, formatBytes, IconComponent, MetaLineComponent, SectionComponent, StatusTextComponent, ToastService, ErrorTextComponent } from '@stupa-makers/ui-kit';
 import { UPLOAD_ACCEPT } from '../apply.util';
 import { DraftAttachmentsService, type DraftFile } from '../draft-attachments.service';
 
@@ -34,6 +26,8 @@ import { DraftAttachmentsService, type DraftFile } from '../draft-attachments.se
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ErrorTextComponent,
+    MetaLineComponent,
     SectionComponent,
     TranslatePipe,
     ConfirmDialogComponent,

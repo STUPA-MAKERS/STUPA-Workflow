@@ -16,6 +16,7 @@ import {
   IconComponent,
   SwitchComponent,
   parseMoney,
+  ErrorTextComponent,
 } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -23,6 +24,7 @@ import { formatMoney } from '@shared/format-money';
 import { withEntry, withoutEntry } from '@shared/util/immutable';
 import { type CostLine, costLine, placeholderReasons } from '@shared/forms/form-rules';
 import { POSITION_FILES, newPositionId } from '@shared/forms/position-files';
+import { RowChevronComponent } from '../../ui/row-chevron/row-chevron.component';
 
 /** A comparison offer within a cost position. */
 interface Offer {
@@ -88,6 +90,8 @@ let nextUid = 0;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ErrorTextComponent,
+    RowChevronComponent,
     ButtonComponent,
     ButtonGroupComponent,
     IconComponent,

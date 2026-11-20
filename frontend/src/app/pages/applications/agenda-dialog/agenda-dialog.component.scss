@@ -95,10 +95,7 @@
 }
 
 .agd__refusal {
-  margin: 0;
-  padding: 0 4px;
-  color: var(--color-danger);
-  font-size: 0.8125rem;
+  padding-inline: var(--space-1);
 }
 .agd__switchLabel {
   font-weight: var(--fw-medium);

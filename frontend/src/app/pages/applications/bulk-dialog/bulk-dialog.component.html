@@ -74,7 +74,7 @@
         </label>
       }
       @if (failed()) {
-        <p class="bkd__refusal" role="alert">{{ 'applications.actions.error' | t }}</p>
+        <app-error-text class="bkd__refusal">{{ 'applications.actions.error' | t }}</app-error-text>
       }
       <button type="submit" hidden></button>
     </form>

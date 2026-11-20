@@ -59,14 +59,13 @@
             @for (e of rows(); track e.id) {
               @let cc = costCentre(e);
               <app-booking-row [title]="e.description" [amount]="signed(e)">
-                  <span meta class="fd__linkMeta">
+                  <span meta class="fd__linkMeta"><app-meta-line>
                     <span>{{ (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</span>
-                    <span class="fd__dot" aria-hidden="true">·</span>
                     <span class="fd__linkCc" [title]="cc.name">{{ cc.name }}</span>
                     @if (day(e.paymentDate ?? e.createdAt); as d) {
-                      <span class="fd__dot" aria-hidden="true">·</span><span class="mono">{{ d }}</span>
+                      <span class="mono">{{ d }}</span>
                     }
-                  </span>
+                  </app-meta-line></span>
               </app-booking-row>
             }
             <app-sum-row strong [label]="'expenses.bulk.sum' | t" [amount]="sum()" />

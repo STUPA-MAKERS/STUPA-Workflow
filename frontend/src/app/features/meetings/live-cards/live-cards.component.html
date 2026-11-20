@@ -30,13 +30,12 @@
       </div>
     }
     @if (c.vote; as v) {
-      <p class="lc__voteLine">
+      <p class="lc__voteLine"><app-meta-line>
         <app-status-text kind="accent">{{ 'meetings.overview.voteOpen' | t }}</app-status-text>
         @if (v.ballot) {
-          <span class="lc__dot" aria-hidden="true">·</span>
           <span>{{ (v.ballot === 'cast' ? 'dashboard.today.voted' : 'dashboard.today.voteMissing') | t }}</span>
         }
-      </p>
+      </app-meta-line></p>
     }
     <a class="lc__join" [routerLink]="['/meetings', c.meeting.id]">
       <app-icon name="play" [size]="14" />

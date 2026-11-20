@@ -17,6 +17,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { clock } from '@shared/date-format';
 import { toggled } from '@shared/util/immutable';
+import { RowChevronComponent } from '../row-chevron/row-chevron.component';
 
 /** One changed field of an event, for example of a new version. */
 export interface HistoryChange {
@@ -92,7 +93,7 @@ let nextId = 0;
   selector: 'app-history',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconComponent, RouterLink, StatusTextComponent, TranslatePipe],
+  imports: [RowChevronComponent, IconComponent, RouterLink, StatusTextComponent, TranslatePipe],
   templateUrl: './history.component.html',
   styleUrl: './history.component.scss',
 })

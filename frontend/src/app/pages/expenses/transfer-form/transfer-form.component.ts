@@ -15,6 +15,7 @@ import {
   TextareaComponent,
   ScrollFadeDirective,
   SectionComponent,
+  ErrorTextComponent,
 } from '@stupa-makers/ui-kit';
 import { formatMoney } from '@shared/format-money';
 import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
@@ -62,6 +63,7 @@ interface LegFree {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ErrorTextComponent,
     SectionComponent,
     ScrollFadeDirective,
     PaneFormHeadComponent,

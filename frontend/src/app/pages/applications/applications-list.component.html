@@ -228,39 +228,28 @@
                           }}</span></app-checkbox
                         >
                       }
-                      <span sub>
+                      <span sub><app-meta-line>
                         @if (row.stateLabel) {
                           <app-status-text [kind]="row.stateKind">{{ row.stateLabel }}</app-status-text>
-                        }
-                        @if (row.stateLabel && row.typeLabel) {
-                          <span class="apps__dot" aria-hidden="true">·</span>
                         }
                         @if (row.typeLabel) {
                           <span>{{ row.typeLabel }}</span>
                         }
                         @if (row.item.archivedAt) {
-                          @if (row.stateLabel || row.typeLabel) {
-                            <span class="apps__dot" aria-hidden="true">·</span>
-                          }
                           <span class="apps__archived">
                             <app-icon name="archive" [size]="13" />{{ 'applications.list.archivedRow' | t }}
                           </span>
                         }
                         @if (row.item.observed) {
-                          @if (row.stateLabel || row.typeLabel || row.item.archivedAt) {
-                            <span class="apps__dot" aria-hidden="true">·</span>
-                          }
                           <span class="apps__archived">
                             <app-icon name="eye" [size]="13" />{{ 'observers.observed' | t }}
                           </span>
                         }
-                      </span>
+                      </app-meta-line></span>
                       <span trail class="apps__trail">
                         <app-amount [amount]="row.amount" [approved]="row.approved" layout="stack" />
                         @if (!split()) {
-                          <span class="apps__chev" aria-hidden="true">
-                            <app-icon name="right" [size]="17" />
-                          </span>
+                          <app-row-chevron class="apps__chev" />
                         }
                       </span>
                       <app-row-transitions-menu

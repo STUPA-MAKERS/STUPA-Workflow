@@ -32,7 +32,7 @@ const norm = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').tr
 /** The visible parts of an element, each part one element of text, joined by " | ". */
 const parts = (el: Element, selector: string) =>
   [...el.querySelectorAll(selector)].map((p) => norm(p.textContent)).join(' | ');
-const ROW = '.pv__name, .pv__sub > *, .pv__amount';
+const ROW = '.pv__name, .pv__sub .ml__parts > *, .pv__amount';
 
 describe('PositionsViewComponent', () => {
   /** Without comparison offers the row shows the count and the warning instead of the supplier. */
@@ -41,8 +41,8 @@ describe('PositionsViewComponent', () => {
     const buttons = screen.getAllByRole('button');
     expect(buttons).toHaveLength(2);
     expect(buttons[0]).toHaveAttribute('aria-expanded', 'false');
-    expect(parts(buttons[0], ROW)).toBe('Raummiete | 3 Angebote | · | bevorzugt: Studierendenwerk | 450,00 €');
-    expect(parts(buttons[1], ROW)).toBe('Technik | 1 Angebot | · | ohne Vergleichsangebote | 420,00 €');
+    expect(parts(buttons[0], ROW)).toBe('Raummiete | 3 Angebote | bevorzugt: Studierendenwerk | 450,00 €');
+    expect(parts(buttons[1], ROW)).toBe('Technik | 1 Angebot | ohne Vergleichsangebote | 420,00 €');
     expect(container.querySelector('.pv__offers')).toBeNull();
     expect(parts(container.querySelector('.pv__total')!, 'span')).toBe('Gesamtbetrag | 870,00 €');
   });

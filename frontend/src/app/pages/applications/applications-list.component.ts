@@ -30,39 +30,7 @@ import type {
 } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
-import {
-  ButtonComponent,
-  ButtonGroupComponent,
-  CheckboxComponent,
-  ConfirmDialogComponent,
-  CurrencyInputComponent,
-  DatepickerComponent,
-  EmptyStateComponent,
-  FilterSelectComponent,
-  IconComponent,
-  InfiniteScrollDirective,
-  ListDetailLayoutComponent,
-  ListGroupComponent,
-  ListItemComponent,
-  LongPressDirective,
-  MEDIA,
-  mediaQuery,
-  RowMenuComponent,
-  type RowMenuItem,
-  SelectionBarComponent,
-  type RowMenuSection,
-  type RowSwipeAction,
-  ScrollFadeDirective,
-  SearchPillComponent,
-  SideSheetComponent,
-  SkeletonComponent,
-  type StatusKind,
-  StatusTextComponent,
-  StickyBarComponent,
-  ToastService,
-  FabComponent,
-  PageHeaderComponent,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, CheckboxComponent, ConfirmDialogComponent, CurrencyInputComponent, DatepickerComponent, EmptyStateComponent, FabComponent, FilterSelectComponent, IconComponent, InfiniteScrollDirective, ListDetailLayoutComponent, ListGroupComponent, ListItemComponent, LongPressDirective, MEDIA, mediaQuery, MetaLineComponent, PageHeaderComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, type RowSwipeAction, ScrollFadeDirective, SearchPillComponent, SelectionBarComponent, SideSheetComponent, SkeletonComponent, type StatusKind, StatusTextComponent, StickyBarComponent, ToastService } from '@stupa-makers/ui-kit';
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { flowColorKind } from '@shared/ui';
 import { exportDownload } from '@shared/download.util';
@@ -91,6 +59,7 @@ import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.direc
 import { withEntry, withoutKey } from '@shared/util/immutable';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import { RowChevronComponent } from '../../shared/ui/row-chevron/row-chevron.component';
 
 /**
  * One filter of the list.
@@ -168,6 +137,8 @@ type FilterSheet = 'more' | null;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowChevronComponent,
+    MetaLineComponent,
     PullRefreshDirective,
     InfiniteScrollDirective,
     AmountComponent,

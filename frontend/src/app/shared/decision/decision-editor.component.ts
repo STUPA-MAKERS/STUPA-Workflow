@@ -10,6 +10,7 @@ import {
   MoveButtonsComponent,
   moveItem,
   SwitchComponent,
+  ErrorTextComponent,
 } from '@stupa-makers/ui-kit';
 import {
   MAX_CONDITIONS,
@@ -31,7 +32,7 @@ import { formatMoney } from '../format-money';
   selector: 'app-decision-editor',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MoveButtonsComponent, FormsModule, TranslatePipe, ButtonComponent, ButtonGroupComponent, CurrencyInputComponent, IconComponent, SwitchComponent],
+  imports: [ErrorTextComponent, MoveButtonsComponent, FormsModule, TranslatePipe, ButtonComponent, ButtonGroupComponent, CurrencyInputComponent, IconComponent, SwitchComponent],
   templateUrl: './decision-editor.component.html',
   styleUrl: './decision-editor.component.scss',
 })

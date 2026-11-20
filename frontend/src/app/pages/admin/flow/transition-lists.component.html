@@ -15,13 +15,13 @@
                   }
                   <span class="ell">{{ r.label || r.from + ' → ' + r.to }}</span>
                 </span>
-                <span class="tl__meta">
-                  <span><span class="mono">{{ r.from }} → {{ r.to }}</span><span aria-hidden="true"> ·</span></span>
+                <span class="tl__meta"><app-meta-line>
+                  <span class="mono">{{ r.from }} → {{ r.to }}</span>
                   @if (r.branch) {
-                    <span>{{ r.branch }}<span aria-hidden="true"> ·</span></span>
+                    <span>{{ r.branch }}</span>
                   }
                   <span>{{ r.guard }}</span>
-                </span>
+                </app-meta-line></span>
               </button>
             </li>
           }

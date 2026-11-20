@@ -3,21 +3,7 @@ import { RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import {
-  ButtonComponent,
-  ButtonGroupComponent,
-  EmptyStateComponent,
-  IconComponent,
-  NoteComponent,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-  SegBarComponent,
-  SheetBarComponent,
-  SheetBarTitleDirective,
-  StatusTextComponent,
-  SectionComponent,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, EmptyStateComponent, IconComponent, MetaLineComponent, NoteComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, SectionComponent, SegBarComponent, SheetBarComponent, SheetBarTitleDirective, StatusTextComponent } from '@stupa-makers/ui-kit';
 import {
   invoiceStatus,
 } from '@shared/ui';
@@ -32,6 +18,7 @@ import { bookedOn } from '../invoice-figures';
 import { TodoLinkedListComponent } from '../../../features/todos/linked-list/todo-linked-list.component';
 import { dayMonth, daysUntil } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
+import { RowChevronComponent } from '../../../shared/ui/row-chevron/row-chevron.component';
 
 /**
  * The detail of an invoice:
@@ -47,6 +34,8 @@ import { formatMoney } from '@shared/format-money';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowChevronComponent,
+    MetaLineComponent,
     SectionComponent,
     NoteComponent,
     EmptyStateComponent,

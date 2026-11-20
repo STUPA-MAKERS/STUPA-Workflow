@@ -19,22 +19,10 @@ import { resolveI18n } from '@shared/forms/i18n-text';
 import { groupByMonth, type MonthGroup } from '@shared/group-by-month';
 import { flowColorKind } from '@shared/status-kind.util';
 import { AmountComponent } from '@shared/ui/amount/amount.component';
-import {
-  EmptyStateComponent,
-  IconComponent,
-  ListDetailLayoutComponent,
-  ListGroupComponent,
-  ListItemComponent,
-  PageHeaderComponent,
-  ScrollFadeDirective,
-  SearchPillComponent,
-  StickyBarComponent,
-  SkeletonComponent,
-  StatusTextComponent,
-  type StatusKind,
-} from '@stupa-makers/ui-kit';
+import { EmptyStateComponent, IconComponent, ListDetailLayoutComponent, ListGroupComponent, ListItemComponent, MetaLineComponent, PageHeaderComponent, ScrollFadeDirective, SearchPillComponent, SkeletonComponent, type StatusKind, StatusTextComponent, StickyBarComponent } from '@stupa-makers/ui-kit';
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { MY_APPLICATIONS_PAGE, type MyApplicationsPage } from './my-applications-page';
+import { RowChevronComponent } from '../../shared/ui/row-chevron/row-chevron.component';
 
 /** One row of the list, in the shape of the rows of the list "Anträge". */
 interface MyRow {
@@ -67,6 +55,8 @@ interface MyRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowChevronComponent,
+    MetaLineComponent,
     RouterOutlet,
     TranslatePipe,
     AmountComponent,

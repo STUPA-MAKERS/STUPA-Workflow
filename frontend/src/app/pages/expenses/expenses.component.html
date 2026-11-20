@@ -164,20 +164,17 @@
                       linkQueryParamsHandling="merge"
                       [selected]="t.transferId === selectedTransferId()"
                     >
-                      <span sub class="exp__sub">
+                      <span sub class="exp__sub"><app-meta-line>
                         <span class="mono">{{ day(t.paymentDate ?? t.createdAt) }}</span>
-                        <span class="exp__dot" aria-hidden="true">·</span>
                         <app-cost-centre-label class="exp__cc" [title]="from.name" [name]="from.name" [color]="from.color" />
                         <app-icon class="exp__arrow" name="arrow" [size]="13" />
                         <span class="sr-only">{{ 'expenses.transfers.to' | t }}</span>
                         <app-cost-centre-label class="exp__cc" [title]="to.name" [name]="to.name" [color]="to.color" />
-                      </span>
+                      </app-meta-line></span>
                       <span trail class="exp__trail">
                         <span class="mono exp__amount">{{ money(t.amount) }}</span>
                         @if (!split()) {
-                          <span class="exp__chev" aria-hidden="true">
-                            <app-icon name="right" [size]="17" />
-                          </span>
+                          <app-row-chevron />
                         }
                       </span>
                       @if (canChange(t.fiscalYearId)) {
@@ -255,29 +252,25 @@
                           }}</span></app-checkbox
                         >
                       }
-                      <span sub class="exp__sub">
+                      <span sub class="exp__sub"><app-meta-line>
                         <app-status-text [kind]="e.kind === 'income' ? 'accent' : 'muted'">{{
                           (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t
                         }}</app-status-text>
-                        <span class="exp__dot" aria-hidden="true">·</span>
                         <app-cost-centre-label class="exp__cc" [title]="cc.name" [name]="cc.name" [color]="cc.color" />
                         @if (day(e.paymentDate ?? e.createdAt); as d) {
-                          <span class="exp__dot" aria-hidden="true">·</span>
                           <span class="mono">{{ d }}</span>
                         }
                         @if (e.invoiceId) {
                           <app-icon class="exp__receipt" name="receipt" [size]="13" />
                           <span class="sr-only">{{ 'expenses.withInvoice' | t }}</span>
                         }
-                      </span>
+                      </app-meta-line></span>
                       <span trail class="exp__trail">
                         <span class="mono exp__amount" [class.exp__amount--in]="e.kind === 'income'">{{
                           signed(e)
                         }}</span>
                         @if (!selecting() && !split()) {
-                          <span class="exp__chev" aria-hidden="true">
-                            <app-icon name="right" [size]="17" />
-                          </span>
+                          <app-row-chevron />
                         }
                       </span>
                       @if (menu.length) {

@@ -27,6 +27,7 @@ import {
   type SelectOption,
   TextareaComponent,
   ToastService,
+  ErrorTextComponent,
 } from '@stupa-makers/ui-kit';
 
 /** The shortest reason of a change (spec 001620, as the server). */
@@ -62,6 +63,7 @@ function toNumber(value: string | null | undefined): number | null {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ErrorTextComponent,
     FormsModule,
     TranslatePipe,
     ButtonComponent,

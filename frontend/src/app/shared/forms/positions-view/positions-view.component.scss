@@ -1,5 +1,3 @@
-@use 'display' as d;
-
 :host {
   display: block;
   min-width: 0;
@@ -49,19 +47,6 @@
   outline-offset: -2px;
 }
 
-.pv__chev {
-  flex: none;
-  color: var(--color-text-muted);
-  transition: transform var(--motion-base) var(--ease-standard);
-}
-.pv__chev--open {
-  transform: rotate(180deg);
-}
-@include d.host-on(motion) {
-  .pv__chev {
-    transition: none;
-  }
-}
 
 .pv__text {
   display: flex;
@@ -87,10 +72,6 @@
 }
 .pv__count {
   flex: none;
-}
-.pv__dot {
-  flex: none;
-  color: var(--color-text-subtle);
 }
 .pv__pref {
   flex: 1 1 auto;

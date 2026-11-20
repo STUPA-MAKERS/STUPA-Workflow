@@ -24,14 +24,12 @@
 
 <ng-template #actions><ng-content /></ng-template>
 
-<ng-template #subtitle>
+<ng-template #subtitle><app-meta-line>
   <app-status-text class="mh__barStatus" [kind]="statusKind()">{{ statusText() }}</app-status-text>
   @if (sub()) {
-    <span aria-hidden="true">·</span>
     <span class="mh__barSub">{{ sub() }}</span>
   }
   @if (link(); as l) {
-    <span aria-hidden="true">·</span>
     <a class="mh__link" [routerLink]="l.to">{{ l.label }}</a>
   }
-</ng-template>
+</app-meta-line></ng-template>

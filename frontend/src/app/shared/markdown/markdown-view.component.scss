@@ -113,10 +113,8 @@
   hyphens: auto;
 }
 .mdv th {
-  font-size: var(--fs-cap);
+  font-size: var(--fs-small);
   font-weight: var(--fw-semibold);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-cap);
   color: var(--table-head-fg, var(--color-text-subtle));
   white-space: nowrap;
 }

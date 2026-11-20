@@ -17,25 +17,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { Attachment, ScanState, Uuid } from '@core/api/models';
-import {
-  ButtonComponent,
-  ButtonGroupComponent,
-  CheckboxComponent,
-  ConfirmDialogComponent,
-  DropOverlayComponent,
-  EmptyStateComponent,
-  FileDropDirective,
-  FileViewerComponent,
-  type FileViewerItem,
-  IconComponent,
-  LongPressDirective,
-  matchesMedia,
-  MEDIA,
-  SelectionBarComponent,
-  StatusTextComponent,
-  ToastService,
-  SectionComponent,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, CheckboxComponent, ConfirmDialogComponent, DropOverlayComponent, EmptyStateComponent, FileDropDirective, FileViewerComponent, type FileViewerItem, IconComponent, LongPressDirective, matchesMedia, MEDIA, MetaLineComponent, SectionComponent, SelectionBarComponent, StatusTextComponent, ToastService } from '@stupa-makers/ui-kit';
 import { scanStatus } from '@shared/status-kind.util';
 import {
   ImageThumbComponent,
@@ -75,6 +57,7 @@ import { formatBytes } from './applications.util';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    MetaLineComponent,
     SectionComponent,
     DropOverlayComponent,
     EmptyStateComponent,

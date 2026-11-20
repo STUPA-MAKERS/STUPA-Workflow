@@ -148,15 +148,15 @@
     (activate)="open(m.id)"
   >
     <app-date-block lead [date]="day(m)" [live]="m.status === 'live'" [muted]="past" />
-    <span sub class="mtl__sub">
+    <span sub class="mtl__sub"><app-meta-line>
       <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
       @if (phone()) {
-        <span class="mtl__dot" aria-hidden="true">·</span><span class="mono">{{ time(m) }}</span>
-        <span class="mtl__dot" aria-hidden="true">·</span><span>{{ tops(m) }}</span>
+        <span class="mono">{{ time(m) }}</span>
+        <span>{{ tops(m) }}</span>
       } @else if (m.gremiumName) {
-        <span class="mtl__dot" aria-hidden="true">·</span><span>{{ m.gremiumName }}</span>
+        <span>{{ m.gremiumName }}</span>
       }
-    </span>
+    </app-meta-line></span>
     <span trail class="mtl__trail">
       @if (!phone()) {
         <span class="mtl__facts">

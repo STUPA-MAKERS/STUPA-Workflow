@@ -11,19 +11,7 @@ import {
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import {
-  ButtonComponent,
-  ButtonGroupComponent,
-  ConfigDiffComponent,
-  ConfirmDialogComponent,
-  EmptyStateComponent,
-  IconComponent,
-  SkeletonComponent,
-  StatusTextComponent,
-  ToastService,
-  TruncatedDirective,
-  SectionComponent,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, ConfigDiffComponent, ConfirmDialogComponent, EmptyStateComponent, IconComponent, MetaLineComponent, SectionComponent, SkeletonComponent, StatusTextComponent, ToastService, TruncatedDirective } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { ConfigRevision, ConfigRevisionDiff } from '../admin.models';
 import type { LoadState } from '@shared/forms/settings-form';
@@ -43,6 +31,7 @@ import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-stat
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    MetaLineComponent,
     LoadStateComponent,
     SectionComponent,
     EmptyStateComponent,

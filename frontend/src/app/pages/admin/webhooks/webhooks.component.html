@@ -78,7 +78,7 @@
                       </div>
                     </dl>
                     @if (s.lastState === 'dead') {
-                      <p class="wh__dead" role="alert">{{ 'admin.webhook.delivery.deadHint' | t }}</p>
+                      <app-error-text>{{ 'admin.webhook.delivery.deadHint' | t }}</app-error-text>
                     }
                   } @else {
                     <app-empty-state icon="send" rows="1" [heading]="'admin.webhook.delivery.none' | t" />

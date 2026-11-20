@@ -32,11 +32,11 @@
                 @for (e of hits(); track e.kind + e.id) {
                   <app-list-item role="listitem" [title]="e.title" [wrap]="true" (activate)="jump(e)">
                     <span lead class="cal__lead"><app-icon [name]="icon(e.kind)" /></span>
-                    <span sub class="cal__sub">
+                    <span sub class="cal__sub"><app-meta-line>
                       <span class="mono">{{ hitWhen(e) }}</span>
-                      <span aria-hidden="true">·</span><span>{{ kindKey(e.kind) | t }}</span>
-                      @if (e.source) {<span aria-hidden="true">·</span><span>{{ e.source }}</span>}
-                    </span>
+                      <span>{{ kindKey(e.kind) | t }}</span>
+                      @if (e.source) {<span>{{ e.source }}</span>}
+                    </app-meta-line></span>
                   </app-list-item>
                 }
               </div>
@@ -299,13 +299,13 @@
   </div>
 }
 
-<ng-template #facts let-e let-place="place">
+<ng-template #facts let-e let-place="place"><app-meta-line>
   <app-status-text kind="neutral">{{ kindKey(e.kind) | t }}</app-status-text>
-  @if (time(e); as when) {<span aria-hidden="true">·</span><span class="mono">{{ when }}</span>}
-  @if (e.source) {<span aria-hidden="true">·</span><span>{{ e.source }}</span>}
-  @if (place && e.place) {<span aria-hidden="true">·</span><span>{{ e.place }}</span>}
-  @if (e.myAnswer) {<span aria-hidden="true">·</span><app-status-text [kind]="answerKind(e.myAnswer)">{{ answerKey(e.myAnswer) | t }}</app-status-text>}
-</ng-template>
+  @if (time(e); as when) {<span class="mono">{{ when }}</span>}
+  @if (e.source) {<span>{{ e.source }}</span>}
+  @if (place && e.place) {<span>{{ e.place }}</span>}
+  @if (e.myAnswer) {<app-status-text [kind]="answerKind(e.myAnswer)">{{ answerKey(e.myAnswer) | t }}</app-status-text>}
+</app-meta-line></ng-template>
 
 <ng-template #chips>
   @if (!isPublic) {

@@ -25,29 +25,7 @@ import type {
   Uuid,
 } from '@core/api/models';
 import { langFieldLabel, resolveI18n, sameI18n, setI18n } from '@shared/forms/i18n-text';
-import {
-  ButtonComponent,
-  ButtonGroupComponent,
-  CheckboxComponent,
-  EmptyStateComponent,
-  IconComponent,
-  InputComponent,
-  MEDIA,
-  mediaQuery,
-  MoveButtonsComponent,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-  ScrollFadeDirective,
-  SelectFieldComponent,
-  type SelectOption,
-  SideSheetComponent,
-  StatusTextComponent,
-  ToastService,
-  FabComponent,
-  PageHeaderComponent,
-  scrollBehavior,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, CheckboxComponent, EmptyStateComponent, FabComponent, IconComponent, InputComponent, MEDIA, mediaQuery, MetaLineComponent, MoveButtonsComponent, PageHeaderComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, scrollBehavior, ScrollFadeDirective, SelectFieldComponent, type SelectOption, SideSheetComponent, StatusTextComponent, ToastService } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import { VersionHistoryComponent } from '../version-history/version-history.component';
@@ -121,6 +99,7 @@ type QPos = QuestionPos;
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ContentLangState],
   imports: [
+    MetaLineComponent,
     ContentLangSwitchComponent,
     MoveButtonsComponent,
     I18nInputComponent,

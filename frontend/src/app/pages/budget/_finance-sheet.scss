@@ -139,10 +139,6 @@
 .fd__swatch {
   @include swatch.mark;
 }
-.fd__dot {
-  margin-inline: 6px;
-  color: var(--color-text-subtle);
-}
 .fd__ccLine {
   --ccl-gap: 8px;
 }
@@ -167,10 +163,6 @@
   outline-offset: -2px;
 }
 .fd__linkIcon,
-.fd__chev {
-  flex: none;
-  color: var(--color-text-muted);
-}
 // The icon stands beside the first line (the kind), not in the middle of a row of three
 // lines: centred, it sat below the kind and the title, and the text looked indented.
 .fd__linkIcon {

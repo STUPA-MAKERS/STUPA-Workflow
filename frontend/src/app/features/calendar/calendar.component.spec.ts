@@ -17,6 +17,13 @@ import { CALENDAR_NOW } from './calendar-grid.util';
 import { CalendarComponent } from './calendar.component';
 import { VIEW_STORAGE_KEY } from './calendar.util';
 
+/** The text of `el` with a space between the parts of each meta line (the dots are CSS). */
+function spaced(el: Element | null | undefined): string {
+  const copy = el?.cloneNode(true) as Element | undefined;
+  copy?.querySelectorAll('.ml__parts > *').forEach((part) => part.before(' '));
+  return (copy?.textContent ?? '').replace(/\s+/g, ' ').trim();
+}
+
 /** "Now" of the tests: Wednesday, 11.11.2026, 10:00. */
 const NOW = new Date(2026, 10, 11, 10, 0);
 
@@ -692,8 +699,8 @@ describe('CalendarComponent (phone)', () => {
     ]);
     expect(screen.getAllByText('Klausurtagung')).toHaveLength(3);
     const row = screen.getByText('Jour fixe').closest('[role="listitem"]') as HTMLElement;
-    expect(row.querySelector('.cal__sub')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-      'Termin·14:00 – 15:30·Haushaltsausschuss·Zusage',
+    expect(spaced(row.querySelector('.cal__sub'))).toBe(
+      'Termin 14:00 – 15:30 Haushaltsausschuss Zusage',
     );
     expect(await runAxe(view.container)).toHaveNoViolations();
   });

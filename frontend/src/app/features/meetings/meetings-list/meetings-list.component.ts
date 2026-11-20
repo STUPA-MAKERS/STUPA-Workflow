@@ -16,28 +16,7 @@ import type { Meeting, Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { meetingStatus, type StatusView } from '@shared/status-kind.util';
-import {
-  FabComponent,
-  ButtonComponent,
-  ButtonGroupComponent,
-  DateBlockComponent,
-  EmptyStateComponent,
-  FilterSelectComponent,
-  IconComponent,
-  ListGroupComponent,
-  ListItemComponent,
-  MEDIA,
-  mediaQuery,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-  ScrollFadeDirective,
-  SearchPillComponent,
-  SkeletonComponent,
-  StatusTextComponent,
-  StickyBarComponent,
-  PageHeaderComponent,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, DateBlockComponent, EmptyStateComponent, FabComponent, FilterSelectComponent, IconComponent, ListGroupComponent, ListItemComponent, MEDIA, mediaQuery, MetaLineComponent, PageHeaderComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, ScrollFadeDirective, SearchPillComponent, SkeletonComponent, StatusTextComponent, StickyBarComponent } from '@stupa-makers/ui-kit';
 import { meetingDay, meetingTimeText } from '../meetings-display.util';
 import { type MeetingGroup, overviewGroups, topsLabel } from '../meetings-overview.util';
 import { MeetingsTimelineService } from '../meetings-timeline.service';
@@ -66,6 +45,7 @@ import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pu
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    MetaLineComponent,
     PullRefreshDirective,
     RowChevronComponent,
     PageHeaderComponent,

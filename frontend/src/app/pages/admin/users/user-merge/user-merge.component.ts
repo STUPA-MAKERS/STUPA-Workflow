@@ -92,12 +92,14 @@ interface ConflictProblem {
  */
 import type { LoadState } from '@shared/forms/settings-form';
 import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
+import { RowChevronComponent } from '../../../../shared/ui/row-chevron/row-chevron.component';
 
 @Component({
   selector: 'app-user-merge',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowChevronComponent,
     LoadStateComponent,
     SectionComponent,
     EmptyStateComponent,

@@ -11,18 +11,7 @@ import {
 import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import {
-  ButtonComponent,
-  ButtonGroupComponent,
-  dockInListDetailBar,
-  IconComponent,
-  ListDetailBarComponent,
-  ListDetailNav,
-  MEDIA,
-  mediaQuery,
-  type StatusKind,
-  StatusTextComponent,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, dockInListDetailBar, IconComponent, ListDetailBarComponent, ListDetailNav, MEDIA, mediaQuery, MetaLineComponent, type StatusKind, StatusTextComponent } from '@stupa-makers/ui-kit';
 
 /**
  * The head of a meeting view: "Zurück", the title with the status after it, and a quiet
@@ -54,6 +43,7 @@ import {
   selector: 'header[appMeetingHead]',
   standalone: true,
   imports: [
+    MetaLineComponent,
     ButtonComponent,
     ButtonGroupComponent,
     IconComponent,

@@ -99,9 +99,6 @@
   line-height: 1.5;
   color: var(--color-text-muted);
 }
-.bm__sep {
-  color: var(--color-text-subtle);
-}
 .bm__warn {
   color: var(--color-warning);
   font-weight: var(--fw-semibold);
@@ -142,8 +139,6 @@
   margin: 0;
   font-size: clamp(0.8125rem, 1.04vw, 1.25rem);
   font-weight: var(--fw-semibold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--color-text-muted);
 }
 .bm__nowTop {
@@ -276,9 +271,6 @@
   .bm__foot {
     flex-direction: column;
     gap: 0;
-  }
-  .bm__foot .bm__sep {
-    display: none;
   }
   .bm__idleWrap--join {
     grid-template-columns: minmax(0, 1fr);
