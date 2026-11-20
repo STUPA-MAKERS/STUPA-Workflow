@@ -174,14 +174,37 @@ def test_the_search_shows_the_hits_and_their_neighbours() -> None:
     ]
 
     nodes, lines = shown(candidates, relations, Filters(q="  PARTY ", depth=1))
-    assert set(_refs(nodes)) == {APP, TOP}
+    assert set(_refs(nodes)) == {APP, TOP, LONELY}
     assert _pairs(lines) == {frozenset((APP, TOP))}
 
     with_single, _ = shown(candidates, relations, Filters(q="party", single=True, depth=1))
     assert set(_refs(with_single)) == {APP, TOP, LONELY}
 
     grey, _ = shown(candidates, relations, Filters(q="party", no_access=True, depth=1))
-    assert set(_refs(grey)) == {APP, TOP, INVOICE}
+    assert set(_refs(grey)) == {APP, TOP, INVOICE, LONELY}
+
+
+def test_a_hit_of_the_search_shows_without_a_line() -> None:
+    """Spec 001434: a hit of the search shows at 0 steps without a line to another hit."""
+    candidates = _nodes(
+        Node(ref=APP, accessible=True, title="Folie", date=date(2026, 5, 1)),
+        Node(ref=CARD, accessible=True, title="Plakat", date=date(2026, 5, 2)),
+        Node(ref=LONELY, accessible=True, title="Folien-Ticket", date=date(2026, 5, 3)),
+        Node(ref=INVOICE, accessible=False, title="Folie"),
+    )
+    relations = [Relation(APP, CARD, "link")]
+
+    def refs(filters: Filters) -> set[Ref]:
+        nodes, _ = shown(candidates, relations, filters)
+        return set(_refs(nodes))
+
+    assert refs(Filters(q="folie")) == {APP, LONELY}
+    assert refs(Filters(q="folie", depth=1)) == {APP, CARD, LONELY}
+    # An element that the reader does not read is no hit of the search.
+    assert refs(Filters(q="folie", no_access=True)) == {APP, LONELY}
+    # Without a term the rule of spec 001423 holds: no node without a line.
+    assert refs(Filters()) == {APP, CARD}
+    assert refs(Filters(kinds=frozenset({"ticket"}))) == set()
 
 
 def test_the_neighbours_of_a_hit_show_up_to_the_steps() -> None:
@@ -210,7 +233,7 @@ def test_the_neighbours_of_a_hit_show_up_to_the_steps() -> None:
         nodes, _ = shown(candidates, relations, filters)
         return set(_refs(nodes))
 
-    assert refs(links) == set()
+    assert refs(links) == {APP}
     assert refs(replace(links, single=True)) == {APP}
     assert refs(replace(links, depth=1)) == {APP, TOP}
     assert refs(replace(links, depth=2)) == {APP, TOP, MEETING}

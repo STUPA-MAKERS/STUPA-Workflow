@@ -133,7 +133,9 @@ class GraphService:
             *await reads.builtin_relations(session, scope),
         )
         ends = frozenset(ref for r in relations for ref in (r.a, r.b))
-        refs = ends | (await reads.all_refs(session, kinds) if filters.single else frozenset())
+        # A hit of the search shows without a relation too (spec 001434).
+        lone = filters.single or bool(filters.q.strip())
+        refs = ends | (await reads.all_refs(session, kinds) if lone else frozenset())
         resolved = await self.links.resolve(refs, principal)
         readable = grouped(ref for ref, found in resolved.items() if found.accessible)
         dates = await reads.dates(session, readable)

@@ -314,8 +314,11 @@
     max-width: none;
     min-width: 0;
   }
+  // A line of its own that runs from screen edge to screen edge (000193): the strip is
+  // as wide as the bar with its padding, because `phone-chips` moves it out by that padding
+  // on both sides, and a basis of 100% would end it short of the end edge by twice as much.
   .gr__chips {
-    flex: 0 0 100%;
+    flex: 0 0 calc(100% + 2 * var(--space-4));
     margin-inline-start: 0;
     justify-content: flex-start;
     @include lp.phone-chips;

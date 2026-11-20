@@ -173,8 +173,9 @@ def shown(
     A hit is a node that passes the filters and the search. The neighbours of a hit show
     too, up to ``filters.depth`` lines away, also when they do not pass the kind, the
     period or the search (spec 001434). A line shows when both ends show and
-    the reader reads at least one of them. A node shows when it has a line, or with the
-    switch "Auch ohne Verknüpfung" when it is a hit that the reader reads (spec 001423).
+    the reader reads at least one of them. A node shows when it has a line. A hit that the
+    reader reads shows without a line too, with the switch "Auch ohne Verknüpfung" (spec
+    001423) or with a term in the search (spec 001434).
     """
     allowed = {
         ref: node for ref, node in candidates.items() if node.accessible or filters.no_access
@@ -196,10 +197,11 @@ def shown(
     reach = _within(hits, hits, lines, filters.depth)
     final = _between(lines, reach)
     connected = _ends(final)
+    lone = filters.single or bool(term)
     nodes = {
         ref: allowed[ref]
         for ref in reach
-        if ref in connected or (filters.single and ref in hits and allowed[ref].accessible)
+        if ref in connected or (lone and ref in hits and allowed[ref].accessible)
     }
     return (_ordered(nodes, final), final)
 
