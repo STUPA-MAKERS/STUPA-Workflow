@@ -16,12 +16,12 @@
   height: calc(64px + var(--app-top-safe-area, 0px));
   padding: var(--app-top-safe-area, 0px) max(6px, var(--app-right-safe-area, 0px)) 0
     max(18px, var(--app-left-safe-area, 0px));
-  // Frosted glass while the page scrolls under it, like the bar of every phone detail;
-  // at rest the page colour and no rule.
-  @include frosted(var(--color-bg), bottom);
+  // Solid like the bar of every phone detail (`bar`, spec 002010): the page colour at rest,
+  // the bar colour while the page scrolls under it, and no rule.
+  @include bar(var(--color-bg));
 }
-.pm__bar:not(.pm__bar--under) {
-  @include frosted-rest(var(--color-bg));
+.pm__bar--under {
+  @include bar(var(--color-bg), $scrolled: true);
 }
 .pm__logo {
   display: block;

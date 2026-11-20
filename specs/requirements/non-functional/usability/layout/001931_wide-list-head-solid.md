@@ -2,13 +2,10 @@
 id: "001931"
 title: The head of a wide list column stays solid, also on a fast scroll
 kind: non-functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
 updated: 2026-11-20
-tests:
-  - "frontend/vendor/ui-kit/src/styles/styles.spec.ts:SolidWideHead"
-implementation:
-  - frontend/vendor/ui-kit/src/styles/list-detail.scss
+replaced_by: NF/usability/layout/002010
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

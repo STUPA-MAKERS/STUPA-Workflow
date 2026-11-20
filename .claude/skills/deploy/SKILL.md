@@ -11,8 +11,8 @@ description: Single-VM docker-compose stack (web/migrate/api/worker/postgres/red
 - `docker-compose.yml` — the full stack: 10 services, networks (`internal`, `typst_net` egress-less, `proxy`), volumes, healthchecks. No service has a profile, so `--profile prod` starts the same services as no profile.
 - `docker-compose.e2e.yml` — overlay for Playwright e2e: adds `mailpit` (SMTP sink), `seed` one-shot (`profiles:[seed]`), `:ro,z` SELinux relabel + IPv4 healthcheck for `web`. Mock OIDC stays OFF.
 - `docker-compose.keycloak.yml` — local-only OIDC: Keycloak `start-dev --import-realm`, `host.docker.internal` wiring. Not for prod.
-- `web/Dockerfile` — multi-stage: node:22 builds the Angular SPA (`dist/antragsplattform/browser`), nginx:1.27 serves it. Build context = repo root.
-- `web/nginx.conf` — plain-HTTP server: `real_ip` from proxy, `/api/` proxy with body caps, WS upgrade, `.well-known/oauth-*` + dynamic `/manifest.webmanifest` proxies, SPA fallback, security headers (CSP, X-Frame-Options DENY).
+- `web/Dockerfile` — multi-stage: node:22 builds the Angular SPA (`dist/antragsplattform/browser`), nginx:1.27 serves it. Build context = repo root. It hashes the frontend sources into the build ID, writes it into `src/app/core/pwa/build-id.ts` and into `/etc/nginx/app-version.conf` (`$ap_app_version`).
+- `web/nginx.conf` — plain-HTTP server: `real_ip` from proxy, `/api/` proxy with body caps, WS upgrade, `.well-known/oauth-*` + dynamic `/manifest.webmanifest` proxies, SPA fallback, security headers (CSP, X-Frame-Options DENY), and `X-App-Version` on every answer (002150; a location with its own `add_header` repeats it).
 - `db/roles.sql` — least-privilege DB roles (`migrator`/`app`/`audit_writer`). Revokes UPDATE/DELETE/TRUNCATE on `audit_entry` from the runtime user. Run it as superuser, in two stages around `alembic upgrade head`.
 - `deploy.sh` — prod update: `git pull --ff-only` → build all → recreate only services whose image-id changed (`--profile prod`).
 - `.env.example` — full secrets/config template (DB, Redis, MinIO, OIDC, SMTP, Nextcloud, webhooks, altcha, typst, rate-limits, CSRF, `BACKUP_*` of the in-app backup). Copy to `.env`.

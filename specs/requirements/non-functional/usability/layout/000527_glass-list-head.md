@@ -2,12 +2,10 @@
 id: "000527"
 title: A list head is solid on a wide screen and glass on a phone
 kind: non-functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-19
-implementation:
-  - frontend/src/app/pages/todos
-  - frontend/vendor/ui-kit
+updated: 2026-11-20
+replaced_by: NF/usability/layout/002010
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

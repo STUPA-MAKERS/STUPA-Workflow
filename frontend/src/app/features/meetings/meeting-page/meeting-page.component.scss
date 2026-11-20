@@ -181,12 +181,7 @@
     z-index: var(--z-sticky, 10);
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-md);
-    @include frosted(var(--color-surface-2), $reach: 0px);
-  }
-  // The popover of the minute-taker chip opens above the dock, so the dock does not clip;
-  // the glass takes the round corners itself.
-  .mp__dock::before {
-    border-radius: inherit;
+    @include frosted-pop(var(--color-surface-2), 85%, 20px);
   }
 }
 
@@ -225,20 +220,20 @@
     margin: 0;
     overflow: hidden;
     border-radius: var(--radius-xl);
-    // Frosted glass like the bar at the top: the dock floats over the protocol with a small
-    // gap above the navigation bar, so the protocol shows through the glass, and a light
-    // shadow lifts the dock off it. The rounded box clips the glass, which reaches past both
-    // edges (`frosted`).
+    // A floating box of frosted glass (`frosted-pop`, spec 002010): the dock floats over
+    // the protocol with a small gap above the navigation bar, and a light shadow lifts it
+    // off the protocol.
     box-shadow: var(--shadow-md);
-    @include frosted(var(--color-surface-2));
+    @include frosted-pop(var(--color-surface-2), 85%, 20px);
   }
   // Before the opening the dock only says "Noch nicht eröffnet", which the status in the
   // head already says, so it shows nothing there (`SessionDockComponent`).
   .mp__dock--quiet {
+    outline: none;
+    background: none;
     box-shadow: none;
-  }
-  .mp__dock--quiet::before {
-    display: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }
 
