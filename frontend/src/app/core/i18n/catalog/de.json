@@ -536,7 +536,6 @@
   "applications.list.deleteConfirm": "„{title}“ wird gelöscht. Das lässt sich nicht rückgängig machen.",
   "applications.list.none": "Kein Antrag geöffnet",
   "applications.row.menu": "Aktionen für {title}",
-  "applications.row.open": "Öffnen",
   "applications.row.archive": "Archivieren",
   "applications.row.unarchive": "Aus Archiv holen",
   "applications.detail.menu": "Weitere Aktionen",

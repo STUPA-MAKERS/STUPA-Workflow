@@ -47,6 +47,7 @@ import {
   type RowAction,
   rowArchiveItem,
   rowForceItem,
+  rowMenuShown,
 } from './row-transitions-menu/row-transitions-menu.component';
 import { ApplicationCaptureComponent } from './capture/application-capture.component';
 import { BULK_MAX, BulkDialogComponent, type BulkMode } from './bulk-dialog/bulk-dialog.component';
@@ -196,6 +197,8 @@ export class ApplicationsListComponent {
   readonly canExport = computed(() => this.auth.can('application.export'));
   /** The multiple selection with its bulk actions (001700). */
   readonly canBulk = computed(() => this.auth.can('application.manage'));
+  /** The ⋮ of a row shows only when it holds an action (spec 001981). */
+  readonly showRowMenu = computed(() => rowMenuShown(this.auth));
   /** The rows show check boxes. */
   readonly selecting = signal(false);
   readonly selected = signal<ReadonlySet<Uuid>>(new Set());
@@ -719,9 +722,6 @@ export class ApplicationsListComponent {
 
   onRowAction(item: ApplicationListItem, action: RowAction): void {
     switch (action.kind) {
-      case 'open':
-        this.open(item.id);
-        return;
       case 'force':
         this.forceFor.set(item);
         this.forceOpen.set(true);

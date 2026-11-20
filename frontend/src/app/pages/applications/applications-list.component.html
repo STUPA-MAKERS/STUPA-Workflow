@@ -250,12 +250,14 @@
                           <app-row-chevron class="apps__chev" />
                         }
                       </span>
-                      <app-row-transitions-menu
-                        menu
-                        [item]="row.item"
-                        [title]="row.title"
-                        (action)="onRowAction(row.item, $event)"
-                      />
+                      @if (showRowMenu()) {
+                        <app-row-transitions-menu
+                          menu
+                          [item]="row.item"
+                          [title]="row.title"
+                          (action)="onRowAction(row.item, $event)"
+                        />
+                      }
                     </app-list-item>
                   }
                 </div>
