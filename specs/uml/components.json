@@ -221,12 +221,12 @@
       "to": "auth"
     },
     {
-      "count": 11,
+      "count": 12,
       "from": "applications",
       "to": "budget"
     },
     {
-      "count": 9,
+      "count": 10,
       "from": "applications",
       "to": "files"
     },
@@ -236,7 +236,7 @@
       "to": "flow"
     },
     {
-      "count": 16,
+      "count": 19,
       "from": "applications",
       "to": "forms"
     },
@@ -256,7 +256,7 @@
       "to": "notifications"
     },
     {
-      "count": 63,
+      "count": 65,
       "from": "applications",
       "to": "shared"
     },
@@ -706,7 +706,7 @@
       "to": "budget"
     },
     {
-      "count": 1,
+      "count": 2,
       "from": "flow",
       "to": "files"
     },
