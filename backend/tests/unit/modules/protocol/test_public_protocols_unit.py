@@ -218,13 +218,14 @@ async def test_list_protocols_without_storage_has_no_pdf() -> None:
 async def test_list_gremien_and_semesters() -> None:
     session = _Session(
         [
-            [(GID, "AStA", "asta", 3)],
+            [(GID, "AStA", "asta", 3, _date(2026, 11, 5))],
             [(_date(2026, 10, 5),), (_date(2026, 11, 5),), (_date(2026, 5, 1),)],
         ]
     )
     svc = PublicProtocolService(session)  # type: ignore[arg-type]
     gremien = await svc.list_gremien()
     assert gremien[0].protocol_count == 3
+    assert gremien[0].latest_date == _date(2026, 11, 5)
     semesters = await svc.list_semesters(PublicFilter(semester="ws-2026"))
     assert [(s.key, s.count) for s in semesters] == [("ws-2026", 2), ("ss-2026", 1)]
 
@@ -271,7 +272,11 @@ class _FakeService:
         self.filters: list[PublicFilter] = []
 
     async def list_gremien(self) -> list[pub.PublicGremiumOut]:
-        return [pub.PublicGremiumOut(id=GID, name="AStA", slug="asta", protocolCount=1)]
+        return [
+            pub.PublicGremiumOut(
+                id=GID, name="AStA", slug="asta", protocolCount=1, latestDate=_date(2026, 9, 29)
+            )
+        ]
 
     async def list_protocols(
         self, flt: PublicFilter, *, limit: int, offset: int

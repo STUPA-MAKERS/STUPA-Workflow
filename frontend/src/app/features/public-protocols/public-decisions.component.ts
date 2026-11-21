@@ -29,13 +29,14 @@ import {
 } from './public-protocols.util';
 
 /**
- * "Beschlüsse" (`/decisions`, no login, spec 000926): the decisions of the gremien that
- * publish their protocols, newest first and grouped by semester.
+ * The public decisions of one Gremium (`/decisions/<slug>`, no login, specs 000926, 002401),
+ * newest first and grouped by semester.
  *
  * A motion shows its question, its date, the title of its meeting, its result and the
  * sums of the votes. An election shows its question and its date only. No row names a
- * person. The search (the question), the Gremium chip and the Semester chip filter on
- * the server. The page is `noindex`.
+ * person. The search (the question) and the Semester chip filter on the server. The head
+ * links the protocols of the same Gremium (spec 002402). A slug of no public Gremium shows
+ * the empty state (spec 002403). The page is `noindex`.
  */
 @Component({
   selector: 'app-public-decisions',
@@ -66,11 +67,11 @@ export class PublicDecisionsComponent {
   private readonly list = publicList<PublicDecisionRow>({
     load: (query) => this.api.decisions(query),
     semesterQuery: (filters) => ({ gremium: filters.gremium }),
-    checkCommittee: true,
   });
   protected readonly appliedQuery = this.list.appliedQuery;
   protected readonly search = this.list.search;
-  protected readonly gremiumFilter = this.list.gremiumFilter;
+  protected readonly gremium = this.list.gremium;
+  protected readonly unknown = this.list.unknown;
   protected readonly semesterFilter = this.list.semesterFilter;
   protected readonly items = this.list.items;
   protected readonly total = this.list.total;
@@ -79,8 +80,6 @@ export class PublicDecisionsComponent {
   protected readonly error = this.list.error;
   protected readonly hasFilters = this.list.hasFilters;
   protected readonly hasMore = this.list.hasMore;
-  protected readonly gremiumOptions = this.list.gremiumOptions;
-  protected readonly gremiumText = this.list.gremiumText;
   protected readonly semesterOptions = this.list.semesterOptions;
   protected readonly semesterText = this.list.semesterText;
   protected readonly groups = this.list.groups;
@@ -102,10 +101,6 @@ export class PublicDecisionsComponent {
     return this.i18n.translate(key, { n: this.total() });
   });
 
-  protected onGremien(ids: readonly string[]): void {
-    this.list.onGremien(ids);
-  }
-
   protected onSemester(key: string): void {
     this.list.onSemester(key);
   }
@@ -122,11 +117,11 @@ export class PublicDecisionsComponent {
     return parseDay(d.date);
   }
 
-  /** "Studierendenparlament · Di, 29.09.2026 · 34. Sitzung"; an election has no meeting title. */
+  /** "Di, 29.09.2026 · 34. Sitzung"; an election has no meeting title. */
   protected meta(d: PublicDecisionRow): readonly string[] {
     const when = weekdayDate(d.date, this.i18n.formatLocale());
     const where = d.kind === 'circular' ? this.i18n.translate('publicDecisions.circular') : d.meetingTitle;
-    return [d.gremium.name, when, ...(where ? [where] : [])];
+    return [when, ...(where ? [where] : [])];
   }
 
   protected question(d: PublicDecisionRow): string {

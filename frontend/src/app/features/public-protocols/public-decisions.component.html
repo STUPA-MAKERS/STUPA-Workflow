@@ -3,23 +3,47 @@
     <nav class="pp__crumbs" [attr.aria-label]="'publicProtocols.crumbs' | t">
       <a routerLink="/">{{ 'publicProtocols.crumbHome' | t }}</a>
       <app-icon name="right" [size]="13" />
-      <a routerLink="/protocols">{{ 'publicProtocols.title' | t }}</a>
-      <app-icon name="right" [size]="13" />
-      <span aria-current="page">{{ 'publicDecisions.title' | t }}</span>
+      <a routerLink="/decisions">{{ 'publicDecisions.title' | t }}</a>
+      @if (gremium(); as g) {
+        <app-icon name="right" [size]="13" />
+        <span aria-current="page">{{ g.name }}</span>
+      }
     </nav>
-    <h1 class="pp__title">{{ 'publicDecisions.title' | t }}</h1>
+    @if (gremium(); as g) {
+      <h1 class="pp__title">{{ g.name }}</h1>
+      <a class="pp__btn pp__btn--tonal pp__protocols" [routerLink]="['/protocols', g.slug]">
+        <app-icon name="file" [size]="16" />
+        {{ 'publicProtocols.link' | t }}
+      </a>
+    } @else {
+      <h1 class="pp__title">{{ 'publicDecisions.title' | t }}</h1>
+    }
   </header>
 
-  @if (!loading() && !error() && total() === 0 && !hasFilters()) {
+  @if (unknown()) {
+    <div class="pp__none">
+      <app-empty-state icon="vote" shape="date"
+        [heading]="'publicProtocols.gremium.unknown' | t"
+        [body]="'publicProtocols.gremium.unknownBody' | t"
+      >
+        <a class="pp__btn pp__btn--tonal" routerLink="/decisions">
+          <app-icon name="back" [size]="16" />
+          {{ 'publicProtocols.gremium.all' | t }}
+        </a>
+      </app-empty-state>
+    </div>
+  } @else if (!loading() && !error() && total() === 0 && !hasFilters()) {
     <div class="pp__none">
       <app-empty-state icon="vote" shape="date"
         [heading]="'publicDecisions.empty.none' | t"
         [body]="'publicDecisions.empty.noneBody' | t"
       >
-        <a class="pp__btn pp__btn--tonal" routerLink="/protocols">
-          <app-icon name="back" [size]="16" />
-          {{ 'publicProtocols.title' | t }}
-        </a>
+        @if (gremium(); as g) {
+          <a class="pp__btn pp__btn--tonal" [routerLink]="['/protocols', g.slug]">
+            <app-icon name="back" [size]="16" />
+            {{ 'publicProtocols.link' | t }}
+          </a>
+        }
       </app-empty-state>
     </div>
   } @else {
@@ -34,16 +58,6 @@
         (commit)="search.flush()"
       />
       <div class="pp__chips">
-        <app-filter-select
-          [label]="'publicProtocols.filter.gremium' | t"
-          [multiple]="true"
-          [options]="gremiumOptions()"
-          [values]="gremiumFilter()"
-          (valuesChange)="onGremien($event)"
-          [text]="gremiumText()"
-          [active]="gremiumFilter().length > 0"
-          [resetLabel]="'publicProtocols.filter.reset' | t"
-        />
         <app-filter-select
           [label]="'publicProtocols.filter.semester' | t"
           [options]="semesterOptions()"

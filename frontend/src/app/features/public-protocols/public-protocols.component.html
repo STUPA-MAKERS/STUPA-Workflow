@@ -3,17 +3,37 @@
     <nav class="pp__crumbs" [attr.aria-label]="'publicProtocols.crumbs' | t">
       <a routerLink="/">{{ 'publicProtocols.crumbHome' | t }}</a>
       <app-icon name="right" [size]="13" />
-      <span aria-current="page">{{ 'publicProtocols.title' | t }}</span>
+      <a routerLink="/protocols">{{ 'publicProtocols.title' | t }}</a>
+      @if (gremium(); as g) {
+        <app-icon name="right" [size]="13" />
+        <span aria-current="page">{{ g.name }}</span>
+      }
     </nav>
-    <h1 class="pp__title">{{ 'publicProtocols.title' | t }}</h1>
-    <p class="pp__lede">{{ 'publicProtocols.lede' | t }}</p>
-    <a class="pp__btn pp__btn--tonal pp__decisions" routerLink="/decisions">
-      <app-icon name="vote" [size]="16" />
-      {{ 'publicDecisions.link' | t }}
-    </a>
+    @if (gremium(); as g) {
+      <h1 class="pp__title">{{ g.name }}</h1>
+      <p class="pp__lede">{{ 'publicProtocols.lede' | t }}</p>
+      <a class="pp__btn pp__btn--tonal pp__decisions" [routerLink]="['/decisions', g.slug]">
+        <app-icon name="vote" [size]="16" />
+        {{ 'publicDecisions.link' | t }}
+      </a>
+    } @else {
+      <h1 class="pp__title">{{ 'publicProtocols.title' | t }}</h1>
+    }
   </header>
 
-  @if (!loading() && !error() && total() === 0 && !hasFilters()) {
+  @if (unknown()) {
+    <div class="pp__none">
+      <app-empty-state icon="file" shape="date"
+        [heading]="'publicProtocols.gremium.unknown' | t"
+        [body]="'publicProtocols.gremium.unknownBody' | t"
+      >
+        <a class="pp__btn pp__btn--tonal" routerLink="/protocols">
+          <app-icon name="back" [size]="16" />
+          {{ 'publicProtocols.gremium.all' | t }}
+        </a>
+      </app-empty-state>
+    </div>
+  } @else if (!loading() && !error() && total() === 0 && !hasFilters()) {
     <div class="pp__none">
       <app-empty-state icon="file" shape="date"
         [heading]="'publicProtocols.empty.none' | t"
@@ -37,16 +57,6 @@
         (commit)="search.flush()"
       />
       <div class="pp__chips">
-        <app-filter-select
-          [label]="'publicProtocols.filter.gremium' | t"
-          [multiple]="true"
-          [options]="gremiumOptions()"
-          [values]="gremiumFilter()"
-          (valuesChange)="onGremien($event)"
-          [text]="gremiumText()"
-          [active]="gremiumFilter().length > 0"
-          [resetLabel]="'publicProtocols.filter.reset' | t"
-        />
         <app-filter-select
           [label]="'publicProtocols.filter.semester' | t"
           [options]="semesterOptions()"
@@ -86,7 +96,7 @@
             <app-date-block class="pp__date" [date]="dateOf(p)" />
             <div class="pp__main">
               <div class="pp__titles">
-                <span class="pp__meta">{{ p.gremium.name }} · {{ when(p) }}</span>
+                <span class="pp__meta">{{ when(p) }}</span>
                 <h3 class="pp__cardTitle">
                   <a [routerLink]="['/protocols', p.id]">
                     <app-highlight [text]="p.title" [query]="appliedQuery()" />
