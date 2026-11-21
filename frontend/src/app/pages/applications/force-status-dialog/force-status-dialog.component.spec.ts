@@ -232,4 +232,11 @@ describe('ForceStatusDialogComponent', () => {
       decision: { approvedAmount: '100.00', conditions: [] },
     });
   });
+
+  it('offers every state when the current one is unknown', async () => {
+    const { host, cmp, detectChanges } = await setup();
+    host.current.set(null);
+    detectChanges();
+    expect(cmp.options()).toEqual([]);
+  });
 });

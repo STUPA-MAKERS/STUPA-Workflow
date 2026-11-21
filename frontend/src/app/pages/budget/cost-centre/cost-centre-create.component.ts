@@ -158,8 +158,7 @@ export class CostCentreCreateComponent {
     this.amountInvalid.set(!!this.amountField()?.validate());
   }
 
-  submit(event?: Event): void {
-    event?.preventDefault();
+  submit(): void {
     const top = this.top();
     const version = this.versionId();
     if (!top || !this.valid() || this.busy()) return;

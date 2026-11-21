@@ -1894,7 +1894,7 @@ describe('BudgetPlanComponent', () => {
       const none = await setup({ perms: PERMS, plans: {} });
       expect(none.fixture.componentInstance.canSetState()).toBe(false);
       expect(none.fixture.componentInstance.stateOptions()).toEqual([]);
-      none.fixture.componentInstance.setStateByHand(new Event('submit'));
+      none.fixture.componentInstance.setStateByHand();
       expect(none.api.setStateByHand).not.toHaveBeenCalled();
     });
 

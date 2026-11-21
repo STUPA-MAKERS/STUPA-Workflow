@@ -412,8 +412,7 @@ export class FormsListComponent {
   }
 
   /** Create or change the group of the dialog. Empty languages are not sent. */
-  protected saveGroup(event?: Event): void {
-    event?.preventDefault();
+  protected saveGroup(): void {
     const target = this.groupDialog();
     const f = this.groupForm();
     const nameDe = f.nameDe.trim();
@@ -512,8 +511,7 @@ export class FormsListComponent {
     this.dialogOpen.set(false);
   }
 
-  protected submit(event?: Event): void {
-    event?.preventDefault();
+  protected submit(): void {
     const f = this.form();
     const nameDe = f.nameDe.trim();
     if (!nameDe || this.saving()) return;

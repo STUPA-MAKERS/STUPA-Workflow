@@ -623,7 +623,7 @@
   "
 >
   <ng-template dialogBody>
-    <form id="bp-add-form" class="bp__addForm" (submit)="addLine($event)">
+    <form id="bp-add-form" class="bp__addForm" (submit)="$event.preventDefault(); addLine()">
       <app-cost-centre-select
         [nodes]="addNodes()"
         [value]="addId()"
@@ -659,7 +659,7 @@
   "
 >
   <ng-template dialogBody>
-    <form id="bp-state-form" class="bp__addForm" (submit)="setStateByHand($event)">
+    <form id="bp-state-form" class="bp__addForm" (submit)="$event.preventDefault(); setStateByHand()">
       <app-select
         name="bpState"
         [label]="'budget.plan.setState.state' | t"

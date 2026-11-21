@@ -135,7 +135,7 @@
   "
 >
   <ng-template dialogBody>
-    <form id="fl-form" class="fl__form" (submit)="submit($event)">
+    <form id="fl-form" class="fl__form" (submit)="$event.preventDefault(); submit()">
       <app-input
         [id]="'fl-name-de'"
         [label]="'admin.forms.nameDe' | t"
@@ -188,7 +188,7 @@
   "
 >
   <ng-template dialogBody>
-    <form id="fl-group-form" class="fl__form" (submit)="saveGroup($event)">
+    <form id="fl-group-form" class="fl__form" (submit)="$event.preventDefault(); saveGroup()">
       <app-input
         [id]="'fl-group-name-de'"
         [label]="'admin.forms.groupNameDe' | t"

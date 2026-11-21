@@ -84,7 +84,7 @@
   "
 >
   <ng-template dialogBody>
-    <form id="ab-top-form" class="ab__form" (submit)="createTop($event)">
+    <form id="ab-top-form" class="ab__form" (submit)="$event.preventDefault(); createTop()">
       <div class="ab__pair">
         <app-input
           class="ab__keyField"

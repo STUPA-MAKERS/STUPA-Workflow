@@ -384,8 +384,7 @@ export class AdminBudgetsComponent {
       : '';
   }
 
-  createTop(event?: Event): void {
-    event?.preventDefault();
+  createTop(): void {
     const t = this.newTop();
     if (!this.topValid() || this.busy()) return;
     this.busy.set(true);

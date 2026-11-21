@@ -319,4 +319,11 @@ describe('TypeChangeDialogComponent', () => {
     expect(cmp.note()).toBe('');
     expect(cmp.preview()).toBeNull();
   });
+
+  it('offers every active Antragsart when the current one is unknown', async () => {
+    const { host, cmp, detectChanges } = await setup();
+    host.current.set(null);
+    detectChanges();
+    expect(cmp.typeOptions().map((o) => o.value)).toEqual(['t1', 't2', 't4']);
+  });
 });

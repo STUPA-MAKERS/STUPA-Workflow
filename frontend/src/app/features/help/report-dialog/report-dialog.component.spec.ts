@@ -468,4 +468,10 @@ describe('ReportDialogComponent', () => {
     expect(c.error()).toBe('help.report.error.rateLimit');
     expect(c.altcha()).toBeNull();
   });
+
+  it('ignores a remove confirmation without a chosen file', async () => {
+    const { c } = await setup();
+    c.confirmRemoveFile();
+    expect(c.fileToRemove()).toBeNull();
+  });
 });

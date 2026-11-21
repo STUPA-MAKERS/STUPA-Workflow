@@ -1254,8 +1254,7 @@ export class BudgetPlanComponent {
   }
 
   /** Save the state of the dialog "Zustand setzen". A version in force sets the allocations, so the tree is read again. */
-  setStateByHand(event?: Event): void {
-    event?.preventDefault();
+  setStateByHand(): void {
     const version = this.version();
     const target = this.stateTarget();
     const reason = this.stateReason().trim();
@@ -1379,8 +1378,7 @@ export class BudgetPlanComponent {
   }
 
   /** Take the chosen Kostenstelle into the draft with an Ansatz of 0 €. */
-  addLine(event?: Event): void {
-    event?.preventDefault();
+  addLine(): void {
     const version = this.version();
     const id = this.addId();
     if (!version || !id || this.busy()) return;

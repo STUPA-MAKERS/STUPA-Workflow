@@ -130,7 +130,7 @@
   "
 >
   <ng-template dialogBody>
-    <form id="cdv-form" class="cdv__form" (submit)="submit($event)">
+    <form id="cdv-form" class="cdv__form" (submit)="$event.preventDefault(); submit()">
       <app-input
         [label]="'admin.cdVariants.name' | t"
         [required]="true"

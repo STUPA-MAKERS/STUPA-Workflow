@@ -14,16 +14,18 @@ import { kindSpies } from '../../../../testing/toast';
   template: `
     <app-amend-amount-dialog
       [applicationId]="'app-1'"
-      [requested]="'250.00'"
+      [requested]="requested()"
       [approved]="approved()"
-      [gremiumId]="'g1'"
+      [gremiumId]="gremiumId()"
       [(open)]="open"
       (done)="done = done + 1"
     />
   `,
 })
 class Host {
+  readonly requested = signal<string | null>('250.00');
   readonly approved = signal<string | null>('200.00');
+  readonly gremiumId = signal<string | null>('g1');
   readonly open = signal(false);
   done = 0;
 }
@@ -148,5 +150,19 @@ describe('AmendAmountDialogComponent', () => {
     detectChanges();
     http.expectOne('/api/committees').flush({}, { status: 500, statusText: 'x' });
     expect(cmp.gremiumOptions()).toEqual([]);
+  });
+
+  it('starts empty without any amount or Gremium and refuses a non-number', async () => {
+    const { host, cmp, openIt } = await setup();
+    host.requested.set(null);
+    host.approved.set(null);
+    host.gremiumId.set(null);
+    openIt();
+    expect(cmp.amount()).toBe('');
+    expect(cmp.gremium()).toBe('');
+    cmp.amount.set('12.00');
+    expect(cmp.amountError()).toBe('');
+    cmp.amount.set('1e');
+    expect(cmp.amountError()).toBe('Der Förderbetrag darf nicht negativ sein und höchstens zwei Nachkommastellen haben.');
   });
 });

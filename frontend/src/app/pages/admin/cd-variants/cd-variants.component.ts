@@ -423,8 +423,7 @@ export class AdminCdVariantsComponent {
     return this.editingId() !== null || CD_VARIANT_KEY_PATTERN.test(f.key);
   }
 
-  submit(event?: Event): void {
-    event?.preventDefault();
+  submit(): void {
     if (!this.canSave()) return;
     const f = this.form();
     this.saving.set(true);

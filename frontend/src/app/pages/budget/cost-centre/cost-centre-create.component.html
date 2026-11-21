@@ -16,7 +16,7 @@
   (action)="$event.key === 'closed' ? closed.emit() : $event.key === 'submit' ? submit() : null"
 >
   <ng-template dialogBody>
-    <form id="cc-create-form" class="ccc" (submit)="submit($event)">
+    <form id="cc-create-form" class="ccc" (submit)="$event.preventDefault(); submit()">
       <app-cost-centre-select
         [nodes]="parentNodes()"
         [value]="parentId()"
