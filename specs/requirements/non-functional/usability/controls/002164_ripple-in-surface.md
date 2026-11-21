@@ -2,7 +2,7 @@
 id: "002164"
 title: The ripple is the ripple of Angular Material inside the pressed surface
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-20
 tests:
