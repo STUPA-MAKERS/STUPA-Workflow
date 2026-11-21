@@ -334,7 +334,7 @@
   "frontend/src/app/pages/admin/budgets/admin-budgets.component.html": 29,
   "frontend/src/app/pages/admin/budgets/admin-budgets.component.scss": 83,
   "frontend/src/app/pages/admin/budgets/admin-budgets.component.ts": 1,
-  "frontend/src/app/pages/admin/calendars/calendars.component.html": 11,
+  "frontend/src/app/pages/admin/calendars/calendars.component.html": 10,
   "frontend/src/app/pages/admin/calendars/calendars.component.ts": 1,
   "frontend/src/app/pages/admin/cd-variants/cd-variants.component.html": 47,
   "frontend/src/app/pages/admin/cd-variants/cd-variants.component.scss": 235,
