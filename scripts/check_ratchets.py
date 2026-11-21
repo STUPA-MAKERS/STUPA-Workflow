@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Hold three counts of the backend under a baseline, so they can only go down.
+"""Hold four counts under a baseline, so they can only go down.
+
+- `app-styles` (§ui-kit:S/framework/architecture/002213): the own styles of the frontend per file
+  in `frontend/src`. The app must end with no stylesheet of its own (§ui-kit:S/framework/architecture/002205),
+  because every style lives in the kit. A stylesheet counts each line that is not blank, a comment
+  or a `@use`/`@forward` line; a template or a component counts each `class=`, `[class`,
+  `[ngClass]`, `style=`, `[style`, `styles:` and `styleUrl`. Tests do not count.
 
 - `service-commits` (§ S/backend/python/000640): the `commit()` calls per file in `backend/app`
   outside the router files. A router file is `router.py` or `*_router.py`. A service function
@@ -72,7 +78,43 @@ RATCHETS: Mapping[str, tuple[str, Callable[[Path], bool], Callable[[ast.AST], in
     "session-fakes": ("backend/tests/unit", lambda _p: True, count_session_classes),
 }
 
-NAMES = (*RATCHETS, IMPORT_EXCEPTIONS)
+APP_STYLES = "app-styles"
+NAMES = (*RATCHETS, IMPORT_EXCEPTIONS, APP_STYLES)
+STYLE_FILES = {".scss", ".css"}
+STYLE_HOOKS = ("class=", "[class", "[ngClass]", "style=", "[style", "styles:", "styleUrl")
+
+
+def count_style_lines(text: str) -> int:
+    """Count the lines of a stylesheet that are not blank, a comment or a module line."""
+    lines = (line.strip() for line in text.splitlines())
+    return sum(
+        1
+        for line in lines
+        if line and not line.startswith(("//", "/*", "*", "@use", "@forward"))
+    )
+
+
+def count_style_hooks(text: str) -> int:
+    """Count the class and style bindings of a template or a component file."""
+    return sum(text.count(hook) for hook in STYLE_HOOKS)
+
+
+def measure_app_styles(root: Path) -> dict[str, int]:
+    """Count the own styles of each frontend file; the kit in `vendor/` does not count."""
+    counts: dict[str, int] = {}
+    for path in sorted((root / "frontend" / "src").rglob("*")):
+        if not path.is_file() or path.name.endswith(".spec.ts"):
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        if path.suffix in STYLE_FILES:
+            n = count_style_lines(text)
+        elif path.suffix in (".html", ".ts"):
+            n = count_style_hooks(text)
+        else:
+            continue
+        if n:
+            counts[path.relative_to(root).as_posix()] = n
+    return counts
 
 
 def count_import_exceptions(pyproject: str) -> dict[str, int]:
@@ -84,6 +126,8 @@ def count_import_exceptions(pyproject: str) -> dict[str, int]:
 
 def measure(name: str, root: Path = ROOT) -> dict[str, int]:
     """Count one ratchet over its folder or file; a key with the count 0 is left out."""
+    if name == APP_STYLES:
+        return measure_app_styles(root)
     if name == IMPORT_EXCEPTIONS:
         found = count_import_exceptions((root / IMPORT_CONTRACTS).read_text(encoding="utf-8"))
         return {contract: n for contract, n in found.items() if n}

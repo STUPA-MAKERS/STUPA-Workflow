@@ -1,21 +1,16 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { InputComponent, SwitchComponent, ToastService } from '@stupa-makers/ui-kit';
 import {
-  InputComponent,
-  SwitchComponent,
-  FabComponent,
-  ToastService,
-  PageHeaderComponent,
-  SectionComponent,
-  ButtonComponent,
-} from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+  ScreenGroupDirective,
+  SettingsScreenComponent,
+  type SettingsGroup,
+  type SettingsState,
+} from '@stupa-makers/ui-kit/screens';
 import { I18nService } from '@core/i18n/i18n.service';
 import { AdminApiService } from '../admin-api.service';
 import type { NotificationSettings } from '../admin.models';
-import type { LoadState } from '@shared/forms/settings-form';
-import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
 
 /**
  * Admin notification settings (permission
@@ -31,16 +26,12 @@ import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    ButtonComponent,
-    SectionComponent,
-    LoadStateComponent,
     FormsModule,
     TranslatePipe,
-    FabComponent,
     InputComponent,
     SwitchComponent,
-    PageHeaderComponent,
-    BreadcrumbsComponent,
+    SettingsScreenComponent,
+    ScreenGroupDirective,
   ],
   templateUrl: './notification-settings.component.html',
   styleUrl: './notification-settings.component.scss',
@@ -57,10 +48,6 @@ export class NotificationSettingsComponent {
   readonly dirty = signal(false);
   /** The settings as the server has them, for "Verwerfen". */
   private readonly saved = signal<NotificationSettings | null>(null);
-  /** The read: loading, then the form, or the error note of a failed read. */
-  protected readonly loadState = computed<LoadState>(() =>
-    this.loading() ? 'loading' : this.settings() ? 'ok' : 'error',
-  );
 
   /** A whole number of days. The reminder needs at least 1, the repeat at least 0. */
   readonly afterDaysError = computed(() => {
@@ -76,6 +63,34 @@ export class NotificationSettingsComponent {
       : '';
   });
   readonly valid = computed(() => !this.afterDaysError() && !this.repeatDaysError());
+
+  /** The state of the settings screen (§ui-kit:002244). */
+  protected readonly screenState = computed<SettingsState>(() => {
+    if (this.loading()) return { state: 'loading', skeleton: { variant: 'lines', count: 4 } };
+    if (!this.settings())
+      return {
+        state: 'error',
+        message: this.i18n.translate('admin.notifications.error'),
+        retry: () => this.load(),
+      };
+    return { state: 'ready' };
+  });
+
+  /** One group: the task reminder, its switch and its two day fields. */
+  protected readonly groups = computed<readonly SettingsGroup[]>(() => [
+    {
+      key: 'reminder',
+      label: this.i18n.translate('admin.notifications.taskReminder'),
+      rows: [
+        {
+          key: 'taskReminderEnabled',
+          label: this.i18n.translate('admin.notifications.enabled'),
+          control: 'switch',
+          value: this.settings()?.taskReminderEnabled ?? false,
+        },
+      ],
+    },
+  ]);
 
   constructor() {
     this.load();

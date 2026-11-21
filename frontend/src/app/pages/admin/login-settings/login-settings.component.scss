@@ -2,9 +2,6 @@
 
 :host {
   display: block;
-}
-
-.ls {
   container-type: inline-size;
 }
 
@@ -18,10 +15,4 @@
   .ls__grid {
     grid-template-columns: minmax(0, 1fr);
   }
-}
-
-.ls__meta {
-  margin: 0;
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
 }

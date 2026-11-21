@@ -10,17 +10,13 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { LoadState } from '@shared/forms/settings-form';
-import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
+import { ConfirmDialogComponent, NoteComponent, ToastService } from '@stupa-makers/ui-kit';
 import {
-  ButtonComponent,
-  ConfirmDialogComponent,
-  FabComponent,
-  NoteComponent,
-  PageHeaderComponent,
-  SwitchComponent,
-  ToastService,
-} from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+  ScreenGroupDirective,
+  SettingsScreenComponent,
+  type SettingsGroup,
+  type SettingsState,
+} from '@stupa-makers/ui-kit/screens';
 import { AdminApiService } from '../admin-api.service';
 import type { FeatureSwitches } from '../admin.models';
 
@@ -103,14 +99,10 @@ export function usesOf(errors: unknown): readonly FeatureUse[] {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     TranslatePipe,
-    PageHeaderComponent,
-    BreadcrumbsComponent,
-    ButtonComponent,
     ConfirmDialogComponent,
-    FabComponent,
-    LoadStateComponent,
     NoteComponent,
-    SwitchComponent,
+    SettingsScreenComponent,
+    ScreenGroupDirective,
   ],
   templateUrl: './features.component.html',
   styleUrl: './features.component.scss',
@@ -168,6 +160,37 @@ export class FeaturesComponent {
   protected readonly confirmBody = computed(() =>
     this.i18n.translate('admin.features.confirm', { names: this.goingOff().join(', ') }),
   );
+
+  /** The state of the settings screen (§ui-kit:002244). */
+  protected readonly screenState = computed<SettingsState>(() => {
+    const s = this.state();
+    if (s === 'loading') return { state: 'loading' };
+    if (s === 'forbidden')
+      return { state: 'forbidden', message: this.i18n.translate('admin.features.forbidden') };
+    if (s === 'error')
+      return {
+        state: 'error',
+        message: this.i18n.translate('admin.helpTickets.loadError'),
+        retry: () => this.load(),
+      };
+    return { state: 'ready' };
+  });
+
+  /** The uses of the refused save above the switches, then one switch per feature. */
+  protected readonly groups = computed<readonly SettingsGroup[]>(() => [
+    ...(this.uses().length ? [{ key: 'uses', rows: [] }] : []),
+    {
+      key: 'features',
+      rows: FEATURES.map((key) => ({
+        key,
+        label: this.i18n.translate(FEATURE_LABELS[key]),
+        control: 'switch' as const,
+        value: this.shown(key),
+        disabled: !!this.lockedBy()[key],
+        meta: this.hint(key) || undefined,
+      })),
+    },
+  ]);
 
   constructor() {
     if (this.auth.can('admin.features')) {

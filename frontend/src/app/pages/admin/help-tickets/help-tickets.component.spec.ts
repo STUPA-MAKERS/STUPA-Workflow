@@ -250,7 +250,7 @@ describe('HelpTicketsComponent', () => {
   it('shows the skeleton while it loads', async () => {
     const { fixture } = await setup({ api: { getHelpTickets: jest.fn(() => new Subject()), putHelpTickets: jest.fn() } });
     expect(document.querySelector('.ht__skelField')).not.toBeNull();
-    expect(document.querySelectorAll('.ht__skelSwitch')).toHaveLength(3);
+    expect(document.querySelectorAll('.sts__skelSwitch')).toHaveLength(3);
     expect(screen.getByRole('status')).toHaveTextContent('Wird geladen');
     const c = fixture.componentInstance as unknown as { dirty(): boolean; discard(): void };
     expect(c.dirty()).toBe(false);

@@ -5,9 +5,13 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { EmptyStateComponent, NoteComponent, SkeletonComponent, SwitchComponent, PageHeaderComponent } from '@stupa-makers/ui-kit';
+import {
+  SettingsScreenComponent,
+  type SettingsGroup,
+  type SettingsNotice,
+  type SettingsState,
+} from '@stupa-makers/ui-kit/screens';
 import { FeatureService, type FeatureKey } from '@core/features/feature.service';
-import { BreadcrumbsComponent } from '../../layout/breadcrumbs.component';
 
 /**
  * Kinds that the page never shows. No mail goes out for them: "vote" has no sender,
@@ -61,7 +65,7 @@ const KIND_FEATURE: ReadonlyMap<string, FeatureKey> = new Map<string, FeatureKey
   selector: 'app-account-notifications',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [EmptyStateComponent, NoteComponent, PageHeaderComponent, BreadcrumbsComponent, SkeletonComponent, SwitchComponent, TranslatePipe],
+  imports: [SettingsScreenComponent, TranslatePipe],
   templateUrl: './notifications.component.html',
   styleUrl: './notifications.component.scss',
 })
@@ -89,6 +93,36 @@ export class AccountNotificationsComponent {
       (p) => !HIDDEN_KINDS.has(p.kind) && this.mayGet(p.kind) && this.featureOn(p.kind),
     ),
   );
+
+  /** The state of the settings screen (§ui-kit:002244): six grey rows while it loads. */
+  protected readonly screenState = computed<SettingsState>(() =>
+    this.loading()
+      ? { state: 'loading', skeleton: { variant: 'rows', count: 6 } }
+      : { state: 'ready' },
+  );
+
+  /** One group without a heading, one switch row per kind; none without rows. */
+  protected readonly groups = computed<SettingsGroup[]>(() => {
+    const rows = this.rows();
+    if (!rows.length) return [];
+    return [
+      {
+        key: 'kinds',
+        rows: rows.map((p) => ({
+          key: p.kind,
+          label: this.kindLabel(p.kind),
+          control: 'switch' as const,
+          value: p.enabled,
+        })),
+      },
+    ];
+  });
+
+  /** A failed load or save, as a note under the head. */
+  protected readonly notice = computed<SettingsNotice | null>(() => {
+    const e = this.error();
+    return e ? { kind: 'error', text: this.i18n.translate(e) } : null;
+  });
 
   /** A kind of a feature that is off gets no row (spec 000758). */
   private featureOn(kind: string): boolean {

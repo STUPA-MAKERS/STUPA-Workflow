@@ -3,12 +3,12 @@ import { join } from 'node:path';
 
 /**
  * §ui-kit:000631: a settings row is a child of the shared settings row group. The stylesheet of
- * the page sets no height, surface or corners for the row.
+ * the page sets no height, surface or corners for the row. A page on `app-settings-screen` without
+ * an own row group (Konto Benachrichtigungen) gets the group from the kit (§ui-kit:002244).
  */
 const PAGES = [
   { name: 'pages/admin/notifications/notification-settings.component', row: 'ns__row' },
   { name: 'pages/admin/help-tickets/help-tickets.component', row: 'ht__row' },
-  { name: 'pages/account/notifications.component', row: 'nt__row' },
 ];
 
 const read = (rel: string): string => readFileSync(join(__dirname, rel), 'utf8');

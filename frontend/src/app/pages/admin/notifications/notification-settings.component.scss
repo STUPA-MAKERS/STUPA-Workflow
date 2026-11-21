@@ -1,11 +1,7 @@
-@use '../../../shared/ui/surface-card' as sc;
 @use '../widths' as w;
 
 :host {
   display: block;
-}
-
-.ns {
   container-type: inline-size;
 }
 .ns__fields {
