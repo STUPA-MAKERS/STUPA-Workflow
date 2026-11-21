@@ -388,4 +388,9 @@ describe('WebhooksComponent', () => {
     retryLoadError();
     expect(api.listWebhooks).toHaveBeenCalledTimes(2);
   });
+
+  it('offers no "Webhook anlegen" without webhook.manage', async () => {
+    await setup(HOOKS, { can: false });
+    expect(screen.queryByRole('button', { name: 'Webhook anlegen' })).toBeNull();
+  });
 });

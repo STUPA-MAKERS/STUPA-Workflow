@@ -398,4 +398,13 @@ describe('AdminRolesComponent', () => {
     retryLoadError();
     expect(api.listRoles).toHaveBeenCalledTimes(2);
   });
+
+  it('shows the empty state without roles, and "Rolle anlegen" opens the dialog', async () => {
+    const api = makeApi();
+    api.listRoles.mockReturnValueOnce(of([]));
+    const { inst } = await setup(api);
+    expect(screen.getByText('Noch keine globalen Rollen.')).toBeInTheDocument();
+    inst.onAction('add');
+    expect(inst.addOpen()).toBe(true);
+  });
 });

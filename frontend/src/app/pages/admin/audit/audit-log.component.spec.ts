@@ -893,4 +893,13 @@ describe('AuditLogComponent', () => {
 
     (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver = original;
   });
+
+  it('shows the search-off face when a filter finds no entry', async () => {
+    const { cmp } = await setup({ page: { items: [], nextCursor: null, hasMore: false } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows = () => (cmp as any).rows();
+    expect(rows()).toEqual(expect.objectContaining({ state: 'empty', icon: 'clipcheck' }));
+    cmp.setAction('login');
+    expect(rows()).toEqual(expect.objectContaining({ state: 'empty', icon: 'searchOff' }));
+  });
 });
