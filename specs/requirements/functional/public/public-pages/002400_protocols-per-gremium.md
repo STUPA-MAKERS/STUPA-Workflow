@@ -7,6 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-21
 implementation:
   - frontend/src/app/features/public-protocols
+  - backend/app/modules/protocol/public.py
 scope:
   - frontend/src/app/features/public-protocols
   - frontend/src/app/app.routes.ts
@@ -15,7 +16,8 @@ scope:
 # The public protocols have one page per Gremium
 
 The page `/protocols` must list the public Gremien that have at least one public protocol
-(F/public/public-pages/000171), by name. A row must open the page `/protocols/<slug>` of its
+(F/public/public-pages/000171), by name. A row must show the day of the newest public
+protocol of its Gremium and must show no count. A row must open the page `/protocols/<slug>` of its
 Gremium. The page of a Gremium must list the public protocols of that Gremium only, with the
 search and the Semester filter. It must not have a Gremium filter. The page of one protocol
 must stay at `/protocols/<id>`.
