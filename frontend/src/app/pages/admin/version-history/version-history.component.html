@@ -1,5 +1,5 @@
 <app-section class="vh" [level]="2" [heading]="'admin.config.history.title' | t">
-  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.config.history.loadFailed' | t" (retry)="reload()">
+  <app-load-state [state]="loadState()" [keepContent]="true" [hasContent]="revisions().length > 0" [errorText]="'admin.config.history.loadFailed' | t" (retry)="reload()">
     <ng-template #loading>
       <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
     </ng-template>

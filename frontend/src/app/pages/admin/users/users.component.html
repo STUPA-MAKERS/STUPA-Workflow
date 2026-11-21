@@ -51,7 +51,7 @@
     </div>
   </app-sticky-bar>
 
-  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.users.loadFailed' | t" (retry)="retryLoad()">
+  <app-load-state [state]="loadState()" [keepContent]="true" [hasContent]="principals().length > 0" [errorText]="'admin.users.loadFailed' | t" (retry)="retryLoad()">
     <ng-template #loading>
       <app-skeleton variant="rows" [count]="5" [label]="'admin.users.loading' | t" />
     </ng-template>

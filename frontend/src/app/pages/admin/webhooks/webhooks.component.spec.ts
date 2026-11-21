@@ -378,12 +378,13 @@ describe('WebhooksComponent', () => {
   });
 
   /** §ui-kit:000576 and §ui-kit:S/frontend/angular/000632: a failed read is a toast with a retry. */
-  it('names a failed read in a toast with a retry, and shows the empty state under it', async () => {
+  it('names a failed read in a toast with a retry, and in the face under it', async () => {
     const { fixture, api } = await setup([], { listError: true });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((fixture.componentInstance as any).loading()).toBe(false);
     expect(loadErrorToast()).toBe('Webhooks konnten nicht geladen werden.');
-    expect(screen.getByText('Keine Webhooks konfiguriert.')).toBeInTheDocument();
+    expect(document.querySelector('app-empty-state')?.textContent).toContain('Webhooks konnten nicht geladen werden.');
+    expect(screen.queryByText('Keine Webhooks konfiguriert.')).toBeNull();
     retryLoadError();
     expect(api.listWebhooks).toHaveBeenCalledTimes(2);
   });

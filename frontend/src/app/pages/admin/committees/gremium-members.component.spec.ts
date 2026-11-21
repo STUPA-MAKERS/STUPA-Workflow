@@ -171,12 +171,13 @@ describe('GremiumMembersComponent', () => {
   });
 
   /** §ui-kit:000576: the toast names the error, the list shows its empty placeholder. */
-  it('names a failed load in a toast and shows the empty placeholder', async () => {
+  it('names a failed load in a toast and in the face', async () => {
     const { api, fixture } = await setup({
       api: makeApi({ listGremiumMemberships: jest.fn(() => throwError(() => ({ status: 403 }))) }),
     });
     expect(loadErrorToast()).toContain('Die Mitglieder konnten nicht geladen werden.');
-    expect(screen.getByText('Noch keine Mitglieder in diesem Gremium.')).toBeInTheDocument();
+    expect(document.querySelector('app-empty-state')?.textContent).toContain('Die Mitglieder konnten nicht geladen werden.');
+    expect(screen.queryByText('Noch keine Mitglieder in diesem Gremium.')).toBeNull();
     expect(screen.queryByText(/\d Mitglieder$/)).toBeNull();
     retryLoadError();
     fixture.detectChanges();

@@ -130,9 +130,10 @@ describe('UserMergeComponent', () => {
     expect(screen.getByText('Keine Benutzer gefunden.')).toBeInTheDocument();
   });
 
-  it('a failed search shows an empty list', async () => {
+  it('a failed search shows the face with the error text, not an empty list', async () => {
     await setup(makeApi({ listPrincipals: jest.fn(() => throwError(() => new Error('x'))) }));
-    expect(screen.getByText('Keine Benutzer gefunden.')).toBeInTheDocument();
+    expect(document.querySelector('app-empty-state')).not.toBeNull();
+    expect(screen.queryByText('Keine Benutzer gefunden.')).toBeNull();
   });
 
   /** An area without rows does not show. */

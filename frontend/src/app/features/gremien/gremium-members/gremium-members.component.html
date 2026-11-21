@@ -45,7 +45,9 @@
 @if (loading()) {
   <app-skeleton variant="rows" [count]="5" [label]="'gremien.members.loading' | t" />
 } @else if (!groups().length) {
-  @if (filterActive()) {
+  @if (error()) {
+    <app-empty-state icon="alert" [heading]="'gremien.members.error' | t" />
+  } @else if (filterActive()) {
     <app-empty-state icon="searchOff" shape="person" rows="3" [heading]="'gremien.members.noMatch' | t" />
   } @else {
     <app-empty-state icon="users" shape="person"

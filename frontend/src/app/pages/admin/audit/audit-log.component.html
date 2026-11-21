@@ -60,7 +60,7 @@
   </div>
   </app-sticky-bar>
 
-  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.audit.error' | t" (retry)="retry()">
+  <app-load-state [state]="loadState()" [keepContent]="true" [hasContent]="entries().length > 0" [errorText]="'admin.audit.error' | t" (retry)="retry()">
     <ng-template #loading>
       <app-skeleton variant="rows" [count]="6" [label]="'admin.audit.loading' | t" />
     </ng-template>

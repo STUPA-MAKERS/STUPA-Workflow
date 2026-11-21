@@ -69,7 +69,9 @@
             />
           </div>
         } @else if (!mine().length && !others().length) {
-          @if (query().trim()) {
+          @if (store.error()) {
+            <app-empty-state icon="alert" [heading]="'gremien.list.error' | t" />
+          } @else if (query().trim()) {
             <app-empty-state icon="searchOff" [heading]="'gremien.list.noMatch' | t" />
           } @else {
             <app-empty-state icon="landmark"

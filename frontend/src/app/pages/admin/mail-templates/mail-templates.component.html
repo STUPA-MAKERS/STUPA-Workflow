@@ -10,7 +10,7 @@
     </div>
   </app-page-header>
 
-  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.mailTemplates.loadFailed' | t" (retry)="load()">
+  <app-load-state [state]="loadState()" [keepContent]="true" [hasContent]="templates().length > 0" [errorText]="'admin.mailTemplates.loadFailed' | t" (retry)="load()">
     <ng-template #loading>
       <div class="mt__layout">
         @if (!phone()) {

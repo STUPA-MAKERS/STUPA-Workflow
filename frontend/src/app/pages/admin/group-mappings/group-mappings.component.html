@@ -15,7 +15,7 @@
         </app-button>
       </app-button-group>
 
-      <app-load-state [state]="sec.state" [keepContent]="true" [errorText]="'admin.groupMappings.loadFailed' | t" (retry)="retry(sec.kind)">
+      <app-load-state [state]="sec.state" [keepContent]="true" [hasContent]="sec.rows.length > 0" [errorText]="'admin.groupMappings.loadFailed' | t" (retry)="retry(sec.kind)">
         <ng-template #loading>
           <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
         </ng-template>

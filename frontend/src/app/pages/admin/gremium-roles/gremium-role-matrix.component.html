@@ -16,7 +16,7 @@
     <app-fab [label]="'fab.gremiumRole' | t" (activate)="openAdd()" />
   }
 
-  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.gremiumRoles.loadFailed' | t" (retry)="load()">
+  <app-load-state [state]="loadState()" [keepContent]="true" [hasContent]="sorted().length > 0" [errorText]="'admin.gremiumRoles.loadFailed' | t" (retry)="load()">
     <ng-template #loading>
       <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
     </ng-template>

@@ -9,7 +9,7 @@
     </div>
   </app-page-header>
 
-  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.roles.error' | t" (retry)="load()">
+  <app-load-state [state]="loadState()" [keepContent]="true" [hasContent]="roles().length > 0" [errorText]="'admin.roles.error' | t" (retry)="load()">
     <ng-template #loading>
       <app-skeleton variant="rows" [count]="5" [label]="'admin.roles.loading' | t" />
     </ng-template>

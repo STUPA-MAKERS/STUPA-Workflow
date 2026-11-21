@@ -91,6 +91,8 @@
               </label>
             }
           </div>
+        } @else if (failed()) {
+          <app-empty-state icon="alert" [heading]="'meetings.leadSubstitute.loadFailed' | t" />
         } @else {
           <app-empty-state
             [icon]="query() ? 'searchOff' : 'users'"

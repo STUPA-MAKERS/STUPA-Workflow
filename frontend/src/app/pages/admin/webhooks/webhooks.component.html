@@ -3,7 +3,7 @@
     <app-breadcrumbs crumbs />
   </app-page-header>
 
-  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.webhook.error' | t" (retry)="load()">
+  <app-load-state [state]="loadState()" [keepContent]="true" [hasContent]="hooks().length > 0" [errorText]="'admin.webhook.error' | t" (retry)="load()">
     <ng-template #loading>
       <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
     </ng-template>

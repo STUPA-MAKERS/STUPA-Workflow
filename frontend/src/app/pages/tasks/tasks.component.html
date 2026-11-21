@@ -59,6 +59,8 @@
             <app-list-group skeleton="7rem" />
             <app-skeleton variant="items" [count]="6" [grouped]="!split()" [label]="'tasks.loading' | t" />
           </div>
+        } @else if (error() && !rows().length && !hasTodos()) {
+          <app-empty-state icon="alert" [heading]="'tasks.error' | t" />
         } @else if (query() && !rows().length && !todoRows().length) {
           <app-empty-state icon="searchOff" rows="3" [heading]="'tasks.noMatch' | t" />
         } @else if (!rows().length && !hasTodos()) {

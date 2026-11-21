@@ -3,7 +3,7 @@
     <app-breadcrumbs crumbs />
   </app-page-header>
 
-  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.cdVariants.error' | t" (retry)="retryLoad()">
+  <app-load-state [state]="loadState()" [keepContent]="true" [hasContent]="variants().length > 0" [errorText]="'admin.cdVariants.error' | t" (retry)="retryLoad()">
     <ng-template #loading>
       <app-skeleton variant="rows" [count]="3" [label]="'admin.cdVariants.loading' | t" />
     </ng-template>
