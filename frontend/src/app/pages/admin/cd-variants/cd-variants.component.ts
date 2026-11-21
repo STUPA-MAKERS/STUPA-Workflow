@@ -19,24 +19,24 @@ import {
   ConfirmDialogComponent,
   DialogComponent,
   EmptyStateComponent,
-  FabComponent,
   FilePickerComponent,
   formatBytes,
   IconComponent,
   InputComponent,
   MetaLineComponent,
   NoteComponent,
-  PageHeaderComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
   SegmentedComponent,
   type SegmentedOption,
-  SkeletonComponent,
   ToastService,
+  type Action,
+  type ListRow,
+  type LoadState,
   DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import { RecordsScreenComponent, ScreenRecordDirective } from '@stupa-makers/ui-kit/screens';
 import { AdminApiService } from '../admin-api.service';
 import {
   CD_LOGO_ACCEPT,
@@ -61,7 +61,6 @@ import {
   squareVerdict,
   variantInitials,
 } from './cd-variants.util';
-import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 /** Dialog state of the create/edit form. */
 interface VariantForm {
@@ -118,9 +117,7 @@ function emptyForm(): VariantForm {
   imports: [
     DialogBodyDirective,
     MetaLineComponent,
-    LoadStateComponent,
     FilePickerComponent,
-    FabComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
     FormsModule,
@@ -132,10 +129,9 @@ function emptyForm(): VariantForm {
     InputComponent,
     NoteComponent,
     SegmentedComponent,
-    SkeletonComponent,
-    PageHeaderComponent,
-    BreadcrumbsComponent,
     RowMenuComponent,
+    RecordsScreenComponent,
+    ScreenRecordDirective,
   ],
   templateUrl: './cd-variants.component.html',
   styleUrl: './cd-variants.component.scss',
@@ -152,7 +148,29 @@ export class AdminCdVariantsComponent {
   readonly variants = signal<CdVariant[]>([]);
   readonly loading = signal(true);
   readonly loadError = signal(false);
-  readonly loadState = loadStateOf(this.loading, this.loadError);
+  /** The rows of the records screen (§ui-kit:002257). */
+  readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
+    if (this.loading()) return { state: 'loading' };
+    if (this.loadError())
+      return {
+        state: 'error',
+        message: this.i18n.translate('admin.cdVariants.error'),
+        retry: () => this.retryLoad(),
+      };
+    const rows = this.variants().map((v) => ({ id: v.id, title: v.key }));
+    return rows.length
+      ? { state: 'ready', data: rows }
+      : { state: 'empty', icon: 'palette', heading: this.i18n.translate('admin.cdVariants.empty') };
+  });
+  /** "Variante anlegen" as the FAB. */
+  protected readonly actions = computed<readonly Action[]>(() => [
+    { key: 'add', label: this.i18n.translate('fab.cdVariant'), priority: 'fab' },
+  ]);
+
+  /** The variant of a row of the records screen. */
+  protected variantOf(id: string): CdVariant {
+    return this.variants().find((v) => v.id === id)!;
+  }
 
   readonly expandedId = signal<Uuid | null>(null);
 

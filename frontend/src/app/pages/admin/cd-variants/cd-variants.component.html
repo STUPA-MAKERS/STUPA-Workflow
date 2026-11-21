@@ -1,114 +1,105 @@
-<section class="cdv admin-page">
-  <app-page-header [flush]="true" [title]="'admin.cdVariants.title' | t">
-    <app-breadcrumbs crumbs />
-  </app-page-header>
+<app-records-screen
+  class="cdv"
+  [head]="{ title: 'admin.cdVariants.title' | t }"
+  [rows]="rows()"
+  [actions]="actions()"
+  variant="records"
+  [keepOnError]="variants().length > 0"
+  [skeleton]="3"
+  (action)="$event.key === 'add' && openCreate()"
+>
+  <ng-template screenRecord let-row>
+    @let v = variantOf(row.id);
+    <li class="cdv__variant">
+      <div class="cdv__head hitrow">
+        @if (squareLogo(v); as sq) {
+          <img class="cdv__square" [src]="squareUrl(sq)" alt="" width="40" height="40" (error)="thumbFailed(sq)" />
+        } @else {
+          <span class="cdv__square cdv__square--none" [attr.title]="'admin.cdVariants.noSquare' | t" aria-hidden="true">{{ initials(v.name) }}</span>
+        }
+        <span class="cdv__text">
+          <span class="cdv__titleLine">
+            <button
+              type="button"
+              class="hitrow__open cdv__name rowgroup__title"
+              [attr.aria-label]="('admin.common.edit' | t) + ': ' + v.name"
+              (click)="openEdit(v)"
+            >
+              {{ v.name }}
+            </button>
+            <span class="cdv__key mono">{{ v.key }}</span>
+          </span>
+          <span class="cdv__usage">{{ usage(v) }}</span>
+        </span>
+        <span class="cdv__actions hitrow__keep">
+          <app-button-group>
+            <app-button
+              class="cdv__toggle"
+              variant="text"
+              [ariaExpanded]="isExpanded(v.id)"
+              [ariaControls]="'cdv-logos-' + v.id"
+              (click)="toggle(v.id)"
+            >
+              {{ (isExpanded(v.id) ? 'admin.cdVariants.hideLogos' : 'admin.cdVariants.toggleLogos') | t }}
+              <span class="cdv__count">({{ v.logos.length }})</span>
+            </app-button>
+            <app-row-menu
+              [sections]="variantMenu()"
+              [label]="('ui.rowMenu.trigger' | t) + ': ' + v.name"
+              (selected)="askDelete(v)"
+            />
+          </app-button-group>
+        </span>
+      </div>
 
-  <app-load-state [state]="loadState()" [keepContent]="true" [hasContent]="variants().length > 0" [errorText]="'admin.cdVariants.error' | t" (retry)="retryLoad()">
-    <ng-template #loading>
-      <app-skeleton variant="rows" [count]="3" [label]="'admin.cdVariants.loading' | t" />
-    </ng-template>
-    <ng-template #content>
-      @if (variants().length) {
-        <ul class="rowgroup rowgroup--records cdv__list" [attr.aria-label]="'admin.cdVariants.title' | t">
-          @for (v of variants(); track v.id) {
-            <li class="cdv__variant">
-              <div class="cdv__head hitrow">
-                @if (squareLogo(v); as sq) {
-                  <img class="cdv__square" [src]="squareUrl(sq)" alt="" width="40" height="40" (error)="thumbFailed(sq)" />
-                } @else {
-                  <span class="cdv__square cdv__square--none" [attr.title]="'admin.cdVariants.noSquare' | t" aria-hidden="true">{{ initials(v.name) }}</span>
-                }
-                <span class="cdv__text">
-                  <span class="cdv__titleLine">
-                    <button
-                      type="button"
-                      class="hitrow__open cdv__name rowgroup__title"
-                      [attr.aria-label]="('admin.common.edit' | t) + ': ' + v.name"
-                      (click)="openEdit(v)"
-                    >
-                      {{ v.name }}
-                    </button>
-                    <span class="cdv__key mono">{{ v.key }}</span>
-                  </span>
-                  <span class="cdv__usage">{{ usage(v) }}</span>
-                </span>
-                <span class="cdv__actions hitrow__keep">
-                  <app-button-group>
-                    <app-button
-                      class="cdv__toggle"
-                      variant="text"
-                      [ariaExpanded]="isExpanded(v.id)"
-                      [ariaControls]="'cdv-logos-' + v.id"
-                      (click)="toggle(v.id)"
-                    >
-                      {{ (isExpanded(v.id) ? 'admin.cdVariants.hideLogos' : 'admin.cdVariants.toggleLogos') | t }}
-                      <span class="cdv__count">({{ v.logos.length }})</span>
-                    </app-button>
-                    <app-row-menu
-                      [sections]="variantMenu()"
-                      [label]="('ui.rowMenu.trigger' | t) + ': ' + v.name"
-                      (selected)="askDelete(v)"
-                    />
-                  </app-button-group>
-                </span>
-              </div>
-
-              @if (isExpanded(v.id)) {
-                <div class="cdv__body" [id]="'cdv-logos-' + v.id">
-                  @if (v.logos.length) {
-                    <ul class="rowgroup rowgroup--bg3 cdv__logos">
-                      @for (slot of listOrder; track slot) {
-                        @for (logo of logosOf(v, slot); track logo.id; let i = $index; let last = $last) {
-                          <li class="cdv__logo">
-                            @if (slot === 'square' && logo.fileName && !brokenThumbs().has(logo.id)) {
-                              <img class="cdv__thumb cdv__thumb--img" [src]="squareUrl(logo)" alt="" width="40" height="40" (error)="thumbFailed(logo)" />
-                            } @else {
-                              <span class="cdv__thumb" aria-hidden="true"><app-icon [name]="logo.vendoredName ? 'pin' : 'file'" [size]="18" /></span>
-                            }
-                            <span class="cdv__logoText">
-                              <span class="cdv__logoHead"><app-meta-line>
-                                <strong>{{ slotLabel(slot) }}</strong>
-                                <span class="cdv__muted">{{ (logo.vendoredName ? 'admin.cdVariants.sourceVendored' : 'admin.cdVariants.sourceUpload') | t }}</span>
-                              </app-meta-line></span>
-                              <span class="cdv__logoName mono">{{ logoDetail(logo) }}</span>
-                              @if (logo.vendoredName) {
-                                <span class="cdv__logoHint">{{ 'admin.cdVariants.vendoredHint' | t }}</span>
-                              }
-                            </span>
-                            <span class="cdv__logoActions">
-                              <app-button-group>
-                                <app-row-menu
-                                  [sections]="logoMenu(slot, i, last, logo)"
-                                  [label]="('ui.rowMenu.trigger' | t) + ': ' + logoLabel(logo)"
-                                  (selected)="onLogoMenu($event, v, slot, i, logo)"
-                                />
-                              </app-button-group>
-                            </span>
-                          </li>
-                        }
+      @if (isExpanded(v.id)) {
+        <div class="cdv__body" [id]="'cdv-logos-' + v.id">
+          @if (v.logos.length) {
+            <ul class="rowgroup rowgroup--bg3 cdv__logos">
+              @for (slot of listOrder; track slot) {
+                @for (logo of logosOf(v, slot); track logo.id; let i = $index; let last = $last) {
+                  <li class="cdv__logo">
+                    @if (slot === 'square' && logo.fileName && !brokenThumbs().has(logo.id)) {
+                      <img class="cdv__thumb cdv__thumb--img" [src]="squareUrl(logo)" alt="" width="40" height="40" (error)="thumbFailed(logo)" />
+                    } @else {
+                      <span class="cdv__thumb" aria-hidden="true"><app-icon [name]="logo.vendoredName ? 'pin' : 'file'" [size]="18" /></span>
+                    }
+                    <span class="cdv__logoText">
+                      <span class="cdv__logoHead"><app-meta-line>
+                        <strong>{{ slotLabel(slot) }}</strong>
+                        <span class="cdv__muted">{{ (logo.vendoredName ? 'admin.cdVariants.sourceVendored' : 'admin.cdVariants.sourceUpload') | t }}</span>
+                      </app-meta-line></span>
+                      <span class="cdv__logoName mono">{{ logoDetail(logo) }}</span>
+                      @if (logo.vendoredName) {
+                        <span class="cdv__logoHint">{{ 'admin.cdVariants.vendoredHint' | t }}</span>
                       }
-                    </ul>
-                  } @else {
-                    <app-empty-state icon="image" shape="file" rows="1" [heading]="'admin.cdVariants.noLogos' | t" />
-                  }
-                  <app-button-group>
-                    <app-button class="cdv__add" variant="text" size="sm" (click)="openLogoDialog(v)">
-                      <app-icon name="plus" /> {{ 'admin.cdVariants.addLogo' | t }}
-                    </app-button>
-                  </app-button-group>
-                </div>
+                    </span>
+                    <span class="cdv__logoActions">
+                      <app-button-group>
+                        <app-row-menu
+                          [sections]="logoMenu(slot, i, last, logo)"
+                          [label]="('ui.rowMenu.trigger' | t) + ': ' + logoLabel(logo)"
+                          (selected)="onLogoMenu($event, v, slot, i, logo)"
+                        />
+                      </app-button-group>
+                    </span>
+                  </li>
+                }
               }
-            </li>
+            </ul>
+          } @else {
+            <app-empty-state icon="image" shape="file" rows="1" [heading]="'admin.cdVariants.noLogos' | t" />
           }
-        </ul>
-      } @else {
-        <app-empty-state icon="palette" [heading]="'admin.cdVariants.empty' | t" />
+          <app-button-group>
+            <app-button class="cdv__add" variant="text" size="sm" (click)="openLogoDialog(v)">
+              <app-icon name="plus" /> {{ 'admin.cdVariants.addLogo' | t }}
+            </app-button>
+          </app-button-group>
+        </div>
       }
-    </ng-template>
-  </app-load-state>
-
-  <app-fab [label]="'fab.cdVariant' | t" (activate)="openCreate()" />
-</section>
+    </li>
+  </ng-template>
+</app-records-screen>
 
 <app-dialog
   [open]="dialogOpen()"
