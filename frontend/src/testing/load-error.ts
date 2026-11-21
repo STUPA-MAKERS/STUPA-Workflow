@@ -40,8 +40,16 @@ export function toastWith(
   const service = new ToastService();
   const real = service.show.bind(service);
   const m = mock as Partial<Record<ToastKind, (text: string) => void>>;
+  // A plain toast of a mocked kind goes only to the jest function, as `success(text)` did:
+  // a real one would hold a timer that `whenStable` waits for. A toast with an action or one
+  // that stays (the load error toast) is real.
   const show = (o: ToastOptions): number => {
-    m[o.kind ?? 'info']?.(o.text);
+    const fn = m[o.kind ?? 'info'];
+    if (fn && !o.action && !o.sticky) {
+      fn(o.text);
+      return -1;
+    }
+    fn?.(o.text);
     return real(o);
   };
   const kinds = Object.fromEntries(
