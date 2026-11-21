@@ -22,6 +22,8 @@
       <app-icon name="right" [size]="13" />
       <a routerLink="/protocols">{{ 'publicProtocols.title' | t }}</a>
       <app-icon name="right" [size]="13" />
+      <a [routerLink]="['/protocols', p.gremium.slug]">{{ p.gremium.name }}</a>
+      <app-icon name="right" [size]="13" />
       <span class="ell" aria-current="page" [title]="p.title">{{ p.title }}</span>
     </nav>
 
@@ -141,7 +143,7 @@
             <li>{{ 'publicProtocols.version.internal' | t }}</li>
           </ul>
           <app-button-group class="pd__more">
-            <a appButton="text" size="sm" routerLink="/protocols" [queryParams]="{ committee: p.gremium.id }">{{
+            <a appButton="text" size="sm" [routerLink]="['/protocols', p.gremium.slug]">{{
               'publicProtocols.detail.allOf' | t: { name: p.gremium.name }
             }}</a>
           </app-button-group>

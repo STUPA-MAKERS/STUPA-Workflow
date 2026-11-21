@@ -18,6 +18,8 @@ export interface PublicGremium {
   readonly name: string;
   readonly slug: string;
   readonly protocolCount: number;
+  /** The day of the newest public protocol (`YYYY-MM-DD`). */
+  readonly latestDate: string;
 }
 
 /** The gremium of a protocol. */

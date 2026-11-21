@@ -222,9 +222,13 @@ class PublicGremiumRef(FrozenCamelModel, frozen=True):
 
 
 class PublicGremiumOut(PublicGremiumRef, frozen=True):
-    """A gremium with the number of its public protocols."""
+    """A gremium with the number of its public protocols and the day of the newest one.
+
+    The overview of `/protocols` and `/decisions` shows the day (§F/public/public-pages/002400).
+    """
 
     protocol_count: int = Field(alias="protocolCount")
+    latest_date: _date = Field(alias="latestDate")
 
 
 class PublicTopSummary(FrozenCamelModel, frozen=True):
@@ -421,7 +425,13 @@ class PublicProtocolService:
         """List the public gremien that have at least one visible protocol."""
         rows = (
             await self.session.execute(
-                select(Gremium.id, Gremium.name, Gremium.slug, func.count(Protocol.id))
+                select(
+                    Gremium.id,
+                    Gremium.name,
+                    Gremium.slug,
+                    func.count(Protocol.id),
+                    func.max(meeting_day_expr()),
+                )
                 .select_from(Protocol)
                 .join(Meeting, Meeting.id == Protocol.meeting_id)
                 .join(Gremium, Gremium.id == Protocol.gremium_id)
@@ -431,8 +441,10 @@ class PublicProtocolService:
             )
         ).all()
         return [
-            PublicGremiumOut(id=gid, name=name, slug=slug, protocolCount=int(count))
-            for gid, name, slug, count in rows
+            PublicGremiumOut(
+                id=gid, name=name, slug=slug, protocolCount=int(count), latestDate=latest
+            )
+            for gid, name, slug, count, latest in rows
         ]
 
     async def list_protocols(

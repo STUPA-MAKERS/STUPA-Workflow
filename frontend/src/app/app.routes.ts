@@ -1,4 +1,4 @@
-import type { Routes } from '@angular/router';
+import type { CanMatchFn, Routes } from '@angular/router';
 import { authGuard } from '@core/auth/auth.guard';
 import { homeRedirectGuard } from '@core/auth/home-redirect.guard';
 import { featureMatch } from '@core/features/feature.guard';
@@ -33,7 +33,17 @@ import {
  * its answers and files. `apply/confirmation` comes first, or `:type` would match it.
  * A route of a feature with a switch has `featureMatch`: while the feature is off, the route
  * does not match and the catch-all route shows "Seite nicht gefunden".
+ * `/protocols/:id` matches only an id (`idAt(1)`), so `/protocols/<slug>` is the page of a
+ * Gremium (spec 002400) and the links to one protocol keep working.
  */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Match only when the URL segment at `index` is an id. */
+const idAt =
+  (index: number): CanMatchFn =>
+  (_route, segments) =>
+    UUID.test(segments[index]?.path ?? '');
+
 export const routes: Routes = [
   {
     path: '',
@@ -105,6 +115,15 @@ export const routes: Routes = [
       {
         path: 'decisions',
         canMatch: [featureMatch('meetings')],
+        data: { title: 'publicDecisions.title', footer: true, kind: 'decisions' },
+        loadComponent: () =>
+          import('./features/public-protocols/public-gremien.component').then(
+            (m) => m.PublicGremienComponent,
+          ),
+      },
+      {
+        path: 'decisions/:committee',
+        canMatch: [featureMatch('meetings')],
         data: { title: 'publicDecisions.title', footer: true },
         loadComponent: () =>
           import('./features/public-protocols/public-decisions.component').then(
@@ -114,19 +133,28 @@ export const routes: Routes = [
       {
         path: 'protocols',
         canMatch: [featureMatch('meetings')],
-        data: { title: 'publicProtocols.title', footer: true },
+        data: { title: 'publicProtocols.title', footer: true, kind: 'protocols' },
         loadComponent: () =>
-          import('./features/public-protocols/public-protocols.component').then(
-            (m) => m.PublicProtocolsComponent,
+          import('./features/public-protocols/public-gremien.component').then(
+            (m) => m.PublicGremienComponent,
           ),
       },
       {
         path: 'protocols/:id',
-        canMatch: [featureMatch('meetings')],
+        canMatch: [featureMatch('meetings'), idAt(1)],
         data: { title: 'publicProtocols.title', footer: true },
         loadComponent: () =>
           import('./features/public-protocols/public-protocol-detail.component').then(
             (m) => m.PublicProtocolDetailComponent,
+          ),
+      },
+      {
+        path: 'protocols/:committee',
+        canMatch: [featureMatch('meetings')],
+        data: { title: 'publicProtocols.title', footer: true },
+        loadComponent: () =>
+          import('./features/public-protocols/public-protocols.component').then(
+            (m) => m.PublicProtocolsComponent,
           ),
       },
       {

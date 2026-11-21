@@ -68,7 +68,9 @@ export function mockPublicProtocols(
 ): { readonly body: unknown } | undefined {
   if (method !== 'GET') return undefined;
   if (path.endsWith('/public/committees')) {
-    const body: PublicGremium[] = [{ ...GREMIUM, protocolCount: PROTOCOLS.length }];
+    const body: PublicGremium[] = [
+      { ...GREMIUM, protocolCount: PROTOCOLS.length, latestDate: PROTOCOLS[0]?.date ?? '2026-09-29' },
+    ];
     return { body };
   }
   if (path.endsWith('/public/protocols/semesters')) {

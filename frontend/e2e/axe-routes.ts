@@ -40,6 +40,8 @@ export const AXE_ROUTES: readonly AxeRoute[] = [
   fixed('decisions', { public: true }),
   fixed('public-calendar', { public: true }),
   { path: 'protocols/:id', url: () => `/protocols/${MISSING}`, public: true },
+  { path: 'protocols/:committee', url: () => '/protocols/no-such-committee', public: true },
+  { path: 'decisions/:committee', url: () => '/decisions/no-such-committee', public: true },
   { path: 'j/:code', url: () => '/j/ZZZZZZ', public: true },
   fixed('accessibility', { public: true }),
   fixed('applications'),

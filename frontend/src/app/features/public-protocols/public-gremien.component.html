@@ -1,0 +1,37 @@
+<section class="pp">
+  <header class="pp__head">
+    <nav class="pp__crumbs" [attr.aria-label]="'publicProtocols.crumbs' | t">
+      <a routerLink="/">{{ 'publicProtocols.crumbHome' | t }}</a>
+      <app-icon name="right" [size]="13" />
+      <span aria-current="page">{{ titleKey | t }}</span>
+    </nav>
+    <h1 class="pp__title">{{ titleKey | t }}</h1>
+    @if (kind === 'protocols') {
+      <p class="pp__lede">{{ 'publicProtocols.lede' | t }}</p>
+    }
+  </header>
+
+  @if (loading()) {
+    <app-skeleton variant="items" [count]="3" [grouped]="true" [label]="'publicProtocols.gremien.loading' | t" />
+  } @else if (error()) {
+    <app-note kind="error" icon="alert" role="alert">{{ 'publicProtocols.error' | t }}</app-note>
+  } @else if (rows().length === 0) {
+    <div class="pp__none">
+      <app-empty-state [icon]="kind === 'decisions' ? 'vote' : 'file'" shape="date"
+        [heading]="(kind === 'decisions' ? 'publicDecisions.empty.none' : 'publicProtocols.empty.none') | t"
+        [body]="(kind === 'decisions' ? 'publicDecisions.empty.noneBody' : 'publicProtocols.empty.noneBody') | t"
+      >
+        <a class="pp__btn pp__btn--tonal" routerLink="/">
+          <app-icon name="back" [size]="16" />
+          {{ 'publicProtocols.empty.home' | t }}
+        </a>
+      </app-empty-state>
+    </div>
+  } @else {
+    <div class="pp__rows rowgroup" role="list" [attr.aria-label]="'publicProtocols.gremien.label' | t">
+      @for (row of rows(); track row.id) {
+        <app-list-item role="listitem" [title]="row.name" [sub]="row.sub" [link]="row.link" />
+      }
+    </div>
+  }
+</section>

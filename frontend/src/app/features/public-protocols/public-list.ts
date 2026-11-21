@@ -12,8 +12,6 @@ export const PAGE_SIZE = 20;
 /** The time after the last key press until the search runs, in ms. */
 export const SEARCH_DEBOUNCE = 300;
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /** One page of a public list, as the server gives it. */
 interface Page<T> {
   readonly items: readonly T[];
@@ -36,7 +34,10 @@ export interface PublicList<T> {
   readonly appliedQuery: WritableSignal<string>;
   /** The search field: from the first character, Enter searches at once. */
   readonly search: ReturnType<typeof liveSearch<never>>;
-  readonly gremiumFilter: WritableSignal<readonly string[]>;
+  /** The Gremium of the page (`:committee` of the route), once the Gremien are read. */
+  readonly gremium: Signal<PublicGremium | null>;
+  /** True when the slug of the page names no public Gremium (spec 002403). */
+  readonly unknown: Signal<boolean>;
   readonly semesterFilter: WritableSignal<string>;
   readonly gremien: WritableSignal<readonly PublicGremium[]>;
   readonly semesters: WritableSignal<readonly PublicSemester[]>;
@@ -47,45 +48,39 @@ export interface PublicList<T> {
   readonly error: WritableSignal<boolean>;
   readonly hasFilters: Signal<boolean>;
   readonly hasMore: Signal<boolean>;
-  readonly gremiumOptions: Signal<readonly FilterSelectOption[]>;
-  /** The chip text: "Gremium", the one name, or "2 Gremien". */
-  readonly gremiumText: Signal<string | null>;
   readonly semesterOptions: Signal<readonly FilterSelectOption[]>;
   readonly semesterText: Signal<string | null>;
   /** The loaded rows by semester, in the order of the list. */
   readonly groups: Signal<readonly SemesterRows<T>[]>;
   semesterName(key: string): string;
-  onGremien(ids: readonly string[]): void;
   onSemester(key: string): void;
   resetFilters(): void;
   loadMore(): void;
 }
 
 /**
- * The list logic that "Protokolle" and "Beschlüsse" share: the search, the Gremium chip
- * (`?committee=`), the Semester chip, the pages and the groups by semester. Call it in an
- * injection context; it reads the Gremien and the first page at once.
+ * The list logic that the Gremium pages of "Protokolle" and "Beschlüsse" share (specs 002400,
+ * 002401): the search, the Semester chip, the pages and the groups by semester. Call it in an
+ * injection context. It reads the Gremien first, finds the Gremium of the slug `:committee`
+ * of the route and then reads its first page. A slug that names no public Gremium reads no
+ * page and sets `unknown`.
  *
- * - With `checkCommittee`, a value of `?committee=` that is no id is dropped, so it gives no
- *   error of the server, and a Gremium of the filter that is not public is dropped too: it gives
- *   no row. Without it the filter keeps each value of the link, and the chip counts it.
- * - A newer read wins over an older answer (`newest`).
+ * A newer read wins over an older answer (`newest`).
  *
  * `load` reads one page. `semesterQuery` gives the filters of the semester options.
  */
 export function publicList<T extends { readonly semester: string }>(cfg: {
   readonly load: (query: PublicProtocolQuery) => Observable<Page<T>>;
   readonly semesterQuery: (filters: PublicListFilters) => PublicProtocolQuery;
-  readonly checkCommittee: boolean;
 }): PublicList<T> {
   const api = inject(PublicProtocolsService);
   const i18n = inject(I18nService);
   const route = inject(ActivatedRoute);
 
   const appliedQuery = signal('');
-  const gremiumFilter = signal<readonly string[]>(
-    route.snapshot.queryParamMap.getAll('committee').filter((id) => !cfg.checkCommittee || UUID.test(id)),
-  );
+  const slug = route.snapshot.paramMap.get('committee') ?? '';
+  const gremium = signal<PublicGremium | null>(null);
+  const unknown = signal(false);
   const semesterFilter = signal('');
   const gremien = signal<PublicGremium[]>([]);
   const semesters = signal<PublicSemester[]>([]);
@@ -98,7 +93,7 @@ export function publicList<T extends { readonly semester: string }>(cfg: {
   const newest = signal(0);
 
   const filters = (): PublicListFilters => ({
-    gremium: gremiumFilter(),
+    gremium: [gremium()?.id].filter((id): id is string => id !== undefined),
     semester: semesterFilter(),
     q: appliedQuery(),
     limit: PAGE_SIZE,
@@ -141,11 +136,6 @@ export function publicList<T extends { readonly semester: string }>(cfg: {
     }
   };
 
-  const onGremien = (ids: readonly string[]): void => {
-    gremiumFilter.set(ids);
-    reload();
-  };
-
   const search = liveSearch<never>({
     minLength: 1,
     debounceMs: SEARCH_DEBOUNCE,
@@ -158,17 +148,27 @@ export function publicList<T extends { readonly semester: string }>(cfg: {
   api.gremien().subscribe({
     next: (rows) => {
       gremien.set(rows);
-      const kept = gremiumFilter().filter((id) => rows.some((g) => g.id === id));
-      if (cfg.checkCommittee && kept.length !== gremiumFilter().length) onGremien(kept);
+      const hit = rows.find((g) => g.slug === slug) ?? null;
+      gremium.set(hit);
+      if (hit) {
+        reload();
+      } else {
+        unknown.set(true);
+        loading.set(false);
+      }
     },
-    error: () => gremien.set([]),
+    error: () => {
+      gremien.set([]);
+      loading.set(false);
+      error.set(true);
+    },
   });
-  reload();
 
   return {
     appliedQuery,
     search,
-    gremiumFilter,
+    gremium,
+    unknown,
     semesterFilter,
     gremien,
     semesters,
@@ -178,18 +178,9 @@ export function publicList<T extends { readonly semester: string }>(cfg: {
     loadingMore,
     error,
     hasFilters: computed(
-      () => gremiumFilter().length > 0 || semesterFilter() !== '' || appliedQuery() !== '',
+      () => semesterFilter() !== '' || appliedQuery() !== '',
     ),
     hasMore: computed(() => items().length < total()),
-    gremiumOptions: computed(() => gremien().map((g) => ({ value: g.id, label: g.name }))),
-    gremiumText: computed(() => {
-      const ids = gremiumFilter();
-      if (ids.length === 0) return null;
-      const label = i18n.translate('publicProtocols.filter.gremium');
-      const hit = ids.length === 1 ? gremien().find((g) => g.id === ids[0]) : undefined;
-      const value = hit ? hit.name : i18n.translate('publicProtocols.filter.gremienN', { n: ids.length });
-      return `${label}: ${value}`;
-    }),
     semesterOptions: computed(() => [
       { value: '', label: i18n.translate('publicProtocols.filter.all') },
       ...semesters().map((s) => ({ value: s.key, label: semesterName(s.key) })),
@@ -208,7 +199,6 @@ export function publicList<T extends { readonly semester: string }>(cfg: {
       }));
     }),
     semesterName,
-    onGremien,
     onSemester: (key) => {
       semesterFilter.set(key);
       reload(false);
@@ -216,7 +206,6 @@ export function publicList<T extends { readonly semester: string }>(cfg: {
     resetFilters: () => {
       search.sync('');
       appliedQuery.set('');
-      gremiumFilter.set([]);
       semesterFilter.set('');
       reload();
     },
