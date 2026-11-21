@@ -272,7 +272,11 @@ class _FakeService:
         self.filters: list[PublicFilter] = []
 
     async def list_gremien(self) -> list[pub.PublicGremiumOut]:
-        return [pub.PublicGremiumOut(id=GID, name="AStA", slug="asta", protocolCount=1)]
+        return [
+            pub.PublicGremiumOut(
+                id=GID, name="AStA", slug="asta", protocolCount=1, latestDate=_date(2026, 9, 29)
+            )
+        ]
 
     async def list_protocols(
         self, flt: PublicFilter, *, limit: int, offset: int
