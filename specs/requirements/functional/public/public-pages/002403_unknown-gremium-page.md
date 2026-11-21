@@ -2,7 +2,7 @@
 id: "002403"
 title: An unknown Gremium page shows that it has no protocols
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-21
 implementation:

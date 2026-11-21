@@ -2,7 +2,7 @@
 id: "002404"
 title: An old Gremium filter link opens the page of the Gremium
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-21
 implementation:

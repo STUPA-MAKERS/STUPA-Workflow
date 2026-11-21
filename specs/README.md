@@ -718,11 +718,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/public/public-pages/000945](requirements/functional/public/public-pages/000945_public-decisions-last-result.md) | The public decisions show the last result of a TOP | approved |
 | [F/public/public-pages/000967](requirements/functional/public/public-pages/000967_blackout-block-public.md) | The public variants show a blackout block as one bar | approved |
 | [F/public/public-pages/001303](requirements/functional/public/public-pages/001303_public-pages-in-navigation.md) | The navigation leads a signed-in person to the public pages | approved |
-| [F/public/public-pages/002400](requirements/functional/public/public-pages/002400_protocols-per-gremium.md) | The public protocols have one page per Gremium | draft |
-| [F/public/public-pages/002401](requirements/functional/public/public-pages/002401_decisions-per-gremium.md) | The public decisions have one page per Gremium | draft |
-| [F/public/public-pages/002402](requirements/functional/public/public-pages/002402_gremium-pages-link-each-other.md) | The two public pages of a Gremium link each other | draft |
-| [F/public/public-pages/002403](requirements/functional/public/public-pages/002403_unknown-gremium-page.md) | An unknown Gremium page shows that it has no protocols | draft |
-| [F/public/public-pages/002404](requirements/functional/public/public-pages/002404_committee-query-redirect.md) | An old Gremium filter link opens the page of the Gremium | draft |
+| [F/public/public-pages/002400](requirements/functional/public/public-pages/002400_protocols-per-gremium.md) | The public protocols have one page per Gremium | approved |
+| [F/public/public-pages/002401](requirements/functional/public/public-pages/002401_decisions-per-gremium.md) | The public decisions have one page per Gremium | approved |
+| [F/public/public-pages/002402](requirements/functional/public/public-pages/002402_gremium-pages-link-each-other.md) | The two public pages of a Gremium link each other | approved |
+| [F/public/public-pages/002403](requirements/functional/public/public-pages/002403_unknown-gremium-page.md) | An unknown Gremium page shows that it has no protocols | approved |
+| [F/public/public-pages/002404](requirements/functional/public/public-pages/002404_committee-query-redirect.md) | An old Gremium filter link opens the page of the Gremium | approved |
 | [NF/accessibility/documents/000524](requirements/non-functional/accessibility/documents/000524_protocol-pdf-ua.md) | The protocol PDF is tagged as PDF/UA-1 | approved |
 | [NF/accessibility/documents/000525](requirements/non-functional/accessibility/documents/000525_mail-plain-text.md) | Each mail has a plain text part | approved |
 | [NF/accessibility/interaction/000521](requirements/non-functional/accessibility/interaction/000521_no-cognitive-test.md) | The login and the captcha need no cognitive test | approved |

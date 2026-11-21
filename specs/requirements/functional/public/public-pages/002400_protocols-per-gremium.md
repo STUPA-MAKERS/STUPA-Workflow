@@ -2,7 +2,7 @@
 id: "002400"
 title: The public protocols have one page per Gremium
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-21
 implementation:

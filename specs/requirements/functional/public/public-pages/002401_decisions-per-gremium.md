@@ -2,7 +2,7 @@
 id: "002401"
 title: The public decisions have one page per Gremium
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-21
 implementation:

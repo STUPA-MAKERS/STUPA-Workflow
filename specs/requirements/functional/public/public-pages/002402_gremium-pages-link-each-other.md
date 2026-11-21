@@ -2,7 +2,7 @@
 id: "002402"
 title: The two public pages of a Gremium link each other
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-21
 implementation:
