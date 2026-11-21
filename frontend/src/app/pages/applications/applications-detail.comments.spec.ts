@@ -24,6 +24,7 @@ import type {
   VersionOutWire,
 } from '@core/api/models';
 import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
+import { kindSpies } from '../../../testing/toast';
 
 const SUBMITTED: StateOutWire = {
   id: 's1',
@@ -338,7 +339,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
   /** A foreign comment offers no edit. */
   it('posts a public comment without application.manage, at once and without a toast', async () => {
     const { http, toast, type, detectChanges } = await loaded(['application.read']);
-    const success = jest.spyOn(toast, 'success');
+    const success = jest.spyOn(kindSpies(toast), 'success');
     expect(screen.queryByRole('radiogroup', { name: 'Sichtbarkeit' })).not.toBeInTheDocument();
     expect(screen.getByText('Bitte Kostenplan ergänzen.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Nachricht bearbeiten' })).not.toBeInTheDocument();
@@ -570,7 +571,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     [500, 'Kommentar konnte nicht gespeichert werden.'],
   ])('explains a %s on the comment patch', async (status, message) => {
     const { http, toast, cmp } = await loaded(undefined, [OWN]);
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     const restore = jest.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (cmp as any).editComment({ id: 'c2', body: 'x', restore });
@@ -646,7 +647,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
 
   it('reports a failed delete and keeps the comment', async () => {
     const { http, toast, cmp } = await loaded(undefined, [OWN]);
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (cmp as any).deleteComment({ id: 'c2' });
     http.expectOne(url('/comments/c2')).flush({ title: 'e' }, { status: 403, statusText: 'x' });

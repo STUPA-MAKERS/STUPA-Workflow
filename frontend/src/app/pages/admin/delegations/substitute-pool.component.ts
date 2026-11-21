@@ -33,6 +33,7 @@ import {
   SkeletonComponent,
   ToastService,
   SectionComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { Subscription } from 'rxjs';
 import { AdminApiService } from '../admin-api.service';
@@ -65,6 +66,7 @@ const SEARCH_LIMIT = 8;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     LoadStateComponent,
     SectionComponent,
     NoteComponent,
@@ -244,12 +246,18 @@ export class SubstitutePoolComponent {
           this.adding.set(false);
           this.addOpen.set(false);
           this.entries.update((list) => [...list, row]);
-          this.toast.success(this.i18n.translate('admin.substitutes.added'));
+          this.toast.show({
+            text: this.i18n.translate('admin.substitutes.added'),
+            kind: 'success',
+          });
         },
         error: (err: { status?: number }) => {
           this.adding.set(false);
           if (err.status !== 409 && err.status !== 422) {
-            this.toast.error(this.i18n.translate('admin.substitutes.failed'));
+            this.toast.show({
+              text: this.i18n.translate('admin.substitutes.failed'),
+              kind: 'error',
+            });
             return;
           }
           this.addError.set(
@@ -268,11 +276,14 @@ export class SubstitutePoolComponent {
       next: () => {
         this.done(s.id);
         this.entries.update((list) => list.filter((x) => x.id !== s.id));
-        this.toast.success(this.i18n.translate('admin.substitutes.removed'));
+        this.toast.show({
+          text: this.i18n.translate('admin.substitutes.removed'),
+          kind: 'success',
+        });
       },
       error: () => {
         this.done(s.id);
-        this.toast.error(this.i18n.translate('admin.substitutes.failed'));
+        this.toast.show({ text: this.i18n.translate('admin.substitutes.failed'), kind: 'error' });
       },
     });
   }

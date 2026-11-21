@@ -8,6 +8,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AuditEntry, AuditPage, ConfigRevisionDiff } from '../admin.models';
 import { AuditLogComponent } from './audit-log.component';
+import { toastMock } from '../../../../testing/toast';
 
 const DIFF: ConfigRevisionDiff = {
   id: 'rev-2',
@@ -67,7 +68,7 @@ async function setup(
     runAuditVerification: jest.fn(),
     revertAuditEntry,
   };
-  const toast = { success: jest.fn(), error: jest.fn() };
+  const toast = toastMock();
   const auth = { can: jest.fn((p: string) => (opts.canRevert ?? true) && p === 'audit.revert') };
   const view = await render(AuditLogComponent, {
     providers: [

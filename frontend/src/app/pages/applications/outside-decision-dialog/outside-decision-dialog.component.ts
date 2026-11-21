@@ -35,6 +35,7 @@ import {
   type SelectOption,
   ToastService,
   ErrorTextComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 
 /** The result of a decision made outside the platform. */
@@ -78,6 +79,7 @@ function countOf(text: string): number | null | undefined {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     ErrorTextComponent,
     FormsModule,
     TranslatePipe,
@@ -244,7 +246,7 @@ export class OutsideDecisionDialogComponent {
       next: () => {
         this.saving.set(false);
         this.open.set(false);
-        this.toast.success(this.i18n.translate('outsideDecision.saved'));
+        this.toast.show({ text: this.i18n.translate('outsideDecision.saved'), kind: 'success' });
         this.done.emit();
       },
       error: (err: { status?: number; error?: ProblemDetail | null }) => {
@@ -255,16 +257,22 @@ export class OutsideDecisionDialogComponent {
           return;
         }
         if (err.status === 409) {
-          this.toast.error(this.i18n.translate('outsideDecision.error.state'));
+          this.toast.show({
+            text: this.i18n.translate('outsideDecision.error.state'),
+            kind: 'error',
+          });
           this.open.set(false);
           this.done.emit();
           return;
         }
-        this.toast.error(
-          this.i18n.translate(
-            err.status === 403 ? 'applications.transitions.forbidden' : 'applications.actions.error',
+        this.toast.show({
+          text: this.i18n.translate(
+            err.status === 403
+              ? 'applications.transitions.forbidden'
+              : 'applications.actions.error',
           ),
-        );
+          kind: 'error',
+        });
       },
     });
   }

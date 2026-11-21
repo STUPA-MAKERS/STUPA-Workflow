@@ -1,40 +1,53 @@
-<app-side-sheet side="bottom" [heading]="'todos.move.title' | t" [(open)]="open" (closed)="dismissed.emit()">
-  <div class="ms">
-    <div class="ms__list rowgroup rowgroup--bg3" role="radiogroup" [attr.aria-label]="'todos.move.column' | t">
-      @for (col of columns(); track col.id) {
-        <button
-          type="button"
-          class="ms__row"
-          role="radio"
-          [class.ms__row--on]="col.id === columnId()"
-          [attr.aria-checked]="col.id === columnId()"
-          (click)="columnId.set(col.id)"
-        >
-          <span class="ms__name">{{ col.name }}</span>
-          @if (col.id === columnId()) {
-            <app-icon class="ms__check" name="check" [size]="18" />
-          }
-        </button>
-      }
-    </div>
-    @if (canTransfer()) {
-      <div class="rowgroup rowgroup--bg3">
-        <button type="button" class="ms__row" (click)="moveOn()">
-          <span class="ms__name">{{ 'todos.card.transfer' | t }}</span>
-          <app-icon class="ms__go" name="right" [size]="18" />
-        </button>
+<app-side-sheet
+  side="bottom"
+  [heading]="'todos.move.title' | t"
+  [(open)]="open"
+  (closed)="dismissed.emit()"
+>
+  <ng-template sheetBody>
+    <div class="ms">
+      <div
+        class="ms__list rowgroup rowgroup--bg3"
+        role="radiogroup"
+        [attr.aria-label]="'todos.move.column' | t"
+      >
+        @for (col of columns(); track col.id) {
+          <button
+            type="button"
+            class="ms__row"
+            role="radio"
+            [class.ms__row--on]="col.id === columnId()"
+            [attr.aria-checked]="col.id === columnId()"
+            (click)="columnId.set(col.id)"
+          >
+            <span class="ms__name">{{ col.name }}</span>
+            @if (col.id === columnId()) {
+              <app-icon class="ms__check" name="check" [size]="18" />
+            }
+          </button>
+        }
       </div>
-    }
-    <app-segmented
-      width="fill"
-      ariaLabel="{{ 'todos.move.position' | t }}"
-      [options]="positions()"
-      [value]="position()"
-      (valueChange)="setPosition($event)"
-    />
-    <app-button-group class="ms__foot" [main]="true">
-      <app-button variant="text" (click)="open.set(false)">{{ 'action.cancel' | t }}</app-button>
-      <app-button variant="fill" [disabled]="!columnId()" (click)="confirm()">{{ 'todos.move.confirm' | t }}</app-button>
-    </app-button-group>
-  </div>
+      @if (canTransfer()) {
+        <div class="rowgroup rowgroup--bg3">
+          <button type="button" class="ms__row" (click)="moveOn()">
+            <span class="ms__name">{{ 'todos.card.transfer' | t }}</span>
+            <app-icon class="ms__go" name="right" [size]="18" />
+          </button>
+        </div>
+      }
+      <app-segmented
+        width="fill"
+        ariaLabel="{{ 'todos.move.position' | t }}"
+        [options]="positions()"
+        [value]="position()"
+        (valueChange)="setPosition($event)"
+      />
+      <app-button-group class="ms__foot" [main]="true">
+        <app-button variant="text" (click)="open.set(false)">{{ 'action.cancel' | t }}</app-button>
+        <app-button variant="fill" [disabled]="!columnId()" (click)="confirm()">{{
+          'todos.move.confirm' | t
+        }}</app-button>
+      </app-button-group>
+    </div>
+  </ng-template>
 </app-side-sheet>

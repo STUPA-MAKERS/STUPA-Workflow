@@ -15,6 +15,7 @@ import { TodoNewDialogComponent, type NewTodoLink } from './todo-new-dialog.comp
 import { LINK_ICON } from '../todos.util';
 import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-upload.directive';
 import { pickOption } from '../../../../testing/select';
+import { toastMock } from '../../../../testing/toast';
 
 interface Opts {
   boards?: TodoBoardSummary[];
@@ -34,7 +35,7 @@ async function setup(opts: Opts = {}) {
     series: jest.fn(() => of([{ id: 's-1', name: 'Erstiparty' }])),
     createSeries: jest.fn((name: string) => of({ id: 's-2', name })),
   };
-  const toast = { success: jest.fn(), error: jest.fn() };
+  const toast = toastMock();
   const created = jest.fn();
   const view = await render(TodoNewDialogComponent, {
     inputs: { open: false, ...opts.inputs },
@@ -355,7 +356,7 @@ describe('TodoNewDialogComponent from a ticket', () => {
       createCard: opts.create ?? jest.fn((_b: TodoCardCreate) => of(detail({ id: 'card1' }))),
       linkTargets: jest.fn(() => of([])),
     };
-    const toast = { success: jest.fn(), error: jest.fn() };
+    const toast = toastMock();
     const created = jest.fn();
     const view = await render(TodoNewDialogComponent, {
       inputs: {

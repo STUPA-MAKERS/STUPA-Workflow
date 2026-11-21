@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output } f
 import type { ExternalEntry } from '@core/api/calendar.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { DialogComponent, FactsComponent } from '@stupa-makers/ui-kit';
+import { DialogComponent, FactsComponent, DialogBodyDirective } from '@stupa-makers/ui-kit';
 import { spanText } from '../calendar.util';
 
 /**
@@ -15,7 +15,7 @@ import { spanText } from '../calendar.util';
   selector: 'app-external-entry',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FactsComponent, DialogComponent, TranslatePipe],
+  imports: [DialogBodyDirective, FactsComponent, DialogComponent, TranslatePipe],
   templateUrl: './external-entry.component.html',
   styleUrl: '../appointment-detail/appointment-detail.component.scss',
 })

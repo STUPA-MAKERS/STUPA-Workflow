@@ -139,15 +139,16 @@ export class VersionHistoryComponent {
     this.api.restoreConfigRevision(rev.id).subscribe({
       next: () => {
         this.restoring.set(false);
-        this.toast.success(
-          this.i18n.translate('admin.config.restore.success', { version: rev.version }),
-        );
+        this.toast.show({
+          text: this.i18n.translate('admin.config.restore.success', { version: rev.version }),
+          kind: 'success',
+        });
         this.reload();
         this.restored.emit();
       },
       error: () => {
         this.restoring.set(false);
-        this.toast.error(this.i18n.translate('admin.config.restore.error'));
+        this.toast.show({ text: this.i18n.translate('admin.config.restore.error'), kind: 'error' });
       },
     });
   }

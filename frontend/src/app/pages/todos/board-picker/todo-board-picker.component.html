@@ -81,10 +81,17 @@
     </div>
   }
   @if (phone()) {
-    <app-side-sheet side="bottom" [heading]="'todos.board.pick' | t" [open]="open()" (openChange)="open.set($event)">
-      <div class="bp__sheet">
-        <ng-container *ngTemplateOutlet="rows" />
-      </div>
+    <app-side-sheet
+      side="bottom"
+      [heading]="'todos.board.pick' | t"
+      [open]="open()"
+      (openChange)="open.set($event)"
+    >
+      <ng-template sheetBody>
+        <div class="bp__sheet">
+          <ng-container *ngTemplateOutlet="rows" />
+        </div>
+      </ng-template>
     </app-side-sheet>
   }
 </div>

@@ -27,6 +27,7 @@ import { TodosApiService } from '@core/api/todos.service';
 import { PALETTE, shadeColor } from './budget-color.util';
 import { itemApp, itemBooking } from './budget-items/budget-items.fixtures';
 import { loadErrorToast } from '../../../testing/load-error';
+import { kindSpies } from '../../../testing/toast';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Inst = any;
@@ -585,7 +586,7 @@ describe('BudgetDashboardComponent', () => {
       const { c, http } = await setup();
       c.selectedKsId.set('');
       c.selectedFyId.set('');
-      const toast = jest.spyOn(TestBed.inject(ToastService), 'error');
+      const toast = jest.spyOn(kindSpies(TestBed.inject(ToastService)), 'error');
       c.onExport();
       const req = http.expectOne((r) => r.url.includes('/budget/export.xlsx'));
       expect(req.request.params.keys()).toEqual([]);
@@ -1817,7 +1818,7 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
 
     it('selects the budget when the selected Kostenstelle is gone after a refresh, and names a failed refresh', async () => {
       const view = await setup({ queryParams: { costCentre: 'b-900' } });
-      const error = jest.spyOn(TestBed.inject(ToastService), 'error');
+      const error = jest.spyOn(kindSpies(TestBed.inject(ToastService)), 'error');
       view.c.refreshTree();
       view.http.expectOne(treeUrl).flush([{ ...TREE[0], children: [TREE[0].children[0]] }]);
       expect(view.c.selectedKsId()).toBe('b-vs');
@@ -1828,8 +1829,9 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
 
     it('§F/finance/budget/000831: a failed tree read after a refused save of the section says nothing', async () => {
       const view = await setup({ queryParams: { costCentre: 'b-800' } });
-      const error = jest.spyOn(TestBed.inject(ToastService), 'error');
-      const section = view.fixture.debugElement.query(By.directive(CostCentreSettingsComponent)).componentInstance as CostCentreSettingsComponent;
+      const error = jest.spyOn(kindSpies(TestBed.inject(ToastService)), 'error');
+      const section = view.fixture.debugElement.query(By.directive(CostCentreSettingsComponent))
+        .componentInstance as CostCentreSettingsComponent;
       section.saved.emit(false);
       view.http.expectOne(treeUrl).flush({}, { status: 500, statusText: 'Error' });
       expect(error).not.toHaveBeenCalled();
@@ -1885,8 +1887,8 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
     it('§F/finance/budget/000832: deletes the selected Kostenstelle after the confirmation', async () => {
       const view = await setup({ queryParams: { costCentre: 'b-810' } });
       const toast = TestBed.inject(ToastService);
-      const success = jest.spyOn(toast, 'success');
-      const error = jest.spyOn(toast, 'error');
+      const success = jest.spyOn(kindSpies(toast), 'success');
+      const error = jest.spyOn(kindSpies(toast), 'error');
       const remove = async (button: string) => {
         await userEvent.click(within(view.container.querySelector('.bd__head') as HTMLElement).getByRole('button', { name: 'Weitere Aktionen' }));
         await userEvent.click(await screen.findByRole('menuitem', { name: 'Kostenstelle löschen' }));
@@ -1921,9 +1923,11 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
     it('§F/finance/budget/000833: saves the allocation when the field loses the focus', async () => {
       const view = await setup({ queryParams: { costCentre: 'b-800' } });
       const toast = TestBed.inject(ToastService);
-      const success = jest.spyOn(toast, 'success');
-      const put = (r: { method: string; url: string }) => r.method === 'PUT' && r.url.endsWith('/budgets/b-800/allocations/fy-1');
-      const field = () => view.container.querySelector('[name="allocation-b-800"]') as HTMLInputElement;
+      const success = jest.spyOn(kindSpies(toast), 'success');
+      const put = (r: { method: string; url: string }) =>
+        r.method === 'PUT' && r.url.endsWith('/budgets/b-800/allocations/fy-1');
+      const field = () =>
+        view.container.querySelector('[name="allocation-b-800"]') as HTMLInputElement;
       const retype = async (value: string) => {
         await userEvent.clear(field());
         if (value) await userEvent.type(field(), value);
@@ -1953,9 +1957,11 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
 
     it('§F/finance/budget/000833: an empty or refused allocation shows the saved one again and names the cause', async () => {
       const view = await setup({ queryParams: { costCentre: 'b-800' } });
-      const error = jest.spyOn(TestBed.inject(ToastService), 'error');
-      const put = (r: { method: string; url: string }) => r.method === 'PUT' && r.url.endsWith('/budgets/b-800/allocations/fy-1');
-      const field = () => view.container.querySelector('[name="allocation-b-800"]') as HTMLInputElement;
+      const error = jest.spyOn(kindSpies(TestBed.inject(ToastService)), 'error');
+      const put = (r: { method: string; url: string }) =>
+        r.method === 'PUT' && r.url.endsWith('/budgets/b-800/allocations/fy-1');
+      const field = () =>
+        view.container.querySelector('[name="allocation-b-800"]') as HTMLInputElement;
       const retype = async (value: string) => {
         await userEvent.clear(field());
         if (value) await userEvent.type(field(), value);

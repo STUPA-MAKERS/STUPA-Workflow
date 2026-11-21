@@ -44,14 +44,26 @@
 @if (request(); as r) {
   @if (phone()) {
     <div #layer class="gad__layer" popover="manual">
-      <app-side-sheet side="bottom" [heading]="r.heading" [open]="true" (openChange)="onSheetOpen($event)">
-        <div class="gad gad--sheet">
-          <div class="gad__who">
-            <app-avatar size="sm" [name]="r.name" [principalId]="r.principalId" [decorative]="true" />
-            <span class="gad__summary">{{ r.summary }}</span>
+      <app-side-sheet
+        side="bottom"
+        [heading]="r.heading"
+        [open]="true"
+        (openChange)="onSheetOpen($event)"
+      >
+        <ng-template sheetBody>
+          <div class="gad gad--sheet">
+            <div class="gad__who">
+              <app-avatar
+                size="sm"
+                [name]="r.name"
+                [principalId]="r.principalId"
+                [decorative]="true"
+              />
+              <span class="gad__summary">{{ r.summary }}</span>
+            </div>
+            <ng-container [ngTemplateOutlet]="body" />
           </div>
-          <ng-container [ngTemplateOutlet]="body" />
-        </div>
+        </ng-template>
       </app-side-sheet>
     </div>
   } @else {

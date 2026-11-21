@@ -23,6 +23,7 @@ import type {
   StateOutWire,
 } from '@core/api/models';
 import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
+import { kindSpies } from '../../../testing/toast';
 
 const SUBMITTED: StateOutWire = {
   id: 's1',
@@ -203,7 +204,7 @@ describe('ApplicationsDetailComponent — Folgeanträge', () => {
 
   it('links a Vorgänger from the dialog and ignores a second click while it runs', async () => {
     const { cmp, http, toast, detectChanges } = await loaded(EMPTY);
-    const success = jest.spyOn(toast, 'success');
+    const success = jest.spyOn(kindSpies(toast), 'success');
     fireEvent.click(screen.getByTestId('ad-predecessor'));
     detectChanges();
     expect(cmp.predecessorOpen()).toBe(true);
@@ -221,7 +222,7 @@ describe('ApplicationsDetailComponent — Folgeanträge', () => {
 
   it('names the reason when the link is refused', async () => {
     const { cmp, http, toast } = await loaded(EMPTY);
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     cmp.setPredecessor(PICK);
     http
       .expectOne(url('/predecessor'))
@@ -232,7 +233,7 @@ describe('ApplicationsDetailComponent — Folgeanträge', () => {
 
   it('removes the Vorgänger and reads the links again', async () => {
     const { cmp, http, toast, detectChanges } = await loaded(LINKS);
-    const success = jest.spyOn(toast, 'success');
+    const success = jest.spyOn(kindSpies(toast), 'success');
     cmp.predecessorOpen.set(true);
     detectChanges();
     fireEvent.click(screen.getByRole('button', { name: 'Vorgänger entfernen' }));
@@ -249,7 +250,7 @@ describe('ApplicationsDetailComponent — Folgeanträge', () => {
 
   it('a failed reload after the removal and a refused removal free the dialog', async () => {
     const { cmp, http, toast } = await loaded(LINKS);
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     cmp.removePredecessor();
     http.expectOne(url('/predecessor')).flush(null);
     http.expectOne(url('/links')).flush(null, { status: 500, statusText: 'Error' });

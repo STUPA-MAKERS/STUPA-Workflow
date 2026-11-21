@@ -20,6 +20,7 @@ import {
   MEDIA,
   mediaQuery,
   SideSheetComponent,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { MeetingGuestsService } from '../meeting-guests.service';
 import { JOIN_COPIED_MS } from './join-link.component';
@@ -35,7 +36,18 @@ import { JOIN_COPIED_MS } from './join-link.component';
   selector: 'app-join-qr',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FocusDialogDirective, NgTemplateOutlet, TranslatePipe, ButtonComponent, ButtonGroupComponent, CopyButtonComponent, IconComponent, QrCodeComponent, SideSheetComponent],
+  imports: [
+    SheetBodyDirective,
+    FocusDialogDirective,
+    NgTemplateOutlet,
+    TranslatePipe,
+    ButtonComponent,
+    ButtonGroupComponent,
+    CopyButtonComponent,
+    IconComponent,
+    QrCodeComponent,
+    SideSheetComponent,
+  ],
   host: {
     '(document:keydown.escape)': 'open.set(false)',
     '[class.btn-grp__seg]': 'segment()',

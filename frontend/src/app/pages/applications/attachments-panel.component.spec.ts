@@ -6,6 +6,7 @@ import { AttachmentsPanelComponent } from './attachments-panel.component';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type { AttachmentOutWire } from '@core/api/models';
+import { kindSpies } from '../../../testing/toast';
 
 const APP_ID = 'app-1';
 
@@ -86,7 +87,7 @@ describe('AttachmentsPanelComponent', () => {
 
   it('uploads a file and lists it as "scanning" (download disabled)', async () => {
     const { http, detectChanges, toast } = await setup();
-    const success = jest.spyOn(toast, 'success');
+    const success = jest.spyOn(kindSpies(toast), 'success');
     await uploadFile();
 
     const req = http.expectOne(uploadUrl);
@@ -105,7 +106,7 @@ describe('AttachmentsPanelComponent', () => {
 
   it('deletes an attachment via DELETE and drops it from the list', async () => {
     const { http, detectChanges, toast } = await setup();
-    const success = jest.spyOn(toast, 'success');
+    const success = jest.spyOn(kindSpies(toast), 'success');
     await uploadFile();
     http.expectOne(uploadUrl).flush(wire(), { status: 201, statusText: 'Created' });
     detectChanges();
@@ -173,7 +174,7 @@ describe('AttachmentsPanelComponent', () => {
       .expectOne(uploadUrl)
       .flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
     detectChanges();
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
 
     await userEvent.click(screen.getByRole('button', { name: 'Herunterladen' }));
     http
@@ -222,7 +223,7 @@ describe('AttachmentsPanelComponent', () => {
       .expectOne(uploadUrl)
       .flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
     detectChanges();
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
 
     await userEvent.click(screen.getByRole('button', { name: 'Herunterladen' }));
     http.expectOne(dlUrl('att-1')).flush({ title: 'Gone' }, { status: 410, statusText: 'Gone' });
@@ -240,7 +241,7 @@ describe('AttachmentsPanelComponent', () => {
     [undefined, 'Hochladen fehlgeschlagen.'],
   ])('maps upload error %s to its toast', async (status, message) => {
     const { http, toast } = await setup();
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     await uploadFile();
     http
       .expectOne(uploadUrl)
@@ -311,7 +312,7 @@ describe('AttachmentsPanelComponent', () => {
   /** Only the first request goes out, because concatMap holds the second one back. */
   it('uploads several files sequentially (concatMap) and toasts once', async () => {
     const { http, detectChanges, toast } = await setup();
-    const success = jest.spyOn(toast, 'success');
+    const success = jest.spyOn(kindSpies(toast), 'success');
     const input = screen.getByLabelText('Datei hochladen') as HTMLInputElement;
     await userEvent.upload(input, [
       new File(['a'], 'a.pdf', { type: 'application/pdf' }),
@@ -332,8 +333,8 @@ describe('AttachmentsPanelComponent', () => {
 
   it('toasts both success and error when some files uploaded before a failure', async () => {
     const { http, detectChanges, toast } = await setup();
-    const success = jest.spyOn(toast, 'success');
-    const error = jest.spyOn(toast, 'error');
+    const success = jest.spyOn(kindSpies(toast), 'success');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     const input = screen.getByLabelText('Datei hochladen') as HTMLInputElement;
     await userEvent.upload(input, [
       new File(['a'], 'a.pdf', { type: 'application/pdf' }),
@@ -360,7 +361,7 @@ describe('AttachmentsPanelComponent', () => {
       .expectOne(uploadUrl)
       .flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
     detectChanges();
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
 
     await userEvent.click(screen.getByRole('button', { name: 'Herunterladen' }));
     http.expectOne(dlUrl('att-1')).flush({ title: 'e' }, { status: 500, statusText: 'Server Error' });
@@ -387,7 +388,7 @@ describe('AttachmentsPanelComponent', () => {
     await uploadFile();
     http.expectOne(uploadUrl).flush(wire(), { status: 201, statusText: 'Created' });
     detectChanges();
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
 
     await userEvent.click(screen.getByRole('button', { name: 'Anhang löschen' }));
     detectChanges();
@@ -541,7 +542,7 @@ describe('AttachmentsPanelComponent', () => {
   it('bulk-deletes selected attachments and clears them from the list', async () => {
     const { http, detectChanges, toast, fixture } = await setup();
     const cmp = fixture.componentInstance;
-    const success = jest.spyOn(toast, 'success');
+    const success = jest.spyOn(kindSpies(toast), 'success');
     await uploadFile('a.pdf');
     http.expectOne(uploadUrl).flush(wire({ id: 'a', filename: 'a.pdf' }), {
       status: 201,
@@ -648,7 +649,7 @@ describe('AttachmentsPanelComponent', () => {
   it('keeps remaining selections on a partial bulk-delete failure (list reload succeeds)', async () => {
     const { http, detectChanges, toast, fixture } = await setup();
     const cmp = fixture.componentInstance;
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     await uploadFile('a.pdf');
     http.expectOne(uploadUrl).flush(wire({ id: 'a', filename: 'a.pdf' }), {
       status: 201,
@@ -888,7 +889,7 @@ describe('AttachmentsPanelComponent', () => {
   /** A late answer after the viewer closed changes nothing. */
   it('closes the viewer with the toast when the URL of the next file fails (409 quarantines it)', async () => {
     const { http, detectChanges, fixture, toast } = await setup();
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     await uploadFile();
     http.expectOne(uploadUrl).flush(wire({ scanned: true, filename: 'plan.pdf', mime: 'application/pdf' }), { status: 201, statusText: 'Created' });
     const cmp = fixture.componentInstance;
@@ -961,7 +962,7 @@ describe('AttachmentsPanelComponent', () => {
    */
   it('marks quarantined on 409 preview and toasts on 410/500', async () => {
     const { http, detectChanges, fixture, toast } = await setup();
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     await uploadFile();
     http.expectOne(uploadUrl).flush(wire({ scanned: true, filename: 'plan.pdf', mime: 'application/pdf' }), { status: 201, statusText: 'Created' });
     detectChanges();

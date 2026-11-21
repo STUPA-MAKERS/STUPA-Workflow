@@ -544,7 +544,11 @@ export class CalendarComponent implements OnDestroy {
         this.external.set(entry);
         this.externalOpen.set(true);
       },
-      error: () => this.toast.error(this.i18n.translate('calendar.external.loadFailed')),
+      error: () =>
+        this.toast.show({
+          text: this.i18n.translate('calendar.external.loadFailed'),
+          kind: 'error',
+        }),
     });
   }
 
@@ -559,7 +563,11 @@ export class CalendarComponent implements OnDestroy {
         this.publicEntry.set(entry);
         this.publicOpen.set(true);
       },
-      error: () => this.toast.error(this.i18n.translate('calendar.external.loadFailed')),
+      error: () =>
+        this.toast.show({
+          text: this.i18n.translate('calendar.external.loadFailed'),
+          kind: 'error',
+        }),
     });
   }
 
@@ -569,7 +577,8 @@ export class CalendarComponent implements OnDestroy {
         this.detail.set(a);
         this.detailOpen.set(true);
       },
-      error: () => this.toast.error(this.i18n.translate('calendar.toast.loadFailed')),
+      error: () =>
+        this.toast.show({ text: this.i18n.translate('calendar.toast.loadFailed'), kind: 'error' }),
     });
   }
 

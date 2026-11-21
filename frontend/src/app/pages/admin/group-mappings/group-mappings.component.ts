@@ -25,6 +25,7 @@ import {
   TruncatedDirective,
   PageHeaderComponent,
   SectionComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
@@ -101,6 +102,7 @@ const RESERVED_GROUP_PREFIX = 'vote:';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     LoadStateComponent,
     SectionComponent,
     ConfirmDialogComponent,
@@ -450,13 +452,16 @@ export class GroupMappingsComponent {
     req.subscribe({
       next: () => {
         this.saving.set(false);
-        this.toast.success(this.i18n.translate('admin.groupMappings.saved'));
+        this.toast.show({
+          text: this.i18n.translate('admin.groupMappings.saved'),
+          kind: 'success',
+        });
         this.dialog.set(null);
         this.refresh(kind);
       },
       error: (err: { status?: number }) => {
         this.saving.set(false);
-        this.toast.error(this.i18n.translate(this.errorKey(err?.status)));
+        this.toast.show({ text: this.i18n.translate(this.errorKey(err?.status)), kind: 'error' });
       },
     });
   }
@@ -484,11 +489,15 @@ export class GroupMappingsComponent {
           : this.api.deleteRoleMapping(id);
     req.subscribe({
       next: () => {
-        this.toast.success(this.i18n.translate('admin.groupMappings.deleted'));
+        this.toast.show({
+          text: this.i18n.translate('admin.groupMappings.deleted'),
+          kind: 'success',
+        });
         this.confirm.set(null);
         this.refresh(c.kind);
       },
-      error: () => this.toast.error(this.i18n.translate('admin.groupMappings.failed')),
+      error: () =>
+        this.toast.show({ text: this.i18n.translate('admin.groupMappings.failed'), kind: 'error' }),
     });
   }
 }

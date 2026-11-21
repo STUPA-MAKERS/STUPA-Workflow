@@ -4,6 +4,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { Meeting } from '@core/api/models';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { TodoAgendaDialogComponent } from './todo-agenda-dialog.component';
+import { toastMock } from '../../../../testing/toast';
 
 const MEETINGS = [
   { id: 'm-1', title: '34. Sitzung', date: '2026-11-12', startTime: '18:00:00' },
@@ -15,7 +16,7 @@ async function setup(code?: string, meetings: readonly Meeting[] = MEETINGS, ope
   const api = {
     addAgendaTodo: jest.fn(() => (code ? throwError(() => ({ error: { code } })) : of([]))),
   };
-  const toast = { success: jest.fn(), error: jest.fn() };
+  const toast = toastMock();
   const view = await render(TodoAgendaDialogComponent, {
     inputs: { open, cardId: 'k-1', meetings },
     providers: [

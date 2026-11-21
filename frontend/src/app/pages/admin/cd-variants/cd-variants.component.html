@@ -112,108 +112,147 @@
 
 <app-dialog
   [open]="dialogOpen()"
-  [title]="(editingId() ? 'admin.cdVariants.edit' : 'admin.cdVariants.create') | t"
+  [heading]="(editingId() ? 'admin.cdVariants.edit' : 'admin.cdVariants.create') | t"
   [closeLabel]="'action.close' | t"
   (closed)="closeDialog()"
+  [actions]="[
+    { key: 'closeDialog', label: ('action.cancel' | t) },
+    {
+      key: 'submit',
+      label: ((editingId() ? 'action.save' : 'admin.common.create') | t),
+      kind: 'main',
+      disabled: !canSave(),
+      busy: saving(),
+    },
+  ]"
+  (action)="
+    $event.key === 'closeDialog' ? closeDialog() : $event.key === 'submit' ? submit() : null
+  "
 >
-  <form id="cdv-form" class="cdv__form" (submit)="submit($event)">
-    <app-input
-      [label]="'admin.cdVariants.name' | t"
-      [required]="true"
-      name="name"
-      [ngModel]="form().name"
-      (ngModelChange)="patchName($event)"
-    />
-    <app-input
-      class="cdv__keyField"
-      [label]="'admin.common.key' | t"
-      [hint]="editingId() ? ('admin.cdVariants.keyLocked' | t) : ''"
-      name="key"
-      [disabled]="editingId() !== null"
-      [ngModel]="form().key"
-      (ngModelChange)="patchKey($event)"
-    />
-    @if (formError(); as err) {
-      <app-note kind="error" icon="alert" role="alert">{{ err | t }}</app-note>
-    }
-  </form>
-  <div dialog-footer class="cdv__foot">
-    <app-button variant="text" (click)="closeDialog()">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" [disabled]="!canSave()" [loading]="saving()" (click)="submit($event)">
-      {{ (editingId() ? 'action.save' : 'admin.common.create') | t }}
-    </app-button>
-  </div>
+  <ng-template dialogBody>
+    <form id="cdv-form" class="cdv__form" (submit)="$event.preventDefault(); submit()">
+      <app-input
+        [label]="'admin.cdVariants.name' | t"
+        [required]="true"
+        name="name"
+        [ngModel]="form().name"
+        (ngModelChange)="patchName($event)"
+      />
+      <app-input
+        class="cdv__keyField"
+        [label]="'admin.common.key' | t"
+        [hint]="editingId() ? ('admin.cdVariants.keyLocked' | t) : ''"
+        name="key"
+        [disabled]="editingId() !== null"
+        [ngModel]="form().key"
+        (ngModelChange)="patchKey($event)"
+      />
+      @if (formError(); as err) {
+        <app-note kind="error" icon="alert" role="alert">{{ err | t }}</app-note>
+      }
+    </form>
+  </ng-template>
 </app-dialog>
 
 <app-dialog
   [open]="logoDraft() !== null"
-  [title]="'admin.cdVariants.addLogo' | t"
-  [subtitle]="logoDraft() ? ('admin.cdVariants.variantOf' | t: { name: logoDraft()?.variantName ?? '' }) : ''"
+  [heading]="'admin.cdVariants.addLogo' | t"
+  [subtitle]="
+    logoDraft() ? ('admin.cdVariants.variantOf' | t: { name: logoDraft()?.variantName ?? '' }) : ''
+  "
   [closeLabel]="'action.close' | t"
   (closed)="closeLogoDialog()"
+  [actions]="[
+    { key: 'closeLogoDialog', label: ('action.cancel' | t) },
+    {
+      key: 'saveLogo',
+      label: ('admin.common.add' | t),
+      kind: 'main',
+      disabled: !canSaveLogo(),
+      busy: logoSaving(),
+    },
+  ]"
+  (action)="
+    $event.key === 'closeLogoDialog'
+      ? closeLogoDialog()
+      : $event.key === 'saveLogo'
+        ? saveLogo()
+        : null
+  "
 >
-  @if (logoDraft(); as draft) {
-    <form class="cdv__form" (submit)="$event.preventDefault(); saveLogo()">
-      <div class="cdv__field">
-        <span class="cdv__fieldLabel" aria-hidden="true">{{ 'admin.cdVariants.slot' | t }}</span>
-        <app-segmented
-          width="fill"
-          [ariaLabel]="'admin.cdVariants.slot' | t"
-          [options]="slotOptions()"
-          [value]="draft.slot"
-          (valueChange)="setSlot($event)"
-        />
-      </div>
-      <div class="cdv__fileRow" [class.cdv__fileRow--square]="draft.slot === 'square'">
-        <app-file-picker #logoFile [accept]="accept()" (picked)="onFileSelected($event)" />
-        @if (draft.previewUrl) {
-          <img class="cdv__bigSquare" [src]="draft.previewUrl" alt="" width="96" height="96" />
-        }
-        <span class="cdv__fileText">
-          <span class="cdv__fileName mono">{{ draft.file?.name ?? ('admin.cdVariants.noFile' | t) }}</span>
-          @if (draft.slot === 'square' && draft.file) {
-            @if (draft.checking) {
-              <span class="cdv__check">{{ 'admin.cdVariants.squareChecking' | t }}</span>
-            } @else if (draft.size; as size) {
-              <span class="cdv__check" [class.cdv__check--ok]="verdict() === 'ok'" [class.cdv__check--bad]="verdict() !== 'ok'" role="status">
-                <app-icon [name]="verdict() === 'ok' ? 'check' : 'alert'" [size]="14" />
-                {{ verdictText(size) }}
-              </span>
-            }
+  <ng-template dialogBody>
+    @if (logoDraft(); as draft) {
+      <form class="cdv__form" (submit)="$event.preventDefault(); saveLogo()">
+        <div class="cdv__field">
+          <span class="cdv__fieldLabel" aria-hidden="true">{{ 'admin.cdVariants.slot' | t }}</span>
+          <app-segmented
+            width="fill"
+            [ariaLabel]="'admin.cdVariants.slot' | t"
+            [options]="slotOptions()"
+            [value]="draft.slot"
+            (valueChange)="setSlot($event)"
+          />
+        </div>
+        <div class="cdv__fileRow" [class.cdv__fileRow--square]="draft.slot === 'square'">
+          <app-file-picker #logoFile [accept]="accept()" (picked)="onFileSelected($event)" />
+          @if (draft.previewUrl) {
+            <img class="cdv__bigSquare" [src]="draft.previewUrl" alt="" width="96" height="96" />
           }
-        </span>
-        <app-button-group>
-          <app-button [variant]="draft.file ? 'tonal' : 'outlined'" size="sm" (click)="logoFile.open()">
-            <app-icon name="upload" />
-            {{ (draft.file ? 'admin.cdVariants.otherFile' : 'admin.cdVariants.pickFile') | t }}
-          </app-button>
-        </app-button-group>
-      </div>
-      @if (draft.slot === 'square') {
-        @if (draft.previewUrl && verdict() === 'ok') {
-          <div class="cdv__field">
-            <span class="cdv__fieldLabel">{{ 'admin.cdVariants.previewLabel' | t }}</span>
-            <div class="cdv__preview">
-              <img class="cdv__square" [src]="draft.previewUrl" alt="" width="40" height="40" />
-              <span class="cdv__previewText">
-                <span class="cdv__previewName">{{ previewName(draft) }}</span>
-                <span class="cdv__previewSub">{{ 'admin.cdVariants.variantOf' | t: { name: draft.variantName } }}</span>
-              </span>
+          <span class="cdv__fileText">
+            <span class="cdv__fileName mono">{{
+              draft.file?.name ?? ('admin.cdVariants.noFile' | t)
+            }}</span>
+            @if (draft.slot === 'square' && draft.file) {
+              @if (draft.checking) {
+                <span class="cdv__check">{{ 'admin.cdVariants.squareChecking' | t }}</span>
+              } @else if (draft.size; as size) {
+                <span
+                  class="cdv__check"
+                  [class.cdv__check--ok]="verdict() === 'ok'"
+                  [class.cdv__check--bad]="verdict() !== 'ok'"
+                  role="status"
+                >
+                  <app-icon [name]="verdict() === 'ok' ? 'check' : 'alert'" [size]="14" />
+                  {{ verdictText(size) }}
+                </span>
+              }
+            }
+          </span>
+          <app-button-group>
+            <app-button
+              [variant]="draft.file ? 'tonal' : 'outlined'"
+              size="sm"
+              (click)="logoFile.open()"
+            >
+              <app-icon name="upload" />
+              {{ (draft.file ? 'admin.cdVariants.otherFile' : 'admin.cdVariants.pickFile') | t }}
+            </app-button>
+          </app-button-group>
+        </div>
+        @if (draft.slot === 'square') {
+          @if (draft.previewUrl && verdict() === 'ok') {
+            <div class="cdv__field">
+              <span class="cdv__fieldLabel">{{ 'admin.cdVariants.previewLabel' | t }}</span>
+              <div class="cdv__preview">
+                <img class="cdv__square" [src]="draft.previewUrl" alt="" width="40" height="40" />
+                <span class="cdv__previewText">
+                  <span class="cdv__previewName">{{ previewName(draft) }}</span>
+                  <span class="cdv__previewSub">{{
+                    'admin.cdVariants.variantOf' | t: { name: draft.variantName }
+                  }}</span>
+                </span>
+              </div>
             </div>
-          </div>
+          }
         }
-      }
-      @if (logoError(); as err) {
-        <app-note kind="error" icon="alert" role="alert">{{ err | t: { min: minPx, max: maxPx } }}</app-note>
-      }
-    </form>
-  }
-  <div dialog-footer class="cdv__foot">
-    <app-button variant="text" (click)="closeLogoDialog()">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" [disabled]="!canSaveLogo()" [loading]="logoSaving()" (click)="saveLogo()">
-      {{ 'admin.common.add' | t }}
-    </app-button>
-  </div>
+        @if (logoError(); as err) {
+          <app-note kind="error" icon="alert" role="alert">{{
+            err | t: { min: minPx, max: maxPx }
+          }}</app-note>
+        }
+      </form>
+    }
+  </ng-template>
 </app-dialog>
 
 <app-confirm-dialog

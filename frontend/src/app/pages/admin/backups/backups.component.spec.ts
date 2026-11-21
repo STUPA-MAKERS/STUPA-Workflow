@@ -6,6 +6,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import type { Backup, BackupList } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { BackupsComponent } from './backups.component';
+import { toastMock } from '../../../../testing/toast';
 
 const DONE: Backup = {
   id: 'b-1',
@@ -60,7 +61,7 @@ function makeApi(o: ApiOverrides = {}) {
 }
 
 async function setup(api = makeApi()) {
-  const toast = { success: jest.fn(), error: jest.fn(), show: jest.fn() };
+  const toast = { success: jest.fn(), error: jest.fn(), warning: jest.fn() };
   const view = await render(BackupsComponent, {
     providers: [
       { provide: AdminApiService, useValue: api },
@@ -202,7 +203,7 @@ describe('BackupsComponent', () => {
       await userEvent.type(screen.getByLabelText(/RESTORE/i), 'RESTORE');
       await userEvent.click(screen.getAllByRole('button', { name: 'Wiederherstellen' }).at(-1)!);
       expect(api.restoreBackup).toHaveBeenCalledWith('b-1');
-      expect(toast.show).toHaveBeenCalledWith(expect.stringMatching(/abgemeldet/i), 'warning');
+      expect(toast.warning).toHaveBeenCalledWith(expect.stringMatching(/abgemeldet/i));
     });
   });
 
@@ -345,7 +346,7 @@ describe('BackupsComponent', () => {
         listBackups: jest.fn(() => of(list({ items: [RUNNING] }))),
         getBackup: jest.fn(() => of({ ...RUNNING, status: 'failed' as const, error: 'pg_dump failed' })),
       });
-      const toast = { success: jest.fn(), error: jest.fn(), show: jest.fn() };
+      const toast = toastMock();
       const view = await render(BackupsComponent, {
         providers: [
           { provide: AdminApiService, useValue: api },

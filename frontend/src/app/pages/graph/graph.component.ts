@@ -44,6 +44,7 @@ import {
   SearchPillComponent,
   SideSheetComponent,
   mediaQuery,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { LINK_ICON, LINK_KIND_LABEL, linkSub, splitUrl } from '../../features/todos/todos.util';
 import { type CanvasNode, GraphCanvasComponent } from './graph-canvas.component';
@@ -95,6 +96,7 @@ export interface GraphRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBodyDirective,
     ButtonComponent,
     ButtonGroupComponent,
     ButtonLinkComponent,

@@ -108,28 +108,45 @@
 
 <app-dialog
   [open]="addOpen()"
-  [title]="'admin.roles.create' | t"
+  [heading]="'admin.roles.create' | t"
   [closeLabel]="'action.close' | t"
   (closed)="addOpen.set(false)"
+  [actions]="[
+    { key: 'addOpen', label: ('action.cancel' | t) },
+    {
+      key: 'createRole',
+      label: ('admin.common.create' | t),
+      kind: 'main',
+      disabled: !keyValid(),
+      busy: creating(),
+    },
+  ]"
+  (action)="
+    $event.key === 'addOpen'
+      ? addOpen.set(false)
+      : $event.key === 'createRole'
+        ? createRole()
+        : null
+  "
 >
-  <form class="ar__form" (submit)="$event.preventDefault(); createRole()">
-    <app-input
-      class="ar__keyInput"
-      [label]="'admin.roles.roleKey' | t"
-      [ngModel]="draft().key"
-      (ngModelChange)="patchDraft('key', $event)"
-      name="roleKey"
-      [required]="true"
-      [error]="keyError()"
-    />
-    <app-i18n-input [value]="draft().label" (valueChange)="patchDraft('label', $event)" />
-    <span class="ar__lang"><app-content-lang-switch [(value)]="contentLang.lang" [ariaLabel]="'admin.common.contentLang' | t" /></span>
-    <button type="submit" hidden></button>
-  </form>
-  <div dialog-footer>
-    <app-button variant="text" (click)="addOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" [disabled]="!keyValid()" [loading]="creating()" (click)="createRole()">{{
-      'admin.common.create' | t
-    }}</app-button>
-  </div>
+  <ng-template dialogBody>
+    <form class="ar__form" (submit)="$event.preventDefault(); createRole()">
+      <app-input
+        class="ar__keyInput"
+        [label]="'admin.roles.roleKey' | t"
+        [ngModel]="draft().key"
+        (ngModelChange)="patchDraft('key', $event)"
+        name="roleKey"
+        [required]="true"
+        [error]="keyError()"
+      />
+      <app-i18n-input [value]="draft().label" (valueChange)="patchDraft('label', $event)" />
+      <span class="ar__lang"
+        ><app-content-lang-switch
+          [(value)]="contentLang.lang"
+          [ariaLabel]="'admin.common.contentLang' | t"
+      /></span>
+      <button type="submit" hidden></button>
+    </form>
+  </ng-template>
 </app-dialog>

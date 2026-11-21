@@ -6,6 +6,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { summary } from '../../../../testing/todo-fixtures';
 import { TodoArchivedBoardsComponent } from './todo-archived-boards.component';
+import { toastMock } from '../../../../testing/toast';
 
 const ARCHIVED = [
   summary({ id: 'b-7', name: 'Ersti-Woche', kind: 'free', gremiumId: null, canConfigure: true, archived: true }),
@@ -18,7 +19,7 @@ async function setup(admin: boolean) {
     restoreBoard: jest.fn(() => of({ ...ARCHIVED[0], archived: false })),
     deleteBoard: jest.fn(() => of(undefined)),
   };
-  const toast = { success: jest.fn(), error: jest.fn() };
+  const toast = toastMock();
   const restored = jest.fn();
   const emptied = jest.fn();
   const view = await render(TodoArchivedBoardsComponent, {

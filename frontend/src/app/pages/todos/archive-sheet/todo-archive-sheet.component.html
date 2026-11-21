@@ -1,62 +1,72 @@
-<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'todos.archive.title' | t" [(open)]="open">
-  <div class="as">
-    <app-search-pill
-      size="md"
-      [clearable]="true"
-      [placeholder]="'todos.archive.search' | t"
-      [value]="search.text()"
-      (valueChange)="search.set($event)"
-      (commit)="search.flush()"
-    />
-    @if (failed()) {
-      <app-load-error [message]="'todos.archive.error' | t" (retry)="load()" />
-    }
-    @if (loading() && !items().length) {
-      <ul class="as__list skel-in" aria-hidden="true">
-        @for (w of ['72%', '58%', '66%', '50%', '62%']; track $index) {
-          <li class="as__row">
-            <span class="as__open">
-              <span class="as__title"><span class="skel-text" [style.width]="w"></span></span>
-              <span class="as__sub"><span class="skel-text skel-text--muted as__skelSub"></span></span>
-            </span>
-            <span class="skel-box as__skelButton"></span>
-          </li>
-        }
-      </ul>
-      <span class="sr-only" role="status">{{ 'todos.archive.loading' | t }}</span>
-    } @else if (!items().length) {
-      <app-empty-state icon="archive" fill rows="3" [heading]="'todos.archive.empty' | t" />
-    }
-    @if (items().length) {
-      <ul class="as__list">
-        @for (card of items(); track card.id) {
-          <li class="as__row">
-            <button type="button" class="as__open" (click)="pick(card)">
-              <span class="as__title">{{ card.title }}</span>
-              @if (doneOn(card)) {
-                <span class="as__sub">{{ doneOn(card) }}</span>
-              }
-            </button>
-            <app-button-group>
-              <app-button
-                class="as__restore"
-                variant="tonal"
-                size="sm"
-                [ariaLabel]="'todos.archive.restoreOne' | t: { title: card.title }"
-                (click)="restore(card)"
-              >
-                <app-icon name="undo" />
-                {{ 'todos.archive.restore' | t }}
-              </app-button>
-            </app-button-group>
-          </li>
-        }
-      </ul>
-    }
-    @if (items().length < total()) {
-      <app-button-group>
-        <app-button variant="text" size="sm" [loading]="loading()" (click)="more()">{{ 'todos.archive.more' | t }}</app-button>
-      </app-button-group>
-    }
-  </div>
+<app-side-sheet
+  [side]="phone() ? 'bottom' : 'end'"
+  [heading]="'todos.archive.title' | t"
+  [(open)]="open"
+>
+  <ng-template sheetBody>
+    <div class="as">
+      <app-search-pill
+        size="md"
+        [clearable]="true"
+        [placeholder]="'todos.archive.search' | t"
+        [value]="search.text()"
+        (valueChange)="search.set($event)"
+        (commit)="search.flush()"
+      />
+      @if (failed()) {
+        <app-load-error [message]="'todos.archive.error' | t" (retry)="load()" />
+      }
+      @if (loading() && !items().length) {
+        <ul class="as__list skel-in" aria-hidden="true">
+          @for (w of ['72%', '58%', '66%', '50%', '62%']; track $index) {
+            <li class="as__row">
+              <span class="as__open">
+                <span class="as__title"><span class="skel-text" [style.width]="w"></span></span>
+                <span class="as__sub"
+                  ><span class="skel-text skel-text--muted as__skelSub"></span
+                ></span>
+              </span>
+              <span class="skel-box as__skelButton"></span>
+            </li>
+          }
+        </ul>
+        <span class="sr-only" role="status">{{ 'todos.archive.loading' | t }}</span>
+      } @else if (!items().length) {
+        <app-empty-state icon="archive" fill rows="3" [heading]="'todos.archive.empty' | t" />
+      }
+      @if (items().length) {
+        <ul class="as__list">
+          @for (card of items(); track card.id) {
+            <li class="as__row">
+              <button type="button" class="as__open" (click)="pick(card)">
+                <span class="as__title">{{ card.title }}</span>
+                @if (doneOn(card)) {
+                  <span class="as__sub">{{ doneOn(card) }}</span>
+                }
+              </button>
+              <app-button-group>
+                <app-button
+                  class="as__restore"
+                  variant="tonal"
+                  size="sm"
+                  [ariaLabel]="'todos.archive.restoreOne' | t: { title: card.title }"
+                  (click)="restore(card)"
+                >
+                  <app-icon name="undo" />
+                  {{ 'todos.archive.restore' | t }}
+                </app-button>
+              </app-button-group>
+            </li>
+          }
+        </ul>
+      }
+      @if (items().length < total()) {
+        <app-button-group>
+          <app-button variant="text" size="sm" [loading]="loading()" (click)="more()">{{
+            'todos.archive.more' | t
+          }}</app-button>
+        </app-button-group>
+      }
+    </div>
+  </ng-template>
 </app-side-sheet>

@@ -1,55 +1,58 @@
 <app-dialog
   [open]="open()"
-  [title]="'meetings.closeConfirm.title' | t"
+  [heading]="'meetings.closeConfirm.title' | t"
   [subtitle]="meeting().title"
   [closeLabel]="'action.close' | t"
   (closed)="cancel()"
+  [actions]="[
+    { key: 'cancel', label: ('action.cancel' | t) },
+    {
+      key: 'confirm',
+      label: ('meetings.closeConfirm.confirm' | t),
+      kind: 'danger',
+      disabled: openVote() || lotPending(),
+      busy: closing(),
+    },
+  ]"
+  (action)="$event.key === 'cancel' ? cancel() : $event.key === 'confirm' ? confirm() : null"
 >
-  <div class="cmc">
-    <app-note icon="alert">{{ 'meetings.closeConfirm.body' | t }}</app-note>
-    <ul class="cmc__list">
-      @if (openVote()) {
-        <li class="cmc__row cmc__row--blocked">
-          <app-icon class="cmc__icon" name="x" [size]="18" />
-          <span role="alert">{{ 'meetings.closeConfirm.openVote' | t }}</span>
-        </li>
-      } @else {
+  <ng-template dialogBody>
+    <div class="cmc">
+      <app-note icon="alert">{{ 'meetings.closeConfirm.body' | t }}</app-note>
+      <ul class="cmc__list">
+        @if (openVote()) {
+          <li class="cmc__row cmc__row--blocked">
+            <app-icon class="cmc__icon" name="x" [size]="18" />
+            <span role="alert">{{ 'meetings.closeConfirm.openVote' | t }}</span>
+          </li>
+        } @else {
+          <li class="cmc__row">
+            <app-icon class="cmc__icon cmc__icon--ok" name="check" [size]="18" />
+            <span>{{ 'meetings.closeConfirm.noOpenVote' | t }}</span>
+          </li>
+        }
+        @if (lotPending()) {
+          <li class="cmc__row cmc__row--blocked">
+            <app-icon class="cmc__icon" name="x" [size]="18" />
+            <span role="alert">{{ 'meetings.closeConfirm.lotPending' | t }}</span>
+          </li>
+        }
+        @if (hasDrafts()) {
+          <li class="cmc__row">
+            <app-icon class="cmc__icon" name="x" [size]="18" />
+            <span>{{ 'meetings.closeConfirm.draftsCancelled' | t }}</span>
+          </li>
+        }
         <li class="cmc__row">
-          <app-icon class="cmc__icon cmc__icon--ok" name="check" [size]="18" />
-          <span>{{ 'meetings.closeConfirm.noOpenVote' | t }}</span>
+          <app-icon class="cmc__icon" name="send" [size]="18" />
+          <span>{{
+            (meeting().canFinalize
+              ? 'meetings.closeConfirm.finalizeLater'
+              : 'meetings.closeConfirm.finalizeByOthers'
+            ) | t
+          }}</span>
         </li>
-      }
-      @if (lotPending()) {
-        <li class="cmc__row cmc__row--blocked">
-          <app-icon class="cmc__icon" name="x" [size]="18" />
-          <span role="alert">{{ 'meetings.closeConfirm.lotPending' | t }}</span>
-        </li>
-      }
-      @if (hasDrafts()) {
-        <li class="cmc__row">
-          <app-icon class="cmc__icon" name="x" [size]="18" />
-          <span>{{ 'meetings.closeConfirm.draftsCancelled' | t }}</span>
-        </li>
-      }
-      <li class="cmc__row">
-        <app-icon class="cmc__icon" name="send" [size]="18" />
-        <span>{{
-          (meeting().canFinalize
-            ? 'meetings.closeConfirm.finalizeLater'
-            : 'meetings.closeConfirm.finalizeByOthers'
-          ) | t
-        }}</span>
-      </li>
-    </ul>
-  </div>
-  <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
-  <app-button
-    dialog-footer
-    variant="danger"
-    [disabled]="openVote() || lotPending()"
-    [loading]="closing()"
-    (click)="confirm()"
-  >
-    {{ 'meetings.closeConfirm.confirm' | t }}
-  </app-button>
+      </ul>
+    </div>
+  </ng-template>
 </app-dialog>

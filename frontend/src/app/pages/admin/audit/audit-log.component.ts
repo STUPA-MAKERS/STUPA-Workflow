@@ -405,9 +405,12 @@ export class AuditLogComponent {
       next: (check) => {
         this.verifying.set(false);
         this.verify.set({ status: 'stored', check });
-        this.toast.success(
-          this.i18n.translate(check.valid ? 'admin.audit.verify.done' : 'admin.audit.verify.broken'),
-        );
+        this.toast.show({
+          text: this.i18n.translate(
+            check.valid ? 'admin.audit.verify.done' : 'admin.audit.verify.broken',
+          ),
+          kind: 'success',
+        });
       },
       error: (err: { status?: number }) => {
         this.verifying.set(false);
@@ -417,7 +420,7 @@ export class AuditLogComponent {
             : err?.status === 429
               ? 'admin.audit.verify.cooldown'
               : 'admin.audit.verify.failed';
-        this.toast.error(this.i18n.translate(key));
+        this.toast.show({ text: this.i18n.translate(key), kind: 'error' });
       },
     });
   }
@@ -518,12 +521,15 @@ export class AuditLogComponent {
     this.api.revertAuditEntry(e.id).subscribe({
       next: () => {
         this.reverting.set(false);
-        this.toast.success(this.i18n.translate('admin.audit.revert.success'));
+        this.toast.show({
+          text: this.i18n.translate('admin.audit.revert.success'),
+          kind: 'success',
+        });
         this.reload();
       },
       error: (err: { status?: number; error?: { code?: string } }) => {
         this.reverting.set(false);
-        this.toast.error(this.i18n.translate(this.revertErrorKey(err)));
+        this.toast.show({ text: this.i18n.translate(this.revertErrorKey(err)), kind: 'error' });
       },
     });
   }

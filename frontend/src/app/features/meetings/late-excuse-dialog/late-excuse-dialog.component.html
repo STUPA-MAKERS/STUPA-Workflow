@@ -1,25 +1,34 @@
 <app-dialog
   [open]="meetingId() !== null"
-  [title]="'meetings.lateExcuse.title' | t"
+  [heading]="'meetings.lateExcuse.title' | t"
   [closeLabel]="'action.close' | t"
   (closed)="cancel()"
+  [actions]="[
+    { key: 'cancel', label: ('action.cancel' | t) },
+    {
+      key: 'save',
+      label: ('meetings.lateExcuse.submit' | t),
+      kind: 'main',
+      disabled: !valid(),
+      busy: saving(),
+    },
+  ]"
+  (action)="$event.key === 'cancel' ? cancel() : $event.key === 'save' ? save() : null"
 >
-  <form (submit)="$event.preventDefault(); save()">
-    <app-textarea [label]="'meetings.lateExcuse.note' | t" [invalid]="tooLong()">
-      <textarea
-        id="led-note"
-        name="note"
-        rows="3"
-        required
-        [attr.maxlength]="max"
-        [ngModel]="note()"
-        (ngModelChange)="note.set($event)"
-      ></textarea>
-    </app-textarea>
-    <button type="submit" hidden></button>
-  </form>
-  <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
-  <app-button dialog-footer variant="fill" [loading]="saving()" [disabled]="!valid()" (click)="save()">
-    {{ 'meetings.lateExcuse.submit' | t }}
-  </app-button>
+  <ng-template dialogBody>
+    <form (submit)="$event.preventDefault(); save()">
+      <app-textarea [label]="'meetings.lateExcuse.note' | t" [invalid]="tooLong()">
+        <textarea
+          id="led-note"
+          name="note"
+          rows="3"
+          required
+          [attr.maxlength]="max"
+          [ngModel]="note()"
+          (ngModelChange)="note.set($event)"
+        ></textarea>
+      </app-textarea>
+      <button type="submit" hidden></button>
+    </form>
+  </ng-template>
 </app-dialog>

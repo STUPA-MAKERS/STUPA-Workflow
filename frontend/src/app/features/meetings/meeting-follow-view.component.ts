@@ -30,6 +30,7 @@ import {
   ScrollFadeDirective,
   SideSheetComponent,
   type StatusKind,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { AgendaPaneComponent } from './agenda-pane/agenda-pane.component';
 import { MeetingDelegationCardComponent } from './meeting-delegation-card.component';
@@ -87,6 +88,7 @@ const EXCERPT_LENGTH = 160;
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ParticipantVoteService],
   imports: [
+    SheetBodyDirective,
     MeetingHeadComponent,
     EmptyStateComponent,
     NgTemplateOutlet,

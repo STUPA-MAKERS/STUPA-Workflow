@@ -6,6 +6,11 @@
 @use 'very-high' as vh;
 
 @include d.on(veryHigh) {
+  // The link to the manual in the report dialog is a box on the chosen tint, whose text
+  // takes the same yellow, so it has the form of the other state of a choice.
+  .rd__wiki {
+    @include vh.edge;
+  }
   // A segment for blackout has a solid edge instead of the dashed one (000689).
   .mdv .md-blackout,
   .mdv .md-blackout-block,

@@ -1,138 +1,151 @@
 <app-dialog
   [open]="open()"
-  [title]="'meetings.create.title' | t"
+  [heading]="'meetings.create.title' | t"
   [closeLabel]="'action.close' | t"
   (closed)="cancel()"
+  [actions]="[
+    { key: 'a0', label: ((step() === 1 ? 'action.cancel' : 'meetings.create.back') | t) },
+    {
+      key: 'submit',
+      label: ((step() === 1 ? 'meetings.create.next' : 'meetings.create.submit') | t),
+      kind: 'main',
+      disabled: step() === 1 ? !step1Valid() : !step2Valid(),
+      busy: creating(),
+    },
+  ]"
+  (action)="
+    $event.key === 'a0'
+      ? step() === 1
+        ? cancel()
+        : back()
+      : $event.key === 'submit'
+        ? submit()
+        : null
+  "
 >
-  <form class="cmd" (submit)="$event.preventDefault(); submit()">
-    <div class="cmd__steps">
-      <app-seg-bar
-        class="cmd__bar"
-        size="thin"
-        aria-hidden="true"
-        [segments]="[{ value: 1, tone: 'filled' }, { value: step() === 2 ? 1 : 0, tone: 'filled' }]"
-        [total]="2"
-        [label]="'meetings.create.step' | t: { n: step(), m: 2 }"
-      />
-      <span class="cmd__stepText">{{ 'meetings.create.step' | t: { n: step(), m: 2 } }}</span>
-    </div>
-
-    @if (step() === 1) {
-      <app-select
-        name="gremium"
-        [id]="'cmd-gremium'"
-        [label]="'meetings.create.gremium' | t"
-        [placeholder]="'meetings.create.gremiumPlaceholder' | t"
-        [options]="gremiumOptions()"
-        [required]="true"
-        [ngModel]="gremium()"
-        (ngModelChange)="onGremiumChange($event)"
-      />
-      @if (optionsLoaded() && !gremiumOptions().length) {
-        <p class="cmd__hint" role="status">{{ 'meetings.create.noGremien' | t }}</p>
-      }
-      <app-select
-        name="kind"
-        [id]="'cmd-kind'"
-        [label]="'meetings.kind.label' | t"
-        [options]="kindOptions()"
-        [ngModel]="kind()"
-        (ngModelChange)="kind.set($event)"
-      />
-      @if (kind() === 'repeat') {
-        <app-select
-          name="repeatOf"
-          [id]="'cmd-repeat-of'"
-          [label]="'meetings.repeatOf.label' | t"
-          [placeholder]="'meetings.repeatOf.placeholder' | t"
-          [options]="repeatOfOptions()"
-          [required]="true"
-          [ngModel]="repeatOf()"
-          (ngModelChange)="repeatOf.set($event)"
+  <ng-template dialogBody>
+    <form class="cmd" (submit)="$event.preventDefault(); submit()">
+      <div class="cmd__steps">
+        <app-seg-bar
+          class="cmd__bar"
+          size="thin"
+          aria-hidden="true"
+          [segments]="[
+            { value: 1, tone: 'filled' },
+            { value: step() === 2 ? 1 : 0, tone: 'filled' },
+          ]"
+          [total]="2"
+          [label]="'meetings.create.step' | t: { n: step(), m: 2 }"
         />
-      }
-      <div class="cmd__when">
-        <app-datepicker
-          name="date"
-          [id]="'cmd-date'"
-          [label]="'meetings.create.date' | t"
-          [required]="true"
-          [ngModel]="date()"
-          (ngModelChange)="date.set($event)"
-        />
-        <app-time-input
-          name="time"
-          [id]="'cmd-time'"
-          [label]="'meetings.create.time' | t"
-          [required]="true"
-          [ngModel]="time()"
-          (ngModelChange)="time.set($event)"
-        />
-        <app-time-input
-          name="endTime"
-          [id]="'cmd-end'"
-          [label]="'meetings.create.endTime' | t"
-          [ngModel]="endTime()"
-          (ngModelChange)="endTime.set($event)"
-        />
+        <span class="cmd__stepText">{{ 'meetings.create.step' | t: { n: step(), m: 2 } }}</span>
       </div>
-      @if (lateInvite(); as days) {
-        <app-note icon="alert" kind="warn" role="status">{{ (days === 1 ? 'meetings.lateInvite1' : 'meetings.lateInvite') | t: { n: days } }}</app-note>
-      }
-      <div class="cmd__where">
+
+      @if (step() === 1) {
+        <app-select
+          name="gremium"
+          [id]="'cmd-gremium'"
+          [label]="'meetings.create.gremium' | t"
+          [placeholder]="'meetings.create.gremiumPlaceholder' | t"
+          [options]="gremiumOptions()"
+          [required]="true"
+          [ngModel]="gremium()"
+          (ngModelChange)="onGremiumChange($event)"
+        />
+        @if (optionsLoaded() && !gremiumOptions().length) {
+          <p class="cmd__hint" role="status">{{ 'meetings.create.noGremien' | t }}</p>
+        }
+        <app-select
+          name="kind"
+          [id]="'cmd-kind'"
+          [label]="'meetings.kind.label' | t"
+          [options]="kindOptions()"
+          [ngModel]="kind()"
+          (ngModelChange)="kind.set($event)"
+        />
+        @if (kind() === 'repeat') {
+          <app-select
+            name="repeatOf"
+            [id]="'cmd-repeat-of'"
+            [label]="'meetings.repeatOf.label' | t"
+            [placeholder]="'meetings.repeatOf.placeholder' | t"
+            [options]="repeatOfOptions()"
+            [required]="true"
+            [ngModel]="repeatOf()"
+            (ngModelChange)="repeatOf.set($event)"
+          />
+        }
+        <div class="cmd__when">
+          <app-datepicker
+            name="date"
+            [id]="'cmd-date'"
+            [label]="'meetings.create.date' | t"
+            [required]="true"
+            [ngModel]="date()"
+            (ngModelChange)="date.set($event)"
+          />
+          <app-time-input
+            name="time"
+            [id]="'cmd-time'"
+            [label]="'meetings.create.time' | t"
+            [required]="true"
+            [ngModel]="time()"
+            (ngModelChange)="time.set($event)"
+          />
+          <app-time-input
+            name="endTime"
+            [id]="'cmd-end'"
+            [label]="'meetings.create.endTime' | t"
+            [ngModel]="endTime()"
+            (ngModelChange)="endTime.set($event)"
+          />
+        </div>
+        @if (lateInvite(); as days) {
+          <app-note icon="alert" kind="warn" role="status">{{
+            (days === 1 ? 'meetings.lateInvite1' : 'meetings.lateInvite') | t: { n: days }
+          }}</app-note>
+        }
+        <div class="cmd__where">
+          <app-input
+            name="location"
+            [id]="'cmd-location'"
+            [label]="'meetings.location.label' | t"
+            [error]="locationError()"
+            [ngModel]="location()"
+            (ngModelChange)="location.set($event)"
+          />
+          <app-select
+            name="form"
+            [id]="'cmd-form'"
+            [label]="'meetings.form.label' | t"
+            [options]="formOptions()"
+            [ngModel]="form()"
+            (ngModelChange)="form.set($event)"
+          />
+        </div>
+      } @else {
         <app-input
-          name="location"
-          [id]="'cmd-location'"
-          [label]="'meetings.location.label' | t"
-          [error]="locationError()"
-          [ngModel]="location()"
-          (ngModelChange)="location.set($event)"
+          name="title"
+          [id]="'cmd-title'"
+          [label]="'meetings.create.name' | t"
+          [required]="true"
+          [ngModel]="title()"
+          (ngModelChange)="title.set($event)"
         />
         <app-select
-          name="form"
-          [id]="'cmd-form'"
-          [label]="'meetings.form.label' | t"
-          [options]="formOptions()"
-          [ngModel]="form()"
-          (ngModelChange)="form.set($event)"
+          name="keeper"
+          [id]="'cmd-keeper'"
+          [label]="'meetings.protokollant.label' | t"
+          [options]="keeperOptions()"
+          [ngModel]="keeper()"
+          (ngModelChange)="keeper.set($event)"
         />
-      </div>
-    } @else {
-      <app-input
-        name="title"
-        [id]="'cmd-title'"
-        [label]="'meetings.create.name' | t"
-        [required]="true"
-        [ngModel]="title()"
-        (ngModelChange)="title.set($event)"
-      />
-      <app-select
-        name="keeper"
-        [id]="'cmd-keeper'"
-        [label]="'meetings.protokollant.label' | t"
-        [options]="keeperOptions()"
-        [ngModel]="keeper()"
-        (ngModelChange)="keeper.set($event)"
-      />
-      <app-public-join-settings
-        [(publicJoin)]="publicJoin"
-        [(guestsMode)]="guestsMode"
-        [voteAllowed]="defaults()?.guestsVoteAllowed ?? false"
-      />
-    }
-    <button type="submit" hidden></button>
-  </form>
-
-  <app-button dialog-footer variant="text" (click)="step() === 1 ? cancel() : back()">
-    {{ (step() === 1 ? 'action.cancel' : 'meetings.create.back') | t }}
-  </app-button>
-  <app-button
-    dialog-footer
-    variant="fill"
-    [disabled]="step() === 1 ? !step1Valid() : !step2Valid()"
-    [loading]="creating()"
-    (click)="submit()"
-  >
-    {{ (step() === 1 ? 'meetings.create.next' : 'meetings.create.submit') | t }}
-  </app-button>
+        <app-public-join-settings
+          [(publicJoin)]="publicJoin"
+          [(guestsMode)]="guestsMode"
+          [voteAllowed]="defaults()?.guestsVoteAllowed ?? false"
+        />
+      }
+      <button type="submit" hidden></button>
+    </form>
+  </ng-template>
 </app-dialog>

@@ -202,19 +202,21 @@
     [open]="chosen() !== null"
     (openChange)="$event ? null : choose(null)"
   >
-    @if (sheetRow(); as c) {
-      <div class="gr__sheet">
-        <div class="gr__sheetHead" [attr.data-kind]="c.node.kind">
-          <span class="gr__mark" [class.gr__mark--muted]="!c.node.accessible">
-            <app-icon [name]="c.icon" [size]="18" />
-          </span>
-          <div class="gr__panelText">
-            <ng-container *ngTemplateOutlet="lines; context: { $implicit: c }" />
+    <ng-template sheetBody>
+      @if (sheetRow(); as c) {
+        <div class="gr__sheet">
+          <div class="gr__sheetHead" [attr.data-kind]="c.node.kind">
+            <span class="gr__mark" [class.gr__mark--muted]="!c.node.accessible">
+              <app-icon [name]="c.icon" [size]="18" />
+            </span>
+            <div class="gr__panelText">
+              <ng-container *ngTemplateOutlet="lines; context: { $implicit: c }" />
+            </div>
           </div>
+          <ng-container *ngTemplateOutlet="action; context: { $implicit: c }" />
         </div>
-        <ng-container *ngTemplateOutlet="action; context: { $implicit: c }" />
-      </div>
-    }
+      }
+    </ng-template>
   </app-side-sheet>
 }
 

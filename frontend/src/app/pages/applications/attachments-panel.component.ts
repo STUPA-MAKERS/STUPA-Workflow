@@ -217,12 +217,23 @@ export class AttachmentsPanelComponent {
         },
         error: (err: { status?: number }) => {
           this.uploading.set(false);
-          if (ok > 0) this.toast.success(this.i18n.translate('applications.attachments.added'));
-          this.toast.error(this.i18n.translate(this.uploadErrorKey(err.status)));
+          if (ok > 0)
+            this.toast.show({
+              text: this.i18n.translate('applications.attachments.added'),
+              kind: 'success',
+            });
+          this.toast.show({
+            text: this.i18n.translate(this.uploadErrorKey(err.status)),
+            kind: 'error',
+          });
         },
         complete: () => {
           this.uploading.set(false);
-          if (ok > 0) this.toast.success(this.i18n.translate('applications.attachments.added'));
+          if (ok > 0)
+            this.toast.show({
+              text: this.i18n.translate('applications.attachments.added'),
+              kind: 'success',
+            });
         },
       });
   }
@@ -279,13 +290,19 @@ export class AttachmentsPanelComponent {
           this.bulkDeleting.set(false);
           this.confirming.set(null);
           this.refreshAfterBulk(ids);
-          this.toast.error(this.i18n.translate('applications.attachments.deleteError'));
+          this.toast.show({
+            text: this.i18n.translate('applications.attachments.deleteError'),
+            kind: 'error',
+          });
         },
         complete: () => {
           this.bulkDeleting.set(false);
           this.confirming.set(null);
           this.refreshAfterBulk(ids);
-          this.toast.success(this.i18n.translate('applications.attachments.deleted'));
+          this.toast.show({
+            text: this.i18n.translate('applications.attachments.deleted'),
+            kind: 'success',
+          });
         },
       });
   }
@@ -433,11 +450,20 @@ export class AttachmentsPanelComponent {
       this.attachments.update((list) =>
         list.map((a) => (a.id === att.id ? { ...a, scanState: 'quarantined' as ScanState } : a)),
       );
-      this.toast.error(this.i18n.translate('applications.attachments.download.conflict'));
+      this.toast.show({
+        text: this.i18n.translate('applications.attachments.download.conflict'),
+        kind: 'error',
+      });
     } else if (status === 410) {
-      this.toast.error(this.i18n.translate('applications.attachments.download.gone'));
+      this.toast.show({
+        text: this.i18n.translate('applications.attachments.download.gone'),
+        kind: 'error',
+      });
     } else {
-      this.toast.error(this.i18n.translate('applications.attachments.download.error'));
+      this.toast.show({
+        text: this.i18n.translate('applications.attachments.download.error'),
+        kind: 'error',
+      });
     }
   }
 
@@ -449,12 +475,18 @@ export class AttachmentsPanelComponent {
         this.attachments.update((list) => list.filter((a) => a.id !== att.id));
         this.removingId.set(null);
         this.confirming.set(null);
-        this.toast.success(this.i18n.translate('applications.attachments.deleted'));
+        this.toast.show({
+          text: this.i18n.translate('applications.attachments.deleted'),
+          kind: 'success',
+        });
       },
       error: () => {
         this.removingId.set(null);
         this.confirming.set(null);
-        this.toast.error(this.i18n.translate('applications.attachments.deleteError'));
+        this.toast.show({
+          text: this.i18n.translate('applications.attachments.deleteError'),
+          kind: 'error',
+        });
       },
     });
   }

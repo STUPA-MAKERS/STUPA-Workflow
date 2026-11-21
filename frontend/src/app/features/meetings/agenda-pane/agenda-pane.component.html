@@ -104,25 +104,41 @@
   <app-dialog
     appBodyPortal
     [open]="true"
-    [title]="'meetings.agenda.durationEdit' | t"
+    [heading]="'meetings.agenda.durationEdit' | t"
     [closeLabel]="'action.close' | t"
-    size="form"
+    size="md"
     (closed)="durationItem.set(null)"
+    [actions]="[
+      { key: 'durationItem', label: ('action.cancel' | t) },
+      {
+        key: 'saveDuration',
+        label: ('action.save' | t),
+        kind: 'main',
+        disabled: durationInvalid(),
+      },
+    ]"
+    (action)="
+      $event.key === 'durationItem'
+        ? durationItem.set(null)
+        : $event.key === 'saveDuration'
+          ? saveDuration()
+          : null
+    "
   >
-    <form (submit)="$event.preventDefault(); saveDuration()">
-      <app-input
-        type="number"
-        name="minutes"
-        [id]="'ap-minutes'"
-        [label]="'meetings.agenda.duration' | t"
-        [suffix]="'meetings.agenda.durationUnit' | t"
-        [error]="durationInvalid() ? ('meetings.agenda.durationRange' | t) : ''"
-        [ngModel]="durationDraft()"
-        (ngModelChange)="durationDraft.set($event)"
-      />
-      <button type="submit" hidden></button>
-    </form>
-    <app-button dialog-footer variant="text" (click)="durationItem.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button dialog-footer variant="fill" [disabled]="durationInvalid()" (click)="saveDuration()">{{ 'action.save' | t }}</app-button>
+    <ng-template dialogBody>
+      <form (submit)="$event.preventDefault(); saveDuration()">
+        <app-input
+          type="number"
+          name="minutes"
+          [id]="'ap-minutes'"
+          [label]="'meetings.agenda.duration' | t"
+          [suffix]="'meetings.agenda.durationUnit' | t"
+          [error]="durationInvalid() ? ('meetings.agenda.durationRange' | t) : ''"
+          [ngModel]="durationDraft()"
+          (ngModelChange)="durationDraft.set($event)"
+        />
+        <button type="submit" hidden></button>
+      </form>
+    </ng-template>
   </app-dialog>
 }

@@ -375,12 +375,21 @@ export class CostCentreSettingsComponent {
       )
       .subscribe({
         next: () => {
-          this.toast.success(this.i18n.translate('budget.tree.toast.saved'));
+          this.toast.show({
+            text: this.i18n.translate('budget.tree.toast.saved'),
+            kind: 'success',
+          });
           this.tell();
         },
         error: (err: unknown) => {
-          this.toast.error(this.i18n.translate(costCentreError(problemCode(err))));
-          this.sent = Object.fromEntries([...Object.entries(this.sent).filter(([k]) => k !== key), ...(before ? [[key, before]] : [])]);
+          this.toast.show({
+            text: this.i18n.translate(costCentreError(problemCode(err))),
+            kind: 'error',
+          });
+          this.sent = Object.fromEntries([
+            ...Object.entries(this.sent).filter(([k]) => k !== key),
+            ...(before ? [[key, before]] : []),
+          ]);
           const known = this.known(id, field);
           const waits = this.waiting().some((c) => c.id === id && c.field === field);
           if (this.node().id === id && known !== undefined && !waits) this.show(field, known);

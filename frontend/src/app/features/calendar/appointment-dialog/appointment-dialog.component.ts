@@ -25,6 +25,7 @@ import {
   TextareaComponent,
   TimeInputComponent,
   ToastService,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { GremiumLogoComponent } from '../../gremien/gremium-logo/gremium-logo.component';
 import {
@@ -71,6 +72,7 @@ const SAVE_ERRORS: Readonly<Record<string, TranslationKey>> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     FormsModule,
     AvatarComponent,
     ButtonComponent,
@@ -175,12 +177,18 @@ export class AppointmentDialogComponent {
     (current ? this.api.update(current.id, body) : this.api.create(body)).subscribe({
       next: (result) => {
         this.saving.set(false);
-        this.toast.success(this.i18n.translate(current ? 'calendar.toast.saved' : 'calendar.toast.created'));
+        this.toast.show({
+          text: this.i18n.translate(current ? 'calendar.toast.saved' : 'calendar.toast.created'),
+          kind: 'success',
+        });
         this.saved.emit(result);
       },
       error: (err: unknown) => {
         this.saving.set(false);
-        this.toast.error(this.i18n.translate(SAVE_ERRORS[problemCode(err)] ?? 'calendar.toast.saveFailed'));
+        this.toast.show({
+          text: this.i18n.translate(SAVE_ERRORS[problemCode(err)] ?? 'calendar.toast.saveFailed'),
+          kind: 'error',
+        });
       },
     });
   }

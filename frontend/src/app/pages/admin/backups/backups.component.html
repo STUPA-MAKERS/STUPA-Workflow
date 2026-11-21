@@ -120,36 +120,49 @@
 @if (confirmRestore(); as target) {
   <app-dialog
     [open]="true"
-    [title]="'admin.backups.restoreTitle' | t"
+    [heading]="'admin.backups.restoreTitle' | t"
     [subtitle]="restoreSubtitle(target)"
     [closeLabel]="'action.close' | t"
     (closed)="confirmRestore.set(null)"
+    [actions]="[
+      { key: 'confirmRestore', label: ('action.cancel' | t) },
+      {
+        key: 'doRestore',
+        label: ('admin.backups.restore' | t),
+        icon: 'history',
+        kind: 'danger',
+        disabled: !restoreArmed() || busy(),
+      },
+    ]"
+    (action)="
+      $event.key === 'confirmRestore'
+        ? confirmRestore.set(null)
+        : $event.key === 'doRestore'
+          ? doRestore()
+          : null
+    "
   >
-    <form class="bk__restore" (submit)="$event.preventDefault(); doRestore()">
-      <p class="bk__warn">{{ 'admin.backups.restoreWarning' | t }}</p>
-      <ul class="bk__points">
-        <li>{{ 'admin.backups.restorePoint1' | t }}</li>
-        <li>{{ 'admin.backups.restorePoint2' | t }}</li>
-        <li>{{ 'admin.backups.restorePoint3' | t }}</li>
-      </ul>
-      <p class="bk__target">
-        {{ 'admin.backups.restoreTarget' | t }}
-        <strong class="mono">{{ target.createdAt | ldate: 'medium' }}</strong>
-      </p>
-      <app-input
-        [label]="'admin.backups.restoreConfirmLabel' | t"
-        [ngModel]="restoreConfirmText()"
-        (ngModelChange)="restoreConfirmText.set($event)"
-        name="restoreConfirm"
-      />
-      <button type="submit" hidden></button>
-    </form>
-    <div dialog-footer>
-      <app-button variant="text" (click)="confirmRestore.set(null)">{{ 'action.cancel' | t }}</app-button>
-      <app-button variant="danger" [disabled]="!restoreArmed() || busy()" (click)="doRestore()">
-        <app-icon name="history" /> {{ 'admin.backups.restore' | t }}
-      </app-button>
-    </div>
+    <ng-template dialogBody>
+      <form class="bk__restore" (submit)="$event.preventDefault(); doRestore()">
+        <p class="bk__warn">{{ 'admin.backups.restoreWarning' | t }}</p>
+        <ul class="bk__points">
+          <li>{{ 'admin.backups.restorePoint1' | t }}</li>
+          <li>{{ 'admin.backups.restorePoint2' | t }}</li>
+          <li>{{ 'admin.backups.restorePoint3' | t }}</li>
+        </ul>
+        <p class="bk__target">
+          {{ 'admin.backups.restoreTarget' | t }}
+          <strong class="mono">{{ target.createdAt | ldate: 'medium' }}</strong>
+        </p>
+        <app-input
+          [label]="'admin.backups.restoreConfirmLabel' | t"
+          [ngModel]="restoreConfirmText()"
+          (ngModelChange)="restoreConfirmText.set($event)"
+          name="restoreConfirm"
+        />
+        <button type="submit" hidden></button>
+      </form>
+    </ng-template>
   </app-dialog>
 }
 

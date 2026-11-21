@@ -6,6 +6,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { MarkdownImageUploadDirective, imageUploadErrorKey } from './markdown-image-upload.directive';
 import { ImageAltService } from './image-alt.service';
 import { MediaApiService, type MediaImage } from './media-api.service';
+import { kindSpies } from '../../../testing/toast';
 
 const ID = '0b8f3c3e-4d6a-4f43-9a1e-2f0c1d2e3f40';
 const ID2 = '1b8f3c3e-4d6a-4f43-9a1e-2f0c1d2e3f40';
@@ -71,7 +72,7 @@ async function setup(initial = '') {
   await view.fixture.whenStable();
   const area = view.container.querySelector('textarea') as HTMLTextAreaElement;
   const toast = view.fixture.debugElement.injector.get(ToastService);
-  const error = jest.spyOn(toast, 'error');
+  const error = jest.spyOn(kindSpies(toast), 'error');
   const dir = view.fixture.debugElement
     .query((d) => d.nativeElement === area)
     .injector.get(MarkdownImageUploadDirective);

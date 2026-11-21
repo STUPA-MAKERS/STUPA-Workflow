@@ -407,4 +407,9 @@ describe('UserMergeComponent', () => {
     );
     expect(api.previewPrincipalMerge).toHaveBeenCalledTimes(2);
   });
+
+  it('reports the account list as loading until the search answers', async () => {
+    const { fixture } = await setup(makeApi(), null);
+    expect(fixture.componentInstance['pickState']()).toBe('loading');
+  });
 });

@@ -17,6 +17,7 @@ import {
   meeting,
 } from '../../../../testing/meeting-fixtures';
 import { AttendanceSheetComponent } from './attendance-sheet.component';
+import { toastMock } from '../../../../testing/toast';
 
 const ROSTER: Attendance[] = [
   ...ATTENDANCE,
@@ -62,7 +63,7 @@ afterEach(() => {
   document.body.style.overflow = '';
 });
 
-const toast = { success: jest.fn(), error: jest.fn() };
+const toast = toastMock();
 
 /**
  * Render the open sheet and answer its delegation list with `delegations`, and the context
@@ -552,10 +553,17 @@ describe('AttendanceSheetComponent', () => {
       await userEvent.click(await screen.findByRole('menuitem', { name: 'Vertretung eintragen' }));
       const picker = screen.getByRole('dialog', { name: 'Vertretung eintragen' });
       expect(within(picker).getByText('für Fritz Fehlend')).toBeInTheDocument();
+      http.expectOne('/api/delegations/meetings/m-1/recipients?delegatorId=pr-5').flush([
+        {
+          principalId: 'pr-9',
+          displayName: 'Sven Stellvertreter',
+          viaPool: true,
+          isMember: false,
+        },
+      ]);
       http
-        .expectOne('/api/delegations/meetings/m-1/recipients?delegatorId=pr-5')
-        .flush([{ principalId: 'pr-9', displayName: 'Sven Stellvertreter', viaPool: true, isMember: false }]);
-      http.expectOne('/api/delegations/meetings/m-1/context').flush({ ...DELEGATION_CONTEXT, allowVoteDelegation: true });
+        .expectOne('/api/delegations/meetings/m-1/context')
+        .flush({ ...DELEGATION_CONTEXT, allowVoteDelegation: true });
       fixture.detectChanges();
       await userEvent.click(within(picker).getByRole('radio', { name: /Sven Stellvertreter/ }));
       await userEvent.click(within(picker).getByRole('button', { name: 'Vertretung eintragen' }));

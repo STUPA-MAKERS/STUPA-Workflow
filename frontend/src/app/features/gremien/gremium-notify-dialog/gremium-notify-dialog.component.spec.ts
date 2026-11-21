@@ -4,11 +4,16 @@ import { GremienApiService } from '@core/api/gremien.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { gremienApiMock } from '../../../../testing/gremien-fixtures';
 import { runAxe } from '../../../../testing/a11y';
-import { GremiumNotifyDialogComponent, messageError, subjectError } from './gremium-notify-dialog.component';
+import {
+  GremiumNotifyDialogComponent,
+  messageError,
+  subjectError,
+} from './gremium-notify-dialog.component';
+import { toastMock } from '../../../../testing/toast';
 
 async function setup(api = gremienApiMock()) {
   localStorage.setItem('ap.locale', 'de');
-  const toast = { success: jest.fn(), error: jest.fn() };
+  const toast = toastMock();
   const view = await render(GremiumNotifyDialogComponent, {
     inputs: { open: true, gremiumId: 'g-1', gremiumName: 'STUPA' },
     providers: [

@@ -14,6 +14,7 @@ import type {
 } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { GroupMappingsComponent, type MappingKind } from './group-mappings.component';
+import { toastMock } from '../../../../testing/toast';
 
 const GLOBAL: GroupMapping[] = [
   { id: 'm1', oidcGroup: 'stupa-vorstand', roleId: 'r1' },
@@ -72,7 +73,7 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
 type ApiMethod = keyof ReturnType<typeof makeApi>;
 
 function makeToast() {
-  return { success: jest.fn(), error: jest.fn() };
+  return toastMock();
 }
 
 async function setup(api = makeApi(), toast = makeToast(), can = true) {

@@ -1,87 +1,98 @@
 <app-dialog
   size="lg"
   [open]="open()"
-  [title]="title() | t"
+  [heading]="title() | t"
   [subtitle]="gremiumName()"
   [closeLabel]="'action.close' | t"
   (closed)="close()"
+  [actions]="
+    role() && !role()!.forced
+      ? [
+          { key: 'delete', label: ('admin.gremiumRoles.delete' | t), kind: 'danger' },
+          { key: 'cancel', label: ('action.cancel' | t) },
+          {
+            key: 'save',
+            label: ('action.save' | t),
+            kind: 'main',
+            disabled: !keyValid() || (isNew() && !draft().key.trim()),
+            busy: saving(),
+          },
+        ]
+      : [
+          { key: 'cancel', label: ('action.cancel' | t) },
+          {
+            key: 'save',
+            label: ('action.save' | t),
+            kind: 'main',
+            disabled: !keyValid() || (isNew() && !draft().key.trim()),
+            busy: saving(),
+          },
+        ]
+  "
+  (action)="$event.key === 'delete' ? askDelete() : $event.key === 'cancel' ? close() : save()"
 >
-  <form class="rd" (submit)="$event.preventDefault(); save()">
-    <div class="rd__names">
-      <app-input
-        class="rd__key"
-        [label]="'admin.common.key' | t"
-        [ngModel]="draft().key"
-        (ngModelChange)="patch('key', $event)"
-        name="key"
-        [required]="isNew()"
-        [disabled]="!isNew()"
-        [error]="keyError()"
-      />
-      <app-i18n-input [value]="draft().label" (valueChange)="patch('label', $event)" />
-      <app-content-lang-switch [(value)]="contentLang.lang" [ariaLabel]="'admin.common.contentLang' | t" />
-    </div>
+  <ng-template dialogBody>
+    <form class="rd" (submit)="$event.preventDefault(); save()">
+      <div class="rd__names">
+        <app-input
+          class="rd__key"
+          [label]="'admin.common.key' | t"
+          [ngModel]="draft().key"
+          (ngModelChange)="patch('key', $event)"
+          name="key"
+          [required]="isNew()"
+          [disabled]="!isNew()"
+          [error]="keyError()"
+        />
+        <app-i18n-input [value]="draft().label" (valueChange)="patch('label', $event)" />
+        <app-content-lang-switch
+          [(value)]="contentLang.lang"
+          [ariaLabel]="'admin.common.contentLang' | t"
+        />
+      </div>
 
-    @if (role()?.forced) {
-      <app-note icon="lock">{{ 'admin.gremiumRoles.forcedNote' | t }}</app-note>
-    }
-
-    <fieldset class="rd__perms">
-      <legend class="cap rd__cap">
-        {{ 'admin.gremiumRoles.permissionsIn' | t: { gremium: gremiumName() } }}
-      </legend>
-      @for (p of permissions; track p) {
-        <div class="rd__perm">
-          <app-checkbox
-            [ngModel]="has(p)"
-            (ngModelChange)="togglePerm(p, $event)"
-            [name]="'perm-' + p"
-            >{{ permLabel(p) | t }}</app-checkbox
-          >
-          <span class="mono rd__permKey" aria-hidden="true">{{ p }}</span>
-        </div>
+      @if (role()?.forced) {
+        <app-note icon="lock">{{ 'admin.gremiumRoles.forcedNote' | t }}</app-note>
       }
-    </fieldset>
 
-    @if (showGroups()) {
-      <app-section class="rd__groups" [heading]="'admin.gremiumRoles.groups' | t">
-        <div class="rd__groupBox">
-          <span class="rd__groupText">
-            @if (isMemberRole()) {
-              <span class="rd__groupLead">{{ 'admin.gremiumRoles.memberVia' | t }}</span>
-            }
-            @if (groups().length) {
-              <span class="mono rd__groupNames">{{ groups().join(', ') }}</span>
-            } @else {
-              <span class="rd__muted">{{ 'admin.gremiumRoles.noGroups' | t }}</span>
-            }
-          </span>
-          <a class="rd__groupLink" routerLink="/admin/group-mappings">{{
-            'admin.gremiumRoles.changeGroups' | t
-          }}</a>
-        </div>
-      </app-section>
-    }
+      <fieldset class="rd__perms">
+        <legend class="cap rd__cap">
+          {{ 'admin.gremiumRoles.permissionsIn' | t: { gremium: gremiumName() } }}
+        </legend>
+        @for (p of permissions; track p) {
+          <div class="rd__perm">
+            <app-checkbox
+              [ngModel]="has(p)"
+              (ngModelChange)="togglePerm(p, $event)"
+              [name]="'perm-' + p"
+              >{{ permLabel(p) | t }}</app-checkbox
+            >
+            <span class="mono rd__permKey" aria-hidden="true">{{ p }}</span>
+          </div>
+        }
+      </fieldset>
 
-    <button type="submit" hidden></button>
-  </form>
-
-  <div dialog-footer class="rd__foot">
-    @if (role(); as r) {
-      @if (!r.forced) {
-        <app-button class="rd__del" variant="danger" (click)="askDelete()">{{
-          'admin.gremiumRoles.delete' | t
-        }}</app-button>
+      @if (showGroups()) {
+        <app-section class="rd__groups" [heading]="'admin.gremiumRoles.groups' | t">
+          <div class="rd__groupBox">
+            <span class="rd__groupText">
+              @if (isMemberRole()) {
+                <span class="rd__groupLead">{{ 'admin.gremiumRoles.memberVia' | t }}</span>
+              }
+              @if (groups().length) {
+                <span class="mono rd__groupNames">{{ groups().join(', ') }}</span>
+              } @else {
+                <span class="rd__muted">{{ 'admin.gremiumRoles.noGroups' | t }}</span>
+              }
+            </span>
+            <a class="rd__groupLink" routerLink="/admin/group-mappings">{{
+              'admin.gremiumRoles.changeGroups' | t
+            }}</a>
+          </div>
+        </app-section>
       }
-    }
-    <span class="rd__spacer"></span>
-    <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-    <app-button
-      variant="fill"
-      [disabled]="!keyValid() || (isNew() && !draft().key.trim())"
-      [loading]="saving()"
-      (click)="save()"
-      >{{ 'action.save' | t }}</app-button
-    >
-  </div>
+
+      <button type="submit" hidden></button>
+    </form>
+  </ng-template>
 </app-dialog>

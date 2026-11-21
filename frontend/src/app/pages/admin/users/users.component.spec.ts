@@ -8,6 +8,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import type { AdminPrincipal, GroupMapping, Role, RoleAssignment } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { principalFilters, UsersComponent } from './users.component';
+import { toastMock } from '../../../../testing/toast';
 
 const ROLES: Role[] = [
   {
@@ -89,7 +90,7 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
 }
 
 function makeToast() {
-  return { success: jest.fn(), error: jest.fn() };
+  return toastMock();
 }
 
 async function setup(

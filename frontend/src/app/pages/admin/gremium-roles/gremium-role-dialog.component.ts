@@ -24,6 +24,7 @@ import {
   NoteComponent,
   SectionComponent,
   ToastService,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import { GREMIUM_PERMISSIONS, ROLE_KEY_PATTERN, type GremiumRole } from '../admin.models';
@@ -56,6 +57,7 @@ const NEW_ROLE_PERMISSIONS = ['vote.cast'];
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ContentLangState],
   imports: [
+    DialogBodyDirective,
     SectionComponent,
     ContentLangSwitchComponent,
     I18nInputComponent,
@@ -197,7 +199,7 @@ export class GremiumRoleDialogComponent {
           );
         } else {
           this.serverKeyError.set('');
-          this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+          this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
         }
       },
     });

@@ -506,7 +506,10 @@ export class TodoBoardRowsComponent implements OnInit {
     this.localWrites++;
     if (!this.keeps(card)) {
       this.removeCard(card.id);
-      this.toast.success(this.i18n.translate('todos.card.transferred', { board: card.boardName }));
+      this.toast.show({
+        text: this.i18n.translate('todos.card.transferred', { board: card.boardName }),
+        kind: 'success',
+      });
       return false;
     }
     this.update(card.boardId, (b) => replaceTile(b, card));
@@ -672,17 +675,24 @@ export class TodoBoardRowsComponent implements OnInit {
     this.localWrites++;
     this.update(boardId, () => optimistic);
     this.pending++;
-    this.api.moveCard(cardId, move).pipe(finalize(() => this.pending--)).subscribe({
-      next: (tile) => {
-        this.localWrites++;
-        this.update(boardId, (b) => replaceTile(b, tile));
-      },
-      error: (err: unknown) => {
-        this.toast.error(this.i18n.translate(moveErrorText(err, 'todos.error.move')));
-        if (this.boards().find((b) => b.id === boardId) === optimistic) this.update(boardId, () => before);
-        this.refresh();
-      },
-    });
+    this.api
+      .moveCard(cardId, move)
+      .pipe(finalize(() => this.pending--))
+      .subscribe({
+        next: (tile) => {
+          this.localWrites++;
+          this.update(boardId, (b) => replaceTile(b, tile));
+        },
+        error: (err: unknown) => {
+          this.toast.show({
+            text: this.i18n.translate(moveErrorText(err, 'todos.error.move')),
+            kind: 'error',
+          });
+          if (this.boards().find((b) => b.id === boardId) === optimistic)
+            this.update(boardId, () => before);
+          this.refresh();
+        },
+      });
   }
 
   /**
@@ -700,21 +710,27 @@ export class TodoBoardRowsComponent implements OnInit {
     this.localWrites++;
     this.boards.set(optimistic);
     this.pending++;
-    this.api.transferCard(tile.id, { boardId: toId, ...move }).pipe(finalize(() => this.pending--)).subscribe({
-      next: (card) => {
-        this.accept(card);
-        this.transferred.emit(card);
-      },
-      error: (err: unknown) => {
-        this.toast.error(this.i18n.translate(moveErrorText(err, 'todos.error.transfer')));
-        if (this.boards() === optimistic) {
-          this.mutations++;
-          this.localWrites++;
-          this.boards.set(before);
-        }
-        this.refresh();
-      },
-    });
+    this.api
+      .transferCard(tile.id, { boardId: toId, ...move })
+      .pipe(finalize(() => this.pending--))
+      .subscribe({
+        next: (card) => {
+          this.accept(card);
+          this.transferred.emit(card);
+        },
+        error: (err: unknown) => {
+          this.toast.show({
+            text: this.i18n.translate(moveErrorText(err, 'todos.error.transfer')),
+            kind: 'error',
+          });
+          if (this.boards() === optimistic) {
+            this.mutations++;
+            this.localWrites++;
+            this.boards.set(before);
+          }
+          this.refresh();
+        },
+      });
   }
 
   drop(row: BoardRow, event: CdkDragDrop<Uuid>): void {

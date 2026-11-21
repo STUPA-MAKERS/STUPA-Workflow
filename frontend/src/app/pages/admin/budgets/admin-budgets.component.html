@@ -64,29 +64,51 @@
   <app-fab [label]="'fab.budget' | t" (activate)="openTop()" />
 </section>
 
-<app-dialog [open]="topOpen()" [title]="'budget.tree.createTop' | t" [closeLabel]="'action.close' | t" (closed)="topOpen.set(false)">
-  <form id="ab-top-form" class="ab__form" (submit)="createTop($event)">
-    <div class="ab__pair">
-      <app-input
-        class="ab__keyField"
-        [label]="'budget.tree.key' | t"
-        [required]="true"
-        [error]="topKeyError()"
-        [ngModel]="newTop().key"
-        (ngModelChange)="patchTop('key', $event)"
-        name="topKey"
+<app-dialog
+  [open]="topOpen()"
+  [heading]="'budget.tree.createTop' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="topOpen.set(false)"
+  [actions]="[
+    { key: 'topOpen', label: ('action.cancel' | t) },
+    {
+      key: 'createTop',
+      label: ('budget.tree.create' | t),
+      kind: 'main',
+      disabled: !topValid() || busy(),
+      busy: busy(),
+    },
+  ]"
+  (action)="
+    $event.key === 'topOpen' ? topOpen.set(false) : $event.key === 'createTop' ? createTop() : null
+  "
+>
+  <ng-template dialogBody>
+    <form id="ab-top-form" class="ab__form" (submit)="$event.preventDefault(); createTop()">
+      <div class="ab__pair">
+        <app-input
+          class="ab__keyField"
+          [label]="'budget.tree.key' | t"
+          [required]="true"
+          [error]="topKeyError()"
+          [ngModel]="newTop().key"
+          (ngModelChange)="patchTop('key', $event)"
+          name="topKey"
+        />
+        <app-input
+          [label]="'budget.tree.name' | t"
+          [required]="true"
+          [ngModel]="newTop().name"
+          (ngModelChange)="patchTop('name', $event)"
+          name="topName"
+        />
+      </div>
+      <ng-container
+        *ngTemplateOutlet="cutoff; context: { day: newTop().day, month: newTop().month, top: true }"
       />
-      <app-input [label]="'budget.tree.name' | t" [required]="true" [ngModel]="newTop().name" (ngModelChange)="patchTop('name', $event)" name="topName" />
-    </div>
-    <ng-container *ngTemplateOutlet="cutoff; context: { day: newTop().day, month: newTop().month, top: true }" />
-    <button type="submit" hidden></button>
-  </form>
-  <div dialog-footer>
-    <app-button variant="text" (click)="topOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" (click)="createTop($event)" [disabled]="!topValid() || busy()" [loading]="busy()">{{
-      'budget.tree.create' | t
-    }}</app-button>
-  </div>
+      <button type="submit" hidden></button>
+    </form>
+  </ng-template>
 </app-dialog>
 
 <ng-template #cutoff let-day="day" let-month="month" let-top="top">
@@ -112,127 +134,183 @@
   </app-section>
 </ng-template>
 
-<app-dialog [open]="!!editNode()" [title]="'admin.budgets.edit' | t" [closeLabel]="'action.close' | t" (closed)="closeEdit()">
-  @if (form(); as f) {
-    <form id="ab-edit-form" class="ab__form" (submit)="$event.preventDefault(); saveEdit()">
-      <app-section [heading]="'admin.budgets.col.budget' | t">
-        <div class="ab__fields">
-          <div class="ab__pair">
-            <app-input
-              class="ab__keyField"
-              [label]="'budget.tree.key' | t"
-              [required]="true"
-              [error]="keyError()"
-              [ngModel]="f.key"
-              (ngModelChange)="patch({ key: $event })"
-              name="editKey"
+<app-dialog
+  [open]="!!editNode()"
+  [heading]="'admin.budgets.edit' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="closeEdit()"
+  [actions]="[
+    { key: 'closeEdit', label: ('action.cancel' | t) },
+    {
+      key: 'saveEdit',
+      label:
+        ((stichtagAsked() && stichtagChanged()
+          ? 'admin.budgets.stichtagConfirm'
+          : 'budget.tree.save'
+        ) | t),
+      kind: 'main',
+      disabled: busy(),
+      busy: busy(),
+    },
+  ]"
+  (action)="
+    $event.key === 'closeEdit' ? closeEdit() : $event.key === 'saveEdit' ? saveEdit() : null
+  "
+>
+  <ng-template dialogBody>
+    @if (form(); as f) {
+      <form id="ab-edit-form" class="ab__form" (submit)="$event.preventDefault(); saveEdit()">
+        <app-section [heading]="'admin.budgets.col.budget' | t">
+          <div class="ab__fields">
+            <div class="ab__pair">
+              <app-input
+                class="ab__keyField"
+                [label]="'budget.tree.key' | t"
+                [required]="true"
+                [error]="keyError()"
+                [ngModel]="f.key"
+                (ngModelChange)="patch({ key: $event })"
+                name="editKey"
+              />
+              <app-input
+                [label]="'budget.tree.name' | t"
+                [required]="true"
+                [error]="nameError()"
+                [ngModel]="f.name"
+                (ngModelChange)="patch({ name: $event })"
+                name="editName"
+              />
+            </div>
+            <app-colour-field
+              [value]="f.colour"
+              (valueChange)="patch({ colour: $event })"
+              name="editColour"
             />
-            <app-input
-              [label]="'budget.tree.name' | t"
-              [required]="true"
-              [error]="nameError()"
-              [ngModel]="f.name"
-              (ngModelChange)="patch({ name: $event })"
-              name="editName"
+            <app-switch [checked]="f.active" (checkedChange)="patch({ active: $event })">{{
+              'budget.tree.active' | t
+            }}</app-switch>
+          </div>
+        </app-section>
+        <ng-container
+          *ngTemplateOutlet="cutoff; context: { day: f.day, month: f.month, top: false }"
+        />
+        <app-section [heading]="'admin.budgets.gremien' | t">
+          <div class="ab__fields">
+            <app-select
+              name="editViewGremium"
+              [label]="'budget.tree.viewGremium' | t"
+              [placeholder]="'admin.budgets.noGremium' | t"
+              [options]="gremiumOptions()"
+              [ngModel]="f.viewGremium"
+              (ngModelChange)="patch({ viewGremium: $event ?? '' })"
+            />
+            <app-select
+              name="editDecisionGremium"
+              [label]="'budget.tree.decisionGremium' | t"
+              [placeholder]="'admin.budgets.noGremium' | t"
+              [options]="gremiumOptions()"
+              [ngModel]="f.decisionGremium"
+              (ngModelChange)="patch({ decisionGremium: $event ?? '' })"
             />
           </div>
-          <app-colour-field [value]="f.colour" (valueChange)="patch({ colour: $event })" name="editColour" />
-          <app-switch [checked]="f.active" (checkedChange)="patch({ active: $event })">{{ 'budget.tree.active' | t }}</app-switch>
-        </div>
-      </app-section>
-      <ng-container *ngTemplateOutlet="cutoff; context: { day: f.day, month: f.month, top: false }" />
-      <app-section [heading]="'admin.budgets.gremien' | t">
-        <div class="ab__fields">
-          <app-select
-            name="editViewGremium"
-            [label]="'budget.tree.viewGremium' | t"
-            [placeholder]="'admin.budgets.noGremium' | t"
-            [options]="gremiumOptions()"
-            [ngModel]="f.viewGremium"
-            (ngModelChange)="patch({ viewGremium: $event ?? '' })"
-          />
-          <app-select
-            name="editDecisionGremium"
-            [label]="'budget.tree.decisionGremium' | t"
-            [placeholder]="'admin.budgets.noGremium' | t"
-            [options]="gremiumOptions()"
-            [ngModel]="f.decisionGremium"
-            (ngModelChange)="patch({ decisionGremium: $event ?? '' })"
-          />
-        </div>
-      </app-section>
-      <app-section [heading]="'admin.budgets.plan' | t">
-        <app-switch [checked]="f.plan" (checkedChange)="patch({ plan: $event })">{{ 'admin.budgets.planSwitch' | t }}</app-switch>
-        @if (f.plan) {
-          <app-switch [checked]="f.coverable" (checkedChange)="patch({ coverable: $event })">{{ 'admin.budgets.coverableDefault' | t }}</app-switch>
-        }
-      </app-section>
-      @if (f.plan) {
-        <app-section [heading]="'admin.budgets.steps' | t">
-          <app-load-state [state]="stepsState()" [lines]="2" [errorText]="'admin.budgets.stepsLoadError' | t" (retry)="loadSteps()">
-            <ng-template #content>
-          @if (f.steps.length) {
-            <ol class="ab__steps">
-              @for (step of f.steps; track $index; let i = $index; let first = $first; let last = $last) {
-                <li class="ab__step">
-                  <span class="ab__stepNo mono" aria-hidden="true">{{ i + 1 }}</span>
-                  <app-input
-                    class="ab__stepName"
-                    [label]="'admin.budgets.stepName' | t: { number: i + 1 }"
-                    [required]="true"
-                    [error]="stepNameError(step.name)"
-                    [ngModel]="step.name"
-                    (ngModelChange)="patchStep(i, { name: $event })"
-                    [name]="'stepName' + i"
-                  />
-                  <span class="ab__stepActions">
-                    <app-move-buttons [upDisabled]="first" [downDisabled]="last" (move)="moveStep(i, $event)" />
-                    <app-button-group>
-                      <app-button
-                        variant="text"
-                        [iconOnly]="true"
-                        [ariaLabel]="'admin.budgets.stepRemove' | t: { number: i + 1 }"
-                        [title]="'admin.budgets.stepRemove' | t: { number: i + 1 }"
-                        (click)="removeStep(i)"
-                      >
-                        <app-icon name="trash" />
-                      </app-button>
-                    </app-button-group>
-                  </span>
-                  <app-select
-                    class="ab__stepGremium"
-                    [label]="'admin.budgets.stepGremium' | t: { number: i + 1 }"
-                    [placeholder]="'admin.budgets.noGremium' | t"
-                    [options]="gremiumOptions()"
-                    [ngModel]="step.gremiumId"
-                    (ngModelChange)="patchStep(i, { gremiumId: $event ?? '' })"
-                    [name]="'stepGremium' + i"
-                  />
-                </li>
-              }
-            </ol>
-          } @else {
-            <app-empty-state icon="list" shape="table" rows="1" [heading]="'admin.budgets.stepsEmpty' | t" />
-          }
-          @if (canAddStep()) {
-            <app-button-group>
-              <app-button class="ab__stepAdd" variant="tonal" (click)="addStep()"><app-icon name="plus" /> {{ 'admin.budgets.stepAdd' | t }}</app-button>
-            </app-button-group>
-          }
-            </ng-template>
-          </app-load-state>
         </app-section>
-      }
-      @if (stichtagAsked() && stichtagChanged()) {
-        <app-note kind="warn" icon="alert" role="alert">{{ 'admin.budgets.stichtagAsk' | t }}</app-note>
-      }
-      <button type="submit" hidden></button>
-    </form>
-  }
-  <div dialog-footer>
-    <app-button variant="text" (click)="closeEdit()">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" (click)="saveEdit()" [disabled]="busy()" [loading]="busy()">{{ (stichtagAsked() && stichtagChanged() ? 'admin.budgets.stichtagConfirm' : 'budget.tree.save') | t }}</app-button>
-  </div>
+        <app-section [heading]="'admin.budgets.plan' | t">
+          <app-switch [checked]="f.plan" (checkedChange)="patch({ plan: $event })">{{
+            'admin.budgets.planSwitch' | t
+          }}</app-switch>
+          @if (f.plan) {
+            <app-switch [checked]="f.coverable" (checkedChange)="patch({ coverable: $event })">{{
+              'admin.budgets.coverableDefault' | t
+            }}</app-switch>
+          }
+        </app-section>
+        @if (f.plan) {
+          <app-section [heading]="'admin.budgets.steps' | t">
+            <app-load-state
+              [state]="stepsState()"
+              [lines]="2"
+              [errorText]="'admin.budgets.stepsLoadError' | t"
+              (retry)="loadSteps()"
+            >
+              <ng-template #content>
+                @if (f.steps.length) {
+                  <ol class="ab__steps">
+                    @for (
+                      step of f.steps;
+                      track $index;
+                      let i = $index;
+                      let first = $first;
+                      let last = $last
+                    ) {
+                      <li class="ab__step">
+                        <span class="ab__stepNo mono" aria-hidden="true">{{ i + 1 }}</span>
+                        <app-input
+                          class="ab__stepName"
+                          [label]="'admin.budgets.stepName' | t: { number: i + 1 }"
+                          [required]="true"
+                          [error]="stepNameError(step.name)"
+                          [ngModel]="step.name"
+                          (ngModelChange)="patchStep(i, { name: $event })"
+                          [name]="'stepName' + i"
+                        />
+                        <span class="ab__stepActions">
+                          <app-move-buttons
+                            [upDisabled]="first"
+                            [downDisabled]="last"
+                            (move)="moveStep(i, $event)"
+                          />
+                          <app-button-group>
+                            <app-button
+                              variant="text"
+                              [iconOnly]="true"
+                              [ariaLabel]="'admin.budgets.stepRemove' | t: { number: i + 1 }"
+                              [title]="'admin.budgets.stepRemove' | t: { number: i + 1 }"
+                              (click)="removeStep(i)"
+                            >
+                              <app-icon name="trash" />
+                            </app-button>
+                          </app-button-group>
+                        </span>
+                        <app-select
+                          class="ab__stepGremium"
+                          [label]="'admin.budgets.stepGremium' | t: { number: i + 1 }"
+                          [placeholder]="'admin.budgets.noGremium' | t"
+                          [options]="gremiumOptions()"
+                          [ngModel]="step.gremiumId"
+                          (ngModelChange)="patchStep(i, { gremiumId: $event ?? '' })"
+                          [name]="'stepGremium' + i"
+                        />
+                      </li>
+                    }
+                  </ol>
+                } @else {
+                  <app-empty-state
+                    icon="list"
+                    shape="table"
+                    rows="1"
+                    [heading]="'admin.budgets.stepsEmpty' | t"
+                  />
+                }
+                @if (canAddStep()) {
+                  <app-button-group>
+                    <app-button class="ab__stepAdd" variant="tonal" (click)="addStep()"
+                      ><app-icon name="plus" /> {{ 'admin.budgets.stepAdd' | t }}</app-button
+                    >
+                  </app-button-group>
+                }
+              </ng-template>
+            </app-load-state>
+          </app-section>
+        }
+        @if (stichtagAsked() && stichtagChanged()) {
+          <app-note kind="warn" icon="alert" role="alert">{{
+            'admin.budgets.stichtagAsk' | t
+          }}</app-note>
+        }
+        <button type="submit" hidden></button>
+      </form>
+    }
+  </ng-template>
 </app-dialog>
 
 <app-confirm-dialog
@@ -244,73 +322,122 @@
   (cancel)="deleteTarget.set(null)"
 />
 
-<app-dialog [open]="fyOpen()" [title]="fyTitle()" [closeLabel]="'action.close' | t" (closed)="fyOpen.set(false)">
-  @if (canStructure()) {
-    <form id="ab-fy-form" class="ab__form" (submit)="createFiscalYear($event)">
-      <app-section [heading]="'budget.tree.fyNew' | t">
-        <div class="ab__fyNew">
-          <app-input type="number" [label]="'budget.tree.fyYear' | t" [required]="true" [error]="newFyError()" [ngModel]="newFyYear()" (ngModelChange)="newFyYear.set('' + ($event ?? ''))" name="fyYear" />
-          <app-button-group>
-            <app-button variant="tonal" type="submit" form="ab-fy-form" [disabled]="busy()">{{ 'budget.tree.create' | t }}</app-button>
-          </app-button-group>
-        </div>
-      </app-section>
-    </form>
-  }
-  <app-section class="ab__fyList" [heading]="'budget.tree.fyExisting' | t">
-    @if (fiscalYears().length) {
-      <app-data-table
-        surface="rowgroup"
-        [loading]="false"
-        [columns]="fyColumns()"
-        [rows]="fiscalYears()"
-        [rowKey]="fyRowId"
-        [clickable]="canStructure()"
-        (rowClick)="openFyEdit(asYear($event))"
-      >
-        <ng-template appCell="display" let-fy><span class="ab__name">{{ asYear(fy).display }}</span></ng-template>
-        <ng-template appCell="active" let-fy>
-          @if (asYear(fy).closedAt) {
-            <app-status-text kind="neutral">{{ 'budget.tree.fyClosed' | t }}</app-status-text>
-          } @else {
-            <app-status-text [kind]="asYear(fy).active ? 'accent' : 'muted'">{{
-              (asYear(fy).active ? 'budget.tree.fyActive' : 'budget.tree.fyInactive') | t
-            }}</app-status-text>
-          }
-        </ng-template>
-        <ng-template appCell="actions" let-fy>
-          <span class="ab__actions" role="presentation" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
+<app-dialog
+  [open]="fyOpen()"
+  [heading]="fyTitle()"
+  [closeLabel]="'action.close' | t"
+  (closed)="fyOpen.set(false)"
+  [actions]="[{ key: 'fyOpen', label: ('budget.tree.done' | t), kind: 'main' }]"
+  (action)="$event.key === 'fyOpen' ? fyOpen.set(false) : null"
+>
+  <ng-template dialogBody>
+    @if (canStructure()) {
+      <form id="ab-fy-form" class="ab__form" (submit)="createFiscalYear($event)">
+        <app-section [heading]="'budget.tree.fyNew' | t">
+          <div class="ab__fyNew">
+            <app-input
+              type="number"
+              [label]="'budget.tree.fyYear' | t"
+              [required]="true"
+              [error]="newFyError()"
+              [ngModel]="newFyYear()"
+              (ngModelChange)="newFyYear.set('' + ($event ?? ''))"
+              name="fyYear"
+            />
             <app-button-group>
-              <app-row-menu
-                [label]="('budget.tree.rowActions' | t) + ': ' + asYear(fy).display"
-                [sections]="fyMenu(asYear(fy))"
-                (selected)="onFyMenu(asYear(fy), $event)"
-              />
+              <app-button variant="tonal" type="submit" form="ab-fy-form" [disabled]="busy()">{{
+                'budget.tree.create' | t
+              }}</app-button>
             </app-button-group>
-          </span>
-        </ng-template>
-      </app-data-table>
-    } @else {
-      <app-empty-state icon="cal" shape="table" rows="1" [heading]="'budget.tree.fyEmpty' | t" />
+          </div>
+        </app-section>
+      </form>
     }
-  </app-section>
-  <div dialog-footer>
-    <app-button variant="fill" (click)="fyOpen.set(false)">{{ 'budget.tree.done' | t }}</app-button>
-  </div>
+    <app-section class="ab__fyList" [heading]="'budget.tree.fyExisting' | t">
+      @if (fiscalYears().length) {
+        <app-data-table
+          surface="rowgroup"
+          [loading]="false"
+          [columns]="fyColumns()"
+          [rows]="fiscalYears()"
+          [rowKey]="fyRowId"
+          [clickable]="canStructure()"
+          (rowClick)="openFyEdit(asYear($event))"
+        >
+          <ng-template appCell="display" let-fy
+            ><span class="ab__name">{{ asYear(fy).display }}</span></ng-template
+          >
+          <ng-template appCell="active" let-fy>
+            @if (asYear(fy).closedAt) {
+              <app-status-text kind="neutral">{{ 'budget.tree.fyClosed' | t }}</app-status-text>
+            } @else {
+              <app-status-text [kind]="asYear(fy).active ? 'accent' : 'muted'">{{
+                (asYear(fy).active ? 'budget.tree.fyActive' : 'budget.tree.fyInactive') | t
+              }}</app-status-text>
+            }
+          </ng-template>
+          <ng-template appCell="actions" let-fy>
+            <span
+              class="ab__actions"
+              role="presentation"
+              (click)="$event.stopPropagation()"
+              (keydown.enter)="$event.stopPropagation()"
+            >
+              <app-button-group>
+                <app-row-menu
+                  [label]="('budget.tree.rowActions' | t) + ': ' + asYear(fy).display"
+                  [sections]="fyMenu(asYear(fy))"
+                  (selected)="onFyMenu(asYear(fy), $event)"
+                />
+              </app-button-group>
+            </span>
+          </ng-template>
+        </app-data-table>
+      } @else {
+        <app-empty-state icon="cal" shape="table" rows="1" [heading]="'budget.tree.fyEmpty' | t" />
+      }
+    </app-section>
+  </ng-template>
 </app-dialog>
 
-<app-dialog [open]="!!fyEdit()" [title]="'budget.tree.fyEdit' | t" [closeLabel]="'action.close' | t" (closed)="backToYears()">
-  @if (fyEdit(); as fy) {
-    <form id="ab-fy-edit-form" class="ab__form" (submit)="$event.preventDefault(); saveFyEdit()">
-      <app-input type="number" [label]="'budget.tree.fyYear' | t" [required]="true" [error]="fyEditError()" [ngModel]="fyEditYear()" (ngModelChange)="fyEditYear.set('' + ($event ?? ''))" [disabled]="!!fy.closedAt" name="fyEditYear" />
-      <app-switch [checked]="fyEditActive()" (checkedChange)="fyEditActive.set($event)">{{ 'budget.tree.fyActive' | t }}</app-switch>
-      <button type="submit" hidden></button>
-    </form>
-  }
-  <div dialog-footer>
-    <app-button variant="text" (click)="backToYears()">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" (click)="saveFyEdit()" [disabled]="!!fyEditError() || busy()">{{ 'budget.tree.save' | t }}</app-button>
-  </div>
+<app-dialog
+  [open]="!!fyEdit()"
+  [heading]="'budget.tree.fyEdit' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="backToYears()"
+  [actions]="[
+    { key: 'backToYears', label: ('action.cancel' | t) },
+    {
+      key: 'saveFyEdit',
+      label: ('budget.tree.save' | t),
+      kind: 'main',
+      disabled: !!fyEditError() || busy(),
+    },
+  ]"
+  (action)="
+    $event.key === 'backToYears' ? backToYears() : $event.key === 'saveFyEdit' ? saveFyEdit() : null
+  "
+>
+  <ng-template dialogBody>
+    @if (fyEdit(); as fy) {
+      <form id="ab-fy-edit-form" class="ab__form" (submit)="$event.preventDefault(); saveFyEdit()">
+        <app-input
+          type="number"
+          [label]="'budget.tree.fyYear' | t"
+          [required]="true"
+          [error]="fyEditError()"
+          [ngModel]="fyEditYear()"
+          (ngModelChange)="fyEditYear.set('' + ($event ?? ''))"
+          [disabled]="!!fy.closedAt"
+          name="fyEditYear"
+        />
+        <app-switch [checked]="fyEditActive()" (checkedChange)="fyEditActive.set($event)">{{
+          'budget.tree.fyActive' | t
+        }}</app-switch>
+        <button type="submit" hidden></button>
+      </form>
+    }
+  </ng-template>
 </app-dialog>
 
 <app-confirm-dialog

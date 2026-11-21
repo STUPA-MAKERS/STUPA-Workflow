@@ -9,6 +9,7 @@ import { TodoLinkPickerComponent } from '../link-picker/todo-link-picker.compone
 import { TodoLinkedListComponent } from './todo-linked-list.component';
 import { TodoLinkedRefresh } from './todo-linked-refresh';
 import { By } from '@angular/platform-browser';
+import { kindSpies } from '../../../../testing/toast';
 
 function card(over: Partial<TodoLinkedCard> = {}): TodoLinkedCard {
   return {
@@ -249,7 +250,7 @@ describe('TodoLinkedListComponent actions (specs 000547, 001404, 001408)', () =>
     const fail = () => throwError(() => new Error('403'));
     const { cmp } = await withActions(true, linksOf([], [linkRow({ removable: true })]), { link: jest.fn(fail), unlink: jest.fn(fail) });
     const toast = TestBed.inject(ToastService);
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     cmp.pick({ kind: 'ticket', targetId: 't-1', title: 'T-0001', detail: {} });
     expect(error).toHaveBeenLastCalledWith('Die Verknüpfung ist fehlgeschlagen.');
     cmp.remove(cmp.links()[0]);

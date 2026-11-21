@@ -1,63 +1,69 @@
 <app-dialog
   [open]="open()"
-  [title]="'applications.detail.forceStatusTitle' | t"
+  [heading]="'applications.detail.forceStatusTitle' | t"
   [closeLabel]="'action.close' | t"
   (closed)="close()"
+  [actions]="[
+    { key: 'close', label: ('action.cancel' | t) },
+    {
+      key: 'submit',
+      label: ('applications.detail.forceStatusConfirm' | t),
+      kind: 'danger',
+      disabled: !ready(),
+      busy: saving(),
+    },
+  ]"
+  (action)="$event.key === 'close' ? close() : $event.key === 'submit' ? submit() : null"
 >
-  <app-select
-    [label]="'applications.detail.forceStatusField' | t"
-    [placeholder]="'applications.detail.forceStatusPlaceholder' | t"
-    [options]="options()"
-    [ngModel]="choice()"
-    (ngModelChange)="choice.set($event)"
-  />
-  @if (needsAmount()) {
-    <app-decision-editor
-      idPrefix="fsd"
-      [required]="true"
-      [requested]="requested()"
-      [currency]="currency()"
-      [draft]="draft()"
-      (draftChange)="draft.set($event)"
+  <ng-template dialogBody>
+    <app-select
+      [label]="'applications.detail.forceStatusField' | t"
+      [placeholder]="'applications.detail.forceStatusPlaceholder' | t"
+      [options]="options()"
+      [ngModel]="choice()"
+      (ngModelChange)="choice.set($event)"
     />
-  }
-  <app-select
-    [label]="'applications.detail.forceStatusReason' | t"
-    [placeholder]="'applications.detail.forceStatusReasonPick' | t"
-    [options]="reasonOptions()"
-    [ngModel]="reason()"
-    (ngModelChange)="reason.set($event)"
-  />
-  <div class="fsd__note">
-    <app-textarea
-      [label]="
-        (noteRequired()
-          ? 'applications.detail.forceStatusNoteRequired'
-          : 'applications.detail.forceStatusNote'
-        ) | t
-      "
-      [invalid]="noteRequired() && note().length > 0 && noteMissing()"
-    >
-      <textarea
-        rows="3"
-        name="forceNote"
-        [attr.aria-required]="noteRequired()"
-        [placeholder]="'applications.detail.forceStatusReasonPlaceholder' | t"
-        [ngModel]="note()"
-        (ngModelChange)="note.set($event)"
-      ></textarea>
-    </app-textarea>
-    @if (noteRequired() && note().length > 0 && noteMissing()) {
-      <app-error-text [inset]="true">{{ 'applications.detail.forceStatusNoteShort' | t }}</app-error-text>
+    @if (needsAmount()) {
+      <app-decision-editor
+        idPrefix="fsd"
+        [required]="true"
+        [requested]="requested()"
+        [currency]="currency()"
+        [draft]="draft()"
+        (draftChange)="draft.set($event)"
+      />
     }
-  </div>
-  <app-button dialog-footer variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-  <app-button
-    dialog-footer
-    variant="danger"
-    [loading]="saving()"
-    [disabled]="!ready()"
-    (click)="submit()"
-    >{{ 'applications.detail.forceStatusConfirm' | t }}</app-button
-  >
+    <app-select
+      [label]="'applications.detail.forceStatusReason' | t"
+      [placeholder]="'applications.detail.forceStatusReasonPick' | t"
+      [options]="reasonOptions()"
+      [ngModel]="reason()"
+      (ngModelChange)="reason.set($event)"
+    />
+    <div class="fsd__note">
+      <app-textarea
+        [label]="
+          (noteRequired()
+            ? 'applications.detail.forceStatusNoteRequired'
+            : 'applications.detail.forceStatusNote'
+          ) | t
+        "
+        [invalid]="noteRequired() && note().length > 0 && noteMissing()"
+      >
+        <textarea
+          rows="3"
+          name="forceNote"
+          [attr.aria-required]="noteRequired()"
+          [placeholder]="'applications.detail.forceStatusReasonPlaceholder' | t"
+          [ngModel]="note()"
+          (ngModelChange)="note.set($event)"
+        ></textarea>
+      </app-textarea>
+      @if (noteRequired() && note().length > 0 && noteMissing()) {
+        <app-error-text [inset]="true">{{
+          'applications.detail.forceStatusNoteShort' | t
+        }}</app-error-text>
+      }
+    </div>
+  </ng-template>
 </app-dialog>

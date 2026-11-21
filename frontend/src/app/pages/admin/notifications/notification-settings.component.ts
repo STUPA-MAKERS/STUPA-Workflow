@@ -127,10 +127,16 @@ export class NotificationSettingsComponent {
         this.saved.set(saved);
         this.dirty.set(false);
         this.saving.set(false);
-        this.toast.success(this.i18n.translate('admin.notifications.saved'));
+        this.toast.show({
+          text: this.i18n.translate('admin.notifications.saved'),
+          kind: 'success',
+        });
       },
       error: () => {
-        this.toast.error(this.i18n.translate('admin.notifications.saveError'));
+        this.toast.show({
+          text: this.i18n.translate('admin.notifications.saveError'),
+          kind: 'error',
+        });
         this.saving.set(false);
       },
     });

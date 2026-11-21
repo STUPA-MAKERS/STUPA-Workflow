@@ -36,6 +36,7 @@ import {
   type SelectOption,
   TimeInputComponent,
   ToastService,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { AdminOptionsService } from '../../../pages/admin/admin-options.service';
 import {
@@ -72,6 +73,7 @@ import { personLabel } from '@shared/person-label.util';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     PublicJoinSettingsComponent,
     FormsModule,
     TranslatePipe,
@@ -268,7 +270,10 @@ export class CreateMeetingDialogComponent {
   next(): void {
     if (!this.step1Valid()) return;
     if (this.endTime().trim() && this.endTime().trim() <= this.time().trim()) {
-      this.toast.error(this.i18n.translate('meetings.create.endBeforeStart'));
+      this.toast.show({
+        text: this.i18n.translate('meetings.create.endBeforeStart'),
+        kind: 'error',
+      });
       return;
     }
     const committee = this.gremiumOptions().find((o) => o.value === this.gremium())?.label ?? '';
@@ -315,7 +320,7 @@ export class CreateMeetingDialogComponent {
       .subscribe({
         next: (m) => {
           this.creating.set(false);
-          this.toast.success(this.i18n.translate('meetings.toast.created'));
+          this.toast.show({ text: this.i18n.translate('meetings.toast.created'), kind: 'success' });
           this.closed.emit();
           void this.router.navigate(['/meetings', m.id]);
         },
@@ -328,7 +333,7 @@ export class CreateMeetingDialogComponent {
               : code === 'repeat_first_meeting_invalid' || code === 'repeat_needs_first_meeting'
                 ? 'meetings.repeatOf.invalid'
                 : 'meetings.toast.createFailed';
-          this.toast.error(this.i18n.translate(key));
+          this.toast.show({ text: this.i18n.translate(key), kind: 'error' });
         },
       });
   }

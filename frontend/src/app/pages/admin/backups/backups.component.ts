@@ -27,6 +27,7 @@ import {
   ToastService,
   PageHeaderComponent,
   SectionComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
@@ -67,6 +68,7 @@ const POLL_TIMEOUT_MS = 30 * 60 * 1000;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     SectionComponent,
     FilePickerComponent,
     ConfirmDialogComponent,
@@ -204,10 +206,16 @@ export class BackupsComponent implements OnDestroy {
         next: (fresh) => {
           this.rows.update((rows) => rows.map((r) => (r.id === fresh.id ? fresh : r)));
           if (fresh.status === 'failed') {
-            this.toast.error(this.i18n.translate('admin.backups.toast.failed'));
+            this.toast.show({
+              text: this.i18n.translate('admin.backups.toast.failed'),
+              kind: 'error',
+            });
           }
           if (fresh.status === 'done') {
-            this.toast.success(this.i18n.translate('admin.backups.toast.created'));
+            this.toast.show({
+              text: this.i18n.translate('admin.backups.toast.created'),
+              kind: 'success',
+            });
           }
           this.syncPolling();
         },
@@ -234,7 +242,7 @@ export class BackupsComponent implements OnDestroy {
         this.rows.update((rows) => [row, ...rows]);
         this.createNote.set('');
         this.creating.set(false);
-        this.toast.show(this.i18n.translate('admin.backups.toast.started'), 'info');
+        this.toast.show({ text: this.i18n.translate('admin.backups.toast.started') });
         this.syncPolling();
       },
       error: () => this.creating.set(false),
@@ -299,7 +307,10 @@ export class BackupsComponent implements OnDestroy {
       next: (row) => {
         this.rows.update((rows) => [row, ...rows]);
         this.busy.set(false);
-        this.toast.success(this.i18n.translate('admin.backups.toast.imported'));
+        this.toast.show({
+          text: this.i18n.translate('admin.backups.toast.imported'),
+          kind: 'success',
+        });
       },
       error: () => this.busy.set(false),
     });
@@ -338,10 +349,10 @@ export class BackupsComponent implements OnDestroy {
       next: () => {
         this.confirmRestore.set(null);
         this.busy.set(false);
-        this.toast.show(
-          this.i18n.translate('admin.backups.toast.restoreStarted'),
-          'warning',
-        );
+        this.toast.show({
+          text: this.i18n.translate('admin.backups.toast.restoreStarted'),
+          kind: 'warning',
+        });
       },
       error: () => this.busy.set(false),
     });

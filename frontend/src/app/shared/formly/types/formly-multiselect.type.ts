@@ -8,6 +8,7 @@ import {
   MEDIA,
   type SheetSide,
   SideSheetComponent,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 
@@ -34,7 +35,14 @@ interface MultiOption {
   selector: 'app-formly-multiselect',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, CheckboxComponent, IconComponent, SideSheetComponent, TranslatePipe],
+  imports: [
+    FormsModule,
+    CheckboxComponent,
+    IconComponent,
+    SideSheetComponent,
+    SheetBodyDirective,
+    TranslatePipe,
+  ],
   template: `
     <div class="field">
       <div class="field__box" [class.field__box--invalid]="showError">
@@ -78,18 +86,20 @@ interface MultiOption {
       (openChange)="open.set($event)"
       (closed)="formControl.markAsTouched()"
     >
-      <div class="rowgroup rowgroup--bg3" role="group" [attr.aria-label]="props.label">
-        @for (opt of optionList; track opt.value) {
-          <div class="msel__check">
-            <app-checkbox
-              [ngModel]="isChecked(opt.value)"
-              [ngModelOptions]="{ standalone: true }"
-              (ngModelChange)="toggle(opt.value, $event)"
-              ><span [attr.lang]="opt.lang ?? null">{{ opt.label }}</span></app-checkbox
-            >
-          </div>
-        }
-      </div>
+      <ng-template sheetBody>
+        <div class="rowgroup rowgroup--bg3" role="group" [attr.aria-label]="props.label">
+          @for (opt of optionList; track opt.value) {
+            <div class="msel__check">
+              <app-checkbox
+                [ngModel]="isChecked(opt.value)"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="toggle(opt.value, $event)"
+                ><span [attr.lang]="opt.lang ?? null">{{ opt.label }}</span></app-checkbox
+              >
+            </div>
+          }
+        </div>
+      </ng-template>
     </app-side-sheet>
   `,
   styleUrls: ['./formly-select.type.scss', './formly-multiselect.type.scss'],

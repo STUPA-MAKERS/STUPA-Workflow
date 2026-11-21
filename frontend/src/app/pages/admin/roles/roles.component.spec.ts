@@ -6,6 +6,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import type { Role } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { AdminRolesComponent } from './roles.component';
+import { toastMock } from '../../../../testing/toast';
 
 const ROLES: Role[] = [
   { id: 'r-admin', key: 'admin', label: { de: 'administrator', en: 'administrator' }, permissions: ['admin.roles'] },
@@ -27,7 +28,7 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
 }
 
 function makeToast() {
-  return { success: jest.fn(), error: jest.fn() };
+  return toastMock();
 }
 
 async function setup(api = makeApi(), toast = makeToast()) {

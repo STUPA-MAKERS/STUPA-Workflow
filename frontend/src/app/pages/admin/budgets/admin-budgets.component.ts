@@ -28,6 +28,7 @@ import {
   StatusTextComponent,
   SwitchComponent,
   ToastService,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { errorStatus, problemCode } from '@core/api/problem';
 import { AuthService } from '@core/auth/auth.service';
@@ -104,6 +105,7 @@ const STEP_NAME_MAX = 120;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     NgTemplateOutlet,
     FormsModule,
     TranslatePipe,
@@ -336,7 +338,10 @@ export class AdminBudgetsComponent {
 
   private fail(err: unknown, fallback: TranslationKey = 'budget.tree.toast.failed'): void {
     this.busy.set(false);
-    this.toast.error(this.i18n.translate(costCentreError(problemCode(err), fallback)));
+    this.toast.show({
+      text: this.i18n.translate(costCentreError(problemCode(err), fallback)),
+      kind: 'error',
+    });
   }
 
   onRowMenu(budget: BudgetTreeNode, item: RowMenuItem): void {
@@ -379,8 +384,7 @@ export class AdminBudgetsComponent {
       : '';
   }
 
-  createTop(event: Event): void {
-    event.preventDefault();
+  createTop(): void {
     const t = this.newTop();
     if (!this.topValid() || this.busy()) return;
     this.busy.set(true);
@@ -389,7 +393,10 @@ export class AdminBudgetsComponent {
       .subscribe({
         next: () => {
           this.busy.set(false);
-          this.toast.success(this.i18n.translate('admin.budgets.toast.created'));
+          this.toast.show({
+            text: this.i18n.translate('admin.budgets.toast.created'),
+            kind: 'success',
+          });
           this.topOpen.set(false);
           this.reload();
         },
@@ -527,7 +534,10 @@ export class AdminBudgetsComponent {
       .subscribe({
         next: () => {
           this.busy.set(false);
-          this.toast.success(this.i18n.translate('budget.tree.toast.saved'));
+          this.toast.show({
+            text: this.i18n.translate('budget.tree.toast.saved'),
+            kind: 'success',
+          });
           this.closeEdit();
           this.reload();
         },
@@ -542,7 +552,12 @@ export class AdminBudgetsComponent {
   private saveFailed(err: unknown): void {
     this.busy.set(false);
     const code = problemCode(err);
-    this.toast.error(this.i18n.translate(SAVE_ERRORS[code] ?? costCentreError(code, 'admin.budgets.error.save')));
+    this.toast.show({
+      text: this.i18n.translate(
+        SAVE_ERRORS[code] ?? costCentreError(code, 'admin.budgets.error.save'),
+      ),
+      kind: 'error',
+    });
     const id = this.editNode()?.id;
     this.api.tree().subscribe({
       next: (tree) => {
@@ -562,7 +577,10 @@ export class AdminBudgetsComponent {
     this.api.deleteNode(node.id).subscribe({
       next: () => {
         this.busy.set(false);
-        this.toast.success(this.i18n.translate('admin.budgets.toast.deleted'));
+        this.toast.show({
+          text: this.i18n.translate('admin.budgets.toast.deleted'),
+          kind: 'success',
+        });
         this.deleteTarget.set(null);
         this.reload();
       },
@@ -625,7 +643,14 @@ export class AdminBudgetsComponent {
   private fyError(err: unknown, fallback: TranslationKey): void {
     this.busy.set(false);
     const code = problemCode(err);
-    this.toast.error(this.i18n.translate(code === 'fiscal_year_exists' ? 'budget.tree.toast.fyDuplicate' : fyBlockerKey(code, fallback)));
+    this.toast.show({
+      text: this.i18n.translate(
+        code === 'fiscal_year_exists'
+          ? 'budget.tree.toast.fyDuplicate'
+          : fyBlockerKey(code, fallback),
+      ),
+      kind: 'error',
+    });
   }
 
   createFiscalYear(event: Event): void {
@@ -636,7 +661,10 @@ export class AdminBudgetsComponent {
     this.api.createFiscalYear(budget.id, { year: Number(this.newFyYear()) }).subscribe({
       next: () => {
         this.busy.set(false);
-        this.toast.success(this.i18n.translate('budget.tree.toast.fyCreated'));
+        this.toast.show({
+          text: this.i18n.translate('budget.tree.toast.fyCreated'),
+          kind: 'success',
+        });
         this.loadFiscalYears();
       },
       error: (err: unknown) => this.fyError(err, 'budget.tree.toast.fyFailed'),
@@ -716,7 +744,7 @@ export class AdminBudgetsComponent {
     request.subscribe({
       next: () => {
         this.busy.set(false);
-        this.toast.success(toast);
+        this.toast.show({ text: toast, kind: 'success' });
         this.backToYears();
         this.loadFiscalYears();
       },

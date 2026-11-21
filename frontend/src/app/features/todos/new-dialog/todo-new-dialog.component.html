@@ -1,164 +1,177 @@
 <app-dialog
   [open]="open()"
-  [title]="(kind() === 'event' ? 'todos.eventCard.newTitle' : heading()) | t"
+  [heading]="(kind() === 'event' ? 'todos.eventCard.newTitle' : heading()) | t"
   [closeLabel]="'action.close' | t"
-  size="form"
+  size="md"
   (closed)="cancel()"
+  [actions]="[
+    { key: 'cancel', label: ('action.cancel' | t) },
+    {
+      key: 'save',
+      label: ('todos.new.create' | t),
+      kind: 'main',
+      disabled: !canSave(),
+      busy: saving(),
+    },
+  ]"
+  (action)="$event.key === 'cancel' ? cancel() : $event.key === 'save' ? save() : null"
 >
-  <form class="tn" (submit)="$event.preventDefault(); save()">
-    @if (canEvent()) {
-      <app-segmented
-        width="fill"
-        [ariaLabel]="'todos.eventCard.kind' | t"
-        [options]="kindOptions()"
-        [value]="kind()"
-        (valueChange)="setKind($any($event))"
+  <ng-template dialogBody>
+    <form class="tn" (submit)="$event.preventDefault(); save()">
+      @if (canEvent()) {
+        <app-segmented
+          width="fill"
+          [ariaLabel]="'todos.eventCard.kind' | t"
+          [options]="kindOptions()"
+          [value]="kind()"
+          (valueChange)="setKind($any($event))"
+        />
+      }
+      <app-input
+        name="title"
+        [label]="'todos.new.cardTitle' | t"
+        [required]="true"
+        [error]="titleError()"
+        [ngModel]="title()"
+        (ngModelChange)="title.set($event)"
       />
-    }
-    <app-input
-      name="title"
-      [label]="'todos.new.cardTitle' | t"
-      [required]="true"
-      [error]="titleError()"
-      [ngModel]="title()"
-      (ngModelChange)="title.set($event)"
-    />
 
-    @if (noBoard()) {
-      <app-error-text>{{ 'todos.new.noBoard' | t }}</app-error-text>
-    } @else {
-      <div class="tn__pair">
-        <app-select
-          name="board"
-          [label]="'todos.new.board' | t"
-          [options]="boardOptions()"
-          [ngModel]="selectedBoard()"
-          (ngModelChange)="setBoard($event)"
-        />
-        <app-select
-          name="column"
-          [label]="'todos.new.column' | t"
-          [options]="columnOptions()"
-          [ngModel]="column()"
-          (ngModelChange)="column.set($event)"
-        />
-      </div>
-      <div class="tn__pair">
-        <app-select
-          name="assignee"
-          [label]="'todos.new.assignee' | t"
-          [options]="memberOptions()"
-          [ngModel]="assignee()"
-          (ngModelChange)="assignee.set($event)"
-        />
-        <app-datepicker
-          name="due"
-          [label]="'todos.new.due' | t"
-          [ngModel]="due()"
-          (ngModelChange)="due.set($event ?? '')"
-        />
-      </div>
-      @if (kind() === 'event') {
+      @if (noBoard()) {
+        <app-error-text>{{ 'todos.new.noBoard' | t }}</app-error-text>
+      } @else {
         <div class="tn__pair">
-          <app-datepicker
-            name="start"
-            [label]="'todos.eventCard.starts' | t"
-            [ngModel]="startsOn()"
-            (ngModelChange)="startsOn.set($event ?? '')"
-          />
-          <app-datepicker
-            name="end"
-            [label]="'todos.eventCard.ends' | t"
-            [error]="datesError()"
-            [ngModel]="endsOn()"
-            (ngModelChange)="endsOn.set($event ?? '')"
-          />
-        </div>
-        <div class="tn__pair">
-          <app-time-input
-            name="startTime"
-            [label]="'todos.eventCard.startTime' | t"
-            [disabled]="!startsOn()"
-            [ngModel]="startTime()"
-            (ngModelChange)="startTime.set($event)"
-          />
-          <app-time-input
-            name="endTime"
-            [label]="'todos.eventCard.endTime' | t"
-            [disabled]="!endsOn()"
-            [ngModel]="endTime()"
-            (ngModelChange)="endTime.set($event)"
-          />
-        </div>
-        <div class="tn__pair">
-          <app-input
-            name="place"
-            [label]="'todos.eventCard.place' | t"
-            [ngModel]="place()"
-            (ngModelChange)="place.set($event)"
+          <app-select
+            name="board"
+            [label]="'todos.new.board' | t"
+            [options]="boardOptions()"
+            [ngModel]="selectedBoard()"
+            (ngModelChange)="setBoard($event)"
           />
           <app-select
-            name="series"
-            [label]="'todos.eventCard.series' | t"
-            [options]="seriesOptions()"
-            [ngModel]="seriesId()"
-            (ngModelChange)="seriesId.set($event)"
+            name="column"
+            [label]="'todos.new.column' | t"
+            [options]="columnOptions()"
+            [ngModel]="column()"
+            (ngModelChange)="column.set($event)"
           />
         </div>
-        @if (seriesId() === newSeries) {
-          <app-input
-            name="seriesName"
-            [label]="'todos.eventCard.seriesName' | t"
-            [required]="true"
-            [ngModel]="seriesName()"
-            (ngModelChange)="seriesName.set($event)"
+        <div class="tn__pair">
+          <app-select
+            name="assignee"
+            [label]="'todos.new.assignee' | t"
+            [options]="memberOptions()"
+            [ngModel]="assignee()"
+            (ngModelChange)="assignee.set($event)"
           />
+          <app-datepicker
+            name="due"
+            [label]="'todos.new.due' | t"
+            [ngModel]="due()"
+            (ngModelChange)="due.set($event ?? '')"
+          />
+        </div>
+        @if (kind() === 'event') {
+          <div class="tn__pair">
+            <app-datepicker
+              name="start"
+              [label]="'todos.eventCard.starts' | t"
+              [ngModel]="startsOn()"
+              (ngModelChange)="startsOn.set($event ?? '')"
+            />
+            <app-datepicker
+              name="end"
+              [label]="'todos.eventCard.ends' | t"
+              [error]="datesError()"
+              [ngModel]="endsOn()"
+              (ngModelChange)="endsOn.set($event ?? '')"
+            />
+          </div>
+          <div class="tn__pair">
+            <app-time-input
+              name="startTime"
+              [label]="'todos.eventCard.startTime' | t"
+              [disabled]="!startsOn()"
+              [ngModel]="startTime()"
+              (ngModelChange)="startTime.set($event)"
+            />
+            <app-time-input
+              name="endTime"
+              [label]="'todos.eventCard.endTime' | t"
+              [disabled]="!endsOn()"
+              [ngModel]="endTime()"
+              (ngModelChange)="endTime.set($event)"
+            />
+          </div>
+          <div class="tn__pair">
+            <app-input
+              name="place"
+              [label]="'todos.eventCard.place' | t"
+              [ngModel]="place()"
+              (ngModelChange)="place.set($event)"
+            />
+            <app-select
+              name="series"
+              [label]="'todos.eventCard.series' | t"
+              [options]="seriesOptions()"
+              [ngModel]="seriesId()"
+              (ngModelChange)="seriesId.set($event)"
+            />
+          </div>
+          @if (seriesId() === newSeries) {
+            <app-input
+              name="seriesName"
+              [label]="'todos.eventCard.seriesName' | t"
+              [required]="true"
+              [ngModel]="seriesName()"
+              (ngModelChange)="seriesName.set($event)"
+            />
+          }
         }
       }
-    }
 
-    <div class="tn__links" role="group" aria-labelledby="tn-links">
-      <span id="tn-links" class="tn__cap">{{ 'todos.new.linked' | t }}</span>
-      @for (link of links(); track link.kind + link.targetId) {
-        <app-chip
-          class="tn__chip"
-          [removable]="true"
-          [removeLabel]="'todos.new.unlink' | t: { label: link.label }"
-          (remove)="unlink(link)"
-        >
-          <app-icon [name]="icon(link.kind)" [size]="15" />
-          <span class="tn__chipText">{{ link.label }}</span>
-        </app-chip>
+      <div class="tn__links" role="group" aria-labelledby="tn-links">
+        <span id="tn-links" class="tn__cap">{{ 'todos.new.linked' | t }}</span>
+        @for (link of links(); track link.kind + link.targetId) {
+          <app-chip
+            class="tn__chip"
+            [removable]="true"
+            [removeLabel]="'todos.new.unlink' | t: { label: link.label }"
+            (remove)="unlink(link)"
+          >
+            <app-icon [name]="icon(link.kind)" [size]="15" />
+            <span class="tn__chipText">{{ link.label }}</span>
+          </app-chip>
+        }
+        <div class="tn__add">
+          <app-button-group>
+            <app-button variant="text" size="sm" (click)="pickerOpen.set(!pickerOpen())">
+              <app-icon name="link" />
+              {{ 'todos.new.link' | t }}
+            </app-button>
+          </app-button-group>
+        </div>
+        <div class="tn__picker">
+          <app-todo-link-picker
+            [(open)]="pickerOpen"
+            [linked]="linkedKeys()"
+            (picked)="pickLink($event)"
+          />
+        </div>
+      </div>
+
+      @if (withDescription()) {
+        <app-textarea class="tn__desc" [label]="'todos.new.description' | t" [grow]="true">
+          <textarea
+            id="tn-desc"
+            name="description"
+            rows="3"
+            maxlength="20000"
+            appMarkdownImageUpload
+            [ngModel]="description()"
+            (ngModelChange)="description.set($event)"
+          ></textarea>
+        </app-textarea>
       }
-      <div class="tn__add">
-        <app-button-group>
-          <app-button variant="text" size="sm" (click)="pickerOpen.set(!pickerOpen())">
-            <app-icon name="link" />
-            {{ 'todos.new.link' | t }}
-          </app-button>
-        </app-button-group>
-      </div>
-      <div class="tn__picker">
-        <app-todo-link-picker [(open)]="pickerOpen" [linked]="linkedKeys()" (picked)="pickLink($event)" />
-      </div>
-    </div>
-
-    @if (withDescription()) {
-      <app-textarea class="tn__desc" [label]="'todos.new.description' | t" [grow]="true">
-        <textarea
-          id="tn-desc"
-          name="description"
-          rows="3"
-          maxlength="20000"
-          appMarkdownImageUpload
-          [ngModel]="description()"
-          (ngModelChange)="description.set($event)"
-        ></textarea>
-      </app-textarea>
-    }
-  </form>
-  <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
-  <app-button dialog-footer variant="fill" [loading]="saving()" [disabled]="!canSave()" (click)="save()">
-    {{ 'todos.new.create' | t }}
-  </app-button>
+    </form>
+  </ng-template>
 </app-dialog>

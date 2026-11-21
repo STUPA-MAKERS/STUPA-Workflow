@@ -1,188 +1,221 @@
 <app-dialog
   [open]="item() !== null"
-  [title]="titleKey() | t"
+  [heading]="titleKey() | t"
   [subtitle]="subtitle()"
   [closeLabel]="'action.close' | t"
   (closed)="cancel()"
+  [actions]="footer()"
+  (action)="onFooter($event.key)"
 >
-  <form class="vod" (submit)="$event.preventDefault(); submit()">
-    @if (electionAllowed()) {
-      <app-segmented width="equal"
-        class="vod__seg"
-        [ariaLabel]="'meetings.vote.kind.label' | t"
-        [options]="kindOptions()"
-        [value]="kind()"
-        (valueChange)="setKind($event)"
-      />
-    }
+  <ng-template dialogBody>
+    <form class="vod" (submit)="$event.preventDefault(); submit()">
+      @if (electionAllowed()) {
+        <app-segmented
+          width="equal"
+          class="vod__seg"
+          [ariaLabel]="'meetings.vote.kind.label' | t"
+          [options]="kindOptions()"
+          [value]="kind()"
+          (valueChange)="setKind($event)"
+        />
+      }
 
-    @if (forApplication()) {
-      <span class="vod__section cap">{{ 'decision.section' | t }}</span>
-      <app-decision-editor
-        idPrefix="vod-dec"
-        [requested]="requested()"
-        [draft]="draft()"
-        (draftChange)="setDraft($event)"
-      />
-      <hr class="vod__divider" />
-    }
-    <app-textarea [label]="(isPoll() ? 'poll.dialog.question' : isElection() ? 'election.dialog.round' : 'meetings.vote.question') | t">
-      <textarea
-        id="vod-question"
-        [rows]="isElection() || isPoll() ? 1 : 3"
-        name="question"
-        [placeholder]="isPoll() ? '' : ((isElection() ? 'election.dialog.roundPlaceholder' : 'meetings.vote.questionPlaceholder') | t)"
-        [ngModel]="question()"
-        (ngModelChange)="setQuestion($event)"
-      ></textarea>
-    </app-textarea>
-
-    @if (isPoll()) {
-    <app-poll-editor idPrefix="vod-poll" [draft]="poll()" (draftChange)="poll.set($event)" />
-    } @else if (isElection()) {
-    <div class="vod__group">
-      <span class="vod__cap cap" id="vod-seats-cap">{{ 'election.dialog.seats' | t }}</span>
-      <div class="vod__stepper" role="group" aria-labelledby="vod-seats-cap">
-        <app-button-group>
-          <app-button
-            variant="tonal"
-            size="sm"
-            [disabled]="seats() <= 1"
-            [iconOnly]="true"
-            [ariaLabel]="'election.dialog.seatsLess' | t"
-            (click)="changeSeats(-1)"
-          ><app-icon name="minus" /></app-button>
-        </app-button-group>
-        <span class="vod__seats mono" aria-live="polite">{{ seats() }}</span>
-        <app-button-group>
-          <app-button
-            variant="tonal"
-            size="sm"
-            [disabled]="seats() >= 50"
-            [iconOnly]="true"
-            [ariaLabel]="'election.dialog.seatsMore' | t"
-            (click)="changeSeats(1)"
-          ><app-icon name="plus" /></app-button>
-        </app-button-group>
-      </div>
-    </div>
-
-    @if (seats() === 1) {
-      <app-switch
-        [id]="'vod-members'"
-        [checked]="electionMembers()"
-        (checkedChange)="electionMembers.set($event)"
-        ><span class="vod__switchLabel">{{ 'election.dialog.members' | t }}</span></app-switch
+      @if (forApplication()) {
+        <span class="vod__section cap">{{ 'decision.section' | t }}</span>
+        <app-decision-editor
+          idPrefix="vod-dec"
+          [requested]="requested()"
+          [draft]="draft()"
+          (draftChange)="setDraft($event)"
+        />
+        <hr class="vod__divider" />
+      }
+      <app-textarea
+        [label]="
+          (isPoll()
+            ? 'poll.dialog.question'
+            : isElection()
+              ? 'election.dialog.round'
+              : 'meetings.vote.question'
+          ) | t
+        "
       >
-    }
+        <textarea
+          id="vod-question"
+          [rows]="isElection() || isPoll() ? 1 : 3"
+          name="question"
+          [placeholder]="
+            isPoll()
+              ? ''
+              : ((isElection()
+                  ? 'election.dialog.roundPlaceholder'
+                  : 'meetings.vote.questionPlaceholder'
+                ) | t)
+          "
+          [ngModel]="question()"
+          (ngModelChange)="setQuestion($event)"
+        ></textarea>
+      </app-textarea>
 
-    <div class="vod__group">
-      <span class="vod__cap cap">{{ 'election.dialog.candidates' | t }}</span>
-      @if (candidates().length > 0) {
-        <ol class="vod__cands">
-          @for (c of candidates(); track c.key; let i = $index, first = $first, last = $last) {
-            <li class="vod__cand">
-              <span class="vod__candNo mono" aria-hidden="true">{{ i + 1 }}</span>
-              <span class="vod__candName ell" [appTruncated]="c.name" #cut="appTruncated" [attr.title]="cut.truncated() ? c.name : null">{{ c.name }}</span>
-              <span class="vod__candKind">{{ (c.principalId ? 'election.dialog.member' : 'election.dialog.free') | t }}</span>
-              <app-move-buttons
-                [upDisabled]="first"
-                [downDisabled]="last"
-                [upLabel]="'election.dialog.up' | t: { name: c.name }"
-                [downLabel]="'election.dialog.down' | t: { name: c.name }"
-                (move)="moveCandidate(i, $event)"
-              />
-              <app-button-group>
-                <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'election.dialog.remove' | t: { name: c.name }" (click)="removeCandidate(c.key)"><app-icon name="trash" /></app-button>
-              </app-button-group>
-            </li>
+      @if (isPoll()) {
+        <app-poll-editor idPrefix="vod-poll" [draft]="poll()" (draftChange)="poll.set($event)" />
+      } @else if (isElection()) {
+        <div class="vod__group">
+          <span class="vod__cap cap" id="vod-seats-cap">{{ 'election.dialog.seats' | t }}</span>
+          <div class="vod__stepper" role="group" aria-labelledby="vod-seats-cap">
+            <app-button-group>
+              <app-button
+                variant="tonal"
+                size="sm"
+                [disabled]="seats() <= 1"
+                [iconOnly]="true"
+                [ariaLabel]="'election.dialog.seatsLess' | t"
+                (click)="changeSeats(-1)"
+                ><app-icon name="minus"
+              /></app-button>
+            </app-button-group>
+            <span class="vod__seats mono" aria-live="polite">{{ seats() }}</span>
+            <app-button-group>
+              <app-button
+                variant="tonal"
+                size="sm"
+                [disabled]="seats() >= 50"
+                [iconOnly]="true"
+                [ariaLabel]="'election.dialog.seatsMore' | t"
+                (click)="changeSeats(1)"
+                ><app-icon name="plus"
+              /></app-button>
+            </app-button-group>
+          </div>
+        </div>
+
+        @if (seats() === 1) {
+          <app-switch
+            [id]="'vod-members'"
+            [checked]="electionMembers()"
+            (checkedChange)="electionMembers.set($event)"
+            ><span class="vod__switchLabel">{{ 'election.dialog.members' | t }}</span></app-switch
+          >
+        }
+
+        <div class="vod__group">
+          <span class="vod__cap cap">{{ 'election.dialog.candidates' | t }}</span>
+          @if (candidates().length > 0) {
+            <ol class="vod__cands">
+              @for (c of candidates(); track c.key; let i = $index, first = $first, last = $last) {
+                <li class="vod__cand">
+                  <span class="vod__candNo mono" aria-hidden="true">{{ i + 1 }}</span>
+                  <span
+                    class="vod__candName ell"
+                    [appTruncated]="c.name"
+                    #cut="appTruncated"
+                    [attr.title]="cut.truncated() ? c.name : null"
+                    >{{ c.name }}</span
+                  >
+                  <span class="vod__candKind">{{
+                    (c.principalId ? 'election.dialog.member' : 'election.dialog.free') | t
+                  }}</span>
+                  <app-move-buttons
+                    [upDisabled]="first"
+                    [downDisabled]="last"
+                    [upLabel]="'election.dialog.up' | t: { name: c.name }"
+                    [downLabel]="'election.dialog.down' | t: { name: c.name }"
+                    (move)="moveCandidate(i, $event)"
+                  />
+                  <app-button-group>
+                    <app-button
+                      variant="text"
+                      size="sm"
+                      [iconOnly]="true"
+                      [ariaLabel]="'election.dialog.remove' | t: { name: c.name }"
+                      (click)="removeCandidate(c.key)"
+                      ><app-icon name="trash"
+                    /></app-button>
+                  </app-button-group>
+                </li>
+              }
+            </ol>
+          } @else {
+            <app-empty-state
+              icon="vote"
+              shape="person"
+              rows="2"
+              [heading]="'election.dialog.none' | t"
+            />
           }
-        </ol>
-      } @else {
-        <app-empty-state icon="vote" shape="person" rows="2" [heading]="'election.dialog.none' | t" />
-      }
-      @if (memberOptions().length > 0) {
-        <app-select
-          class="vod__pick"
-          [label]="'election.dialog.addMember' | t"
-          [placeholder]="'election.dialog.pickMember' | t"
-          [options]="memberOptions()"
-          [ngModel]="''"
-          [ngModelOptions]="{ standalone: true }"
-          (ngModelChange)="addMember($event)"
-        />
-      }
-      <div class="vod__free">
-        <app-input
-          class="vod__freeInput"
-          [label]="'election.dialog.addFree' | t"
-          [placeholder]="'election.dialog.freePlaceholder' | t"
-          [error]="freeNameTaken() ? ('election.dialog.nameTaken' | t) : ''"
-          [ngModel]="freeName()"
-          [ngModelOptions]="{ standalone: true }"
-          (ngModelChange)="freeName.set($event)"
-          (keydown.enter)="$event.preventDefault(); addFreeName()"
-        />
-        <app-button-group>
-          <app-button variant="tonal" [disabled]="!freeName().trim() || freeNameTaken()" (click)="addFreeName()">
-            <app-icon name="plus" />
-            {{ 'election.dialog.add' | t }}
-          </app-button>
-        </app-button-group>
-      </div>
-      @if (tooFew()) {
-        <p class="vod__warn" role="status">{{ 'election.dialog.tooFew' | t: { n: seats() } }}</p>
-      }
-      @if (nameTwice()) {
-        <p class="vod__warn" role="status">{{ 'election.dialog.nameTwice' | t }}</p>
-      }
-    </div>
+          @if (memberOptions().length > 0) {
+            <app-select
+              class="vod__pick"
+              [label]="'election.dialog.addMember' | t"
+              [placeholder]="'election.dialog.pickMember' | t"
+              [options]="memberOptions()"
+              [ngModel]="''"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="addMember($event)"
+            />
+          }
+          <div class="vod__free">
+            <app-input
+              class="vod__freeInput"
+              [label]="'election.dialog.addFree' | t"
+              [placeholder]="'election.dialog.freePlaceholder' | t"
+              [error]="freeNameTaken() ? ('election.dialog.nameTaken' | t) : ''"
+              [ngModel]="freeName()"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="freeName.set($event)"
+              (keydown.enter)="$event.preventDefault(); addFreeName()"
+            />
+            <app-button-group>
+              <app-button
+                variant="tonal"
+                [disabled]="!freeName().trim() || freeNameTaken()"
+                (click)="addFreeName()"
+              >
+                <app-icon name="plus" />
+                {{ 'election.dialog.add' | t }}
+              </app-button>
+            </app-button-group>
+          </div>
+          @if (tooFew()) {
+            <p class="vod__warn" role="status">
+              {{ 'election.dialog.tooFew' | t: { n: seats() } }}
+            </p>
+          }
+          @if (nameTwice()) {
+            <p class="vod__warn" role="status">{{ 'election.dialog.nameTwice' | t }}</p>
+          }
+        </div>
 
-    <p class="vod__rule" role="note">
-      <app-icon name="info" [size]="16" />
-      <span>{{ ruleSentence() }}</span>
-    </p>
-    } @else {
-      @if (planItem()) {
-      <p class="vod__rule" role="note">
-        <app-icon name="info" [size]="16" />
-        <span>{{ 'meetings.vote.rule.plan' | t }}</span>
-      </p>
+        <p class="vod__rule" role="note">
+          <app-icon name="info" [size]="16" />
+          <span>{{ ruleSentence() }}</span>
+        </p>
       } @else {
-      <app-select
-        [label]="'meetings.vote.majorityRule' | t"
-        [options]="ruleOptions()"
-        [ngModel]="majorityRule()"
-        [ngModelOptions]="{ standalone: true }"
-        (ngModelChange)="setRule($event)"
-      />
+        @if (planItem()) {
+          <p class="vod__rule" role="note">
+            <app-icon name="info" [size]="16" />
+            <span>{{ 'meetings.vote.rule.plan' | t }}</span>
+          </p>
+        } @else {
+          <app-select
+            [label]="'meetings.vote.majorityRule' | t"
+            [options]="ruleOptions()"
+            [ngModel]="majorityRule()"
+            [ngModelOptions]="{ standalone: true }"
+            (ngModelChange)="setRule($event)"
+          />
+        }
       }
-    }
 
-    @if (guestsAllowed()) {
-      <app-switch
-        [id]="'vod-guests'"
-        [disabled]="guestsLocked()"
-        [checked]="guestsVote() && !guestsLocked()"
-        (checkedChange)="guestsVote.set($event)"
-        ><span class="vod__switchLabel">{{ 'guests.vote.switch' | t }}</span></app-switch
-      >
-    }
-  </form>
-  <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
-  @if (editing()) {
-    <app-button dialog-footer variant="fill" [loading]="submitting()" [disabled]="!canSubmit()" (click)="submit(true)">
-      {{ 'meetings.vote.save' | t }}
-    </app-button>
-  } @else {
-    <app-button dialog-footer [variant]="canOpen() ? 'tonal' : 'fill'" [loading]="submitting() && preparing()" [disabled]="!canSubmit() || (submitting() && !preparing())" (click)="submit(true)">
-      {{ 'meetings.vote.prepare' | t }}
-    </app-button>
-  }
-  @if (canOpen()) {
-    <app-button dialog-footer variant="fill" [loading]="submitting() && !preparing()" [disabled]="!canSubmit() || (submitting() && preparing())" (click)="submit(false)">
-      <app-icon name="vote" [size]="16" />
-      {{ (isPoll() ? 'poll.dialog.submit' : isElection() ? 'election.dialog.submit' : 'meetings.vote.openSubmit') | t }}
-    </app-button>
-  }
+      @if (guestsAllowed()) {
+        <app-switch
+          [id]="'vod-guests'"
+          [disabled]="guestsLocked()"
+          [checked]="guestsVote() && !guestsLocked()"
+          (checkedChange)="guestsVote.set($event)"
+          ><span class="vod__switchLabel">{{ 'guests.vote.switch' | t }}</span></app-switch
+        >
+      }
+    </form>
+  </ng-template>
 </app-dialog>

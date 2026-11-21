@@ -25,6 +25,7 @@ import {
   TextareaComponent,
   ToastService,
   ErrorTextComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 
 /** The shortest note of the reason `other` (spec 001650, as the server). */
@@ -46,6 +47,7 @@ export const MIN_OTHER_NOTE = 10;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     ErrorTextComponent,
     FormsModule,
     TranslatePipe,
@@ -158,25 +160,30 @@ export class ForceStatusDialogComponent {
     if (!id || !reason || !this.ready() || this.saving()) return;
     this.saving.set(true);
     const decision = this.needsAmount() ? toProposal(this.draft(), this.requested(), true) : null;
-    this.api.forceStatus(id, { stateId, reason, note: note || null, ...(decision ? { decision } : {}) }).subscribe({
-      next: () => {
-        this.saving.set(false);
-        this.open.set(false);
-        this.toast.success(this.i18n.translate('applications.actions.success'));
-        this.done.emit();
-      },
-      error: (err: { status?: number }) => {
-        this.saving.set(false);
-        const key =
-          err.status === 422
-            ? 'decision.error.amountRequired'
-            : err.status === 403
-            ? 'applications.transitions.forbidden'
-            : err.status === 409
-              ? 'applications.actions.conflict'
-              : 'applications.actions.error';
-        this.toast.error(this.i18n.translate(key));
-      },
-    });
+    this.api
+      .forceStatus(id, { stateId, reason, note: note || null, ...(decision ? { decision } : {}) })
+      .subscribe({
+        next: () => {
+          this.saving.set(false);
+          this.open.set(false);
+          this.toast.show({
+            text: this.i18n.translate('applications.actions.success'),
+            kind: 'success',
+          });
+          this.done.emit();
+        },
+        error: (err: { status?: number }) => {
+          this.saving.set(false);
+          const key =
+            err.status === 422
+              ? 'decision.error.amountRequired'
+              : err.status === 403
+                ? 'applications.transitions.forbidden'
+                : err.status === 409
+                  ? 'applications.actions.conflict'
+                  : 'applications.actions.error';
+          this.toast.show({ text: this.i18n.translate(key), kind: 'error' });
+        },
+      });
   }
 }

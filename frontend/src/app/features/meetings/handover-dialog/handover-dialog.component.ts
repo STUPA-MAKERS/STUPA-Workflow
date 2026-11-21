@@ -20,6 +20,7 @@ import {
   DialogComponent,
   IconComponent,
   ErrorTextComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { currentPosition, handoverPreview } from '../keepers.util';
 import { clock } from '@shared/date-format';
@@ -54,7 +55,16 @@ interface ModeOption {
   selector: 'app-handover-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ErrorTextComponent, TranslatePipe, DialogComponent, ButtonComponent, ButtonGroupComponent, IconComponent, AvatarComponent],
+  imports: [
+    DialogBodyDirective,
+    ErrorTextComponent,
+    TranslatePipe,
+    DialogComponent,
+    ButtonComponent,
+    ButtonGroupComponent,
+    IconComponent,
+    AvatarComponent,
+  ],
   templateUrl: './handover-dialog.component.html',
   styleUrl: './handover-dialog.component.scss',
 })

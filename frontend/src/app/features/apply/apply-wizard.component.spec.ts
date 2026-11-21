@@ -11,6 +11,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { DRAFT_LAST_TYPE, DRAFT_PREFIX, ApplyWizardComponent } from './apply-wizard.component';
 import { DraftAttachmentsService, type DraftFile } from './draft-attachments.service';
 import { FormlyDraftFilesType } from './draft-files/formly-draft-files.type';
+import { toastMock } from '../../../testing/toast';
 
 const TYPES: ApplicationType[] = [
   { id: 't1', name: 'Förderantrag', active: true, hasBudget: true, activeFormVersionId: 'v1', key: 'foerderantrag', gremiumId: null },
@@ -148,7 +149,7 @@ interface SetupOpts {
 async function setup(opts: SetupOpts = {}) {
   const create = opts.create ?? jest.fn(() => of({ applicationId: 'app-1' }));
   const drafts = opts.drafts ?? fakeDrafts();
-  const toast = { error: jest.fn(), success: jest.fn(), show: jest.fn() };
+  const toast = toastMock();
   const api: Partial<ApiClient> = {
     applicationTypes: opts.types ?? (() => of(TYPES)),
     applicationTypeGroups: opts.groups ?? (() => of([])),
@@ -309,7 +310,7 @@ describe('ApplyWizardComponent', () => {
     s.comp.next();
     s.comp.next();
     expect(s.comp.currentStep()).toBe('details');
-    expect(s.toast.show).toHaveBeenCalledWith('Bitte warte, bis alle Dateien hochgeladen sind.');
+    expect(s.toast.info).toHaveBeenCalledWith('Bitte warte, bis alle Dateien hochgeladen sind.');
   });
 
   it('goes back by the button and by a done step, never forward by the stepper', async () => {
@@ -378,7 +379,7 @@ describe('ApplyWizardComponent', () => {
     s.comp.choosePredecessor(PRED);
     s.fixture.detectChanges();
     expect(prefill).toHaveBeenCalledWith('p-1');
-    expect(s.toast.show).toHaveBeenCalledWith('Angaben aus dem Vorgänger übernommen');
+    expect(s.toast.info).toHaveBeenCalledWith('Angaben aus dem Vorgänger übernommen');
     expect(s.comp.predecessor()).toEqual({ id: 'p-1', title: 'Sommerfest 2025' });
     s.comp.next();
     s.fixture.detectChanges();

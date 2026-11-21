@@ -9,6 +9,7 @@ import { API_BASE_URL } from '@core/api/api.config';
 import type { DelegationRecipient, MeetingDelegationContext } from '@core/api/delegations.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { DelegationDialogComponent } from './delegation-dialog.component';
+import { toastMock } from '../../../../testing/toast';
 
 const BASE = '/api';
 
@@ -42,7 +43,7 @@ function ctx(over: Partial<MeetingDelegationContext> = {}): MeetingDelegationCon
   };
 }
 
-const toast = { success: jest.fn(), error: jest.fn() };
+const toast = toastMock();
 
 async function setup(context: MeetingDelegationContext = ctx()) {
   toast.success.mockReset();

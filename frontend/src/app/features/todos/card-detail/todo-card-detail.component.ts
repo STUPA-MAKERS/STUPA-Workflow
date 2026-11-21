@@ -78,6 +78,7 @@ import {
   SectionComponent,
   ConfirmDialogComponent,
   FactsComponent,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { TodoAgendaDialogComponent } from '../agenda-dialog/todo-agenda-dialog.component';
 import { TodoDueChipComponent } from '../due-chip/todo-due-chip.component';
@@ -159,6 +160,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBodyDirective,
     FactsComponent,
     LoadErrorComponent,
     ConfirmDialogComponent,
@@ -302,7 +304,8 @@ export class TodoCardDetailComponent {
         comments: appendOnce(c.comments, comment),
         commentCount: c.commentCount + (c.comments.some((x) => x.id === comment.id) ? 0 : 1),
       })),
-    (err) => this.toast.error(this.t(sendErrorKey(err, 'todos.error.comment'))),
+    (err) =>
+      this.toast.show({ text: this.t(sendErrorKey(err, 'todos.error.comment')), kind: 'error' }),
     draftDropper(this.files),
   );
 
@@ -861,7 +864,10 @@ export class TodoCardDetailComponent {
       this.card.set(null);
       return;
     }
-    this.toast.error(this.t((code && ERROR_TEXT[code]) || 'todos.error.save'));
+    this.toast.show({
+      text: this.t((code && ERROR_TEXT[code]) || 'todos.error.save'),
+      kind: 'error',
+    });
     this.reload();
   }
 
@@ -1158,7 +1164,7 @@ export class TodoCardDetailComponent {
       next: (card) => {
         if (!current()) return;
         this.busy.set(false);
-        this.toast.success(this.t('todos.eventCard.followUpDone'));
+        this.toast.show({ text: this.t('todos.eventCard.followUpDone'), kind: 'success' });
         void this.router.navigate(['/todos', card.boardId], { queryParams: { card: card.id } });
       },
       error: (err: unknown) => {
@@ -1316,7 +1322,10 @@ export class TodoCardDetailComponent {
         this.transferred.emit({ card, fromBoardId: c.boardId });
         this.apply(card);
         this.loadMembers(card.boardId);
-        this.toast.success(this.t('todos.card.transferred', { board: target.boardName }));
+        this.toast.show({
+          text: this.t('todos.card.transferred', { board: target.boardName }),
+          kind: 'success',
+        });
       },
       error: (err: unknown) => {
         if (!current()) return;
@@ -1324,7 +1333,7 @@ export class TodoCardDetailComponent {
         this.transferOpen.set(false);
         if (err instanceof HttpErrorResponse && err.status === 404) {
           this.busy.set(false);
-          this.toast.error(this.t('todos.error.transfer'));
+          this.toast.show({ text: this.t('todos.error.transfer'), kind: 'error' });
           this.reload();
           return;
         }
@@ -1342,7 +1351,7 @@ export class TodoCardDetailComponent {
       next: () => {
         if (!current()) return;
         this.busy.set(false);
-        this.toast.success(this.t('todos.card.archived'));
+        this.toast.show({ text: this.t('todos.card.archived'), kind: 'success' });
         this.archived.emit(c.id);
       },
       error: (err: unknown) => {
@@ -1366,8 +1375,10 @@ export class TodoCardDetailComponent {
     if (!c) return;
     const url = `${location.origin}/todos?card=${c.id}`;
     void shareOrCopy({ url, title: c.title }).then((outcome) => {
-      if (outcome === 'copied') this.toast.success(this.t('todos.card.linkCopied'));
-      else if (outcome === 'failed') this.toast.error(this.t('todos.card.linkFailed'));
+      if (outcome === 'copied')
+        this.toast.show({ text: this.t('todos.card.linkCopied'), kind: 'success' });
+      else if (outcome === 'failed')
+        this.toast.show({ text: this.t('todos.card.linkFailed'), kind: 'error' });
     });
   }
 
@@ -1402,7 +1413,7 @@ export class TodoCardDetailComponent {
       error: () => {
         if (!current()) return;
         edit.restore?.();
-        this.toast.error(this.t('todos.error.comment'));
+        this.toast.show({ text: this.t('todos.error.comment'), kind: 'error' });
       },
     });
   }
@@ -1421,7 +1432,7 @@ export class TodoCardDetailComponent {
         }));
       },
       error: () => {
-        if (current()) this.toast.error(this.t('todos.error.comment'));
+        if (current()) this.toast.show({ text: this.t('todos.error.comment'), kind: 'error' });
       },
     });
   }

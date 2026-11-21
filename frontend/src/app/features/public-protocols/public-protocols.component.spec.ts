@@ -162,8 +162,10 @@ describe('PublicProtocolsComponent', () => {
   it('reports a failed read of the gremien', async () => {
     const { api } = await setup(makeApi({ gremien: jest.fn(() => throwError(() => new Error('down'))) }));
     expect(api.list).not.toHaveBeenCalled();
-    expect(toasts['showAction']).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining('Die Protokolle konnten nicht geladen werden.') }),
+    expect(toasts['show']).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining('Die Protokolle konnten nicht geladen werden.'),
+      }),
     );
   });
 
@@ -285,8 +287,8 @@ describe('PublicProtocolsComponent', () => {
       .mockReturnValueOnce(throwError(() => new Error('down')))
       .mockReturnValue(of(pageFixture([summaryFixture()])));
     const { api } = await setup(makeApi({ list }));
-    const toast = toasts['showAction'].mock.calls[0][0];
-    expect(toast.message).toContain('Die Protokolle konnten nicht geladen werden.');
+    const toast = toasts['show'].mock.calls[0][0];
+    expect(toast.text).toContain('Die Protokolle konnten nicht geladen werden.');
     toast.closed('action');
     expect(api.list).toHaveBeenCalledTimes(2);
     expect(await waitFor(() => oneCard())).toBeInTheDocument();

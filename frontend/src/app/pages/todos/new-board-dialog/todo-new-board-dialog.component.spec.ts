@@ -6,6 +6,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { board } from '../../../../testing/todo-fixtures';
 import { runAxe } from '../../../../testing/a11y';
 import { TodoNewBoardDialogComponent } from './todo-new-board-dialog.component';
+import { toastMock } from '../../../../testing/toast';
 
 async function setup() {
   const created = board({ id: 'b-9', name: 'Ersti-Woche', kind: 'free', gremiumId: null });
@@ -13,7 +14,7 @@ async function setup() {
     entryOptions: jest.fn(() => of({ gremien: [{ id: 'g-1', name: 'AStA', logoUrl: null }], persons: [] })),
     createBoard: jest.fn(() => of(created)),
   };
-  const toast = { success: jest.fn(), error: jest.fn() };
+  const toast = toastMock();
   const onCreated = jest.fn();
   const view = await render(TodoNewBoardDialogComponent, {
     inputs: { open: true },

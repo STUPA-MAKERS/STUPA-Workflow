@@ -21,6 +21,7 @@ import { MeetingSessionService } from './meeting-session.service';
 import { MeetingsComponent } from './meetings.component';
 import { pickOption } from '../../../testing/select';
 import { retryLoadError } from '../../../testing/load-error';
+import { kindSpies } from '../../../testing/toast';
 
 const MEETING: MeetingOutWire = {
   id: 'm-1',
@@ -491,7 +492,14 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
     http.expectOne('/api/meetings/m-1/attendance').flush([]);
     http.expectOne('/api/meetings/m-1/agenda').flush([
-      { id: 't-1', applicationId: null, title: 'Vertraulich', body: '', position: 0, nonPublic: true },
+      {
+        id: 't-1',
+        applicationId: null,
+        title: 'Vertraulich',
+        body: '',
+        position: 0,
+        nonPublic: true,
+      },
     ]);
     flushDelegationContext(http);
 
@@ -543,7 +551,14 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status });
     http.expectOne('/api/meetings/m-1/attendance').flush([]);
     http.expectOne('/api/meetings/m-1/agenda').flush([
-      { id: 't-1', applicationId: null, title: 'Haushalt', body: 'Aussprache.', position: 0, nonPublic: false },
+      {
+        id: 't-1',
+        applicationId: null,
+        title: 'Haushalt',
+        body: 'Aussprache.',
+        position: 0,
+        nonPublic: false,
+      },
     ]);
     flushDelegationContext(http);
   };
@@ -681,14 +696,30 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1').flush(MEETING);
     http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
     http.expectOne('/api/meetings/m-1/attendance').flush([
-      { principalId: 'pr-1', displayName: 'Max P', email: 'm@x.de', status: null, source: null, isSelf: false, canKeepProtocol: true },
+      {
+        principalId: 'pr-1',
+        displayName: 'Max P',
+        email: 'm@x.de',
+        status: null,
+        source: null,
+        isSelf: false,
+        canKeepProtocol: true,
+      },
     ]);
     http.expectOne('/api/meetings/m-1/agenda').flush([]);
     flushDelegationContext(http);
     await userEvent.click(await screen.findByRole('button', { name: 'Sitzungsmenü' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Sitzung bearbeiten' }));
     http.expectOne('/api/meetings/m-1/attendance').flush([
-      { principalId: 'pr-1', displayName: 'Max P', email: 'm@x.de', status: null, source: null, isSelf: false, canKeepProtocol: true },
+      {
+        principalId: 'pr-1',
+        displayName: 'Max P',
+        email: 'm@x.de',
+        status: null,
+        source: null,
+        isSelf: false,
+        canKeepProtocol: true,
+      },
     ]);
     const select = await screen.findByLabelText('Protokollführung');
     await pickOption(select, 'Max P');
@@ -762,11 +793,16 @@ describe('MeetingsComponent', () => {
       });
       http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
       http.expectOne('/api/meetings/m-1/attendance').flush([]);
-      http
-        .expectOne('/api/meetings/m-1/agenda')
-        .flush([
-          { id: 't-1', applicationId: null, title: 'Begrüßung', body: '', position: 0, nonPublic: false },
-        ]);
+      http.expectOne('/api/meetings/m-1/agenda').flush([
+        {
+          id: 't-1',
+          applicationId: null,
+          title: 'Begrüßung',
+          body: '',
+          position: 0,
+          nonPublic: false,
+        },
+      ]);
       flushDelegationContext(http);
       return view;
     }
@@ -1133,7 +1169,7 @@ describe('MeetingsComponent — methods', () => {
     it('removes a TOP from the agenda and says so', async () => {
       const { cmp, http, fixture } = await loaded();
       const toasts = fixture.debugElement.injector.get(ToastService);
-      const success = jest.spyOn(toasts, 'success');
+      const success = jest.spyOn(kindSpies(toasts), 'success');
       cmp.removeFromAgenda('t-1');
       http.expectOne('/api/meetings/m-1/agenda/t-1').flush([]);
       expect(cmp.savingAgenda()).toBe(false);
@@ -1365,7 +1401,7 @@ describe('MeetingsComponent — methods', () => {
     it('handles an attendance error with the server reason', async () => {
       const { cmp, http, fixture } = await asMember();
       const toast = fixture.debugElement.injector.get(ToastService);
-      const spy = jest.spyOn(toast, 'error');
+      const spy = jest.spyOn(kindSpies(toast), 'error');
       cmp.setAttendance(SELF as never, 'present');
       http
         .expectOne('/api/meetings/m-1/attendance/me')
@@ -1384,7 +1420,7 @@ describe('MeetingsComponent — methods', () => {
      */
     it('marks the row of an active delegation and reloads the roster', async () => {
       const { cmp, http, fixture } = await loaded();
-      const spy = jest.spyOn(fixture.debugElement.injector.get(ToastService), 'error');
+      const spy = jest.spyOn(kindSpies(fixture.debugElement.injector.get(ToastService)), 'error');
       cmp.setAttendance(OTHER as never, 'present');
       http
         .expectOne('/api/meetings/m-1/attendance/pr-2')
@@ -1409,7 +1445,7 @@ describe('MeetingsComponent — methods', () => {
 
     it('explains the own delegation to a member and reloads the roster', async () => {
       const { cmp, http, fixture } = await asMember();
-      const spy = jest.spyOn(fixture.debugElement.injector.get(ToastService), 'error');
+      const spy = jest.spyOn(kindSpies(fixture.debugElement.injector.get(ToastService)), 'error');
       cmp.setAttendance(SELF as never, 'present');
       http
         .expectOne('/api/meetings/m-1/attendance/me')
@@ -1420,7 +1456,7 @@ describe('MeetingsComponent — methods', () => {
 
     it('explains a record that the lead set and reloads the roster', async () => {
       const { cmp, http, fixture } = await asMember();
-      const spy = jest.spyOn(fixture.debugElement.injector.get(ToastService), 'error');
+      const spy = jest.spyOn(kindSpies(fixture.debugElement.injector.get(ToastService)), 'error');
       cmp.setAttendance(SELF as never, 'present');
       http
         .expectOne('/api/meetings/m-1/attendance/me')
@@ -1482,12 +1518,13 @@ describe('MeetingsComponent — methods', () => {
       const { cmp, http, fixture } = await loaded();
       cmp.meeting.set({ ...cmp.meeting()!, status: 'planned', protokollantId: 'pr-9' });
       cmp.startMeeting();
-      http
-        .expectOne('/api/meetings/m-1')
-        .flush(
-          { detail: 'a meeting cannot change from closed to live', code: 'invalid_status_transition' },
-          { status: 409, statusText: 'Conflict' },
-        );
+      http.expectOne('/api/meetings/m-1').flush(
+        {
+          detail: 'a meeting cannot change from closed to live',
+          code: 'invalid_status_transition',
+        },
+        { status: 409, statusText: 'Conflict' },
+      );
       const toasts = fixture.debugElement.injector.get(ToastService).toasts();
       expect(toasts.map((t) => t.message)).toContain(
         'Aktion fehlgeschlagen.: a meeting cannot change from closed to live',
@@ -1843,7 +1880,7 @@ describe('MeetingsComponent — methods', () => {
     it('hands the minutes over now and plans the next-item handover', async () => {
       const { cmp, http, fixture } = await loaded();
       const toast = fixture.debugElement.injector.get(ToastService);
-      const success = jest.spyOn(toast, 'success');
+      const success = jest.spyOn(kindSpies(toast), 'success');
       cmp.attendance.set([PR9, PR2]);
       cmp.askHandover('pr-9');
       cmp.handOver(cmp.meeting()!, 'now');
@@ -1930,7 +1967,7 @@ describe('MeetingsComponent — methods', () => {
 
     it('reports a refused handover in the dialog, or as a toast', async () => {
       const { cmp, http, fixture } = await loaded();
-      const error = jest.spyOn(fixture.debugElement.injector.get(ToastService), 'error');
+      const error = jest.spyOn(kindSpies(fixture.debugElement.injector.get(ToastService)), 'error');
       cmp.attendance.set([PR9]);
       cmp.askHandover('pr-9');
       cmp.handOver(cmp.meeting()!, 'now');
@@ -1995,8 +2032,8 @@ describe('MeetingsComponent — methods', () => {
     it('discards the planned handover', async () => {
       const { cmp, http, fixture } = await loaded();
       const toast = fixture.debugElement.injector.get(ToastService);
-      const success = jest.spyOn(toast, 'success');
-      const error = jest.spyOn(toast, 'error');
+      const success = jest.spyOn(kindSpies(toast), 'success');
+      const error = jest.spyOn(kindSpies(toast), 'error');
       cmp.cancelHandover(cmp.meeting()!);
       const req = http.expectOne('/api/meetings/m-1/minute-taker-handover');
       expect(req.request.method).toBe('DELETE');

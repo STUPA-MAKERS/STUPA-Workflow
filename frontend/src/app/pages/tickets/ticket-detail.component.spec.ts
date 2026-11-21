@@ -24,6 +24,7 @@ import { DraftAttachmentsService } from '../../features/apply/draft-attachments.
 import { TicketDetailComponent, reportScanState } from './ticket-detail.component';
 import { TicketsPageService } from './tickets-page.service';
 import { loadErrorToast, retryLoadError, toastWith } from '../../../testing/load-error';
+import { toastMock } from '../../../testing/toast';
 
 const MARA: PersonRef = { principalId: 'p1', displayName: 'Mara Keller' };
 const JONAS: PersonRef = { principalId: 'p2', displayName: 'Jonas Albrecht' };
@@ -235,7 +236,7 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
     members: jest.fn(),
     createCard: jest.fn(),
   };
-  const toast = { success: jest.fn(), error: jest.fn() };
+  const toast = toastMock();
   const files = {
     deleteDraftAttachment: jest.fn(() => of(undefined)),
     uploadDraftAttachment: jest.fn(),
@@ -699,8 +700,9 @@ describe('TicketDetailComponent', () => {
   });
 
   it('says that the ticket is not there', async () => {
-    await start('/tickets/t40', { get: () => throwError(() => notFound()) });
+    const { cmp } = await start('/tickets/t40', { get: () => throwError(() => notFound()) });
     expect(screen.getByText('Ticket nicht gefunden')).toBeInTheDocument();
+    expect(cmp.todoLinks()).toEqual([]);
     expect(screen.getByRole('link', { name: 'Zur Liste' })).toHaveAttribute('href', '/tickets');
   });
 

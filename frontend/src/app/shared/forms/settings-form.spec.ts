@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { type Observable, of, Subject, throwError } from 'rxjs';
 import { settingsForm, type SettingsFormOptions } from './settings-form';
+import { toastMock } from '../../../testing/toast';
 
 interface Stored {
   days: number;
@@ -12,7 +13,7 @@ interface Draft {
 }
 
 describe('settingsForm', () => {
-  const toast = { success: jest.fn(), error: jest.fn() };
+  const toast = toastMock();
 
   beforeEach(() => {
     toast.success.mockReset();

@@ -26,10 +26,19 @@
 </header>
 
 @if (!wide()) {
-  <app-side-sheet [side]="phone() ? 'bottom' : 'start'" [heading]="'meetings.agenda.title' | t" [(open)]="agendaOpen">
-    @if (agendaOpen()) {
-      <ng-container [ngTemplateOutlet]="agendaTpl" [ngTemplateOutletContext]="{ inSheet: true }" />
-    }
+  <app-side-sheet
+    [side]="phone() ? 'bottom' : 'start'"
+    [heading]="'meetings.agenda.title' | t"
+    [(open)]="agendaOpen"
+  >
+    <ng-template sheetBody>
+      @if (agendaOpen()) {
+        <ng-container
+          [ngTemplateOutlet]="agendaTpl"
+          [ngTemplateOutletContext]="{ inSheet: true }"
+        />
+      }
+    </ng-template>
   </app-side-sheet>
 }
 
@@ -222,28 +231,40 @@
       }
     </footer>
 
-    <app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'participant.attendance.title' | t" [(open)]="attendanceOpen">
-      @if (attendanceOpen() && me(); as row) {
-        <div class="fv__sheetStack">
-          <app-participant-attendance
-            [member]="row"
-            [meetingStatus]="m.status"
-            [saving]="savingAttendance()"
-            [delegated]="delegated()"
-            (change)="reportAttendance($event)"
-            (lateExcuse)="lateExcuseOpen.set(true)"
-          />
-          <app-participant-roster [rows]="attendance()" [protokollantId]="m.protokollantId" />
-        </div>
-      }
+    <app-side-sheet
+      [side]="phone() ? 'bottom' : 'end'"
+      [heading]="'participant.attendance.title' | t"
+      [(open)]="attendanceOpen"
+    >
+      <ng-template sheetBody>
+        @if (attendanceOpen() && me(); as row) {
+          <div class="fv__sheetStack">
+            <app-participant-attendance
+              [member]="row"
+              [meetingStatus]="m.status"
+              [saving]="savingAttendance()"
+              [delegated]="delegated()"
+              (change)="reportAttendance($event)"
+              (lateExcuse)="lateExcuseOpen.set(true)"
+            />
+            <app-participant-roster [rows]="attendance()" [protokollantId]="m.protokollantId" />
+          </div>
+        }
+      </ng-template>
     </app-side-sheet>
   }
 }
 
-<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'participant.roster.all' | t" [(open)]="rosterOpen">
-  @if (rosterOpen()) {
-    <app-participant-roster [rows]="attendance()" [protokollantId]="m.protokollantId" />
-  }
+<app-side-sheet
+  [side]="phone() ? 'bottom' : 'end'"
+  [heading]="'participant.roster.all' | t"
+  [(open)]="rosterOpen"
+>
+  <ng-template sheetBody>
+    @if (rosterOpen()) {
+      <app-participant-roster [rows]="attendance()" [protokollantId]="m.protokollantId" />
+    }
+  </ng-template>
 </app-side-sheet>
 
 <ng-template #rosterButtonTpl>

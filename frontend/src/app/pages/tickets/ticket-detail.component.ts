@@ -80,6 +80,7 @@ import {
   TabsComponent,
   ToastService,
   SectionComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { browserLabel, viewportLabel } from '../../features/help/report-context';
 import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
@@ -199,6 +200,7 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     LoadErrorComponent,
     SectionComponent,
     FormsModule,
@@ -391,9 +393,10 @@ export class TicketDetailComponent {
         : this.api.addMyNote(this.id, req.body, req),
     (created) => this.notes.update((list) => appendOnce(list, created)),
     (err) =>
-      this.toast.error(
-        this.t(this.blockedKey(err) ?? sendErrorKey(err, 'tickets.detail.error.note')),
-      ),
+      this.toast.show({
+        text: this.t(this.blockedKey(err) ?? sendErrorKey(err, 'tickets.detail.error.note')),
+        kind: 'error',
+      }),
     draftDropper(this.files),
   );
 
@@ -631,13 +634,14 @@ export class TicketDetailComponent {
         this.blocking.set(false);
         if (id !== this.id) return;
         this.ticket.set(t);
-        this.toast.success(
-          this.t(block ? 'tickets.detail.senderBlocked' : 'tickets.detail.senderUnblocked'),
-        );
+        this.toast.show({
+          text: this.t(block ? 'tickets.detail.senderBlocked' : 'tickets.detail.senderUnblocked'),
+          kind: 'success',
+        });
       },
       error: (err: unknown) => {
         this.blocking.set(false);
-        this.toast.error(this.t(blockErrorKey(err)));
+        this.toast.show({ text: this.t(blockErrorKey(err)), kind: 'error' });
       },
     });
   }
@@ -656,8 +660,10 @@ export class TicketDetailComponent {
     const t = this.ticket();
     const title = t ? `${t.number} ${t.title}` : undefined;
     const outcome = await shareOrCopy({ url: location.href.split('?')[0], title });
-    if (outcome === 'copied') this.toast.success(this.t('tickets.detail.linkCopied'));
-    else if (outcome === 'failed') this.toast.error(this.t('tickets.detail.linkFailed'));
+    if (outcome === 'copied')
+      this.toast.show({ text: this.t('tickets.detail.linkCopied'), kind: 'success' });
+    else if (outcome === 'failed')
+      this.toast.show({ text: this.t('tickets.detail.linkFailed'), kind: 'error' });
   }
 
   /** "Erledigt" or "Ablehnen". With open to-dos the dialog asks first. */
@@ -741,7 +747,7 @@ export class TicketDetailComponent {
       },
       error: (err: unknown) => {
         this.saving.set(null);
-        this.toast.error(this.t(this.patchError(err)));
+        this.toast.show({ text: this.t(this.patchError(err)), kind: 'error' });
       },
     });
   }
@@ -799,7 +805,10 @@ export class TicketDetailComponent {
       next: (n) => this.notes.update((list) => list.map((x) => (x.id === n.id ? n : x))),
       error: (err: unknown) => {
         change.restore?.();
-        this.toast.error(this.t(this.blockedKey(err) ?? 'tickets.detail.error.note'));
+        this.toast.show({
+          text: this.t(this.blockedKey(err) ?? 'tickets.detail.error.note'),
+          kind: 'error',
+        });
       },
     });
   }
@@ -811,7 +820,7 @@ export class TicketDetailComponent {
       : this.api.deleteMyNote(this.id, ref.id);
     remove.subscribe({
       next: () => this.notes.update((list) => list.filter((x) => x.id !== ref.id)),
-      error: () => this.toast.error(this.t('tickets.detail.error.note')),
+      error: () => this.toast.show({ text: this.t('tickets.detail.error.note'), kind: 'error' }),
     });
   }
 

@@ -8,7 +8,13 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, CheckboxComponent, DialogComponent, InputComponent } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  CheckboxComponent,
+  DialogComponent,
+  InputComponent,
+  DialogBodyDirective,
+} from '@stupa-makers/ui-kit';
 
 /**
  * Asks for the alternative text of an image before it goes into a Markdown text (app
@@ -19,7 +25,15 @@ import { ButtonComponent, CheckboxComponent, DialogComponent, InputComponent } f
 @Component({
   selector: 'app-image-alt-dialog',
   standalone: true,
-  imports: [FormsModule, TranslatePipe, DialogComponent, InputComponent, CheckboxComponent, ButtonComponent],
+  imports: [
+    DialogBodyDirective,
+    FormsModule,
+    TranslatePipe,
+    DialogComponent,
+    InputComponent,
+    CheckboxComponent,
+    ButtonComponent,
+  ],
   templateUrl: './image-alt-dialog.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './image-alt-dialog.component.scss',

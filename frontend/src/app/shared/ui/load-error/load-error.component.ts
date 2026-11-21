@@ -83,16 +83,15 @@ export class LoadErrorComponent {
   private show(): void {
     if (this.toastId !== null) return;
     const action = this.i18n.translate('action.retry');
-    this.toastId = this.toast.showAction({
-      message: this.message(),
-      action,
-      actionIcon: 'reload',
-      variant: 'danger',
-      timeout: 0,
+    this.toastId = this.toast.show({
+      text: this.message(),
+      action: { key: 'action', label: action, icon: 'reload' },
+      kind: 'error',
       closed: (how) => {
         this.toastId = null;
         if (how === 'action' && !this.done) this.retry.emit();
       },
+      sticky: true,
     });
   }
 

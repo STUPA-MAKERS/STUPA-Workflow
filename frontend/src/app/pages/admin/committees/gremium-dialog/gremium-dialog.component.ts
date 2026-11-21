@@ -26,6 +26,7 @@ import {
   SkeletonComponent,
   SwitchComponent,
   ToastService,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../../admin-api.service';
 import {
@@ -147,6 +148,7 @@ import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-stat
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     LoadStateComponent,
     NoteComponent,
     SkeletonComponent,
@@ -476,7 +478,7 @@ export class GremiumDialogComponent {
     this.saving.set(false);
     const text = this.i18n.translate(key);
     if (key === 'admin.gremien.toast.failed' || key === 'admin.gremien.recipientsFailed') {
-      this.toast.error(text);
+      this.toast.show({ text: text, kind: 'error' });
     } else {
       this.error.set(text);
     }

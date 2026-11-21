@@ -27,6 +27,7 @@ import { TodoLiveService } from '@core/ws/todo-live.service';
 import { TodoCacheService } from '../../features/todos/todo-cache.service';
 import { ALL_BOARDS, BOARD_POLL_MS, TodosComponent } from './todos.component';
 import { loadErrorToast, retryLoadError, toastWith } from '../../../testing/load-error';
+import { toastMock } from '../../../testing/toast';
 
 /** Keeps what the page reads but reads nothing ahead, so a test counts the reads of the page. */
 @Injectable()
@@ -90,7 +91,7 @@ async function start(url: string, opts: Opts = {}) {
     entries: jest.fn(() => of([])),
     entryOptions: jest.fn(() => of({ gremien: [], persons: [] })),
   };
-  const toast = { success: jest.fn(), error: jest.fn() };
+  const toast = toastMock();
   TestBed.configureTestingModule({
     providers: [
       provideHttpClient(),

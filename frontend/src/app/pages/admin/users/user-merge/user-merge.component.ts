@@ -29,6 +29,7 @@ import {
   SkeletonComponent,
   ToastService,
   SectionComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../../admin-api.service';
 import type {
@@ -99,6 +100,7 @@ import { RowChevronComponent } from '../../../../shared/ui/row-chevron/row-chevr
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     RowChevronComponent,
     LoadStateComponent,
     SectionComponent,
@@ -313,7 +315,7 @@ export class UserMergeComponent {
         this.merging.set(false);
         this.result.set(res);
         this.step.set('done');
-        this.toast.success(this.i18n.translate('admin.users.merge.done'));
+        this.toast.show({ text: this.i18n.translate('admin.users.merge.done'), kind: 'success' });
         this.merged.emit(res);
       },
       error: (err: { status?: number; error?: ConflictProblem }) => {
@@ -328,18 +330,22 @@ export class UserMergeComponent {
             this.loadPreview(p.source.id, p.target.id);
           }
           this.understood.set(false);
-          this.toast.error(this.i18n.translate('admin.users.merge.conflictToast'));
+          this.toast.show({
+            text: this.i18n.translate('admin.users.merge.conflictToast'),
+            kind: 'error',
+          });
           return;
         }
         const code = err?.error?.code;
         if (code === 'merge_privileges') {
           this.loadPreview(p.source.id, p.target.id);
         }
-        this.toast.error(
-          this.i18n.translate(
+        this.toast.show({
+          text: this.i18n.translate(
             isMergeErrorCode(code) ? this.errorKey(code) : 'admin.users.merge.failed',
           ),
-        );
+          kind: 'error',
+        });
       },
     });
   }

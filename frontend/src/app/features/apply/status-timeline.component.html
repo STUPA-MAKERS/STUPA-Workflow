@@ -247,20 +247,22 @@
         [side]="phone() ? 'bottom' : 'end'"
         [contentScrolls]="true"
       >
-        <app-chat
-          class="sp__chat"
-          [draftKey]="'status.' + app.id"
-          [messages]="chatMessages()"
-          [canAttach]="!app.applicant?.anonymized"
-          [canPost]="!observer()"
-          placeholder="status.comments.placeholder"
-          (send)="sendComment($event)"
-          (retry)="retryComment($event)"
-          (discard)="discardComment($event)"
-          (edit)="editComment($event)"
-          (delete)="deleteComment($event)"
-          (refresh)="refreshComments(app.id)"
-        />
+        <ng-template sheetBody>
+          <app-chat
+            class="sp__chat"
+            [draftKey]="'status.' + app.id"
+            [messages]="chatMessages()"
+            [canAttach]="!app.applicant?.anonymized"
+            [canPost]="!observer()"
+            placeholder="status.comments.placeholder"
+            (send)="sendComment($event)"
+            (retry)="retryComment($event)"
+            (discard)="discardComment($event)"
+            (edit)="editComment($event)"
+            (delete)="deleteComment($event)"
+            (refresh)="refreshComments(app.id)"
+          />
+        </ng-template>
       </app-side-sheet>
 
       @if (!observer()) {

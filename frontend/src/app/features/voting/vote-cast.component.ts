@@ -319,12 +319,14 @@ export class VoteCastComponent implements OnDestroy {
   /** The toast "Verbindung verloren" stays while the connection is lost and closes itself. */
   private showConnectionLost(lost: boolean): void {
     if (lost && this.lostToast === null) {
-      this.lostToast = this.toast.showNotice({
-        message: this.i18n.translate('voting.live.reconnecting'),
-        variant: 'warning',
+      this.lostToast = this.toast.show({
+        text: this.i18n.translate('voting.live.reconnecting'),
+        kind: 'warning',
         // On a phone the notice is the bar at the top of the frame, like "Server nicht
         // erreichbar": a card that stays would cover the back arrow of the detail.
-        phonePlacement: 'top',
+        placement: 'top',
+        sticky: true,
+        closable: false,
       });
     } else if (!lost && this.lostToast !== null) {
       this.toast.dismiss(this.lostToast);
@@ -391,13 +393,16 @@ export class VoteCastComponent implements OnDestroy {
     call.subscribe({
       next: () => {
         this.pollBusy.set(false);
-        this.toast.success(this.i18n.translate(this.pollToast(action)));
+        this.toast.show({ text: this.i18n.translate(this.pollToast(action)), kind: 'success' });
         this.page?.notify({ id: vote.id, kind: 'updated' });
         this.reload();
       },
       error: (err: unknown) => {
         this.pollBusy.set(false);
-        this.toast.error(pollRefusalMessage(err, (key, params) => this.i18n.translate(key, params)));
+        this.toast.show({
+          text: pollRefusalMessage(err, (key, params) => this.i18n.translate(key, params)),
+          kind: 'error',
+        });
         this.reload();
       },
     });
@@ -413,7 +418,7 @@ export class VoteCastComponent implements OnDestroy {
         this.objecting.set(false);
         this.confirmObject.set(false);
         this.loaded.set(cancelled);
-        this.toast.success(this.i18n.translate('circular.object.done'));
+        this.toast.show({ text: this.i18n.translate('circular.object.done'), kind: 'success' });
         this.page?.notify({ id: vote.id, kind: 'updated' });
       },
       error: (err: unknown) => {
@@ -421,7 +426,7 @@ export class VoteCastComponent implements OnDestroy {
         this.confirmObject.set(false);
         const detail = problemDetail(err);
         const base = this.i18n.translate('meetings.toast.actionFailed');
-        this.toast.error(detail ? `${base}: ${detail}` : base);
+        this.toast.show({ text: detail ? `${base}: ${detail}` : base, kind: 'error' });
         this.reload();
       },
     });
@@ -449,23 +454,30 @@ export class VoteCastComponent implements OnDestroy {
     if (error.status === 403) {
       if (failure.asDelegation) this.proxyRefused.set(true);
       else this.notEligible.set(true);
-      this.toast.error(this.i18n.translate(castRefusalText(failure) ?? 'voting.cast.notEligible'));
+      this.toast.show({
+        text: this.i18n.translate(castRefusalText(failure) ?? 'voting.cast.notEligible'),
+        kind: 'error',
+      });
       this.reload();
       const id = this.loaded()?.id;
       if (id) this.loadDelegation(id);
       return;
     }
     if (error.status === 409) {
-      this.toast.error(
-        this.i18n.translate(
+      this.toast.show({
+        text: this.i18n.translate(
           castRefusalText(failure) ??
             (failure.alreadyVoted ? 'voting.cast.toast.alreadyVoted' : 'voting.cast.toast.conflict'),
         ),
-      );
+        kind: 'error',
+      });
       this.reload();
       return;
     }
-    this.toast.error(error.error?.detail ?? this.i18n.translate('voting.cast.toast.failed'));
+    this.toast.show({
+      text: error.error?.detail ?? this.i18n.translate('voting.cast.toast.failed'),
+      kind: 'error',
+    });
   }
 
   /**
@@ -485,7 +497,7 @@ export class VoteCastComponent implements OnDestroy {
       next: () => {
         this.deleting.set(false);
         this.confirmDelete.set(false);
-        this.toast.success(this.i18n.translate('voting.delete.done'));
+        this.toast.show({ text: this.i18n.translate('voting.delete.done'), kind: 'success' });
         this.page?.notify({ id: vote.id, kind: 'deleted' });
         void this.router.navigate(['/voting'], { queryParamsHandling: 'preserve' });
       },
@@ -494,15 +506,16 @@ export class VoteCastComponent implements OnDestroy {
         this.confirmDelete.set(false);
         if (err.status === 409) {
           const key = DELETE_CONFLICT_KEYS[err.error?.code ?? ''] ?? 'voting.delete.conflict.other';
-          this.toast.error(this.i18n.translate(key));
+          this.toast.show({ text: this.i18n.translate(key), kind: 'error' });
           this.reload();
           return;
         }
-        this.toast.error(
-          this.i18n.translate(
+        this.toast.show({
+          text: this.i18n.translate(
             err.status === 403 ? 'voting.delete.forbidden' : 'voting.delete.failed',
           ),
-        );
+          kind: 'error',
+        });
       },
     });
   }

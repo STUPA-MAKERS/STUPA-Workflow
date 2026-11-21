@@ -5,7 +5,15 @@ import { TodosApiService, type TodoBoardSummary } from '@core/api/todos.service'
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, ButtonGroupComponent, ConfirmDialogComponent, DialogComponent, IconComponent, ToastService } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  ButtonGroupComponent,
+  ConfirmDialogComponent,
+  DialogComponent,
+  IconComponent,
+  ToastService,
+  DialogBodyDirective,
+} from '@stupa-makers/ui-kit';
 
 /**
  * "Archivierte Boards" (spec 001068): the archived free boards that the person reads. A
@@ -16,7 +24,15 @@ import { ButtonComponent, ButtonGroupComponent, ConfirmDialogComponent, DialogCo
   selector: 'app-todo-archived-boards',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonComponent, ButtonGroupComponent, ConfirmDialogComponent, DialogComponent, IconComponent, TranslatePipe],
+  imports: [
+    DialogBodyDirective,
+    ButtonComponent,
+    ButtonGroupComponent,
+    ConfirmDialogComponent,
+    DialogComponent,
+    IconComponent,
+    TranslatePipe,
+  ],
   templateUrl: './todo-archived-boards.component.html',
   styleUrl: './todo-archived-boards.component.scss',
 })
@@ -46,7 +62,11 @@ export class TodoArchivedBoardsComponent {
   private load(): void {
     this.api.archivedBoards().subscribe({
       next: (list) => this.boards.set(list),
-      error: () => this.toast.error(this.i18n.translate('todos.archivedBoards.loadFailed')),
+      error: () =>
+        this.toast.show({
+          text: this.i18n.translate('todos.archivedBoards.loadFailed'),
+          kind: 'error',
+        }),
     });
   }
 
@@ -61,12 +81,18 @@ export class TodoArchivedBoardsComponent {
       next: (summary) => {
         this.busy.set(null);
         this.drop(board.id);
-        this.toast.success(this.i18n.translate('todos.archivedBoards.restored', { name: board.name }));
+        this.toast.show({
+          text: this.i18n.translate('todos.archivedBoards.restored', { name: board.name }),
+          kind: 'success',
+        });
         this.restored.emit(summary);
       },
       error: () => {
         this.busy.set(null);
-        this.toast.error(this.i18n.translate('todos.archivedBoards.failed'));
+        this.toast.show({
+          text: this.i18n.translate('todos.archivedBoards.failed'),
+          kind: 'error',
+        });
       },
     });
   }
@@ -80,18 +106,22 @@ export class TodoArchivedBoardsComponent {
         this.busy.set(null);
         this.deleting.set(null);
         this.drop(board.id);
-        this.toast.success(this.i18n.translate('todos.archivedBoards.deleted', { name: board.name }));
+        this.toast.show({
+          text: this.i18n.translate('todos.archivedBoards.deleted', { name: board.name }),
+          kind: 'success',
+        });
       },
       error: (err: unknown) => {
         this.busy.set(null);
         this.deleting.set(null);
-        this.toast.error(
-          this.i18n.translate(
+        this.toast.show({
+          text: this.i18n.translate(
             problemCode(err) === 'board_delete_admin_only'
               ? 'todos.archivedBoards.adminOnly'
               : 'todos.archivedBoards.failed',
           ),
-        );
+          kind: 'error',
+        });
       },
     });
   }

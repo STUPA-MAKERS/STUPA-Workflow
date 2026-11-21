@@ -47,64 +47,71 @@
 
 <app-dialog
   [open]="addOpen()"
-  [title]="'admin.substitutes.add' | t"
+  [heading]="'admin.substitutes.add' | t"
   [closeLabel]="'action.close' | t"
   (closed)="addOpen.set(false)"
+  [actions]="[
+    { key: 'addOpen', label: ('action.cancel' | t) },
+    {
+      key: 'add',
+      label: ('admin.common.add' | t),
+      kind: 'main',
+      disabled: !selected(),
+      busy: adding(),
+    },
+  ]"
+  (action)="$event.key === 'addOpen' ? addOpen.set(false) : $event.key === 'add' ? add() : null"
 >
-  <form class="sp__form" (submit)="$event.preventDefault(); add()">
-    <div class="sp__search">
-      <app-search-pill
-        size="md"
-        [placeholder]="'admin.gremien.memberSearchPlaceholder' | t"
-        [label]="'admin.substitutes.search' | t"
-        [busy]="search.pending()"
-        [value]="search.text()"
-        (valueChange)="onSearch($event)"
-        (commit)="search.flush()"
-      />
-      @if (candidates().length) {
-        <ul class="sp__hits" appScrollFade="y" [attr.aria-label]="'admin.substitutes.hits' | t">
-          @for (c of candidates(); track c.id) {
-            <li>
-              <app-list-item
-                [title]="label(c)"
-                [selected]="selected()?.id === c.id"
-                subWrap
-                [attr.title]="c.displayName || c.email ? null : c.sub"
-                (activate)="pick(c)"
-              >
-                @if (c.email) {
-                  <span sub class="mono">{{ c.email }}</span>
-                }
-              </app-list-item>
-            </li>
-          }
-        </ul>
-      } @else if (search.applied() && !search.pending() && !selected()) {
-        <p class="sp__none">{{ 'admin.substitutes.noHits' | t }}</p>
+  <ng-template dialogBody>
+    <form class="sp__form" (submit)="$event.preventDefault(); add()">
+      <div class="sp__search">
+        <app-search-pill
+          size="md"
+          [placeholder]="'admin.gremien.memberSearchPlaceholder' | t"
+          [label]="'admin.substitutes.search' | t"
+          [busy]="search.pending()"
+          [value]="search.text()"
+          (valueChange)="onSearch($event)"
+          (commit)="search.flush()"
+        />
+        @if (candidates().length) {
+          <ul class="sp__hits" appScrollFade="y" [attr.aria-label]="'admin.substitutes.hits' | t">
+            @for (c of candidates(); track c.id) {
+              <li>
+                <app-list-item
+                  [title]="label(c)"
+                  [selected]="selected()?.id === c.id"
+                  subWrap
+                  [attr.title]="c.displayName || c.email ? null : c.sub"
+                  (activate)="pick(c)"
+                >
+                  @if (c.email) {
+                    <span sub class="mono">{{ c.email }}</span>
+                  }
+                </app-list-item>
+              </li>
+            }
+          </ul>
+        } @else if (search.applied() && !search.pending() && !selected()) {
+          <p class="sp__none">{{ 'admin.substitutes.noHits' | t }}</p>
+        }
+      </div>
+      @if (selected(); as s) {
+        <p class="sp__picked" role="status">
+          {{ 'admin.gremien.memberPicked' | t }}: <strong>{{ label(s) }}</strong>
+        </p>
       }
-    </div>
-    @if (selected(); as s) {
-      <p class="sp__picked" role="status">
-        {{ 'admin.gremien.memberPicked' | t }}: <strong>{{ label(s) }}</strong>
-      </p>
-    }
-    <app-select
-      [label]="'admin.substitutes.forMember' | t"
-      [options]="memberOptions()"
-      [ngModel]="memberId()"
-      (ngModelChange)="memberId.set($event)"
-      name="member"
-    />
-    @if (addError()) {
-      <app-note kind="error" icon="alert" role="alert">{{ addError() }}</app-note>
-    }
-    <button type="submit" hidden></button>
-  </form>
-  <div dialog-footer>
-    <app-button variant="text" (click)="addOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" [disabled]="!selected()" [loading]="adding()" (click)="add()">{{
-      'admin.common.add' | t
-    }}</app-button>
-  </div>
+      <app-select
+        [label]="'admin.substitutes.forMember' | t"
+        [options]="memberOptions()"
+        [ngModel]="memberId()"
+        (ngModelChange)="memberId.set($event)"
+        name="member"
+      />
+      @if (addError()) {
+        <app-note kind="error" icon="alert" role="alert">{{ addError() }}</app-note>
+      }
+      <button type="submit" hidden></button>
+    </form>
+  </ng-template>
 </app-dialog>

@@ -18,6 +18,7 @@ import {
   SkeletonComponent,
   SwitchComponent,
   ToastService,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 import { AdminApiService } from '../../admin-api.service';
@@ -34,6 +35,7 @@ import { delegationLeadOf, delegationMaxOf, percentOrNull } from '../gremium-dia
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     FormsModule,
     TranslatePipe,
     ButtonComponent,
@@ -111,12 +113,18 @@ export class GremiumDefaultsDialogComponent {
     this.api.putGremiumDefaults(body).subscribe({
       next: () => {
         this.saving.set(false);
-        this.toast.success(this.i18n.translate('admin.gremien.defaults.saved'));
+        this.toast.show({
+          text: this.i18n.translate('admin.gremien.defaults.saved'),
+          kind: 'success',
+        });
         this.closed.emit();
       },
       error: () => {
         this.saving.set(false);
-        this.toast.error(this.i18n.translate('admin.gremien.defaults.saveFailed'));
+        this.toast.show({
+          text: this.i18n.translate('admin.gremien.defaults.saveFailed'),
+          kind: 'error',
+        });
       },
     });
   }

@@ -31,6 +31,7 @@ import {
   FabComponent,
   PageHeaderComponent,
   SectionComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
@@ -59,6 +60,7 @@ const PERSON_HITS = 6;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     SectionComponent,
     FabComponent,
     ConfirmDialogComponent,
@@ -208,10 +210,11 @@ export class PrivacyComponent {
     this.api.executeErasure(r.id).subscribe({
       next: () => {
         this.confirmExecute.set(null);
-        this.toast.success(this.i18n.translate('admin.privacy.executed'));
+        this.toast.show({ text: this.i18n.translate('admin.privacy.executed'), kind: 'success' });
         this.reload();
       },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+      error: () =>
+        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' }),
     });
   }
 
@@ -226,10 +229,11 @@ export class PrivacyComponent {
     this.api.rejectErasure(r.id, this.rejectReason().trim() || null).subscribe({
       next: () => {
         this.rejecting.set(null);
-        this.toast.success(this.i18n.translate('admin.privacy.rejected'));
+        this.toast.show({ text: this.i18n.translate('admin.privacy.rejected'), kind: 'success' });
         this.reload();
       },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+      error: () =>
+        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' }),
     });
   }
 
@@ -239,9 +243,13 @@ export class PrivacyComponent {
     this.api.downloadAuskunft(email).subscribe({
       next: (blob) => {
         downloadBlob(blob, 'auskunft.xlsx');
-        this.toast.success(this.i18n.translate('admin.privacy.auskunftDone'));
+        this.toast.show({
+          text: this.i18n.translate('admin.privacy.auskunftDone'),
+          kind: 'success',
+        });
       },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+      error: () =>
+        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' }),
     });
   }
 
@@ -257,11 +265,14 @@ export class PrivacyComponent {
       next: () => {
         this.confirmPrincipal.set(false);
         this.person.set(null);
-        this.toast.success(this.i18n.translate('admin.privacy.principalErased'));
+        this.toast.show({
+          text: this.i18n.translate('admin.privacy.principalErased'),
+          kind: 'success',
+        });
       },
       error: () => {
         this.confirmPrincipal.set(false);
-        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
       },
     });
   }
@@ -285,11 +296,11 @@ export class PrivacyComponent {
       next: (s) => {
         this.retentionSaving.set(false);
         this.applyRetention(s.defaultRetentionMonths);
-        this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
       },
       error: () => {
         this.retentionSaving.set(false);
-        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
       },
     });
   }

@@ -159,24 +159,29 @@
 
 <app-dialog
   [open]="rejecting() !== null"
-  [title]="'admin.privacy.rejectTitle' | t"
+  [heading]="'admin.privacy.rejectTitle' | t"
   [subtitle]="rejecting()?.email ?? ''"
   [closeLabel]="'action.close' | t"
   (closed)="rejecting.set(null)"
+  [actions]="[
+    { key: 'rejecting', label: ('action.cancel' | t) },
+    { key: 'doReject', label: ('admin.privacy.reject' | t), kind: 'main' },
+  ]"
+  (action)="
+    $event.key === 'rejecting' ? rejecting.set(null) : $event.key === 'doReject' ? doReject() : null
+  "
 >
-  <label class="pv__reason">
-    <span class="pv__reasonLabel">{{ 'admin.privacy.rejectReason' | t }}</span>
-    <textarea
-      class="pv__textarea"
-      rows="3"
-      [ngModel]="rejectReason()"
-      (ngModelChange)="rejectReason.set($event)"
-    ></textarea>
-  </label>
-  <div dialog-footer>
-    <app-button variant="text" (click)="rejecting.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" (click)="doReject()">{{ 'admin.privacy.reject' | t }}</app-button>
-  </div>
+  <ng-template dialogBody>
+    <label class="pv__reason">
+      <span class="pv__reasonLabel">{{ 'admin.privacy.rejectReason' | t }}</span>
+      <textarea
+        class="pv__textarea"
+        rows="3"
+        [ngModel]="rejectReason()"
+        (ngModelChange)="rejectReason.set($event)"
+      ></textarea>
+    </label>
+  </ng-template>
 </app-dialog>
 
 <app-confirm-dialog

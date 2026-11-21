@@ -59,6 +59,7 @@ import {
   DetailNoneComponent,
   FabComponent,
   PageHeaderComponent,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { invoiceStatus } from '@shared/ui';
@@ -134,6 +135,7 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBodyDirective,
     RowChevronComponent,
     PullRefreshDirective,
     InfiniteScrollDirective,
@@ -702,7 +704,7 @@ export class InvoicesComponent implements InvoiceFormHost {
 
   /** The zone takes PDFs only. */
   onZoneRejected(): void {
-    this.toast.error(this.i18n.translate('invoices.toast.notPdf'));
+    this.toast.show({ text: this.i18n.translate('invoices.toast.notPdf'), kind: 'error' });
   }
 
   onHeaderMenu(item: RowMenuItem): void {
@@ -728,7 +730,7 @@ export class InvoicesComponent implements InvoiceFormHost {
           this.importNotice.set('manual');
           this.attachFile(file);
         } else {
-          this.toast.error(this.failureText(err));
+          this.toast.show({ text: this.failureText(err), kind: 'error' });
         }
       },
     });
@@ -769,7 +771,7 @@ export class InvoicesComponent implements InvoiceFormHost {
       },
       error: (err) => {
         this.attaching.set(false);
-        this.toast.error(this.failureText(err));
+        this.toast.show({ text: this.failureText(err), kind: 'error' });
       },
     });
   }
@@ -844,13 +846,13 @@ export class InvoicesComponent implements InvoiceFormHost {
         next: (created) => {
           this.saving.set(false);
           this.createOpen.set(false);
-          this.toast.success(this.i18n.translate('invoices.toast.created'));
+          this.toast.show({ text: this.i18n.translate('invoices.toast.created'), kind: 'success' });
           this.reload();
           if (created?.id) this.openInvoice(created.id);
         },
         error: (err) => {
           this.saving.set(false);
-          this.toast.error(this.failureText(err));
+          this.toast.show({ text: this.failureText(err), kind: 'error' });
         },
       });
   }
@@ -891,12 +893,12 @@ export class InvoicesComponent implements InvoiceFormHost {
           this.saving.set(false);
           this.editing.set(null);
           this.replaceRow(updated);
-          this.toast.success(this.i18n.translate('invoices.toast.saved'));
+          this.toast.show({ text: this.i18n.translate('invoices.toast.saved'), kind: 'success' });
           if (updated.status !== i.status) this.reload();
         },
         error: (err) => {
           this.saving.set(false);
-          this.toast.error(this.failureText(err));
+          this.toast.show({ text: this.failureText(err), kind: 'error' });
         },
       });
   }
@@ -909,12 +911,12 @@ export class InvoicesComponent implements InvoiceFormHost {
       next: (updated) => {
         this.markingPaid.set(null);
         this.replaceRow(updated);
-        this.toast.success(this.i18n.translate('invoices.toast.paid'));
+        this.toast.show({ text: this.i18n.translate('invoices.toast.paid'), kind: 'success' });
         this.reload();
       },
       error: (err) => {
         this.markingPaid.set(null);
-        this.toast.error(this.failureText(err));
+        this.toast.show({ text: this.failureText(err), kind: 'error' });
       },
     });
   }
@@ -951,13 +953,13 @@ export class InvoicesComponent implements InvoiceFormHost {
         this.closeForms();
         this.items.update((list) => list.filter((x) => x.id !== i.id));
         this.total.update((t) => Math.max(0, t - 1));
-        this.toast.success(this.i18n.translate('invoices.toast.deleted'));
+        this.toast.show({ text: this.i18n.translate('invoices.toast.deleted'), kind: 'success' });
         if (i.id === this.selectedId()) this.closeDetail();
         this.reload();
       },
       error: () => {
         this.saving.set(false);
-        this.toast.error(this.i18n.translate('invoices.toast.failed'));
+        this.toast.show({ text: this.i18n.translate('invoices.toast.failed'), kind: 'error' });
       },
     });
   }
@@ -1078,8 +1080,13 @@ export class InvoicesComponent implements InvoiceFormHost {
       this.bulkBusy.set(false);
       this.stopSelecting();
       this.reload();
-      if (failed) this.toast.error(this.i18n.translate('invoices.bulk.failed'));
-      else this.toast.success(this.i18n.translate(doneKey, { count: String(ids.length) }));
+      if (failed)
+        this.toast.show({ text: this.i18n.translate('invoices.bulk.failed'), kind: 'error' });
+      else
+        this.toast.show({
+          text: this.i18n.translate(doneKey, { count: String(ids.length) }),
+          kind: 'success',
+        });
     };
     from(ids)
       .pipe(concatMap((id) => call(id)))
@@ -1121,11 +1128,10 @@ export class InvoicesComponent implements InvoiceFormHost {
       next: (updated) => {
         this.replaceRow(updated);
         this.reload();
-        this.toast.showAction({
-          message: this.i18n.translate('invoices.toast.paid'),
-          action: this.i18n.translate('action.undo'),
-          actionIcon: 'undo',
-          variant: 'success',
+        this.toast.show({
+          text: this.i18n.translate('invoices.toast.paid'),
+          action: { key: 'action', label: this.i18n.translate('action.undo'), icon: 'undo' },
+          kind: 'success',
           closed: (how) => {
             if (how !== 'action') {
               this.setSwipedAway(i.id, false);
@@ -1135,7 +1141,7 @@ export class InvoicesComponent implements InvoiceFormHost {
               next: (back) => settle(back),
               error: (err) => {
                 settle(null);
-                this.toast.error(this.failureText(err));
+                this.toast.show({ text: this.failureText(err), kind: 'error' });
               },
             });
           },
@@ -1143,7 +1149,7 @@ export class InvoicesComponent implements InvoiceFormHost {
       },
       error: (err) => {
         this.setSwipedAway(i.id, false);
-        this.toast.error(this.failureText(err));
+        this.toast.show({ text: this.failureText(err), kind: 'error' });
       },
     });
   }

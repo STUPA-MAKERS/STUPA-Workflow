@@ -118,7 +118,10 @@ export class MarkdownImageUploadDirective {
           media.uploadImage(slot.file).pipe(
             map((image) => markdownImage(slot.alt, image.id)),
             catchError((err: { status?: number } | null) => {
-              this.toast.error(this.i18n.translate(imageUploadErrorKey(err?.status)));
+              this.toast.show({
+                text: this.i18n.translate(imageUploadErrorKey(err?.status)),
+                kind: 'error',
+              });
               return of('');
             }),
             map((text) => this.replace(slot.mark, text)),

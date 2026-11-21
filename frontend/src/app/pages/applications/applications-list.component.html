@@ -332,14 +332,16 @@
     [open]="capturing()"
     (openChange)="$event ? null : closeCapture()"
   >
-    @if (capturing()) {
-      <app-application-capture
-        layout="sheet"
-        [types]="types()"
-        (closed)="closeCapture()"
-        (created)="onCaptured($event)"
-      />
-    }
+    <ng-template sheetBody>
+      @if (capturing()) {
+        <app-application-capture
+          layout="sheet"
+          [types]="types()"
+          (closed)="closeCapture()"
+          (created)="onCaptured($event)"
+        />
+      }
+    </ng-template>
   </app-side-sheet>
 }
 
@@ -349,46 +351,54 @@
   [open]="moreSheetOpen()"
   (openChange)="sheet.set($event ? 'more' : null)"
 >
-  <div class="apps__moreForm">
-    <div class="apps__range" role="group" aria-labelledby="apps-amount">
-      <span id="apps-amount" class="apps__legend">{{ 'applications.list.filter.amount' | t }}</span>
-      <app-currency-input
-        name="amountMin"
-        [placeholder]="'applications.list.filter.min' | t"
-        [ariaLabel]="'applications.list.filter.amountMin' | t"
-        [ngModel]="draftAmountMin()"
-        (ngModelChange)="draftAmountMin.set($event ?? '')"
-      />
-      <app-currency-input
-        name="amountMax"
-        [placeholder]="'applications.list.filter.max' | t"
-        [ariaLabel]="'applications.list.filter.amountMax' | t"
-        [ngModel]="draftAmountMax()"
-        (ngModelChange)="draftAmountMax.set($event ?? '')"
-      />
+  <ng-template sheetBody>
+    <div class="apps__moreForm">
+      <div class="apps__range" role="group" aria-labelledby="apps-amount">
+        <span id="apps-amount" class="apps__legend">{{
+          'applications.list.filter.amount' | t
+        }}</span>
+        <app-currency-input
+          name="amountMin"
+          [placeholder]="'applications.list.filter.min' | t"
+          [ariaLabel]="'applications.list.filter.amountMin' | t"
+          [ngModel]="draftAmountMin()"
+          (ngModelChange)="draftAmountMin.set($event ?? '')"
+        />
+        <app-currency-input
+          name="amountMax"
+          [placeholder]="'applications.list.filter.max' | t"
+          [ariaLabel]="'applications.list.filter.amountMax' | t"
+          [ngModel]="draftAmountMax()"
+          (ngModelChange)="draftAmountMax.set($event ?? '')"
+        />
+      </div>
+      <div class="apps__range" role="group" aria-labelledby="apps-date">
+        <span id="apps-date" class="apps__legend">{{ 'applications.list.filter.date' | t }}</span>
+        <app-datepicker
+          name="createdFrom"
+          [ariaLabel]="'applications.list.filter.from' | t"
+          [ngModel]="draftCreatedFrom()"
+          (ngModelChange)="draftCreatedFrom.set($event ?? '')"
+        />
+        <app-datepicker
+          name="createdTo"
+          [ariaLabel]="'applications.list.filter.to' | t"
+          [ngModel]="draftCreatedTo()"
+          (ngModelChange)="draftCreatedTo.set($event ?? '')"
+        />
+      </div>
+      <div class="apps__moreActions">
+        <app-button-group [main]="true">
+          <app-button variant="text" (click)="clearMore()">{{
+            'applications.list.filter.reset' | t
+          }}</app-button>
+          <app-button variant="fill" (click)="applyMore()">{{
+            'applications.list.filter.apply' | t
+          }}</app-button>
+        </app-button-group>
+      </div>
     </div>
-    <div class="apps__range" role="group" aria-labelledby="apps-date">
-      <span id="apps-date" class="apps__legend">{{ 'applications.list.filter.date' | t }}</span>
-      <app-datepicker
-        name="createdFrom"
-        [ariaLabel]="'applications.list.filter.from' | t"
-        [ngModel]="draftCreatedFrom()"
-        (ngModelChange)="draftCreatedFrom.set($event ?? '')"
-      />
-      <app-datepicker
-        name="createdTo"
-        [ariaLabel]="'applications.list.filter.to' | t"
-        [ngModel]="draftCreatedTo()"
-        (ngModelChange)="draftCreatedTo.set($event ?? '')"
-      />
-    </div>
-    <div class="apps__moreActions">
-      <app-button-group [main]="true">
-        <app-button variant="text" (click)="clearMore()">{{ 'applications.list.filter.reset' | t }}</app-button>
-        <app-button variant="fill" (click)="applyMore()">{{ 'applications.list.filter.apply' | t }}</app-button>
-      </app-button-group>
-    </div>
-  </div>
+  </ng-template>
 </app-side-sheet>
 
 <app-agenda-dialog

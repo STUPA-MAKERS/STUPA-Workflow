@@ -1,4 +1,3 @@
-@use 'breakpoints' as bp;
 @use '../../../shared/ui/dialog-form' as df;
 @use '../widths' as w;
 
@@ -80,14 +79,6 @@
 }
 
 
-// The kit lays out the footer wrapper (flex, wrap, end, 12px); the spacer pushes the delete
-// to the start.
-.rd__foot {
-  width: 100%;
-}
-.rd__spacer {
-  flex: 1 1 auto;
-}
 
 @include w.fields {
   .rd__names {
@@ -101,12 +92,3 @@
   }
 }
 
-@include bp.phone {
-  .rd__spacer {
-    display: none;
-  }
-  .rd__del {
-    order: 2;
-    flex-basis: 100%;
-  }
-}

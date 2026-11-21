@@ -23,7 +23,44 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { searchPlaceholder } from '@shared/util/search-placeholder';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ButtonComponent, ButtonGroupComponent, CheckboxComponent, ConfirmDialogComponent, DetailNoneComponent, downloadBlob, EmptyStateComponent, FabComponent, filterChipText, FilterSelectComponent, type FilterSelectOption, IconComponent, InfiniteScrollDirective, ListDetailLayoutComponent, ListGroupComponent, ListItemComponent, LongPressDirective, MEDIA, mediaQuery, MetaLineComponent, PageHeaderComponent, RangeChipComponent, type RangeValue, RowMenuComponent, type RowMenuItem, type RowMenuSection, type RowSwipeAction, ScrollFadeDirective, SearchPillComponent, SelectionBarComponent, SideSheetComponent, SkeletonComponent, StatusTextComponent, StickyBarComponent, ToastService } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  ButtonGroupComponent,
+  CheckboxComponent,
+  ConfirmDialogComponent,
+  DetailNoneComponent,
+  downloadBlob,
+  EmptyStateComponent,
+  FabComponent,
+  filterChipText,
+  FilterSelectComponent,
+  type FilterSelectOption,
+  IconComponent,
+  InfiniteScrollDirective,
+  ListDetailLayoutComponent,
+  ListGroupComponent,
+  ListItemComponent,
+  LongPressDirective,
+  MEDIA,
+  mediaQuery,
+  MetaLineComponent,
+  PageHeaderComponent,
+  RangeChipComponent,
+  type RangeValue,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  type RowSwipeAction,
+  ScrollFadeDirective,
+  SearchPillComponent,
+  SelectionBarComponent,
+  SideSheetComponent,
+  SkeletonComponent,
+  StatusTextComponent,
+  StickyBarComponent,
+  ToastService,
+  SheetBodyDirective,
+} from '@stupa-makers/ui-kit';
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { CostCentreSelectComponent } from '../budget/cost-centre-select/cost-centre-select.component';
 import {
@@ -107,6 +144,7 @@ const SORTS: readonly {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBodyDirective,
     RowChevronComponent,
     MetaLineComponent,
     PullRefreshDirective,
@@ -1133,7 +1171,10 @@ export class ExpensesComponent implements OnDestroy {
       },
       error: (err) => {
         this.bulkBusy.set(false);
-        this.toast.error(problemDetail(err) || this.i18n.translate('expenses.toast.failed'));
+        this.toast.show({
+          text: problemDetail(err) || this.i18n.translate('expenses.toast.failed'),
+          kind: 'error',
+        });
       },
     });
   }
@@ -1184,10 +1225,13 @@ export class ExpensesComponent implements OnDestroy {
     this.list.refresh();
     if (failed) {
       const key = kind === 'delete' ? 'expenses.bulk.deleteError' : 'expenses.bulk.reassignError';
-      this.toast.error(this.i18n.translate(key));
+      this.toast.show({ text: this.i18n.translate(key), kind: 'error' });
     } else {
       const key = kind === 'delete' ? 'expenses.bulk.deleteDone' : 'expenses.bulk.reassignDone';
-      this.toast.success(this.i18n.translate(key, { count: String(count) }));
+      this.toast.show({
+        text: this.i18n.translate(key, { count: String(count) }),
+        kind: 'success',
+      });
     }
   }
 

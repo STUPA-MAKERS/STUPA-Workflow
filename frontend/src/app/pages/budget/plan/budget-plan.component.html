@@ -565,21 +565,29 @@
   </app-data-table>
 </ng-template>
 
-<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="sheetRow()?.name ?? ''" [open]="!!sheetRow()" (closed)="selectId('')">
-  @if (sheetMenu().length) {
-    <app-row-menu sheet-actions [sections]="sheetMenu()" (selected)="onAction($event.id, sheetRow())" />
-  }
-  @if (sheetRow(); as row) {
-    <div class="bp__sheet">
-      <p class="bp__sheetPath"><span class="mono">{{ row.pathKey | simplifyPath }}</span> · {{ sideLabel(row) }}</p>
-      @if (version(); as v) {
-        <ng-container *ngTemplateOutlet="stateNote; context: { $implicit: v }" />
-      }
-      <ng-container *ngTemplateOutlet="lineFigs; context: { $implicit: row }" />
-      <ng-container *ngTemplateOutlet="lineForm; context: { $implicit: row, cols: false }" />
-      <ng-container *ngTemplateOutlet="lineChildren" />
-    </div>
-  }
+<app-side-sheet
+  [side]="phone() ? 'bottom' : 'end'"
+  [heading]="sheetRow()?.name ?? ''"
+  [open]="!!sheetRow()"
+  (closed)="selectId('')"
+  [actions]="sheetActions()"
+  (action)="onAction($event.key, sheetRow())"
+>
+  <ng-template sheetBody>
+    @if (sheetRow(); as row) {
+      <div class="bp__sheet">
+        <p class="bp__sheetPath">
+          <span class="mono">{{ row.pathKey | simplifyPath }}</span> · {{ sideLabel(row) }}
+        </p>
+        @if (version(); as v) {
+          <ng-container *ngTemplateOutlet="stateNote; context: { $implicit: v }" />
+        }
+        <ng-container *ngTemplateOutlet="lineFigs; context: { $implicit: row }" />
+        <ng-container *ngTemplateOutlet="lineForm; context: { $implicit: row, cols: false }" />
+        <ng-container *ngTemplateOutlet="lineChildren" />
+      </div>
+    }
+  </ng-template>
 </app-side-sheet>
 
 @if (fab(); as f) {
@@ -596,43 +604,90 @@
   (cancel)="ask.set(null)"
 />
 
-<app-dialog [open]="addOpen()" [title]="'budget.plan.action.add' | t" [closeLabel]="'action.close' | t" (closed)="addOpen.set(false)">
-  <form id="bp-add-form" class="bp__addForm" (submit)="addLine($event)">
-    <app-cost-centre-select [nodes]="addNodes()" [value]="addId()" [label]="'budget.plan.col.node' | t" [required]="true" (picked)="addId.set($event)" />
-    <button type="submit" hidden></button>
-  </form>
-  <div dialog-footer>
-    <app-button variant="text" (click)="addOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" (click)="addLine($event)" [disabled]="!addId() || busy()">{{ 'budget.plan.action.add' | t }}</app-button>
-  </div>
+<app-dialog
+  [open]="addOpen()"
+  [heading]="'budget.plan.action.add' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="addOpen.set(false)"
+  [actions]="[
+    { key: 'addOpen', label: ('action.cancel' | t) },
+    {
+      key: 'addLine',
+      label: ('budget.plan.action.add' | t),
+      kind: 'main',
+      disabled: !addId() || busy(),
+    },
+  ]"
+  (action)="
+    $event.key === 'addOpen' ? addOpen.set(false) : $event.key === 'addLine' ? addLine() : null
+  "
+>
+  <ng-template dialogBody>
+    <form id="bp-add-form" class="bp__addForm" (submit)="$event.preventDefault(); addLine()">
+      <app-cost-centre-select
+        [nodes]="addNodes()"
+        [value]="addId()"
+        [label]="'budget.plan.col.node' | t"
+        [required]="true"
+        (picked)="addId.set($event)"
+      />
+      <button type="submit" hidden></button>
+    </form>
+  </ng-template>
 </app-dialog>
 
-<app-dialog [open]="stateOpen()" [title]="'budget.plan.action.setState' | t" [closeLabel]="'action.close' | t" (closed)="stateOpen.set(false)">
-  <form id="bp-state-form" class="bp__addForm" (submit)="setStateByHand($event)">
-    <app-select
-      name="bpState"
-      [label]="'budget.plan.setState.state' | t"
-      [required]="true"
-      [clearable]="false"
-      [options]="stateOptions()"
-      [ngModel]="stateTarget()"
-      (ngModelChange)="stateTarget.set($event || '')"
-    />
-    <app-textarea [label]="'budget.plan.setState.reason' | t">
-      <textarea name="bpReason" rows="3" maxlength="2000" required [value]="stateReason()" (input)="stateReason.set($any($event.target).value)"></textarea>
-    </app-textarea>
-    @if (stateTarget() === 'in_force') {
-      <app-note kind="warn" icon="alert">{{ 'budget.plan.inForce.body' | t }}</app-note>
-    }
-    @if (version()?.state === 'in_force' && stateTarget() && stateTarget() !== 'in_force') {
-      <app-note kind="warn" icon="alert">{{ 'budget.plan.setState.leavesForce' | t }}</app-note>
-    }
-    <button type="submit" hidden></button>
-  </form>
-  <div dialog-footer>
-    <app-button variant="text" (click)="stateOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" data-testid="bp-state-save" (click)="setStateByHand($event)" [disabled]="!stateTarget() || !stateReason().trim() || busy()">{{ 'budget.plan.setState.confirm' | t }}</app-button>
-  </div>
+<app-dialog
+  [open]="stateOpen()"
+  [heading]="'budget.plan.action.setState' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="stateOpen.set(false)"
+  [actions]="[
+    { key: 'stateOpen', label: ('action.cancel' | t) },
+    {
+      key: 'setStateByHand',
+      label: ('budget.plan.setState.confirm' | t),
+      kind: 'main',
+      disabled: !stateTarget() || !stateReason().trim() || busy(),
+    },
+  ]"
+  (action)="
+    $event.key === 'stateOpen'
+      ? stateOpen.set(false)
+      : $event.key === 'setStateByHand'
+        ? setStateByHand()
+        : null
+  "
+>
+  <ng-template dialogBody>
+    <form id="bp-state-form" class="bp__addForm" (submit)="$event.preventDefault(); setStateByHand()">
+      <app-select
+        name="bpState"
+        [label]="'budget.plan.setState.state' | t"
+        [required]="true"
+        [clearable]="false"
+        [options]="stateOptions()"
+        [ngModel]="stateTarget()"
+        (ngModelChange)="stateTarget.set($event || '')"
+      />
+      <app-textarea [label]="'budget.plan.setState.reason' | t">
+        <textarea
+          name="bpReason"
+          rows="3"
+          maxlength="2000"
+          required
+          [value]="stateReason()"
+          (input)="stateReason.set($any($event.target).value)"
+        ></textarea>
+      </app-textarea>
+      @if (stateTarget() === 'in_force') {
+        <app-note kind="warn" icon="alert">{{ 'budget.plan.inForce.body' | t }}</app-note>
+      }
+      @if (version()?.state === 'in_force' && stateTarget() && stateTarget() !== 'in_force') {
+        <app-note kind="warn" icon="alert">{{ 'budget.plan.setState.leavesForce' | t }}</app-note>
+      }
+      <button type="submit" hidden></button>
+    </form>
+  </ng-template>
 </app-dialog>
 
 <app-cost-centre-create
