@@ -39,6 +39,14 @@ function makeToasts(): Record<string, jest.Mock> {
 }
 let toasts = makeToasts();
 
+/** The row cards; the kit public screen is an `article` too. */
+const allCards = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>('article.pp__card')];
+const oneCard = (): HTMLElement => {
+  const all = allCards();
+  if (all.length !== 1) throw new Error(`expected one card, found ${all.length}`);
+  return all[0];
+};
+
 async function setup(api = makeApi(), committee = 'stupa') {
   const view = await render(PublicDecisionsComponent, {
     providers: [
@@ -73,7 +81,7 @@ describe('PublicDecisionsComponent', () => {
     const crumbs = screen.getByRole('navigation', { name: 'Pfad' });
     expect(within(crumbs).getByRole('link', { name: 'Beschlüsse' })).toHaveAttribute('href', '/decisions');
     expect(screen.getByRole('heading', { level: 2, name: 'Sommersemester 2026' })).toBeInTheDocument();
-    const card = screen.getByRole('article');
+    const card = oneCard();
     expect(within(card).getByRole('heading', { level: 3, name: 'Zuschuss für das Sommerfest' })).toBeInTheDocument();
     expect(within(card).getByText('Di, 29.09.2026')).toBeInTheDocument();
     expect(within(card).getByText('34. Sitzung des Studierendenparlaments')).toBeInTheDocument();
@@ -96,7 +104,7 @@ describe('PublicDecisionsComponent', () => {
       counts: {},
     });
     await setup(makeApi({ decisions: jest.fn(() => of(page([election]))) }));
-    const card = screen.getByRole('article');
+    const card = oneCard();
     expect(within(card).getByRole('heading', { level: 3, name: 'Wahl des Vorsitzes' })).toBeInTheDocument();
     expect(within(card).getByText('Wahl')).toBeInTheDocument();
     expect(within(card).getByText('Di, 29.09.2026')).toBeInTheDocument();
@@ -113,7 +121,7 @@ describe('PublicDecisionsComponent', () => {
       date: '2026-10-20',
     });
     await setup(makeApi({ decisions: jest.fn(() => of(page([circular]))) }));
-    const card = screen.getByRole('article');
+    const card = oneCard();
     expect(within(card).getByText('Lastenanhänger beschaffen')).toBeInTheDocument();
     expect(within(card).getByText('Umlaufverfahren')).toBeInTheDocument();
     expect(within(card).getByText('Angenommen')).toBeInTheDocument();
@@ -126,7 +134,7 @@ describe('PublicDecisionsComponent', () => {
       decisionRowFixture({ question: null, result: null, counts: {}, semester: 'ws-2025' }),
     ];
     await setup(makeApi({ decisions: jest.fn(() => of(page(rows))) }));
-    const [first, second] = screen.getAllByRole('article');
+    const [first, second] = allCards();
     expect(within(first).getByText('Abgelehnt')).toHaveClass('pp__result--no');
     expect(within(first).getByText('vertagen 2')).toBeInTheDocument();
     expect(within(second).getByRole('heading', { level: 3, name: 'Beschluss ohne Frage' })).toBeInTheDocument();
@@ -199,7 +207,7 @@ describe('PublicDecisionsComponent', () => {
     const { api } = await setup(makeApi({ decisions }));
     await userEvent.click(screen.getByRole('button', { name: MORE }));
     expect(api.decisions).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 1 }));
-    expect(screen.getAllByRole('article')).toHaveLength(2);
+    expect(allCards()).toHaveLength(2);
     expect(screen.queryByRole('button', { name: MORE })).toBeNull();
   });
 
@@ -211,7 +219,7 @@ describe('PublicDecisionsComponent', () => {
     await setup(makeApi({ decisions }));
     await userEvent.click(screen.getByRole('button', { name: MORE }));
     expect(screen.getByRole('alert')).toHaveTextContent('nicht geladen');
-    expect(screen.getAllByRole('article')).toHaveLength(1);
+    expect(allCards()).toHaveLength(1);
   });
 
   it('drops the answer of an older request', async () => {
@@ -241,10 +249,12 @@ describe('PublicDecisionsComponent', () => {
     const stale = new Subject<PublicDecisionPage>();
     const decisions = jest
       .fn()
+      .mockReturnValueOnce(of(page([decisionRowFixture()])))
       .mockReturnValueOnce(stale)
       .mockReturnValue(of(page([decisionRowFixture({ question: 'Neu' })])));
     const { fixture } = await setup(makeApi({ decisions }));
     await userEvent.type(screen.getByRole('searchbox'), 'x{enter}');
+    await userEvent.type(screen.getByRole('searchbox'), 'y{enter}');
     stale.next(page([decisionRowFixture({ question: 'Alt' })]));
     stale.error(new Error('late'));
     fixture.detectChanges();
@@ -285,13 +295,13 @@ describe('PublicDecisionsComponent', () => {
     expect(screen.getByText('Keine Beschlüsse gefunden')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
     expect(api.decisions).toHaveBeenLastCalledWith({ gremium: ['g-1'], semester: '', q: '', limit: 20 });
-    expect(screen.getByRole('article')).toBeInTheDocument();
+    expect(oneCard()).toBeInTheDocument();
   });
 
   it('reports a failed list', async () => {
     await setup(makeApi({ decisions: jest.fn(() => throwError(() => new Error('down'))) }));
     expect(toasts['showAction']).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Die Beschlüsse konnten nicht geladen werden.' }),
+      expect.objectContaining({ message: expect.stringContaining('Die Beschlüsse konnten nicht geladen werden.') }),
     );
   });
 

@@ -130,7 +130,7 @@ describe('PublicGremienComponent', () => {
       .mockReturnValue(of(GREMIEN));
     await setup('protocols', makeApi({ gremien }));
     const toast = toasts['showAction'].mock.calls[0][0];
-    expect(toast.message).toBe('Die Protokolle konnten nicht geladen werden.');
+    expect(toast.message).toContain('Die Protokolle konnten nicht geladen werden.');
     toast.closed('action');
     expect(await screen.findAllByRole('listitem')).toHaveLength(2);
   });

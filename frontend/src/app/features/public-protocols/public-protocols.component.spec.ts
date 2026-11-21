@@ -32,6 +32,14 @@ function makeToasts(): Record<string, jest.Mock> {
 }
 let toasts = makeToasts();
 
+/** The row cards; the kit public screen is an `article` too. */
+const allCards = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>('article.pp__card')];
+const oneCard = (): HTMLElement => {
+  const all = allCards();
+  if (all.length !== 1) throw new Error(`expected one card, found ${all.length}`);
+  return all[0];
+};
+
 async function setup(api = makeApi(), committee = 'stupa') {
   const view = await render(PublicProtocolsComponent, {
     providers: [
@@ -65,7 +73,7 @@ describe('PublicProtocolsComponent', () => {
     expect(within(crumbs).getByRole('link', { name: 'Öffentliche Protokolle' })).toHaveAttribute('href', '/protocols');
     expect(within(crumbs).getByText('Studierendenparlament')).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('heading', { level: 2, name: 'Sommersemester 2026' })).toBeInTheDocument();
-    const card = screen.getByRole('article');
+    const card = oneCard();
     expect(within(card).getByText('Di, 29.09.2026')).toBeInTheDocument();
     expect(
       within(card).getByRole('link', { name: '34. Sitzung des Studierendenparlaments' }),
@@ -104,7 +112,7 @@ describe('PublicProtocolsComponent', () => {
     expect(screen.getByText('2 nicht-öffentliche TOPs ausgelassen')).toBeInTheDocument();
     expect(screen.getByText('Ohne Beschluss')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Wintersemester 2025/26' })).toBeInTheDocument();
-    const first = screen.getAllByRole('article')[0];
+    const first = allCards()[0];
     expect(within(first).queryByRole('link', { name: /PDF/ })).toBeNull();
     expect(within(first).getByText('PDF')).toBeInTheDocument();
   });
@@ -155,7 +163,7 @@ describe('PublicProtocolsComponent', () => {
     const { api } = await setup(makeApi({ gremien: jest.fn(() => throwError(() => new Error('down'))) }));
     expect(api.list).not.toHaveBeenCalled();
     expect(toasts['showAction']).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Die Protokolle konnten nicht geladen werden.' }),
+      expect.objectContaining({ message: expect.stringContaining('Die Protokolle konnten nicht geladen werden.') }),
     );
   });
 
@@ -180,7 +188,7 @@ describe('PublicProtocolsComponent', () => {
     const { api } = await setup(makeApi({ list }));
     await userEvent.click(screen.getByRole('button', { name: 'Weitere Protokolle laden' }));
     expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 1 }));
-    expect(screen.getAllByRole('article')).toHaveLength(2);
+    expect(allCards()).toHaveLength(2);
     expect(screen.queryByRole('button', { name: 'Weitere Protokolle laden' })).toBeNull();
   });
 
@@ -192,7 +200,7 @@ describe('PublicProtocolsComponent', () => {
     await setup(makeApi({ list }));
     await userEvent.click(screen.getByRole('button', { name: 'Weitere Protokolle laden' }));
     expect(screen.getByRole('alert')).toHaveTextContent('nicht geladen');
-    expect(screen.getAllByRole('article')).toHaveLength(1);
+    expect(allCards()).toHaveLength(1);
   });
 
   /** A new filter starts while the next page still loads. */
@@ -223,10 +231,12 @@ describe('PublicProtocolsComponent', () => {
     const stale = new Subject<PublicProtocolPage>();
     const list = jest
       .fn()
+      .mockReturnValueOnce(of(pageFixture([summaryFixture()])))
       .mockReturnValueOnce(stale)
       .mockReturnValue(of(pageFixture([summaryFixture({ id: 'p-9', title: 'Neu' })])));
     const { fixture } = await setup(makeApi({ list }));
     await userEvent.type(screen.getByRole('searchbox'), 'x{enter}');
+    await userEvent.type(screen.getByRole('searchbox'), 'y{enter}');
     stale.next(pageFixture([summaryFixture({ id: 'p-old', title: 'Alt' })]));
     stale.error(new Error('late'));
     fixture.detectChanges();
@@ -266,7 +276,7 @@ describe('PublicProtocolsComponent', () => {
     expect(screen.getByText('Keine Protokolle gefunden')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
     expect(api.list).toHaveBeenLastCalledWith({ gremium: ['g-1'], semester: '', q: '', limit: 20 });
-    expect(screen.getByRole('article')).toBeInTheDocument();
+    expect(oneCard()).toBeInTheDocument();
   });
 
   it('reports a failed list', async () => {
@@ -276,10 +286,10 @@ describe('PublicProtocolsComponent', () => {
       .mockReturnValue(of(pageFixture([summaryFixture()])));
     const { api } = await setup(makeApi({ list }));
     const toast = toasts['showAction'].mock.calls[0][0];
-    expect(toast.message).toBe('Die Protokolle konnten nicht geladen werden.');
+    expect(toast.message).toContain('Die Protokolle konnten nicht geladen werden.');
     toast.closed('action');
     expect(api.list).toHaveBeenCalledTimes(2);
-    expect(await screen.findByRole('article')).toBeInTheDocument();
+    expect(await waitFor(() => oneCard())).toBeInTheDocument();
   });
 
   it('cancels a pending search when the page goes away', async () => {

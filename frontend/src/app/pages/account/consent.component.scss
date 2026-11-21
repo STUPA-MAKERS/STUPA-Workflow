@@ -81,9 +81,6 @@
   gap: var(--space-3);
   padding: var(--space-2) var(--space-4);
 }
-.cs__scope ::ng-deep app-checkbox .cbx__input {
-  margin-top: 1px;
-}
 .cs__scopeText {
   display: flex;
   flex-direction: column;
