@@ -5,15 +5,7 @@
 }
 
 .ht__form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
   margin: 0;
-}
-
-
-.ht__sec:focus {
-  outline: none;
 }
 
 .ht__row {
@@ -88,12 +80,6 @@
 }
 .ht__skelFieldValue .skel-text {
   width: 22rem;
-}
-// The track of `app-switch`.
-.ht__skelSwitch {
-  width: 44px;
-  height: 26px;
-  border-radius: 999px;
 }
 .ht__skelName {
   width: 14rem;

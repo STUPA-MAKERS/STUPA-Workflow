@@ -27,11 +27,14 @@ import {
   InputComponent,
   SwitchComponent,
   ToastService,
-  FabComponent,
-  PageHeaderComponent,
-  SectionComponent,
 } from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import {
+  ScreenGroupDirective,
+  ScreenSkeletonDirective,
+  SettingsScreenComponent,
+  type SettingsGroup,
+  type SettingsState,
+} from '@stupa-makers/ui-kit/screens';
 import { AdminApiService } from '../admin-api.service';
 import type { HelpTicketsSettings } from '../admin.models';
 import { personLabel } from '@shared/person-label.util';
@@ -76,15 +79,14 @@ export function isHttpUrl(text: string): boolean {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    SectionComponent,
     EmptyStateComponent,
-    FabComponent,
     FormsModule,
     RouterLink,
     TranslatePipe,
     LocalizedDatePipe,
-    PageHeaderComponent,
-    BreadcrumbsComponent,
+    SettingsScreenComponent,
+    ScreenGroupDirective,
+    ScreenSkeletonDirective,
     FilterSelectComponent,
     ButtonComponent,
     ButtonGroupComponent,
@@ -105,7 +107,7 @@ export class HelpTicketsComponent {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   /** The labels of the switch rows, which the loading form shows as they are. */
-  protected readonly skelSwitches = [
+  private readonly skelSwitches = [
     'admin.helpTickets.public',
     'admin.helpTickets.notify',
     'admin.helpTickets.anonymize',
@@ -160,6 +162,51 @@ export class HelpTicketsComponent {
   });
 
   protected readonly dirty = this.form.dirty;
+
+  /** The state of the settings screen (§ui-kit:002244); without a right the blocked senders stay. */
+  protected readonly screenState = computed<SettingsState>(() => {
+    switch (this.form.state()) {
+      case 'loading':
+        return { state: 'loading' };
+      case 'forbidden':
+        return {
+          state: 'forbidden',
+          message: this.canBlock() ? '' : this.i18n.translate('admin.helpTickets.forbidden'),
+        };
+      case 'error':
+        return {
+          state: 'error',
+          message: this.i18n.translate('admin.helpTickets.loadError'),
+          retry: () => this.form.reload(),
+        };
+      default:
+        return { state: 'ready' };
+    }
+  });
+
+  /** Wiki and Meldungen follow the form; the blocked senders have their own load state. */
+  protected readonly groups = computed<SettingsGroup[]>(() => [
+    { key: 'wiki', label: this.i18n.translate('admin.helpTickets.wiki'), rows: [] },
+    {
+      key: 'reports',
+      label: this.i18n.translate('admin.helpTickets.reports'),
+      rows: this.skelSwitches.map((key) => ({
+        key,
+        label: this.i18n.translate(key),
+        control: 'switch' as const,
+      })),
+    },
+    ...(this.canBlock()
+      ? [
+          {
+            key: 'blocked',
+            label: this.i18n.translate('admin.helpTickets.blocked'),
+            rows: [],
+            always: true,
+          },
+        ]
+      : []),
+  ]);
 
   /** null while loading; the read failed: `blockedError`. */
   protected readonly blocked = signal<TicketBlockedSender[] | null>(null);
@@ -239,7 +286,11 @@ export class HelpTicketsComponent {
     const root = this.host.nativeElement;
     const buttons = Array.from(root.querySelectorAll<HTMLElement>('.ht__blocks button'));
     const next = buttons[Math.min(Math.max(at, 0), buttons.length - 1)];
-    (next ?? root.querySelector<HTMLElement>('#ht-blocked'))?.focus();
+    if (next) return next.focus();
+    const section = root.querySelector('#ht-blocked')?.closest<HTMLElement>('[role="group"]');
+    if (!section) return;
+    section.setAttribute('tabindex', '-1');
+    section.focus();
   }
 
   protected monthsText(n: number): string {

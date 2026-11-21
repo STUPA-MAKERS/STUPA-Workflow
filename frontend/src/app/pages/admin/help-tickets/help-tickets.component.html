@@ -1,90 +1,71 @@
-<section class="ht admin-page">
-  <app-page-header [flush]="true" [title]="'admin.helpTickets.title' | t">
-    <app-breadcrumbs crumbs />
-    @if (form.state() === 'ok' && dirty()) {
-      <app-button actions variant="text" [disabled]="saving()" (click)="discard()">
-        {{ 'admin.helpTickets.discard' | t }}
-      </app-button>
-    }
-  </app-page-header>
+<app-settings-screen
+  [head]="{ title: 'admin.helpTickets.title' | t }"
+  [groups]="groups()"
+  [state]="screenState()"
+  [save]="{ dirty: dirty(), busy: saving(), disabled: !!wikiError() }"
+  (save)="save()"
+  (discard)="discard()"
+>
+  <ng-template screenSkeleton="wiki">
+    <span class="ht__skelField">
+      <span class="ht__skelFieldLabel">{{ 'admin.helpTickets.wikiUrl' | t }}</span>
+      <span class="ht__skelFieldValue skel-in"><span class="skel-text"></span></span>
+    </span>
+  </ng-template>
+  <ng-template screenGroup="wiki">
+    <form class="ht__form" (submit)="$event.preventDefault(); save()">
+      <app-input
+        type="url"
+        name="wikiUrl"
+        [label]="'admin.helpTickets.wikiUrl' | t"
+        [required]="true"
+        [error]="wikiError()"
+        [ngModel]="draft().wikiUrl"
+        (ngModelChange)="patch({ wikiUrl: $event })"
+      />
+    </form>
+  </ng-template>
 
-  <app-load-state
-    [state]="form.state()"
-    [forbiddenText]="canBlock() ? null : ('admin.helpTickets.forbidden' | t)"
-    [errorText]="'admin.helpTickets.loadError' | t"
-    (retry)="form.reload()"
-  >
-    <ng-template #loading>
-      <div class="ht__form" aria-hidden="true">
-        <app-section class="ht__sec" [level]="2" [heading]="'admin.helpTickets.wiki' | t">
-          <span class="ht__skelField">
-            <span class="ht__skelFieldLabel">{{ 'admin.helpTickets.wikiUrl' | t }}</span>
-            <span class="ht__skelFieldValue skel-in"><span class="skel-text"></span></span>
-          </span>
-        </app-section>
-        <app-section class="ht__sec" [level]="2" [heading]="'admin.helpTickets.reports' | t">
-          <div class="rowgroup rowgroup--settings">
-            @for (key of skelSwitches; track key) {
-              <div class="ht__row ht__row--split">
-                <span class="ht__label">{{ key | t }}</span>
-                <span class="skel-box ht__skelSwitch skel-in"></span>
-              </div>
-            }
-          </div>
-        </app-section>
-      </div>
-      <span class="sr-only" role="status">{{ 'common.loading' | t }}</span>
-    </ng-template>
-    <ng-template #content>
-      <form class="ht__form" (submit)="$event.preventDefault(); save()">
-        <app-section class="ht__sec" [level]="2" [heading]="'admin.helpTickets.wiki' | t">
-          <app-input
-            type="url"
-            name="wikiUrl"
-            [label]="'admin.helpTickets.wikiUrl' | t"
-            [required]="true"
-            [error]="wikiError()"
-            [ngModel]="draft().wikiUrl"
-            (ngModelChange)="patch({ wikiUrl: $event })"
+  <ng-template screenGroup="reports">
+    <div class="rowgroup rowgroup--settings">
+      <app-switch
+        class="ht__row"
+        [checked]="draft().publicEnabled"
+        (checkedChange)="patch({ publicEnabled: $event })"
+        >{{ 'admin.helpTickets.public' | t }}</app-switch
+      >
+      <app-switch
+        class="ht__row"
+        [checked]="draft().notifyNew"
+        (checkedChange)="patch({ notifyNew: $event })"
+        >{{ 'admin.helpTickets.notify' | t }}</app-switch
+      >
+      <div class="ht__row ht__row--split">
+        <span id="ht-anon" class="ht__label">{{ 'admin.helpTickets.anonymize' | t }}</span>
+        @if (draft().retentionMonths; as months) {
+          <app-filter-select
+            [label]="'admin.helpTickets.retention' | t"
+            [options]="monthOptions()"
+            [value]="'' + months"
+            (valueChange)="setMonths($event)"
           />
-        </app-section>
+        }
+        <app-switch
+          [ariaLabel]="'admin.helpTickets.anonymize' | t"
+          [checked]="draft().retentionMonths !== null"
+          (checkedChange)="setAnonymize($event)"
+        />
+      </div>
+    </div>
+  </ng-template>
 
-        <app-section class="ht__sec" [level]="2" [heading]="'admin.helpTickets.reports' | t">
-          <div class="rowgroup rowgroup--settings">
-            <app-switch
-              class="ht__row"
-              [checked]="draft().publicEnabled"
-              (checkedChange)="patch({ publicEnabled: $event })"
-              >{{ 'admin.helpTickets.public' | t }}</app-switch
-            >
-            <app-switch class="ht__row" [checked]="draft().notifyNew" (checkedChange)="patch({ notifyNew: $event })">{{
-              'admin.helpTickets.notify' | t
-            }}</app-switch>
-            <div class="ht__row ht__row--split">
-              <span id="ht-anon" class="ht__label">{{ 'admin.helpTickets.anonymize' | t }}</span>
-              @if (draft().retentionMonths; as months) {
-                <app-filter-select
-                  [label]="'admin.helpTickets.retention' | t"
-                  [options]="monthOptions()"
-                  [value]="'' + months"
-                  (valueChange)="setMonths($event)"
-                />
-              }
-              <app-switch
-                [ariaLabel]="'admin.helpTickets.anonymize' | t"
-                [checked]="draft().retentionMonths !== null"
-                (checkedChange)="setAnonymize($event)"
-              />
-            </div>
-          </div>
-        </app-section>
-      </form>
-    </ng-template>
-  </app-load-state>
-
-  @if (canBlock()) {
-    <app-section id="ht-blocked" class="ht__sec" tabindex="-1" [level]="2" [heading]="'admin.helpTickets.blocked' | t">
-      <app-load-state [state]="blockedState()" [errorText]="'admin.helpTickets.error.blocked' | t" (retry)="loadBlocked()">
+  <ng-template screenGroup="blocked">
+    <div id="ht-blocked">
+      <app-load-state
+        [state]="blockedState()"
+        [errorText]="'admin.helpTickets.error.blocked' | t"
+        (retry)="loadBlocked()"
+      >
         <ng-template #content>
           @let list = blocked() ?? [];
           @if (list.length) {
@@ -95,9 +76,16 @@
                     <span class="ht__name rowgroup__title">{{ senderName(b) }}</span>
                     <span class="ht__meta">
                       <span class="ht__parts">
-                        <span class="ht__part">{{ 'admin.helpTickets.blockedOn' | t: { date: (b.blockedAt | ldate: 'mediumDate') } }}</span>
+                        <span class="ht__part">{{
+                          'admin.helpTickets.blockedOn'
+                            | t: { date: (b.blockedAt | ldate: 'mediumDate') }
+                        }}</span>
                         @if (b.sourceTicket; as src) {
-                          <span class="ht__part"><a class="mono ht__link" [routerLink]="['/tickets', src.id]">{{ src.number }}</a></span>
+                          <span class="ht__part"
+                            ><a class="mono ht__link" [routerLink]="['/tickets', src.id]">{{
+                              src.number
+                            }}</a></span
+                          >
                         }
                         @if (b.hitCount > 0) {
                           <span class="ht__part">{{ hits(b) }}</span>
@@ -121,15 +109,23 @@
               }
             </ul>
           } @else {
-            <app-empty-state icon="shield" rows="3" [heading]="'admin.helpTickets.blockedEmpty' | t" />
+            <app-empty-state
+              icon="shield"
+              rows="3"
+              [heading]="'admin.helpTickets.blockedEmpty' | t"
+            />
           }
         </ng-template>
         <ng-template #loading>
           <ul class="rowgroup rowgroup--records ht__skelBlocks skel-in" aria-hidden="true">
             <li class="ht__row ht__row--split">
               <span class="ht__block">
-                <span class="ht__name rowgroup__title"><span class="skel-text ht__skelName"></span></span>
-                <span class="ht__meta"><span class="skel-text skel-text--muted ht__skelMeta"></span></span>
+                <span class="ht__name rowgroup__title"
+                  ><span class="skel-text ht__skelName"></span
+                ></span>
+                <span class="ht__meta"
+                  ><span class="skel-text skel-text--muted ht__skelMeta"></span
+                ></span>
               </span>
               <span class="skel-box ht__skelButton ht__skelButton--sm"></span>
             </li>
@@ -139,10 +135,6 @@
           }
         </ng-template>
       </app-load-state>
-    </app-section>
-  }
-
-  @if (form.state() === 'ok' && dirty()) {
-    <app-fab icon="check" [label]="'action.save' | t" [loading]="saving()" [disabled]="!!wikiError()" (activate)="save()" />
-  }
-</section>
+    </div>
+  </ng-template>
+</app-settings-screen>
