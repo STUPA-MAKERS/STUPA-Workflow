@@ -151,7 +151,7 @@ describe('UsersComponent', () => {
     expect(screen.getByText('Administrator, Referent')).toBeInTheDocument();
     expect(screen.queryByText(/administrator/)).not.toBeInTheDocument();
     expect(screen.getByText('Keine Rollen zugewiesen.')).toBeInTheDocument();
-    expect(screen.getAllByRole('listitem').filter((li) => li.parentElement?.classList.contains('au__list'))).toHaveLength(2);
+    expect(screen.getAllByRole('listitem').filter((li) => li.parentElement?.classList.contains('rcs__list'))).toHaveLength(2);
     expect(screen.queryByRole('button', { name: /Entziehen|Zuweisung|Rolle \+/ })).toBeNull();
   });
 
