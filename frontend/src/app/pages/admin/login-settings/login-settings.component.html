@@ -1,40 +1,32 @@
 <app-settings-screen
   [head]="{ title: 'admin.loginSettings.title' | t }"
-  [groups]="groups"
+  [groups]="groups()"
   [state]="screenState()"
   [save]="{ dirty: dirty(), busy: saving(), disabled: !body() }"
   (save)="save()"
   (discard)="discard()"
 >
   <ng-template screenGroup="sessions">
-    <div class="ls__body">
-      <form class="ls__grid" (submit)="$event.preventDefault(); save()">
-        <app-input
-          type="number"
-          [label]="'admin.loginSettings.web' | t"
-          [error]="webError()"
-          name="webSessionDays"
-          [ngModel]="draft().web"
-          (ngModelChange)="patch({ web: $event })"
-          [suffix]="'admin.loginSettings.daysUnit' | t"
-        />
+    <form class="ls__grid" (submit)="$event.preventDefault(); save()">
+      <app-input
+        type="number"
+        [label]="'admin.loginSettings.web' | t"
+        [error]="webError()"
+        name="webSessionDays"
+        [ngModel]="draft().web"
+        (ngModelChange)="patch({ web: $event })"
+        [suffix]="'admin.loginSettings.daysUnit' | t"
+      />
 
-        <app-input
-          type="number"
-          [label]="'admin.loginSettings.pwa' | t"
-          [error]="pwaError()"
-          name="pwaSessionDays"
-          [ngModel]="draft().pwa"
-          (ngModelChange)="patch({ pwa: $event })"
-          [suffix]="'admin.loginSettings.daysUnit' | t"
-        />
-      </form>
-
-      @if (saved()?.updatedAt; as at) {
-        <p class="ls__meta">
-          {{ 'admin.loginSettings.updatedAt' | t: { date: (at | ldate: 'medium') } }}
-        </p>
-      }
-    </div>
+      <app-input
+        type="number"
+        [label]="'admin.loginSettings.pwa' | t"
+        [error]="pwaError()"
+        name="pwaSessionDays"
+        [ngModel]="draft().pwa"
+        (ngModelChange)="patch({ pwa: $event })"
+        [suffix]="'admin.loginSettings.daysUnit' | t"
+      />
+    </form>
   </ng-template>
 </app-settings-screen>

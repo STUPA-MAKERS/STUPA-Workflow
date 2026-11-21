@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
-import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
+import { formatMoment } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { type SettingsForm, settingsForm } from '@shared/forms/settings-form';
 import { InputComponent } from '@stupa-makers/ui-kit';
@@ -60,7 +60,6 @@ function draftOf(s: LoginSettings): Draft {
   imports: [
     FormsModule,
     TranslatePipe,
-    LocalizedDatePipe,
     SettingsScreenComponent,
     ScreenGroupDirective,
     InputComponent,
@@ -102,8 +101,16 @@ export class LoginSettingsComponent {
 
   protected readonly dirty = this.form.dirty;
 
-  /** One group without a heading: the two fields and the time of the last change. */
-  protected readonly groups: readonly SettingsGroup[] = [{ key: 'sessions', rows: [] }];
+  /** One group without a heading: the two fields, and the time of the last change under them. */
+  protected readonly groups = computed<SettingsGroup[]>(() => {
+    const at = this.saved()?.updatedAt;
+    const foot = at
+      ? this.i18n.translate('admin.loginSettings.updatedAt', {
+          date: formatMoment(at, this.i18n.formatLocale(), 'medium'),
+        })
+      : undefined;
+    return [{ key: 'sessions', rows: [], foot }];
+  });
 
   /** The state of the settings screen (§ui-kit:002244): three grey lines while it loads. */
   protected readonly screenState = computed<SettingsState>(() => {
