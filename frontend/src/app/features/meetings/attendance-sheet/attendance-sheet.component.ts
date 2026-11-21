@@ -493,17 +493,14 @@ export class AttendanceSheetComponent {
     this.delegationsApi.revoke(d.id).subscribe({
       next: () => {
         this.revoking.set(null);
-        this.toast.show({ text: this.i18n.translate('delegation.toast.revoked'), kind: 'success' });
+        this.toast.show(this.i18n.translate('delegation.toast.revoked'), 'success');
         this.loadDelegations(this.meeting().id);
         this.ownCard()?.reload();
         this.resolveConflict(d.delegatorId);
       },
       error: () => {
         this.revoking.set(null);
-        this.toast.show({
-          text: this.i18n.translate('delegation.toast.revokeFailed'),
-          kind: 'error',
-        });
+        this.toast.show(this.i18n.translate('delegation.toast.revokeFailed'), 'error');
       },
     });
   }

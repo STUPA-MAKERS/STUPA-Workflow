@@ -297,12 +297,12 @@ export class AdminGremienComponent {
   }): void {
     this.dialogGremium.set(undefined);
     if (event.recipients) this.setRecipients(event.gremium.id, event.recipients);
-    this.toast.show({
-      text: this.i18n.translate(
+    this.toast.show(
+      this.i18n.translate(
         event.created ? 'admin.gremien.toast.created' : 'admin.gremien.toast.updated',
       ),
-      kind: 'success',
-    });
+      'success',
+    );
     if (event.created) this.expanded.open(event.gremium.id);
     this.reload(false);
   }
@@ -338,15 +338,12 @@ export class AdminGremienComponent {
       next: () => {
         this.deleting.set(false);
         this.confirmDelete.set(null);
-        this.toast.show({
-          text: this.i18n.translate('admin.gremien.toast.deleted'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('admin.gremien.toast.deleted'), 'success');
         this.reload(false);
       },
       error: (err: unknown) => {
         this.deleting.set(false);
-        this.toast.show({ text: this.i18n.translate(deleteErrorKey(err)), kind: 'error' });
+        this.toast.show(this.i18n.translate(deleteErrorKey(err)), 'error');
       },
     });
   }

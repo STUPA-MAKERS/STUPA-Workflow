@@ -264,11 +264,10 @@ export class WebhooksComponent {
         if (idx === null && !this.delivery().has(saved.id)) {
           this.delivery.update((m) => withEntry(m, saved.id, neverDelivered(saved.id)));
         }
-        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
         this.close();
       },
-      error: () =>
-        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' }),
+      error: () => this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error'),
     });
   }
 
@@ -304,7 +303,7 @@ export class WebhooksComponent {
       error: () => {
         this.setToggling(hook.id, false);
         this.hooks.update((list) => withActive(list, hook.id, before));
-        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
+        this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
       },
     });
   }
@@ -321,10 +320,9 @@ export class WebhooksComponent {
         this.hooks.update((list) => list.filter((h) => h.id !== hook.id));
         this.delivery.update((m) => new Map([...m].filter(([id]) => id !== hook.id)));
         this.confirmDelete.set(null);
-        this.toast.show({ text: this.i18n.translate('admin.webhook.deleted'), kind: 'success' });
+        this.toast.show(this.i18n.translate('admin.webhook.deleted'), 'success');
       },
-      error: () =>
-        this.toast.show({ text: this.i18n.translate('admin.webhook.deleteFailed'), kind: 'error' }),
+      error: () => this.toast.show(this.i18n.translate('admin.webhook.deleteFailed'), 'error'),
     });
   }
 }

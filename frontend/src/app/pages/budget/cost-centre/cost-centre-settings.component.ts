@@ -375,17 +375,11 @@ export class CostCentreSettingsComponent {
       )
       .subscribe({
         next: () => {
-          this.toast.show({
-            text: this.i18n.translate('budget.tree.toast.saved'),
-            kind: 'success',
-          });
+          this.toast.show(this.i18n.translate('budget.tree.toast.saved'), 'success');
           this.tell();
         },
         error: (err: unknown) => {
-          this.toast.show({
-            text: this.i18n.translate(costCentreError(problemCode(err))),
-            kind: 'error',
-          });
+          this.toast.show(this.i18n.translate(costCentreError(problemCode(err))), 'error');
           this.sent = Object.fromEntries([
             ...Object.entries(this.sent).filter(([k]) => k !== key),
             ...(before ? [[key, before]] : []),

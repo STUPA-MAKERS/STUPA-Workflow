@@ -1087,10 +1087,7 @@ export class TodosComponent implements OnDestroy {
         if (now) this.board.set(replaceTile(now, tile));
       },
       error: (err: unknown) => {
-        this.toast.show({
-          text: this.i18n.translate(moveErrorText(err, 'todos.error.move')),
-          kind: 'error',
-        });
+        this.toast.show(this.i18n.translate(moveErrorText(err, 'todos.error.move')), 'error');
         if (this.board() === optimistic) this.board.set(board);
         this.resync(board.id);
       },
@@ -1115,8 +1112,7 @@ export class TodosComponent implements OnDestroy {
       .createCard({ boardId: board.id, columnId: event.columnId, title: event.title })
       .subscribe({
         next: (card) => this.onCreated(card),
-        error: () =>
-          this.toast.show({ text: this.i18n.translate('todos.error.create'), kind: 'error' }),
+        error: () => this.toast.show(this.i18n.translate('todos.error.create'), 'error'),
       });
   }
 
@@ -1254,19 +1250,16 @@ export class TodosComponent implements OnDestroy {
         this.onTransferred({ card, fromBoardId: req.boardId });
         this.onCardChanged(card);
         if (!this.board()) this.refreshBoards();
-        this.toast.show({
-          text: this.i18n.translate('todos.card.transferred', { board: target.boardName }),
-          kind: 'success',
-        });
+        this.toast.show(
+          this.i18n.translate('todos.card.transferred', { board: target.boardName }),
+          'success',
+        );
         this.tileMenu.set(null);
       },
       error: (err: unknown) => {
         this.tileTransferring.set(false);
         this.tileTransferOpen.set(false);
-        this.toast.show({
-          text: this.i18n.translate(moveErrorText(err, 'todos.error.transfer')),
-          kind: 'error',
-        });
+        this.toast.show(this.i18n.translate(moveErrorText(err, 'todos.error.transfer')), 'error');
         const board = this.board();
         if (board) this.resync(board.id);
         this.rowsView()?.refresh();
@@ -1328,10 +1321,7 @@ export class TodosComponent implements OnDestroy {
 
   /** Roll a refused drag between the board and the rows back, then read both again. */
   private transferFailed(board: TodoBoard, optimistic: TodoBoard, err: unknown): void {
-    this.toast.show({
-      text: this.i18n.translate(moveErrorText(err, 'todos.error.transfer')),
-      kind: 'error',
-    });
+    this.toast.show(this.i18n.translate(moveErrorText(err, 'todos.error.transfer')), 'error');
     if (this.board() === optimistic) this.board.set(board);
     this.resync(board.id);
     this.rowsView()?.refresh();

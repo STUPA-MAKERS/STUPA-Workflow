@@ -43,7 +43,8 @@ export function toastWith(
   // A plain toast of a mocked kind goes only to the jest function, as `success(text)` did:
   // a real one would hold a timer that `whenStable` waits for. A toast with an action or one
   // that stays (the load error toast) is real.
-  const show = (o: ToastOptions): number => {
+  const show = (arg: ToastOptions | string, kind?: ToastKind): number => {
+    const o: ToastOptions = typeof arg === 'string' ? { text: arg, kind } : arg;
     const fn = m[o.kind ?? 'info'];
     if (fn && !o.action && !o.sticky) {
       fn(o.text);

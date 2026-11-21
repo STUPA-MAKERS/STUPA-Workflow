@@ -166,10 +166,7 @@ export class ForceStatusDialogComponent {
         next: () => {
           this.saving.set(false);
           this.open.set(false);
-          this.toast.show({
-            text: this.i18n.translate('applications.actions.success'),
-            kind: 'success',
-          });
+          this.toast.show(this.i18n.translate('applications.actions.success'), 'success');
           this.done.emit();
         },
         error: (err: { status?: number }) => {
@@ -182,7 +179,7 @@ export class ForceStatusDialogComponent {
                 : err.status === 409
                   ? 'applications.actions.conflict'
                   : 'applications.actions.error';
-          this.toast.show({ text: this.i18n.translate(key), kind: 'error' });
+          this.toast.show(this.i18n.translate(key), 'error');
         },
       });
   }

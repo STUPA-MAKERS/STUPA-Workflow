@@ -203,10 +203,9 @@ export class AdminRolesComponent {
     this.api.deleteRole(role.id).subscribe({
       next: () => {
         this.roles.update((list) => list.filter((r) => r.id !== role.id));
-        this.toast.show({ text: this.i18n.translate('admin.roles.deleted'), kind: 'success' });
+        this.toast.show(this.i18n.translate('admin.roles.deleted'), 'success');
       },
-      error: () =>
-        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' }),
+      error: () => this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error'),
     });
   }
 
@@ -288,11 +287,11 @@ export class AdminRolesComponent {
         this.nameDrafts.update((m) =>
           Object.fromEntries(Object.entries(m).filter(([id]) => !savedIds.has(id))),
         );
-        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
       },
       error: () => {
         this.savingRoles.set(false);
-        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
+        this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
       },
     });
   }
@@ -328,7 +327,7 @@ export class AdminRolesComponent {
         this.keepSaved([role]);
         this.expanded.open(role.id);
         this.addOpen.set(false);
-        this.toast.show({ text: this.i18n.translate('admin.roles.created'), kind: 'success' });
+        this.toast.show(this.i18n.translate('admin.roles.created'), 'success');
       },
       error: (err: { status?: number }) => {
         this.creating.set(false);
@@ -337,7 +336,7 @@ export class AdminRolesComponent {
         } else if (err?.status === 409) {
           this.serverKeyError.set(this.i18n.translate('admin.roles.keyTaken'));
         } else {
-          this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
+          this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
         }
       },
     });

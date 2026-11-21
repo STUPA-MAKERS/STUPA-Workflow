@@ -246,7 +246,7 @@ export class OutsideDecisionDialogComponent {
       next: () => {
         this.saving.set(false);
         this.open.set(false);
-        this.toast.show({ text: this.i18n.translate('outsideDecision.saved'), kind: 'success' });
+        this.toast.show(this.i18n.translate('outsideDecision.saved'), 'success');
         this.done.emit();
       },
       error: (err: { status?: number; error?: ProblemDetail | null }) => {
@@ -257,22 +257,19 @@ export class OutsideDecisionDialogComponent {
           return;
         }
         if (err.status === 409) {
-          this.toast.show({
-            text: this.i18n.translate('outsideDecision.error.state'),
-            kind: 'error',
-          });
+          this.toast.show(this.i18n.translate('outsideDecision.error.state'), 'error');
           this.open.set(false);
           this.done.emit();
           return;
         }
-        this.toast.show({
-          text: this.i18n.translate(
+        this.toast.show(
+          this.i18n.translate(
             err.status === 403
               ? 'applications.transitions.forbidden'
               : 'applications.actions.error',
           ),
-          kind: 'error',
-        });
+          'error',
+        );
       },
     });
   }

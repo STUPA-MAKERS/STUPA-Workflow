@@ -113,10 +113,7 @@ export class MeetingDialogsService {
     this.api.patchMeeting(m.id, { protokollantId: principalId }).subscribe({
       next: (updated) => {
         this.applyUpdated(updated);
-        this.toast.show({
-          text: this.i18n.translate('meetings.toast.protokollantSet'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('meetings.toast.protokollantSet'), 'success');
       },
       error: (err: unknown) => this.keeperChangeFailed(err),
     });
@@ -148,12 +145,12 @@ export class MeetingDialogsService {
         this.handoverSaving.set(false);
         this.closeHandover();
         this.applyUpdated(updated);
-        this.toast.show({
-          text: this.i18n.translate(
+        this.toast.show(
+          this.i18n.translate(
             mode === 'now' ? 'meetings.toast.handedOver' : 'meetings.toast.handoverPlanned',
           ),
-          kind: 'success',
-        });
+          'success',
+        );
       },
       error: (err: unknown) => {
         this.handoverSaving.set(false);
@@ -172,10 +169,7 @@ export class MeetingDialogsService {
     this.api.cancelProtokollantHandover(m.id).subscribe({
       next: (updated) => {
         this.applyUpdated(updated);
-        this.toast.show({
-          text: this.i18n.translate('meetings.toast.handoverDiscarded'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('meetings.toast.handoverDiscarded'), 'success');
       },
       error: (err: unknown) => this.keeperChangeFailed(err),
     });
@@ -183,14 +177,11 @@ export class MeetingDialogsService {
 
   private keeperChangeFailed(err: unknown): void {
     if (problemCode(err) === 'protokollant_needs_protocol_write') {
-      this.toast.show({
-        text: this.i18n.translate('meetings.toast.needsProtocolWrite'),
-        kind: 'error',
-      });
+      this.toast.show(this.i18n.translate('meetings.toast.needsProtocolWrite'), 'error');
       return;
     }
     const detail = problemDetail(err);
     const base = this.i18n.translate('meetings.toast.actionFailed');
-    this.toast.show({ text: detail ? `${base}: ${detail}` : base, kind: 'error' });
+    this.toast.show(detail ? `${base}: ${detail}` : base, 'error');
   }
 }

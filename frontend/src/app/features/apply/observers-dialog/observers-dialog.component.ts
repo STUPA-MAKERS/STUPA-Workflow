@@ -110,7 +110,7 @@ export class ObserversDialogComponent {
       error: () => {
         this.observers.set([]);
         this.loading.set(false);
-        this.toast.show({ text: this.i18n.translate('observers.error.load'), kind: 'error' });
+        this.toast.show(this.i18n.translate('observers.error.load'), 'error');
       },
     });
   }
@@ -126,7 +126,7 @@ export class ObserversDialogComponent {
         this.observers.update((list) => [...list, row]);
         this.text.set('');
         this.saving.set(false);
-        this.toast.show({ text: this.i18n.translate('observers.added'), kind: 'success' });
+        this.toast.show(this.i18n.translate('observers.added'), 'success');
       },
       error: (err: unknown) => {
         this.saving.set(false);
@@ -135,7 +135,7 @@ export class ObserversDialogComponent {
         if (refusal) this.error.set(refusal);
         else if (code === '' && (err as { status?: number }).status === 422)
           this.error.set('observers.error.email');
-        else this.toast.show({ text: this.i18n.translate('observers.error.save'), kind: 'error' });
+        else this.toast.show(this.i18n.translate('observers.error.save'), 'error');
       },
     });
   }
@@ -146,10 +146,9 @@ export class ObserversDialogComponent {
     this.api.removeApplicationObserver(this.applicationId(), observerId).subscribe({
       next: () => {
         this.observers.update((list) => list.filter((o) => o.id !== observerId));
-        this.toast.show({ text: this.i18n.translate('observers.removed'), kind: 'success' });
+        this.toast.show(this.i18n.translate('observers.removed'), 'success');
       },
-      error: () =>
-        this.toast.show({ text: this.i18n.translate('observers.error.save'), kind: 'error' }),
+      error: () => this.toast.show(this.i18n.translate('observers.error.save'), 'error'),
     });
   }
 

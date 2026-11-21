@@ -199,7 +199,7 @@ export class GremiumRoleDialogComponent {
           );
         } else {
           this.serverKeyError.set('');
-          this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
+          this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
         }
       },
     });

@@ -206,16 +206,10 @@ export class BackupsComponent implements OnDestroy {
         next: (fresh) => {
           this.rows.update((rows) => rows.map((r) => (r.id === fresh.id ? fresh : r)));
           if (fresh.status === 'failed') {
-            this.toast.show({
-              text: this.i18n.translate('admin.backups.toast.failed'),
-              kind: 'error',
-            });
+            this.toast.show(this.i18n.translate('admin.backups.toast.failed'), 'error');
           }
           if (fresh.status === 'done') {
-            this.toast.show({
-              text: this.i18n.translate('admin.backups.toast.created'),
-              kind: 'success',
-            });
+            this.toast.show(this.i18n.translate('admin.backups.toast.created'), 'success');
           }
           this.syncPolling();
         },
@@ -242,7 +236,7 @@ export class BackupsComponent implements OnDestroy {
         this.rows.update((rows) => [row, ...rows]);
         this.createNote.set('');
         this.creating.set(false);
-        this.toast.show({ text: this.i18n.translate('admin.backups.toast.started') });
+        this.toast.show(this.i18n.translate('admin.backups.toast.started'));
         this.syncPolling();
       },
       error: () => this.creating.set(false),
@@ -307,10 +301,7 @@ export class BackupsComponent implements OnDestroy {
       next: (row) => {
         this.rows.update((rows) => [row, ...rows]);
         this.busy.set(false);
-        this.toast.show({
-          text: this.i18n.translate('admin.backups.toast.imported'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('admin.backups.toast.imported'), 'success');
       },
       error: () => this.busy.set(false),
     });
@@ -349,10 +340,7 @@ export class BackupsComponent implements OnDestroy {
       next: () => {
         this.confirmRestore.set(null);
         this.busy.set(false);
-        this.toast.show({
-          text: this.i18n.translate('admin.backups.toast.restoreStarted'),
-          kind: 'warning',
-        });
+        this.toast.show(this.i18n.translate('admin.backups.toast.restoreStarted'), 'warning');
       },
       error: () => this.busy.set(false),
     });

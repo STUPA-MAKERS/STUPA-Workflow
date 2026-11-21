@@ -311,13 +311,13 @@ export class MeetingSettingsDialogComponent {
           this.guestsSvc.joinLink.set(link);
           this.guestsSvc.reload();
         }
-        this.toast.show({ text: this.i18n.translate('guests.toast.rotated'), kind: 'success' });
+        this.toast.show(this.i18n.translate('guests.toast.rotated'), 'success');
       },
       error: (err: unknown) => {
         this.rotating.set(false);
         const detail = problemDetail(err);
         const base = this.i18n.translate('meetings.toast.actionFailed');
-        this.toast.show({ text: detail ? `${base}: ${detail}` : base, kind: 'error' });
+        this.toast.show(detail ? `${base}: ${detail}` : base, 'error');
       },
     });
   }
@@ -337,29 +337,23 @@ export class MeetingSettingsDialogComponent {
     if (!m || this.saving() || this.locked()) return;
     const title = this.title().trim();
     if (!title || this.titleTooLong()) {
-      this.toast.show({
-        text: this.titleError() || this.i18n.translate('meetings.toast.titleRequired'),
-        kind: 'error',
-      });
+      this.toast.show(
+        this.titleError() || this.i18n.translate('meetings.toast.titleRequired'),
+        'error',
+      );
       return;
     }
     if (this.repeatOfMissing()) {
-      this.toast.show({ text: this.i18n.translate('meetings.repeatOf.required'), kind: 'error' });
+      this.toast.show(this.i18n.translate('meetings.repeatOf.required'), 'error');
       return;
     }
     if (!this.valid()) {
-      this.toast.show({
-        text: this.i18n.translate('meetings.toast.dateTimeRequired'),
-        kind: 'error',
-      });
+      this.toast.show(this.i18n.translate('meetings.toast.dateTimeRequired'), 'error');
       return;
     }
     const end = this.endTime().trim();
     if (end && end <= this.time().trim()) {
-      this.toast.show({
-        text: this.i18n.translate('meetings.create.endBeforeStart'),
-        kind: 'error',
-      });
+      this.toast.show(this.i18n.translate('meetings.create.endBeforeStart'), 'error');
       return;
     }
     this.saving.set(true);
@@ -376,50 +370,35 @@ export class MeetingSettingsDialogComponent {
       .subscribe({
         next: (updated) => {
           this.saving.set(false);
-          this.toast.show({
-            text: this.i18n.translate('meetings.toast.settingsSaved'),
-            kind: 'success',
-          });
+          this.toast.show(this.i18n.translate('meetings.toast.settingsSaved'), 'success');
           this.saved.emit(updated);
         },
         error: (err: unknown) => {
           this.saving.set(false);
           if (problemCode(err) === 'protokollant_needs_protocol_write') {
-            this.toast.show({
-              text: this.i18n.translate('meetings.toast.needsProtocolWrite'),
-              kind: 'error',
-            });
+            this.toast.show(this.i18n.translate('meetings.toast.needsProtocolWrite'), 'error');
             return;
           }
           if (problemCode(err) === 'protocol_final') {
-            this.toast.show({
-              text: this.i18n.translate('meetings.settings.closedHint'),
-              kind: 'error',
-            });
+            this.toast.show(this.i18n.translate('meetings.settings.closedHint'), 'error');
             return;
           }
           const code = problemCode(err);
           if (code === 'repeat_first_meeting_invalid' || code === 'repeat_needs_first_meeting') {
-            this.toast.show({
-              text: this.i18n.translate('meetings.repeatOf.invalid'),
-              kind: 'error',
-            });
+            this.toast.show(this.i18n.translate('meetings.repeatOf.invalid'), 'error');
             return;
           }
           if (code === 'guests_vote_off' || code === 'guests_vote_needs_no_quorum') {
-            this.toast.show({ text: this.i18n.translate('guests.toast.voteOff'), kind: 'error' });
+            this.toast.show(this.i18n.translate('guests.toast.voteOff'), 'error');
             return;
           }
           if (problemCode(err) === 'guest_vote_open') {
-            this.toast.show({
-              text: this.i18n.translate('guests.toast.guestVoteOpen'),
-              kind: 'error',
-            });
+            this.toast.show(this.i18n.translate('guests.toast.guestVoteOpen'), 'error');
             return;
           }
           const detail = problemDetail(err);
           const base = this.i18n.translate('meetings.toast.actionFailed');
-          this.toast.show({ text: detail ? `${base}: ${detail}` : base, kind: 'error' });
+          this.toast.show(detail ? `${base}: ${detail}` : base, 'error');
         },
       });
   }

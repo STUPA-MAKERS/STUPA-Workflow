@@ -248,16 +248,16 @@ export class FeaturesComponent {
         this.saving.set(false);
         this.apply(switches);
         this.features.saved(enabledFeatures(switches));
-        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
       },
       error: (err: { status?: number; error?: { code?: string; errors?: unknown } } | null) => {
         this.saving.set(false);
         const inUse = err?.status === 409 && err.error?.code === 'feature_in_use';
         this.uses.set(inUse ? usesOf(err.error?.errors) : []);
-        this.toast.show({
-          text: this.i18n.translate(inUse ? 'admin.features.inUse' : 'admin.common.saveFailed'),
-          kind: 'error',
-        });
+        this.toast.show(
+          this.i18n.translate(inUse ? 'admin.features.inUse' : 'admin.common.saveFailed'),
+          'error',
+        );
       },
     });
   }

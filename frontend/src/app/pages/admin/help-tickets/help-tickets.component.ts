@@ -222,10 +222,7 @@ export class HelpTicketsComponent {
           return;
         }
         this.unblocking.set(null);
-        this.toast.show({
-          text: this.i18n.translate('admin.helpTickets.error.unblock'),
-          kind: 'error',
-        });
+        this.toast.show(this.i18n.translate('admin.helpTickets.error.unblock'), 'error');
       },
     });
   }
@@ -234,7 +231,7 @@ export class HelpTicketsComponent {
     const at = (this.blocked() ?? []).findIndex((x) => x.id === b.id);
     this.unblocking.set(null);
     this.blocked.update((list) => (list ?? []).filter((x) => x.id !== b.id));
-    this.toast.show({ text: this.i18n.translate('admin.helpTickets.unblocked'), kind: 'success' });
+    this.toast.show(this.i18n.translate('admin.helpTickets.unblocked'), 'success');
     afterNextRender(() => this.focusAfterUnblock(at), { injector: this.injector });
   }
 

@@ -299,11 +299,7 @@ export class AdminTranslationsComponent {
     if (this.stored()[code] === undefined) {
       this.api.texts(code).subscribe({
         next: (t) => this.stored.update((s) => ({ ...s, [code]: t.overrides })),
-        error: () =>
-          this.toast.show({
-            text: this.i18n.translate('admin.translations.loadError'),
-            kind: 'error',
-          }),
+        error: () => this.toast.show(this.i18n.translate('admin.translations.loadError'), 'error'),
       });
     }
   }
@@ -363,11 +359,11 @@ export class AdminTranslationsComponent {
         for (const r of results) this.i18n.applyOverrides(r.locale, r.overrides);
         this.draft.set({});
         this.saving.set(false);
-        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
       },
       error: () => {
         this.saving.set(false);
-        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
+        this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
       },
     });
   }
@@ -398,7 +394,7 @@ export class AdminTranslationsComponent {
       error: () => {
         this.toggling.set(null);
         this.replaceLanguage({ ...lang });
-        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
+        this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
       },
     });
   }
@@ -455,8 +451,7 @@ export class AdminTranslationsComponent {
         this.dialogBusy.set(false);
         const conflict = err instanceof HttpErrorResponse && err.status === 409;
         this.dialogError.set(conflict ? 'admin.translations.codeTaken' : null);
-        if (!conflict)
-          this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
+        if (!conflict) this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
       },
     });
   }
@@ -470,13 +465,12 @@ export class AdminTranslationsComponent {
         this.languages.update((list) => list.filter((l) => l.code !== lang.code));
         this.draft.update((d) => Object.fromEntries(Object.entries(d).filter(([loc]) => loc !== lang.code)));
         if (this.locale() === lang.code) this.locale.set('de');
-        this.toast.show({
-          text: this.i18n.translate('admin.translations.deleted', { name: lang.name }),
-          kind: 'success',
-        });
+        this.toast.show(
+          this.i18n.translate('admin.translations.deleted', { name: lang.name }),
+          'success',
+        );
       },
-      error: () =>
-        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' }),
+      error: () => this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error'),
     });
   }
 

@@ -1,6 +1,9 @@
 import { type ToastKind, type ToastOptions, ToastService } from '@stupa-makers/ui-kit';
 
-/** One jest function per toast kind; `show({ text, kind })` calls the one of its kind with the text. */
+/**
+ * One jest function per toast kind; `show({ text, kind })` and `show(text, kind)` call the one of
+ * its kind with the text.
+ */
 export type ToastKindSpies = { readonly [K in ToastKind]: jest.Mock };
 
 const KINDS: readonly ToastKind[] = ['info', 'success', 'warning', 'error'];
@@ -16,7 +19,8 @@ export function kindSpies<T extends object>(target: T): T & ToastKindSpies & { s
   if (t[MARK]) return t;
   const spies = Object.fromEntries(KINDS.map((k) => [k, jest.fn()])) as ToastKindSpies;
   const inner = (target as { show?: (o: ToastOptions) => number }).show?.bind(target);
-  const show = jest.fn((o: ToastOptions) => {
+  const show = jest.fn((arg: ToastOptions | string, kind?: ToastKind) => {
+    const o: ToastOptions = typeof arg === 'string' ? { text: arg, kind } : arg;
     spies[o.kind ?? 'info'](o.text);
     return inner ? inner(o) : 1;
   });

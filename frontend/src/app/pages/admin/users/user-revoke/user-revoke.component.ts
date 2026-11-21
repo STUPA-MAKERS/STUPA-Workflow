@@ -406,7 +406,7 @@ export class UserRevokeComponent {
     this.api.revokePrincipal(p.principal.id, { ...ids, deactivate: this.deactivate() }).subscribe({
       next: (res) => {
         this.submitting.set(false);
-        this.toast.show({ text: this.i18n.translate('admin.users.revoke.done'), kind: 'success' });
+        this.toast.show(this.i18n.translate('admin.users.revoke.done'), 'success');
         this.revoked.emit(res);
         this.close();
       },

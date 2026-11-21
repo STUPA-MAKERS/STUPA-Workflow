@@ -183,18 +183,12 @@ export class LeadSubstituteDialogComponent {
       .subscribe({
         next: (d) => {
           this.busy.set(false);
-          this.toast.show({
-            text: this.i18n.translate('meetings.leadSubstitute.created'),
-            kind: 'success',
-          });
+          this.toast.show(this.i18n.translate('meetings.leadSubstitute.created'), 'success');
           this.created.emit(d);
         },
         error: () => {
           this.busy.set(false);
-          this.toast.show({
-            text: this.i18n.translate('meetings.leadSubstitute.failed'),
-            kind: 'error',
-          });
+          this.toast.show(this.i18n.translate('meetings.leadSubstitute.failed'), 'error');
         },
       });
   }

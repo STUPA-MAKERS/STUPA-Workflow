@@ -113,18 +113,12 @@ export class GremiumDefaultsDialogComponent {
     this.api.putGremiumDefaults(body).subscribe({
       next: () => {
         this.saving.set(false);
-        this.toast.show({
-          text: this.i18n.translate('admin.gremien.defaults.saved'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('admin.gremien.defaults.saved'), 'success');
         this.closed.emit();
       },
       error: () => {
         this.saving.set(false);
-        this.toast.show({
-          text: this.i18n.translate('admin.gremien.defaults.saveFailed'),
-          kind: 'error',
-        });
+        this.toast.show(this.i18n.translate('admin.gremien.defaults.saveFailed'), 'error');
       },
     });
   }

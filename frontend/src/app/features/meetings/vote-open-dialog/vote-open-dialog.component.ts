@@ -576,23 +576,23 @@ export class VoteOpenDialogComponent {
     request.subscribe({
       next: (updated) => {
         this.submitting.set(false);
-        this.toast.show({
-          text: this.i18n.translate(
+        this.toast.show(
+          this.i18n.translate(
             src?.mode === 'edit'
               ? 'meetings.toast.voteSaved'
               : prepare
                 ? 'meetings.toast.votePrepared'
                 : 'meetings.toast.voteOpened',
           ),
-          kind: 'success',
-        });
+          'success',
+        );
         this.opened.emit(updated);
       },
       error: (err: unknown) => {
         this.submitting.set(false);
         const detail = problemDetail(err);
         const base = this.i18n.translate('meetings.toast.actionFailed');
-        this.toast.show({ text: detail ? `${base}: ${detail}` : base, kind: 'error' });
+        this.toast.show(detail ? `${base}: ${detail}` : base, 'error');
       },
     });
   }
