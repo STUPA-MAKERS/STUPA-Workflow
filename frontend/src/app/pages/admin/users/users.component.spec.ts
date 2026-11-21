@@ -504,4 +504,10 @@ describe('UsersComponent', () => {
       );
     });
   });
+
+  it('gives the records screen loading rows while the first read is out', async () => {
+    const { inst } = await setup();
+    inst.loading.set(true);
+    expect(inst.rows()).toEqual({ state: 'loading' });
+  });
 });

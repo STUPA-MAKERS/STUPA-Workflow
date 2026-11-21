@@ -407,4 +407,12 @@ describe('AdminRolesComponent', () => {
     inst.onAction('add');
     expect(inst.addOpen()).toBe(true);
   });
+
+  it('gives the records screen loading rows, and saves nothing without a change', async () => {
+    const { inst, api } = await setup();
+    inst.loading.set(true);
+    expect(inst.rows()).toEqual({ state: 'loading' });
+    inst.onAction('save');
+    expect(api.saveRolePermissions).not.toHaveBeenCalled();
+  });
 });
