@@ -2,7 +2,8 @@ import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angul
 import { render, screen, within } from '@testing-library/angular';
 import { Meta } from '@angular/platform-browser';
 import { TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
+import type { PublicGremium } from './public-protocols.models';
 import { PublicGremienComponent } from './public-gremien.component';
 import { PublicProtocolsService } from './public-protocols.service';
 
@@ -72,18 +73,30 @@ describe('PublicGremienComponent', () => {
     expect(screen.getByRole('link', { name: /AStA/ })).toHaveAttribute('href', '/protocols/asta');
   });
 
+  /** The Gremien answer after the render, so the router spy is in place before the redirect. */
+  async function oldLink(committee: readonly string[]) {
+    const answer = new Subject<PublicGremium[]>();
+    await setup('decisions', makeApi({ gremien: jest.fn(() => answer) }), committee);
+    const navigate = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    answer.next(GREMIEN);
+    answer.complete();
+    return navigate;
+  }
+
   /** Spec 002404: an old link with one public Gremium opens its page. */
   it('opens the page of the gremium of an old filter link', async () => {
-    const navigate = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-    await setup('decisions', makeApi(), ['g-1']);
+    const navigate = await oldLink(['g-1']);
     expect(navigate).toHaveBeenCalledWith(['/', 'decisions', 'stupa'], { replaceUrl: true });
   });
 
-  it('stays on the list for an old link with several or unknown gremien', async () => {
-    const navigate = jest.spyOn(TestBed.inject(Router), 'navigate');
-    await setup('protocols', makeApi(), ['g-1', 'g-2']);
-    expect(screen.getAllByRole('listitem')).toHaveLength(2);
-    await setup('protocols', makeApi(), ['g-x']);
+  it('stays on the list for an old link with several gremien', async () => {
+    const navigate = await oldLink(['g-1', 'g-2']);
+    expect(navigate).not.toHaveBeenCalled();
+    expect(await screen.findAllByRole('listitem')).toHaveLength(2);
+  });
+
+  it('stays on the list for an old link with an unknown gremium', async () => {
+    const navigate = await oldLink(['g-x']);
     expect(navigate).not.toHaveBeenCalled();
   });
 
