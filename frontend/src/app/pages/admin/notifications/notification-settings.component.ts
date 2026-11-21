@@ -66,7 +66,7 @@ export class NotificationSettingsComponent {
 
   /** The state of the settings screen (§ui-kit:002244). */
   protected readonly screenState = computed<SettingsState>(() => {
-    if (this.loading()) return { state: 'loading', lines: 4 };
+    if (this.loading()) return { state: 'loading', skeleton: { variant: 'lines', count: 4 } };
     if (!this.settings())
       return {
         state: 'error',

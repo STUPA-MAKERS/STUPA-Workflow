@@ -1,28 +1,8 @@
-<section class="nt">
-  <app-page-header
-    [flush]="true"
-    [title]="'account.notifications.title' | t"
-  >
-    <app-breadcrumbs crumbs />
-  </app-page-header>
-
-  @if (error(); as e) {
-    <app-note kind="error" icon="alert" role="alert">{{ e | t }}</app-note>
-  }
-
-  @if (loading()) {
-    <app-skeleton variant="rows" [count]="6" [label]="'common.loading' | t" />
-  } @else if (rows().length > 0) {
-    <ul class="rowgroup rowgroup--settings nt__list" [attr.aria-label]="'account.notifications.title' | t">
-      @for (p of rows(); track p.kind) {
-        <li class="nt__row">
-          <app-switch [checked]="p.enabled" (checkedChange)="toggle(p.kind, $event)">
-            <span class="nt__label">{{ kindLabel(p.kind) }}</span>
-          </app-switch>
-        </li>
-      }
-    </ul>
-  } @else if (!error()) {
-    <app-empty-state icon="bell" [heading]="'account.notifications.empty' | t" />
-  }
-</section>
+<app-settings-screen
+  [head]="{ title: 'account.notifications.title' | t }"
+  [groups]="groups()"
+  [state]="screenState()"
+  [notice]="notice()"
+  [empty]="error() ? null : { icon: 'bell', heading: 'account.notifications.empty' | t }"
+  (change)="toggle($event.key, $event.value)"
+/>
