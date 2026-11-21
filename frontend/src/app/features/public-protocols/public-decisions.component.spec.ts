@@ -182,7 +182,7 @@ describe('PublicDecisionsComponent', () => {
       .mockReturnValue(of(GREMIEN));
     const { api } = await setup(makeApi({ gremien }));
     expect(api.decisions).not.toHaveBeenCalled();
-    toasts['showAction'].mock.calls[0][0].closed('action');
+    toasts['show'].mock.calls[0][0].closed('action');
     expect(api.decisions).toHaveBeenCalledWith(expect.objectContaining({ gremium: ['g-1'] }));
   });
 
@@ -300,8 +300,10 @@ describe('PublicDecisionsComponent', () => {
 
   it('reports a failed list', async () => {
     await setup(makeApi({ decisions: jest.fn(() => throwError(() => new Error('down'))) }));
-    expect(toasts['showAction']).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining('Die Beschlüsse konnten nicht geladen werden.') }),
+    expect(toasts['show']).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining('Die Beschlüsse konnten nicht geladen werden.'),
+      }),
     );
   });
 

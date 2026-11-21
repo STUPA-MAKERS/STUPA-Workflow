@@ -6,6 +6,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import type { Backup, BackupList } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { BackupsComponent } from './backups.component';
+import { toastMock } from '../../../../testing/toast';
 
 const DONE: Backup = {
   id: 'b-1',
@@ -345,7 +346,7 @@ describe('BackupsComponent', () => {
         listBackups: jest.fn(() => of(list({ items: [RUNNING] }))),
         getBackup: jest.fn(() => of({ ...RUNNING, status: 'failed' as const, error: 'pg_dump failed' })),
       });
-      const toast = { success: jest.fn(), error: jest.fn(), show: jest.fn() };
+      const toast = toastMock();
       const view = await render(BackupsComponent, {
         providers: [
           { provide: AdminApiService, useValue: api },

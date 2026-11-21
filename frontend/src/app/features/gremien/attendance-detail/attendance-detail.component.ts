@@ -36,6 +36,7 @@ import {
   SkeletonComponent,
   StatusTextComponent,
   watchAnchoredPopover,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { dayMonth, monthYear } from '@shared/date-format';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
@@ -97,6 +98,7 @@ export const ATTENDANCE_STATE: Record<GremiumAttendanceState, StatusView> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBodyDirective,
     FocusDialogDirective,
     LoadErrorComponent,
     EmptyStateComponent,

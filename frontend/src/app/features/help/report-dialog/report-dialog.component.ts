@@ -43,6 +43,7 @@ import {
   ToastService,
   ErrorTextComponent,
   FactsComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { scanStatus } from '@shared/status-kind.util';
 import { AltchaComponent } from '../../apply/altcha.component';
@@ -99,6 +100,7 @@ const KIND_LABEL: Record<TicketKind, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     FactsComponent,
     ErrorTextComponent,
     TextareaComponent,
@@ -310,13 +312,16 @@ export class ReportDialogComponent {
   async addFiles(files: readonly File[]): Promise<void> {
     const room = MAX_TICKET_FILES - this.drafts.count() - this.pending().length;
     if (files.length > room) {
-      this.toast.error(this.i18n.translate('help.report.tooManyFiles', { max: MAX_TICKET_FILES }));
+      this.toast.show({
+        text: this.i18n.translate('help.report.tooManyFiles', { max: MAX_TICKET_FILES }),
+        kind: 'error',
+      });
     }
     const take = files.slice(0, Math.max(0, room));
     if (!take.length) return;
     const { failed } = await this.drafts.upload(take);
     for (const f of failed) {
-      this.toast.error(`${f.filename}: ${this.i18n.translate(f.reason)}`);
+      this.toast.show({ text: `${f.filename}: ${this.i18n.translate(f.reason)}`, kind: 'error' });
     }
   }
 
@@ -329,7 +334,8 @@ export class ReportDialogComponent {
 
   async removeFile(file: DraftFile): Promise<void> {
     const ok = await this.drafts.remove(file.id);
-    if (!ok) this.toast.error(this.i18n.translate('help.report.removeFailed'));
+    if (!ok)
+      this.toast.show({ text: this.i18n.translate('help.report.removeFailed'), kind: 'error' });
   }
 
   /** Abbrechen, the close button, Escape or the backdrop. The draft and its files stay. */

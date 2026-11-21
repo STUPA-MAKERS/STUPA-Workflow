@@ -7,6 +7,7 @@ import { BudgetTreeApi, type BudgetTreeNode } from '../budget-tree.api';
 import { node } from '../plan/budget-plan.fixtures';
 import { PALETTE } from '../budget-color.util';
 import { CostCentreSettingsComponent } from './cost-centre-settings.component';
+import { kindSpies } from '../../../../testing/toast';
 
 const KS = node({ id: 'ks', parentId: 'top', key: '800', name: 'Kultur', color: ' #112233 ' });
 
@@ -22,7 +23,14 @@ async function setup(over: Partial<BudgetTreeNode> = {}, fail = '') {
   });
   const toast = TestBed.inject(ToastService);
   const field = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
-  return { ...view, api, saved, field, success: jest.spyOn(toast, 'success'), error: jest.spyOn(toast, 'error') };
+  return {
+    ...view,
+    api,
+    saved,
+    field,
+    success: jest.spyOn(kindSpies(toast), 'success'),
+    error: jest.spyOn(kindSpies(toast), 'error'),
+  };
 }
 
 /** Replace the text of a field and leave the field. */

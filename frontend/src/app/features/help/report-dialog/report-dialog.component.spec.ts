@@ -13,6 +13,7 @@ import type { UploadFailure } from '../../apply/draft-attachments.service';
 import { HelpService } from '../help.service';
 import type { ReportEnv } from '../report-context';
 import { MAX_TICKET_FILES, ReportDialogComponent } from './report-dialog.component';
+import { toastMock } from '../../../../testing/toast';
 
 class FakeDrafts {
   readonly files = signal<DraftFile[]>([]);
@@ -69,7 +70,7 @@ async function setup(
   const drafts = new FakeDrafts();
   const create =
     opts.create ?? jest.fn((_b: TicketCreate) => of<TicketCreated>({ number: 'T-0043' }));
-  const toast = { success: jest.fn(), error: jest.fn() };
+  const toast = toastMock();
   const auth = jest.fn();
   const view = await render(ReportDialogComponent, {
     componentProviders: [{ provide: DraftAttachmentsService, useValue: drafts }],

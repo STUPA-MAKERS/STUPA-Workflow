@@ -7,6 +7,7 @@ import type { MeetingOutWire, Transition } from '@core/api/models';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { runAxe } from '../../../../testing/a11y';
 import { AgendaDialogComponent } from './agenda-dialog.component';
+import { kindSpies } from '../../../../testing/toast';
 
 const G = 'g1';
 
@@ -113,7 +114,7 @@ describe('AgendaDialogComponent', () => {
     const { http, detectChanges, toast, done, fixture } = await setup();
     http.expectOne(LIST).flush(MEETINGS);
     detectChanges();
-    const success = jest.spyOn(toast, 'success');
+    const success = jest.spyOn(kindSpies(toast), 'success');
 
     await userEvent.click(screen.getByText('35. Sitzung'));
     await userEvent.click(screen.getByRole('switch', { name: /Nicht öffentlich/ }));
@@ -156,8 +157,16 @@ describe('AgendaDialogComponent', () => {
     detectChanges();
     await userEvent.click(screen.getByRole('button', { name: 'Auf Tagesordnung setzen' }));
     http.expectOne(FIRE).flush(
-      { status: 422, code: 'agenda_meeting_invalid', errors: [{ field: 'meetingId', msg: 'not planned' }] },
+      {
+        status: 422,
+        code: 'agenda_meeting_invalid',
+        errors: [{ field: 'meetingId', msg: 'not planned' }],
+      },
       { status: 422, statusText: 'Unprocessable' },
+    );
+    detectChanges();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Diese Sitzung nimmt keine Anträge mehr an.',
     );
     detectChanges();
     expect(screen.getByRole('alert')).toHaveTextContent('Diese Sitzung nimmt keine Anträge mehr an.');
@@ -185,7 +194,7 @@ describe('AgendaDialogComponent', () => {
     const { http, detectChanges, toast, done, fixture } = await setup();
     http.expectOne(LIST).flush(MEETINGS);
     detectChanges();
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     fixture.componentInstance.submit();
     http.expectOne(FIRE).flush({ code: 'conflict' }, { status: 409, statusText: 'Conflict' });
     expect(error).toHaveBeenCalledWith(
@@ -204,7 +213,7 @@ describe('AgendaDialogComponent', () => {
     const { http, detectChanges, toast, done, fixture } = await setup();
     http.expectOne(LIST).flush(MEETINGS);
     detectChanges();
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     fixture.componentInstance.submit();
     http.expectOne(FIRE).flush({ code: 'other' }, { status, statusText: 'x' });
     expect(error).toHaveBeenCalledWith(message);
@@ -222,7 +231,7 @@ describe('AgendaDialogComponent', () => {
     const { http, detectChanges, toast, done, fixture } = await setup();
     http.expectOne(LIST).flush([meeting({ status: 'closed' })]);
     detectChanges();
-    const success = jest.spyOn(toast, 'success');
+    const success = jest.spyOn(kindSpies(toast), 'success');
     expect(
       screen.getByText(
         'Keine geplante Sitzung sichtbar. Der Antrag kommt automatisch auf die nächste geplante Sitzung des Gremiums, falls es eine gibt.',

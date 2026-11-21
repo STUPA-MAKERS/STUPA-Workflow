@@ -17,6 +17,7 @@ import {
   StatusTextComponent,
   ToastService,
   FactsComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { CALENDAR_NOW } from '../calendar-grid.util';
 import { answerKey, answerKind, hasEnded, spanText } from '../calendar.util';
@@ -35,6 +36,7 @@ import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-lis
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     FactsComponent,
     AvatarComponent,
     ButtonComponent,
@@ -102,7 +104,10 @@ export class AppointmentDetailComponent {
       },
       error: () => {
         this.answering.set(false);
-        this.toast.error(this.i18n.translate('calendar.toast.answerFailed'));
+        this.toast.show({
+          text: this.i18n.translate('calendar.toast.answerFailed'),
+          kind: 'error',
+        });
       },
     });
   }
@@ -115,12 +120,15 @@ export class AppointmentDetailComponent {
       next: () => {
         this.removing.set(false);
         this.confirming.set(false);
-        this.toast.success(this.i18n.translate('calendar.toast.removed'));
+        this.toast.show({ text: this.i18n.translate('calendar.toast.removed'), kind: 'success' });
         this.removed.emit(a);
       },
       error: () => {
         this.removing.set(false);
-        this.toast.error(this.i18n.translate('calendar.toast.removeFailed'));
+        this.toast.show({
+          text: this.i18n.translate('calendar.toast.removeFailed'),
+          kind: 'error',
+        });
       },
     });
   }

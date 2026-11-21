@@ -34,6 +34,7 @@ import {
   type RowMenuItem,
   type RowMenuSection,
   ToastService,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import {
   TodoNewDialogComponent,
@@ -102,6 +103,7 @@ export interface AgendaMove {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     TopBadgeComponent,
     ConfirmDialogComponent,
     ButtonComponent,
@@ -469,7 +471,7 @@ export class AgendaPaneComponent {
           { kind: hit.kind, targetId: hit.targetId },
         ]);
       },
-      error: () => this.toast.error(this.i18n.translate('links.error.add')),
+      error: () => this.toast.show({ text: this.i18n.translate('links.error.add'), kind: 'error' }),
     });
   }
 

@@ -22,6 +22,7 @@ import {
   EmptyStateComponent,
   SelectFieldComponent,
   type SelectOption,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 
 /**
@@ -48,6 +49,7 @@ export function approvalCandidates(own: Meeting, all: readonly Meeting[]): reado
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     FormsModule,
     TranslatePipe,
     DialogComponent,

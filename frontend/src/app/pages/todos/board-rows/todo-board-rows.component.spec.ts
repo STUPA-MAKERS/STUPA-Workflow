@@ -19,7 +19,14 @@ import { TODAY, board, detail, tile } from '../../../../testing/todo-fixtures';
 import { type FakeTodoLive, provideFakeTodoLive } from '../../../../testing/todo-live';
 import { TodoLiveService } from '@core/ws/todo-live.service';
 import { DONE_PREVIEW } from '../board-view/todo-board-view.component';
-import { COLLAPSED_KEY, TodoBoardRowsComponent, boardRows, rowDropId, type RowLead } from './todo-board-rows.component';
+import {
+  COLLAPSED_KEY,
+  TodoBoardRowsComponent,
+  boardRows,
+  rowDropId,
+  type RowLead,
+} from './todo-board-rows.component';
+import { toastMock } from '../../../../testing/toast';
 
 const ME = { principalId: 'me', displayName: 'Mara Keller' };
 
@@ -75,8 +82,14 @@ async function setup(opts: Opts = {}) {
         (() => of(detail({ id: 'k-1', boardId: 'b-9', columnId: 't-1', rank: '0', title: 'Raum buchen', assignees: [ME] }))),
     ),
   };
-  const toast = { success: jest.fn(), error: jest.fn() };
-  const on = { openCard: jest.fn(), matches: jest.fn(), dropIn: jest.fn(), transferred: jest.fn(), menu: jest.fn() };
+  const toast = toastMock();
+  const on = {
+    openCard: jest.fn(),
+    matches: jest.fn(),
+    dropIn: jest.fn(),
+    transferred: jest.fn(),
+    menu: jest.fn(),
+  };
   const view = await render(TodoBoardRowsComponent, {
     inputs: { filter: NO_FILTER, today: TODAY, phone: opts.phone ?? false, ...opts.inputs },
     on,

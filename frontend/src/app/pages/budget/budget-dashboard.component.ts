@@ -39,6 +39,8 @@ import {
   PageHeaderComponent,
   SectionComponent,
   StatusTextComponent,
+  DialogBodyDirective,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
 import { exportDownload } from '@shared/download.util';
@@ -180,6 +182,8 @@ export const APPS_SHOWN = 5;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBodyDirective,
+    DialogBodyDirective,
     TodoLinkedListComponent,
     FabComponent,
     StatusTextComponent,
@@ -1024,7 +1028,8 @@ export class BudgetDashboardComponent {
         if (select && this.nodeById().get(select)) this.selectKs(select);
         else if (!this.selectedKs() && this.selectedBudgetId()) this.selectKs(this.selectedBudgetId());
       },
-      error: () => quiet || this.toast.error(this.i18n.translate('budget.error')),
+      error: () =>
+        quiet || this.toast.show({ text: this.i18n.translate('budget.error'), kind: 'error' }),
     });
   }
 
@@ -1041,13 +1046,21 @@ export class BudgetDashboardComponent {
     if (!node) return;
     this.api.deleteNode(node.id).subscribe({
       next: () => {
-        this.toast.success(this.i18n.translate('budget.tree.toast.deleted'));
+        this.toast.show({
+          text: this.i18n.translate('budget.tree.toast.deleted'),
+          kind: 'success',
+        });
         this.selectedKsId.set(node.parentId ?? this.selectedBudgetId());
         this.refreshTree();
         this.syncUrl();
       },
       error: (err: unknown) =>
-        this.toast.error(this.i18n.translate(costCentreError(problemCode(err), 'budget.tree.toast.deleteFailed'))),
+        this.toast.show({
+          text: this.i18n.translate(
+            costCentreError(problemCode(err), 'budget.tree.toast.deleteFailed'),
+          ),
+          kind: 'error',
+        }),
     });
   }
 
@@ -1069,18 +1082,31 @@ export class BudgetDashboardComponent {
     if (!ks || value === null || value === '' || Number(value) === this.figures().allocated) return;
     const problem = amountProblem(value);
     if (problem) {
-      this.toast.error(
-        this.i18n.translate(problem === 'negative' ? 'budget.plan.error.amountNegative' : 'budget.plan.error.amountTooLarge'),
-      );
+      this.toast.show({
+        text: this.i18n.translate(
+          problem === 'negative'
+            ? 'budget.plan.error.amountNegative'
+            : 'budget.plan.error.amountTooLarge',
+        ),
+        kind: 'error',
+      });
       return;
     }
     this.api.setAllocation(ks.id, this.selectedFyId() as Uuid, value).subscribe({
       next: () => {
-        this.toast.success(this.i18n.translate('budget.cc.toast.allocated'));
+        this.toast.show({
+          text: this.i18n.translate('budget.cc.toast.allocated'),
+          kind: 'success',
+        });
         this.refreshTree();
       },
       error: (err: unknown) => {
-        this.toast.error(this.i18n.translate(costCentreError(problemCode(err), 'budget.cc.error.allocation')));
+        this.toast.show({
+          text: this.i18n.translate(
+            costCentreError(problemCode(err), 'budget.cc.error.allocation'),
+          ),
+          kind: 'error',
+        });
         this.refreshTree();
       },
     });
@@ -1205,7 +1231,8 @@ export class BudgetDashboardComponent {
           fiscalYear: this.selectedFyId() || undefined,
         }),
       'budget.xlsx',
-      () => this.toast.error(this.i18n.translate('budget.dash.exportError')),
+      () =>
+        this.toast.show({ text: this.i18n.translate('budget.dash.exportError'), kind: 'error' }),
     );
   }
 }

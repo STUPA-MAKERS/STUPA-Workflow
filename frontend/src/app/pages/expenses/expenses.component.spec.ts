@@ -21,6 +21,7 @@ import type {
   Invoice,
 } from '../budget/budget-tree.api';
 import { TodosApiService } from '@core/api/todos.service';
+import { kindSpies } from '../../../testing/toast';
 
 /** The Events of the `Veranstaltung` picker: none, and no linked Event. */
 const EVENTS_API = { writableEvents: () => of([]), linked: () => of([]), links: () => of({ canLink: false, links: [] }), boards: () => of([]) };
@@ -1268,7 +1269,10 @@ function toastSpies(cmp: ExpensesComponent): {
   const toast = (
     cmp as unknown as { toast: { success: (m: string) => void; error: (m: string) => void } }
   ).toast;
-  return { success: jest.spyOn(toast, 'success'), error: jest.spyOn(toast, 'error') };
+  return {
+    success: jest.spyOn(kindSpies(toast), 'success'),
+    error: jest.spyOn(kindSpies(toast), 'error'),
+  };
 }
 
 describe('ExpensesComponent (sub-bookings)', () => {
@@ -2151,8 +2155,9 @@ describe('ExpensesComponent (query-param adoption)', () => {
   /** A form on the open row stays while the URL keeps that row. */
   it('closes an open form when the URL opens another booking or transfer', () => {
     const { cmp } = buildWithQuery([]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const adopt = (q: Record<string, string>) => (cmp as any).applyQueryParams(convertToParamMap(q));
+    const adopt = (q: Record<string, string>) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (cmp as any).applyQueryParams(convertToParamMap(q));
     cmp.openEdit(EXPENSE);
     expect(cmp.formMode()).toBe('edit');
     adopt({ id: 'e-2' });
@@ -2342,7 +2347,7 @@ describe('ExpensesListState.refresh', () => {
     state.onExport();
     const reqs = http.match((r) => r.url.endsWith('/expenses/export.xlsx'));
     expect(reqs.length).toBe(1);
-    const toast = jest.spyOn(TestBed.inject(ToastService), 'error');
+    const toast = jest.spyOn(kindSpies(TestBed.inject(ToastService)), 'error');
     reqs[0].error(new ProgressEvent('err'));
     expect(state.exporting()).toBe(false);
     expect(toast).toHaveBeenCalledWith('Der Export ist fehlgeschlagen.');

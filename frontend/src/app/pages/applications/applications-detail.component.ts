@@ -106,6 +106,8 @@ import {
   TabsComponent,
   ToastService,
   scrollBehavior,
+  DialogBodyDirective,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import {
   BudgetTreeApi,
@@ -211,6 +213,8 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBodyDirective,
+    DialogBodyDirective,
     ObserversDialogComponent,
     LoadErrorComponent,
     SectionComponent,
@@ -346,7 +350,10 @@ export class ApplicationsDetailComponent {
         NO_FILES.add(this.id);
         this.filesRefusedHere.set(true);
       }
-      this.toast.error(this.i18n.translate(sendErrorKey(err, 'applications.comments.error')));
+      this.toast.show({
+        text: this.i18n.translate(sendErrorKey(err, 'applications.comments.error')),
+        kind: 'error',
+      });
     },
     draftDropper(this.api),
   );
@@ -612,7 +619,7 @@ export class ApplicationsDetailComponent {
       },
       error: () => {
         this.creatingVersion.set(false);
-        this.toast.error(this.i18n.translate('status.newVersion.failed'));
+        this.toast.show({ text: this.i18n.translate('status.newVersion.failed'), kind: 'error' });
       },
     });
   }
@@ -637,13 +644,14 @@ export class ApplicationsDetailComponent {
         this.app.set(keep ? { ...updated, applicant: current.applicant } : updated);
         this.archiving.set(false);
         this.page?.notify({ id: updated.id, kind: 'updated', source: 'detail' });
-        this.toast.success(
-          this.i18n.translate(next ? 'applications.archived' : 'applications.unarchived'),
-        );
+        this.toast.show({
+          text: this.i18n.translate(next ? 'applications.archived' : 'applications.unarchived'),
+          kind: 'success',
+        });
       },
       error: () => {
         this.archiving.set(false);
-        this.toast.error(this.i18n.translate('applications.detail.error'));
+        this.toast.show({ text: this.i18n.translate('applications.detail.error'), kind: 'error' });
       },
     });
   }
@@ -1302,11 +1310,17 @@ export class ApplicationsDetailComponent {
         if (seq !== this.loadSeq) return;
         this.links.set(links);
         this.predecessorOpen.set(false);
-        this.toast.success(this.i18n.translate('applications.predecessor.linked'));
+        this.toast.show({
+          text: this.i18n.translate('applications.predecessor.linked'),
+          kind: 'success',
+        });
       },
       error: (err: { status?: number; error?: ProblemDetail | null }) => {
         this.linking.set(false);
-        this.toast.error(this.i18n.translate(predecessorErrorKey(err.status, err.error?.code)));
+        this.toast.show({
+          text: this.i18n.translate(predecessorErrorKey(err.status, err.error?.code)),
+          kind: 'error',
+        });
       },
     });
   }
@@ -1326,11 +1340,17 @@ export class ApplicationsDetailComponent {
           },
           error: () => this.linking.set(false),
         });
-        this.toast.success(this.i18n.translate('applications.predecessor.removed'));
+        this.toast.show({
+          text: this.i18n.translate('applications.predecessor.removed'),
+          kind: 'success',
+        });
       },
       error: (err: { status?: number; error?: ProblemDetail | null }) => {
         this.linking.set(false);
-        this.toast.error(this.i18n.translate(predecessorErrorKey(err.status, err.error?.code)));
+        this.toast.show({
+          text: this.i18n.translate(predecessorErrorKey(err.status, err.error?.code)),
+          kind: 'error',
+        });
       },
     });
   }
@@ -1443,7 +1463,10 @@ export class ApplicationsDetailComponent {
         next: () => {
           this.assigningBudget.set(false);
           this.budgetDialogOpen.set(false);
-          this.toast.success(this.i18n.translate('applications.actions.success'));
+          this.toast.show({
+            text: this.i18n.translate('applications.actions.success'),
+            kind: 'success',
+          });
           this.changed();
         },
         error: (err: { status?: number }) => {
@@ -1456,7 +1479,7 @@ export class ApplicationsDetailComponent {
                 : err.status === 403
                   ? 'applications.transitions.forbidden'
                   : 'applications.actions.error';
-          this.toast.error(this.i18n.translate(key));
+          this.toast.show({ text: this.i18n.translate(key), kind: 'error' });
         },
       });
   }
@@ -1549,7 +1572,7 @@ export class ApplicationsDetailComponent {
     clearServerErrors(this.editFields());
     if (this.editForm.invalid) {
       this.editForm.markAllAsTouched();
-      this.toast.error(this.i18n.translate('applications.edit.invalid'));
+      this.toast.show({ text: this.i18n.translate('applications.edit.invalid'), kind: 'error' });
       this.revealError();
       return;
     }
@@ -1558,9 +1581,10 @@ export class ApplicationsDetailComponent {
       next: (updated) => {
         this.savingEdit.set(false);
         this.editing.set(false);
-        this.toast.success(
-          this.i18n.translate('applications.edit.saved', { version: updated.version }),
-        );
+        this.toast.show({
+          text: this.i18n.translate('applications.edit.saved', { version: updated.version }),
+          kind: 'success',
+        });
         this.changed();
       },
       error: (err: { status?: number; error?: ProblemDetail | null }) => {
@@ -1570,14 +1594,17 @@ export class ApplicationsDetailComponent {
             this.i18n.translate(key),
           );
           if (placed) {
-            this.toast.error(this.i18n.translate('applications.edit.invalid'));
+            this.toast.show({
+              text: this.i18n.translate('applications.edit.invalid'),
+              kind: 'error',
+            });
             this.revealError();
             return;
           }
         }
         const key =
           err.status === 409 ? 'applications.detail.locked' : 'applications.detail.saveFailed';
-        this.toast.error(this.i18n.translate(key));
+        this.toast.show({ text: this.i18n.translate(key), kind: 'error' });
       },
     });
   }
@@ -1597,13 +1624,19 @@ export class ApplicationsDetailComponent {
       next: () => {
         this.deleting.set(false);
         this.confirmDelete.set(false);
-        this.toast.success(this.i18n.translate('applications.detail.deleted'));
+        this.toast.show({
+          text: this.i18n.translate('applications.detail.deleted'),
+          kind: 'success',
+        });
         this.page?.notify({ id: this.id, kind: 'deleted', source: 'detail' });
         void this.router.navigate([...this.listPath()], { queryParamsHandling: 'preserve' });
       },
       error: () => {
         this.deleting.set(false);
-        this.toast.error(this.i18n.translate('applications.detail.deleteFailed'));
+        this.toast.show({
+          text: this.i18n.translate('applications.detail.deleteFailed'),
+          kind: 'error',
+        });
       },
     });
   }
@@ -1617,11 +1650,17 @@ export class ApplicationsDetailComponent {
       next: () => {
         this.requestingErasure.set(false);
         this.confirmErase.set(false);
-        this.toast.success(this.i18n.translate('applications.detail.eraseRequested'));
+        this.toast.show({
+          text: this.i18n.translate('applications.detail.eraseRequested'),
+          kind: 'success',
+        });
       },
       error: () => {
         this.requestingErasure.set(false);
-        this.toast.error(this.i18n.translate('applications.detail.eraseRequestFailed'));
+        this.toast.show({
+          text: this.i18n.translate('applications.detail.eraseRequestFailed'),
+          kind: 'error',
+        });
       },
     });
   }
@@ -1714,7 +1753,10 @@ export class ApplicationsDetailComponent {
       },
       error: (err: { status?: number }) => {
         change.restore?.();
-        this.toast.error(this.i18n.translate(this.commentErrorKey(err.status)));
+        this.toast.show({
+          text: this.i18n.translate(this.commentErrorKey(err.status)),
+          kind: 'error',
+        });
       },
     });
   }
@@ -1725,7 +1767,10 @@ export class ApplicationsDetailComponent {
         this.comments.update((list) => list.filter((c) => c.id !== ref.id));
       },
       error: (err: { status?: number }) => {
-        this.toast.error(this.i18n.translate(this.commentErrorKey(err.status)));
+        this.toast.show({
+          text: this.i18n.translate(this.commentErrorKey(err.status)),
+          kind: 'error',
+        });
       },
     });
   }
@@ -1749,7 +1794,10 @@ export class ApplicationsDetailComponent {
     this.api.fireTransition(this.id, { transitionId: t.id }).subscribe({
       next: () => {
         this.firing.set(null);
-        this.toast.success(this.i18n.translate('applications.actions.success'));
+        this.toast.show({
+          text: this.i18n.translate('applications.actions.success'),
+          kind: 'success',
+        });
         this.changed();
       },
       error: (err: { status?: number }) => {
@@ -1760,7 +1808,7 @@ export class ApplicationsDetailComponent {
             : err.status === 409
               ? 'applications.actions.conflict'
               : 'applications.actions.error';
-        this.toast.error(this.i18n.translate(key));
+        this.toast.show({ text: this.i18n.translate(key), kind: 'error' });
         this.changed();
       },
     });

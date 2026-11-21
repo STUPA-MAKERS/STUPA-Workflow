@@ -191,7 +191,9 @@
       [open]="sheetOpen()"
       (openChange)="onSheetOpen($event)"
     >
-      <ng-container [ngTemplateOutlet]="panel" [ngTemplateOutletContext]="{ $implicit: true }" />
+      <ng-template sheetBody>
+        <ng-container [ngTemplateOutlet]="panel" [ngTemplateOutletContext]="{ $implicit: true }" />
+      </ng-template>
     </app-side-sheet>
   </div>
 }

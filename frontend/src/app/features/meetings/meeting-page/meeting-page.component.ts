@@ -44,6 +44,7 @@ import {
   SegmentedComponent,
   type SegmentedOption,
   SideSheetComponent,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { meetingStatus, protocolStatus } from '@shared/status-kind.util';
 import { ProtocolBarComponent } from '../protocol-bar/protocol-bar.component';
@@ -113,6 +114,7 @@ type SessionAction = 'todos' | 'links' | 'open' | 'agenda' | 'settings' | 'atten
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBodyDirective,
     MeetingHeadComponent,
     ScrollFadeDirective,
     NgTemplateOutlet,

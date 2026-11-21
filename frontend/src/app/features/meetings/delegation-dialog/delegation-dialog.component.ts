@@ -34,6 +34,7 @@ import {
   SwitchComponent,
   ToastService,
   TruncatedDirective,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 
 /**
@@ -62,6 +63,7 @@ const REFUSAL_TEXT: Readonly<Record<string, TranslationKey>> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     EmptyStateComponent,
     TruncatedDirective,
     SearchPillComponent,
@@ -171,15 +173,21 @@ export class DelegationDialogComponent {
       .subscribe({
         next: (d) => {
           this.busy.set(false);
-          this.toast.success(this.i18n.translate('delegation.toast.created'));
+          this.toast.show({
+            text: this.i18n.translate('delegation.toast.created'),
+            kind: 'success',
+          });
           this.created.emit(d);
         },
         error: (err: { error?: { detail?: string; code?: string } }) => {
           this.busy.set(false);
           const own = REFUSAL_TEXT[err.error?.code ?? ''];
-          this.toast.error(
-            own ? this.i18n.translate(own) : (err.error?.detail ?? this.i18n.translate('delegation.toast.createFailed')),
-          );
+          this.toast.show({
+            text: own
+              ? this.i18n.translate(own)
+              : (err.error?.detail ?? this.i18n.translate('delegation.toast.createFailed')),
+            kind: 'error',
+          });
         },
       });
   }

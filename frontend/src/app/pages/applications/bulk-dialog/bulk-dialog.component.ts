@@ -26,6 +26,7 @@ import {
   SectionComponent,
   SkeletonComponent,
   ErrorTextComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 
 /** The two bulk actions of the Antrag list (001700): "Status setzen" and the message. */
@@ -63,6 +64,7 @@ export const BULK_MAX = 100;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     ErrorTextComponent,
     FormsModule,
     TranslatePipe,

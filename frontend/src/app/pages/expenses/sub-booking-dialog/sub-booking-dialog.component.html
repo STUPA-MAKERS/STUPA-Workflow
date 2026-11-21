@@ -1,48 +1,63 @@
 @let s = sub();
 <app-dialog
   [open]="!!s.subParent()"
-  [title]="'expenses.sub.addTitle' | t"
-  [subtitle]="s.subParent() ? ('expenses.sub.inherits' | t: { parent: s.subParent()!.description }) : ''"
+  [heading]="'expenses.sub.addTitle' | t"
+  [subtitle]="
+    s.subParent() ? ('expenses.sub.inherits' | t: { parent: s.subParent()!.description }) : ''
+  "
   [closeLabel]="'action.close' | t"
   (closed)="s.closeCreateSub()"
+  [actions]="[
+    { key: 'closeCreateSub', label: ('action.cancel' | t) },
+    {
+      key: 'createSub',
+      label: ('expenses.sub.add' | t),
+      kind: 'main',
+      disabled: !s.canSubmitSub(),
+      busy: saving(),
+    },
+  ]"
+  (action)="
+    $event.key === 'closeCreateSub'
+      ? s.closeCreateSub()
+      : $event.key === 'createSub'
+        ? s.createSub()
+        : null
+  "
 >
-  @if (s.subParent()) {
-    <form class="sd-form" (submit)="s.createSub($event)">
-      <app-input
-        name="subdesc"
-        [label]="'expenses.field.description' | t"
-        [required]="true"
-        [placeholder]="'expenses.field.descriptionPlaceholder' | t"
-        [ngModel]="s.subDescription()"
-        (ngModelChange)="s.subDescription.set($event)"
-      />
-      <app-currency-input
-        name="subamount"
-        [label]="'expenses.field.amount' | t"
-        [required]="true"
-        [ngModel]="s.subAmount()"
-        (ngModelChange)="s.subAmount.set($event)"
-      />
-      <div class="sd-form__grid">
-        <app-datepicker
-          name="subpay"
-          [label]="'expenses.field.paymentDate' | t"
-          [ngModel]="s.subPaymentDate()"
-          (ngModelChange)="s.subPaymentDate.set($event)"
-        />
+  <ng-template dialogBody>
+    @if (s.subParent()) {
+      <form class="sd-form" (submit)="s.createSub($event)">
         <app-input
-          name="subcorr"
-          [label]="'expenses.field.correspondent' | t"
-          [ngModel]="s.subCorrespondent()"
-          (ngModelChange)="s.subCorrespondent.set($event)"
+          name="subdesc"
+          [label]="'expenses.field.description' | t"
+          [required]="true"
+          [placeholder]="'expenses.field.descriptionPlaceholder' | t"
+          [ngModel]="s.subDescription()"
+          (ngModelChange)="s.subDescription.set($event)"
         />
-      </div>
-    </form>
-  }
-  <div dialog-footer>
-    <app-button variant="text" (click)="s.closeCreateSub()">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" [disabled]="!s.canSubmitSub()" [loading]="saving()" (click)="s.createSub($event)">{{
-      'expenses.sub.add' | t
-    }}</app-button>
-  </div>
+        <app-currency-input
+          name="subamount"
+          [label]="'expenses.field.amount' | t"
+          [required]="true"
+          [ngModel]="s.subAmount()"
+          (ngModelChange)="s.subAmount.set($event)"
+        />
+        <div class="sd-form__grid">
+          <app-datepicker
+            name="subpay"
+            [label]="'expenses.field.paymentDate' | t"
+            [ngModel]="s.subPaymentDate()"
+            (ngModelChange)="s.subPaymentDate.set($event)"
+          />
+          <app-input
+            name="subcorr"
+            [label]="'expenses.field.correspondent' | t"
+            [ngModel]="s.subCorrespondent()"
+            (ngModelChange)="s.subCorrespondent.set($event)"
+          />
+        </div>
+      </form>
+    }
+  </ng-template>
 </app-dialog>

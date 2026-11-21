@@ -14,6 +14,7 @@ import {
   SearchPillComponent,
   SideSheetComponent,
   ToastService,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { isoDay, shortDay } from '@shared/date-format';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
@@ -29,7 +30,17 @@ export const ARCHIVE_PAGE = 50;
   selector: 'app-todo-archive-sheet',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LoadErrorComponent, TranslatePipe, ButtonComponent, ButtonGroupComponent, EmptyStateComponent, IconComponent, SearchPillComponent, SideSheetComponent],
+  imports: [
+    SheetBodyDirective,
+    LoadErrorComponent,
+    TranslatePipe,
+    ButtonComponent,
+    ButtonGroupComponent,
+    EmptyStateComponent,
+    IconComponent,
+    SearchPillComponent,
+    SideSheetComponent,
+  ],
   templateUrl: './todo-archive-sheet.component.html',
   styleUrl: './todo-archive-sheet.component.scss',
 })
@@ -111,7 +122,8 @@ export class TodoArchiveSheetComponent {
         this.total.update((n) => Math.max(0, n - 1));
         this.restored.emit(detail);
       },
-      error: () => this.toast.error(this.i18n.translate('todos.error.save')),
+      error: () =>
+        this.toast.show({ text: this.i18n.translate('todos.error.save'), kind: 'error' }),
     });
   }
 

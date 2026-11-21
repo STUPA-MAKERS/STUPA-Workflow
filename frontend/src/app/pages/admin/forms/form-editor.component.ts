@@ -25,7 +25,31 @@ import type {
   Uuid,
 } from '@core/api/models';
 import { langFieldLabel, resolveI18n, sameI18n, setI18n } from '@shared/forms/i18n-text';
-import { ButtonComponent, ButtonGroupComponent, CheckboxComponent, EmptyStateComponent, FabComponent, IconComponent, InputComponent, MEDIA, mediaQuery, MetaLineComponent, MoveButtonsComponent, PageHeaderComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, scrollBehavior, ScrollFadeDirective, SelectFieldComponent, type SelectOption, SideSheetComponent, StatusTextComponent, ToastService } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  ButtonGroupComponent,
+  CheckboxComponent,
+  EmptyStateComponent,
+  FabComponent,
+  IconComponent,
+  InputComponent,
+  MEDIA,
+  mediaQuery,
+  MetaLineComponent,
+  MoveButtonsComponent,
+  PageHeaderComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  scrollBehavior,
+  ScrollFadeDirective,
+  SelectFieldComponent,
+  type SelectOption,
+  SideSheetComponent,
+  StatusTextComponent,
+  ToastService,
+  SheetBodyDirective,
+} from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import { VersionHistoryComponent } from '../version-history/version-history.component';
@@ -99,6 +123,7 @@ type QPos = QuestionPos;
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ContentLangState],
   imports: [
+    SheetBodyDirective,
     MetaLineComponent,
     ContentLangSwitchComponent,
     MoveButtonsComponent,
@@ -394,13 +419,14 @@ export class FormEditorComponent {
         this.active.set(draft.active ?? false);
         this.hasVersion.set(!!draft.formVersionId);
         this.togglingActive.set(false);
-        this.toast.success(
-          this.i18n.translate(next ? 'admin.forms.activated' : 'admin.forms.deactivated'),
-        );
+        this.toast.show({
+          text: this.i18n.translate(next ? 'admin.forms.activated' : 'admin.forms.deactivated'),
+          kind: 'success',
+        });
       },
       error: () => {
         this.togglingActive.set(false);
-        this.toast.error(this.i18n.translate('admin.forms.actionFailed'));
+        this.toast.show({ text: this.i18n.translate('admin.forms.actionFailed'), kind: 'error' });
       },
     });
   }
@@ -1004,7 +1030,7 @@ export class FormEditorComponent {
   protected save(): void {
     const id = this.typeId();
     if (!this.formValid() || !id || this.saving()) {
-      this.toast.error(this.i18n.translate('admin.common.invalid'));
+      this.toast.show({ text: this.i18n.translate('admin.common.invalid'), kind: 'error' });
       return;
     }
     const flat = groupsToFields(this.groups());
@@ -1038,12 +1064,12 @@ export class FormEditorComponent {
         this.savedForm.set(snapshot);
         this.active.set(true);
         this.hasVersion.set(true);
-        this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
         this.history()?.reload();
       },
       error: () => {
         this.saving.set(false);
-        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
       },
     });
   }

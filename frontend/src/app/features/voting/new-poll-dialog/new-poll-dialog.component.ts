@@ -29,6 +29,7 @@ import {
   TextareaComponent,
   TimeInputComponent,
   ToastService,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { AdminOptionsService } from '../../../pages/admin/admin-options.service';
 import { PollEditorComponent } from '../poll-editor/poll-editor.component';
@@ -61,6 +62,7 @@ type NewKind = 'poll' | 'circular';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     ButtonComponent,
     DatepickerComponent,
     DialogComponent,
@@ -203,15 +205,21 @@ export class NewPollDialogComponent {
       : this.api.createPoll({ kind: 'poll', ...head, ...pollInOf(this.draft()), secret: true });
     const started: TranslationKey = circular ? 'circular.toast.started' : 'poll.toast.started';
     call.subscribe({
-        next: (vote) => {
-          this.submitting.set(false);
-          this.toast.success(this.i18n.translate(draft ? 'poll.toast.saved' : started));
-          this.created.emit(vote);
-        },
-        error: (err: unknown) => {
-          this.submitting.set(false);
-          this.toast.error(pollRefusalMessage(err, (key, params) => this.i18n.translate(key, params)));
-        },
-      });
+      next: (vote) => {
+        this.submitting.set(false);
+        this.toast.show({
+          text: this.i18n.translate(draft ? 'poll.toast.saved' : started),
+          kind: 'success',
+        });
+        this.created.emit(vote);
+      },
+      error: (err: unknown) => {
+        this.submitting.set(false);
+        this.toast.show({
+          text: pollRefusalMessage(err, (key, params) => this.i18n.translate(key, params)),
+          kind: 'error',
+        });
+      },
+    });
   }
 }

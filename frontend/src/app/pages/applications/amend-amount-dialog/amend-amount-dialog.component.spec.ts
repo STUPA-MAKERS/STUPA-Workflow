@@ -5,6 +5,7 @@ import { render, screen } from '@testing-library/angular';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { AmendAmountDialogComponent } from './amend-amount-dialog.component';
+import { kindSpies } from '../../../../testing/toast';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -93,7 +94,7 @@ describe('AmendAmountDialogComponent', () => {
   /** Spec 001622: an amount above the request is allowed, with a warning. */
   it('warns about an amount above the requested one and sends it', async () => {
     const { http, host, cmp, toast, openIt, fill, detectChanges } = await setup();
-    const success = jest.spyOn(toast, 'success');
+    const success = jest.spyOn(kindSpies(toast), 'success');
     openIt();
     fill();
     cmp.amount.set('300.00');
@@ -130,7 +131,7 @@ describe('AmendAmountDialogComponent', () => {
     [500, false, null],
   ])('reports a %s answer', async (status, closes, body) => {
     const { http, host, cmp, toast, openIt, fill } = await setup();
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     openIt();
     fill();
     cmp.submit();

@@ -102,38 +102,39 @@
 
 <app-dialog
   [open]="draft() !== null"
-  [title]="(editingIndex() === null ? 'admin.webhook.create' : 'admin.webhook.edit') | t"
+  [heading]="(editingIndex() === null ? 'admin.webhook.create' : 'admin.webhook.edit') | t"
   [closeLabel]="'action.close' | t"
   (closed)="close()"
+  [actions]="[
+    { key: 'close', label: ('action.cancel' | t) },
+    { key: 'save', label: ('action.save' | t), kind: 'main', disabled: errors().length > 0 },
+  ]"
+  (action)="$event.key === 'close' ? close() : $event.key === 'save' ? save() : null"
 >
-  @if (draft(); as d) {
-    <form class="wh__form" (submit)="$event.preventDefault(); save()">
-      <app-input
-        [label]="'admin.webhook.name' | t"
-        [ngModel]="d.name"
-        (ngModelChange)="patch('name', $event)"
-        name="name"
-      />
-      <app-input
-        class="wh__urlField"
-        [label]="'admin.webhook.url' | t"
-        [error]="d.url && errors().length ? tr(errors()[0]) : ''"
-        [ngModel]="d.url"
-        (ngModelChange)="patch('url', $event)"
-        name="url"
-        placeholder="https://"
-      />
-      <app-switch [checked]="d.active" (checkedChange)="patch('active', $event)">{{
-        'admin.webhook.active' | t
-      }}</app-switch>
-    </form>
-  }
-  <div dialog-footer class="wh__foot">
-    <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" [disabled]="errors().length > 0" (click)="save()">{{
-      'action.save' | t
-    }}</app-button>
-  </div>
+  <ng-template dialogBody>
+    @if (draft(); as d) {
+      <form class="wh__form" (submit)="$event.preventDefault(); save()">
+        <app-input
+          [label]="'admin.webhook.name' | t"
+          [ngModel]="d.name"
+          (ngModelChange)="patch('name', $event)"
+          name="name"
+        />
+        <app-input
+          class="wh__urlField"
+          [label]="'admin.webhook.url' | t"
+          [error]="d.url && errors().length ? tr(errors()[0]) : ''"
+          [ngModel]="d.url"
+          (ngModelChange)="patch('url', $event)"
+          name="url"
+          placeholder="https://"
+        />
+        <app-switch [checked]="d.active" (checkedChange)="patch('active', $event)">{{
+          'admin.webhook.active' | t
+        }}</app-switch>
+      </form>
+    }
+  </ng-template>
 </app-dialog>
 
 <app-confirm-dialog

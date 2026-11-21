@@ -17,6 +17,7 @@ import {
   type StatusKind,
   StatusTextComponent,
   TruncatedDirective,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { MeetingGuestsService, guestName } from '../meeting-guests.service';
 import { clock } from '@shared/date-format';
@@ -41,6 +42,7 @@ interface GuestRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     ConfirmDialogComponent,
     EmptyStateComponent,
     TruncatedDirective,

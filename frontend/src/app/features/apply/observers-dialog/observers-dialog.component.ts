@@ -18,6 +18,7 @@ import {
   type RowMenuItem,
   type RowMenuSection,
   ToastService,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 
 /** The most observers of one Antrag (`MAX_OBSERVERS` of the server). */
@@ -42,6 +43,7 @@ const REFUSALS: Readonly<Record<string, TranslationKey>> = {
   selector: 'app-observers-dialog',
   standalone: true,
   imports: [
+    DialogBodyDirective,
     FormsModule,
     TranslatePipe,
     DialogComponent,
@@ -108,7 +110,7 @@ export class ObserversDialogComponent {
       error: () => {
         this.observers.set([]);
         this.loading.set(false);
-        this.toast.error(this.i18n.translate('observers.error.load'));
+        this.toast.show({ text: this.i18n.translate('observers.error.load'), kind: 'error' });
       },
     });
   }
@@ -124,7 +126,7 @@ export class ObserversDialogComponent {
         this.observers.update((list) => [...list, row]);
         this.text.set('');
         this.saving.set(false);
-        this.toast.success(this.i18n.translate('observers.added'));
+        this.toast.show({ text: this.i18n.translate('observers.added'), kind: 'success' });
       },
       error: (err: unknown) => {
         this.saving.set(false);
@@ -133,7 +135,7 @@ export class ObserversDialogComponent {
         if (refusal) this.error.set(refusal);
         else if (code === '' && (err as { status?: number }).status === 422)
           this.error.set('observers.error.email');
-        else this.toast.error(this.i18n.translate('observers.error.save'));
+        else this.toast.show({ text: this.i18n.translate('observers.error.save'), kind: 'error' });
       },
     });
   }
@@ -144,9 +146,10 @@ export class ObserversDialogComponent {
     this.api.removeApplicationObserver(this.applicationId(), observerId).subscribe({
       next: () => {
         this.observers.update((list) => list.filter((o) => o.id !== observerId));
-        this.toast.success(this.i18n.translate('observers.removed'));
+        this.toast.show({ text: this.i18n.translate('observers.removed'), kind: 'success' });
       },
-      error: () => this.toast.error(this.i18n.translate('observers.error.save')),
+      error: () =>
+        this.toast.show({ text: this.i18n.translate('observers.error.save'), kind: 'error' }),
     });
   }
 

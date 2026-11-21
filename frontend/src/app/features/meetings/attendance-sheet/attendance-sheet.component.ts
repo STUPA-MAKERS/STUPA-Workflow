@@ -37,6 +37,7 @@ import {
   ToastService,
   TruncatedDirective,
   ErrorTextComponent,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import {
   type DelegationCardChange,
@@ -137,6 +138,7 @@ const SELF_CHOICES: readonly { readonly value: Choice; readonly label: Translati
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBodyDirective,
     ErrorTextComponent,
     EmptyStateComponent,
     TruncatedDirective,
@@ -491,14 +493,17 @@ export class AttendanceSheetComponent {
     this.delegationsApi.revoke(d.id).subscribe({
       next: () => {
         this.revoking.set(null);
-        this.toast.success(this.i18n.translate('delegation.toast.revoked'));
+        this.toast.show({ text: this.i18n.translate('delegation.toast.revoked'), kind: 'success' });
         this.loadDelegations(this.meeting().id);
         this.ownCard()?.reload();
         this.resolveConflict(d.delegatorId);
       },
       error: () => {
         this.revoking.set(null);
-        this.toast.error(this.i18n.translate('delegation.toast.revokeFailed'));
+        this.toast.show({
+          text: this.i18n.translate('delegation.toast.revokeFailed'),
+          kind: 'error',
+        });
       },
     });
   }

@@ -574,12 +574,19 @@
     [open]="typeMenuGroup() !== null"
     (closed)="closeTypeMenu(false)"
   >
-    <div class="fe__sheetMenu" role="menu" [attr.aria-label]="'admin.form.typeMenu' | t">
-      @for (type of typeMenu; track type) {
-        <button type="button" class="fe__menu-item" role="menuitem" (click)="addQuestion(typeMenuGroup() ?? 0, type)">
-          {{ typeLabel(type) }}
-        </button>
-      }
-    </div>
+    <ng-template sheetBody>
+      <div class="fe__sheetMenu" role="menu" [attr.aria-label]="'admin.form.typeMenu' | t">
+        @for (type of typeMenu; track type) {
+          <button
+            type="button"
+            class="fe__menu-item"
+            role="menuitem"
+            (click)="addQuestion(typeMenuGroup() ?? 0, type)"
+          >
+            {{ typeLabel(type) }}
+          </button>
+        }
+      </div>
+    </ng-template>
   </app-side-sheet>
 }

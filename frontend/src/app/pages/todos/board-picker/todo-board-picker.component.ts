@@ -18,7 +18,14 @@ import type { TodoBoardKind, TodoBoardSummary } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { IconComponent, type IconName, MEDIA, mediaQuery, SideSheetComponent } from '@stupa-makers/ui-kit';
+import {
+  IconComponent,
+  type IconName,
+  MEDIA,
+  mediaQuery,
+  SideSheetComponent,
+  SheetBodyDirective,
+} from '@stupa-makers/ui-kit';
 
 export const BOARD_ICON: Record<TodoBoardKind, IconName> = {
   personal: 'user',
@@ -50,7 +57,7 @@ interface PickerSection {
   selector: 'app-todo-board-picker',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, TranslatePipe, IconComponent, SideSheetComponent],
+  imports: [SheetBodyDirective, NgTemplateOutlet, TranslatePipe, IconComponent, SideSheetComponent],
   templateUrl: './todo-board-picker.component.html',
   styleUrl: './todo-board-picker.component.scss',
 })

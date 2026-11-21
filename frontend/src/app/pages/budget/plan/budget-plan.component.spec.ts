@@ -18,6 +18,7 @@ import { BudgetPlanApi, type BudgetPlan, type PlanMeeting, type PlanStep } from 
 import { FileOpenService } from '@shared/viewer/file-open.service';
 import { BudgetPlanComponent } from './budget-plan.component';
 import { FY25, FY26, QSM, TOP, fy, line, node, plan, version } from './budget-plan.fixtures';
+import { kindSpies } from '../../../../testing/toast';
 
 function setViewport(wide: boolean, phone = false, roomy = wide): void {
   window.matchMedia = ((query: string) => ({
@@ -113,8 +114,8 @@ async function setup(opts: Opts = {}) {
   const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
   const back = jest.spyOn(TestBed.inject(Location), 'back').mockImplementation(() => params.next(convertToParamMap({})));
   const toast = TestBed.inject(ToastService);
-  const success = jest.spyOn(toast, 'success');
-  const error = jest.spyOn(toast, 'error');
+  const success = jest.spyOn(kindSpies(toast), 'success');
+  const error = jest.spyOn(kindSpies(toast), 'error');
   return { ...view, api, treeApi, gremien, router, navigate, success, error, params, back };
 }
 
@@ -1834,7 +1835,7 @@ describe('BudgetPlanComponent', () => {
       const view = await setup({ perms: PERMS, plans: { 'fy-26': stepped() } });
       await choose('Zustand setzen');
       const open = await dialog();
-      const save = within(screen.getByTestId('bp-state-save')).getByRole('button');
+      const save = within(open).getByRole('button', { name: 'Setzen' });
       expect(save).toBeDisabled();
       await pickState(open, 'Genehmigung');
       expect(save).toBeDisabled();

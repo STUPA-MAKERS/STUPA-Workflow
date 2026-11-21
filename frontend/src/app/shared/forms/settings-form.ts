@@ -152,11 +152,11 @@ export function settingsForm<S, D extends object, B>(opts: SettingsFormOptions<S
         next: (s) => {
           saving.set(false);
           apply(s);
-          toast.success(i18n.translate('admin.common.saved'));
+          toast.show({ text: i18n.translate('admin.common.saved'), kind: 'success' });
         },
         error: () => {
           saving.set(false);
-          toast.error(i18n.translate('admin.common.saveFailed'));
+          toast.show({ text: i18n.translate('admin.common.saveFailed'), kind: 'error' });
         },
       });
     },

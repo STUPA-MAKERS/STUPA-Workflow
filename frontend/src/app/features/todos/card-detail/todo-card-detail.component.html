@@ -139,9 +139,11 @@
         side="bottom"
         [contentScrolls]="true"
       >
-        @if (activitySheet.shown()) {
-          <ng-container *ngTemplateOutlet="activity; context: { sheet: true }" />
-        }
+        <ng-template sheetBody>
+          @if (activitySheet.shown()) {
+            <ng-container *ngTemplateOutlet="activity; context: { sheet: true }" />
+          }
+        </ng-template>
       </app-side-sheet>
     } @else {
       <div class="cd__cols">

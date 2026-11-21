@@ -31,6 +31,7 @@ import {
   SectionComponent,
   ErrorTextComponent,
   FactsComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { type StatusView, webhookDeliveryStatus } from '@shared/status-kind.util';
@@ -105,6 +106,7 @@ function withMember(set: ReadonlySet<string>, id: string, on: boolean): Readonly
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     FactsComponent,
     ErrorTextComponent,
     LoadStateComponent,
@@ -262,10 +264,11 @@ export class WebhooksComponent {
         if (idx === null && !this.delivery().has(saved.id)) {
           this.delivery.update((m) => withEntry(m, saved.id, neverDelivered(saved.id)));
         }
-        this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
         this.close();
       },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+      error: () =>
+        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' }),
     });
   }
 
@@ -301,7 +304,7 @@ export class WebhooksComponent {
       error: () => {
         this.setToggling(hook.id, false);
         this.hooks.update((list) => withActive(list, hook.id, before));
-        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
       },
     });
   }
@@ -318,9 +321,10 @@ export class WebhooksComponent {
         this.hooks.update((list) => list.filter((h) => h.id !== hook.id));
         this.delivery.update((m) => new Map([...m].filter(([id]) => id !== hook.id)));
         this.confirmDelete.set(null);
-        this.toast.success(this.i18n.translate('admin.webhook.deleted'));
+        this.toast.show({ text: this.i18n.translate('admin.webhook.deleted'), kind: 'success' });
       },
-      error: () => this.toast.error(this.i18n.translate('admin.webhook.deleteFailed')),
+      error: () =>
+        this.toast.show({ text: this.i18n.translate('admin.webhook.deleteFailed'), kind: 'error' }),
     });
   }
 }

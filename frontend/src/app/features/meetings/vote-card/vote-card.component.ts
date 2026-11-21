@@ -187,7 +187,7 @@ export class VoteCardComponent {
     const base = this.i18n.translate(
       own ?? (failure.alreadyVoted ? 'voting.cast.toast.alreadyVoted' : 'meetings.toast.actionFailed'),
     );
-    this.toast.error(detail ? `${base}: ${detail}` : base);
+    this.toast.show({ text: detail ? `${base}: ${detail}` : base, kind: 'error' });
   }
 
   protected readonly status = computed<StatusView>(() => {

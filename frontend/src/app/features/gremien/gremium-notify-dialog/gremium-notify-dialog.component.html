@@ -1,40 +1,48 @@
 <app-dialog
   [open]="open()"
-  [title]="'gremien.notify.title' | t"
+  [heading]="'gremien.notify.title' | t"
   [subtitle]="gremiumName()"
   [closeLabel]="'action.close' | t"
-  size="form"
+  size="md"
   (closed)="cancel()"
+  [actions]="[
+    { key: 'cancel', label: ('action.cancel' | t) },
+    { key: 'send', label: ('gremien.notify.send' | t), kind: 'main', busy: sending() },
+  ]"
+  (action)="$event.key === 'cancel' ? cancel() : $event.key === 'send' ? send() : null"
 >
-  <form class="gnd" (submit)="$event.preventDefault(); send()">
-    <app-input
-      name="subject"
-      [label]="'gremien.notify.subject' | t"
-      [error]="text(subjectErr())"
-      [required]="true"
-      [ngModel]="subject()"
-      (ngModelChange)="subject.set($event)"
-    />
-    <div class="gnd__field">
-      <app-textarea class="gnd__text" [label]="'gremien.notify.message' | t" [grow]="true" [invalid]="!!messageErr()">
-        <textarea
-          name="message"
-          rows="8"
-          required
-          [attr.maxlength]="maxMessage"
-          [attr.aria-invalid]="!!messageErr()"
-          [attr.aria-describedby]="messageErr() ? 'gnd-message-error' : null"
-          [ngModel]="message()"
-          (ngModelChange)="message.set($event)"
-        ></textarea>
-      </app-textarea>
-      @if (messageErr(); as err) {
-        <app-error-text id="gnd-message-error" [inset]="true">{{ text(err) }}</app-error-text>
-      }
-    </div>
-  </form>
-  <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
-  <app-button dialog-footer variant="fill" [loading]="sending()" (click)="send()">
-    {{ 'gremien.notify.send' | t }}
-  </app-button>
+  <ng-template dialogBody>
+    <form class="gnd" (submit)="$event.preventDefault(); send()">
+      <app-input
+        name="subject"
+        [label]="'gremien.notify.subject' | t"
+        [error]="text(subjectErr())"
+        [required]="true"
+        [ngModel]="subject()"
+        (ngModelChange)="subject.set($event)"
+      />
+      <div class="gnd__field">
+        <app-textarea
+          class="gnd__text"
+          [label]="'gremien.notify.message' | t"
+          [grow]="true"
+          [invalid]="!!messageErr()"
+        >
+          <textarea
+            name="message"
+            rows="8"
+            required
+            [attr.maxlength]="maxMessage"
+            [attr.aria-invalid]="!!messageErr()"
+            [attr.aria-describedby]="messageErr() ? 'gnd-message-error' : null"
+            [ngModel]="message()"
+            (ngModelChange)="message.set($event)"
+          ></textarea>
+        </app-textarea>
+        @if (messageErr(); as err) {
+          <app-error-text id="gnd-message-error" [inset]="true">{{ text(err) }}</app-error-text>
+        }
+      </div>
+    </form>
+  </ng-template>
 </app-dialog>

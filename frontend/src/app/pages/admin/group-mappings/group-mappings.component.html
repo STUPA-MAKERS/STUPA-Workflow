@@ -63,79 +63,89 @@
 
 <app-dialog
   [open]="!!dialog()"
-  [title]="dialogTitle() | t"
+  [heading]="dialogTitle() | t"
   [closeLabel]="'action.close' | t"
   (closed)="closeDialog()"
+  [actions]="[
+    { key: 'closeDialog', label: ('action.cancel' | t) },
+    { key: 'save', label: ('action.save' | t), kind: 'main', disabled: !valid(), busy: saving() },
+  ]"
+  (action)="$event.key === 'closeDialog' ? closeDialog() : $event.key === 'save' ? save() : null"
 >
-  @if (dialog(); as kind) {
-    <form class="gm__form" (submit)="$event.preventDefault(); save()">
-      <app-input
-        class="gm__groupInput"
-        [label]="'admin.groupMappings.oidcGroup' | t"
-        [placeholder]="'admin.groupMappings.oidcGroupPlaceholder' | t"
-        [required]="true"
-        [error]="groupError()"
-        [ngModel]="oidcGroup()"
-        (ngModelChange)="oidcGroup.set($event)"
-        name="oidcGroup"
-      />
+  <ng-template dialogBody>
+    @if (dialog(); as kind) {
+      <form class="gm__form" (submit)="$event.preventDefault(); save()">
+        <app-input
+          class="gm__groupInput"
+          [label]="'admin.groupMappings.oidcGroup' | t"
+          [placeholder]="'admin.groupMappings.oidcGroupPlaceholder' | t"
+          [required]="true"
+          [error]="groupError()"
+          [ngModel]="oidcGroup()"
+          (ngModelChange)="oidcGroup.set($event)"
+          name="oidcGroup"
+        />
 
-      @switch (kind) {
-        @case ('global') {
-          <app-select
-            [label]="'admin.groupMappings.role' | t"
-            [placeholder]="'admin.groupMappings.rolePlaceholder' | t"
-            [options]="roleOptions()"
-            [ngModel]="roleId()"
-            (ngModelChange)="roleId.set($event)"
-            name="role"
-          />
-        }
-        @case ('membership') {
-          <app-select
-            [label]="'admin.groupMappings.gremium' | t"
-            [placeholder]="'admin.groupMappings.gremiumPlaceholder' | t"
-            [options]="gremiumOptions()"
-            [ngModel]="gremiumId()"
-            (ngModelChange)="gremiumId.set($event)"
-            name="gremium"
-          />
-        }
-        @case ('role') {
-          <app-select
-            [label]="'admin.groupMappings.gremium' | t"
-            [placeholder]="'admin.groupMappings.gremiumPlaceholder' | t"
-            [options]="gremiumOptions()"
-            [ngModel]="gremiumId()"
-            (ngModelChange)="onDialogGremium($event)"
-            name="gremium"
-          />
-          <app-select
-            [label]="'admin.groupMappings.gremiumRole' | t"
-            [placeholder]="(gremiumId() ? 'admin.groupMappings.gremiumRolePlaceholder' : 'admin.groupMappings.gremiumFirst') | t"
-            [options]="gremiumRoleOptions()"
-            [disabled]="!gremiumId() || !gremiumRoleOptions().length"
-            [ngModel]="gremiumRoleId()"
-            (ngModelChange)="gremiumRoleId.set($event)"
-            name="gremiumRole"
-          />
-          @if (gremiumId() && dialogGremiumRoles()?.length === 0) {
-            <p class="gm__dialogNote">
-              {{ 'admin.groupMappings.gremiumRolesEmpty' | t }}
-              @if (canManageGremiumRoles()) {
-                <a [routerLink]="['/admin/committees', gremiumId(), 'roles']">{{ 'admin.gremiumRoles.manage' | t }}</a>
-              }
-            </p>
+        @switch (kind) {
+          @case ('global') {
+            <app-select
+              [label]="'admin.groupMappings.role' | t"
+              [placeholder]="'admin.groupMappings.rolePlaceholder' | t"
+              [options]="roleOptions()"
+              [ngModel]="roleId()"
+              (ngModelChange)="roleId.set($event)"
+              name="role"
+            />
+          }
+          @case ('membership') {
+            <app-select
+              [label]="'admin.groupMappings.gremium' | t"
+              [placeholder]="'admin.groupMappings.gremiumPlaceholder' | t"
+              [options]="gremiumOptions()"
+              [ngModel]="gremiumId()"
+              (ngModelChange)="gremiumId.set($event)"
+              name="gremium"
+            />
+          }
+          @case ('role') {
+            <app-select
+              [label]="'admin.groupMappings.gremium' | t"
+              [placeholder]="'admin.groupMappings.gremiumPlaceholder' | t"
+              [options]="gremiumOptions()"
+              [ngModel]="gremiumId()"
+              (ngModelChange)="onDialogGremium($event)"
+              name="gremium"
+            />
+            <app-select
+              [label]="'admin.groupMappings.gremiumRole' | t"
+              [placeholder]="
+                (gremiumId()
+                  ? 'admin.groupMappings.gremiumRolePlaceholder'
+                  : 'admin.groupMappings.gremiumFirst'
+                ) | t
+              "
+              [options]="gremiumRoleOptions()"
+              [disabled]="!gremiumId() || !gremiumRoleOptions().length"
+              [ngModel]="gremiumRoleId()"
+              (ngModelChange)="gremiumRoleId.set($event)"
+              name="gremiumRole"
+            />
+            @if (gremiumId() && dialogGremiumRoles()?.length === 0) {
+              <p class="gm__dialogNote">
+                {{ 'admin.groupMappings.gremiumRolesEmpty' | t }}
+                @if (canManageGremiumRoles()) {
+                  <a [routerLink]="['/admin/committees', gremiumId(), 'roles']">{{
+                    'admin.gremiumRoles.manage' | t
+                  }}</a>
+                }
+              </p>
+            }
           }
         }
-      }
-      <button type="submit" hidden></button>
-    </form>
-  }
-  <div dialog-footer>
-    <app-button variant="text" (click)="closeDialog()">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" [disabled]="!valid()" [loading]="saving()" (click)="save()">{{ 'action.save' | t }}</app-button>
-  </div>
+        <button type="submit" hidden></button>
+      </form>
+    }
+  </ng-template>
 </app-dialog>
 
 <app-confirm-dialog

@@ -1047,7 +1047,7 @@ describe('MeetingPageComponent', () => {
       await userEvent.click(tab);
       const sheet = screen.getByRole('dialog', { name: 'Abstimmungen' });
       expect(within(sheet).getByText('Keine Abstimmungen')).toBeInTheDocument();
-      expect(sheet.querySelector('.ss__actions app-button[sheet-actions]')).toBeNull();
+      expect(sheet.querySelectorAll('.ss__actions app-button')).toHaveLength(1);
     });
 
     /** Spec 001800: the linked rows of the item are in a side sheet that an edge tab opens. */

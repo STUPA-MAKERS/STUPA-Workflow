@@ -13,7 +13,29 @@ import { errorStatus, problemCode } from '@core/api/problem';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ButtonComponent, ButtonGroupComponent, ConfirmDialogComponent, DialogComponent, EmptyStateComponent, FabComponent, FilePickerComponent, formatBytes, IconComponent, InputComponent, MetaLineComponent, NoteComponent, PageHeaderComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, SegmentedComponent, type SegmentedOption, SkeletonComponent, ToastService } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  ButtonGroupComponent,
+  ConfirmDialogComponent,
+  DialogComponent,
+  EmptyStateComponent,
+  FabComponent,
+  FilePickerComponent,
+  formatBytes,
+  IconComponent,
+  InputComponent,
+  MetaLineComponent,
+  NoteComponent,
+  PageHeaderComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  SegmentedComponent,
+  type SegmentedOption,
+  SkeletonComponent,
+  ToastService,
+  DialogBodyDirective,
+} from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import {
@@ -94,6 +116,7 @@ function emptyForm(): VariantForm {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     MetaLineComponent,
     LoadStateComponent,
     FilePickerComponent,
@@ -400,8 +423,8 @@ export class AdminCdVariantsComponent {
     return this.editingId() !== null || CD_VARIANT_KEY_PATTERN.test(f.key);
   }
 
-  submit(event: Event): void {
-    event.preventDefault();
+  submit(event?: Event): void {
+    event?.preventDefault();
     if (!this.canSave()) return;
     const f = this.form();
     this.saving.set(true);
@@ -417,13 +440,14 @@ export class AdminCdVariantsComponent {
         this.variants.update((list) =>
           id ? list.map((v) => (v.id === id ? saved : v)) : [...list, saved],
         );
-        this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
       },
       error: (err: unknown) => {
         this.saving.set(false);
         const key: TranslationKey =
           errorStatus(err) === 409 ? 'admin.cdVariants.keyExists' : 'admin.common.saveFailed';
-        if (key === 'admin.common.saveFailed') this.toast.error(this.i18n.translate(key));
+        if (key === 'admin.common.saveFailed')
+          this.toast.show({ text: this.i18n.translate(key), kind: 'error' });
         else this.formError.set(key);
       },
     });
@@ -445,13 +469,14 @@ export class AdminCdVariantsComponent {
         this.deleting.set(false);
         this.confirmDelete.set(null);
         this.variants.update((list) => list.filter((v) => v.id !== variant.id));
-        this.toast.success(this.i18n.translate('admin.cdVariants.deleted'));
+        this.toast.show({ text: this.i18n.translate('admin.cdVariants.deleted'), kind: 'success' });
       },
       error: (err: unknown) => {
         this.deleting.set(false);
         const key: TranslationKey =
           errorStatus(err) === 409 ? 'admin.cdVariants.inUse' : 'admin.common.saveFailed';
-        if (key === 'admin.common.saveFailed') this.toast.error(this.i18n.translate(key));
+        if (key === 'admin.common.saveFailed')
+          this.toast.show({ text: this.i18n.translate(key), kind: 'error' });
         else this.deleteError.set(key);
       },
     });
@@ -560,14 +585,14 @@ export class AdminCdVariantsComponent {
             v.id === draft.variantId ? { ...v, logos: [...v.logos.filter(keep), logo] } : v,
           ),
         );
-        this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
       },
       error: (err: unknown) => {
         this.logoSaving.set(false);
         const status = errorStatus(err);
-        const key: TranslationKey =
-          SQUARE_ERROR_KEYS[problemCode(err)] ?? squareStatusKey(status);
-        if (key === 'admin.common.saveFailed') this.toast.error(this.i18n.translate(key));
+        const key: TranslationKey = SQUARE_ERROR_KEYS[problemCode(err)] ?? squareStatusKey(status);
+        if (key === 'admin.common.saveFailed')
+          this.toast.show({ text: this.i18n.translate(key), kind: 'error' });
         else this.logoError.set(key);
       },
     });
@@ -581,9 +606,13 @@ export class AdminCdVariantsComponent {
             v.id === variant.id ? { ...v, logos: v.logos.filter((l) => l.id !== logo.id) } : v,
           ),
         );
-        this.toast.success(this.i18n.translate('admin.cdVariants.logoRemoved'));
+        this.toast.show({
+          text: this.i18n.translate('admin.cdVariants.logoRemoved'),
+          kind: 'success',
+        });
       },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+      error: () =>
+        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' }),
     });
   }
 
@@ -605,7 +634,8 @@ export class AdminCdVariantsComponent {
           ),
         );
       },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+      error: () =>
+        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' }),
     });
   }
 }

@@ -19,7 +19,33 @@ import {
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
-import { AvatarComponent, ButtonComponent, ButtonGroupComponent, ChipComponent, ConfirmDialogComponent, copyText, DropOverlayComponent, EmptyStateComponent, FileDragTracker, FileViewerComponent, type FileViewerItem, IconComponent, isFileDrag, MEDIA, mediaQuery, MetaLineComponent, PressSelectDirective, ScrollFadeDirective, SegmentedComponent, type SegmentedOption, SideSheetComponent, SkeletonComponent, StatusTextComponent, ToastService } from '@stupa-makers/ui-kit';
+import {
+  AvatarComponent,
+  ButtonComponent,
+  ButtonGroupComponent,
+  ChipComponent,
+  ConfirmDialogComponent,
+  copyText,
+  DropOverlayComponent,
+  EmptyStateComponent,
+  FileDragTracker,
+  FileViewerComponent,
+  type FileViewerItem,
+  IconComponent,
+  isFileDrag,
+  MEDIA,
+  mediaQuery,
+  MetaLineComponent,
+  PressSelectDirective,
+  ScrollFadeDirective,
+  SegmentedComponent,
+  type SegmentedOption,
+  SideSheetComponent,
+  SkeletonComponent,
+  StatusTextComponent,
+  ToastService,
+  SheetBodyDirective,
+} from '@stupa-makers/ui-kit';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { PersonRef } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -163,6 +189,7 @@ function writeStore(key: string, value: string | null): void {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBodyDirective,
     MetaLineComponent,
     ChipComponent,
     ConfirmDialogComponent,
@@ -736,13 +763,19 @@ export class ChatComponent {
   protected async addFiles(list: readonly File[]): Promise<void> {
     const room = CHAT_MAX_FILES - this.files().length - this.uploads().length;
     if (list.length > room) {
-      this.toast.error(this.i18n.translate('chat.error.tooManyFiles', { max: CHAT_MAX_FILES }));
+      this.toast.show({
+        text: this.i18n.translate('chat.error.tooManyFiles', { max: CHAT_MAX_FILES }),
+        kind: 'error',
+      });
     }
     const maxBytes = this.drafts.limits().maxFileBytes;
     const mb = Math.round(maxBytes / (1024 * 1024));
     const offered = list.slice(0, Math.max(0, room));
     for (const file of offered.filter((f) => f.size > maxBytes)) {
-      this.toast.error(`${file.name}: ${this.i18n.translate('chat.error.fileTooLarge', { mb })}`);
+      this.toast.show({
+        text: `${file.name}: ${this.i18n.translate('chat.error.fileTooLarge', { mb })}`,
+        kind: 'error',
+      });
     }
     const take = offered.filter((f) => f.size <= maxBytes);
     if (!take.length) return;
@@ -750,7 +783,10 @@ export class ChatComponent {
     this.leaveFullAttach();
     const { failed } = await done;
     for (const f of failed) {
-      this.toast.error(`${f.filename}: ${this.i18n.translate(chatUploadError(f.reason), { mb })}`);
+      this.toast.show({
+        text: `${f.filename}: ${this.i18n.translate(chatUploadError(f.reason), { mb })}`,
+        kind: 'error',
+      });
     }
   }
 
@@ -780,7 +816,7 @@ export class ChatComponent {
   protected async removeFile(file: DraftFile): Promise<void> {
     const at = this.files().findIndex((f) => f.id === file.id);
     if (!(await this.drafts.remove(file.id))) {
-      this.toast.error(this.i18n.translate('apply.files.error.delete'));
+      this.toast.show({ text: this.i18n.translate('apply.files.error.delete'), kind: 'error' });
       return;
     }
     afterNextRender(

@@ -25,6 +25,7 @@ import {
   candidateLabel,
 } from './application-capture.component';
 import { localToday } from '@shared/date-format';
+import { toastMock } from '../../../../testing/toast';
 
 const TYPES: ApplicationType[] = [
   { id: 't1', name: 'Förderantrag', active: true, hasBudget: true, activeFormVersionId: 'v1', key: null, gremiumId: null },
@@ -101,7 +102,7 @@ async function setup(opts: Opts = {}) {
   const create = opts.create ?? jest.fn(() => of({ applicationId: 'new-1' }));
   const effectiveForm = opts.effectiveForm ?? jest.fn(() => of(EFF));
   const drafts = opts.drafts ?? fakeDrafts();
-  const toast = { error: jest.fn(), success: jest.fn(), show: jest.fn() };
+  const toast = toastMock();
   const api: Partial<ApiClient> = {
     searchOnBehalfApplicants: search as unknown as ApiClient['searchOnBehalfApplicants'],
     createApplicationOnBehalf: create as unknown as ApiClient['createApplicationOnBehalf'],
@@ -287,7 +288,7 @@ describe('ApplicationCaptureComponent', () => {
     expect(prefill).toHaveBeenCalledWith('p-1');
     expect(s.comp.predecessor()).toEqual({ id: 'p-1', title: 'Ohne Titel' });
     expect(s.comp.model['title']).toBe('Sommerfest');
-    expect(s.toast.show).toHaveBeenCalledWith('Angaben aus dem Vorgänger übernommen');
+    expect(s.toast.info).toHaveBeenCalledWith('Angaben aus dem Vorgänger übernommen');
     s.comp.form.get('title')?.setValue('Sommerfest');
     s.flush();
     s.comp.submit(new Event('submit'));

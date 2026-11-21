@@ -233,7 +233,7 @@ export class ElectionResultComponent {
     this.api.drawElectionLot(id).subscribe({
       next: (vote) => {
         this.busy.set(null);
-        this.toast.success(this.t('election.lot.drawn'));
+        this.toast.show({ text: this.t('election.lot.drawn'), kind: 'success' });
         this.changed.emit(vote);
       },
       error: (err: unknown) => this.fail(err),
@@ -248,7 +248,7 @@ export class ElectionResultComponent {
     this.api.nextElectionRound(id).subscribe({
       next: (vote) => {
         this.busy.set(null);
-        this.toast.success(this.t('election.nextRound.created'));
+        this.toast.show({ text: this.t('election.nextRound.created'), kind: 'success' });
         this.changed.emit(vote);
       },
       error: (err: unknown) => this.fail(err),
@@ -265,6 +265,6 @@ export class ElectionResultComponent {
     this.busy.set(null);
     const detail = problemDetail(err);
     const base = this.t('meetings.toast.actionFailed');
-    this.toast.error(detail ? `${base}: ${detail}` : base);
+    this.toast.show({ text: detail ? `${base}: ${detail}` : base, kind: 'error' });
   }
 }

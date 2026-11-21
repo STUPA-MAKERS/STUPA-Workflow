@@ -28,6 +28,7 @@ import {
   showInTopLayer,
   SideSheetComponent,
   watchAnchoredPopover,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -115,7 +116,14 @@ export interface CostCentreGroup {
   selector: 'app-cost-centre-select',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconComponent, NgTemplateOutlet, ScrollFadeDirective, SideSheetComponent, TranslatePipe],
+  imports: [
+    SheetBodyDirective,
+    IconComponent,
+    NgTemplateOutlet,
+    ScrollFadeDirective,
+    SideSheetComponent,
+    TranslatePipe,
+  ],
   templateUrl: './cost-centre-select.component.html',
   styleUrl: './cost-centre-select.component.scss',
   host: {

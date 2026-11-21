@@ -151,11 +151,11 @@ export class DelegationsComponent {
         this.busy.set(false);
         this.confirmRevoke.set(null);
         this.delegations.update((list) => list.filter((x) => x.id !== d.id));
-        this.toast.success(this.i18n.translate('admin.deleg.revoked'));
+        this.toast.show({ text: this.i18n.translate('admin.deleg.revoked'), kind: 'success' });
       },
       error: () => {
         this.busy.set(false);
-        this.toast.error(this.i18n.translate('admin.deleg.revokeFailed'));
+        this.toast.show({ text: this.i18n.translate('admin.deleg.revokeFailed'), kind: 'error' });
       },
     });
   }

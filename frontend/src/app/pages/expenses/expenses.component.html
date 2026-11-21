@@ -484,21 +484,29 @@
     [open]="formMode() !== null"
     (openChange)="$event ? null : dialogs.closeForms()"
   >
-    <ng-container *ngTemplateOutlet="form; context: { $implicit: true }" />
+    <ng-template sheetBody>
+      <ng-container *ngTemplateOutlet="form; context: { $implicit: true }" />
+    </ng-template>
   </app-side-sheet>
 }
 
-<app-side-sheet [side]="sheetSide()" [heading]="'expenses.bulk.reassignTitle' | t" [(open)]="bulkReassignOpen">
-  <app-bulk-panel
-    variant="reassign"
-    [rows]="selectedRows()"
-    [costCentres]="costCentres()"
-    [tree]="budgetTree()"
-    [busy]="bulkBusy()"
-    [(budgetId)]="bulkBudgetId"
-    [(category)]="bulkCategory"
-    (reassign)="runBulkReassign()"
-  />
+<app-side-sheet
+  [side]="sheetSide()"
+  [heading]="'expenses.bulk.reassignTitle' | t"
+  [(open)]="bulkReassignOpen"
+>
+  <ng-template sheetBody>
+    <app-bulk-panel
+      variant="reassign"
+      [rows]="selectedRows()"
+      [costCentres]="costCentres()"
+      [tree]="budgetTree()"
+      [busy]="bulkBusy()"
+      [(budgetId)]="bulkBudgetId"
+      [(category)]="bulkCategory"
+      (reassign)="runBulkReassign()"
+    />
+  </ng-template>
 </app-side-sheet>
 
 @if (canManage()) {

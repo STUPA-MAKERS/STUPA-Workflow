@@ -3,10 +3,23 @@
 @let keeperOpen = shownPanel() === 'protokollant';
 
 @if (phone()) {
-  <app-side-sheet side="bottom" [heading]="panelHeading() | t" [open]="keeperOpen" (openChange)="$event || closePanel()">
-    @if (keeperOpen) {
-      <app-keeper-menu [meeting]="m" [attendance]="attendance()" [inSheet]="true" (pick)="pickKeeper($event)" (discard)="discardHandover()" />
-    }
+  <app-side-sheet
+    side="bottom"
+    [heading]="panelHeading() | t"
+    [open]="keeperOpen"
+    (openChange)="$event || closePanel()"
+  >
+    <ng-template sheetBody>
+      @if (keeperOpen) {
+        <app-keeper-menu
+          [meeting]="m"
+          [attendance]="attendance()"
+          [inSheet]="true"
+          (pick)="pickKeeper($event)"
+          (discard)="discardHandover()"
+        />
+      }
+    </ng-template>
   </app-side-sheet>
 } @else if (keeperOpen) {
   <button type="button" class="sd__backdrop" aria-hidden="true" tabindex="-1" (click)="closePanel()"></button>

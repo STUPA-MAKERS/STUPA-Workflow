@@ -13,6 +13,7 @@ import { guestMe } from '../../../testing/guest-fixtures';
 import { AltchaService } from '../apply/altcha.service';
 import { LocaleSwitchService } from '../../layout/locale-switch.service';
 import { PublicMeetingComponent, normalizeJoinCode } from './public-meeting.component';
+import { toastMock } from '../../../testing/toast';
 
 const err = (status: number, code?: string) =>
   new HttpErrorResponse({ status, error: code ? { code } : null });
@@ -52,7 +53,7 @@ async function setup(
       { provide: ActivatedRoute, useValue: { paramMap: params.asObservable() } },
       { provide: AltchaService, useValue: { solve: () => Promise.resolve(null) } },
       { provide: USE_MOCK_API, useValue: true },
-      { provide: ToastService, useValue: { success: jest.fn(), error: jest.fn() } },
+      { provide: ToastService, useValue: toastMock() },
     ],
   });
   return { ...view, api, auth, router, params };

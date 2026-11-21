@@ -25,6 +25,7 @@ import { RailStatusService } from '../../layout/rail-status.service';
 import { ApplicationsListComponent, actionErrorKey } from './applications-list.component';
 import { ApplicationsPageService } from './applications-page.service';
 import { loadErrorToast } from '../../../testing/load-error';
+import { kindSpies } from '../../../testing/toast';
 
 /** The dots of the meta lines: one between two parts (001961). */
 const dots = (root: ParentNode = document) =>
@@ -966,7 +967,7 @@ describe('ApplicationsListComponent', () => {
 
     it('reports a failed export', async () => {
       const { http, cmp, toast } = await start();
-      const error = jest.spyOn(toast, 'error');
+      const error = jest.spyOn(kindSpies(toast), 'error');
       cmp.onExport();
       http.expectOne((r) => r.url === '/api/applications/export.xlsx').flush(null, { status: 500, statusText: 'x' });
       expect(cmp.exporting()).toBe(false);
@@ -1240,7 +1241,7 @@ describe('ApplicationsListComponent', () => {
     /** A second action waits for the first. */
     it('loads the transitions only when the menu opens, and fires one', async () => {
       const { http, harness, toast, rail, pageService, cmp } = await start();
-      const success = jest.spyOn(toast, 'success');
+      const success = jest.spyOn(kindSpies(toast), 'success');
       const notices: unknown[] = [];
       pageService.changes$.subscribe((c) => notices.push(c));
       http.verify();
@@ -1264,8 +1265,17 @@ describe('ApplicationsListComponent', () => {
     ])('reports a failed transition (%s) and reloads', async (status, key) => {
       expect(actionErrorKey(status)).toBe(key);
       const { http, cmp, toast } = await start();
-      const error = jest.spyOn(toast, 'error');
-      cmp.onRowAction(cmp.items()[0], { kind: 'transition', transition: { ...START, label: 'x', color: null, addsToAgenda: false, agendaGremiumId: null } });
+      const error = jest.spyOn(kindSpies(toast), 'error');
+      cmp.onRowAction(cmp.items()[0], {
+        kind: 'transition',
+        transition: {
+          ...START,
+          label: 'x',
+          color: null,
+          addsToAgenda: false,
+          agendaGremiumId: null,
+        },
+      });
       http.expectOne((r) => r.method === 'POST').flush({}, { status, statusText: 'x' });
       expect(error).toHaveBeenCalled();
       http.expectOne(LIST).flush(page(ROWS));
@@ -1357,8 +1367,10 @@ describe('ApplicationsListComponent', () => {
 
     it('archives a row and brings an archived one back, without a question', async () => {
       const { http, harness, toast, cmp } = await start();
-      const success = jest.spyOn(toast, 'success');
-      await openRowMenu(http, 'Flyer für die Hochschulgruppen-Messe', [], () => harness.detectChanges());
+      const success = jest.spyOn(kindSpies(toast), 'success');
+      await openRowMenu(http, 'Flyer für die Hochschulgruppen-Messe', [], () =>
+        harness.detectChanges(),
+      );
       await userEvent.click(screen.getByRole('menuitem', { name: 'Archivieren' }));
       http.expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-2/archive').flush(ROWS[1]);
       expect(success).toHaveBeenCalledWith('Antrag archiviert.');
@@ -1372,7 +1384,7 @@ describe('ApplicationsListComponent', () => {
     /** The list runs one row action at a time. */
     it('reports a failed archive', async () => {
       const { http, cmp, toast } = await start();
-      const error = jest.spyOn(toast, 'error');
+      const error = jest.spyOn(kindSpies(toast), 'error');
       cmp.onRowAction(cmp.items()[0], { kind: 'archive' });
       cmp.onRowAction(cmp.items()[1], { kind: 'archive' });
       cmp.onRowAction(cmp.items()[1], {
@@ -1387,8 +1399,10 @@ describe('ApplicationsListComponent', () => {
     /** The row leaves the list without a new request. */
     it('deletes only after the red confirmation', async () => {
       const { http, harness, toast, cmp } = await start();
-      const success = jest.spyOn(toast, 'success');
-      await openRowMenu(http, 'Flyer für die Hochschulgruppen-Messe', [], () => harness.detectChanges());
+      const success = jest.spyOn(kindSpies(toast), 'success');
+      await openRowMenu(http, 'Flyer für die Hochschulgruppen-Messe', [], () =>
+        harness.detectChanges(),
+      );
       const del = screen.getByRole('menuitem', { name: 'Löschen' });
       expect(del).toHaveClass('rm__item--danger');
       await userEvent.click(del);
@@ -1419,7 +1433,7 @@ describe('ApplicationsListComponent', () => {
 
     it('keeps the confirmation open when the delete fails, and does nothing without a row', async () => {
       const { http, cmp, toast } = await start();
-      const error = jest.spyOn(toast, 'error');
+      const error = jest.spyOn(kindSpies(toast), 'error');
       cmp.confirmDelete();
       cmp.deleteFor.set(cmp.items()[0]);
       cmp.confirmDelete();
@@ -1465,14 +1479,18 @@ describe('ApplicationsListComponent', () => {
 
     it('archives at once, keeps the row out, and the undo brings it back', async () => {
       const { cmp, http, toast, rail } = await start();
-      const action = jest.spyOn(toast, 'showAction');
+      const action = jest.spyOn(toast, 'show');
       cmp.onRowSwiped(cmp.items()[1], cmp.rows()[1].swipeLeft!);
       expect(cmp.rows().map((r) => r.item.id)).toEqual(['app-1', 'app-3']);
       http.expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-2/archive').flush(ROWS[1]);
       expect(rail.refresh).toHaveBeenCalled();
       http.expectOne(LIST).flush(page([ROWS[0], ROWS[2]]));
       expect(action).toHaveBeenCalledWith(
-        expect.objectContaining({ message: 'Antrag archiviert.', action: 'Rückgängig', variant: 'success' }),
+        expect.objectContaining({
+          text: 'Antrag archiviert.',
+          action: expect.objectContaining({ label: 'Rückgängig' }),
+          kind: 'success',
+        }),
       );
       lastClosed(action)('action');
       http.expectOne((r) => r.method === 'DELETE' && r.url === '/api/applications/app-2/archive').flush(ROWS[1]);
@@ -1483,11 +1501,13 @@ describe('ApplicationsListComponent', () => {
 
     it('lets the archive stand when the toast goes without the undo', async () => {
       const { cmp, http, toast } = await start();
-      const action = jest.spyOn(toast, 'showAction');
+      const action = jest.spyOn(toast, 'show');
       cmp.onRowSwiped(cmp.items()[2], cmp.rows()[2].swipeLeft!);
       http.expectOne((r) => r.method === 'DELETE' && r.url === '/api/applications/app-3/archive').flush(ROWS[2]);
       http.expectOne(LIST).flush(page(ROWS.slice(0, 2)));
-      expect(action).toHaveBeenCalledWith(expect.objectContaining({ message: 'Antrag ist wieder in der Liste.' }));
+      expect(action).toHaveBeenCalledWith(
+        expect.objectContaining({ text: 'Antrag ist wieder in der Liste.' }),
+      );
       lastClosed(action)('timeout');
       expect(cmp.swipedAway().size).toBe(0);
       http.verify();
@@ -1495,8 +1515,8 @@ describe('ApplicationsListComponent', () => {
 
     it('brings the row back when the archive or its undo fails', async () => {
       const { cmp, http, toast } = await start();
-      const error = jest.spyOn(toast, 'error');
-      const action = jest.spyOn(toast, 'showAction');
+      const error = jest.spyOn(kindSpies(toast), 'error');
+      const action = jest.spyOn(toast, 'show');
       cmp.onRowSwiped(cmp.items()[0], cmp.rows()[0].swipeLeft!);
       http.expectOne((r) => r.url.endsWith('/archive')).flush({}, { status: 500, statusText: 'x' });
       expect(error).toHaveBeenCalledTimes(1);

@@ -408,7 +408,9 @@
       [heading]="'budget.dash.tree' | t"
       [(open)]="navOpen"
     >
-      <ng-container *ngTemplateOutlet="treePane" />
+      <ng-template sheetBody>
+        <ng-container *ngTemplateOutlet="treePane" />
+      </ng-template>
     </app-side-sheet>
   }
 
@@ -522,34 +524,36 @@
 
   <app-dialog
     [open]="overviewOpen()"
-    [title]="'budget.overview.title' | t"
+    [heading]="'budget.overview.title' | t"
     [closeLabel]="'action.close' | t"
     size="lg"
     (closed)="overviewOpen.set(false)"
   >
-    @if (visibleOverviewMetrics().length > 1) {
-      <div class="bd__ovTabs" role="tablist" [attr.aria-label]="'budget.overview.title' | t">
-        @for (m of visibleOverviewMetrics(); track m) {
-          <button
-            type="button"
-            role="tab"
-            class="chip"
-            [class.on]="activeOverviewMetric() === m"
-            [attr.aria-selected]="activeOverviewMetric() === m"
-            (click)="overviewMetric.set(m)"
-          >
-            <span class="chip__text">{{ metricLabel(m) }}</span>
-          </button>
-        }
-      </div>
-    }
-    <app-budget-sunburst
-      [root]="overviewRoot()"
-      [fyId]="selectedFyId()"
-      [metric]="activeOverviewMetric()"
-      [colors]="colors()"
-      (nodeClick)="onOverviewPick($event)"
-    />
+    <ng-template dialogBody>
+      @if (visibleOverviewMetrics().length > 1) {
+        <div class="bd__ovTabs" role="tablist" [attr.aria-label]="'budget.overview.title' | t">
+          @for (m of visibleOverviewMetrics(); track m) {
+            <button
+              type="button"
+              role="tab"
+              class="chip"
+              [class.on]="activeOverviewMetric() === m"
+              [attr.aria-selected]="activeOverviewMetric() === m"
+              (click)="overviewMetric.set(m)"
+            >
+              <span class="chip__text">{{ metricLabel(m) }}</span>
+            </button>
+          }
+        </div>
+      }
+      <app-budget-sunburst
+        [root]="overviewRoot()"
+        [fyId]="selectedFyId()"
+        [metric]="activeOverviewMetric()"
+        [colors]="colors()"
+        (nodeClick)="onOverviewPick($event)"
+      />
+    </ng-template>
   </app-dialog>
 }
 

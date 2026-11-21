@@ -10,6 +10,7 @@ import {
   SegmentedComponent,
   type SegmentedOption,
   SideSheetComponent,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 
 /** A column of the sheet, by its name alone: a selector shows no count (spec 000560). */
@@ -46,7 +47,15 @@ export interface MoveChoice {
   selector: 'app-todo-move-sheet',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ButtonComponent, ButtonGroupComponent, IconComponent, SegmentedComponent, SideSheetComponent],
+  imports: [
+    SheetBodyDirective,
+    TranslatePipe,
+    ButtonComponent,
+    ButtonGroupComponent,
+    IconComponent,
+    SegmentedComponent,
+    SideSheetComponent,
+  ],
   templateUrl: './todo-move-sheet.component.html',
   styleUrl: './todo-move-sheet.component.scss',
 })

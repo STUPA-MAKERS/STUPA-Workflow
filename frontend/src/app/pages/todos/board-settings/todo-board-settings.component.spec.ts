@@ -7,6 +7,7 @@ import { TodosApiService, type TodoBoard, type TodoBoardEntry } from '@core/api/
 import { ToastService } from '@stupa-makers/ui-kit';
 import { board, tile } from '../../../../testing/todo-fixtures';
 import { TodoBoardSettingsComponent } from './todo-board-settings.component';
+import { toastMock } from '../../../../testing/toast';
 
 const ENTRIES: TodoBoardEntry[] = [
   { id: null, kind: 'gremium', targetId: 'g-1', name: 'Studierendenparlament', role: 'edit', fixed: true, logoUrl: null },
@@ -35,7 +36,7 @@ async function setup(b: TodoBoard = board()) {
     board: jest.fn(() => of(b)),
     archiveBoard: jest.fn(() => of(b)),
   };
-  const toast = { success: jest.fn(), error: jest.fn() };
+  const toast = toastMock();
   const changed = jest.fn();
   const archived = jest.fn();
   const view = await render(TodoBoardSettingsComponent, {

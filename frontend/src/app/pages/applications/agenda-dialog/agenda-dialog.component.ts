@@ -27,6 +27,7 @@ import {
   SwitchComponent,
   ToastService,
   ErrorTextComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { localToday, weekdayName } from '@shared/date-format';
 
@@ -61,6 +62,7 @@ interface MeetingChoice {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     ErrorTextComponent,
     EmptyStateComponent,
     ScrollFadeDirective,
@@ -197,40 +199,45 @@ export class AgendaDialogComponent {
     const body = meetingId
       ? { transitionId: transition.id, meetingId, nonPublic: this.nonPublic(), note }
       : { transitionId: transition.id, note };
-    this.api
-      .fireTransition(id, body)
-      .subscribe({
-        next: () => {
-          this.saving.set(false);
-          const meeting = this.meetings().find((m) => m.id === meetingId);
-          this.toast.success(
-            meeting
-              ? this.i18n.translate('applications.agenda.added', { meeting: meeting.title })
-              : this.i18n.translate('applications.actions.success'),
-          );
+    this.api.fireTransition(id, body).subscribe({
+      next: () => {
+        this.saving.set(false);
+        const meeting = this.meetings().find((m) => m.id === meetingId);
+        this.toast.show({
+          text: meeting
+            ? this.i18n.translate('applications.agenda.added', { meeting: meeting.title })
+            : this.i18n.translate('applications.actions.success'),
+          kind: 'success',
+        });
+        this.open.set(false);
+        this.done.emit();
+      },
+      error: (err: { status?: number; error?: ProblemDetail | null }) => {
+        this.saving.set(false);
+        if (err.status === 422 && err.error?.code === 'agenda_meeting_invalid') {
+          this.refusal.set('applications.agenda.meetingInvalid');
+          this.load(transition);
+          return;
+        }
+        if (err.status === 409) {
+          this.toast.show({
+            text: this.i18n.translate('applications.actions.conflict'),
+            kind: 'error',
+          });
           this.open.set(false);
           this.done.emit();
-        },
-        error: (err: { status?: number; error?: ProblemDetail | null }) => {
-          this.saving.set(false);
-          if (err.status === 422 && err.error?.code === 'agenda_meeting_invalid') {
-            this.refusal.set('applications.agenda.meetingInvalid');
-            this.load(transition);
-            return;
-          }
-          if (err.status === 409) {
-            this.toast.error(this.i18n.translate('applications.actions.conflict'));
-            this.open.set(false);
-            this.done.emit();
-            return;
-          }
-          this.toast.error(
-            this.i18n.translate(
-              err.status === 403 ? 'applications.transitions.forbidden' : 'applications.actions.error',
-            ),
-          );
-        },
-      });
+          return;
+        }
+        this.toast.show({
+          text: this.i18n.translate(
+            err.status === 403
+              ? 'applications.transitions.forbidden'
+              : 'applications.actions.error',
+          ),
+          kind: 'error',
+        });
+      },
+    });
   }
 }
 

@@ -243,7 +243,7 @@ export class TodoLinkedListComponent {
         this.loaded.set(out);
         this.touch(hit.kind, hit.targetId);
       },
-      error: () => this.toast.error(this.t('links.error.add')),
+      error: () => this.toast.show({ text: this.t('links.error.add'), kind: 'error' }),
     });
   }
 
@@ -254,7 +254,7 @@ export class TodoLinkedListComponent {
         this.loaded.update((out) => out && { ...out, links: out.links.filter((l) => l.id !== row.id) });
         this.touch(row.kind, row.targetId);
       },
-      error: () => this.toast.error(this.t('links.error.remove')),
+      error: () => this.toast.show({ text: this.t('links.error.remove'), kind: 'error' }),
     });
   }
 

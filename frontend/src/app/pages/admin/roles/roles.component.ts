@@ -25,6 +25,7 @@ import {
   ToastService,
   PageHeaderComponent,
   SectionComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
@@ -66,6 +67,7 @@ const FIXED_ROLES = new Set(['admin', 'member']);
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ContentLangState],
   imports: [
+    DialogBodyDirective,
     LoadStateComponent,
     SectionComponent,
     ContentLangSwitchComponent,
@@ -201,9 +203,10 @@ export class AdminRolesComponent {
     this.api.deleteRole(role.id).subscribe({
       next: () => {
         this.roles.update((list) => list.filter((r) => r.id !== role.id));
-        this.toast.success(this.i18n.translate('admin.roles.deleted'));
+        this.toast.show({ text: this.i18n.translate('admin.roles.deleted'), kind: 'success' });
       },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+      error: () =>
+        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' }),
     });
   }
 
@@ -285,11 +288,11 @@ export class AdminRolesComponent {
         this.nameDrafts.update((m) =>
           Object.fromEntries(Object.entries(m).filter(([id]) => !savedIds.has(id))),
         );
-        this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
       },
       error: () => {
         this.savingRoles.set(false);
-        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
       },
     });
   }
@@ -325,7 +328,7 @@ export class AdminRolesComponent {
         this.keepSaved([role]);
         this.expanded.open(role.id);
         this.addOpen.set(false);
-        this.toast.success(this.i18n.translate('admin.roles.created'));
+        this.toast.show({ text: this.i18n.translate('admin.roles.created'), kind: 'success' });
       },
       error: (err: { status?: number }) => {
         this.creating.set(false);
@@ -334,7 +337,7 @@ export class AdminRolesComponent {
         } else if (err?.status === 409) {
           this.serverKeyError.set(this.i18n.translate('admin.roles.keyTaken'));
         } else {
-          this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+          this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
         }
       },
     });

@@ -16,6 +16,7 @@ import { AGENDA, meeting, protocol } from '../../../../testing/meeting-fixtures'
 import { type SaveState, TopSheetComponent, documentUploadErrorKey } from './top-sheet.component';
 import { KnownNamesService } from './known-names.service';
 import { NO_LINKED_TODOS } from '../../../../testing/todo-fixtures';
+import { kindSpies } from '../../../../testing/toast';
 
 interface Inputs {
   meeting: Meeting;
@@ -209,7 +210,7 @@ describe('TopSheetComponent', () => {
     expect(upload).not.toHaveBeenCalled();
     await expect(uploader!(png)).resolves.toEqual({ src: `/api/media/images/${ID}`, alt: 'Die Sitzung im Saal' });
     const toast = TestBed.inject(ToastService);
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     await expect(uploader!(png)).rejects.toEqual({ status: 413 });
     expect(error).toHaveBeenCalled();
   });
@@ -230,7 +231,7 @@ describe('TopSheetComponent', () => {
     const pdf = new File(['x'], 'Angebot.pdf', { type: 'application/pdf' });
     await expect(uploader!(pdf)).resolves.toEqual({ src: doc.url, name: 'Angebot.pdf' });
     expect(uploadDocument).toHaveBeenCalledWith(view.fixture.componentInstance.meeting().id, pdf);
-    const error = jest.spyOn(TestBed.inject(ToastService), 'error');
+    const error = jest.spyOn(kindSpies(TestBed.inject(ToastService)), 'error');
     await expect(uploader!(pdf)).rejects.toEqual({ status: 415 });
     expect(error).toHaveBeenCalledWith('Nur PDF-Dateien ohne Passwort.');
     await expect(editor.documentInfo()!(doc.url)).resolves.toBe(3);

@@ -5,6 +5,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { of, throwError } from 'rxjs';
 import { AdminApiService } from '../admin-api.service';
 import { GremiumRolesComponent } from './gremium-roles.component';
+import { toastMock } from '../../../../testing/toast';
 
 function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
   return {
@@ -31,7 +32,7 @@ async function setup(api = makeApi(), params: Record<string, string> = { id: 'g-
     providers: [
       provideRouter([]),
       { provide: AdminApiService, useValue: api },
-      { provide: ToastService, useValue: { success: jest.fn(), error: jest.fn() } },
+      { provide: ToastService, useValue: toastMock() },
       { provide: AuthService, useValue: { can: () => true } },
       {
         provide: ActivatedRoute,

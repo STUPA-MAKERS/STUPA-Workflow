@@ -15,6 +15,7 @@ import {
 } from '../../../../testing/meeting-fixtures';
 import { AttendanceSheetComponent } from '../attendance-sheet/attendance-sheet.component';
 import { MeetingGuestsService } from '../meeting-guests.service';
+import { toastMock } from '../../../../testing/toast';
 
 /** The members hold a voting right, so the present one counts (spec 000946). */
 const VOTERS = ATTENDANCE.map((a) => ({ ...a, canVote: true }));
@@ -59,7 +60,7 @@ async function setup(over: Partial<Meeting> = {}, media: string[] = []) {
       provideHttpClientTesting(),
       MeetingGuestsService,
       { provide: ApiClient, useValue: api },
-      { provide: ToastService, useValue: { success: jest.fn(), error: jest.fn() } },
+      { provide: ToastService, useValue: toastMock() },
     ],
   });
   const guests = view.fixture.debugElement.injector.get(MeetingGuestsService);

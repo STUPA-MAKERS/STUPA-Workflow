@@ -30,6 +30,7 @@ import {
   TextareaComponent,
   ToastService,
   ErrorTextComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { INFO_MAX_LABEL, INFO_MAX_LINKS, INFO_MAX_TEXT, infoUrlValid } from '../gremien.util';
 
@@ -90,6 +91,7 @@ export function draftLinks(drafts: readonly InfoLinkDraft[]): readonly GremiumIn
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     ErrorTextComponent,
     FormsModule,
     TranslatePipe,
@@ -203,7 +205,7 @@ export class GremiumInfoDialogComponent {
     this.api.saveInfo(this.gremiumId(), body).subscribe({
       next: (info) => {
         this.saving.set(false);
-        this.toast.success(this.i18n.translate('gremien.info.saved'));
+        this.toast.show({ text: this.i18n.translate('gremien.info.saved'), kind: 'success' });
         this.saved.emit(info);
         this.closed.emit();
       },
@@ -214,7 +216,7 @@ export class GremiumInfoDialogComponent {
           this.stale.emit();
           return;
         }
-        this.toast.error(this.i18n.translate('gremien.info.saveError'));
+        this.toast.show({ text: this.i18n.translate('gremien.info.saveError'), kind: 'error' });
       },
     });
   }

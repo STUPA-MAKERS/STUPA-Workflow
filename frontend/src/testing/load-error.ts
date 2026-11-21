@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { type Toast, ToastService } from '@stupa-makers/ui-kit';
+import { type Toast, type ToastKind, type ToastOptions, ToastService } from '@stupa-makers/ui-kit';
 
 /** The open load error toast of `app-load-error` (§ui-kit:000576): a danger toast with a retry. */
 function findToast(): Toast | undefined {
@@ -29,10 +29,19 @@ export function retryLoadError(): void {
 }
 
 /**
- * A real `ToastService` whose methods in `mock` are replaced, for a spec that checks
- * `success` and `error` with jest functions. The load error toast still works. Use it as
- * `{ provide: ToastService, useFactory: () => toastWith(toast) }`.
+ * A real `ToastService` with the jest functions of `mock`: `show({ text, kind })` also calls
+ * `mock[kind](text)`, so a spec checks `success` and `error` with jest functions. The load
+ * error toast still works. Use it as `{ provide: ToastService, useFactory: () => toastWith(toast) }`.
  */
-export function toastWith(mock: Partial<Record<keyof ToastService, unknown>>): ToastService {
-  return Object.assign(new ToastService(), mock);
+export function toastWith(
+  mock: Partial<Record<ToastKind | 'dismiss' | 'act', unknown>>,
+): ToastService {
+  const service = new ToastService();
+  const real = service.show.bind(service);
+  const m = mock as Partial<Record<ToastKind, (text: string) => void>>;
+  const show = (o: ToastOptions): number => {
+    m[o.kind ?? 'info']?.(o.text);
+    return real(o);
+  };
+  return Object.assign(service, mock, { show });
 }

@@ -112,9 +112,11 @@
     @if (sheetOpen()) {
       <div #layer class="hm__layer" popover="manual">
         <app-side-sheet side="bottom" [heading]="title() | t" [(open)]="sheetOpen">
-          <div class="hm hm--sheet hm--inSheet" role="group">
-            <ng-container [ngTemplateOutlet]="entries" />
-          </div>
+          <ng-template sheetBody>
+            <div class="hm hm--sheet hm--inSheet" role="group">
+              <ng-container [ngTemplateOutlet]="entries" />
+            </div>
+          </ng-template>
         </app-side-sheet>
       </div>
     }

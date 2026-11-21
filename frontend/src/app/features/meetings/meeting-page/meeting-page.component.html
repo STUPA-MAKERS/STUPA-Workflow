@@ -118,15 +118,23 @@
 />
 
 @if (!wide()) {
-  <app-side-sheet [side]="phone() ? 'bottom' : 'start'" [heading]="'meetings.agenda.title' | t" [(open)]="agendaOpen">
-    @if (canAddTop()) {
-      <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'meetings.agenda.dialogTitle' | t" (click)="addTop.emit()">
-        <app-icon name="plus" />
-      </app-button>
-    }
-    @if (agendaOpen()) {
-      <ng-container [ngTemplateOutlet]="agendaTpl" [ngTemplateOutletContext]="{ inSheet: true }" />
-    }
+  <app-side-sheet
+    [side]="phone() ? 'bottom' : 'start'"
+    [heading]="'meetings.agenda.title' | t"
+    [(open)]="agendaOpen"
+    [actions]="
+      canAddTop() ? [{ key: 'add', label: ('meetings.agenda.dialogTitle' | t), icon: 'plus' }] : []
+    "
+    (action)="addTop.emit()"
+  >
+    <ng-template sheetBody>
+      @if (agendaOpen()) {
+        <ng-container
+          [ngTemplateOutlet]="agendaTpl"
+          [ngTemplateOutletContext]="{ inSheet: true }"
+        />
+      }
+    </ng-template>
   </app-side-sheet>
 }
 
@@ -209,33 +217,39 @@
     />
 </ng-template>
 
-<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'todos.meeting.sheet' | t" [(open)]="todosOpen">
-  <!-- One projected group, so the buttons join the head group of the close button. -->
-  @if (todoList()?.canAct() || todoList()?.canLink()) {
-    <ng-container ngProjectAs="[sheet-actions]">
-      <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.link' | t" (click)="todoList()?.linkOpen?.set(true)">
-        <app-icon name="link" />
-      </app-button>
-      @if (todoList()?.canAct()) {
-        <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.add' | t" (click)="todoList()?.newOpen?.set(true)">
-          <app-icon name="plus" />
-        </app-button>
-      }
-    </ng-container>
-  }
-  @if (todosOpen()) {
-    <app-todo-linked-list
-      #todoList
-      kind="meeting"
-      headingId="mp-meeting-todos"
-      [showTitle]="false"
-      [targetId]="m.id"
-      [gremiumId]="m.gremiumId"
-      [linkLabel]="m.title"
-      [emptyHeading]="'todos.meeting.empty' | t"
-      [headActions]="true"
-    />
-  }
+<app-side-sheet
+  [side]="phone() ? 'bottom' : 'end'"
+  [heading]="'todos.meeting.sheet' | t"
+  [(open)]="todosOpen"
+  [actions]="
+    todoList()?.canAct()
+      ? [
+          { key: 'link', label: ('todos.linked.link' | t), icon: 'link' },
+          { key: 'add', label: ('todos.linked.add' | t), icon: 'plus' },
+        ]
+      : todoList()?.canLink()
+        ? [{ key: 'link', label: ('todos.linked.link' | t), icon: 'link' }]
+        : []
+  "
+  (action)="
+    $event.key === 'link' ? todoList()?.linkOpen?.set(true) : todoList()?.newOpen?.set(true)
+  "
+>
+  <ng-template sheetBody>
+    @if (todosOpen()) {
+      <app-todo-linked-list
+        #todoList
+        kind="meeting"
+        headingId="mp-meeting-todos"
+        [showTitle]="false"
+        [targetId]="m.id"
+        [gremiumId]="m.gremiumId"
+        [linkLabel]="m.title"
+        [emptyHeading]="'todos.meeting.empty' | t"
+        [headActions]="true"
+      />
+    }
+  </ng-template>
 </app-side-sheet>
 
 <!-- Above the phone width small tabs at the end edge open the sheets: the votes for everybody
@@ -288,48 +302,59 @@
 
 <!-- The linked rows of the open item: the Antrag or the Haushaltsplan first, then the links
      (spec 001800). -->
-<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'todos.linked.top' | t" [(open)]="linksOpen">
-  <!-- One projected group, so the buttons join the head group of the close button. -->
-  @if (topLinks()?.canAct() || topLinks()?.canLink()) {
-    <ng-container ngProjectAs="[sheet-actions]">
-      <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.link' | t" (click)="topLinks()?.linkOpen?.set(true)">
-        <app-icon name="link" />
-      </app-button>
-      @if (topLinks()?.canAct()) {
-        <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.add' | t" (click)="topLinks()?.newOpen?.set(true)">
-          <app-icon name="plus" />
-        </app-button>
-      }
-    </ng-container>
-  }
-  @if (linksOpen() && top(); as t) {
-    <app-todo-linked-list
-      #topLinks
-      kind="agenda_item"
-      headingId="mp-top-links"
-      [showTitle]="false"
-      [targetId]="t.id"
-      [gremiumId]="m.gremiumId"
-      [linkLabel]="t.title ?? ''"
-      [lead]="applicationLead()"
-      [emptyHeading]="'todos.linked.empty' | t"
-      [headActions]="true"
-    />
-  }
+<app-side-sheet
+  [side]="phone() ? 'bottom' : 'end'"
+  [heading]="'todos.linked.top' | t"
+  [(open)]="linksOpen"
+  [actions]="
+    topLinks()?.canAct()
+      ? [
+          { key: 'link', label: ('todos.linked.link' | t), icon: 'link' },
+          { key: 'add', label: ('todos.linked.add' | t), icon: 'plus' },
+        ]
+      : topLinks()?.canLink()
+        ? [{ key: 'link', label: ('todos.linked.link' | t), icon: 'link' }]
+        : []
+  "
+  (action)="
+    $event.key === 'link' ? topLinks()?.linkOpen?.set(true) : topLinks()?.newOpen?.set(true)
+  "
+>
+  <ng-template sheetBody>
+    @if (linksOpen() && top(); as t) {
+      <app-todo-linked-list
+        #topLinks
+        kind="agenda_item"
+        headingId="mp-top-links"
+        [showTitle]="false"
+        [targetId]="t.id"
+        [gremiumId]="m.gremiumId"
+        [linkLabel]="t.title ?? ''"
+        [lead]="applicationLead()"
+        [emptyHeading]="'todos.linked.empty' | t"
+        [headActions]="true"
+      />
+    }
+  </ng-template>
 </app-side-sheet>
 
-<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'meetings.vote.count' | t" [(open)]="votesOpen">
-  <!-- "Abstimmung vorbereiten" stands in the head, in one group with the close button (spec 001802). -->
-  @if (canAddVote() && top(); as t) {
-    <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="addVoteLabel() | t" (click)="voteDialog.emit(t)">
-      <app-icon name="plus" />
-    </app-button>
-  }
-  @if (votesOpen()) {
-    <div class="mp__votes mp__votes--sheet">
-      <ng-container [ngTemplateOutlet]="votesTpl" />
-    </div>
-  }
+<!-- "Abstimmung vorbereiten" stands in the head, in one group with the close button (spec 001802). -->
+<app-side-sheet
+  [side]="phone() ? 'bottom' : 'end'"
+  [heading]="'meetings.vote.count' | t"
+  [(open)]="votesOpen"
+  [actions]="
+    canAddVote() && top() ? [{ key: 'add', label: (addVoteLabel() | t), icon: 'plus' }] : []
+  "
+  (action)="top() && voteDialog.emit(top()!)"
+>
+  <ng-template sheetBody>
+    @if (votesOpen()) {
+      <div class="mp__votes mp__votes--sheet">
+        <ng-container [ngTemplateOutlet]="votesTpl" />
+      </div>
+    }
+  </ng-template>
 </app-side-sheet>
 
 <!-- The format tools of the sheet for the dock ("Aa" on a phone). A press keeps the focus in

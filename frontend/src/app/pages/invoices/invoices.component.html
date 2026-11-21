@@ -309,7 +309,9 @@
     [open]="formMode() !== null"
     (openChange)="$event ? null : closeForms()"
   >
-    <ng-container *ngTemplateOutlet="form; context: { $implicit: 'sheet' }" />
+    <ng-template sheetBody>
+      <ng-container *ngTemplateOutlet="form; context: { $implicit: 'sheet' }" />
+    </ng-template>
   </app-side-sheet>
 }
 

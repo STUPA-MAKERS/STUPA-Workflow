@@ -41,9 +41,11 @@
   <ng-template #popover>
     @if (phone()) {
       <app-side-sheet side="bottom" [heading]="'guests.qr.title' | t" [(open)]="open">
-        @if (open()) {
-          <ng-container [ngTemplateOutlet]="body" />
-        }
+        <ng-template sheetBody>
+          @if (open()) {
+            <ng-container [ngTemplateOutlet]="body" />
+          }
+        </ng-template>
       </app-side-sheet>
     } @else if (open()) {
       <button type="button" class="jq__backdrop" aria-hidden="true" tabindex="-1" (click)="open.set(false)"></button>

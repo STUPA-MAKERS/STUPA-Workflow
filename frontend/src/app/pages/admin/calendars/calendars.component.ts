@@ -32,6 +32,7 @@ import {
   StatusTextComponent,
   ToastService,
   FactsComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminOptionsService } from '../admin-options.service';
@@ -117,6 +118,7 @@ function withSaved(
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     FactsComponent,
     FormsModule,
     TranslatePipe,
@@ -280,12 +282,12 @@ export class AdminCalendarsComponent {
       next: (saved) => {
         this.calendars.update((list) => withSaved(list, saved));
         this.saving.set(false);
-        this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
         this.close();
       },
       error: () => {
         this.saving.set(false);
-        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
       },
     });
   }
@@ -305,9 +307,16 @@ export class AdminCalendarsComponent {
     this.api.fetchNow(calendar.id).subscribe({
       next: (saved) => {
         this.calendars.update((list) => withSaved(list, saved));
-        this.toast.success(this.i18n.translate('admin.calendars.fetchRequested'));
+        this.toast.show({
+          text: this.i18n.translate('admin.calendars.fetchRequested'),
+          kind: 'success',
+        });
       },
-      error: () => this.toast.error(this.i18n.translate('admin.calendars.fetchFailed')),
+      error: () =>
+        this.toast.show({
+          text: this.i18n.translate('admin.calendars.fetchFailed'),
+          kind: 'error',
+        }),
     });
   }
 
@@ -318,9 +327,13 @@ export class AdminCalendarsComponent {
       next: () => {
         this.calendars.update((list) => list.filter((c) => c.id !== calendar.id));
         this.confirmDelete.set(null);
-        this.toast.success(this.i18n.translate('admin.calendars.deleted'));
+        this.toast.show({ text: this.i18n.translate('admin.calendars.deleted'), kind: 'success' });
       },
-      error: () => this.toast.error(this.i18n.translate('admin.calendars.deleteFailed')),
+      error: () =>
+        this.toast.show({
+          text: this.i18n.translate('admin.calendars.deleteFailed'),
+          kind: 'error',
+        }),
     });
   }
 }

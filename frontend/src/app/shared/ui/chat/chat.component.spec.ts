@@ -16,6 +16,7 @@ import { TestBed } from '@angular/core/testing';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { ChatEvent, ChatMessage, ChatVisibility, ChatVisibilityGuard } from './chat.models';
 import type { ChatPerson } from './chat-mentions';
+import { toastMock } from '../../../../testing/toast';
 
 /** The text of `el` with a space between the parts of each meta line (the dots are CSS). */
 function spaced(el: Element | null | undefined): string {
@@ -107,7 +108,7 @@ async function setup(opts: SetupOpts = {}) {
     ),
     deleteDraftAttachment: jest.fn((): Observable<void> => of(undefined)),
   };
-  const toast = { success: jest.fn(), error: jest.fn() };
+  const toast = toastMock();
   const view = await render(ChatComponent, {
     inputs: {
       messages: opts.messages ?? [],
@@ -1985,7 +1986,7 @@ describe('ChatComponent', () => {
           { provide: ApiClient, useValue: api },
           { provide: AuthService, useValue: { isAuthenticated: signal(true) } },
           { provide: AltchaService, useValue: { solve: jest.fn(async () => 'sol') } },
-          { provide: ToastService, useValue: { success: jest.fn(), error: jest.fn() } },
+          { provide: ToastService, useValue: toastMock() },
         ],
       });
       const settle = async () => {

@@ -116,12 +116,14 @@ export class ServerReachabilityService {
 
   private showBar(): void {
     if (this.noticeId !== null) return;
-    this.noticeId = this.toast.showNotice({
-      message: this.i18n.translate('pwa.serverUnreachable'),
-      variant: 'danger',
+    this.noticeId = this.toast.show({
+      text: this.i18n.translate('pwa.serverUnreachable'),
+      kind: 'error',
       icon: 'cloud-off',
       iconPosition: 'end',
-      phonePlacement: 'top',
+      placement: 'top',
+      sticky: true,
+      closable: false,
     });
   }
 

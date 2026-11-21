@@ -377,11 +377,14 @@ export class BrandingEditorComponent {
   /** Check the type and the size, then keep the file as a data URL in the draft. */
   private readLogo(slot: LogoSlot, file: File): void {
     if (!LOGO_ACCEPT_MIME.includes(file.type)) {
-      this.toast.error(this.i18n.translate('admin.brand.badType'));
+      this.toast.show({ text: this.i18n.translate('admin.brand.badType'), kind: 'error' });
       return;
     }
     if (file.size > LOGO_MAX_SIZE_MB * 1024 * 1024) {
-      this.toast.error(this.i18n.translate('admin.brand.tooLarge', { mb: LOGO_MAX_SIZE_MB }));
+      this.toast.show({
+        text: this.i18n.translate('admin.brand.tooLarge', { mb: LOGO_MAX_SIZE_MB }),
+        kind: 'error',
+      });
       return;
     }
     const reader = new FileReader();
@@ -433,11 +436,14 @@ export class BrandingEditorComponent {
   /** Check the type and the size, then upload the graphic at once. */
   private uploadPdfAsset(slot: PdfSlot, file: File): void {
     if (!PDF_ASSET_ACCEPT_MIME.includes(file.type)) {
-      this.toast.error(this.i18n.translate('admin.brand.badType'));
+      this.toast.show({ text: this.i18n.translate('admin.brand.badType'), kind: 'error' });
       return;
     }
     if (file.size > LOGO_MAX_SIZE_MB * 1024 * 1024) {
-      this.toast.error(this.i18n.translate('admin.brand.tooLarge', { mb: LOGO_MAX_SIZE_MB }));
+      this.toast.show({
+        text: this.i18n.translate('admin.brand.tooLarge', { mb: LOGO_MAX_SIZE_MB }),
+        kind: 'error',
+      });
       return;
     }
     this.savePdfAsset(slot, this.api.uploadPdfAsset(slot, file));
@@ -455,9 +461,10 @@ export class BrandingEditorComponent {
     request.subscribe({
       next: (asset) => {
         this.setPdfAsset(slot, asset);
-        this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
       },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+      error: () =>
+        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' }),
     });
   }
 
@@ -516,7 +523,7 @@ export class BrandingEditorComponent {
     const d = this.draft();
     if (!d || this.saving()) return;
     if (this.linkErrors().length > 0) {
-      this.toast.error(this.i18n.translate('admin.brand.badUrl'));
+      this.toast.show({ text: this.i18n.translate('admin.brand.badUrl'), kind: 'error' });
       return;
     }
     if (this.accentIssues().length > 0) return;
@@ -529,11 +536,11 @@ export class BrandingEditorComponent {
         this.markSaved(rev);
         this.brand.applyBranding(cfg.branding);
         this.brand.previewAccent(undefined);
-        this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
       },
       error: () => {
         this.saving.set(false);
-        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
       },
     });
   }

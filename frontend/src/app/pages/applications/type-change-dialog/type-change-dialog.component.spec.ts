@@ -7,6 +7,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { USE_MOCK_API } from '@core/api/api.config';
 import type { ApplicationType, TypeChangePreview } from '@core/api/models';
 import { TypeChangeDialogComponent } from './type-change-dialog.component';
+import { kindSpies } from '../../../../testing/toast';
 
 const TYPES: ApplicationType[] = [
   {
@@ -170,7 +171,7 @@ describe('TypeChangeDialogComponent', () => {
 
   it('sends back with the transition and the trimmed message', async () => {
     const { http, host, cmp, toast, openIt, pick } = await setup();
-    const success = jest.spyOn(toast, 'success');
+    const success = jest.spyOn(kindSpies(toast), 'success');
     openIt();
     pick('t2', SEND_BACK);
     cmp.note.set('  Bitte ergänzen.  ');
@@ -211,7 +212,7 @@ describe('TypeChangeDialogComponent', () => {
 
   it.each([403, 409, 500])('reports a %s answer and stays open', async (status) => {
     const { http, host, cmp, toast, openIt, pick } = await setup();
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     openIt();
     pick('t4', PLAIN);
     cmp.submit();
@@ -229,7 +230,7 @@ describe('TypeChangeDialogComponent', () => {
     [403, null, 'applications.transitions.forbidden'],
   ])('shows why a %s preview failed and keeps the change off', async (status, code, key) => {
     const { http, cmp, toast, openIt, detectChanges } = await setup();
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     openIt();
     cmp.pickType('t2');
     expect(cmp.loading()).toBe(true);

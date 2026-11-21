@@ -12,6 +12,7 @@ import {
 } from '../draft-attachments.service';
 import { DraftFilesComponent } from './draft-files.component';
 import { FormlyDraftFilesType } from './formly-draft-files.type';
+import { toastMock } from '../../../../testing/toast';
 
 function draft(id: string, extra: Partial<DraftFile> = {}): DraftFile {
   return {
@@ -54,7 +55,7 @@ async function setup(
   drafts = fakeDrafts(),
   changed = jest.fn(),
 ) {
-  const toast = { error: jest.fn(), show: jest.fn(), success: jest.fn() };
+  const toast = toastMock();
   const view = await render(DraftFilesComponent, {
     inputs: { heading: 'Anhänge', ...inputs },
     on: { changed },
@@ -190,7 +191,7 @@ describe('FormlyDraftFilesType', () => {
       providers: [
         provideFormly(),
         { provide: DraftAttachmentsService, useValue: drafts },
-        { provide: ToastService, useValue: { error: jest.fn() } },
+        { provide: ToastService, useValue: toastMock() },
       ],
     });
     expect(screen.getByRole('heading', { name: /Beleg/ })).toBeInTheDocument();
@@ -223,7 +224,7 @@ describe('FormlyDraftFilesType', () => {
       providers: [
         provideFormly(),
         { provide: DraftAttachmentsService, useValue: fakeDrafts() },
-        { provide: ToastService, useValue: { error: jest.fn() } },
+        { provide: ToastService, useValue: toastMock() },
       ],
     });
     expect(screen.getByRole('heading')).toHaveTextContent('');

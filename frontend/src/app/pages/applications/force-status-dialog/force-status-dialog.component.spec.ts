@@ -10,6 +10,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { USE_MOCK_API } from '@core/api/api.config';
 import type { StateOutWire } from '@core/api/models';
 import { ForceStatusDialogComponent } from './force-status-dialog.component';
+import { kindSpies } from '../../../../testing/toast';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -118,7 +119,7 @@ describe('ForceStatusDialogComponent', () => {
 
   it('forces the state with the reason, closes and reports done', async () => {
     const { http, host, cmp, toast, openIt } = await setup();
-    const success = jest.spyOn(toast, 'success');
+    const success = jest.spyOn(kindSpies(toast), 'success');
     openIt();
     cmp.choice.set('s2');
     cmp.reason.set('error_correction');
@@ -150,7 +151,7 @@ describe('ForceStatusDialogComponent', () => {
     [500, 'error'],
   ])('reports a %s answer and stays open', async (status) => {
     const { http, host, cmp, toast, openIt } = await setup();
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     openIt();
     cmp.choice.set('s2');
     cmp.reason.set('outside_decision');

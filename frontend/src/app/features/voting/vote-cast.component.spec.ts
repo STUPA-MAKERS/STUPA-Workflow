@@ -17,6 +17,11 @@ import { VoteCastComponent } from './vote-cast.component';
 import { VotingPageService, type ShownVote } from './voting-page/voting-page.service';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
+import { kindSpies } from '../../../testing/toast';
+
+/** The notices among the toasts: the ones that stay. */
+const notices = (toast: { show: jest.Mock }) =>
+  toast.show.mock.calls.filter(([o]) => (o as { sticky?: boolean }).sticky);
 
 /** A live-vote channel as signals, driven by the test. */
 function fakeSession() {
@@ -131,7 +136,7 @@ async function setup(opts: {
     canInGremium: jest.fn(() => opts.sessionManage ?? false),
     canInAnyGremium: jest.fn(() => opts.sessionManage ?? false),
   };
-  const toast = { success: jest.fn(), error: jest.fn(), showNotice: jest.fn(() => 7), dismiss: jest.fn() };
+  const toast = kindSpies({ show: jest.fn(() => 7), dismiss: jest.fn() });
   const waiting = signal(opts.serverAway ?? false);
   const railStatus = { refresh: jest.fn() };
 
@@ -906,11 +911,13 @@ describe('VoteCastComponent', () => {
         const { sessions, fixture, toast } = await setup();
         sessions[0].connection.set('reconnecting');
         fixture.detectChanges();
-        expect(toast.showNotice).toHaveBeenCalledTimes(1);
-        expect(toast.showNotice).toHaveBeenCalledWith({
-          message: 'Verbindung verloren — verbinde neu …',
-          variant: 'warning',
-          phonePlacement: 'top',
+        expect(notices(toast)).toHaveLength(1);
+        expect(toast.show).toHaveBeenCalledWith({
+          text: 'Verbindung verloren — verbinde neu …',
+          kind: 'warning',
+          placement: 'top',
+          sticky: true,
+          closable: false,
         });
         expect(screen.queryByText('Verbindung verloren — verbinde neu …')).toBeNull();
         jest.advanceTimersByTime(60_000);
@@ -919,7 +926,7 @@ describe('VoteCastComponent', () => {
         sessions[0].connection.set('open');
         fixture.detectChanges();
         expect(toast.dismiss).toHaveBeenCalledWith(7);
-        expect(toast.showNotice).toHaveBeenCalledTimes(1);
+        expect(notices(toast)).toHaveLength(1);
       } finally {
         jest.useRealTimers();
       }
@@ -929,10 +936,10 @@ describe('VoteCastComponent', () => {
       const away = await setup({ serverAway: true });
       away.sessions[0].connection.set('reconnecting');
       away.fixture.detectChanges();
-      expect(away.toast.showNotice).not.toHaveBeenCalled();
+      expect(notices(away.toast)).toHaveLength(0);
       away.waiting.set(false);
       away.fixture.detectChanges();
-      expect(away.toast.showNotice).toHaveBeenCalledTimes(1);
+      expect(notices(away.toast)).toHaveLength(1);
       away.fixture.destroy();
       expect(away.toast.dismiss).toHaveBeenCalledWith(7);
     });

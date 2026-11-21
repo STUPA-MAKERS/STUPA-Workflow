@@ -13,6 +13,7 @@ import { BudgetPlanApi, type PlanSteps } from '../../budget/plan/budget-plan.api
 import { FY25, FY26, QSM, TOP, fy, node, plan, version } from '../../budget/plan/budget-plan.fixtures';
 import { AdminApiService } from '../admin-api.service';
 import { AdminBudgetsComponent } from './admin-budgets.component';
+import { kindSpies } from '../../../../testing/toast';
 
 const problem = (status: number, code = '') => ({ status, error: { code } });
 const refuse = (status: number, code = ''): Observable<never> => throwError(() => problem(status, code));
@@ -73,7 +74,13 @@ async function setup(opts: Opts = {}) {
     ],
   });
   const toast = TestBed.inject(ToastService);
-  return { ...view, api, planApi, success: jest.spyOn(toast, 'success'), error: jest.spyOn(toast, 'error') };
+  return {
+    ...view,
+    api,
+    planApi,
+    success: jest.spyOn(kindSpies(toast), 'success'),
+    error: jest.spyOn(kindSpies(toast), 'error'),
+  };
 }
 
 const field = (scope: HTMLElement, name: string) => scope.querySelector<HTMLInputElement>(`[name="${name}"] input`) as HTMLInputElement;

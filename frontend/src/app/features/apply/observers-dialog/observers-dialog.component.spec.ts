@@ -6,6 +6,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { ApplicationObserver } from '@core/api/models';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { MAX_OBSERVERS, ObserversDialogComponent } from './observers-dialog.component';
+import { toastMock } from '../../../../testing/toast';
 
 const APP = 'a1';
 const ADRIAN: ApplicationObserver = { id: 'o1', email: 'adrian@example.org', addedAt: '2026-11-10T09:00:00Z' };
@@ -15,7 +16,7 @@ function refusal(status: number, code: string): HttpErrorResponse {
 }
 
 async function setup(api: Partial<Record<keyof ApiClient, jest.Mock>>, open = true) {
-  const toast = { error: jest.fn(), success: jest.fn(), show: jest.fn() };
+  const toast = toastMock();
   const full: Partial<Record<keyof ApiClient, jest.Mock>> = {
     applicationObservers: jest.fn(() => of([ADRIAN])),
     addApplicationObserver: jest.fn(),

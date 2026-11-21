@@ -7,6 +7,7 @@ import {
   DatepickerComponent,
   DialogComponent,
   InputComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import type { ExpenseSubBookingsState } from '../expense-sub-bookings.state';
 
@@ -19,6 +20,7 @@ import type { ExpenseSubBookingsState } from '../expense-sub-bookings.state';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     ButtonComponent,
     CurrencyInputComponent,
     DatepickerComponent,
