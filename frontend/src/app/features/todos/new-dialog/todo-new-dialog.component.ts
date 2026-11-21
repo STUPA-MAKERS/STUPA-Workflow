@@ -353,10 +353,7 @@ export class TodoNewDialogComponent {
         },
         error: (err: { error?: { code?: string } }) => {
           this.saving.set(false);
-          this.toast.show({
-            text: this.i18n.translate(this.errorKey(err?.error?.code)),
-            kind: 'error',
-          });
+          this.toast.show(this.i18n.translate(this.errorKey(err?.error?.code)), 'error');
         },
       });
       return;
@@ -392,15 +389,12 @@ export class TodoNewDialogComponent {
         next: (card) => {
           this.saving.set(false);
           this.open.set(false);
-          this.toast.show({ text: this.i18n.translate('todos.new.created'), kind: 'success' });
+          this.toast.show(this.i18n.translate('todos.new.created'), 'success');
           this.created.emit(card);
         },
         error: (err: { error?: { code?: string } }) => {
           this.saving.set(false);
-          this.toast.show({
-            text: this.i18n.translate(this.errorKey(err?.error?.code)),
-            kind: 'error',
-          });
+          this.toast.show(this.i18n.translate(this.errorKey(err?.error?.code)), 'error');
         },
       });
   }

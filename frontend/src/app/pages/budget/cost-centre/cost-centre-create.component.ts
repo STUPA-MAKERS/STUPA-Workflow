@@ -170,20 +170,17 @@ export class CostCentreCreateComponent {
     this.busy.set(true);
     const done = (result: CostCentreCreated): void => {
       this.busy.set(false);
-      this.toast.show({
-        text: this.i18n.translate(
+      this.toast.show(
+        this.i18n.translate(
           this.titled() ? 'budget.cc.toast.createdTitle' : 'budget.cc.toast.created',
         ),
-        kind: 'success',
-      });
+        'success',
+      );
       this.created.emit(result);
     };
     const failed = (err: unknown): void => {
       this.busy.set(false);
-      this.toast.show({
-        text: this.i18n.translate(costCentreError(problemCode(err))),
-        kind: 'error',
-      });
+      this.toast.show(this.i18n.translate(costCentreError(problemCode(err))), 'error');
     };
     if (version)
       this.planApi

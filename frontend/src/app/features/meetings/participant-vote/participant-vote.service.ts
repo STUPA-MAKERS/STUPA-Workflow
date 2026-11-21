@@ -137,28 +137,30 @@ export class ParticipantVoteService {
     if (error.status === 403) {
       if (failure.asDelegation) this.proxyRefused.set(true);
       else this.notEligible.set(true);
-      this.toast.show({
-        text: this.i18n.translate(castRefusalText(failure) ?? 'voting.cast.notEligible'),
-        kind: 'error',
-      });
+      this.toast.show(
+        this.i18n.translate(castRefusalText(failure) ?? 'voting.cast.notEligible'),
+        'error',
+      );
       this.reload(true);
       return;
     }
     if (error.status === 409) {
-      this.toast.show({
-        text: this.i18n.translate(
+      this.toast.show(
+        this.i18n.translate(
           castRefusalText(failure) ??
-            (failure.alreadyVoted ? 'voting.cast.toast.alreadyVoted' : 'voting.cast.toast.conflict'),
+            (failure.alreadyVoted
+              ? 'voting.cast.toast.alreadyVoted'
+              : 'voting.cast.toast.conflict'),
         ),
-        kind: 'error',
-      });
+        'error',
+      );
       this.reload();
       return;
     }
-    this.toast.show({
-      text: error.error?.detail ?? this.i18n.translate('voting.cast.toast.failed'),
-      kind: 'error',
-    });
+    this.toast.show(
+      error.error?.detail ?? this.i18n.translate('voting.cast.toast.failed'),
+      'error',
+    );
   }
 
   /** A read can arrive after the read of a newer vote, so only the vote of the row is kept. */

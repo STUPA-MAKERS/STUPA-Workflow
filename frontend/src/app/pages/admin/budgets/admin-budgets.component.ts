@@ -338,10 +338,7 @@ export class AdminBudgetsComponent {
 
   private fail(err: unknown, fallback: TranslationKey = 'budget.tree.toast.failed'): void {
     this.busy.set(false);
-    this.toast.show({
-      text: this.i18n.translate(costCentreError(problemCode(err), fallback)),
-      kind: 'error',
-    });
+    this.toast.show(this.i18n.translate(costCentreError(problemCode(err), fallback)), 'error');
   }
 
   onRowMenu(budget: BudgetTreeNode, item: RowMenuItem): void {
@@ -393,10 +390,7 @@ export class AdminBudgetsComponent {
       .subscribe({
         next: () => {
           this.busy.set(false);
-          this.toast.show({
-            text: this.i18n.translate('admin.budgets.toast.created'),
-            kind: 'success',
-          });
+          this.toast.show(this.i18n.translate('admin.budgets.toast.created'), 'success');
           this.topOpen.set(false);
           this.reload();
         },
@@ -534,10 +528,7 @@ export class AdminBudgetsComponent {
       .subscribe({
         next: () => {
           this.busy.set(false);
-          this.toast.show({
-            text: this.i18n.translate('budget.tree.toast.saved'),
-            kind: 'success',
-          });
+          this.toast.show(this.i18n.translate('budget.tree.toast.saved'), 'success');
           this.closeEdit();
           this.reload();
         },
@@ -552,12 +543,10 @@ export class AdminBudgetsComponent {
   private saveFailed(err: unknown): void {
     this.busy.set(false);
     const code = problemCode(err);
-    this.toast.show({
-      text: this.i18n.translate(
-        SAVE_ERRORS[code] ?? costCentreError(code, 'admin.budgets.error.save'),
-      ),
-      kind: 'error',
-    });
+    this.toast.show(
+      this.i18n.translate(SAVE_ERRORS[code] ?? costCentreError(code, 'admin.budgets.error.save')),
+      'error',
+    );
     const id = this.editNode()?.id;
     this.api.tree().subscribe({
       next: (tree) => {
@@ -577,10 +566,7 @@ export class AdminBudgetsComponent {
     this.api.deleteNode(node.id).subscribe({
       next: () => {
         this.busy.set(false);
-        this.toast.show({
-          text: this.i18n.translate('admin.budgets.toast.deleted'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('admin.budgets.toast.deleted'), 'success');
         this.deleteTarget.set(null);
         this.reload();
       },
@@ -643,14 +629,14 @@ export class AdminBudgetsComponent {
   private fyError(err: unknown, fallback: TranslationKey): void {
     this.busy.set(false);
     const code = problemCode(err);
-    this.toast.show({
-      text: this.i18n.translate(
+    this.toast.show(
+      this.i18n.translate(
         code === 'fiscal_year_exists'
           ? 'budget.tree.toast.fyDuplicate'
           : fyBlockerKey(code, fallback),
       ),
-      kind: 'error',
-    });
+      'error',
+    );
   }
 
   createFiscalYear(event: Event): void {
@@ -661,10 +647,7 @@ export class AdminBudgetsComponent {
     this.api.createFiscalYear(budget.id, { year: Number(this.newFyYear()) }).subscribe({
       next: () => {
         this.busy.set(false);
-        this.toast.show({
-          text: this.i18n.translate('budget.tree.toast.fyCreated'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('budget.tree.toast.fyCreated'), 'success');
         this.loadFiscalYears();
       },
       error: (err: unknown) => this.fyError(err, 'budget.tree.toast.fyFailed'),
@@ -744,7 +727,7 @@ export class AdminBudgetsComponent {
     request.subscribe({
       next: () => {
         this.busy.set(false);
-        this.toast.show({ text: toast, kind: 'success' });
+        this.toast.show(toast, 'success');
         this.backToYears();
         this.loadFiscalYears();
       },

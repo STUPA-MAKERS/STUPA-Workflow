@@ -333,10 +333,10 @@ export class TopSheetComponent {
       const image = await firstValueFrom(this.injector.get(MediaApiService).uploadImage(file));
       return { src: `/api/media/images/${image.id}`, alt };
     } catch (err) {
-      this.toast.show({
-        text: this.i18n.translate(imageUploadErrorKey((err as { status?: number } | null)?.status)),
-        kind: 'error',
-      });
+      this.toast.show(
+        this.i18n.translate(imageUploadErrorKey((err as { status?: number } | null)?.status)),
+        'error',
+      );
       throw err;
     }
   };
@@ -376,12 +376,10 @@ export class TopSheetComponent {
         this.injector.get(MediaApiService).uploadDocument(this.meeting().id, file),
       );
     } catch (err) {
-      this.toast.show({
-        text: this.i18n.translate(
-          documentUploadErrorKey((err as { status?: number } | null)?.status),
-        ),
-        kind: 'error',
-      });
+      this.toast.show(
+        this.i18n.translate(documentUploadErrorKey((err as { status?: number } | null)?.status)),
+        'error',
+      );
       throw err;
     }
   }

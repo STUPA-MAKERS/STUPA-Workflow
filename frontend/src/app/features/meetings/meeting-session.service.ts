@@ -252,10 +252,7 @@ export class MeetingSessionService implements OnDestroy {
       },
       error: () => {
         if (completeItemId) this.agendaSvc.settleDone(completeItemId, false);
-        this.toast.show({
-          text: this.i18n.translate('meetings.toast.actionFailed'),
-          kind: 'error',
-        });
+        this.toast.show(this.i18n.translate('meetings.toast.actionFailed'), 'error');
       },
     });
   }
@@ -279,10 +276,7 @@ export class MeetingSessionService implements OnDestroy {
     const m = this.meeting();
     if (!m || m.status !== 'planned') return;
     if (!m.protokollantId) {
-      this.toast.show({
-        text: this.i18n.translate('meetings.toast.protokollantRequired'),
-        kind: 'error',
-      });
+      this.toast.show(this.i18n.translate('meetings.toast.protokollantRequired'), 'error');
       return;
     }
     if (openWindowState(m, Date.now()) === 'tooEarly') {
@@ -312,11 +306,11 @@ export class MeetingSessionService implements OnDestroy {
    */
   private statusChangeFailed(err: unknown): void {
     if (problemCode(err) === 'quorum_not_met') {
-      this.toast.show({ text: this.i18n.translate('meetings.toast.quorumNotMet'), kind: 'error' });
+      this.toast.show(this.i18n.translate('meetings.toast.quorumNotMet'), 'error');
     } else {
       const detail = problemDetail(err);
       const base = this.i18n.translate('meetings.toast.actionFailed');
-      this.toast.show({ text: detail ? `${base}: ${detail}` : base, kind: 'error' });
+      this.toast.show(detail ? `${base}: ${detail}` : base, 'error');
     }
     const m = this.meeting();
     if (m) {
@@ -329,7 +323,7 @@ export class MeetingSessionService implements OnDestroy {
 
   /** The open is too early: say so and read the meeting again for a fresh window. */
   private tooEarly(): void {
-    this.toast.show({ text: this.i18n.translate('meetings.toast.tooEarly'), kind: 'error' });
+    this.toast.show(this.i18n.translate('meetings.toast.tooEarly'), 'error');
     this.reloadMeeting();
   }
 
@@ -354,14 +348,11 @@ export class MeetingSessionService implements OnDestroy {
       next: (updated) => {
         this.savingDate.set(false);
         this.meeting.set(updated);
-        this.toast.show({ text: this.i18n.translate('meetings.toast.dateSaved'), kind: 'success' });
+        this.toast.show(this.i18n.translate('meetings.toast.dateSaved'), 'success');
       },
       error: () => {
         this.savingDate.set(false);
-        this.toast.show({
-          text: this.i18n.translate('meetings.toast.actionFailed'),
-          kind: 'error',
-        });
+        this.toast.show(this.i18n.translate('meetings.toast.actionFailed'), 'error');
       },
     });
   }
@@ -371,11 +362,7 @@ export class MeetingSessionService implements OnDestroy {
     if (!m) return;
     this.api.patchMeeting(m.id, { activeApplicationId: applicationId }).subscribe({
       next: (updated) => this.meeting.set(updated),
-      error: () =>
-        this.toast.show({
-          text: this.i18n.translate('meetings.toast.actionFailed'),
-          kind: 'error',
-        }),
+      error: () => this.toast.show(this.i18n.translate('meetings.toast.actionFailed'), 'error'),
     });
   }
 
@@ -405,10 +392,7 @@ export class MeetingSessionService implements OnDestroy {
       next: (closed) => {
         this.patchVote(voteId, { status: 'closed', closedAt: nowIso() });
         if (closed.applicationId && !closed.branchFired) {
-          this.toast.show({
-            text: this.i18n.translate('meetings.toast.voteBranchBlocked'),
-            kind: 'warning',
-          });
+          this.toast.show(this.i18n.translate('meetings.toast.voteBranchBlocked'), 'warning');
         }
       },
       error: (err: unknown) => this.voteActionFailed(err),
@@ -428,11 +412,11 @@ export class MeetingSessionService implements OnDestroy {
    *  may have changed on the server, for example to cancelled. */
   private voteActionFailed(err: unknown): void {
     if (problemCode(err) === 'quorum_not_met') {
-      this.toast.show({ text: this.i18n.translate('meetings.toast.quorumNotMet'), kind: 'error' });
+      this.toast.show(this.i18n.translate('meetings.toast.quorumNotMet'), 'error');
     } else {
       const detail = problemDetail(err);
       const base = this.i18n.translate('meetings.toast.actionFailed');
-      this.toast.show({ text: detail ? `${base}: ${detail}` : base, kind: 'error' });
+      this.toast.show(detail ? `${base}: ${detail}` : base, 'error');
     }
     const m = this.meeting();
     if (m) {
@@ -451,7 +435,7 @@ export class MeetingSessionService implements OnDestroy {
       next: () => {
         this.casting.set(null);
         this.myChoices.update((m) => ({ ...m, [voteId]: choice }));
-        this.toast.show({ text: this.i18n.translate('meetings.toast.voteCast'), kind: 'success' });
+        this.toast.show(this.i18n.translate('meetings.toast.voteCast'), 'success');
       },
       error: (err: unknown) => {
         this.casting.set(null);
@@ -469,10 +453,7 @@ export class MeetingSessionService implements OnDestroy {
       next: (updated) => {
         this.deletingVote.set(null);
         this.meeting.set(updated);
-        this.toast.show({
-          text: this.i18n.translate('meetings.toast.voteDeleted'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('meetings.toast.voteDeleted'), 'success');
       },
       error: (err: unknown) => {
         this.deletingVote.set(null);
@@ -513,12 +494,9 @@ export class MeetingSessionService implements OnDestroy {
     this.protocol.set(updated);
     if (prev?.status === 'rendering') {
       if (updated.isFinal) {
-        this.toast.show({ text: this.i18n.translate('meetings.toast.finalized'), kind: 'success' });
+        this.toast.show(this.i18n.translate('meetings.toast.finalized'), 'success');
       } else if (updated.status === 'draft') {
-        this.toast.show({
-          text: this.i18n.translate('meetings.toast.finalizeFailed'),
-          kind: 'error',
-        });
+        this.toast.show(this.i18n.translate('meetings.toast.finalizeFailed'), 'error');
       }
     }
     this.watchRendering(updated);
@@ -560,7 +538,7 @@ export class MeetingSessionService implements OnDestroy {
     this.agendaSvc.persistBody(meetingId).subscribe((held) => {
       if (!held) {
         this.finalizing.set(false);
-        this.toast.show({ text: this.i18n.translate('meetings.toast.saveFailed'), kind: 'error' });
+        this.toast.show(this.i18n.translate('meetings.toast.saveFailed'), 'error');
         return;
       }
       this.api
@@ -572,10 +550,7 @@ export class MeetingSessionService implements OnDestroy {
           },
           error: () => {
             this.finalizing.set(false);
-            this.toast.show({
-              text: this.i18n.translate('meetings.toast.saveFailed'),
-              kind: 'error',
-            });
+            this.toast.show(this.i18n.translate('meetings.toast.saveFailed'), 'error');
           },
         });
     });
@@ -596,18 +571,18 @@ export class MeetingSessionService implements OnDestroy {
       next: (updated) => {
         this.publicationSaving.set(false);
         this.protocol.set(updated);
-        this.toast.show({
-          text: this.i18n.translate(
+        this.toast.show(
+          this.i18n.translate(
             withheld ? 'meetings.toast.protocolWithheld' : 'meetings.toast.protocolPublished',
           ),
-          kind: 'success',
-        });
+          'success',
+        );
       },
       error: (err: unknown) => {
         this.publicationSaving.set(false);
         const detail = problemDetail(err);
         const base = this.i18n.translate('meetings.toast.actionFailed');
-        this.toast.show({ text: detail ? `${base}: ${detail}` : base, kind: 'error' });
+        this.toast.show(detail ? `${base}: ${detail}` : base, 'error');
       },
     });
   }
@@ -627,21 +602,16 @@ export class MeetingSessionService implements OnDestroy {
         this.draftSending.set(false);
         if (draftSentAt) this.protocol.update((p) => (p?.id === proto.id ? { ...p, draftSentAt } : p));
         if (recipients === 0) {
-          this.toast.show({
-            text: this.i18n.translate('meetings.toast.draftNoRecipient'),
-            kind: 'warning',
-          });
+          this.toast.show(this.i18n.translate('meetings.toast.draftNoRecipient'), 'warning');
           return;
         }
-        this.toast.show({
-          text: this.i18n.translate(
+        this.toast.show(
+          this.i18n.translate(
             recipients === 1 ? 'meetings.toast.draftSent1' : 'meetings.toast.draftSent',
-            {
-              n: recipients,
-            },
+            { n: recipients },
           ),
-          kind: 'success',
-        });
+          'success',
+        );
       },
       error: (err: unknown) => {
         this.draftSending.set(false);
@@ -659,12 +629,12 @@ export class MeetingSessionService implements OnDestroy {
       next: (updated) => {
         this.approvalSaving.set(false);
         this.protocol.set(updated);
-        this.toast.show({
-          text: this.i18n.translate(
+        this.toast.show(
+          this.i18n.translate(
             meetingId ? 'meetings.toast.protocolApproved' : 'meetings.toast.approvalRemoved',
           ),
-          kind: 'success',
-        });
+          'success',
+        );
       },
       error: (err: unknown) => {
         this.approvalSaving.set(false);
@@ -684,10 +654,7 @@ export class MeetingSessionService implements OnDestroy {
       next: (updated) => {
         this.reopenSaving.set(false);
         this.protocol.set(updated);
-        this.toast.show({
-          text: this.i18n.translate('meetings.toast.protocolReopened'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('meetings.toast.protocolReopened'), 'success');
       },
       error: (err: unknown) => {
         this.reopenSaving.set(false);
@@ -704,14 +671,14 @@ export class MeetingSessionService implements OnDestroy {
   private protocolRefused(err: unknown): void {
     const known = PROTOCOL_REFUSALS[problemCode(err) ?? ''];
     if (!known) return this.actionFailed(err);
-    this.toast.show({ text: this.i18n.translate(known), kind: 'error' });
+    this.toast.show(this.i18n.translate(known), 'error');
     this.refreshProtocol();
   }
 
   private actionFailed(err: unknown): void {
     const detail = problemDetail(err);
     const base = this.i18n.translate('meetings.toast.actionFailed');
-    this.toast.show({ text: detail ? `${base}: ${detail}` : base, kind: 'error' });
+    this.toast.show(detail ? `${base}: ${detail}` : base, 'error');
   }
 
   private doFinalize(protocolId: Uuid, opts: { publicWithheld?: boolean } = {}): void {
@@ -720,27 +687,21 @@ export class MeetingSessionService implements OnDestroy {
         this.finalizing.set(false);
         this.protocol.set(updated);
         if (updated.isFinal) {
-          this.toast.show({
-            text: this.i18n.translate('meetings.toast.finalized'),
-            kind: 'success',
-          });
+          this.toast.show(this.i18n.translate('meetings.toast.finalized'), 'success');
         } else {
-          this.toast.show({
-            text: this.i18n.translate('meetings.toast.renderQueued'),
-            kind: 'success',
-          });
+          this.toast.show(this.i18n.translate('meetings.toast.renderQueued'), 'success');
           this.watchRendering(updated);
         }
       },
       error: (err: unknown) => {
         this.finalizing.set(false);
         if (problemCode(err) === 'blackout_unclosed') {
-          this.toast.show({
-            text: this.i18n.translate('meetings.toast.blackoutOpen', {
+          this.toast.show(
+            this.i18n.translate('meetings.toast.blackoutOpen', {
               where: blackoutWhere(err, this.i18n),
             }),
-            kind: 'error',
-          });
+            'error',
+          );
           return;
         }
         const detail = problemDetail(err);
@@ -835,20 +796,14 @@ export class MeetingSessionService implements OnDestroy {
       if (asLead) {
         this.attendanceConflict.set(principalId);
       } else {
-        this.toast.show({
-          text: this.i18n.translate('meetings.toast.ownDelegationActive'),
-          kind: 'error',
-        });
+        this.toast.show(this.i18n.translate('meetings.toast.ownDelegationActive'), 'error');
       }
     } else if (code === 'attendance_set_by_lead') {
-      this.toast.show({
-        text: this.i18n.translate('meetings.toast.attendanceSetByLead'),
-        kind: 'error',
-      });
+      this.toast.show(this.i18n.translate('meetings.toast.attendanceSetByLead'), 'error');
     } else {
       const detail = problemDetail(err);
       const base = this.i18n.translate('meetings.toast.actionFailed');
-      this.toast.show({ text: detail ? `${base}: ${detail}` : base, kind: 'error' });
+      this.toast.show(detail ? `${base}: ${detail}` : base, 'error');
       return;
     }
     this.loadAttendance(meetingId);

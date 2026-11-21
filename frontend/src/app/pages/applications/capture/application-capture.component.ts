@@ -361,7 +361,7 @@ export class ApplicationCaptureComponent {
         this.effForm.set(null);
         this.fields.set([]);
         this.loadingForm.set(false);
-        this.toast.show({ text: this.i18n.translate('apply.error.formLoad'), kind: 'error' });
+        this.toast.show(this.i18n.translate('apply.error.formLoad'), 'error');
       },
     });
   }
@@ -379,14 +379,11 @@ export class ApplicationCaptureComponent {
         if (!eff || prefill.typeId !== this.typeId()) return;
         this.model = { ...this.model, ...prefill.data };
         this.buildFields(eff);
-        this.toast.show({ text: this.i18n.translate('applications.predecessor.prefilled') });
+        this.toast.show(this.i18n.translate('applications.predecessor.prefilled'));
       },
       error: () => {
         this.predecessor.set(null);
-        this.toast.show({
-          text: this.i18n.translate('applications.predecessor.error'),
-          kind: 'error',
-        });
+        this.toast.show(this.i18n.translate('applications.predecessor.error'), 'error');
       },
     });
   }
@@ -426,10 +423,7 @@ export class ApplicationCaptureComponent {
     if (this.saving()) return;
     if (!this.canSubmit()) {
       this.form.markAllAsTouched();
-      this.toast.show({
-        text: this.i18n.translate('applications.capture.incomplete'),
-        kind: 'error',
-      });
+      this.toast.show(this.i18n.translate('applications.capture.incomplete'), 'error');
       const root = event?.currentTarget instanceof HTMLElement ? event.currentTarget : null;
       setTimeout(() => revealFirstInvalid(root));
       return;
@@ -455,10 +449,7 @@ export class ApplicationCaptureComponent {
       next: (res) => {
         this.saving.set(false);
         this.drafts.clear();
-        this.toast.show({
-          text: this.i18n.translate('applications.capture.done'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('applications.capture.done'), 'success');
         this.created.emit(res.applicationId);
       },
       error: (err: { status?: number; error?: ProblemDetail | null }) => {
@@ -476,7 +467,7 @@ export class ApplicationCaptureComponent {
   private onError(status: number | undefined, problem: ProblemDetail | null): void {
     const known = problem?.code ? ERROR_TEXTS[problem.code] : undefined;
     if (known) {
-      this.toast.show({ text: this.i18n.translate(known), kind: 'error' });
+      this.toast.show(this.i18n.translate(known), 'error');
       return;
     }
     if (status === 422) {
@@ -484,11 +475,11 @@ export class ApplicationCaptureComponent {
       const t = (key: TranslationKey) => this.i18n.translate(key);
       const errors = problem?.errors ?? [];
       if (errors.length && applyServerErrors(this.fields(), errors, t)) {
-        this.toast.show({ text: this.i18n.translate('apply.error.invalid'), kind: 'error' });
+        this.toast.show(this.i18n.translate('apply.error.invalid'), 'error');
         return;
       }
     }
-    this.toast.show({ text: this.i18n.translate('applications.capture.error'), kind: 'error' });
+    this.toast.show(this.i18n.translate('applications.capture.error'), 'error');
   }
 }
 

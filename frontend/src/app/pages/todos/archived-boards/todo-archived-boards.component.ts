@@ -62,11 +62,7 @@ export class TodoArchivedBoardsComponent {
   private load(): void {
     this.api.archivedBoards().subscribe({
       next: (list) => this.boards.set(list),
-      error: () =>
-        this.toast.show({
-          text: this.i18n.translate('todos.archivedBoards.loadFailed'),
-          kind: 'error',
-        }),
+      error: () => this.toast.show(this.i18n.translate('todos.archivedBoards.loadFailed'), 'error'),
     });
   }
 
@@ -81,18 +77,15 @@ export class TodoArchivedBoardsComponent {
       next: (summary) => {
         this.busy.set(null);
         this.drop(board.id);
-        this.toast.show({
-          text: this.i18n.translate('todos.archivedBoards.restored', { name: board.name }),
-          kind: 'success',
-        });
+        this.toast.show(
+          this.i18n.translate('todos.archivedBoards.restored', { name: board.name }),
+          'success',
+        );
         this.restored.emit(summary);
       },
       error: () => {
         this.busy.set(null);
-        this.toast.show({
-          text: this.i18n.translate('todos.archivedBoards.failed'),
-          kind: 'error',
-        });
+        this.toast.show(this.i18n.translate('todos.archivedBoards.failed'), 'error');
       },
     });
   }
@@ -106,22 +99,22 @@ export class TodoArchivedBoardsComponent {
         this.busy.set(null);
         this.deleting.set(null);
         this.drop(board.id);
-        this.toast.show({
-          text: this.i18n.translate('todos.archivedBoards.deleted', { name: board.name }),
-          kind: 'success',
-        });
+        this.toast.show(
+          this.i18n.translate('todos.archivedBoards.deleted', { name: board.name }),
+          'success',
+        );
       },
       error: (err: unknown) => {
         this.busy.set(null);
         this.deleting.set(null);
-        this.toast.show({
-          text: this.i18n.translate(
+        this.toast.show(
+          this.i18n.translate(
             problemCode(err) === 'board_delete_admin_only'
               ? 'todos.archivedBoards.adminOnly'
               : 'todos.archivedBoards.failed',
           ),
-          kind: 'error',
-        });
+          'error',
+        );
       },
     });
   }

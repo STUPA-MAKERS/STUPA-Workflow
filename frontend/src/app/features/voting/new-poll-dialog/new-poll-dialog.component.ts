@@ -207,18 +207,15 @@ export class NewPollDialogComponent {
     call.subscribe({
       next: (vote) => {
         this.submitting.set(false);
-        this.toast.show({
-          text: this.i18n.translate(draft ? 'poll.toast.saved' : started),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate(draft ? 'poll.toast.saved' : started), 'success');
         this.created.emit(vote);
       },
       error: (err: unknown) => {
         this.submitting.set(false);
-        this.toast.show({
-          text: pollRefusalMessage(err, (key, params) => this.i18n.translate(key, params)),
-          kind: 'error',
-        });
+        this.toast.show(
+          pollRefusalMessage(err, (key, params) => this.i18n.translate(key, params)),
+          'error',
+        );
       },
     });
   }

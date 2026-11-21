@@ -471,7 +471,7 @@ export class AgendaPaneComponent {
           { kind: hit.kind, targetId: hit.targetId },
         ]);
       },
-      error: () => this.toast.show({ text: this.i18n.translate('links.error.add'), kind: 'error' }),
+      error: () => this.toast.show(this.i18n.translate('links.error.add'), 'error'),
     });
   }
 

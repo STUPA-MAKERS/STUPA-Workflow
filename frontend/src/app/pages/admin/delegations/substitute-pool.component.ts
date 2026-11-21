@@ -246,18 +246,12 @@ export class SubstitutePoolComponent {
           this.adding.set(false);
           this.addOpen.set(false);
           this.entries.update((list) => [...list, row]);
-          this.toast.show({
-            text: this.i18n.translate('admin.substitutes.added'),
-            kind: 'success',
-          });
+          this.toast.show(this.i18n.translate('admin.substitutes.added'), 'success');
         },
         error: (err: { status?: number }) => {
           this.adding.set(false);
           if (err.status !== 409 && err.status !== 422) {
-            this.toast.show({
-              text: this.i18n.translate('admin.substitutes.failed'),
-              kind: 'error',
-            });
+            this.toast.show(this.i18n.translate('admin.substitutes.failed'), 'error');
             return;
           }
           this.addError.set(
@@ -276,14 +270,11 @@ export class SubstitutePoolComponent {
       next: () => {
         this.done(s.id);
         this.entries.update((list) => list.filter((x) => x.id !== s.id));
-        this.toast.show({
-          text: this.i18n.translate('admin.substitutes.removed'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('admin.substitutes.removed'), 'success');
       },
       error: () => {
         this.done(s.id);
-        this.toast.show({ text: this.i18n.translate('admin.substitutes.failed'), kind: 'error' });
+        this.toast.show(this.i18n.translate('admin.substitutes.failed'), 'error');
       },
     });
   }

@@ -348,8 +348,7 @@ export class FormsListComponent {
   protected moveType(t: ApplicationTypeFull, by: -1 | 1): void {
     this.api.moveApplicationType(t.id, by).subscribe({
       next: (list) => this.types.set(list),
-      error: () =>
-        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' }),
+      error: () => this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error'),
     });
   }
 
@@ -357,8 +356,7 @@ export class FormsListComponent {
   protected moveGroup(g: ApplicationTypeGroupFull, by: -1 | 1): void {
     this.api.moveApplicationTypeGroup(g.id, by).subscribe({
       next: (list) => this.groups.set(list),
-      error: () =>
-        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' }),
+      error: () => this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error'),
     });
   }
 
@@ -376,12 +374,12 @@ export class FormsListComponent {
       next: () => {
         this.saving.set(false);
         this.regroup.set(null);
-        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
         this.reload();
       },
       error: () => {
         this.saving.set(false);
-        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
+        this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
       },
     });
   }
@@ -434,11 +432,11 @@ export class FormsListComponent {
         this.groups.update((list) =>
           target === 'new' ? [...list, saved] : list.map((g) => (g.id === saved.id ? saved : g)),
         );
-        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
       },
       error: () => {
         this.saving.set(false);
-        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
+        this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
       },
     });
   }
@@ -452,12 +450,12 @@ export class FormsListComponent {
       next: () => {
         this.deleting.set(false);
         this.confirmGroupDelete.set(null);
-        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
         this.reload();
       },
       error: () => {
         this.deleting.set(false);
-        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
+        this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
       },
     });
   }
@@ -498,11 +496,11 @@ export class FormsListComponent {
         this.deleting.set(false);
         this.confirmDelete.set(null);
         this.types.update((rows) => rows.filter((r) => r.id !== t.id));
-        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
       },
       error: () => {
         this.deleting.set(false);
-        this.toast.show({ text: this.i18n.translate('admin.forms.deleteFailed'), kind: 'error' });
+        this.toast.show(this.i18n.translate('admin.forms.deleteFailed'), 'error');
       },
     });
   }
@@ -528,12 +526,12 @@ export class FormsListComponent {
         next: (created) => {
           this.saving.set(false);
           this.dialogOpen.set(false);
-          this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
+          this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
           this.router.navigate(['/admin/forms', created.id]);
         },
         error: () => {
           this.saving.set(false);
-          this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
+          this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
         },
       });
   }

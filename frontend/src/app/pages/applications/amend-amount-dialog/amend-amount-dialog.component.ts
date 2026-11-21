@@ -200,7 +200,7 @@ export class AmendAmountDialogComponent {
         next: () => {
           this.saving.set(false);
           this.open.set(false);
-          this.toast.show({ text: this.i18n.translate('amendAmount.saved'), kind: 'success' });
+          this.toast.show(this.i18n.translate('amendAmount.saved'), 'success');
           this.done.emit();
         },
         error: (err: { status?: number; error?: ProblemDetail | null }) => {
@@ -211,22 +211,19 @@ export class AmendAmountDialogComponent {
             return;
           }
           if (err.status === 409) {
-            this.toast.show({
-              text: this.i18n.translate('amendAmount.error.state'),
-              kind: 'error',
-            });
+            this.toast.show(this.i18n.translate('amendAmount.error.state'), 'error');
             this.open.set(false);
             this.done.emit();
             return;
           }
-          this.toast.show({
-            text: this.i18n.translate(
+          this.toast.show(
+            this.i18n.translate(
               err.status === 403
                 ? 'applications.transitions.forbidden'
                 : 'applications.actions.error',
             ),
-            kind: 'error',
-          });
+            'error',
+          );
         },
       });
   }

@@ -177,18 +177,18 @@ export class AppointmentDialogComponent {
     (current ? this.api.update(current.id, body) : this.api.create(body)).subscribe({
       next: (result) => {
         this.saving.set(false);
-        this.toast.show({
-          text: this.i18n.translate(current ? 'calendar.toast.saved' : 'calendar.toast.created'),
-          kind: 'success',
-        });
+        this.toast.show(
+          this.i18n.translate(current ? 'calendar.toast.saved' : 'calendar.toast.created'),
+          'success',
+        );
         this.saved.emit(result);
       },
       error: (err: unknown) => {
         this.saving.set(false);
-        this.toast.show({
-          text: this.i18n.translate(SAVE_ERRORS[problemCode(err)] ?? 'calendar.toast.saveFailed'),
-          kind: 'error',
-        });
+        this.toast.show(
+          this.i18n.translate(SAVE_ERRORS[problemCode(err)] ?? 'calendar.toast.saveFailed'),
+          'error',
+        );
       },
     });
   }

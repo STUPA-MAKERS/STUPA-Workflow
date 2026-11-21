@@ -335,7 +335,7 @@ export class ExpenseDialogsState {
         this.invoices.update((rows) => [...rows.filter((r) => r.id !== inv.id), inv]);
         this.onPickInvoice(inv.id);
       },
-      error: (err) => this.toast.show({ text: this.failureText(err), kind: 'error' }),
+      error: (err) => this.toast.show(this.failureText(err), 'error'),
     });
   }
 
@@ -441,7 +441,7 @@ export class ExpenseDialogsState {
         next: (created) => {
           this.list.saving.set(false);
           this.createOpen.set(false);
-          this.toast.show({ text: this.i18n.translate('expenses.toast.created'), kind: 'success' });
+          this.toast.show(this.i18n.translate('expenses.toast.created'), 'success');
           this.loadInvoices();
           this.list.refresh();
           if (created) {
@@ -451,7 +451,7 @@ export class ExpenseDialogsState {
         },
         error: (err) => {
           this.list.saving.set(false);
-          this.toast.show({ text: this.failureText(err), kind: 'error' });
+          this.toast.show(this.failureText(err), 'error');
         },
       });
   }
@@ -521,13 +521,13 @@ export class ExpenseDialogsState {
             this.list.items.update((rows) => rows.map((x) => (x.id === merged.id ? merged : x)));
             this.onSaved?.(merged);
           }
-          this.toast.show({ text: this.i18n.translate('expenses.toast.saved'), kind: 'success' });
+          this.toast.show(this.i18n.translate('expenses.toast.saved'), 'success');
           this.linkEvent(e.id);
           this.loadInvoices();
         },
         error: (err) => {
           this.list.saving.set(false);
-          this.toast.show({ text: this.failedText(err), kind: 'error' });
+          this.toast.show(this.failedText(err), 'error');
         },
       });
   }
@@ -536,14 +536,14 @@ export class ExpenseDialogsState {
   private linkEvent(expenseId: Uuid): void {
     this.event.apply(expenseId).subscribe({
       error: (err: unknown) =>
-        this.toast.show({
-          text: this.i18n.translate(
+        this.toast.show(
+          this.i18n.translate(
             problemCode(err) === 'event_link_taken'
               ? 'todos.error.eventLinkTaken'
               : 'todos.error.save',
           ),
-          kind: 'error',
-        }),
+          'error',
+        ),
     });
   }
 
@@ -572,12 +572,12 @@ export class ExpenseDialogsState {
           this.list.items.update((rows) => rows.filter((x) => x.id !== e.id));
           this.list.total.update((t) => Math.max(0, t - 1));
         }
-        this.toast.show({ text: this.i18n.translate('expenses.toast.deleted'), kind: 'success' });
+        this.toast.show(this.i18n.translate('expenses.toast.deleted'), 'success');
         this.onDeleted?.(e);
       },
       error: (err) => {
         this.list.saving.set(false);
-        this.toast.show({ text: this.failedText(err), kind: 'error' });
+        this.toast.show(this.failedText(err), 'error');
       },
     });
   }
@@ -671,13 +671,13 @@ export class ExpenseDialogsState {
         next: () => {
           this.list.saving.set(false);
           this.transferOpen.set(false);
-          this.toast.show({ text: this.i18n.translate('expenses.transferToast'), kind: 'success' });
+          this.toast.show(this.i18n.translate('expenses.transferToast'), 'success');
           this.list.refresh();
           if (this.transfers.loaded()) this.transfers.reload();
         },
         error: (err) => {
           this.list.saving.set(false);
-          this.toast.show({ text: this.failureText(err), kind: 'error' });
+          this.toast.show(this.failureText(err), 'error');
         },
       });
   }

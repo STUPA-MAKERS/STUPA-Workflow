@@ -128,7 +128,7 @@ export class CloseMeetingDialogComponent {
     this.api.patchMeeting(m.id, { status: 'closed' }).subscribe({
       next: (updated) => {
         this.closing.set(false);
-        this.toast.show({ text: this.i18n.translate('meetings.toast.closed'), kind: 'success' });
+        this.toast.show(this.i18n.translate('meetings.toast.closed'), 'success');
         this.meetingClosed.emit(updated);
       },
       error: (err: unknown) => {
@@ -143,7 +143,7 @@ export class CloseMeetingDialogComponent {
         }
         const detail = problemDetail(err);
         const base = this.i18n.translate('meetings.toast.actionFailed');
-        this.toast.show({ text: detail ? `${base}: ${detail}` : base, kind: 'error' });
+        this.toast.show(detail ? `${base}: ${detail}` : base, 'error');
       },
     });
   }

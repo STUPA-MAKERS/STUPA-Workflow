@@ -203,12 +203,12 @@ export class AgendaDialogComponent {
       next: () => {
         this.saving.set(false);
         const meeting = this.meetings().find((m) => m.id === meetingId);
-        this.toast.show({
-          text: meeting
+        this.toast.show(
+          meeting
             ? this.i18n.translate('applications.agenda.added', { meeting: meeting.title })
             : this.i18n.translate('applications.actions.success'),
-          kind: 'success',
-        });
+          'success',
+        );
         this.open.set(false);
         this.done.emit();
       },
@@ -220,22 +220,19 @@ export class AgendaDialogComponent {
           return;
         }
         if (err.status === 409) {
-          this.toast.show({
-            text: this.i18n.translate('applications.actions.conflict'),
-            kind: 'error',
-          });
+          this.toast.show(this.i18n.translate('applications.actions.conflict'), 'error');
           this.open.set(false);
           this.done.emit();
           return;
         }
-        this.toast.show({
-          text: this.i18n.translate(
+        this.toast.show(
+          this.i18n.translate(
             err.status === 403
               ? 'applications.transitions.forbidden'
               : 'applications.actions.error',
           ),
-          kind: 'error',
-        });
+          'error',
+        );
       },
     });
   }

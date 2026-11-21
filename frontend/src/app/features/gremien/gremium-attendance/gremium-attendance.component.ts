@@ -502,10 +502,7 @@ export class GremiumAttendanceComponent {
       },
       error: () => {
         this.exporting.set(false);
-        this.toast.show({
-          text: this.i18n.translate('gremien.attendance.exportFailed'),
-          kind: 'error',
-        });
+        this.toast.show(this.i18n.translate('gremien.attendance.exportFailed'), 'error');
       },
     });
   }

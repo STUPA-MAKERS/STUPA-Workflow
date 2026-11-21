@@ -202,17 +202,11 @@ export class MailTemplatesComponent {
         next: (updated) => {
           this.saving.set(false);
           this.applyUpdate(updated);
-          this.toast.show({
-            text: this.i18n.translate('admin.mailTemplates.saved'),
-            kind: 'success',
-          });
+          this.toast.show(this.i18n.translate('admin.mailTemplates.saved'), 'success');
         },
         error: () => {
           this.saving.set(false);
-          this.toast.show({
-            text: this.i18n.translate('admin.mailTemplates.failed'),
-            kind: 'error',
-          });
+          this.toast.show(this.i18n.translate('admin.mailTemplates.failed'), 'error');
         },
       });
   }
@@ -225,14 +219,11 @@ export class MailTemplatesComponent {
       next: (builtin) => {
         this.resetting.set(false);
         this.applyUpdate(builtin);
-        this.toast.show({
-          text: this.i18n.translate('admin.mailTemplates.resetDone'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('admin.mailTemplates.resetDone'), 'success');
       },
       error: () => {
         this.resetting.set(false);
-        this.toast.show({ text: this.i18n.translate('admin.mailTemplates.failed'), kind: 'error' });
+        this.toast.show(this.i18n.translate('admin.mailTemplates.failed'), 'error');
       },
     });
   }
@@ -264,10 +255,7 @@ export class MailTemplatesComponent {
         },
         error: () => {
           this.previewing.set(false);
-          this.toast.show({
-            text: this.i18n.translate('admin.mailTemplates.previewFailed'),
-            kind: 'error',
-          });
+          this.toast.show(this.i18n.translate('admin.mailTemplates.previewFailed'), 'error');
         },
       });
   }

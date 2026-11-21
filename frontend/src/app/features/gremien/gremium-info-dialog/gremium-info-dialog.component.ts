@@ -205,7 +205,7 @@ export class GremiumInfoDialogComponent {
     this.api.saveInfo(this.gremiumId(), body).subscribe({
       next: (info) => {
         this.saving.set(false);
-        this.toast.show({ text: this.i18n.translate('gremien.info.saved'), kind: 'success' });
+        this.toast.show(this.i18n.translate('gremien.info.saved'), 'success');
         this.saved.emit(info);
         this.closed.emit();
       },
@@ -216,7 +216,7 @@ export class GremiumInfoDialogComponent {
           this.stale.emit();
           return;
         }
-        this.toast.show({ text: this.i18n.translate('gremien.info.saveError'), kind: 'error' });
+        this.toast.show(this.i18n.translate('gremien.info.saveError'), 'error');
       },
     });
   }

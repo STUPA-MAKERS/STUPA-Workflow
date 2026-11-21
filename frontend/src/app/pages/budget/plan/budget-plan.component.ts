@@ -1248,7 +1248,7 @@ export class BudgetPlanComponent {
       },
       error: () => {
         this.busy.set(false);
-        this.toast.show({ text: this.i18n.translate('budget.dash.exportError'), kind: 'error' });
+        this.toast.show(this.i18n.translate('budget.dash.exportError'), 'error');
       },
     });
   }
@@ -1304,10 +1304,7 @@ export class BudgetPlanComponent {
     this.api.deleteVersion(version.id).subscribe({
       next: () => {
         this.busy.set(false);
-        this.toast.show({
-          text: this.i18n.translate('budget.plan.toast.draftDeleted'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('budget.plan.toast.draftDeleted'), 'success');
         this.versionId.set('');
         this.selId.set('');
         this.pickYear(this.fyId());
@@ -1357,22 +1354,17 @@ export class BudgetPlanComponent {
     this.treeApi.deleteNode(row.id).subscribe({
       next: () => {
         this.busy.set(false);
-        this.toast.show({
-          text: this.i18n.translate('budget.tree.toast.deleted'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('budget.tree.toast.deleted'), 'success');
         this.selectId(this.wide() ? (row.parentId ?? '') : '');
         this.reloadTree();
         this.reloadPlan();
       },
       error: (err: unknown) => {
         this.busy.set(false);
-        this.toast.show({
-          text: this.i18n.translate(
-            costCentreError(problemCode(err), 'budget.tree.toast.deleteFailed'),
-          ),
-          kind: 'error',
-        });
+        this.toast.show(
+          this.i18n.translate(costCentreError(problemCode(err), 'budget.tree.toast.deleteFailed')),
+          'error',
+        );
       },
     });
   }
@@ -1530,10 +1522,7 @@ export class BudgetPlanComponent {
     const saved = (field === 'prevAmount' ? line?.prevAmount : line?.prevActual) ?? null;
     if (!this.editable() || !line || wanted === saved) return;
     if (wanted !== null && amountProblem(wanted) === 'negative') {
-      this.toast.show({
-        text: this.i18n.translate('budget.plan.error.amountNegative'),
-        kind: 'error',
-      });
+      this.toast.show(this.i18n.translate('budget.plan.error.amountNegative'), 'error');
       return;
     }
     const body = { prevAmount: line.prevAmount ?? null, prevActual: line.prevActual ?? null, [field]: wanted };
@@ -1614,16 +1603,10 @@ export class BudgetPlanComponent {
     if (value === '') return;
     switch (amountProblem(value)) {
       case 'negative':
-        this.toast.show({
-          text: this.i18n.translate('budget.plan.error.amountNegative'),
-          kind: 'error',
-        });
+        this.toast.show(this.i18n.translate('budget.plan.error.amountNegative'), 'error');
         return;
       case 'tooLarge':
-        this.toast.show({
-          text: this.i18n.translate('budget.plan.error.amountTooLarge'),
-          kind: 'error',
-        });
+        this.toast.show(this.i18n.translate('budget.plan.error.amountTooLarge'), 'error');
         return;
       case null:
         this.saveLine(row, { [field]: value });
@@ -1698,7 +1681,7 @@ export class BudgetPlanComponent {
         if (this.place() !== place) return;
         if (this.versionId() === shown) this.versionId.set('');
         if (this.newest(sent)) this.load.set({ kind: 'plan', plan });
-        if (toast) this.toast.show({ text: this.i18n.translate(toast), kind: 'success' });
+        if (toast) this.toast.show(this.i18n.translate(toast), 'success');
         after?.();
         this.syncUrl();
       },
@@ -1713,10 +1696,10 @@ export class BudgetPlanComponent {
    */
   private fail(err: unknown, quiet = false): void {
     this.busy.set(false);
-    this.toast.show({
-      text: this.i18n.translate(WRITE_ERRORS[problemCode(err)] ?? 'budget.plan.error.failed'),
-      kind: 'error',
-    });
+    this.toast.show(
+      this.i18n.translate(WRITE_ERRORS[problemCode(err)] ?? 'budget.plan.error.failed'),
+      'error',
+    );
     if (quiet) this.refreshPlan();
     else this.reloadPlan();
   }

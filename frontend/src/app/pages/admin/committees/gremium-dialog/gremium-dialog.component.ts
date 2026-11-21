@@ -478,7 +478,7 @@ export class GremiumDialogComponent {
     this.saving.set(false);
     const text = this.i18n.translate(key);
     if (key === 'admin.gremien.toast.failed' || key === 'admin.gremien.recipientsFailed') {
-      this.toast.show({ text: text, kind: 'error' });
+      this.toast.show(text, 'error');
     } else {
       this.error.set(text);
     }

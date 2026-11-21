@@ -419,14 +419,14 @@ export class FormEditorComponent {
         this.active.set(draft.active ?? false);
         this.hasVersion.set(!!draft.formVersionId);
         this.togglingActive.set(false);
-        this.toast.show({
-          text: this.i18n.translate(next ? 'admin.forms.activated' : 'admin.forms.deactivated'),
-          kind: 'success',
-        });
+        this.toast.show(
+          this.i18n.translate(next ? 'admin.forms.activated' : 'admin.forms.deactivated'),
+          'success',
+        );
       },
       error: () => {
         this.togglingActive.set(false);
-        this.toast.show({ text: this.i18n.translate('admin.forms.actionFailed'), kind: 'error' });
+        this.toast.show(this.i18n.translate('admin.forms.actionFailed'), 'error');
       },
     });
   }
@@ -1030,7 +1030,7 @@ export class FormEditorComponent {
   protected save(): void {
     const id = this.typeId();
     if (!this.formValid() || !id || this.saving()) {
-      this.toast.show({ text: this.i18n.translate('admin.common.invalid'), kind: 'error' });
+      this.toast.show(this.i18n.translate('admin.common.invalid'), 'error');
       return;
     }
     const flat = groupsToFields(this.groups());
@@ -1064,12 +1064,12 @@ export class FormEditorComponent {
         this.savedForm.set(snapshot);
         this.active.set(true);
         this.hasVersion.set(true);
-        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
         this.history()?.reload();
       },
       error: () => {
         this.saving.set(false);
-        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
+        this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
       },
     });
   }
