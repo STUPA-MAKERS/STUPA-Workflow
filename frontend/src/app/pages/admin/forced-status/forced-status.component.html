@@ -1,56 +1,31 @@
-<section class="fs admin-page">
-  <app-page-header [flush]="true" [title]="'admin.forced.title' | t">
-    <app-breadcrumbs crumbs />
-  </app-page-header>
-
-  <app-sticky-bar>
-    <div class="fs__filters" role="group" [attr.aria-label]="'admin.forced.filters' | t">
-      <app-filter-select
-        [label]="'admin.forced.filter.reason' | t"
-        [text]="reasonText()"
-        [active]="!!reason()"
-        [options]="reasonOptions()"
-        [value]="reason()"
-        (valueChange)="setReason($event)"
-      />
-      <app-filter-select
-        [label]="'admin.forced.filter.path' | t"
-        [text]="pathText()"
-        [active]="!!path()"
-        [options]="pathOptions()"
-        [value]="path()"
-        (valueChange)="setPath($event)"
-      />
-      <app-range-chip
-        kind="date"
-        [label]="'admin.forced.period' | t"
-        [from]="from()"
-        [to]="to()"
-        (applied)="setRange($event)"
-      />
-    </div>
-  </app-sticky-bar>
-
-  <app-load-state [state]="loadState()" [errorText]="'admin.forced.loadError' | t" (retry)="load()">
-    <ng-template #loading>
-      <app-skeleton variant="rows" [count]="5" [label]="'common.loading' | t" />
-    </ng-template>
-    <ng-template #content>
-      @if (!events().length) {
-        <app-empty-state [icon]="filtered() ? 'searchOff' : 'flow'" [heading]="(filtered() ? 'admin.forced.emptyFiltered' : 'admin.forced.empty') | t" />
-      } @else {
-        <div class="rowgroup" role="list" [attr.aria-label]="'admin.forced.title' | t">
-          @for (e of events(); track e.applicationId + e.at) {
-            <app-list-item
-              role="listitem"
-              [title]="titleOf(e)"
-              [link]="['/applications', e.applicationId]"
-              [subWrap]="true"
-              [sub]="(e.at | ldate: 'medium') + ' · ' + pathOf(e) + ' · ' + reasonLabel(e.reason) + (e.note ? ' · ' + e.note : '')"
-            />
-          }
-        </div>
-      }
-    </ng-template>
-  </app-load-state>
-</section>
+<app-records-screen
+  [head]="{ title: 'admin.forced.title' | t }"
+  [rows]="rows()"
+  [filtersLabel]="'admin.forced.filters' | t"
+>
+  <ng-template screenFilters>
+    <app-filter-select
+      [label]="'admin.forced.filter.reason' | t"
+      [text]="reasonText()"
+      [active]="!!reason()"
+      [options]="reasonOptions()"
+      [value]="reason()"
+      (valueChange)="setReason($event)"
+    />
+    <app-filter-select
+      [label]="'admin.forced.filter.path' | t"
+      [text]="pathText()"
+      [active]="!!path()"
+      [options]="pathOptions()"
+      [value]="path()"
+      (valueChange)="setPath($event)"
+    />
+    <app-range-chip
+      kind="date"
+      [label]="'admin.forced.period' | t"
+      [from]="from()"
+      [to]="to()"
+      (applied)="setRange($event)"
+    />
+  </ng-template>
+</app-records-screen>

@@ -112,11 +112,11 @@ describe('ForcedStatusComponent', () => {
     detectChanges();
     expect(cmp.failed()).toBe(true);
     expect(cmp.paths()).toEqual([]);
-    expect(cmp.loadState()).toBe('error');
+    expect(cmp.rows().state).toBe('error');
     expect(loadErrorToast()).toBe('Die Liste konnte nicht geladen werden.');
     retryLoadError();
     http.expectOne(isEvents).flush([]);
-    expect(cmp.loadState()).toBe('ok');
+    expect(cmp.rows().state).toBe('empty');
   });
 
   it('keeps only the answer of the last load and falls back to the default period', async () => {
