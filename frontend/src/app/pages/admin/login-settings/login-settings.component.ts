@@ -5,9 +5,13 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { type SettingsForm, settingsForm } from '@shared/forms/settings-form';
-import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
-import { ButtonComponent, FabComponent, InputComponent, PageHeaderComponent } from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import { InputComponent } from '@stupa-makers/ui-kit';
+import {
+  ScreenGroupDirective,
+  SettingsScreenComponent,
+  type SettingsGroup,
+  type SettingsState,
+} from '@stupa-makers/ui-kit/screens';
 import { AdminApiService } from '../admin-api.service';
 import { type LoginSettings, MAX_SESSION_DAYS } from '../admin.models';
 
@@ -54,15 +58,12 @@ function draftOf(s: LoginSettings): Draft {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    ButtonComponent,
     FormsModule,
     TranslatePipe,
     LocalizedDatePipe,
-    PageHeaderComponent,
-    BreadcrumbsComponent,
-    FabComponent,
+    SettingsScreenComponent,
+    ScreenGroupDirective,
     InputComponent,
-    LoadStateComponent,
   ],
   templateUrl: './login-settings.component.html',
   styleUrl: './login-settings.component.scss',
@@ -100,6 +101,30 @@ export class LoginSettingsComponent {
   });
 
   protected readonly dirty = this.form.dirty;
+
+  /** One group without a heading: the two fields and the time of the last change. */
+  protected readonly groups: readonly SettingsGroup[] = [{ key: 'sessions', rows: [] }];
+
+  /** The state of the settings screen (§ui-kit:002244): three grey lines while it loads. */
+  protected readonly screenState = computed<SettingsState>(() => {
+    switch (this.form.state()) {
+      case 'loading':
+        return { state: 'loading', skeleton: { variant: 'lines', count: 3 } };
+      case 'forbidden':
+        return {
+          state: 'forbidden',
+          message: this.i18n.translate('admin.loginSettings.forbidden'),
+        };
+      case 'error':
+        return {
+          state: 'error',
+          message: this.i18n.translate('admin.loginSettings.loadError'),
+          retry: () => this.form.reload(),
+        };
+      default:
+        return { state: 'ready' };
+    }
+  });
   protected readonly canSave = this.form.canSave;
 
   private rangeText(): string {
