@@ -110,18 +110,17 @@ export class GremiumNotifyDialogComponent {
     this.api.notify(this.gremiumId(), body).subscribe({
       next: ({ recipients }) => {
         this.sending.set(false);
-        this.toast.show({
-          text:
-            recipients === 1
-              ? this.i18n.translate('gremien.notify.sent1')
-              : this.i18n.translate('gremien.notify.sent', { n: recipients }),
-          kind: 'success',
-        });
+        this.toast.show(
+          recipients === 1
+            ? this.i18n.translate('gremien.notify.sent1')
+            : this.i18n.translate('gremien.notify.sent', { n: recipients }),
+          'success',
+        );
         this.closed.emit();
       },
       error: () => {
         this.sending.set(false);
-        this.toast.show({ text: this.i18n.translate('gremien.notify.error'), kind: 'error' });
+        this.toast.show(this.i18n.translate('gremien.notify.error'), 'error');
       },
     });
   }

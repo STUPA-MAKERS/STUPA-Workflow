@@ -83,19 +83,19 @@ export class TodoNewBoardDialogComponent {
       next: (board) => {
         this.saving.set(false);
         this.open.set(false);
-        this.toast.show({ text: this.i18n.translate('todos.newBoard.created'), kind: 'success' });
+        this.toast.show(this.i18n.translate('todos.newBoard.created'), 'success');
         this.created.emit(board);
       },
       error: (err: unknown) => {
         this.saving.set(false);
-        this.toast.show({
-          text: this.i18n.translate(
+        this.toast.show(
+          this.i18n.translate(
             problemCode(err) === 'board_create_required'
               ? 'todos.newBoard.forbidden'
               : 'todos.newBoard.failed',
           ),
-          kind: 'error',
-        });
+          'error',
+        );
       },
     });
   }

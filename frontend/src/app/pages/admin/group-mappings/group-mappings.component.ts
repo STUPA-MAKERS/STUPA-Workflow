@@ -452,16 +452,13 @@ export class GroupMappingsComponent {
     req.subscribe({
       next: () => {
         this.saving.set(false);
-        this.toast.show({
-          text: this.i18n.translate('admin.groupMappings.saved'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('admin.groupMappings.saved'), 'success');
         this.dialog.set(null);
         this.refresh(kind);
       },
       error: (err: { status?: number }) => {
         this.saving.set(false);
-        this.toast.show({ text: this.i18n.translate(this.errorKey(err?.status)), kind: 'error' });
+        this.toast.show(this.i18n.translate(this.errorKey(err?.status)), 'error');
       },
     });
   }
@@ -489,15 +486,11 @@ export class GroupMappingsComponent {
           : this.api.deleteRoleMapping(id);
     req.subscribe({
       next: () => {
-        this.toast.show({
-          text: this.i18n.translate('admin.groupMappings.deleted'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('admin.groupMappings.deleted'), 'success');
         this.confirm.set(null);
         this.refresh(c.kind);
       },
-      error: () =>
-        this.toast.show({ text: this.i18n.translate('admin.groupMappings.failed'), kind: 'error' }),
+      error: () => this.toast.show(this.i18n.translate('admin.groupMappings.failed'), 'error'),
     });
   }
 }

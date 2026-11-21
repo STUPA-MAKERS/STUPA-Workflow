@@ -210,11 +210,10 @@ export class PrivacyComponent {
     this.api.executeErasure(r.id).subscribe({
       next: () => {
         this.confirmExecute.set(null);
-        this.toast.show({ text: this.i18n.translate('admin.privacy.executed'), kind: 'success' });
+        this.toast.show(this.i18n.translate('admin.privacy.executed'), 'success');
         this.reload();
       },
-      error: () =>
-        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' }),
+      error: () => this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error'),
     });
   }
 
@@ -229,11 +228,10 @@ export class PrivacyComponent {
     this.api.rejectErasure(r.id, this.rejectReason().trim() || null).subscribe({
       next: () => {
         this.rejecting.set(null);
-        this.toast.show({ text: this.i18n.translate('admin.privacy.rejected'), kind: 'success' });
+        this.toast.show(this.i18n.translate('admin.privacy.rejected'), 'success');
         this.reload();
       },
-      error: () =>
-        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' }),
+      error: () => this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error'),
     });
   }
 
@@ -243,13 +241,9 @@ export class PrivacyComponent {
     this.api.downloadAuskunft(email).subscribe({
       next: (blob) => {
         downloadBlob(blob, 'auskunft.xlsx');
-        this.toast.show({
-          text: this.i18n.translate('admin.privacy.auskunftDone'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('admin.privacy.auskunftDone'), 'success');
       },
-      error: () =>
-        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' }),
+      error: () => this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error'),
     });
   }
 
@@ -265,14 +259,11 @@ export class PrivacyComponent {
       next: () => {
         this.confirmPrincipal.set(false);
         this.person.set(null);
-        this.toast.show({
-          text: this.i18n.translate('admin.privacy.principalErased'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('admin.privacy.principalErased'), 'success');
       },
       error: () => {
         this.confirmPrincipal.set(false);
-        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
+        this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
       },
     });
   }
@@ -296,11 +287,11 @@ export class PrivacyComponent {
       next: (s) => {
         this.retentionSaving.set(false);
         this.applyRetention(s.defaultRetentionMonths);
-        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
       },
       error: () => {
         this.retentionSaving.set(false);
-        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
+        this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
       },
     });
   }

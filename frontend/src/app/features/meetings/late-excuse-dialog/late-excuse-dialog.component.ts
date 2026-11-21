@@ -96,20 +96,14 @@ export class LateExcuseDialogComponent {
     this.api.excuseLate(id, this.note().trim()).subscribe({
       next: (roster) => {
         this.saving.set(false);
-        this.toast.show({
-          text: this.i18n.translate('meetings.lateExcuse.saved'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('meetings.lateExcuse.saved'), 'success');
         this.excused.emit(roster);
       },
       error: (err: unknown) => {
         this.saving.set(false);
         const code = problemCode(err);
         const final = FINAL_REFUSALS[code ?? ''];
-        this.toast.show({
-          text: this.i18n.translate(final ?? 'meetings.toast.actionFailed'),
-          kind: 'error',
-        });
+        this.toast.show(this.i18n.translate(final ?? 'meetings.toast.actionFailed'), 'error');
         if (final) this.closed.emit();
       },
     });

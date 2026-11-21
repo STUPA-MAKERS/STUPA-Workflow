@@ -83,7 +83,7 @@ export class MeetingAgendaService implements OnDestroy {
   private failed(err: unknown): void {
     const detail = problemDetail(err);
     const base = this.i18n.translate('meetings.toast.actionFailed');
-    this.toast.show({ text: detail ? `${base}: ${detail}` : base, kind: 'error' });
+    this.toast.show(detail ? `${base}: ${detail}` : base, 'error');
   }
 
   /** Save a pending edit when the page goes away, so that the debounce drops no text. */
@@ -141,10 +141,7 @@ export class MeetingAgendaService implements OnDestroy {
       next: (rows) => {
         this.savingAgenda.set(false);
         this.setRows(rows);
-        this.toast.show({
-          text: this.i18n.translate('meetings.toast.agendaItemRemoved'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('meetings.toast.agendaItemRemoved'), 'success');
       },
       error: (err: unknown) => {
         this.savingAgenda.set(false);

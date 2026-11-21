@@ -1028,8 +1028,7 @@ export class BudgetDashboardComponent {
         if (select && this.nodeById().get(select)) this.selectKs(select);
         else if (!this.selectedKs() && this.selectedBudgetId()) this.selectKs(this.selectedBudgetId());
       },
-      error: () =>
-        quiet || this.toast.show({ text: this.i18n.translate('budget.error'), kind: 'error' }),
+      error: () => quiet || this.toast.show(this.i18n.translate('budget.error'), 'error'),
     });
   }
 
@@ -1046,21 +1045,16 @@ export class BudgetDashboardComponent {
     if (!node) return;
     this.api.deleteNode(node.id).subscribe({
       next: () => {
-        this.toast.show({
-          text: this.i18n.translate('budget.tree.toast.deleted'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('budget.tree.toast.deleted'), 'success');
         this.selectedKsId.set(node.parentId ?? this.selectedBudgetId());
         this.refreshTree();
         this.syncUrl();
       },
       error: (err: unknown) =>
-        this.toast.show({
-          text: this.i18n.translate(
-            costCentreError(problemCode(err), 'budget.tree.toast.deleteFailed'),
-          ),
-          kind: 'error',
-        }),
+        this.toast.show(
+          this.i18n.translate(costCentreError(problemCode(err), 'budget.tree.toast.deleteFailed')),
+          'error',
+        ),
     });
   }
 
@@ -1082,31 +1076,26 @@ export class BudgetDashboardComponent {
     if (!ks || value === null || value === '' || Number(value) === this.figures().allocated) return;
     const problem = amountProblem(value);
     if (problem) {
-      this.toast.show({
-        text: this.i18n.translate(
+      this.toast.show(
+        this.i18n.translate(
           problem === 'negative'
             ? 'budget.plan.error.amountNegative'
             : 'budget.plan.error.amountTooLarge',
         ),
-        kind: 'error',
-      });
+        'error',
+      );
       return;
     }
     this.api.setAllocation(ks.id, this.selectedFyId() as Uuid, value).subscribe({
       next: () => {
-        this.toast.show({
-          text: this.i18n.translate('budget.cc.toast.allocated'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('budget.cc.toast.allocated'), 'success');
         this.refreshTree();
       },
       error: (err: unknown) => {
-        this.toast.show({
-          text: this.i18n.translate(
-            costCentreError(problemCode(err), 'budget.cc.error.allocation'),
-          ),
-          kind: 'error',
-        });
+        this.toast.show(
+          this.i18n.translate(costCentreError(problemCode(err), 'budget.cc.error.allocation')),
+          'error',
+        );
         this.refreshTree();
       },
     });
@@ -1231,8 +1220,7 @@ export class BudgetDashboardComponent {
           fiscalYear: this.selectedFyId() || undefined,
         }),
       'budget.xlsx',
-      () =>
-        this.toast.show({ text: this.i18n.translate('budget.dash.exportError'), kind: 'error' }),
+      () => this.toast.show(this.i18n.translate('budget.dash.exportError'), 'error'),
     );
   }
 }

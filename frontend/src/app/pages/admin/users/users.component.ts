@@ -367,14 +367,13 @@ export class UsersComponent {
   protected setActive(principal: AdminPrincipal, active: boolean): void {
     this.api.setPrincipalActive(principal.id, active).subscribe({
       next: () => {
-        this.toast.show({
-          text: this.i18n.translate(active ? 'admin.users.activated' : 'admin.users.deactivated'),
-          kind: 'success',
-        });
+        this.toast.show(
+          this.i18n.translate(active ? 'admin.users.activated' : 'admin.users.deactivated'),
+          'success',
+        );
         this.search.refresh();
       },
-      error: () =>
-        this.toast.show({ text: this.i18n.translate('admin.users.actionFailed'), kind: 'error' }),
+      error: () => this.toast.show(this.i18n.translate('admin.users.actionFailed'), 'error'),
     });
   }
 }

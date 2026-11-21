@@ -239,10 +239,7 @@ export class AdminOAuthGrantsComponent {
           return;
         }
         this.revoking.set(false);
-        this.toast.show({
-          text: this.i18n.translate('admin.oauthGrants.revokeFailed'),
-          kind: 'error',
-        });
+        this.toast.show(this.i18n.translate('admin.oauthGrants.revokeFailed'), 'error');
       },
     });
   }
@@ -250,7 +247,7 @@ export class AdminOAuthGrantsComponent {
   private afterRevoke(message: 'admin.oauthGrants.revoked' | 'admin.oauthGrants.alreadyGone'): void {
     this.revoking.set(false);
     this.confirmRevoke.set(null);
-    this.toast.show({ text: this.i18n.translate(message), kind: 'success' });
+    this.toast.show(this.i18n.translate(message), 'success');
     this.load();
   }
 }

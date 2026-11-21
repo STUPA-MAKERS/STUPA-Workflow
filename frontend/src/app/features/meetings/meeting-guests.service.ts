@@ -190,10 +190,10 @@ export class MeetingGuestsService {
       next: (rows) => {
         this.busy.set(null);
         rows.forEach((g) => this.apply(g));
-        this.toast.show({
-          text: this.i18n.translate('guests.toast.admittedAll', { n: rows.length }),
-          kind: 'success',
-        });
+        this.toast.show(
+          this.i18n.translate('guests.toast.admittedAll', { n: rows.length }),
+          'success',
+        );
       },
       error: (err: unknown) => this.failed(err),
     });
@@ -210,7 +210,7 @@ export class MeetingGuestsService {
         this.code = link.joinCode;
         this.joinLink.set(link);
         this.guests.update((rows) => rows.filter((g) => g.status !== 'pending'));
-        this.toast.show({ text: this.i18n.translate('guests.toast.rotated'), kind: 'success' });
+        this.toast.show(this.i18n.translate('guests.toast.rotated'), 'success');
       },
       error: (err: unknown) => {
         this.rotating.set(false);
@@ -228,6 +228,6 @@ export class MeetingGuestsService {
   private report(err: unknown): void {
     const detail = problemDetail(err);
     const base = this.i18n.translate('meetings.toast.actionFailed');
-    this.toast.show({ text: detail ? `${base}: ${detail}` : base, kind: 'error' });
+    this.toast.show(detail ? `${base}: ${detail}` : base, 'error');
   }
 }

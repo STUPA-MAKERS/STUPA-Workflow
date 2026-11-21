@@ -747,11 +747,7 @@ export class ApplicationsListComponent {
         return this.api.exportApplicationsXlsx(unpaged);
       },
       'applications.xlsx',
-      () =>
-        this.toast.show({
-          text: this.i18n.translate('applications.list.exportError'),
-          kind: 'error',
-        }),
+      () => this.toast.show(this.i18n.translate('applications.list.exportError'), 'error'),
     );
   }
 
@@ -795,15 +791,12 @@ export class ApplicationsListComponent {
     this.api.fireTransition(item.id, { transitionId }).subscribe({
       next: () => {
         this.busyRow.set(null);
-        this.toast.show({
-          text: this.i18n.translate('applications.actions.success'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('applications.actions.success'), 'success');
         this.changed(item.id, 'updated');
       },
       error: (err: { status?: number }) => {
         this.busyRow.set(null);
-        this.toast.show({ text: this.i18n.translate(actionErrorKey(err.status)), kind: 'error' });
+        this.toast.show(this.i18n.translate(actionErrorKey(err.status)), 'error');
         this.changed(item.id, 'updated');
       },
     });
@@ -897,10 +890,7 @@ export class ApplicationsListComponent {
               },
               error: () => {
                 this.setSwipedAway(item.id, false);
-                this.toast.show({
-                  text: this.i18n.translate('applications.actions.error'),
-                  kind: 'error',
-                });
+                this.toast.show(this.i18n.translate('applications.actions.error'), 'error');
               },
             });
           },
@@ -908,7 +898,7 @@ export class ApplicationsListComponent {
       },
       error: () => {
         this.setSwipedAway(item.id, false);
-        this.toast.show({ text: this.i18n.translate('applications.actions.error'), kind: 'error' });
+        this.toast.show(this.i18n.translate('applications.actions.error'), 'error');
       },
     });
   }
@@ -926,15 +916,15 @@ export class ApplicationsListComponent {
     this.api.setApplicationArchived(item.id, next).subscribe({
       next: () => {
         this.busyRow.set(null);
-        this.toast.show({
-          text: this.i18n.translate(next ? 'applications.archived' : 'applications.unarchived'),
-          kind: 'success',
-        });
+        this.toast.show(
+          this.i18n.translate(next ? 'applications.archived' : 'applications.unarchived'),
+          'success',
+        );
         this.changed(item.id, 'updated');
       },
       error: () => {
         this.busyRow.set(null);
-        this.toast.show({ text: this.i18n.translate('applications.actions.error'), kind: 'error' });
+        this.toast.show(this.i18n.translate('applications.actions.error'), 'error');
       },
     });
   }
@@ -948,19 +938,13 @@ export class ApplicationsListComponent {
       next: () => {
         this.deleting.set(false);
         this.deleteFor.set(null);
-        this.toast.show({
-          text: this.i18n.translate('applications.detail.deleted'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('applications.detail.deleted'), 'success');
         if (this.selectedId() === item.id) this.closeDetail();
         this.changed(item.id, 'deleted');
       },
       error: () => {
         this.deleting.set(false);
-        this.toast.show({
-          text: this.i18n.translate('applications.detail.deleteFailed'),
-          kind: 'error',
-        });
+        this.toast.show(this.i18n.translate('applications.detail.deleteFailed'), 'error');
       },
     });
   }

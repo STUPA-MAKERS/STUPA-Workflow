@@ -1017,10 +1017,10 @@ export class FlowEditorComponent {
     if (this.saving()) return;
     const v = this.validation();
     if (!v.valid) {
-      this.toast.show({
-        text: this.validationMessages()[0] ?? this.i18n.translate('admin.common.invalid'),
-        kind: 'error',
-      });
+      this.toast.show(
+        this.validationMessages()[0] ?? this.i18n.translate('admin.common.invalid'),
+        'error',
+      );
       return;
     }
     const graph = normalizeFlowGraph(autoLayout(this.graph()));
@@ -1030,15 +1030,15 @@ export class FlowEditorComponent {
       next: () => {
         this.saving.set(false);
         this.savedJson.set(json);
-        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
         this.versionHistory()?.reload();
       },
       error: (err: { error?: { detail?: string } }) => {
         this.saving.set(false);
-        this.toast.show({
-          text: err?.error?.detail ?? this.i18n.translate('admin.common.saveFailed'),
-          kind: 'error',
-        });
+        this.toast.show(
+          err?.error?.detail ?? this.i18n.translate('admin.common.saveFailed'),
+          'error',
+        );
       },
     });
   }
@@ -1053,8 +1053,7 @@ export class FlowEditorComponent {
         }
         this.savedJson.set(this.json());
       },
-      error: () =>
-        this.toast.show({ text: this.i18n.translate('admin.flow.loadFailed'), kind: 'error' }),
+      error: () => this.toast.show(this.i18n.translate('admin.flow.loadFailed'), 'error'),
     });
   }
 

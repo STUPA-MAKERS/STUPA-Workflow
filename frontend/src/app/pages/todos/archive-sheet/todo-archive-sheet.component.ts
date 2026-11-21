@@ -122,8 +122,7 @@ export class TodoArchiveSheetComponent {
         this.total.update((n) => Math.max(0, n - 1));
         this.restored.emit(detail);
       },
-      error: () =>
-        this.toast.show({ text: this.i18n.translate('todos.error.save'), kind: 'error' }),
+      error: () => this.toast.show(this.i18n.translate('todos.error.save'), 'error'),
     });
   }
 

@@ -1171,10 +1171,10 @@ export class ExpensesComponent implements OnDestroy {
       },
       error: (err) => {
         this.bulkBusy.set(false);
-        this.toast.show({
-          text: problemDetail(err) || this.i18n.translate('expenses.toast.failed'),
-          kind: 'error',
-        });
+        this.toast.show(
+          problemDetail(err) || this.i18n.translate('expenses.toast.failed'),
+          'error',
+        );
       },
     });
   }
@@ -1225,13 +1225,10 @@ export class ExpensesComponent implements OnDestroy {
     this.list.refresh();
     if (failed) {
       const key = kind === 'delete' ? 'expenses.bulk.deleteError' : 'expenses.bulk.reassignError';
-      this.toast.show({ text: this.i18n.translate(key), kind: 'error' });
+      this.toast.show(this.i18n.translate(key), 'error');
     } else {
       const key = kind === 'delete' ? 'expenses.bulk.deleteDone' : 'expenses.bulk.reassignDone';
-      this.toast.show({
-        text: this.i18n.translate(key, { count: String(count) }),
-        kind: 'success',
-      });
+      this.toast.show(this.i18n.translate(key, { count: String(count) }), 'success');
     }
   }
 

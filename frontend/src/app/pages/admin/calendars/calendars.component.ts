@@ -282,12 +282,12 @@ export class AdminCalendarsComponent {
       next: (saved) => {
         this.calendars.update((list) => withSaved(list, saved));
         this.saving.set(false);
-        this.toast.show({ text: this.i18n.translate('admin.common.saved'), kind: 'success' });
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
         this.close();
       },
       error: () => {
         this.saving.set(false);
-        this.toast.show({ text: this.i18n.translate('admin.common.saveFailed'), kind: 'error' });
+        this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
       },
     });
   }
@@ -307,16 +307,9 @@ export class AdminCalendarsComponent {
     this.api.fetchNow(calendar.id).subscribe({
       next: (saved) => {
         this.calendars.update((list) => withSaved(list, saved));
-        this.toast.show({
-          text: this.i18n.translate('admin.calendars.fetchRequested'),
-          kind: 'success',
-        });
+        this.toast.show(this.i18n.translate('admin.calendars.fetchRequested'), 'success');
       },
-      error: () =>
-        this.toast.show({
-          text: this.i18n.translate('admin.calendars.fetchFailed'),
-          kind: 'error',
-        }),
+      error: () => this.toast.show(this.i18n.translate('admin.calendars.fetchFailed'), 'error'),
     });
   }
 
@@ -327,13 +320,9 @@ export class AdminCalendarsComponent {
       next: () => {
         this.calendars.update((list) => list.filter((c) => c.id !== calendar.id));
         this.confirmDelete.set(null);
-        this.toast.show({ text: this.i18n.translate('admin.calendars.deleted'), kind: 'success' });
+        this.toast.show(this.i18n.translate('admin.calendars.deleted'), 'success');
       },
-      error: () =>
-        this.toast.show({
-          text: this.i18n.translate('admin.calendars.deleteFailed'),
-          kind: 'error',
-        }),
+      error: () => this.toast.show(this.i18n.translate('admin.calendars.deleteFailed'), 'error'),
     });
   }
 }

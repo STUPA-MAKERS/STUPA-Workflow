@@ -37,7 +37,7 @@ export const authGuard: CanActivateFn = (route, state) => {
     map((principal) => {
       if (!principal) {
         if (auth.loginJustFailed()) {
-          toast.show({ text: i18n.translate('auth.loginFailed'), kind: 'error' });
+          toast.show(i18n.translate('auth.loginFailed'), 'error');
           return router.createUrlTree(['/']);
         }
         auth.login(state?.url);
@@ -69,7 +69,7 @@ export const authGuard: CanActivateFn = (route, state) => {
         if (route.data['allowReporter'] === true && auth.hasReportedTickets()) {
           return true;
         }
-        toast.show({ text: i18n.translate('rbac.forbidden'), kind: 'error' });
+        toast.show(i18n.translate('rbac.forbidden'), 'error');
         return router.createUrlTree(['/forbidden']);
       }
       return true;

@@ -104,10 +104,7 @@ export class AppointmentDetailComponent {
       },
       error: () => {
         this.answering.set(false);
-        this.toast.show({
-          text: this.i18n.translate('calendar.toast.answerFailed'),
-          kind: 'error',
-        });
+        this.toast.show(this.i18n.translate('calendar.toast.answerFailed'), 'error');
       },
     });
   }
@@ -120,15 +117,12 @@ export class AppointmentDetailComponent {
       next: () => {
         this.removing.set(false);
         this.confirming.set(false);
-        this.toast.show({ text: this.i18n.translate('calendar.toast.removed'), kind: 'success' });
+        this.toast.show(this.i18n.translate('calendar.toast.removed'), 'success');
         this.removed.emit(a);
       },
       error: () => {
         this.removing.set(false);
-        this.toast.show({
-          text: this.i18n.translate('calendar.toast.removeFailed'),
-          kind: 'error',
-        });
+        this.toast.show(this.i18n.translate('calendar.toast.removeFailed'), 'error');
       },
     });
   }

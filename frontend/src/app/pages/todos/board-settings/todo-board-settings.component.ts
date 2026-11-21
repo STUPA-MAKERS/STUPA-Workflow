@@ -238,10 +238,10 @@ export class TodoBoardSettingsComponent {
     this.busy.set(false);
     const code =
       err instanceof HttpErrorResponse ? (err.error as { code?: string } | null)?.code : undefined;
-    this.toast.show({
-      text: this.i18n.translate((code && ERROR_TEXT[code]) || 'todos.settings.error.save'),
-      kind: 'error',
-    });
+    this.toast.show(
+      this.i18n.translate((code && ERROR_TEXT[code]) || 'todos.settings.error.save'),
+      'error',
+    );
   }
 
   saveName(): void {
@@ -261,7 +261,7 @@ export class TodoBoardSettingsComponent {
     const n = Math.round(Number(this.days()));
     if (!Number.isFinite(n) || n < 1 || n > 365) {
       this.days.set(this.board().archiveAfterDays ?? DEFAULT_ARCHIVE_DAYS);
-      this.toast.show({ text: this.i18n.translate('todos.settings.daysRange'), kind: 'error' });
+      this.toast.show(this.i18n.translate('todos.settings.daysRange'), 'error');
       return;
     }
     if (n === this.board().archiveAfterDays) return;

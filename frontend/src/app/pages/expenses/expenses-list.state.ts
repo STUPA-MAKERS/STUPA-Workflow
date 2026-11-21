@@ -276,7 +276,7 @@ export class ExpensesListState {
           createdTo: this.createdTo() || undefined,
         }),
       'buchungen.xlsx',
-      () => this.toast.show({ text: this.i18n.translate('expenses.exportError'), kind: 'error' }),
+      () => this.toast.show(this.i18n.translate('expenses.exportError'), 'error'),
     );
   }
 

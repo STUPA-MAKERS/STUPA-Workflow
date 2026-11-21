@@ -198,10 +198,7 @@ export class TypeChangeDialogComponent {
         next: () => {
           this.saving.set(false);
           this.open.set(false);
-          this.toast.show({
-            text: this.i18n.translate('applications.typeChange.success'),
-            kind: 'success',
-          });
+          this.toast.show(this.i18n.translate('applications.typeChange.success'), 'success');
           this.done.emit();
         },
         error: (err: { status?: number }) => {
@@ -212,7 +209,7 @@ export class TypeChangeDialogComponent {
               : err.status === 409
                 ? 'applications.actions.conflict'
                 : 'applications.typeChange.error.save';
-          this.toast.show({ text: this.i18n.translate(key), kind: 'error' });
+          this.toast.show(this.i18n.translate(key), 'error');
         },
       });
   }

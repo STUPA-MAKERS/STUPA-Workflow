@@ -763,19 +763,19 @@ export class ChatComponent {
   protected async addFiles(list: readonly File[]): Promise<void> {
     const room = CHAT_MAX_FILES - this.files().length - this.uploads().length;
     if (list.length > room) {
-      this.toast.show({
-        text: this.i18n.translate('chat.error.tooManyFiles', { max: CHAT_MAX_FILES }),
-        kind: 'error',
-      });
+      this.toast.show(
+        this.i18n.translate('chat.error.tooManyFiles', { max: CHAT_MAX_FILES }),
+        'error',
+      );
     }
     const maxBytes = this.drafts.limits().maxFileBytes;
     const mb = Math.round(maxBytes / (1024 * 1024));
     const offered = list.slice(0, Math.max(0, room));
     for (const file of offered.filter((f) => f.size > maxBytes)) {
-      this.toast.show({
-        text: `${file.name}: ${this.i18n.translate('chat.error.fileTooLarge', { mb })}`,
-        kind: 'error',
-      });
+      this.toast.show(
+        `${file.name}: ${this.i18n.translate('chat.error.fileTooLarge', { mb })}`,
+        'error',
+      );
     }
     const take = offered.filter((f) => f.size <= maxBytes);
     if (!take.length) return;
@@ -783,10 +783,10 @@ export class ChatComponent {
     this.leaveFullAttach();
     const { failed } = await done;
     for (const f of failed) {
-      this.toast.show({
-        text: `${f.filename}: ${this.i18n.translate(chatUploadError(f.reason), { mb })}`,
-        kind: 'error',
-      });
+      this.toast.show(
+        `${f.filename}: ${this.i18n.translate(chatUploadError(f.reason), { mb })}`,
+        'error',
+      );
     }
   }
 
@@ -816,7 +816,7 @@ export class ChatComponent {
   protected async removeFile(file: DraftFile): Promise<void> {
     const at = this.files().findIndex((f) => f.id === file.id);
     if (!(await this.drafts.remove(file.id))) {
-      this.toast.show({ text: this.i18n.translate('apply.files.error.delete'), kind: 'error' });
+      this.toast.show(this.i18n.translate('apply.files.error.delete'), 'error');
       return;
     }
     afterNextRender(

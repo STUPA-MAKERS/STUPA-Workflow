@@ -393,10 +393,10 @@ export class TicketDetailComponent {
         : this.api.addMyNote(this.id, req.body, req),
     (created) => this.notes.update((list) => appendOnce(list, created)),
     (err) =>
-      this.toast.show({
-        text: this.t(this.blockedKey(err) ?? sendErrorKey(err, 'tickets.detail.error.note')),
-        kind: 'error',
-      }),
+      this.toast.show(
+        this.t(this.blockedKey(err) ?? sendErrorKey(err, 'tickets.detail.error.note')),
+        'error',
+      ),
     draftDropper(this.files),
   );
 
@@ -634,14 +634,14 @@ export class TicketDetailComponent {
         this.blocking.set(false);
         if (id !== this.id) return;
         this.ticket.set(t);
-        this.toast.show({
-          text: this.t(block ? 'tickets.detail.senderBlocked' : 'tickets.detail.senderUnblocked'),
-          kind: 'success',
-        });
+        this.toast.show(
+          this.t(block ? 'tickets.detail.senderBlocked' : 'tickets.detail.senderUnblocked'),
+          'success',
+        );
       },
       error: (err: unknown) => {
         this.blocking.set(false);
-        this.toast.show({ text: this.t(blockErrorKey(err)), kind: 'error' });
+        this.toast.show(this.t(blockErrorKey(err)), 'error');
       },
     });
   }
@@ -660,10 +660,8 @@ export class TicketDetailComponent {
     const t = this.ticket();
     const title = t ? `${t.number} ${t.title}` : undefined;
     const outcome = await shareOrCopy({ url: location.href.split('?')[0], title });
-    if (outcome === 'copied')
-      this.toast.show({ text: this.t('tickets.detail.linkCopied'), kind: 'success' });
-    else if (outcome === 'failed')
-      this.toast.show({ text: this.t('tickets.detail.linkFailed'), kind: 'error' });
+    if (outcome === 'copied') this.toast.show(this.t('tickets.detail.linkCopied'), 'success');
+    else if (outcome === 'failed') this.toast.show(this.t('tickets.detail.linkFailed'), 'error');
   }
 
   /** "Erledigt" or "Ablehnen". With open to-dos the dialog asks first. */
@@ -747,7 +745,7 @@ export class TicketDetailComponent {
       },
       error: (err: unknown) => {
         this.saving.set(null);
-        this.toast.show({ text: this.t(this.patchError(err)), kind: 'error' });
+        this.toast.show(this.t(this.patchError(err)), 'error');
       },
     });
   }
@@ -805,10 +803,7 @@ export class TicketDetailComponent {
       next: (n) => this.notes.update((list) => list.map((x) => (x.id === n.id ? n : x))),
       error: (err: unknown) => {
         change.restore?.();
-        this.toast.show({
-          text: this.t(this.blockedKey(err) ?? 'tickets.detail.error.note'),
-          kind: 'error',
-        });
+        this.toast.show(this.t(this.blockedKey(err) ?? 'tickets.detail.error.note'), 'error');
       },
     });
   }
@@ -820,7 +815,7 @@ export class TicketDetailComponent {
       : this.api.deleteMyNote(this.id, ref.id);
     remove.subscribe({
       next: () => this.notes.update((list) => list.filter((x) => x.id !== ref.id)),
-      error: () => this.toast.show({ text: this.t('tickets.detail.error.note'), kind: 'error' }),
+      error: () => this.toast.show(this.t('tickets.detail.error.note'), 'error'),
     });
   }
 

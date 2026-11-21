@@ -173,21 +173,18 @@ export class DelegationDialogComponent {
       .subscribe({
         next: (d) => {
           this.busy.set(false);
-          this.toast.show({
-            text: this.i18n.translate('delegation.toast.created'),
-            kind: 'success',
-          });
+          this.toast.show(this.i18n.translate('delegation.toast.created'), 'success');
           this.created.emit(d);
         },
         error: (err: { error?: { detail?: string; code?: string } }) => {
           this.busy.set(false);
           const own = REFUSAL_TEXT[err.error?.code ?? ''];
-          this.toast.show({
-            text: own
+          this.toast.show(
+            own
               ? this.i18n.translate(own)
               : (err.error?.detail ?? this.i18n.translate('delegation.toast.createFailed')),
-            kind: 'error',
-          });
+            'error',
+          );
         },
       });
   }

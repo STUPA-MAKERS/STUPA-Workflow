@@ -141,16 +141,13 @@ export class MeetingDelegationCardComponent {
     this.api.revoke(d.id).subscribe({
       next: () => {
         this.busy.set(false);
-        this.toast.show({ text: this.i18n.translate('delegation.toast.revoked'), kind: 'success' });
+        this.toast.show(this.i18n.translate('delegation.toast.revoked'), 'success');
         this.reload();
         this.changed.emit({ kind: 'revoked', delegation: d });
       },
       error: () => {
         this.busy.set(false);
-        this.toast.show({
-          text: this.i18n.translate('delegation.toast.revokeFailed'),
-          kind: 'error',
-        });
+        this.toast.show(this.i18n.translate('delegation.toast.revokeFailed'), 'error');
       },
     });
   }

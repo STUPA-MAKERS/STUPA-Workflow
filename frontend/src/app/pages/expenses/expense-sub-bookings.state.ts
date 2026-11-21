@@ -44,7 +44,7 @@ export class ExpenseSubBookingsState {
       },
       error: () => {
         this.loadingSub.update((s) => withoutItem(s, id));
-        this.toast.show({ text: this.i18n.translate('expenses.sub.loadError'), kind: 'error' });
+        this.toast.show(this.i18n.translate('expenses.sub.loadError'), 'error');
       },
     });
   }
@@ -82,16 +82,16 @@ export class ExpenseSubBookingsState {
           this.list.saving.set(false);
           this.closeCreateSub();
           this.loadSub(parent.id);
-          this.toast.show({ text: this.i18n.translate('expenses.sub.added'), kind: 'success' });
+          this.toast.show(this.i18n.translate('expenses.sub.added'), 'success');
           this.list.refresh();
         },
         error: (err: unknown) => {
           this.list.saving.set(false);
           const closed = problemCode(err) === FISCAL_YEAR_CLOSED;
-          this.toast.show({
-            text: this.i18n.translate(closed ? 'budget.fy.closedError' : 'expenses.toast.failed'),
-            kind: 'error',
-          });
+          this.toast.show(
+            this.i18n.translate(closed ? 'budget.fy.closedError' : 'expenses.toast.failed'),
+            'error',
+          );
         },
       });
   }
