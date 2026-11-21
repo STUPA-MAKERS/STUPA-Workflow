@@ -31,7 +31,8 @@ export function retryLoadError(): void {
 /**
  * A real `ToastService` with the jest functions of `mock`: `show({ text, kind })` also calls
  * `mock[kind](text)`, so a spec checks `success` and `error` with jest functions. The load
- * error toast still works. Use it as `{ provide: ToastService, useFactory: () => toastWith(toast) }`.
+ * error toast still works: `show`, `dismiss` and `act` stay the real ones. Use it as
+ * `{ provide: ToastService, useFactory: () => toastWith(toast) }`.
  */
 export function toastWith(
   mock: Partial<Record<ToastKind | 'dismiss' | 'act', unknown>>,
@@ -43,5 +44,8 @@ export function toastWith(
     m[o.kind ?? 'info']?.(o.text);
     return real(o);
   };
-  return Object.assign(service, mock, { show });
+  const kinds = Object.fromEntries(
+    Object.entries(mock).filter(([k]) => ['info', 'success', 'warning', 'error'].includes(k)),
+  );
+  return Object.assign(service, kinds, { show });
 }

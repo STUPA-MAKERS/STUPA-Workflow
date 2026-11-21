@@ -61,7 +61,7 @@ function makeApi(o: ApiOverrides = {}) {
 }
 
 async function setup(api = makeApi()) {
-  const toast = { success: jest.fn(), error: jest.fn(), show: jest.fn() };
+  const toast = { success: jest.fn(), error: jest.fn(), warning: jest.fn() };
   const view = await render(BackupsComponent, {
     providers: [
       { provide: AdminApiService, useValue: api },
@@ -203,7 +203,7 @@ describe('BackupsComponent', () => {
       await userEvent.type(screen.getByLabelText(/RESTORE/i), 'RESTORE');
       await userEvent.click(screen.getAllByRole('button', { name: 'Wiederherstellen' }).at(-1)!);
       expect(api.restoreBackup).toHaveBeenCalledWith('b-1');
-      expect(toast.show).toHaveBeenCalledWith(expect.stringMatching(/abgemeldet/i), 'warning');
+      expect(toast.warning).toHaveBeenCalledWith(expect.stringMatching(/abgemeldet/i));
     });
   });
 

@@ -3,16 +3,13 @@
   [heading]="'todos.transfer.title' | t"
   [closeLabel]="'action.close' | t"
   (closed)="cancel()"
-  [actions]="[
-    { key: 'cancel', label: ('action.cancel' | t) },
-    {
+  [actions]="!none() && !unloadable() ? [{ key: 'cancel', label: ('action.cancel' | t) }, {
       key: 'confirm',
       label: ('todos.transfer.confirm' | t),
       kind: 'main',
       disabled: !canConfirm(),
       busy: busy(),
-    },
-  ]"
+    }] : [{ key: 'cancel', label: ('action.cancel' | t) }]"
   (action)="$event.key === 'cancel' ? cancel() : $event.key === 'confirm' ? confirm() : null"
 >
   <ng-template dialogBody>
@@ -47,6 +44,5 @@
       </form>
     }
 
-    @if (!none() && !unloadable()) {}
   </ng-template>
 </app-dialog>

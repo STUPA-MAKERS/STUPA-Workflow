@@ -4,9 +4,7 @@
   [closeLabel]="'action.close' | t"
   size="md"
   (closed)="cancel()"
-  [actions]="[
-    { key: 'cancel', label: ('action.close' | t), kind: 'main' },
-    { key: 'a1', label: ('action.cancel' | t) },
+  [actions]="sentNumber() ? [{ key: 'cancel', label: ('action.close' | t), kind: 'main' }] : [{ key: 'a1', label: ('action.cancel' | t) },
     {
       key: 'send',
       label: ('help.report.send' | t),
@@ -14,8 +12,7 @@
       kind: 'main',
       disabled: drafts.busy(),
       busy: sending(),
-    },
-  ]"
+    }]"
   (action)="
     $event.key === 'cancel'
       ? cancel()
@@ -173,8 +170,6 @@
       </form>
     }
 
-    @if (sentNumber()) {
-    } @else {}
   </ng-template>
 </app-dialog>
 

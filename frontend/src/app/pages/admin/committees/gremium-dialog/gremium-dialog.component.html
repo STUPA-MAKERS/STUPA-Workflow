@@ -11,24 +11,21 @@
   "
   [closeLabel]="'action.close' | t"
   (closed)="close()"
-  [actions]="[
-    { key: 'backFromConfirm', label: ('action.cancel' | t) },
+  [actions]="confirmPublic() ? [{ key: 'backFromConfirm', label: ('action.cancel' | t) },
     {
       key: 'confirmAndSave',
       label: ('admin.gremien.publicConfirm.confirm' | t),
       kind: 'main',
       disabled: previewLoading(),
       busy: saving(),
-    },
-    { key: 'close', label: ('action.cancel' | t) },
+    }] : [{ key: 'close', label: ('action.cancel' | t) },
     {
       key: 'submit',
       label: ((isNew() ? 'admin.common.create' : 'action.save') | t),
       kind: 'main',
       disabled: !canSave() || recipientsLoading(),
       busy: saving(),
-    },
-  ]"
+    }]"
   (action)="
     $event.key === 'backFromConfirm'
       ? backFromConfirm()
@@ -245,7 +242,5 @@
       </form>
     }
 
-    @if (confirmPublic()) {
-    } @else {}
   </ng-template>
 </app-dialog>

@@ -739,10 +739,7 @@ describe('ExpensesComponent (unit)', () => {
   /** Without a detail the toast shows a generic fallback. */
   it('create surfaces the problem+json detail on error, else a generic message', () => {
     const { cmp, http } = build();
-    const toastSpy = jest.spyOn(
-      (cmp as unknown as { toast: { error: (m: string) => void } }).toast,
-      'error',
-    );
+    const toastSpy = jest.spyOn(kindSpies((cmp as unknown as { toast: object }).toast), 'error');
     dlg(cmp).newDescription.set('x');
     dlg(cmp).newAmount.set('1');
     dlg(cmp).newApplicationId.set('app-1');
@@ -1014,10 +1011,7 @@ describe('ExpensesComponent (unit)', () => {
 
   it('saveEdit toasts a generic failure on error', () => {
     const { cmp, http } = build();
-    const toastSpy = jest.spyOn(
-      (cmp as unknown as { toast: { error: (m: string) => void } }).toast,
-      'error',
-    );
+    const toastSpy = jest.spyOn(kindSpies((cmp as unknown as { toast: object }).toast), 'error');
     cmp.openEdit(EXPENSE);
     cmp.saveEdit(new Event('submit'));
     http
@@ -1064,10 +1058,7 @@ describe('ExpensesComponent (unit)', () => {
 
   it('doDelete toasts a failure on error', () => {
     const { cmp, http } = build({ expenses: page([EXPENSE], 1) });
-    const toastSpy = jest.spyOn(
-      (cmp as unknown as { toast: { error: (m: string) => void } }).toast,
-      'error',
-    );
+    const toastSpy = jest.spyOn(kindSpies((cmp as unknown as { toast: object }).toast), 'error');
     cmp.confirmDelete.set(EXPENSE);
     cmp.doDelete();
     http
@@ -1230,10 +1221,7 @@ describe('ExpensesComponent (unit)', () => {
 
   it('createTransfer surfaces the problem detail on error', () => {
     const { cmp, http } = build();
-    const toastSpy = jest.spyOn(
-      (cmp as unknown as { toast: { error: (m: string) => void } }).toast,
-      'error',
-    );
+    const toastSpy = jest.spyOn(kindSpies((cmp as unknown as { toast: object }).toast), 'error');
     cmp.tFromId.set('a');
     cmp.tToId.set('b');
     cmp.tFiscalYearId.set('fy-1');

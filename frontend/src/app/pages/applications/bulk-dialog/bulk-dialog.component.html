@@ -4,17 +4,14 @@
   [subtitle]="subtitle()"
   [closeLabel]="'action.close' | t"
   (closed)="close()"
-  [actions]="[
-    { key: 'close', label: ('action.close' | t), kind: 'main' },
-    { key: 'a1', label: ('action.cancel' | t) },
+  [actions]="results() ? [{ key: 'close', label: ('action.close' | t), kind: 'main' }] : [{ key: 'a1', label: ('action.cancel' | t) },
     {
       key: 'submit',
       label: ((mode() === 'transition' ? 'applications.bulk.fire' : 'applications.bulk.send') | t),
       kind: 'main',
       disabled: !canConfirm(),
       busy: running(),
-    },
-  ]"
+    }]"
   (action)="
     $event.key === 'close'
       ? close()
@@ -117,7 +114,5 @@
         <button type="submit" hidden></button>
       </form>
     }
-    @if (results()) {
-    } @else {}
   </ng-template>
 </app-dialog>
