@@ -1,51 +1,15 @@
-<section class="pp">
-  <header class="pp__head">
-    <nav class="pp__crumbs" [attr.aria-label]="'publicProtocols.crumbs' | t">
-      <a routerLink="/">{{ 'publicProtocols.crumbHome' | t }}</a>
-      <app-icon name="right" [size]="13" />
-      <a routerLink="/protocols">{{ 'publicProtocols.title' | t }}</a>
-      @if (gremium(); as g) {
-        <app-icon name="right" [size]="13" />
-        <span aria-current="page">{{ g.name }}</span>
-      }
-    </nav>
-    @if (gremium(); as g) {
-      <h1 class="pp__title">{{ g.name }}</h1>
-      <p class="pp__lede">{{ 'publicProtocols.lede' | t }}</p>
-      <a class="pp__btn pp__btn--tonal pp__decisions" [routerLink]="['/decisions', g.slug]">
-        <app-icon name="vote" [size]="16" />
-        {{ 'publicDecisions.link' | t }}
-      </a>
-    } @else {
-      <h1 class="pp__title">{{ 'publicProtocols.title' | t }}</h1>
-    }
-  </header>
-
-  @if (unknown()) {
-    <div class="pp__none">
-      <app-empty-state icon="file" shape="date"
-        [heading]="'publicProtocols.gremium.unknown' | t"
-        [body]="'publicProtocols.gremium.unknownBody' | t"
-      >
-        <a class="pp__btn pp__btn--tonal" routerLink="/protocols">
-          <app-icon name="back" [size]="16" />
-          {{ 'publicProtocols.gremium.all' | t }}
-        </a>
-      </app-empty-state>
-    </div>
-  } @else if (!loading() && !error() && total() === 0 && !hasFilters()) {
-    <div class="pp__none">
-      <app-empty-state icon="file" shape="date"
-        [heading]="'publicProtocols.empty.none' | t"
-        [body]="'publicProtocols.empty.noneBody' | t"
-      >
-        <a class="pp__btn pp__btn--tonal" routerLink="/">
-          <app-icon name="back" [size]="16" />
-          {{ 'publicProtocols.empty.home' | t }}
-        </a>
-      </app-empty-state>
-    </div>
-  } @else {
+<app-public-screen
+  width="wide"
+  [head]="head()"
+  [lede]="gremium() ? ('publicProtocols.lede' | t) : null"
+  [crumbs]="crumbs()"
+  [actions]="actions()"
+  [state]="state()"
+  [skeletonRows]="4"
+  [emptyAction]="emptyAction()"
+>
+  <ng-template screenBody>
+    <div class="pp__body">
     <div class="pp__toolbar">
       <app-search-pill
         size="md"
@@ -82,12 +46,10 @@
     } @else if (error() && items().length === 0) {
       <app-note kind="error" icon="alert" role="alert">{{ 'publicProtocols.error' | t }}</app-note>
     } @else if (items().length === 0) {
-      <div class="pp__none">
-        <app-empty-state icon="searchOff" shape="date"
-          [heading]="'publicProtocols.empty.filtered' | t"
-          [body]="'publicProtocols.empty.filteredBody' | t"
-         />
-      </div>
+      <app-empty-state icon="searchOff" shape="date"
+        [heading]="'publicProtocols.empty.filtered' | t"
+        [body]="'publicProtocols.empty.filteredBody' | t"
+      />
     } @else {
       @for (group of groups(); track group.key) {
         <h2 class="pp__group">{{ group.label }}</h2>
@@ -160,5 +122,6 @@
         </app-button-group>
       }
     }
-  }
-</section>
+    </div>
+  </ng-template>
+</app-public-screen>

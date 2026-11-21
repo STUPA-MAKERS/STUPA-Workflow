@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { PublicScreenComponent, ScreenBodyDirective, type PublicCrumb } from '@stupa-makers/ui-kit/screens';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -14,6 +15,9 @@ import {
   NoteComponent,
   SearchPillComponent,
   SkeletonComponent,
+  type Action,
+  type LoadState,
+  type ScreenHead,
 } from '@stupa-makers/ui-kit';
 import { parseDay, weekdayDate } from '@shared/date-format';
 import type {
@@ -36,7 +40,9 @@ import {
  * sums of the votes. An election shows its question and its date only. No row names a
  * person. The search (the question) and the Semester chip filter on the server. The head
  * links the protocols of the same Gremium (spec 002402). A slug of no public Gremium shows
- * the empty state (spec 002403). The page is `noindex`.
+ * the empty state (spec 002403). The kit public screen (ui-kit 002245) draws the column, the
+ * crumbs, the head and the first load; the body keeps the list on the page while a search
+ * reads again. The page is `noindex`.
  */
 @Component({
   selector: 'app-public-decisions',
@@ -55,6 +61,8 @@ import {
     NoteComponent,
     SearchPillComponent,
     SkeletonComponent,
+    PublicScreenComponent,
+    ScreenBodyDirective,
   ],
   templateUrl: './public-decisions.component.html',
   styleUrl: './public-decisions.component.scss',
@@ -84,9 +92,75 @@ export class PublicDecisionsComponent {
   protected readonly semesterText = this.list.semesterText;
   protected readonly groups = this.list.groups;
 
+  private readonly loaded = this.list.loaded;
+
   constructor() {
     useNoindex();
   }
+
+  protected readonly head = computed<ScreenHead>(() => ({
+    title: this.gremium()?.name ?? this.i18n.translate('publicDecisions.title'),
+    back: null,
+  }));
+
+  /** "Start › Beschlüsse › Studierendenparlament" (spec 002402). */
+  protected readonly crumbs = computed<readonly PublicCrumb[]>(() => {
+    const g = this.gremium();
+    return [
+      { label: this.i18n.translate('publicProtocols.crumbHome'), link: { commands: ['/'] } },
+      { label: this.i18n.translate('publicDecisions.title'), link: { commands: ['/decisions'] } },
+      ...(g ? [{ label: g.name }] : []),
+    ];
+  });
+
+  /** The protocols of the same Gremium (spec 002402). */
+  private readonly protocolsAction = computed<Action | null>(() => {
+    const g = this.gremium();
+    return g
+      ? {
+          key: 'protocols',
+          label: this.i18n.translate('publicProtocols.link'),
+          icon: 'file',
+          route: { commands: ['/protocols', g.slug] },
+        }
+      : null;
+  });
+
+  protected readonly actions = computed<readonly Action[]>(() => {
+    const a = this.protocolsAction();
+    return a ? [a] : [];
+  });
+
+  /**
+   * The state of the screen: the first load, an unknown slug (spec 002403), a Gremium without
+   * public decisions, a failed first read. After the first page the screen stays `ready`.
+   */
+  protected readonly state = computed<LoadState<unknown>>(() => {
+    if (this.unknown()) {
+      return { state: 'empty', heading: this.i18n.translate('publicProtocols.gremium.unknown'), icon: 'vote' };
+    }
+    if (!this.loaded()) {
+      return this.error()
+        ? { state: 'error', message: this.i18n.translate('publicDecisions.error'), retry: () => this.list.retry() }
+        : { state: 'loading' };
+    }
+    if (this.total() === 0 && !this.hasFilters() && !this.loading()) {
+      return { state: 'empty', heading: this.i18n.translate('publicDecisions.empty.none'), icon: 'vote' };
+    }
+    return { state: 'ready', data: null };
+  });
+
+  /** The button of the empty state: the list of Gremien, or the protocols of the Gremium. */
+  protected readonly emptyAction = computed<Action | null>(() =>
+    this.unknown()
+      ? {
+          key: 'all',
+          label: this.i18n.translate('publicProtocols.gremium.all'),
+          icon: 'back',
+          route: { commands: ['/decisions'] },
+        }
+      : this.protocolsAction(),
+  );
 
   /** "12 Beschlüsse", or "3 Treffer" with a search text. */
   protected readonly countText = computed(() => {

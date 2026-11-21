@@ -3,16 +3,6 @@
 
 @include pp.list-page;
 
-.pp__lede {
-  max-width: 45rem;
-  margin: 0;
-  color: var(--color-text-muted);
-}
-
-.pp__decisions {
-  align-self: flex-start;
-}
-
 .pp__meta,
 .pp__counts,
 .pp__pdfMeta {

@@ -5,6 +5,7 @@ import {
   inject,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { PublicScreenComponent, ScreenBodyDirective, type PublicCrumb } from '@stupa-makers/ui-kit/screens';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -15,6 +16,9 @@ import {
   EmptyStateComponent,
   FilterSelectComponent,
   formatBytes,
+  type Action,
+  type LoadState,
+  type ScreenHead,
   HighlightComponent,
   IconComponent,
   NoteComponent,
@@ -42,7 +46,9 @@ import { dayMonthYear, parseDay, weekdayDate } from '@shared/date-format';
  * The search (meeting title and the text of the public agenda items) and the Semester chip
  * filter on the server. "Weitere Protokolle laden" appends the next page. The head links the
  * decisions of the same Gremium (spec 002402). A slug of no public Gremium shows the empty
- * state (spec 002403). The page is `noindex`.
+ * state (spec 002403). The kit public screen (ui-kit 002245) draws the column, the crumbs, the
+ * head and the first load; the body keeps the list on the page while a search reads again, so
+ * the search field keeps its focus. The page is `noindex`.
  */
 @Component({
   selector: 'app-public-protocols',
@@ -61,6 +67,8 @@ import { dayMonthYear, parseDay, weekdayDate } from '@shared/date-format';
     NoteComponent,
     SearchPillComponent,
     SkeletonComponent,
+    PublicScreenComponent,
+    ScreenBodyDirective,
   ],
   templateUrl: './public-protocols.component.html',
   styleUrl: './public-protocols.component.scss',
@@ -91,9 +99,77 @@ export class PublicProtocolsComponent {
   protected readonly semesterText = this.list.semesterText;
   protected readonly groups = this.list.groups;
 
+  private readonly loaded = this.list.loaded;
+
   constructor() {
     useNoindex();
   }
+
+  protected readonly head = computed<ScreenHead>(() => ({
+    title: this.gremium()?.name ?? this.i18n.translate('publicProtocols.title'),
+    back: null,
+  }));
+
+  /** "Start › Öffentliche Protokolle › Studierendenparlament" (spec 002402). */
+  protected readonly crumbs = computed<readonly PublicCrumb[]>(() => {
+    const g = this.gremium();
+    return [
+      { label: this.i18n.translate('publicProtocols.crumbHome'), link: { commands: ['/'] } },
+      { label: this.i18n.translate('publicProtocols.title'), link: { commands: ['/protocols'] } },
+      ...(g ? [{ label: g.name }] : []),
+    ];
+  });
+
+  /** The decisions of the same Gremium (spec 002402). */
+  protected readonly actions = computed<readonly Action[]>(() => {
+    const g = this.gremium();
+    return g
+      ? [
+          {
+            key: 'decisions',
+            label: this.i18n.translate('publicDecisions.link'),
+            icon: 'vote',
+            route: { commands: ['/decisions', g.slug] },
+          },
+        ]
+      : [];
+  });
+
+  /**
+   * The state of the screen: the first load, an unknown slug (spec 002403), a Gremium without
+   * protocols, a failed first read. After the first page the screen stays `ready`.
+   */
+  protected readonly state = computed<LoadState<unknown>>(() => {
+    if (this.unknown()) {
+      return { state: 'empty', heading: this.i18n.translate('publicProtocols.gremium.unknown'), icon: 'file' };
+    }
+    if (!this.loaded()) {
+      return this.error()
+        ? { state: 'error', message: this.i18n.translate('publicProtocols.error'), retry: () => this.list.retry() }
+        : { state: 'loading' };
+    }
+    if (this.total() === 0 && !this.hasFilters() && !this.loading()) {
+      return { state: 'empty', heading: this.i18n.translate('publicProtocols.empty.none'), icon: 'file' };
+    }
+    return { state: 'ready', data: null };
+  });
+
+  /** The button of the empty state: the list of Gremien, or the start page. */
+  protected readonly emptyAction = computed<Action>(() =>
+    this.unknown()
+      ? {
+          key: 'all',
+          label: this.i18n.translate('publicProtocols.gremium.all'),
+          icon: 'back',
+          route: { commands: ['/protocols'] },
+        }
+      : {
+          key: 'home',
+          label: this.i18n.translate('publicProtocols.empty.home'),
+          icon: 'back',
+          route: { commands: ['/'] },
+        },
+  );
 
   protected readonly countText = computed(() =>
     this.i18n.translate(

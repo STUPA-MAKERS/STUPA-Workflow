@@ -5,6 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { of, Subject, throwError } from 'rxjs';
 import type { PublicGremium } from './public-protocols.models';
 import { PublicGremienComponent } from './public-gremien.component';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { PublicProtocolsService } from './public-protocols.service';
 
 const GREMIEN = [
@@ -16,6 +17,13 @@ function makeApi(over: Record<string, jest.Mock> = {}) {
   return { gremien: jest.fn(() => of(GREMIEN)), ...over };
 }
 
+/** A stand-in of the toasts: the kit public screen shows a failed first read as a toast. */
+function makeToasts(): Record<string, jest.Mock> {
+  const fns: Record<string, jest.Mock> = {};
+  return new Proxy(fns, { get: (t, k: string) => (t[k] ??= jest.fn(() => 1)) });
+}
+let toasts = makeToasts();
+
 async function setup(
   kind: 'protocols' | 'decisions' | undefined = 'protocols',
   api = makeApi(),
@@ -25,6 +33,7 @@ async function setup(
     providers: [
       provideRouter([]),
       { provide: PublicProtocolsService, useValue: api },
+      { provide: ToastService, useValue: toasts },
       {
         provide: ActivatedRoute,
         useValue: {
@@ -40,7 +49,10 @@ async function setup(
 }
 
 describe('PublicGremienComponent', () => {
-  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  beforeEach(() => {
+    localStorage.setItem('ap.locale', 'de');
+    toasts = makeToasts();
+  });
   afterEach(() => localStorage.clear());
 
   /** Spec 002400: one row per public Gremium, with the day of its newest protocol and no count. */
@@ -112,8 +124,15 @@ describe('PublicGremienComponent', () => {
   });
 
   it('reports a failed read', async () => {
-    await setup('protocols', makeApi({ gremien: jest.fn(() => throwError(() => new Error('down'))) }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Protokolle konnten nicht geladen werden.');
+    const gremien = jest
+      .fn()
+      .mockReturnValueOnce(throwError(() => new Error('down')))
+      .mockReturnValue(of(GREMIEN));
+    await setup('protocols', makeApi({ gremien }));
+    const toast = toasts['showAction'].mock.calls[0][0];
+    expect(toast.message).toContain('Die Protokolle konnten nicht geladen werden.');
+    toast.closed('action');
+    expect(await screen.findAllByRole('listitem')).toHaveLength(2);
   });
 
   it('localizes to English', async () => {

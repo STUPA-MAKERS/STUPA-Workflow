@@ -1,14 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { PublicScreenComponent, ScreenBodyDirective, type PublicCrumb } from '@stupa-makers/ui-kit/screens';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import {
-  EmptyStateComponent,
-  IconComponent,
-  ListItemComponent,
-  NoteComponent,
-  SkeletonComponent,
-} from '@stupa-makers/ui-kit';
+import { ListItemComponent, type Action, type LoadState, type ScreenHead } from '@stupa-makers/ui-kit';
 import { dayMonthYear } from '@shared/date-format';
 import type { PublicGremium } from './public-protocols.models';
 import { PublicProtocolsService } from './public-protocols.service';
@@ -23,23 +18,16 @@ export type PublicKind = 'protocols' | 'decisions';
  * opens the page of the Gremium (`/<kind>/<slug>`). The route data `kind` names the page.
  *
  * A link with the old Gremium filter (`?committee=<id>`) and exactly one public Gremium opens
- * the page of that Gremium and replaces the address (spec 002404). The page is `noindex`.
+ * the page of that Gremium and replaces the address (spec 002404). The kit public screen (ui-kit
+ * 002245) draws the column, the crumbs, the head, the load and the empty state. The page is
+ * `noindex`.
  */
 @Component({
   selector: 'app-public-gremien',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    RouterLink,
-    TranslatePipe,
-    EmptyStateComponent,
-    IconComponent,
-    ListItemComponent,
-    NoteComponent,
-    SkeletonComponent,
-  ],
+  imports: [TranslatePipe, ListItemComponent, PublicScreenComponent, ScreenBodyDirective],
   templateUrl: './public-gremien.component.html',
-  styleUrl: './public-gremien.component.scss',
 })
 export class PublicGremienComponent {
   private readonly api = inject(PublicProtocolsService);
@@ -54,7 +42,36 @@ export class PublicGremienComponent {
   protected readonly error = signal(false);
 
   /** The title of the page and of the crumb. */
-  protected readonly titleKey = this.kind === 'decisions' ? 'publicDecisions.title' : 'publicProtocols.title';
+  private readonly title = this.i18n.translate(
+    this.kind === 'decisions' ? 'publicDecisions.title' : 'publicProtocols.title',
+  );
+  protected readonly head = computed<ScreenHead>(() => ({ title: this.title, back: null }));
+  protected readonly crumbs = computed<readonly PublicCrumb[]>(() => [
+    { label: this.i18n.translate('publicProtocols.crumbHome'), link: { commands: ['/'] } },
+    { label: this.title },
+  ]);
+  protected readonly home = computed<Action>(() => ({
+    key: 'home',
+    label: this.i18n.translate('publicProtocols.empty.home'),
+    icon: 'back',
+    route: { commands: ['/'] },
+  }));
+
+  protected readonly state = computed<LoadState<unknown>>(() => {
+    if (this.loading()) return { state: 'loading' };
+    if (this.error()) {
+      return { state: 'error', message: this.i18n.translate('publicProtocols.error'), retry: () => this.load() };
+    }
+    if (this.gremien().length === 0) {
+      const decisions = this.kind === 'decisions';
+      return {
+        state: 'empty',
+        heading: this.i18n.translate(decisions ? 'publicDecisions.empty.none' : 'publicProtocols.empty.none'),
+        icon: decisions ? 'vote' : 'file',
+      };
+    }
+    return { state: 'ready', data: null };
+  });
 
   /** The rows: name, link and "Letztes Protokoll 29.09.2026". */
   protected readonly rows = computed(() =>
@@ -70,7 +87,13 @@ export class PublicGremienComponent {
 
   constructor() {
     useNoindex();
+    this.load();
+  }
+
+  private load(): void {
     const asked = this.route.snapshot.queryParamMap.getAll('committee');
+    this.loading.set(true);
+    this.error.set(false);
     this.api.gremien().subscribe({
       next: (rows) => {
         const hits = rows.filter((g) => asked.includes(g.id));
