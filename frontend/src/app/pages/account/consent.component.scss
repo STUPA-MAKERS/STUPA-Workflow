@@ -75,11 +75,16 @@
 .cs__scope app-checkbox {
   display: flex;
 }
-.cs__scope ::ng-deep app-checkbox > label {
-  flex: 1 1 auto;
-  align-items: flex-start;
-  gap: var(--space-3);
+.cs__scope {
   padding: var(--space-2) var(--space-4);
+}
+// The M3 checkbox (ui-kit 002293) centres its box on the whole text; a scope row has two or three
+// lines, so the box stands at the first line, and its 40px state layer reaches above it.
+.cs__scope ::ng-deep .mdc-form-field {
+  align-items: flex-start;
+}
+.cs__scope ::ng-deep .mdc-checkbox {
+  margin-block-start: -8px;
 }
 .cs__scopeText {
   display: flex;
