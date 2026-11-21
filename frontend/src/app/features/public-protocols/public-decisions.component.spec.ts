@@ -10,6 +10,7 @@ import type {
   PublicSemester,
 } from './public-protocols.models';
 import { PublicDecisionsComponent } from './public-decisions.component';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { PublicProtocolsService } from './public-protocols.service';
 import { decisionRowFixture } from './public-protocols.fixtures';
 
@@ -31,11 +32,19 @@ function makeApi(over: Record<string, jest.Mock> = {}) {
   };
 }
 
+/** A stand-in of the toasts: the kit public screen shows a failed first read as a toast. */
+function makeToasts(): Record<string, jest.Mock> {
+  const fns: Record<string, jest.Mock> = {};
+  return new Proxy(fns, { get: (t, k: string) => (t[k] ??= jest.fn(() => 1)) });
+}
+let toasts = makeToasts();
+
 async function setup(api = makeApi(), committee = 'stupa') {
   const view = await render(PublicDecisionsComponent, {
     providers: [
       provideRouter([]),
       { provide: PublicProtocolsService, useValue: api },
+      { provide: ToastService, useValue: toasts },
       {
         provide: ActivatedRoute,
         useValue: {
@@ -50,7 +59,10 @@ async function setup(api = makeApi(), committee = 'stupa') {
 const MORE = 'Weitere Beschlüsse laden';
 
 describe('PublicDecisionsComponent', () => {
-  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  beforeEach(() => {
+    localStorage.setItem('ap.locale', 'de');
+    toasts = makeToasts();
+  });
   afterEach(() => localStorage.clear());
 
   it('lists a motion with its meeting, its result and the sums of the votes', async () => {
@@ -153,6 +165,17 @@ describe('PublicDecisionsComponent', () => {
     expect(screen.getByText('Keine öffentlichen Protokolle')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Alle Gremien/ })).toHaveAttribute('href', '/decisions');
     expect(screen.getByRole('heading', { level: 1, name: 'Beschlüsse' })).toBeInTheDocument();
+  });
+
+  it('reads the gremien again after a failed read', async () => {
+    const gremien = jest
+      .fn()
+      .mockReturnValueOnce(throwError(() => new Error('down')))
+      .mockReturnValue(of(GREMIEN));
+    const { api } = await setup(makeApi({ gremien }));
+    expect(api.decisions).not.toHaveBeenCalled();
+    toasts['showAction'].mock.calls[0][0].closed('action');
+    expect(api.decisions).toHaveBeenCalledWith(expect.objectContaining({ gremium: ['g-1'] }));
   });
 
   it('loads the next page once while it runs', async () => {
@@ -267,7 +290,9 @@ describe('PublicDecisionsComponent', () => {
 
   it('reports a failed list', async () => {
     await setup(makeApi({ decisions: jest.fn(() => throwError(() => new Error('down'))) }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Beschlüsse konnten nicht geladen werden.');
+    expect(toasts['showAction']).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Die Beschlüsse konnten nicht geladen werden.' }),
+    );
   });
 
   it('localizes to English', async () => {

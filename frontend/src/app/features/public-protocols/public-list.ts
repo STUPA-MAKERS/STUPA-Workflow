@@ -46,6 +46,8 @@ export interface PublicList<T> {
   readonly loading: WritableSignal<boolean>;
   readonly loadingMore: WritableSignal<boolean>;
   readonly error: WritableSignal<boolean>;
+  /** True once a first page has come in: later reads keep the list on the page. */
+  readonly loaded: Signal<boolean>;
   readonly hasFilters: Signal<boolean>;
   readonly hasMore: Signal<boolean>;
   readonly semesterOptions: Signal<readonly FilterSelectOption[]>;
@@ -56,6 +58,8 @@ export interface PublicList<T> {
   onSemester(key: string): void;
   resetFilters(): void;
   loadMore(): void;
+  /** Read the Gremien and the first page again, after a failed read. */
+  retry(): void;
 }
 
 /**
@@ -89,6 +93,7 @@ export function publicList<T extends { readonly semester: string }>(cfg: {
   const loading = signal(true);
   const loadingMore = signal(false);
   const error = signal(false);
+  const loaded = signal(false);
   /** The number of the newest read; an answer of an older read is dropped. */
   const newest = signal(0);
 
@@ -115,6 +120,7 @@ export function publicList<T extends { readonly semester: string }>(cfg: {
         items.set(page.items);
         total.set(page.total);
         loading.set(false);
+        loaded.set(true);
       },
       error: () => {
         if (seq !== newest()) return;
@@ -145,24 +151,30 @@ export function publicList<T extends { readonly semester: string }>(cfg: {
     },
   });
 
-  api.gremien().subscribe({
-    next: (rows) => {
-      gremien.set(rows);
-      const hit = rows.find((g) => g.slug === slug) ?? null;
-      gremium.set(hit);
-      if (hit) {
-        reload();
-      } else {
-        unknown.set(true);
+  /** Read the Gremien, find the Gremium of the slug and read its first page. */
+  const start = (): void => {
+    loading.set(true);
+    error.set(false);
+    api.gremien().subscribe({
+      next: (rows) => {
+        gremien.set(rows);
+        const hit = rows.find((g) => g.slug === slug) ?? null;
+        gremium.set(hit);
+        if (hit) {
+          reload();
+        } else {
+          unknown.set(true);
+          loading.set(false);
+        }
+      },
+      error: () => {
+        gremien.set([]);
         loading.set(false);
-      }
-    },
-    error: () => {
-      gremien.set([]);
-      loading.set(false);
-      error.set(true);
-    },
-  });
+        error.set(true);
+      },
+    });
+  };
+  start();
 
   return {
     appliedQuery,
@@ -177,6 +189,7 @@ export function publicList<T extends { readonly semester: string }>(cfg: {
     loading,
     loadingMore,
     error,
+    loaded,
     hasFilters: computed(
       () => semesterFilter() !== '' || appliedQuery() !== '',
     ),
@@ -209,6 +222,7 @@ export function publicList<T extends { readonly semester: string }>(cfg: {
       semesterFilter.set('');
       reload();
     },
+    retry: () => (gremium() ? reload() : start()),
     loadMore: () => {
       if (loadingMore()) return;
       const seq = newest();

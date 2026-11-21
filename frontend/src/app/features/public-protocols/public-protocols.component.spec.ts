@@ -6,6 +6,7 @@ import { TestBed } from '@angular/core/testing';
 import { of, Subject, throwError, type Observable } from 'rxjs';
 import type { PublicProtocolPage, PublicSemester } from './public-protocols.models';
 import { PublicProtocolsComponent } from './public-protocols.component';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { PublicProtocolsService } from './public-protocols.service';
 import { pageFixture, summaryFixture } from './public-protocols.fixtures';
 
@@ -24,11 +25,19 @@ function makeApi(over: Record<string, jest.Mock> = {}) {
   };
 }
 
+/** A stand-in of the toasts: the kit public screen shows a failed first read as a toast. */
+function makeToasts(): Record<string, jest.Mock> {
+  const fns: Record<string, jest.Mock> = {};
+  return new Proxy(fns, { get: (t, k: string) => (t[k] ??= jest.fn(() => 1)) });
+}
+let toasts = makeToasts();
+
 async function setup(api = makeApi(), committee = 'stupa') {
   const view = await render(PublicProtocolsComponent, {
     providers: [
       provideRouter([]),
       { provide: PublicProtocolsService, useValue: api },
+      { provide: ToastService, useValue: toasts },
       {
         provide: ActivatedRoute,
         useValue: {
@@ -41,7 +50,10 @@ async function setup(api = makeApi(), committee = 'stupa') {
 }
 
 describe('PublicProtocolsComponent', () => {
-  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  beforeEach(() => {
+    localStorage.setItem('ap.locale', 'de');
+    toasts = makeToasts();
+  });
   afterEach(() => localStorage.clear());
 
   /** The page shows no raw ids. */
@@ -142,7 +154,9 @@ describe('PublicProtocolsComponent', () => {
   it('reports a failed read of the gremien', async () => {
     const { api } = await setup(makeApi({ gremien: jest.fn(() => throwError(() => new Error('down'))) }));
     expect(api.list).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Protokolle konnten nicht geladen werden.');
+    expect(toasts['showAction']).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Die Protokolle konnten nicht geladen werden.' }),
+    );
   });
 
   it('loads the next page once while it runs', async () => {
@@ -256,8 +270,16 @@ describe('PublicProtocolsComponent', () => {
   });
 
   it('reports a failed list', async () => {
-    await setup(makeApi({ list: jest.fn(() => throwError(() => new Error('down'))) }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Protokolle konnten nicht geladen werden.');
+    const list = jest
+      .fn()
+      .mockReturnValueOnce(throwError(() => new Error('down')))
+      .mockReturnValue(of(pageFixture([summaryFixture()])));
+    const { api } = await setup(makeApi({ list }));
+    const toast = toasts['showAction'].mock.calls[0][0];
+    expect(toast.message).toBe('Die Protokolle konnten nicht geladen werden.');
+    toast.closed('action');
+    expect(api.list).toHaveBeenCalledTimes(2);
+    expect(await screen.findByRole('article')).toBeInTheDocument();
   });
 
   it('cancels a pending search when the page goes away', async () => {
