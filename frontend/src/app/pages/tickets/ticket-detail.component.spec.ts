@@ -700,8 +700,9 @@ describe('TicketDetailComponent', () => {
   });
 
   it('says that the ticket is not there', async () => {
-    await start('/tickets/t40', { get: () => throwError(() => notFound()) });
+    const { cmp } = await start('/tickets/t40', { get: () => throwError(() => notFound()) });
     expect(screen.getByText('Ticket nicht gefunden')).toBeInTheDocument();
+    expect(cmp.todoLinks()).toEqual([]);
     expect(screen.getByRole('link', { name: 'Zur Liste' })).toHaveAttribute('href', '/tickets');
   });
 
