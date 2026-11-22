@@ -430,7 +430,8 @@ jobs:
 
   # axe on every route in both themes (spec ui-kit:000491), against the real stack. Unlike the
   # full e2e run it is not opt-in: an accessibility regression fails the PR. It runs only
-  # e2e/06-axe.spec.ts, so it stays a few minutes.
+  # e2e/06-axe.spec.ts and the opaque-head check e2e/07-opaque-heads.spec.ts (spec
+  # ui-kit:002420), so it stays a few minutes.
   axe:
     runs-on: ubuntu-latest
     env:
@@ -462,7 +463,7 @@ jobs:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: axe sweep (vs echtem Stack)
-        run: scripts/e2e.sh e2e/06-axe.spec.ts
+        run: scripts/e2e.sh e2e/06-axe.spec.ts e2e/07-opaque-heads.spec.ts
       - name: Playwright-Report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
