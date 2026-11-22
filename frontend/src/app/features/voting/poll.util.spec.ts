@@ -9,7 +9,6 @@ import {
   emptyPollDraft,
   localMoment,
   pollAsElection,
-  pollBars,
   pollCaption,
   pollChoiceLabel,
   pollChoiceLimit,
@@ -93,30 +92,6 @@ describe('poll.util', () => {
     expect(answersComplete(DATE, { o1: 'no' })).toBe(true);
   });
 
-  /** An order that misses an option falls back to the counts. */
-  it('builds the bars from a stored result, and the top line', () => {
-    const bars = pollBars(
-      TEXT,
-      { counts: { o1: 2 }, abstentions: 3, ballots: 5, order: ['o9', 'o1'], top: ['o1'] },
-      {},
-      'de-DE',
-      t,
-    );
-    expect(bars.map((b) => [b.id, b.count, b.top])).toEqual([
-      ['o1', 2, true],
-      ['o2', 0, false],
-      ['abstain', 3, false],
-    ]);
-    const dates = pollBars(
-      DATE,
-      { counts: { o1: 1 }, abstentions: 0, ballots: 1, order: ['o1'], top: ['o1'] },
-      {},
-      'de-DE',
-      t,
-    );
-    expect(dates.map((b) => b.maybe)).toEqual([0]);
-  });
-
   describe('the editor draft', () => {
     const draft = (over: Partial<PollDraft>): PollDraft => ({ ...emptyPollDraft(), ...over });
     const text = (key: number, label: string) => ({ key, label, date: '', start: '', end: '' });
@@ -162,6 +137,7 @@ describe('poll.util', () => {
       expect(draftDateLabel(date(1, '2026-11-03', '18:00', '20:00'), 'de-DE')).toBe('Di, 3.11. · 18:00–20:00');
       expect(draftDateLabel(date(2, '2026-11-03', '18:00'), 'de-DE')).toBe('Di, 3.11. · 18:00');
       expect(draftDateLabel(date(3, '2026-11-03', ''), 'de-DE')).toBe('2026-11-03');
+      expect(draftDateLabel(date(4, '2026-11-03', '18:00'), 'en')).toBe('Tue, 3.11. · 18:00');
     });
   });
 });

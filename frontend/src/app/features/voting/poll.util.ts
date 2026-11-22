@@ -7,7 +7,6 @@ import type {
   PollIn,
   PollMode,
   PollOption,
-  PollResult,
   VoteStatus,
 } from '@core/api/models';
 import type { Translate } from '@core/i18n/translations';
@@ -153,74 +152,6 @@ export function pollStatus(status: VoteStatus | string): StatusView | null {
     default:
       return null;
   }
-}
-
-/** One row of a poll result. */
-export interface PollBar {
-  readonly id: string;
-  readonly label: string;
-  /** The votes; a date poll: the Ja answers. */
-  readonly count: number;
-  /** A date poll: the Vielleicht answers. `null` otherwise. */
-  readonly maybe: number | null;
-  /** One of the options with the most votes (several on a tie). */
-  readonly top: boolean;
-}
-
-/**
- * The rows of a poll result, highest first (the order of the server), then the
- * abstentions of a single or multi poll. Without a stored result the rows come from
- * the revealed counts, ranked by votes.
- */
-export function pollBars(
-  poll: PollConfig,
-  result: PollResult | null,
-  counts: Readonly<Record<string, number>>,
-  locale: string,
-  t: Translate,
-): readonly PollBar[] {
-  const date = poll.mode === 'date';
-  const ids = poll.options.map((o) => o.id);
-  const source = result?.counts ?? counts;
-  const order = pollOrder(ids, result?.order ?? [], source);
-  const top = new Set(result?.top ?? topOf(order, source));
-  const rows: readonly PollBar[] = order.map((id) => ({
-    id,
-    label: pollLabelOf(poll, id, locale),
-    count: source[id] ?? 0,
-    maybe: date ? (result?.maybe?.[id] ?? 0) : null,
-    top: top.has(id),
-  }));
-  if (date) return rows;
-  const abstain = result?.abstentions ?? counts[POLL_ABSTAIN] ?? 0;
-  return [
-    ...rows,
-    { id: POLL_ABSTAIN, label: t('election.abstentionsLabel'), count: abstain, maybe: null, top: false },
-  ];
-}
-
-/**
- * The order of the rows: the stored order when it names every option, else the options
- * ranked by votes.
- */
-function pollOrder(
-  ids: readonly string[],
-  stored: readonly string[],
-  source: Readonly<Record<string, number>>,
-): readonly string[] {
-  const order = stored.filter((id) => ids.includes(id));
-  return order.length === ids.length
-    ? order
-    : [...ids].sort((a, b) => (source[b] ?? 0) - (source[a] ?? 0));
-}
-
-/** The options with the most votes, none while no option has a vote. */
-function topOf(
-  order: readonly string[],
-  counts: Readonly<Record<string, number>>,
-): readonly string[] {
-  const most = Math.max(0, ...order.map((id) => counts[id] ?? 0));
-  return most > 0 ? order.filter((id) => (counts[id] ?? 0) === most) : [];
 }
 
 /** One option in the editor: a text, or a date with a start and an optional end. */
