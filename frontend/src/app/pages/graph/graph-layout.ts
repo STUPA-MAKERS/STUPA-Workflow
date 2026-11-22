@@ -91,6 +91,26 @@ export function place(bodies: readonly Body[], ids: readonly string[], near: Adj
   }, bodies);
 }
 
+/** The pause before the next node joins, per waiting node, in ms (spec 001426). */
+export const JOIN_BUDGET = 3600;
+/** The shortest pause between two nodes, in ms. */
+export const JOIN_MIN = 30;
+/** The longest pause between two nodes, in ms. */
+export const JOIN_MAX = 120;
+
+/** The pause before the next node joins: shorter for a longer queue (spec 001426). */
+export function pauseFor(waiting: number): number {
+  return Math.min(JOIN_MAX, Math.max(JOIN_MIN, JOIN_BUDGET / Math.max(waiting, 1)));
+}
+
+/**
+ * The node that joins the drawing next (spec 001426): the first waiting node with a
+ * neighbour that shows, else the first waiting node; null when none waits.
+ */
+export function joinNext(queue: readonly string[], shown: ReadonlySet<string>, near: Adjacency): string | null {
+  return queue.find((id) => (near.get(id) ?? []).some((n) => shown.has(n))) ?? queue[0] ?? null;
+}
+
 /** Keep only the bodies of `ids`. */
 export function keep(bodies: readonly Body[], ids: ReadonlySet<string>): readonly Body[] {
   return bodies.filter((b) => ids.has(b.id));

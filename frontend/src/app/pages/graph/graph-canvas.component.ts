@@ -26,8 +26,10 @@ import {
   bounds,
   fit,
   hold,
+  joinNext,
   keep,
   nearestIn,
+  pauseFor,
   place,
   settle,
   step,
@@ -78,8 +80,8 @@ export const NUDGE = 24;
 const DRAG_ALPHA = 0.3;
 /** The factor of one press on "+" or "−". */
 export const ZOOM_STEP = 1.3;
-/** The most nodes of one page that appear one after the other (spec 001426). */
-const STAGGER = 60;
+/** The least `alpha` after a node joins the drawing, so the layout makes room for it. */
+const JOIN_ALPHA = 0.5;
 /** The room that a node keeps to the edge of the frame when the keyboard moves to it. */
 const REVEAL_MARGIN = 48;
 
@@ -93,10 +95,11 @@ const ARROWS: Readonly<Record<string, Direction>> = {
 /**
  * The drawing of the graph (specs 001426-001430): the nodes as buttons over the lines.
  *
- * A small force layout places the nodes (`graph-layout.ts`). New nodes start beside a
- * neighbour and scale in; the nodes that already show keep their place apart from the
- * settling. With reduced motion the layout runs to its end before the paint and nothing
- * moves. The view follows the drawing until the person moves or zooms it: a drag on the
+ * A small force layout places the nodes (`graph-layout.ts`). New nodes wait in a queue and
+ * join the drawing one at a time (spec 001426): each one starts beside a neighbour that
+ * shows, scales in and brings its lines; the nodes that already show keep their place apart
+ * from the settling. With reduced motion every node shows at once, the layout runs to its
+ * end before the paint and nothing moves. The view follows the drawing until the person moves or zooms it: a drag on the
  * empty drawing moves it, the wheel, a pinch and the buttons zoom it. A press on a node
  * chooses it, a press on the empty drawing ends the choice. A drag on a node moves the
  * node, and it stays where the person lets go (spec 001433); Alt and an arrow key do the same. The view goes to the chosen
@@ -137,8 +140,15 @@ export class GraphCanvasComponent {
   readonly focused = signal<string | null>(null);
   /** True while nothing may move (spec 001427). */
   readonly still = signal(reducedMotion());
-  /** The place of each new node in its page, for the order of the scale-in. */
-  readonly order = signal<ReadonlyMap<string, number>>(new Map());
+  /** The keys of the nodes that show; the others wait in {@link queue} (spec 001426). */
+  readonly shown = signal<ReadonlySet<string>>(new Set());
+  /** The nodes that the drawing shows, in the order of the input. */
+  readonly visible = computed(() => {
+    const shown = this.shown();
+    return this.nodes().filter((n) => shown.has(n.key));
+  });
+  /** True while nodes wait to join the drawing. */
+  readonly busy = signal(false);
 
   readonly near = computed<Adjacency>(() => adjacency(this.lines()));
   readonly world = computed(() => {
@@ -179,12 +189,15 @@ export class GraphCanvasComponent {
 
   /** The one node that Tab reaches: the focused one, else the chosen one, else the first. */
   readonly tabStop = computed<string | null>(() => {
-    const keys = this.nodes().map((n) => n.key);
+    const keys = this.visible().map((n) => n.key);
     return [this.focused(), this.selected()].find((k) => k !== null && keys.includes(k)) ?? keys[0] ?? null;
   });
 
   private alpha = 0;
   private frame: number | null = null;
+  /** The keys of the loaded nodes that do not show yet, in the order in which they arrived. */
+  private queue: readonly string[] = [];
+  private timer: number | null = null;
   /** True after the person moved or zoomed the view; then the view stops to follow. */
   private free = false;
   private pointers: ReadonlyMap<number, Point> = new Map();
@@ -230,10 +243,6 @@ export class GraphCanvasComponent {
 
   isLit(key: string): boolean {
     return this.lit()?.has(key) ?? false;
-  }
-
-  delay(key: string): string {
-    return `${Math.min(this.order().get(key) ?? 0, STAGGER) * 14}ms`;
   }
 
   choose(key: string): void {
@@ -384,26 +393,77 @@ export class GraphCanvasComponent {
     this.refit();
   }
 
-  /** Take the nodes that show now: drop the bodies that left, place the new ones, and settle. */
+  /**
+   * Take the loaded nodes: drop the bodies and the waiting keys that left and queue the new
+   * nodes (spec 001426). With reduced motion every node shows at once at its final place.
+   */
   private arrange(ids: readonly string[], near: Adjacency): void {
-    const before = keep(this.bodies(), new Set(ids));
-    const known = new Set(before.map((b) => b.id));
-    const fresh = ids.filter((id) => !known.has(id));
+    const all = new Set(ids);
+    const before = keep(this.bodies(), all);
     if (before.length === 0) this.free = false;
-    if (fresh.length > 0) this.order.set(new Map(fresh.map((id, i) => [id, i] as const)));
-    const placed = place(before, ids, near);
     const still = reducedMotion();
     this.still.set(still);
     if (still) {
       this.stop();
-      this.bodies.set(settle(placed, near));
+      this.queue = [];
+      this.shown.set(all);
+      this.bodies.set(settle(place(before, ids, near), near));
+      this.busy.set(false);
       this.refit();
       return;
     }
-    this.bodies.set(placed);
+    const known = new Set(before.map((b) => b.id));
+    const waiting = this.queue.filter((id) => all.has(id));
+    const queued = new Set(waiting);
+    this.queue = [...waiting, ...ids.filter((id) => !known.has(id) && !queued.has(id))];
+    this.shown.set(known);
+    this.bodies.set(before);
     this.refit();
-    this.alpha = ALPHA_START;
+    if (this.queue.length === 0) {
+      this.busy.set(false);
+      this.halt();
+      return;
+    }
+    this.busy.set(true);
+    if (this.timer === null) this.join();
+  }
+
+  /** One node joins the drawing beside a neighbour that shows; the next one follows after a pause. */
+  private join(): void {
+    this.timer = null;
+    const shown = this.shown();
+    const near = this.near();
+    const next = joinNext(this.queue, shown, near);
+    if (next === null) {
+      this.busy.set(false);
+      return;
+    }
+    this.queue = this.queue.filter((id) => id !== next);
+    const ids = [...shown, next];
+    this.shown.set(new Set(ids));
+    this.bodies.set(place(this.bodies(), ids, near));
+    this.refit();
+    this.alpha = Math.max(this.alpha, this.bodies().length === 1 ? ALPHA_START : JOIN_ALPHA);
     this.run();
+    if (this.queue.length === 0) {
+      this.busy.set(false);
+      return;
+    }
+    this.timer = this.later(() => this.join(), pauseFor(this.queue.length));
+  }
+
+  /** The pause before the next node. A door of its own, like the frame of the layout. */
+  protected later(next: () => void, ms: number): number {
+    return window.setTimeout(next, ms);
+  }
+
+  protected dropLater(timer: number): void {
+    window.clearTimeout(timer);
+  }
+
+  private halt(): void {
+    if (this.timer !== null) this.dropLater(this.timer);
+    this.timer = null;
   }
 
   private run(): void {
@@ -429,6 +489,7 @@ export class GraphCanvasComponent {
   }
 
   private stop(): void {
+    this.halt();
     if (this.frame !== null) this.dropFrame(this.frame);
     this.frame = null;
     this.alpha = 0;
