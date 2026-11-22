@@ -117,8 +117,9 @@
   </div>
 </div>
 
-<app-session-dock
+<app-session-dock-view
   class="mp__dock"
+  [guestCounts]="dockGuests()"
   [class.mp__dock--quiet]="phone() && m.status === 'planned' && !top()"
   [meeting]="m"
   [agenda]="agenda()"

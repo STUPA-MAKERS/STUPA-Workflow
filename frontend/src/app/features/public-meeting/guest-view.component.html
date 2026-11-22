@@ -134,7 +134,7 @@
               [class.gv__item--done]="row.done"
               [attr.aria-current]="row.now ? 'step' : null"
             >
-              <app-top-badge
+              <app-top-badge-view
                 class="gv__badge"
                 [number]="row.item.position"
                 [state]="row.done && !row.item.nonPublic ? 'done' : row.now ? 'now' : 'todo'"

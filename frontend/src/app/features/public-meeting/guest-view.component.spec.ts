@@ -24,7 +24,15 @@ const closedVote = guestVote({
   canCast: false,
   result: 'passed',
   closedAt: '2026-10-06T16:58:00Z',
-  tally: { counts: { yes: 17, no: 4, abstain: 3 }, voted: 24, present: 26, revealed: true, leading: 'yes', presentMembers: 19, presentGuests: 7 },
+  tally: {
+    counts: { yes: 17, no: 4, abstain: 3 },
+    voted: 24,
+    present: 26,
+    revealed: true,
+    leading: 'yes',
+    presentMembers: 19,
+    presentGuests: 7,
+  },
 });
 
 describe('GuestViewComponent', () => {
@@ -51,7 +59,9 @@ describe('GuestViewComponent', () => {
     expect(screen.getByText('Antrag')).toBeInTheDocument();
     // The agenda rows carry no "TOP n" (the protocol page has its own headings).
     expect(document.querySelector('.gv__agenda')?.textContent).not.toMatch(/TOP \d/);
-    expect(document.querySelector('.gv__item[aria-current="step"]')?.textContent).toContain('Antrag');
+    expect(document.querySelector('.gv__item[aria-current="step"]')?.textContent).toContain(
+      'Antrag',
+    );
     expect(screen.getByText('Unbenannter TOP')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('tab', { name: /Protokoll/ }));
     expect(screen.getByText('Vorstellung')).toBeInTheDocument();
@@ -66,21 +76,45 @@ describe('GuestViewComponent', () => {
     await setup({ ...me, view: { ...me.view!, votes: [], agenda } });
     const items = [...document.querySelectorAll('.gv__item')];
     expect(items[0]).not.toHaveClass('gv__item--done');
-    expect(items[0].querySelector('app-top-badge.tb--done')).toBeNull();
+    expect(items[0].querySelector('app-top-badge-view.tb--done')).toBeNull();
     expect(items[3]).toHaveClass('gv__item--done');
-    expect(items[3].querySelector('app-top-badge.tb--done')).not.toBeNull();
+    expect(items[3].querySelector('app-top-badge-view.tb--done')).not.toBeNull();
   });
 
   it('says when no protocol text exists yet', async () => {
     const me = guestMe();
-    await setup({ ...me, view: { ...me.view!, votes: [], agenda: me.view!.agenda.map((a) => ({ ...a, body: null })) } });
+    await setup({
+      ...me,
+      view: { ...me.view!, votes: [], agenda: me.view!.agenda.map((a) => ({ ...a, body: null })) },
+    });
     await userEvent.click(screen.getByRole('tab', { name: /Protokoll/ }));
     expect(screen.getByText('Noch kein Protokolltext zu öffentlichen TOPs.')).toBeInTheDocument();
   });
 
   it('reads a members-only vote in watch mode without a ballot', async () => {
     const me = guestMe({ meeting: { ...guestMe().meeting, guestsMode: 'watch' } });
-    await setup({ ...me, view: { ...me.view!, votes: [guestVote({ guestsVote: false, canCast: false, quorum: { type: 'percent', value: 50 }, tally: { counts: {}, voted: 11, present: 19, revealed: false, leading: null, presentMembers: 19, presentGuests: 7 } })] } });
+    await setup({
+      ...me,
+      view: {
+        ...me.view!,
+        votes: [
+          guestVote({
+            guestsVote: false,
+            canCast: false,
+            quorum: { type: 'percent', value: 50 },
+            tally: {
+              counts: {},
+              voted: 11,
+              present: 19,
+              revealed: false,
+              leading: null,
+              presentMembers: 19,
+              presentGuests: 7,
+            },
+          }),
+        ],
+      },
+    });
     expect(screen.getByText('Du schaust zu')).toBeInTheDocument();
     expect(screen.getByText('Abstimmung läuft · nur Mitglieder')).toBeInTheDocument();
     expect(screen.getByText('11 von 19 Mitgliedern haben abgestimmt')).toBeInTheDocument();
@@ -91,14 +125,28 @@ describe('GuestViewComponent', () => {
 
   it('names a members-only vote in a voting meeting, and the running and cast states', async () => {
     const me = guestMe();
-    const { fixture } = await setup({ ...me, view: { ...me.view!, votes: [guestVote({ guestsVote: false, canCast: false })] } });
+    const { fixture } = await setup({
+      ...me,
+      view: { ...me.view!, votes: [guestVote({ guestsVote: false, canCast: false })] },
+    });
     await userEvent.click(screen.getByRole('button', { name: /nur Mitglieder/ }));
-    expect(screen.getByText(/stimmen nur die Mitglieder der Fachschaft Informatik ab/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/stimmen nur die Mitglieder der Fachschaft Informatik ab/),
+    ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Zurück zur Sitzung' }));
-    fixture.componentRef.setInput('me', { ...me, view: { ...me.view!, votes: [guestVote({ canCast: false, myBallot: { cast: true, choice: 'yes' } })] } });
+    fixture.componentRef.setInput('me', {
+      ...me,
+      view: {
+        ...me.view!,
+        votes: [guestVote({ canCast: false, myBallot: { cast: true, choice: 'yes' } })],
+      },
+    });
     fixture.detectChanges();
     expect(screen.getByText('Abstimmung offen · deine Stimme ist abgegeben')).toBeInTheDocument();
-    fixture.componentRef.setInput('me', { ...me, view: { ...me.view!, votes: [guestVote({ canCast: false })] } });
+    fixture.componentRef.setInput('me', {
+      ...me,
+      view: { ...me.view!, votes: [guestVote({ canCast: false })] },
+    });
     fixture.detectChanges();
     expect(screen.getByText('Abstimmung läuft')).toBeInTheDocument();
   });
@@ -108,10 +156,16 @@ describe('GuestViewComponent', () => {
     expect(screen.getByText(/während der Abstimmung zugelassen/)).toBeInTheDocument();
     const me = guestMe();
     fixture.componentRef.setInput('admittedDuringVote', false);
-    fixture.componentRef.setInput('me', { ...me, view: { ...me.view!, votes: [guestVote({ secret: true })] } });
+    fixture.componentRef.setInput('me', {
+      ...me,
+      view: { ...me.view!, votes: [guestVote({ secret: true })] },
+    });
     fixture.detectChanges();
     expect(screen.queryByText(/ohne Namen gezählt/)).toBeNull();
-    fixture.componentRef.setInput('me', { ...me, view: { ...me.view!, votes: [guestVote({ secret: true, kind: 'poll' })] } });
+    fixture.componentRef.setInput('me', {
+      ...me,
+      view: { ...me.view!, votes: [guestVote({ secret: true, kind: 'poll' })] },
+    });
     fixture.detectChanges();
     expect(screen.queryByText(/ohne Namen gezählt/)).toBeNull();
   });
@@ -122,7 +176,9 @@ describe('GuestViewComponent', () => {
     expect(screen.getByText('Angenommen')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Ergebnis/ }));
     expect(
-      screen.getByText('19 Mitglieder + 7 Gäste anwesend · Abgegeben 24 · Mehrheit der abgegebenen Stimmen'),
+      screen.getByText(
+        '19 Mitglieder + 7 Gäste anwesend · Abgegeben 24 · Mehrheit der abgegebenen Stimmen',
+      ),
     ).toBeInTheDocument();
   });
 
@@ -130,7 +186,11 @@ describe('GuestViewComponent', () => {
     const me = guestMe();
     await setup({
       ...me,
-      view: { ...me.view!, currentAgendaItemId: null, votes: [{ ...closedVote, agendaItemId: null, result: 'tie' }] },
+      view: {
+        ...me.view!,
+        currentAgendaItemId: null,
+        votes: [{ ...closedVote, agendaItemId: null, result: 'tie' }],
+      },
     });
     expect(screen.getByText('Abgelehnt')).toBeInTheDocument();
     expect(screen.queryByText('Jetzt')).toBeNull();
@@ -161,8 +221,13 @@ describe('GuestViewComponent', () => {
 
   it('names a non-public application item without "Antrag", and a vote without an item', async () => {
     const me = guestMe();
-    const agenda = me.view!.agenda.map((a) => (a.id === 'a-3' ? { ...a, nonPublic: true, body: null } : a));
-    const { fixture } = await setup({ ...me, view: { ...me.view!, agenda, votes: [guestVote({ agendaItemId: null, canCast: false })] } });
+    const agenda = me.view!.agenda.map((a) =>
+      a.id === 'a-3' ? { ...a, nonPublic: true, body: null } : a,
+    );
+    const { fixture } = await setup({
+      ...me,
+      view: { ...me.view!, agenda, votes: [guestVote({ agendaItemId: null, canCast: false })] },
+    });
     const cmp = fixture.componentInstance;
     expect(cmp['currentLine']()).toBe('TOP 3 von 4');
     cmp['openVoteId'].set('v-1');

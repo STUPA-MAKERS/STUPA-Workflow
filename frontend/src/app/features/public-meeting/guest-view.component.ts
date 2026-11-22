@@ -34,7 +34,7 @@ import {
 import type { BallotCaster } from '@stupa-makers/ui-kit/views/voting';
 import { VotePanelViewComponent } from '@stupa-makers/ui-kit/views/voting';
 import { guestVoteToVote } from './guest-vote.util';
-import { TopBadgeComponent } from '../meetings/top-badge/top-badge.component';
+import { TopBadgeViewComponent } from '@stupa-makers/ui-kit/views/meeting';
 import { applicationLink, meetingLink, provideVotingApi } from '../voting/voting-api.provider';
 
 /** One agenda row of the guest view. */
@@ -62,7 +62,7 @@ interface AgendaRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    TopBadgeComponent,
+    TopBadgeViewComponent,
     EmptyStateComponent,
     TranslatePipe,
     ButtonComponent,

@@ -43,7 +43,7 @@ import { ParticipantVoteService } from './participant-vote/participant-vote.serv
 import { TopSheetComponent } from './top-sheet/top-sheet.component';
 import { VoteCardViewComponent } from '@stupa-makers/ui-kit/views/voting';
 import { CalendarSubscribeComponent } from './calendar-subscribe/calendar-subscribe.component';
-import { MeetingHeadComponent } from './meeting-head/meeting-head.component';
+import { MeetingHeadViewComponent } from '@stupa-makers/ui-kit/views/meeting';
 import { firstMeetingLink } from './meeting-kind.util';
 import { topLead } from './top-application-lead.util';
 import { TodoLinkedListComponent } from '../todos/linked-list/todo-linked-list.component';
@@ -84,7 +84,7 @@ const EXCERPT_LENGTH = 160;
   providers: [provideVotingApi(), ParticipantVoteService],
   imports: [
     SheetBodyDirective,
-    MeetingHeadComponent,
+    MeetingHeadViewComponent,
     EmptyStateComponent,
     NgTemplateOutlet,
     TranslatePipe,

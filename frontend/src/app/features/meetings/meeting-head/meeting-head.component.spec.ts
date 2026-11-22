@@ -5,7 +5,7 @@ import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { runAxe } from '../../../../testing/a11y';
 import { MEDIA } from '@stupa-makers/ui-kit';
-import { MeetingHeadComponent } from './meeting-head.component';
+import { MeetingHeadViewComponent } from '@stupa-makers/ui-kit/views/meeting';
 
 /** The text of `el` with a space between the parts of each meta line (the dots are CSS). */
 function spaced(el: Element | null | undefined): string {
@@ -14,13 +14,13 @@ function spaced(el: Element | null | undefined): string {
   return (copy?.textContent ?? '').replace(/\s+/g, ' ').trim();
 }
 
-describe('MeetingHeadComponent', () => {
+describe('MeetingHeadViewComponent', () => {
   it('shows back, the title with its status and the sub line, then the page controls', async () => {
     const back = jest.fn();
     const { container } = await render(
       `<header appMeetingHead heading="12. Sitzung" statusKind="accent" statusText="Läuft" sub="Mo, 12.10. · Raum 3"
                (back)="back()"><button type="button">Menü</button></header>`,
-      { imports: [MeetingHeadComponent], componentProperties: { back } },
+      { imports: [MeetingHeadViewComponent], componentProperties: { back } },
     );
     const title = screen.getByRole('heading', { level: 1, name: '12. Sitzung' });
     expect(title).toHaveAttribute('title', '12. Sitzung');
@@ -36,31 +36,38 @@ describe('MeetingHeadComponent', () => {
   describe('link', () => {
     const template = `<header appMeetingHead heading="A" statusText="Geplant" sub="Mo" [link]="link"></header>`;
     const link = { label: 'Erste Sitzung', to: '/meetings/m-0' };
-    const options = { imports: [MeetingHeadComponent], providers: [provideRouter([])], componentProperties: { link } };
+    const options = {
+      imports: [MeetingHeadViewComponent],
+      providers: [provideRouter([])],
+      componentProperties: { link },
+    };
 
     /** §F/meetings/meetings/000940 */
     it('shows a link after the sub line', async () => {
       const { container } = await render(template, options);
-      expect(screen.getByRole('link', { name: 'Erste Sitzung' })).toHaveAttribute('href', '/meetings/m-0');
+      expect(screen.getByRole('link', { name: 'Erste Sitzung' })).toHaveAttribute(
+        'href',
+        '/meetings/m-0',
+      );
       expect(await runAxe(container)).toHaveNoViolations();
     });
 
     it('shows the link in the bar on a phone', async () => {
-    const real = window.matchMedia;
-    window.matchMedia = ((query: string) => ({
-      matches: query === MEDIA.phone,
-      addEventListener: () => undefined,
-      removeEventListener: () => undefined,
-    })) as unknown as typeof window.matchMedia;
-    try {
-      const phone = await render(template, options);
-      await new Promise((r) => setTimeout(r));
-      phone.fixture.detectChanges();
-      const sub = phone.container.querySelector('.ld__barSub')!;
-      expect(sub.querySelector('a')).toHaveAttribute('href', '/meetings/m-0');
-    } finally {
-      window.matchMedia = real;
-    }
+      const real = window.matchMedia;
+      window.matchMedia = ((query: string) => ({
+        matches: query === MEDIA.phone,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      })) as unknown as typeof window.matchMedia;
+      try {
+        const phone = await render(template, options);
+        await new Promise((r) => setTimeout(r));
+        phone.fixture.detectChanges();
+        const sub = phone.container.querySelector('.ld__barSub')!;
+        expect(sub.querySelector('a')).toHaveAttribute('href', '/meetings/m-0');
+      } finally {
+        window.matchMedia = real;
+      }
     });
   });
 
@@ -68,7 +75,7 @@ describe('MeetingHeadComponent', () => {
     const { container, rerender } = await render(
       `<header appMeetingHead heading="A" statusText="Geplant" [sub]="sub"></header>`,
       {
-        imports: [MeetingHeadComponent],
+        imports: [MeetingHeadViewComponent],
         componentProperties: { sub: null as string | null },
       },
     );
@@ -89,7 +96,7 @@ describe('MeetingHeadComponent', () => {
       const { container } = await render(
         `<header appMeetingHead heading="12. Sitzung" statusKind="accent" statusText="Läuft" sub="seit 18:04"
                  (back)="back()"><button type="button">Menü</button></header>`,
-        { imports: [MeetingHeadComponent], componentProperties: { back } },
+        { imports: [MeetingHeadViewComponent], componentProperties: { back } },
       );
       await new Promise((r) => setTimeout(r));
       const bar = container.querySelector('app-list-detail-bar')!;
@@ -107,7 +114,13 @@ describe('MeetingHeadComponent', () => {
   });
 
   it('lets the page size the title and the status', () => {
-    const scss = readFileSync(join(__dirname, 'meeting-head.component.scss'), 'utf8');
+    const scss = readFileSync(
+      join(
+        __dirname,
+        '../../../../../vendor/ui-kit/views/meeting/src/meeting-head-view.component.scss',
+      ),
+      'utf8',
+    );
     expect(scss).toContain('font-size: var(--mh-title-size, var(--fs-h1))');
     expect(scss).toContain('line-height: var(--mh-title-line, 1.75rem)');
     expect(scss).toContain('font-size: var(--mh-status-size, var(--fs-small))');
@@ -115,8 +128,20 @@ describe('MeetingHeadComponent', () => {
 
   /** §ui-kit:001305 (statusChip) */
   it('draws the status beside the title as a chip centred on the title line', () => {
-    const html = readFileSync(join(__dirname, 'meeting-head.component.html'), 'utf8');
-    const scss = readFileSync(join(__dirname, 'meeting-head.component.scss'), 'utf8');
+    const html = readFileSync(
+      join(
+        __dirname,
+        '../../../../../vendor/ui-kit/views/meeting/src/meeting-head-view.component.html',
+      ),
+      'utf8',
+    );
+    const scss = readFileSync(
+      join(
+        __dirname,
+        '../../../../../vendor/ui-kit/views/meeting/src/meeting-head-view.component.scss',
+      ),
+      'utf8',
+    );
     expect(html).toContain('<app-status-text chip class="mh__status"');
     expect(scss).toMatch(/\.mh__titleLine \{[^}]*align-items: center;/);
   });

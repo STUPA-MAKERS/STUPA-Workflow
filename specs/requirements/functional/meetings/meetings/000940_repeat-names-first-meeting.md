@@ -14,7 +14,7 @@ implementation:
   - backend/app/modules/livevote/repeat.py
   - backend/app/modules/livevote/service/lifecycle.py
   - frontend/src/app/features/meetings/meeting-kind.util.ts
-  - frontend/src/app/features/meetings/meeting-head/meeting-head.component.ts
+  - frontend/vendor/ui-kit/views/meeting/src/meeting-head-view.component.ts
 scope:
   - backend/app/modules/livevote
   - backend/app/modules/meetings
