@@ -60,7 +60,8 @@ import {
   type AttendanceChange,
   AttendanceSheetComponent,
 } from '../attendance-sheet/attendance-sheet.component';
-import { type DockPanel, SessionDockComponent } from '../session-dock/session-dock.component';
+import { type DockPanel, SessionDockViewComponent } from '@stupa-makers/ui-kit/views/meeting';
+import { MeetingGuestsService } from '../meeting-guests.service';
 import { type SaveState, TopSheetComponent } from '../top-sheet/top-sheet.component';
 import { VoteCardViewComponent } from '@stupa-makers/ui-kit/views/voting';
 import { firstMeetingLink } from '../meeting-kind.util';
@@ -68,7 +69,7 @@ import { voteSnippet, votesInText } from '../meetings.util';
 import { voteOptionLabel } from '../meetings-display.util';
 import { openWindowClock, openWindowState, openWindowWhen } from '../open-window.util';
 import { JoinQrComponent } from '../public-join/join-qr.component';
-import { MeetingHeadComponent } from '../meeting-head/meeting-head.component';
+import { MeetingHeadViewComponent } from '@stupa-makers/ui-kit/views/meeting';
 import { topLead } from '../top-application-lead.util';
 import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { clock, weekdayDate } from '@shared/date-format';
@@ -129,7 +130,7 @@ type SessionAction =
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     SheetBodyDirective,
-    MeetingHeadComponent,
+    MeetingHeadViewComponent,
     ScrollFadeDirective,
     NgTemplateOutlet,
     TranslatePipe,
@@ -141,7 +142,7 @@ type SessionAction =
     SegmentedComponent,
     SideSheetComponent,
     AgendaPaneComponent,
-    SessionDockComponent,
+    SessionDockViewComponent,
     TopSheetComponent,
     TodoLinkedListComponent,
     VoteCardViewComponent,
@@ -157,8 +158,11 @@ type SessionAction =
   },
 })
 export class MeetingPageComponent {
+  /** The guests of a public meeting that the lead has loaded: the counts on the dock chip. */
+  private readonly guests = inject(MeetingGuestsService, { optional: true });
+  protected readonly dockGuests = computed(() => this.guests?.countsFor(this.meeting()) ?? null);
   private readonly i18n = inject(I18nService);
-  private readonly dock = viewChild.required(SessionDockComponent, { read: ElementRef });
+  private readonly dock = viewChild.required(SessionDockViewComponent, { read: ElementRef });
 
   /** Three columns from 1200px; below that the agenda is a sheet. */
   protected readonly wide = mediaQuery(MEDIA.wide);

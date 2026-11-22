@@ -80,7 +80,7 @@ describe('KanbanKeyDrag', () => {
     for (const scss of [
       'pages/todos/board-view/todo-board-view.component.scss',
       'pages/todos/board-rows/todo-board-rows.component.scss',
-      'features/meetings/agenda-pane/agenda-pane.component.scss',
+      '../../vendor/ui-kit/views/meeting/src/agenda-pane-view.component.scss',
     ]) {
       const src = readFileSync(join(app, scss), 'utf8');
       expect(src).toMatch(/@include dp\.lift\(\d+deg\);/);

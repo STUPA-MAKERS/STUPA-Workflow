@@ -15,8 +15,16 @@ import { TodoNewDialogComponent } from '../../todos/new-dialog/todo-new-dialog.c
 import { AgendaPaneComponent } from './agenda-pane.component';
 
 const OUTPUTS = [
-  'pick', 'add', 'startRename', 'cancelRename', 'renameTop', 'setNonPublic', 'move',
-  'remove', 'setDone', 'setDuration',
+  'pick',
+  'add',
+  'startRename',
+  'cancelRename',
+  'renameTop',
+  'setNonPublic',
+  'move',
+  'remove',
+  'setDone',
+  'setDuration',
 ] as const;
 
 /** Whether each row may be lifted, in agenda order. */
@@ -65,7 +73,10 @@ async function setup(over: Partial<Inputs> = {}, canTodo?: boolean) {
       canTodo === undefined
         ? [{ provide: TodosApiService, useValue: {} }]
         : [
-            { provide: AuthService, useValue: { can: () => false, canInGremium: jest.fn(() => canTodo) } },
+            {
+              provide: AuthService,
+              useValue: { can: () => false, canInGremium: jest.fn(() => canTodo) },
+            },
             {
               provide: TodosApiService,
               useValue: {
@@ -119,8 +130,8 @@ describe('AgendaPaneComponent', () => {
     expect(within(rows[1]).getByText('jetzt')).toBeInTheDocument();
     expect(rows[2]).toHaveClass('ap__row--done');
     expect(within(rows[2]).getByText('behandelt')).toBeInTheDocument();
-    expect(container.querySelector('app-top-badge.tb--now')?.closest('li')).toBe(rows[1]);
-    expect(container.querySelector('app-top-badge.tb--done')?.closest('li')).toBe(rows[2]);
+    expect(container.querySelector('app-top-badge-view.tb--now')?.closest('li')).toBe(rows[1]);
+    expect(container.querySelector('app-top-badge-view.tb--done')?.closest('li')).toBe(rows[2]);
   });
 
   it('shows the tick of the item that runs now as done', async () => {
@@ -129,7 +140,7 @@ describe('AgendaPaneComponent', () => {
     const rows = screen.getAllByRole('listitem');
     expect(rows[1]).toHaveClass('ap__row--done');
     expect(within(rows[1]).getByText('behandelt')).toBeInTheDocument();
-    expect(container.querySelector('app-top-badge.tb--now')).toBeNull();
+    expect(container.querySelector('app-top-badge-view.tb--now')).toBeNull();
   });
 
   it.each(['planned', 'closed'] as const)('shows a tick in a %s meeting', async (status) => {
@@ -146,7 +157,7 @@ describe('AgendaPaneComponent', () => {
     rows.forEach((row) => expect(row).not.toHaveClass('ap__row--done'));
     expect(screen.queryByText('behandelt')).toBeNull();
     expect(screen.queryByText('jetzt')).toBeNull();
-    expect(container.querySelector('app-top-badge.tb--now')).toBeNull();
+    expect(container.querySelector('app-top-badge-view.tb--now')).toBeNull();
   });
 
   it('marks nothing as handled while no item runs', async () => {
@@ -156,7 +167,10 @@ describe('AgendaPaneComponent', () => {
 
   it('opens an item, marks the selected one and adds through the dialog', async () => {
     const { on } = await setup();
-    expect(screen.getByRole('button', { name: 'Begrüßung' })).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('button', { name: 'Begrüßung' })).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Bericht des Finanzreferats' }));
     expect(on.pick).toHaveBeenCalledWith('t-2');
     await userEvent.click(screen.getByRole('button', { name: 'TOP hinzufügen' }));
@@ -190,7 +204,9 @@ describe('AgendaPaneComponent', () => {
       expect(on.setNonPublic).toHaveBeenCalledWith({ item: AGENDA[1], nonPublic: true });
 
       menu = await openMenu(2);
-      await userEvent.click(within(menu).getByRole('menuitemcheckbox', { name: 'Nicht öffentlich (NÖ)' }));
+      await userEvent.click(
+        within(menu).getByRole('menuitemcheckbox', { name: 'Nicht öffentlich (NÖ)' }),
+      );
       expect(on.setNonPublic).toHaveBeenCalledWith({ item: AGENDA[2], nonPublic: false });
     });
 
@@ -234,7 +250,9 @@ describe('AgendaPaneComponent', () => {
       const menu = await openMenu(0);
       await userEvent.click(within(menu).getByRole('menuitem', { name: 'TOP entfernen' }));
       fixture.detectChanges();
-      expect(screen.getByRole('dialog', { name: 'TOP entfernen?' })).toHaveTextContent('„Unbenannter TOP“');
+      expect(screen.getByRole('dialog', { name: 'TOP entfernen?' })).toHaveTextContent(
+        '„Unbenannter TOP“',
+      );
     });
 
     /** A cancelled vote goes with its item. */
@@ -253,10 +271,15 @@ describe('AgendaPaneComponent', () => {
       expect(on.remove).not.toHaveBeenCalled();
       await userEvent.keyboard('{Escape}');
       menu = await openMenu(1);
-      expect(within(menu).getByRole('menuitem', { name: 'TOP entfernen' })).not.toHaveAttribute('aria-disabled');
+      expect(within(menu).getByRole('menuitem', { name: 'TOP entfernen' })).not.toHaveAttribute(
+        'aria-disabled',
+      );
       await userEvent.keyboard('{Escape}');
       menu = await openMenu(2);
-      expect(within(menu).getByRole('menuitem', { name: 'TOP entfernen' })).toHaveAttribute('aria-disabled', 'true');
+      expect(within(menu).getByRole('menuitem', { name: 'TOP entfernen' })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+      );
     });
 
     it('disables the remove of an item with votes without the vote right', async () => {
@@ -283,7 +306,9 @@ describe('AgendaPaneComponent', () => {
       expect(screen.queryByRole('button', { name: 'TOP hinzufügen' })).toBeNull();
       expect(container.querySelector('.ap__grip')).toBeNull();
       expect(draggable(fixture)).toEqual([false, false, false]);
-      expect(fixture.debugElement.query(By.directive(CdkDropList)).injector.get(CdkDropList).disabled).toBe(true);
+      expect(
+        fixture.debugElement.query(By.directive(CdkDropList)).injector.get(CdkDropList).disabled,
+      ).toBe(true);
       const menu = await openMenu(0);
       expect(within(menu).getAllByRole('menuitemcheckbox')).toHaveLength(1);
       const items = within(menu).getAllByRole('menuitem');
@@ -327,7 +352,9 @@ describe('AgendaPaneComponent', () => {
   /** A row in rename is no drag source. */
   it('renames inline: enter saves, escape cancels, blur saves', async () => {
     const { on, fixture } = await setup({ renameDraft: 'Begrüßung neu' });
-    await userEvent.click(within(await openMenu(0)).getByRole('menuitem', { name: 'TOP umbenennen' }));
+    await userEvent.click(
+      within(await openMenu(0)).getByRole('menuitem', { name: 'TOP umbenennen' }),
+    );
     fixture.componentRef.setInput('renamingTopId', 't-1');
     fixture.detectChanges();
     const input = screen.getByRole('textbox', { name: 'TOP umbenennen' });
@@ -378,7 +405,10 @@ describe('AgendaPaneComponent', () => {
     ];
 
     it('planRows: shows the planned start and the duration in the sub line and no end line (§ 001141, § 001144)', async () => {
-      const { container } = await setup({ meeting: meeting({ status: 'planned', startTime: '18:00' }), agenda: TIMED });
+      const { container } = await setup({
+        meeting: meeting({ status: 'planned', startTime: '18:00' }),
+        agenda: TIMED,
+      });
       expect(screen.getByText('ca. 18:00 · 5 Min.')).toBeInTheDocument();
       expect(screen.getByText('ca. 18:05 · 30 Min.')).toBeInTheDocument();
       expect(screen.getByText('ca. 18:35')).toBeInTheDocument();
@@ -405,7 +435,12 @@ describe('AgendaPaneComponent', () => {
 
     it('planRowsLive: shows the recorded time of a reached item without "ca." (§ 001143)', async () => {
       await setup({
-        meeting: meeting({ status: 'live', date: '2026-06-12', startTime: '18:00', currentAgendaItemId: 't-2' }),
+        meeting: meeting({
+          status: 'live',
+          date: '2026-06-12',
+          startTime: '18:00',
+          currentAgendaItemId: 't-2',
+        }),
         agenda: [
           { ...TIMED[0], startedAt: '2026-06-12T16:04:00Z' },
           { ...TIMED[1], startedAt: '2026-06-12T16:09:00Z' },
@@ -423,7 +458,10 @@ describe('AgendaPaneComponent', () => {
     });
 
     it('durationMenu: changes and clears the duration from the row menu (§ 001140)', async () => {
-      const { on, fixture } = await setup({ meeting: meeting({ status: 'planned' }), agenda: TIMED });
+      const { on, fixture } = await setup({
+        meeting: meeting({ status: 'planned' }),
+        agenda: TIMED,
+      });
       let menu = await openMenu(1);
       await userEvent.click(within(menu).getByRole('menuitem', { name: 'Dauer ändern' }));
       fixture.detectChanges();
@@ -445,7 +483,10 @@ describe('AgendaPaneComponent', () => {
     });
 
     it('durationMenuRange: keeps the save off for a duration outside 1 to 480 (§ 001140)', async () => {
-      const { on, fixture } = await setup({ meeting: meeting({ status: 'planned' }), agenda: TIMED });
+      const { on, fixture } = await setup({
+        meeting: meeting({ status: 'planned' }),
+        agenda: TIMED,
+      });
       const menu = await openMenu(1);
       await userEvent.click(within(menu).getByRole('menuitem', { name: 'Dauer ändern' }));
       fixture.detectChanges();
@@ -470,7 +511,9 @@ describe('AgendaPaneComponent', () => {
       await userEvent.click(within(menu).getByRole('menuitem', { name: 'To-Do anlegen' }));
       view.fixture.detectChanges();
       expect(screen.getByRole('dialog', { name: 'To-Do anlegen' })).toBeInTheDocument();
-      const chips = [...document.querySelectorAll('.tn__chipText')].map((c) => c.textContent?.trim());
+      const chips = [...document.querySelectorAll('.tn__chipText')].map((c) =>
+        c.textContent?.trim(),
+      );
       expect(chips).toEqual(['Antrag · Antrag Kulturfestival', `${meeting().title} · TOP 3`]);
       expect(view.on.remove).not.toHaveBeenCalled();
     });
@@ -489,7 +532,9 @@ describe('AgendaPaneComponent', () => {
     it('links a free-text TOP only, also while the agenda saves', async () => {
       const view = await setup({ savingAgenda: true }, true);
       const menu = await openMenu(0);
-      const items = within(menu).getAllByRole('menuitem').map((i) => i.textContent?.trim());
+      const items = within(menu)
+        .getAllByRole('menuitem')
+        .map((i) => i.textContent?.trim());
       expect(items[0]).toBe('To-Do anlegen');
       await userEvent.click(within(menu).getByRole('menuitem', { name: 'To-Do anlegen' }));
       view.fixture.detectChanges();
@@ -530,4 +575,3 @@ describe('AgendaPaneComponent', () => {
     });
   });
 });
-
