@@ -12,8 +12,10 @@ import {
   fit,
   hashUnit,
   hold,
+  joinNext,
   keep,
   nearestIn,
+  pauseFor,
   place,
   settle,
   step,
@@ -160,5 +162,28 @@ describe('graph layout', () => {
     expect(nearestIn(bodies, 'far-right', 'right')).toBeNull();
     expect(nearestIn(bodies, 'gone', 'right')).toBe('mid');
     expect(nearestIn([], 'gone', 'up')).toBeNull();
+  });
+
+  /** §ui-kit:F/collaboration/graph/001426: the pause gets shorter for a long queue, within 30 and 120 ms. */
+  it('takes a shorter pause for a longer queue', () => {
+    expect(pauseFor(0)).toBe(120);
+    expect(pauseFor(1)).toBe(120);
+    expect(pauseFor(30)).toBe(120);
+    expect(pauseFor(60)).toBe(60);
+    expect(pauseFor(120)).toBe(30);
+    expect(pauseFor(300)).toBe(30);
+    const total = Array.from({ length: 300 }, (_, i) => pauseFor(300 - i)).reduce((sum, ms) => sum + ms, 0);
+    expect(total).toBeLessThan(20000);
+  });
+
+  /** §ui-kit:F/collaboration/graph/001426: the next node has a neighbour that shows, else it is the first one. */
+  it('takes the first waiting node with a neighbour that shows', () => {
+    const near = adjacency([
+      { a: 'a', b: 'c' },
+      { a: 'b', b: 'x' },
+    ]);
+    expect(joinNext(['b', 'c'], new Set(['a']), near)).toBe('c');
+    expect(joinNext(['b', 'c'], new Set(), near)).toBe('b');
+    expect(joinNext([], new Set(['a']), near)).toBeNull();
   });
 });
