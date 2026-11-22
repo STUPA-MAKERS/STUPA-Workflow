@@ -1186,6 +1186,11 @@
       "to": "shared"
     },
     {
+      "count": 1,
+      "from": "protocol",
+      "to": "site_config"
+    },
+    {
       "count": 12,
       "from": "protocol",
       "to": "voting"

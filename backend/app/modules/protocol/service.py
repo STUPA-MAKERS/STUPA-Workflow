@@ -110,6 +110,7 @@ from app.modules.protocol.public import (
     passed_conditions,
 )
 from app.modules.protocol.schemas import ProtocolOut
+from app.modules.site_config.features import Feature, feature_on
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import ElectionResultOut, PollResultOut, VoteOut
 from app.modules.voting.service import VotingService
@@ -1630,6 +1631,7 @@ class ProtocolService:
             and protocol.status == "final"
             and not protocol.public_withheld
             and protocol.public_content is not None
+            and await feature_on(self.session, Feature.PUBLIC)
         )
         lines = [
             *([f"Sitzung: {meeting.title}"] if meeting is not None else []),

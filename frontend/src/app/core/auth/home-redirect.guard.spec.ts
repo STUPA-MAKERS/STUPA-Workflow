@@ -13,6 +13,7 @@ import {
 import { type Observable } from 'rxjs';
 import { homeRedirectGuard } from './home-redirect.guard';
 import { USE_MOCK_API } from '../api/api.config';
+import { FeatureService } from '../features/feature.service';
 import type { Principal } from '../api/models';
 
 const MEMBER: Principal = {
@@ -39,10 +40,13 @@ describe('homeRedirectGuard', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    http.verify();
+    localStorage.clear();
+  });
 
   /** Runs the guard, flushes the `/me` probe and returns the result. */
-  function run(principal: Principal | null): boolean | UrlTree {
+  async function run(principal: Principal | null): Promise<boolean | UrlTree> {
     let result!: boolean | UrlTree;
     TestBed.runInInjectionContext(() => {
       const out = homeRedirectGuard(
@@ -54,16 +58,26 @@ describe('homeRedirectGuard', () => {
     http
       .expectOne('/api/auth/me')
       .flush(principal, principal ? {} : { status: 401, statusText: 'Unauthorized' });
+    await Promise.resolve();
+    await Promise.resolve();
     return result;
   }
 
-  it('redirects an authenticated visitor to /activity', () => {
-    const result = run(MEMBER);
+  it('redirects an authenticated visitor to /activity', async () => {
+    TestBed.inject(FeatureService).apply({});
+    const result = await run(MEMBER);
     expect(result).toBeInstanceOf(UrlTree);
     expect((result as UrlTree).toString()).toBe('/activity');
   });
 
-  it('lets an anonymous visitor stay on the public landing page', () => {
-    expect(run(null)).toBe(true);
+  /** Spec 001300: while `Aktivität` is off, the start page is the Anträge. */
+  it('redirects to /applications while the activity is off', async () => {
+    TestBed.inject(FeatureService).apply({ activity: false });
+    const result = await run(MEMBER);
+    expect((result as UrlTree).toString()).toBe('/applications');
+  });
+
+  it('lets an anonymous visitor stay on the public landing page', async () => {
+    expect(await run(null)).toBe(true);
   });
 });

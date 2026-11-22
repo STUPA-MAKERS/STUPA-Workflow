@@ -49,6 +49,8 @@ describe('featureMatch', () => {
   });
 
   it.each([
+    ['activity', ['activity']],
+    ['graph', ['graph']],
     ['todos', ['todos']],
     ['calendar', ['calendar']],
     ['meetings', ['meetings']],
@@ -57,8 +59,9 @@ describe('featureMatch', () => {
     ['expenses', ['budget']],
     ['invoices', ['invoices']],
     ['tickets', ['tickets']],
-    ['protocols', ['meetings']],
-    ['public-calendar', ['calendar']],
+    ['protocols', ['meetings', 'public']],
+    ['decisions', ['meetings', 'public']],
+    ['public-calendar', ['calendar', 'public']],
   ] as const)('guards /%s', (path, keys) => {
     const found = flat(routes).filter(
       (route) => route.path === path && route.redirectTo === undefined,
