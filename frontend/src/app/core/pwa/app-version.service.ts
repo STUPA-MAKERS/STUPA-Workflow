@@ -1,9 +1,13 @@
 import { DOCUMENT } from '@angular/common';
-import { DestroyRef, Injectable, InjectionToken, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { DestroyRef, Injectable, InjectionToken, Injector, inject } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
-import { SwUpdate, type VersionReadyEvent } from '@angular/service-worker';
+import { SwUpdate } from '@angular/service-worker';
+import { skipLoading } from '@stupa-makers/ui-kit';
 import { PAGE_RELOAD } from '@stupa-makers/ui-kit/pwa';
 import { Subscription, filter, firstValueFrom, from, map, race, timer } from 'rxjs';
+import { API_BASE_URL } from '@core/api/api.config';
+import { PageResumeService } from '@core/browser/page-resume.service';
 import { APP_BUILD_ID } from './build-id';
 
 /** The response header with the build ID of the frontend that the server serves (§ 002150). */
@@ -21,18 +25,11 @@ export const DEV_BUILD = 'dev';
 /** The session storage key of the last reload, for the loop guard (§ui-kit:002152). */
 export const RELOAD_KEY = 'appVersionReload';
 
-/** How long the app does not reload a second time for the same server version (§ui-kit:002152). */
+/** How long the app does not reload a third time for the same server version (§ui-kit:002152). */
 export const RELOAD_GUARD_MS = 10 * 60 * 1000;
 
-/**
- * The longest wait for the download of the new version by the service worker (§002340). The
- * service worker fetches the changed files one after the other, which on a phone can take
- * longer than a few seconds.
- */
-export const SW_WAIT_MS = 60_000;
-
-/** The longest wait for the switch of the service worker version or for its removal. */
-export const SW_SWITCH_MS = 5_000;
+/** The longest wait for the removal of the service worker before the second reload. */
+export const SW_REMOVE_MS = 5_000;
 
 /**
  * Removes every service worker registration of the page (§002340). A reload after the
@@ -68,26 +65,28 @@ const NO_TEXT_INPUTS = new Set([
  * The reload of the app when the server serves another frontend build (§ui-kit:002151).
  *
  * `appVersionInterceptor` reports the header `X-App-Version` of each API answer. When the
- * value is not the build ID of the running app, the service loads the new version through
- * the service worker and reloads the page at once. The app shows no update notice.
+ * value is not the build ID of the running app, the service reloads the page at once. The
+ * app shows no update notice.
  *
- * The reload waits until the service worker has the new version (§002340): `checkForUpdate`
- * ends only after the download of all changed files, then `activateUpdate` switches the
- * page to it. When the service worker finds no newer version, fails or takes longer than
- * {@link SW_WAIT_MS}, the service removes the service worker before the reload, so that the
- * reload loads the new version from the network. A `VERSION_READY` of the service worker
- * after a reported server version reloads too, also within the loop guard. When the focus
- * moves into a text field during the download, the reload waits as above; a field that had
- * the focus already when a page change started the reload does not hold it again.
+ * The reload waits for no download of the service worker (§002340). The service worker
+ * loads a page from the network first (`navigationRequestStrategy: "freshness"` in
+ * `ngsw-config.json`), and the new `index.html` names the new files, which the network
+ * serves while the service worker does not hold them. When the next answer after that
+ * reload still reports the same server version, the service removes the service worker and
+ * reloads a second time, so that a service worker of an older config cannot hold the old
+ * version.
  *
- * While a text field has the focus, the reload waits (§ui-kit:002151): it runs at the next page
- * change or at the next reported answer while no text field has the focus, so typed text is
- * not lost.
+ * When the page comes back to the user (§002341), the service reads `/api/health` once, so
+ * that a page that only talks over a WebSocket notices a new version too.
  *
- * The loop guard (§ui-kit:002152): before a reload, the service writes the server version and the
- * time into the session storage. When the next answer after the reload still reports that
- * version within {@link RELOAD_GUARD_MS}, the service does not reload again. A missing
- * header or the build ID `dev` never reloads.
+ * While a text field has the focus, the reload waits (§ui-kit:002151): it runs at the next
+ * page change or at the next reported answer while no text field has the focus, so typed
+ * text is not lost.
+ *
+ * The loop guard (§ui-kit:002152): before a reload, the service writes the server version,
+ * the number of reloads for it and the time into the session storage. After two reloads
+ * for the same version within {@link RELOAD_GUARD_MS}, the service does not reload again.
+ * A missing header or the build ID `dev` never reloads.
  *
  * When the cache of the running version is broken (`unrecoverable`), the service reloads at
  * once, because the page cannot load its lazy chunks.
@@ -100,46 +99,40 @@ export class AppVersionService {
   private readonly router = inject(Router);
   private readonly build = inject(APP_BUILD);
   private readonly unregister = inject(SW_UNREGISTER);
+  private readonly injector = inject(Injector);
   private readonly subscriptions = new Subscription();
   private started = false;
   private reloading = false;
   /** The server version of a reload that waits for the end of typing. */
   private pending: string | null = null;
-  /** The last reported server version that is not the build of the running app. */
-  private seen: string | null = null;
 
   constructor() {
     inject(DestroyRef).onDestroy(() => this.subscriptions.unsubscribe());
   }
 
-  /** Starts the watch of the router and of the service worker. A second call does nothing. */
+  /** Starts the watch of the router, of the page returns and of the service worker. */
   init(): void {
     if (this.started) return;
     this.started = true;
     if (this.updates.isEnabled) {
       this.subscriptions.add(this.updates.unrecoverable.subscribe(() => this.reloadPage()));
-      this.subscriptions.add(
-        this.updates.versionUpdates
-          .pipe(filter((e): e is VersionReadyEvent => e.type === 'VERSION_READY'))
-          .subscribe(() => {
-            if (this.seen === null) return;
-            if (this.typing()) this.pending = this.seen;
-            else void this.reload(this.seen);
-          }),
-      );
     }
     this.subscriptions.add(
       this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe(() => {
         if (this.pending !== null) void this.reload(this.pending);
       }),
     );
+    if (this.build !== DEV_BUILD) {
+      this.subscriptions.add(
+        this.injector.get(PageResumeService).resume$.subscribe(() => this.probe()),
+      );
+    }
   }
 
   /** Takes the version header of one API answer. */
   report(serverVersion: string | null): void {
     if (!serverVersion || this.build === DEV_BUILD || serverVersion === this.build) return;
-    this.seen = serverVersion;
-    if (this.triedBefore(serverVersion)) return;
+    if (this.tries(serverVersion) >= 2) return;
     if (this.typing()) {
       this.pending = serverVersion;
       return;
@@ -147,24 +140,23 @@ export class AppVersionService {
     void this.reload(serverVersion);
   }
 
+  /** One read of the API after a return of the page; the interceptor reports its header. */
+  private probe(): void {
+    const http = this.injector.get(HttpClient);
+    const base = this.injector.get(API_BASE_URL);
+    http
+      .get(`${base}/health`, { context: skipLoading() })
+      .subscribe({ error: () => undefined });
+  }
+
   private async reload(serverVersion: string): Promise<void> {
     if (this.reloading) return;
+    const tries = this.tries(serverVersion);
+    if (tries >= 2) return;
     this.reloading = true;
     this.pending = null;
-    const sw = this.updates.isEnabled;
-    const focusBefore = this.doc.activeElement;
-    const found = sw ? await settle(this.updates.checkForUpdate(), SW_WAIT_MS) : undefined;
-    if (this.doc.activeElement !== focusBefore && this.typing()) {
-      this.reloading = false;
-      this.pending = serverVersion;
-      return;
-    }
-    this.remember(serverVersion);
-    if (sw) {
-      const switched =
-        found === undefined ? undefined : await settle(this.updates.activateUpdate(), SW_SWITCH_MS);
-      if (found !== true && switched !== true) await settle(this.unregister(), SW_SWITCH_MS);
-    }
+    this.remember(serverVersion, tries + 1);
+    if (tries === 1) await settle(this.unregister(), SW_REMOVE_MS);
     this.reloadPage();
   }
 
@@ -182,26 +174,30 @@ export class AppVersionService {
     return el instanceof HTMLInputElement && !NO_TEXT_INPUTS.has(el.type);
   }
 
-  private triedBefore(serverVersion: string): boolean {
+  /** The reloads for this server version within the guard time. */
+  private tries(serverVersion: string): number {
     try {
       const raw = this.doc.defaultView?.sessionStorage.getItem(RELOAD_KEY);
-      if (!raw) return false;
-      const last = JSON.parse(raw) as { version?: unknown; at?: unknown };
-      return (
-        last.version === serverVersion &&
-        typeof last.at === 'number' &&
-        Date.now() - last.at < RELOAD_GUARD_MS
-      );
+      if (!raw) return 0;
+      const last = JSON.parse(raw) as { version?: unknown; at?: unknown; tries?: unknown };
+      if (
+        last.version !== serverVersion ||
+        typeof last.at !== 'number' ||
+        Date.now() - last.at >= RELOAD_GUARD_MS
+      ) {
+        return 0;
+      }
+      return typeof last.tries === 'number' ? last.tries : 2;
     } catch {
-      return false;
+      return 0;
     }
   }
 
-  private remember(serverVersion: string): void {
+  private remember(serverVersion: string, tries: number): void {
     try {
       this.doc.defaultView?.sessionStorage.setItem(
         RELOAD_KEY,
-        JSON.stringify({ version: serverVersion, at: Date.now() }),
+        JSON.stringify({ version: serverVersion, at: Date.now(), tries }),
       );
     } catch {
       /* Without storage the guard is off; the reload still runs. */
