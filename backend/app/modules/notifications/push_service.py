@@ -344,15 +344,13 @@ class PushService:
 
     async def preferences(self, principal_id: uuid.UUID) -> list[tuple[str, bool]]:
         """Return the effective push switch of every kind (stored deviation or default)."""
-        stored: dict[str, bool] = dict(
-            (
-                await self.session.execute(
-                    select(PushPreference.kind, PushPreference.enabled).where(
-                        PushPreference.principal_id == principal_id
-                    )
-                )
-            ).tuples()
+        rows = await self.session.execute(
+            select(PushPreference.kind, PushPreference.enabled).where(
+                PushPreference.principal_id == principal_id
+            )
         )
+        # A Result has keys(), so dict() would read it as a mapping: take the rows as a list.
+        stored = dict(rows.tuples().all())
         return [(k, stored.get(k, push_default(k))) for k in NOTIFICATION_KINDS]
 
     async def set_preferences(
