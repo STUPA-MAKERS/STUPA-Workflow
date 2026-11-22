@@ -750,7 +750,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/performance/rendering/002002](requirements/non-functional/performance/rendering/002002_zoneless.md) | The app runs its change detection without zone.js | approved |
 | [NF/performance/rendering/002160](requirements/non-functional/performance/rendering/002160_scroll-without-check.md) | A scroll event runs no change detection | approved |
 | [NF/performance/rendering/002161](requirements/non-functional/performance/rendering/002161_reads-before-writes.md) | Layout reads wait for the render and come before the writes of a frame | approved |
-| [NF/performance/rendering/002406](requirements/non-functional/performance/rendering/002406_no-root-has-on-scroll.md) | No :has() at the page root | draft |
+| [NF/performance/rendering/002406](requirements/non-functional/performance/rendering/002406_no-root-has-on-scroll.md) | No :has() at the page root | approved |
 | [NF/performance/rendering/002407](requirements/non-functional/performance/rendering/002407_fab-fold-without-layout.md) | The FAB fold runs between two measured sizes and ends in the folded layout | approved |
 | [NF/privacy/personal-data/000185](requirements/non-functional/privacy/personal-data/000185_no-raw-ids.md) | The UI shows no raw IDs | approved |
 | [NF/privacy/personal-data/000186](requirements/non-functional/privacy/personal-data/000186_no-plain-ip.md) | The login audit has no plain IP address | approved |

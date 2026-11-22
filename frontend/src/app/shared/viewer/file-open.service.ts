@@ -1,6 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import { type FileViewerItem, fileViewerKind, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
-import { inlineUrl } from '@shared/ui/image-thumb/image-thumb.component';
+import { type FileViewerItem, fileViewerKind, inlineUrl, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
 
 /**
  * A file that a download button gives. `url` is a same-origin API route that answers the

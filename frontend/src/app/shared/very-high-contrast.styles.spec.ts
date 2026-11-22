@@ -49,8 +49,10 @@ describe('surfaceEdges (§ui-kit:000605)', () => {
   });
 
   it('draws the edges of the comments as borders, which scrolling content does not cover', () => {
-    expect(RULES).toMatch(/app-chat:not\(\.chat--phone\) \.chat__log \{\s*border: var\(--vh-edge\) !important;/);
-    expect(RULES).toMatch(/\.chat__bubble,\s*\.chat__row \.chat__bubble--internal \{\s*border: var\(--vh-edge\);\s*box-shadow: none !important;/);
+    // The chat view of the kit carries its own edges (ui-kit 002276).
+    const chat = readFileSync(join(APP, '../../vendor/ui-kit/views/chat/src/chat-view.component.scss'), 'utf8');
+    expect(chat).toMatch(/:not\(\.chat--phone\) \.chat__log \{\s*border: var\(--vh-edge\) !important;/);
+    expect(chat).toMatch(/\.chat__bubble,\s*\.chat__row \.chat__bubble--internal \{\s*border: var\(--vh-edge\);\s*box-shadow: none !important;/);
   });
 
   it('never draws a surface edge as an outline, because a scroll area inside paints over it', () => {

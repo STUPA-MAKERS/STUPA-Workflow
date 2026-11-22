@@ -2,7 +2,7 @@
 id: "002406"
 title: No :has() at the page root
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-22
 tests:
