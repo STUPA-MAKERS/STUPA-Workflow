@@ -4,7 +4,7 @@ title: The MCP leaves out a closed list of functions
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-16
+updated: 2026-11-22
 tests:
   - "mcp/antragsplattform_mcp/tests/test_route_parity.py:test_exclusions_are_routes"
 implementation:
@@ -31,6 +31,8 @@ The MCP server must not have a tool for these functions:
   and the public pages without a login
 - the removal of the event data of a card, because the route always refuses it
 - the branding images, the manifest, the page head, the avatars and the health check
+- the web push routes of a browser: the public key, the subscription of a device and the
+  action of a push button, because only a browser and its service worker use them
 
 Reason: Each function acts for a person, cannot be undone, or exists only for a browser.
 

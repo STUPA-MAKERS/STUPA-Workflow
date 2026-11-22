@@ -5,4 +5,5 @@
   [notice]="notice()"
   [empty]="error() ? null : { icon: 'bell', heading: 'account.notifications.empty' | t }"
   (change)="toggle($event.key, $event.value)"
+  (action)="act($event.key)"
 />
