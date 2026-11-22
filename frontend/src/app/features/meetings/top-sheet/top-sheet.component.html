@@ -1,262 +1,38 @@
-@let m = meeting();
-@let proto = protocol();
-
-<article class="ts">
-  @if (top(); as t) {
-    <header class="ts__head">
-      <div class="ts__titles">
-        <span class="ts__kind">
-          @if (isNow()) {
-            <span class="ts__now">{{ 'meetings.follow.now' | t }}</span> ·
-          }
-          {{ kindLine(t) }}
-          @if (t.nonPublic) {
-            · {{ 'meetings.agenda.nonPublicLabel' | t }}
-          }
-        </span>
-        @if (titleEditing()) {
-          <input
-            #titleInput
-            class="ts__titleInput"
-            name="renameTop"
-            [ngModel]="renameDraft()"
-            (ngModelChange)="renameDraft.set($event)"
-            (keydown.enter)="saveTitle(t)"
-            (keydown.escape)="cancelTitle()"
-            (blur)="saveTitle(t)"
-            [placeholder]="'meetings.agenda.renamePlaceholder' | t"
-            [attr.aria-label]="'meetings.agenda.rename' | t"
-          />
-        } @else if (titleRenamable()) {
-          <h1 class="ts__title">
-            <button
-              type="button"
-              class="ts__titleBtn"
-              [title]="t.title || ('meetings.agenda.untitled' | t)"
-              [attr.aria-label]="('meetings.agenda.rename' | t) + ': ' + (t.title || ('meetings.agenda.untitled' | t))"
-              (click)="editTitle(t)"
-            >{{ t.title || ('meetings.agenda.untitled' | t) }}</button>
-          </h1>
-        } @else {
-          <h1 class="ts__title" [title]="t.title || ('meetings.agenda.untitled' | t)">{{ t.title || ('meetings.agenda.untitled' | t) }}</h1>
-        }
-      </div>
-      @if (!barControls() && proto && !proto.isLocked) {
-        <ng-container [ngTemplateOutlet]="saveTpl" />
-      }
-    </header>
-
-    @if (follow() && m.status === 'live' && m.protokollantName) {
-      <p class="ts__keepers">
-        <app-icon name="edit" [size]="14" />
-        <span class="ell" [title]="'participant.top.keeper' | t: { name: m.protokollantName }">{{ 'participant.top.keeper' | t: { name: m.protokollantName } }}</span>
-      </p>
-    }
-
-    @if (m.status === 'closed' && keepers()) {
-      <p class="ts__keepers">
-        <app-icon name="edit" [size]="14" />
-        <span class="ell" [title]="'meetings.dock.protokollantIs' | t: { name: keepers() }">{{ 'meetings.dock.protokollantIs' | t: { name: keepers() } }}</span>
-      </p>
-    }
-
-    @if (linked()) {
-      @if (!follow()) {
-        <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [showTitle]="false" [targetId]="t.id" [lead]="applicationLead()" />
-      } @else if (applicationLead(); as lead) {
-        <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [showTitle]="false" [targetId]="t.id" [items]="[]" [lead]="lead" />
-      }
-    }
-
-    @if (follow()) {
-      <div class="ts__rule"></div>
-      @defer (on immediate) {
-        <app-markdown-editor
-          class="ts__editor"
-          [docKey]="docKey()"
-          [voteInfo]="voteInfo()"
-          [value]="t.body ?? ''"
-          [disabled]="true"
-          [ariaLabel]="'participant.top.protocol' | t"
-          [placeholder]="'participant.top.empty' | t"
-            [blackoutTitle]="'markdown.blackout.mark' | t"
-            [timeNoteSuffix]="'meetings.editor.timeNoteSuffix' | t"
-            [timeNoteLabel]="'meetings.editor.timeNoteTime' | t"
-            [documentInfo]="documentInfo"
-            (documentOpen)="openDocument($event)"
-        />
-      } @placeholder {
-        <div class="ts__editor ts__editor--wait" aria-hidden="true">
-          <p class="skel-in"><span class="skel-text"></span></p>
-          <p class="skel-in"><span class="skel-text"></span></p>
-          <p class="skel-in"><span class="skel-text"></span></p>
-        </div>
-      }
-    } @else if (proto || m.status === 'planned') {
-      @if (!proto?.isLocked && barControls()) {
-      <div class="ts__bar">
-        @if (editable()) {
-          <div class="ts__tools" role="toolbar" [attr.aria-label]="'meetings.editor.toolbar' | t">
-            @for (group of toolGroups; track $index) {
-              <app-button-group>
-                @for (tool of group; track tool.format) {
-                  <app-button
-                    variant="tonal"
-                    [iconOnly]="true"
-                    [ariaPressed]="activeFormats().has(tool.format)"
-                    [ariaLabel]="tool.label | t"
-                    [title]="tool.label | t"
-                    (mousedown)="$event.preventDefault()"
-                    (click)="toggleFormat(tool.format)"
-                  ><app-icon [name]="tool.icon" /></app-button>
-                }
-              </app-button-group>
-            }
-            <app-button-group>
-              <app-button
-                variant="text"
-                [iconOnly]="true"
-                [ariaLabel]="'meetings.editor.table' | t"
-                [title]="'meetings.editor.table' | t"
-                (mousedown)="$event.preventDefault()"
-                (click)="insertTable()"
-              ><app-icon name="table" /></app-button>
-              <app-button
-                variant="text"
-                [iconOnly]="true"
-                [ariaLabel]="'meetings.editor.image' | t"
-                [title]="'meetings.editor.image' | t"
-                (mousedown)="$event.preventDefault()"
-                (click)="insertImage()"
-              ><app-icon name="image" /></app-button>
-              <app-button
-                variant="text"
-                [iconOnly]="true"
-                [ariaLabel]="'meetings.editor.document' | t"
-                [title]="'meetings.editor.document' | t"
-                (mousedown)="$event.preventDefault()"
-                (click)="insertDocument()"
-              ><app-icon name="file" /></app-button>
-              <app-button
-                variant="text"
-                [iconOnly]="true"
-                [ariaLabel]="'meetings.editor.timeNote' | t"
-                [title]="'meetings.editor.timeNote' | t"
-                (mousedown)="$event.preventDefault()"
-                (click)="insertTimeNote()"
-              ><app-icon name="clock" /></app-button>
-            </app-button-group>
-          </div>
-        }
-        <span class="ts__spacer"></span>
-        <ng-container [ngTemplateOutlet]="saveTpl" />
-        @if (editable()) {
-          <app-button-group>
-            <app-button
-              class="ts__done"
-              variant="outlined"
-              [ariaPressed]="!!t.doneAt"
-              (click)="doneChange.emit({ item: t, done: !t.doneAt })"
-            >
-              <app-icon name="check" />
-              {{ 'meetings.agenda.done' | t }}
-            </app-button>
-          </app-button-group>
-        }
-        <app-segmented
-          class="ts__mode"
-          size="control"
-          width="equal"
-          [ariaLabel]="'meetings.editor.mode' | t"
-          [options]="modeOptions()"
-          [value]="mode()"
-          (valueChange)="setMode($event)"
-        />
-      </div>
-      <div class="ts__rule"></div>
-      }
-      @if (proto && !proto.isLocked && proto.gremiumProtocolsPublic && editable() && !t.nonPublic) {
-        <app-note class="ts__public" icon="globe">{{ 'meetings.protocol.publicNotice' | t }}</app-note>
-      }
-      @if (editable() && openBlackout()) {
-        <app-note class="ts__public" kind="error" icon="eyeslash" role="alert">{{
-          'meetings.editor.blackoutOpen' | t
-        }}</app-note>
-      }
-      @if (mode() === 'raw') {
-        <div class="ts__editor ts__editor--raw">
-          <textarea
-            #raw
-            appMarkdownImageUpload
-            class="ts__raw"
-            [attr.aria-label]="'meetings.editor.modeRaw' | t"
-            [value]="t.body ?? ''"
-            [readOnly]="!editable()"
-            [ariaLabel]="'participant.top.protocol' | t"
-            [placeholder]="'meetings.protocol.placeholder' | t"
-            spellcheck="true"
-            (input)="onRawInput(t, raw, $event)"
-            (paste)="onRawPaste($event)"
-            (drop)="onRawDrop($event)"
-          ></textarea>
-        </div>
-      } @else {
-        @defer (on immediate) {
-          <app-markdown-editor
-            #ed
-            class="ts__editor"
-            appScrollFade="y"
-            [docKey]="docKey()"
-            [voteInfo]="voteInfo()"
-            [value]="t.body ?? ''"
-            [disabled]="!editable()"
-            [imageUpload]="editable() ? imageUpload : null"
-            [documentUpload]="editable() ? documentUpload : null"
-            [documentInfo]="documentInfo"
-            (documentOpen)="openDocument($event)"
-            [ariaLabel]="'participant.top.protocol' | t"
-            [placeholder]="'meetings.protocol.placeholder' | t"
-            [blackoutTitle]="'markdown.blackout.mark' | t"
-            [timeNoteSuffix]="'meetings.editor.timeNoteSuffix' | t"
-            [timeNoteLabel]="'meetings.editor.timeNoteTime' | t"
-            [knownNames]="editable() ? knownNames : null"
-            (valueChange)="onEditorChange(t, $event)"
-          />
-        } @placeholder {
-          <div class="ts__editor ts__editor--wait" aria-hidden="true">
-            <p class="skel-in"><span class="skel-text"></span></p>
-            <p class="skel-in"><span class="skel-text"></span></p>
-            <p class="skel-in"><span class="skel-text"></span></p>
-          </div>
-        }
-      }
-    }
-  } @else {
-    <app-empty-state plain icon="list"
-      class="ts__empty"
-      fill
-      [heading]="'meetings.dock.noTop' | t"
-      [body]="proto ? ('meetings.protocol.selectTop' | t) : null"
-    />
-  }
-
-  @if (!proto && !follow() && m.status !== 'planned') {
-    <p class="ts__muted ts__pad">{{ 'meetings.protocol.none' | t }}</p>
-  }
-
-</article>
+<app-top-sheet-view
+  [meeting]="meeting()"
+  [protocol]="protocol()"
+  [top]="top()"
+  [topIndex]="topIndex()"
+  [editable]="editable()"
+  [canEdit]="canEdit()"
+  [saveState]="saveState()"
+  [revision]="revision()"
+  [follow]="follow()"
+  [linked]="linked()"
+  [barControls]="barControls()"
+  [canRename]="canRename()"
+  [renamingTopId]="renamingTopId()"
+  [(renameDraft)]="renameDraft"
+  [(mode)]="mode"
+  [voteInfo]="voteInfo()"
+  [keepers]="keepers()"
+  [linkedList]="linkedTpl"
+  (bodyChange)="bodyChange.emit($event)"
+  (startRename)="startRename.emit($event)"
+  (cancelRename)="cancelRename.emit()"
+  (renameTop)="renameTop.emit($event)"
+  (doneChange)="doneChange.emit($event)"
+  (documentOpen)="openDocument($event)"
+/>
 
 @if (shownDocument()) {
   <app-document-viewer [(doc)]="shownDocument" />
 }
 
-<ng-template #saveTpl>
-  <span class="ts__save mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
-    @switch (saveState()) {
-      @case ('saving') { {{ 'meetings.protocol.saving' | t }} }
-      @case ('saved') { <app-icon name="check" [size]="16" /> {{ 'meetings.protocol.saved' | t }} }
-      @case ('error') { {{ 'meetings.protocol.saveFailed' | t }} }
-      @default {}
-    }
-  </span>
+<ng-template #linkedTpl let-t let-follow="follow">
+  @if (!follow) {
+    <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [showTitle]="false" [targetId]="t.id" [lead]="applicationLead()" />
+  } @else if (applicationLead(); as lead) {
+    <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [showTitle]="false" [targetId]="t.id" [items]="[]" [lead]="lead" />
+  }
 </ng-template>
