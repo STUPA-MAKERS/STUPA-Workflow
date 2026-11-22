@@ -116,6 +116,37 @@ describe('BackupsComponent', () => {
     expect(screen.getByText(/Vor der Abstimmung/)).toBeInTheDocument();
   });
 
+  it('builds the meta of a row from what the backup has, and ignores a menu pick of an unknown row', async () => {
+    const FAILED: Backup = { ...DONE, id: 'b-f', status: 'failed', error: 'MinIO weg', objectCount: null, sizeBytes: undefined, note: '  ' };
+    const BARE: Backup = { ...DONE, id: 'b-g', status: 'failed', error: undefined, objectCount: undefined, sizeBytes: null, note: null };
+    const api = makeApi({ listBackups: jest.fn(() => of(list({ items: [FAILED, BARE, PINNED] }))) });
+    const { fixture } = await setup(api);
+    const cmp = fixture.componentInstance as unknown as {
+      list: () => { state: string; data?: { meta: string[]; actions: unknown[] }[]; retry?: () => void };
+      onRowAction: (id: string, key: string) => void;
+    };
+    const data = cmp.list().data ?? [];
+    expect(data[0].meta).toEqual(['Manuell', 'MinIO weg']);
+    expect(data[1].meta).toEqual(['Manuell']);
+    expect(data[0].actions).toEqual([]);
+    expect(data[2].meta).toContain('angeheftet');
+    cmp.onRowAction('missing', 'pin');
+    expect(api.updateBackup).not.toHaveBeenCalled();
+    cmp.onRowAction('b-2', 'pin');
+    expect(api.updateBackup).toHaveBeenCalled();
+  });
+
+  it('retries from the error state of the list', async () => {
+    let fail = true;
+    const api = makeApi({ listBackups: jest.fn(() => (fail ? throwError(() => new Error('down')) : of(list()))) });
+    const { fixture } = await setup(api);
+    const cmp = fixture.componentInstance as unknown as { list: () => { state: string; retry?: () => void } };
+    expect(cmp.list().state).toBe('error');
+    fail = false;
+    cmp.list().retry?.();
+    expect(cmp.list().state).toBe('ready');
+  });
+
   it('shows the empty face when there are no backups', async () => {
     const api = makeApi({ listBackups: jest.fn(() => of(list({ items: [] }))) });
     await setup(api);

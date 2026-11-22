@@ -73,6 +73,10 @@ describe('VersionHistoryComponent', () => {
     fixture.componentInstance.reload();
     fixture.detectChanges();
     expect(container.querySelector('app-empty-state')?.textContent).toContain('konnten nicht geladen werden');
+    const cmp = fixture.componentInstance as unknown as { rows: () => { state: string; retry?: () => void } };
+    api.listConfigRevisions.mockReturnValueOnce(throwError(() => new Error('down')));
+    cmp.rows().retry?.();
+    expect(api.listConfigRevisions).toHaveBeenCalledTimes(3);
     api.listConfigRevisions.mockReturnValueOnce(of([]));
     fixture.componentInstance.reload();
     fixture.detectChanges();
