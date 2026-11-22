@@ -8,7 +8,7 @@ updated: 2026-11-22
 tests:
   - "frontend/vendor/ui-kit/src/styles/root-has.spec.ts:withoutComments"
   - "frontend/vendor/ui-kit/src/lib/sticky-bar/stuck-heads.spec.ts:StuckHeads"
-  - "frontend/vendor/ui-kit/src/lib/file-viewer/file-viewer.component.spec.ts:data-file-viewer"
+  - "frontend/vendor/ui-kit/src/lib/file-viewer/file-viewer.component.spec.ts:FileViewerComponent"
 implementation:
   - frontend/vendor/ui-kit/src/lib/sticky-bar/stuck-heads.ts
   - frontend/vendor/ui-kit/src/lib/sticky-bar/sticky-bar.component.ts
