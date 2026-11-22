@@ -8,6 +8,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { DraftUpload } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
+import { ChatViewComponent } from '@stupa-makers/ui-kit/views/chat';
 import { runAxe } from '../../../../testing/a11y';
 import { AltchaService } from '../../../features/apply/altcha.service';
 import { ChatDrafts } from './chat-drafts';
@@ -137,8 +138,12 @@ async function setup(opts: SetupOpts = {}) {
   const log = () => screen.getByRole('log');
   const input = () =>
     screen.getByRole('textbox', { name: 'Nachricht schreiben …' }) as HTMLTextAreaElement;
+  /** The kit chat view inside the adapter: the tests drive its internals. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const cmp = view.fixture.componentInstance as any;
+  const cmp = view.fixture.debugElement.query(By.directive(ChatViewComponent)).componentInstance as any;
+  /** The adapter itself: it holds the drafts of the app. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const outer = view.fixture.componentInstance as any;
   /** Pick files with the hidden input and let the uploads finish. */
   const pick = async (...files: File[]) => {
     const box = view.container.querySelector('.chat__fileInput') as HTMLInputElement;
@@ -162,6 +167,7 @@ async function setup(opts: SetupOpts = {}) {
     log,
     input,
     cmp,
+    outer,
     api,
     toast,
     pick,
@@ -1756,9 +1762,9 @@ describe('ChatComponent', () => {
     });
 
     it('maps the reasons of the draft service to the chat texts', () => {
-      expect(chatUploadError('apply.files.error.type')).toBe('chat.error.fileType');
-      expect(chatUploadError('apply.files.error.tooLarge')).toBe('chat.error.fileTooLarge');
-      expect(chatUploadError('apply.files.error.rateLimit')).toBe('chat.error.upload');
+      expect(chatUploadError('apply.files.error.type')).toBe('type');
+      expect(chatUploadError('apply.files.error.tooLarge')).toBe('tooLarge');
+      expect(chatUploadError('apply.files.error.rateLimit')).toBe('other');
     });
 
     it('ignores an empty pick', async () => {
@@ -1995,7 +2001,7 @@ describe('ChatComponent', () => {
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const chat = (cls: string): any =>
-        fixture.debugElement.query(By.css(`app-chat.${cls}`)).componentInstance;
+        fixture.debugElement.query(By.css(`app-chat.${cls} app-chat-view`)).componentInstance;
       const pick = async (cls: string, file: File) => {
         const box = fixture.nativeElement.querySelector(
           `app-chat.${cls} .chat__fileInput`,
@@ -2286,9 +2292,9 @@ describe('ChatComponent', () => {
     });
 
     it('marks a lost file in the composer', async () => {
-      const { pick, cmp, view } = await setup({ canAttach: true });
+      const { pick, outer, view } = await setup({ canAttach: true });
       await pick(pdf());
-      cmp.drafts.markFailed({
+      outer.drafts.markFailed({
         code: 'draft_attachments_missing',
         errors: [{ field: 'attachmentIds.d1' }],
       });

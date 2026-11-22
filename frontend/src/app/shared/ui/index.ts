@@ -17,7 +17,7 @@ export { ChatComponent } from './chat/chat.component';
 export { ChatDrafts } from './chat/chat-drafts';
 export { chatPeople, type ChatPerson } from './chat/chat-mentions';
 export { ChatOutbox, draftDropper, filesRefused, missingFiles, sendErrorKey } from './chat/chat-outbox';
-export { CHAT_MAX_FILES, appendOnce, chatFileUrl, toChatAttachments, withScanStates } from './chat/chat.util';
+export { appendOnce, chatFileUrl, toChatAttachments, withScanStates } from './chat/chat.util';
 export type {
   ChatAttachment,
   ChatEdit,
@@ -32,6 +32,5 @@ export type {
 export { BodyPortalDirective } from './body-portal/body-portal.directive';
 export { PullRefreshDirective, rubberBand } from './pull-refresh/pull-refresh.directive';
 export { HistoryComponent } from './history/history.component';
-export { ImageThumbComponent, inlineUrl, isThumbImage } from './image-thumb/image-thumb.component';
 export type { HistoryChange, HistoryEntry } from './history/history.component';
 export * from '../status-kind.util';
