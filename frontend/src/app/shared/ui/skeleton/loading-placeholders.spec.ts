@@ -7,8 +7,9 @@
  * rather than in production.
  *
  * A page loading is not a message. It is a shape, and either `app-skeleton`,
- * `app-data-table` (which draws its own skeleton rows) or a kit screen such as
- * `app-records-screen` (which draws skeleton rows for its `loading` rows) has to draw it,
+ * `app-data-table` (which draws its own skeleton rows), a kit screen such as
+ * `app-records-screen` (which draws skeleton rows for its `loading` rows) or a kit view such as
+ * `app-activity-view` (which draws them for its `loading` state) has to draw it,
  * directly or through a table component of the page that passes `[loading]` on.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -45,7 +46,7 @@ function withoutPlaceholder(): string[] {
     if (ALLOWED.some((a) => file.endsWith(a))) return false;
     const src = readFileSync(file, 'utf8');
     if (!/\bloading\w*\(\)/.test(src)) return false;
-    return !/app-skeleton|app-data-table|app-records-screen|skel|<app-[\w-]+-table\b[^>]*\[loading\]/.test(src);
+    return !/app-skeleton|app-data-table|app-records-screen|<app-[\w-]+-view\b|skel|<app-[\w-]+-table\b[^>]*\[loading\]/.test(src);
   });
 }
 

@@ -23,7 +23,8 @@
       "@stupa-makers/ui-kit/markdown-editor/known-names": ["./vendor/ui-kit/markdown-editor/src/known-names.ts"],
       "@stupa-makers/ui-kit/shell": ["./vendor/ui-kit/shell/src/public-api.ts"],
       "@stupa-makers/ui-kit/pwa": ["./vendor/ui-kit/pwa/src/public-api.ts"],
-      "@stupa-makers/ui-kit/screens": ["./vendor/ui-kit/screens/src/public-api.ts"]
+      "@stupa-makers/ui-kit/screens": ["./vendor/ui-kit/screens/src/public-api.ts"],
+      "@stupa-makers/ui-kit/views/*": ["./vendor/ui-kit/views/*/src/public-api.ts"]
     }
   },
   "angularCompilerOptions": {
