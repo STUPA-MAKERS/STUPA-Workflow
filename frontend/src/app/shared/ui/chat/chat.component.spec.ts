@@ -1258,7 +1258,7 @@ describe('ChatComponent', () => {
 
     /** A confirm without a message does nothing. */
     it('deletes after a confirmation', async () => {
-      const { del, view } = await setup({ messages: own() });
+      const { del, cmp } = await setup({ messages: own() });
       fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht löschen' })[0]);
       const dialog = screen.getByRole('dialog', { name: 'Nachricht löschen?' });
       fireEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
@@ -1270,7 +1270,7 @@ describe('ChatComponent', () => {
         }),
       );
       expect(del).toHaveBeenCalledWith({ id: 'm' });
-      (view.fixture.componentInstance as unknown as { confirmDelete(): void }).confirmDelete();
+      cmp.confirmDelete();
       expect(del).toHaveBeenCalledTimes(1);
     });
   });
