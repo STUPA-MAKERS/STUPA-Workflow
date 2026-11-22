@@ -1,5 +1,5 @@
 import { toastWith } from '../../../../testing/load-error';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
@@ -66,6 +66,11 @@ async function setup(over: Record<string, unknown> = {}) {
 }
 
 describe('VersionHistoryComponent', () => {
+  it('shows grey rows while the versions load', async () => {
+    const { fixture } = await setup({ listConfigRevisions: jest.fn(() => NEVER) });
+    expect((fixture.componentInstance as unknown as { rows: () => { state: string } }).rows().state).toBe('loading');
+  });
+
   it('lists the versions in an ordered list, shows the face on a failed load and the empty face', async () => {
     const { container, fixture, api } = await setup();
     expect(container.querySelector('ol.rowgroup')).not.toBeNull();

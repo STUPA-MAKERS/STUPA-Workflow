@@ -1,5 +1,5 @@
 import { toastWith } from '../../../../testing/load-error';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ToastService } from '@stupa-makers/ui-kit';
@@ -145,6 +145,11 @@ describe('BackupsComponent', () => {
     fail = false;
     cmp.list().retry?.();
     expect(cmp.list().state).toBe('ready');
+  });
+
+  it('shows grey rows while the list loads', async () => {
+    const { fixture } = await setup(makeApi({ listBackups: jest.fn(() => NEVER) }));
+    expect((fixture.componentInstance as unknown as { list: () => { state: string } }).list().state).toBe('loading');
   });
 
   it('shows the empty face when there are no backups', async () => {
