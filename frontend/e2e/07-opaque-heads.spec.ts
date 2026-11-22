@@ -11,8 +11,9 @@ import { measureOpaqueHeads } from './opaque-heads';
  * The rows showed through the search bar of a phone list on a fast scroll, and the fault came
  * back with each new look of the heads, because only a browser computes the colours. The check
  * runs on every route without a parameter (`axe-routes.ts`), in the light theme and in very
- * high contrast, which gives the bars another colour. The page is made taller and scrolled, so
- * the bars stick, and `measureOpaqueHeads` reads them with and without their state classes.
+ * high contrast, which gives the bars another colour. The page and the rows are scrolled, and
+ * `measureOpaqueHeads` reads the bars with and without their state classes, so a bar that is
+ * see-through at rest fails even on a page too short to scroll.
  */
 const MODES = [
   { name: 'light', theme: 'light', display: {} },
@@ -52,9 +53,11 @@ for (const mode of MODES) {
         const page = await context.newPage();
         await page.goto(route.url(NO_IDS));
         await settle(page);
+        // Scroll what scrolls on its own: the window, and the rows of a list column. A page
+        // that fills the screen (a board) does not scroll the window, so it is not made taller.
         await page.evaluate(() => {
-          document.documentElement.style.minHeight = '400vh';
           window.scrollTo(0, 600);
+          document.querySelectorAll('.ld-pane__rows').forEach((rows) => rows.scrollTo(0, 600));
         });
         await page.waitForTimeout(300);
         const report = await page.evaluate(measureOpaqueHeads);
