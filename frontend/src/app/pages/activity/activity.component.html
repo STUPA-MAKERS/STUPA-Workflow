@@ -40,70 +40,15 @@
 
     <div class="act__scroll" appScrollFade="y" [attr.aria-busy]="loading() || null">
       <app-live-cards class="act__live" />
-      @if (loading()) {
-        <div class="act__skel skel-in">
-          <app-list-group skeleton="7rem" />
-          <app-skeleton variant="items" [count]="10" [lead]="true" [grouped]="true" [label]="'activity.loading' | t" />
-        </div>
-      } @else if (error()) {
-        <app-load-error face [message]="'activity.loadError' | t" (retry)="retry()" />
-      } @else if (!entries().length) {
-        @if (filtered()) {
-          <app-empty-state icon="searchOff" [heading]="'activity.emptyFiltered' | t" />
-        } @else {
-          <app-empty-state icon="history" [heading]="'activity.empty' | t" [body]="'activity.emptyBody' | t" />
-        }
-      } @else {
-        <div class="act__groups" animate.enter="motion-fade-in">
-          @for (day of days(); track day.key) {
-            <app-list-group [label]="day.label">
-              <div class="act__rows rowgroup" role="list">
-                @for (e of day.entries; track e.id) {
-                  <app-list-item
-                    class="act__row"
-                    role="listitem"
-                    [title]="title(e)"
-                    [link]="path(e)"
-                    [linkQueryParams]="query(e)"
-                    [wrap]="phone()"
-                    [subWrap]="phone()"
-                  >
-                    <span lead class="act__lead" [class.act__lead--new]="e.isNew">
-                      <app-icon [name]="icon(e)" [size]="18" />
-                      @if (e.isNew) {
-                        <span class="act__dot" aria-hidden="true"></span>
-                      }
-                    </span>
-                    <span sub class="act__sub">
-                      @if (e.isNew) {
-                        <span class="sr-only">{{ 'activity.new' | t }}: </span>
-                      }
-                      {{ sub(e) }}
-                    </span>
-                    <span trail class="act__trail">
-                      <span class="mono act__time">{{ time(e) }}</span>
-                      @if (!phone()) {
-                        <app-row-chevron />
-                      }
-                    </span>
-                  </app-list-item>
-                }
-              </div>
-            </app-list-group>
-          }
-          @if (cursor()) {
-            <div class="act__sentinel" appInfiniteScroll (scrolledToEnd)="loadMore()" aria-hidden="true"></div>
-            <div class="act__more">
-              <app-button-group>
-                <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">
-                  <app-icon name="down" />
-                  {{ 'activity.loadMore' | t }}
-                </app-button>
-              </app-button-group>
-            </div>
-          }
-        </div>
+      @if (error()) {
+        <app-load-error [message]="'activity.loadError' | t" (retry)="retry()" />
       }
+      <app-activity-view
+        [entries]="view()"
+        [loadingMore]="loadingMore()"
+        [emptyBody]="filtered() ? null : ('activity.emptyBody' | t)"
+        (more)="loadMore()"
+      />
     </div>
   </section>
 </div>
