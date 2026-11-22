@@ -2,7 +2,7 @@ import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/l
 import { provideRouter } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
 import type {
@@ -132,11 +132,19 @@ describe('GroupMappingsComponent', () => {
   });
 
   /** The reserved prefix is no footnote; the dialog shows it as the error of the group field. */
+  it('shows grey rows while a section loads', async () => {
+    const api = makeApi();
+    api.listGroupMappings = jest.fn(() => NEVER);
+    const { c } = await setup(api);
+    expect(c.sections()[0].list.state).toBe('loading');
+    expect(document.querySelector('app-skeleton')).not.toBeNull();
+  });
+
   it('shows each section as rows "group → target", a gremium role after its gremium', async () => {
     const { c } = await setup();
     expect(c.sections().map((sec: { kind: string }) => sec.kind)).toEqual(['global', 'membership', 'role']);
-    expect(c.sections()[0].rows[0]).toEqual({ id: 'm1', oidcGroup: 'stupa-vorstand', target: 'Vorstand', role: null });
-    expect(c.sections()[2].rows[0]).toEqual({
+    expect(c.sections()[0].byId.get('m1')).toEqual({ id: 'm1', oidcGroup: 'stupa-vorstand', target: 'Vorstand', role: null });
+    expect(c.sections()[2].byId.get('rm1')).toEqual({
       id: 'rm1',
       oidcGroup: 'stupa-praesidium',
       target: 'StuPa',

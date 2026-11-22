@@ -38,33 +38,6 @@
 }
 
 
-.bk__nowrap {
-  white-space: nowrap;
-}
-.bk__date {
-  font-size: var(--fs-sm);
-}
-.bk__kind {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  white-space: nowrap;
-}
-.bk__pinMark {
-  color: var(--color-accent-text);
-}
-.bk__noteText {
-  display: block;
-  max-width: 18rem;
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
-.bk__error {
-  display: block;
-  font-size: var(--fs-sm);
-  color: var(--color-danger);
-}
-
 .bk__restore {
   display: flex;
   flex-direction: column;
