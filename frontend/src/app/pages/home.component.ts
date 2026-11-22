@@ -43,8 +43,11 @@ export class HomeComponent {
   private readonly protocols = inject(PublicProtocolsService);
   private readonly features = inject(FeatureService);
 
-  /** The card "Kalender" shows only while `Kalender` is on (spec 000758). */
-  protected readonly calendarOn = computed(() => this.features.isOn('calendar'));
+  /**
+   * The card "Kalender" shows only while `Kalender` and `Öffentliche Seiten` are on (spec
+   * 000758).
+   */
+  protected readonly calendarOn = computed(() => this.features.isOn('calendar', 'public'));
 
   /** The newest public protocols. */
   protected readonly latest = signal<readonly PublicProtocolSummary[]>([]);
@@ -70,7 +73,7 @@ export class HomeComponent {
   );
 
   constructor() {
-    if (!this.features.isOn('meetings')) return;
+    if (!this.features.isOn('meetings', 'public')) return;
     this.protocols.list({ limit: LATEST_COUNT }).subscribe({
       next: (page) => {
         this.latest.set(page.items);

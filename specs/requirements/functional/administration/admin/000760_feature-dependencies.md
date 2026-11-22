@@ -2,9 +2,9 @@
 id: "000760"
 title: A feature that needs another feature goes off with it
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-22
 tests:
   - "backend/tests/integration/modules/features/test_features_api.py:test_invoices_go_off_with_budget_and_return_to_their_state"
   - "backend/tests/unit/modules/site_config/test_features.py:test_invoices_are_off_while_budget_is_off_and_keep_their_switch"
@@ -25,6 +25,12 @@ scope:
 
 A feature that only shows records of another feature does not need it. `Kalender` stays on while
 `Sitzungen` is off, and `Sitzungen` stays on while `Abstimmungen` is off.
+
+A public page needs `Öffentliche Seiten` and the feature of its records: the public `Protokolle`
+and `Beschlüsse` need `Sitzungen`, the public `Kalender` needs `Kalender`. The page does not show
+while one of the two is off. The switch of `Öffentliche Seiten` is not locked, because it holds
+pages of two features, and it keeps the other pages while one feature is off. `Graph` and
+`Aktivität` leave out the records of a feature that is off and need no other feature.
 
 Reason: An invoice books on a Kostenstelle, so the invoices cannot work without the budget. One
 press must be enough to switch a feature off.

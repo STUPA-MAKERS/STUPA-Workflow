@@ -1,7 +1,9 @@
+import { inject } from '@angular/core';
 import type { CanMatchFn, Routes } from '@angular/router';
 import { authGuard } from '@core/auth/auth.guard';
 import { homeRedirectGuard } from '@core/auth/home-redirect.guard';
 import { featureMatch } from '@core/features/feature.guard';
+import { FeatureService } from '@core/features/feature.service';
 import { ShellComponent } from './layout/shell.component';
 import {
   ADMIN_AREA_PERMISSIONS,
@@ -114,7 +116,7 @@ export const routes: Routes = [
       },
       {
         path: 'decisions',
-        canMatch: [featureMatch('meetings')],
+        canMatch: [featureMatch('meetings', 'public')],
         data: { title: 'publicDecisions.title', footer: true, kind: 'decisions' },
         loadComponent: () =>
           import('./features/public-protocols/public-gremien.component').then(
@@ -123,7 +125,7 @@ export const routes: Routes = [
       },
       {
         path: 'decisions/:committee',
-        canMatch: [featureMatch('meetings')],
+        canMatch: [featureMatch('meetings', 'public')],
         data: { title: 'publicDecisions.title', footer: true },
         loadComponent: () =>
           import('./features/public-protocols/public-decisions.component').then(
@@ -132,7 +134,7 @@ export const routes: Routes = [
       },
       {
         path: 'protocols',
-        canMatch: [featureMatch('meetings')],
+        canMatch: [featureMatch('meetings', 'public')],
         data: { title: 'publicProtocols.title', footer: true, kind: 'protocols' },
         loadComponent: () =>
           import('./features/public-protocols/public-gremien.component').then(
@@ -141,7 +143,7 @@ export const routes: Routes = [
       },
       {
         path: 'protocols/:id',
-        canMatch: [featureMatch('meetings'), idAt(1)],
+        canMatch: [featureMatch('meetings', 'public'), idAt(1)],
         data: { title: 'publicProtocols.title', footer: true },
         loadComponent: () =>
           import('./features/public-protocols/public-protocol-detail.component').then(
@@ -150,7 +152,7 @@ export const routes: Routes = [
       },
       {
         path: 'protocols/:committee',
-        canMatch: [featureMatch('meetings')],
+        canMatch: [featureMatch('meetings', 'public')],
         data: { title: 'publicProtocols.title', footer: true },
         loadComponent: () =>
           import('./features/public-protocols/public-protocols.component').then(
@@ -159,7 +161,7 @@ export const routes: Routes = [
       },
       {
         path: 'public-calendar',
-        canMatch: [featureMatch('calendar')],
+        canMatch: [featureMatch('calendar', 'public')],
         data: { title: 'calendar.public.title', footer: true, wide: true, public: true },
         loadComponent: () =>
           import('./features/calendar/calendar.component').then((m) => m.CalendarComponent),
@@ -182,10 +184,10 @@ export const routes: Routes = [
           ),
       },
       {
-        /** The old start page; the activity is the start page now (spec 001300). */
+        /** The old start page; the start page is the activity now (specs 001300, 000758). */
         path: 'dashboard',
         pathMatch: 'full',
-        redirectTo: 'activity',
+        redirectTo: () => inject(FeatureService).home(),
       },
       {
         path: 'applications',
@@ -416,6 +418,7 @@ export const routes: Routes = [
       },
       {
         path: 'activity',
+        canMatch: [featureMatch('activity')],
         data: { title: 'nav.activity', wide: true, fab: true },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -424,6 +427,7 @@ export const routes: Routes = [
       {
         /** The graph of the elements and their relations (spec 001420), behind `graph.view` (001421). */
         path: 'graph',
+        canMatch: [featureMatch('graph')],
         data: { title: 'nav.graph', permission: 'graph.view', wide: true },
         canActivate: [authGuard],
         loadComponent: () => import('./pages/graph/graph.component').then((m) => m.GraphComponent),

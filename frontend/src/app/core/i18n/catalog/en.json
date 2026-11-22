@@ -4533,6 +4533,7 @@
   "admin.nav.features": "Features",
   "admin.nav.featuresDesc": "Switch parts of the platform on and off",
   "admin.features.title": "Features",
+  "admin.features.public": "Public pages",
   "admin.features.forbidden": "You do not have the right to switch features.",
   "admin.features.needs": "Needs {name}",
   "admin.features.confirmTitle": "Switch features off",

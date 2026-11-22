@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { FeatureService } from '@core/features/feature.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { ErrorPageComponent } from './error-page/error-page.component';
 
@@ -18,4 +19,7 @@ import { ErrorPageComponent } from './error-page/error-page.component';
   templateUrl: './forbidden.component.html',
   styleUrl: './error-page/error-route.scss',
 })
-export class ForbiddenComponent {}
+export class ForbiddenComponent {
+  /** The start page: the activity, or the Anträge while `Aktivität` is off. */
+  protected readonly home = inject(FeatureService).home;
+}

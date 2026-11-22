@@ -82,11 +82,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/000383](requirements/functional/administration/admin/000383_revert-forward.md) | A config revert goes forward | approved |
 | [F/administration/admin/000405](requirements/functional/administration/admin/000405_revert-permissions.md) | A revert needs the right of the original change | approved |
 | [F/administration/admin/000638](requirements/functional/administration/admin/000638_admin-menu-icons.md) | Each entry of the admin menu has its own icon | approved |
-| [F/administration/admin/000756](requirements/functional/administration/admin/000756_feature-switches.md) | An admin switches each feature on and off | approved |
+| [F/administration/admin/000756](requirements/functional/administration/admin/000756_feature-switches.md) | An admin switches each feature on and off | draft |
 | [F/administration/admin/000757](requirements/functional/administration/admin/000757_feature-off-server.md) | A feature that is off is closed on the server | approved |
-| [F/administration/admin/000758](requirements/functional/administration/admin/000758_feature-off-ui.md) | A feature that is off does not show in the UI | approved |
+| [F/administration/admin/000758](requirements/functional/administration/admin/000758_feature-off-ui.md) | A feature that is off does not show in the UI | draft |
 | [F/administration/admin/000759](requirements/functional/administration/admin/000759_feature-keeps-data.md) | A switch keeps the data of the feature | approved |
-| [F/administration/admin/000760](requirements/functional/administration/admin/000760_feature-dependencies.md) | A feature that needs another feature goes off with it | approved |
+| [F/administration/admin/000760](requirements/functional/administration/admin/000760_feature-dependencies.md) | A feature that needs another feature goes off with it | draft |
 | [F/administration/admin/000761](requirements/functional/administration/admin/000761_feature-in-use.md) | A feature in use by the Antrag flow cannot go off | approved |
 | [F/administration/admin/000762](requirements/functional/administration/admin/000762_features-page.md) | The admin page Funktionen holds the feature switches | approved |
 | [F/administration/admin/000891](requirements/functional/administration/admin/000891_export-logo.md) | Exported PDFs carry the export logo of the branding | approved |
@@ -258,7 +258,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/activity/001274](requirements/functional/collaboration/activity/001274_kind-filter.md) | The activity page filters by the kind of item | approved |
 | [F/collaboration/activity/001275](requirements/functional/collaboration/activity/001275_new-since-last-visit.md) | New events since the last visit are marked | approved |
 | [F/collaboration/activity/001276](requirements/functional/collaboration/activity/001276_paging.md) | The activity page loads 50 events per step without a time limit | approved |
-| [F/collaboration/activity/001300](requirements/functional/collaboration/activity/001300_activity-is-the-start-page.md) | The activity page is the start page | approved |
+| [F/collaboration/activity/001300](requirements/functional/collaboration/activity/001300_activity-is-the-start-page.md) | The activity page is the start page | draft |
 | [F/collaboration/activity/001301](requirements/functional/collaboration/activity/001301_apply-button-in-activity-header.md) | Antrag stellen stands in the header of the activity page | approved |
 | [F/collaboration/activity/001302](requirements/functional/collaboration/activity/001302_live-meeting-on-activity.md) | The activity page shows a running meeting above the list | approved |
 | [F/collaboration/committees/001010](requirements/functional/collaboration/committees/001010_info-tab.md) | A Gremium has an Info tab | approved |

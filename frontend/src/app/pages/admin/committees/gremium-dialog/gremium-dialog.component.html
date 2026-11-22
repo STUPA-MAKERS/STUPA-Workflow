@@ -227,10 +227,12 @@
                   </li>
                 }
               </ul>
-              <a class="gd__link" routerLink="/protocols" target="_blank" rel="noopener">
-                {{ 'admin.gremien.publicView' | t }}
-                <app-icon name="ext" [size]="14" />
-              </a>
+              @if (publicPagesOn()) {
+                <a class="gd__link" routerLink="/protocols" target="_blank" rel="noopener">
+                  {{ 'admin.gremien.publicView' | t }}
+                  <app-icon name="ext" [size]="14" />
+                </a>
+              }
             </div>
           }
         </div>
