@@ -2,7 +2,7 @@
 id: "000758"
 title: A feature that is off does not show in the UI
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-22
 tests:

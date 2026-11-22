@@ -2,7 +2,7 @@
 id: "001300"
 title: The activity page is the start page
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-22
 implementation:

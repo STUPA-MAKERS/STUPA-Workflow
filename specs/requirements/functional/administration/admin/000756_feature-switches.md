@@ -2,7 +2,7 @@
 id: "000756"
 title: An admin switches each feature on and off
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-22
 tests:

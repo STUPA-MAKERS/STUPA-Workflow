@@ -2,7 +2,7 @@
 id: "000760"
 title: A feature that needs another feature goes off with it
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-22
 tests:
