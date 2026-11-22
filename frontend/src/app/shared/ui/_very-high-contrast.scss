@@ -20,11 +20,11 @@
     background: none;
   }
   // A surface has the white edge (000605), because no shade sets it apart from the black
-  // page: on a wide screen the pane "Heute" of the start page, and the week of the
+  // page: the chain check of the Audit-Log, on a wide screen the pane "Heute" of the start page, the week of the
   // calendar. The day column of the calendar is a plain row group without a surface (001770),
   // and each day of the month is a segment with its own edge, so the month has no frame.
   // The edge is a border, so content that scrolls inside the box does not paint over it.
-  .dash--wide .dash__today {
+  .dash--wide .dash__today, .al__verify {
     border: var(--vh-edge) !important;
   }
   // The columns of the week paint over an outline, so its edge is a layer on top.
