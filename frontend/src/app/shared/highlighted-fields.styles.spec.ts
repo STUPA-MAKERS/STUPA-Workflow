@@ -10,7 +10,7 @@ const APP = join(__dirname, '..');
 
 const FIELDS: readonly (readonly [string, string])[] = [
   ['shared/formly/types/formly-positions.type.scss', '.pf'],
-  ['shared/ui/chat/chat.component.scss', '.chat__editInput'],
+  ['../../vendor/ui-kit/views/chat/src/chat-view.component.scss', '.chat__editInput'],
   ['features/todos/card-detail/todo-card-detail.component.scss', '.cd__itemInput'],
   ['features/todos/card-detail/todo-card-detail.component.scss', '.cd__evInput'],
   ['features/meetings/top-sheet/top-sheet.component.scss', '.ts__titleInput'],
@@ -31,7 +31,7 @@ function rule(css: string, selector: string): string {
 }
 
 const SURFACES: readonly (readonly [string, string])[] = [
-  ['shared/ui/chat/chat.component.scss', '.chat__box'],
+  ['../../vendor/ui-kit/views/chat/src/chat-view.component.scss', '.chat__box'],
   ['features/todos/card-detail/todo-card-detail.component.scss', '.cd__area'],
   ['features/todos/link-picker/todo-link-picker.component.scss', '.lp__search'],
   ['pages/todos/board-view/todo-board-view.component.scss', '.bv__quick'],
