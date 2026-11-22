@@ -312,7 +312,10 @@ describe('AccountNotificationsComponent', () => {
     });
 
     it('shows an error when the browser refuses the subscription', async () => {
-      const enable = jest.fn(() => Promise.reject(new Error('denied')));
+      const enable = jest.fn(async () => {
+        await Promise.resolve();
+        throw new Error('denied');
+      });
       const { fixture } = await setup(PREFS, undefined, [], { support: 'ready', enable });
       await settle(fixture);
       await userEvent.click(screen.getByRole('switch', { name: 'Push auf diesem Gerät' }));
