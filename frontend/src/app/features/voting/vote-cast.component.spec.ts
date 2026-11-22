@@ -1,5 +1,11 @@
 import { signal } from '@angular/core';
-import { ActivatedRoute, type ParamMap, Router, convertToParamMap, provideRouter } from '@angular/router';
+import {
+  ActivatedRoute,
+  type ParamMap,
+  Router,
+  convertToParamMap,
+  provideRouter,
+} from '@angular/router';
 import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -56,7 +62,15 @@ function vote(overrides: Partial<Vote> = {}): Vote {
     closesAt: null,
     result: null,
     secret: false,
-    tally: { counts: {}, eligible: 12, voted: 5, present: 12, revealed: false, quorumMet: true, leading: null },
+    tally: {
+      counts: {},
+      eligible: 12,
+      voted: 5,
+      present: 12,
+      revealed: false,
+      quorumMet: true,
+      leading: null,
+    },
     ...overrides,
   };
 }
@@ -77,29 +91,31 @@ const NO_DELEGATION: VoteDelegationStatus = {
  * The server sets the capability flags of the caller on GET /votes/{id}. The delete navigates away,
  * so both target routes must resolve.
  */
-async function setup(opts: {
-  vote?: Vote;
-  getError?: unknown;
-  castError?: unknown;
-  /** The server flag `canCast` of the loaded vote (default true). */
-  canCast?: boolean;
-  /** The server flag `canManage` of the loaded vote (default false). */
-  canManage?: boolean;
-  delegation?: VoteDelegationStatus;
-  delegationError?: boolean;
-  routeId?: string | null;
-  deleteError?: unknown;
-  /** Gremium rights of the caller (`session.manage` gives the beamer). */
-  sessionManage?: boolean;
-  meetingError?: boolean;
-  serverAway?: boolean;
-  /** The list page around the pane: `split` side by side. */
-  page?: { split: boolean };
-  /** The read answers twice, as a vote read ahead does: the kept vote, then this one. */
-  newer?: Partial<Vote>;
-  /** The reader may read the Haushaltsplan of the vote. */
-  planReadable?: boolean;
-} = {}) {
+async function setup(
+  opts: {
+    vote?: Vote;
+    getError?: unknown;
+    castError?: unknown;
+    /** The server flag `canCast` of the loaded vote (default true). */
+    canCast?: boolean;
+    /** The server flag `canManage` of the loaded vote (default false). */
+    canManage?: boolean;
+    delegation?: VoteDelegationStatus;
+    delegationError?: boolean;
+    routeId?: string | null;
+    deleteError?: unknown;
+    /** Gremium rights of the caller (`session.manage` gives the beamer). */
+    sessionManage?: boolean;
+    meetingError?: boolean;
+    serverAway?: boolean;
+    /** The list page around the pane: `split` side by side. */
+    page?: { split: boolean };
+    /** The read answers twice, as a vote read ahead does: the kept vote, then this one. */
+    newer?: Partial<Vote>;
+    /** The reader may read the Haushaltsplan of the vote. */
+    planReadable?: boolean;
+  } = {},
+) {
   const served: Vote = {
     canCast: opts.canCast ?? true,
     canManage: opts.canManage ?? false,
@@ -203,7 +219,10 @@ async function setup(opts: {
 
 /** Conflict answer with its machine code. */
 function conflict(code: string) {
-  return { status: 409, error: { type: `app://error/${code}`, title: 'Conflict', status: 409, code } };
+  return {
+    status: 409,
+    error: { type: `app://error/${code}`, title: 'Conflict', status: 409, code },
+  };
 }
 
 const own = () => within(screen.getByRole('group', { name: 'Deine Stimme' }));
@@ -220,9 +239,14 @@ describe('VoteCastComponent', () => {
     const { getMeeting } = await setup();
     expect(screen.getByRole('article', { name: 'Abstimmung' })).toBeInTheDocument();
     expect(screen.getByText('Offen')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '34. Sitzung · TOP 3' })).toHaveAttribute('href', '/meetings/m1');
+    expect(screen.getByRole('link', { name: '34. Sitzung · TOP 3' })).toHaveAttribute(
+      'href',
+      '/meetings/m1',
+    );
     expect(screen.getByText('Zweidrittelmehrheit')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Soll der Antrag gefördert werden?' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Soll der Antrag gefördert werden?' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('5 von 12 Anwesenden haben abgestimmt')).toBeInTheDocument();
     expect(getMeeting).toHaveBeenCalledWith('m1', { quiet: true, detail: true });
   });
@@ -265,7 +289,9 @@ describe('VoteCastComponent', () => {
 
   it('gates the own ballot on canCast', async () => {
     await setup({ canCast: false });
-    expect(screen.getByText('Du bist für diese Abstimmung nicht stimmberechtigt.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Du bist für diese Abstimmung nicht stimmberechtigt.'),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Deine Stimme' })).not.toBeInTheDocument();
   });
 
@@ -274,7 +300,10 @@ describe('VoteCastComponent', () => {
     expect(
       screen.getByRole('heading', { name: 'Du bist für diese Abstimmung nicht stimmberechtigt.' }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Zu den Abstimmungen' })).toHaveAttribute('href', '/voting');
+    expect(screen.getByRole('link', { name: 'Zu den Abstimmungen' })).toHaveAttribute(
+      'href',
+      '/voting',
+    );
   });
 
   it('shows an error box when the vote cannot be loaded', async () => {
@@ -332,7 +361,9 @@ describe('VoteCastComponent', () => {
 
   it('explains a voting right handed over after the load, on a 403 from an own cast', async () => {
     const { voteStatus } = await setup({ castError: { status: 403 } });
-    voteStatus.mockReturnValue(of({ ...NO_DELEGATION, blocked: true, delegatedToName: 'Mara Keller' }));
+    voteStatus.mockReturnValue(
+      of({ ...NO_DELEGATION, blocked: true, delegatedToName: 'Mara Keller' }),
+    );
     await castOwn();
     expect(screen.getByText(/Mara Keller/)).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Deine Stimme' })).not.toBeInTheDocument();
@@ -351,7 +382,9 @@ describe('VoteCastComponent', () => {
   });
 
   it('explains a handed-over voting right instead of a bare hint', async () => {
-    await setup({ delegation: { ...NO_DELEGATION, blocked: true, delegatedToName: 'Mara Keller' } });
+    await setup({
+      delegation: { ...NO_DELEGATION, blocked: true, delegatedToName: 'Mara Keller' },
+    });
     expect(screen.getByText(/Mara Keller/)).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Deine Stimme' })).not.toBeInTheDocument();
   });
@@ -417,7 +450,15 @@ describe('VoteCastComponent', () => {
       vote: vote({
         status: 'closed',
         result: 'tie',
-        tally: { counts: { yes: 3, no: 3, abstain: 1 }, eligible: 12, voted: 7, present: 0, revealed: true, quorumMet: true, leading: null },
+        tally: {
+          counts: { yes: 3, no: 3, abstain: 1 },
+          eligible: 12,
+          voted: 7,
+          present: 0,
+          revealed: true,
+          quorumMet: true,
+          leading: null,
+        },
       }),
     });
     expect(screen.getByText('Abgelehnt')).toBeInTheDocument();
@@ -427,7 +468,9 @@ describe('VoteCastComponent', () => {
 
   it('has no meeting link on a desktop when the meeting cannot be read', async () => {
     await setup({ meetingError: true });
-    expect(screen.getByRole('heading', { level: 2, name: 'Soll der Antrag gefördert werden?' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Soll der Antrag gefördert werden?' }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /34\. Sitzung/ })).not.toBeInTheDocument();
     expect(document.querySelector('a[href^="/meetings/"]')).toBeNull();
   });
@@ -435,10 +478,25 @@ describe('VoteCastComponent', () => {
   describe('standalone vote without a meeting', () => {
     it('links its application and counts the eligible voters', async () => {
       const { getMeeting } = await setup({
-        vote: vote({ meetingId: null, agendaItemId: null, tally: { counts: { yes: 1 }, eligible: 9, voted: 1, present: 0, revealed: true, quorumMet: false, leading: 'yes' } }),
+        vote: vote({
+          meetingId: null,
+          agendaItemId: null,
+          tally: {
+            counts: { yes: 1 },
+            eligible: 9,
+            voted: 1,
+            present: 0,
+            revealed: true,
+            quorumMet: false,
+            leading: 'yes',
+          },
+        }),
       });
       expect(getMeeting).not.toHaveBeenCalled();
-      expect(screen.getByRole('link', { name: 'Antrag öffnen' })).toHaveAttribute('href', '/applications/a1');
+      expect(screen.getByRole('link', { name: 'Antrag öffnen' })).toHaveAttribute(
+        'href',
+        '/applications/a1',
+      );
       expect(screen.getByText('1 von 9 Stimmberechtigten haben abgestimmt')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Beamer-Ansicht' })).not.toBeInTheDocument();
     });
@@ -451,7 +509,9 @@ describe('VoteCastComponent', () => {
       const navigate = jest.spyOn(router, 'navigate');
       expect(auth.canInGremium).toHaveBeenCalledWith('g1', 'session.manage');
       await userEvent.click(screen.getByRole('button', { name: 'Beamer-Ansicht' }));
-      expect(navigate).toHaveBeenCalledWith(['/voting/projector', 'm1'], { queryParams: { from: '/' } });
+      expect(navigate).toHaveBeenCalledWith(['/voting/projector', 'm1'], {
+        queryParams: { from: '/' },
+      });
     });
 
     it('falls back to any gremium when the meeting is not readable', async () => {
@@ -494,7 +554,7 @@ describe('VoteCastComponent', () => {
         '/meetings/m1',
       );
       expect(document.querySelector('.vc__actions')).toBeNull();
-      expect(document.querySelector('app-ballot')).toHaveClass('ballot--phone');
+      expect(document.querySelector('app-ballot-view')).toHaveClass('ballot--phone');
     });
 
     it('links the application of a vote without a meeting', async () => {
@@ -549,7 +609,11 @@ describe('VoteCastComponent', () => {
       const router = fixture.debugElement.injector.get(Router);
       const navigate = jest.spyOn(router, 'navigate');
       await openDelete();
-      await userEvent.click(within(screen.getByRole('dialog', { name: 'Abstimmung löschen?' })).getByRole('button', { name: 'Löschen' }));
+      await userEvent.click(
+        within(screen.getByRole('dialog', { name: 'Abstimmung löschen?' })).getByRole('button', {
+          name: 'Löschen',
+        }),
+      );
       expect(deleteVote).toHaveBeenCalledWith('v1');
       expect(toast.success).toHaveBeenCalledWith('Abstimmung gelöscht.');
       expect(page?.notify).toHaveBeenCalledWith({ id: 'v1', kind: 'deleted' });
@@ -586,7 +650,10 @@ describe('VoteCastComponent', () => {
     });
 
     it.each([
-      ['vote_not_deletable', 'Eine offene oder geschlossene Abstimmung bleibt erhalten. Brich eine offene Abstimmung ab.'],
+      [
+        'vote_not_deletable',
+        'Eine offene oder geschlossene Abstimmung bleibt erhalten. Brich eine offene Abstimmung ab.',
+      ],
       ['vote_meeting_bound', 'Diese Abstimmung gehört zu einer Sitzung. Sie wird dort gelöscht.'],
       ['something_else', 'Die Abstimmung ist in einem Zustand, der das Löschen ausschließt.'],
     ])('explains the 409 code %s and reloads the vote', async (code, message) => {
@@ -645,13 +712,13 @@ describe('VoteCastComponent', () => {
     it('is a sheet beside the list, with a flat panel', async () => {
       await setup({ page: { split: true } });
       expect(document.querySelector('.vc')).toHaveClass('vc--sheet');
-      expect(document.querySelector('app-vote-panel')).toHaveClass('vpn--flat');
+      expect(document.querySelector('app-vote-panel-view')).toHaveClass('vpn--flat');
     });
 
     it('keeps the card one pane at a time', async () => {
       await setup({ page: { split: false } });
       expect(document.querySelector('.vc')).not.toHaveClass('vc--sheet');
-      expect(document.querySelector('app-vote-panel')).not.toHaveClass('vpn--flat');
+      expect(document.querySelector('app-vote-panel-view')).not.toHaveClass('vpn--flat');
     });
 
     it('opens the sheet with the question on the line of its bar, above the meta line', async () => {
@@ -713,7 +780,11 @@ describe('VoteCastComponent', () => {
       voteStatus.mockClear();
       const cmp = fixture.componentInstance;
       cmp.onCastDone();
-      cmp.onCastFailed({ asDelegation: false, alreadyVoted: false, error: { status: 403 } } as never);
+      cmp.onCastFailed({
+        asDelegation: false,
+        alreadyVoted: false,
+        error: { status: 403 },
+      } as never);
       cmp.caster('yes', false).subscribe();
       expect(castBallot).toHaveBeenCalledWith('', 'yes', false);
       expect(getVote).not.toHaveBeenCalled();
@@ -801,7 +872,7 @@ describe('VoteCastComponent', () => {
       });
       fixture.detectChanges();
       expect(screen.getByText('5 von 12 Anwesenden haben abgestimmt')).toBeInTheDocument();
-      expect(document.querySelector('app-vote-bars')).toBeInTheDocument();
+      expect(document.querySelector('app-vote-bars-view')).toBeInTheDocument();
     });
 
     it('ignores the turnout of another vote', async () => {
@@ -826,11 +897,17 @@ describe('VoteCastComponent', () => {
       getVote.mockReturnValue(of({ ...vote(), canCast: true, canManage: false }));
       sessions[0].openVote.set(opened('v1'));
       fixture.detectChanges();
-      expect(say).toHaveBeenCalledWith(expect.stringMatching(/^Abstimmung geöffnet: Soll der Antrag gefördert werden\? – .*TOP 3/));
-      getVote.mockReturnValue(of({ ...vote({ status: 'closed', result: 'passed' }), canCast: true, canManage: false }));
+      expect(say).toHaveBeenCalledWith(
+        expect.stringMatching(/^Abstimmung geöffnet: Soll der Antrag gefördert werden\? – .*TOP 3/),
+      );
+      getVote.mockReturnValue(
+        of({ ...vote({ status: 'closed', result: 'passed' }), canCast: true, canManage: false }),
+      );
       sessions[0].result.set({ type: 'vote_closed', voteId: 'v1', result: 'passed', counts: {} });
       fixture.detectChanges();
-      expect(say).toHaveBeenLastCalledWith(expect.stringMatching(/^Abstimmung beendet: Soll der Antrag gefördert werden\? – .*\. \S/));
+      expect(say).toHaveBeenLastCalledWith(
+        expect.stringMatching(/^Abstimmung beendet: Soll der Antrag gefördert werden\? – .*\. \S/),
+      );
     });
 
     it('says nothing on the first read or a read without a change', async () => {
@@ -885,12 +962,14 @@ describe('VoteCastComponent', () => {
       });
       hidden.fixture.detectChanges();
       expect(screen.getByText('6 von 12 Anwesenden haben abgestimmt')).toBeInTheDocument();
-      expect(document.querySelector('app-vote-bars')).toBeNull();
+      expect(document.querySelector('app-vote-bars-view')).toBeNull();
     });
 
     it('shows the counts when an old read has no reveal flag', async () => {
       const { sessions, fixture } = await setup({
-        vote: vote({ tally: { counts: {}, eligible: 12, voted: 5, quorumMet: true, leading: null } }),
+        vote: vote({
+          tally: { counts: {}, eligible: 12, voted: 5, quorumMet: true, leading: null },
+        }),
       });
       sessions[0].tally.set({
         type: 'vote_tally',
@@ -901,7 +980,7 @@ describe('VoteCastComponent', () => {
         leading: 'yes',
       });
       fixture.detectChanges();
-      expect(document.querySelector('app-vote-bars')).toBeInTheDocument();
+      expect(document.querySelector('app-vote-bars-view')).toBeInTheDocument();
     });
 
     /** §ui-kit:000678: a toast that stays while the connection is lost, and no line in the page. */
@@ -989,7 +1068,10 @@ describe('VoteCastComponent', () => {
 
     async function withLifecycle(v: Vote, fail = false) {
       const view = await setup({ vote: v, canManage: true, page: { split: true } });
-      const api = view.fixture.debugElement.injector.get(ApiClient) as unknown as Record<string, jest.Mock>;
+      const api = view.fixture.debugElement.injector.get(ApiClient) as unknown as Record<
+        string,
+        jest.Mock
+      >;
       const answer = () => (fail ? throwError(() => conflict('vote_not_open')) : of(void 0));
       api['openVote'] = jest.fn(answer);
       api['closeVote'] = jest.fn(answer);
@@ -1022,7 +1104,9 @@ describe('VoteCastComponent', () => {
       it('reads an open poll again when the tab comes back, and tells the list about a new status', async () => {
         const { getVote, page } = await setup({ vote: pollVote(), page: { split: true } });
         getVote.mockClear();
-        getVote.mockReturnValueOnce(of({ ...pollVote(), tally: { ...pollVote().tally!, voted: 9 } }));
+        getVote.mockReturnValueOnce(
+          of({ ...pollVote(), tally: { ...pollVote().tally!, voted: 9 } }),
+        );
         back();
         expect(getVote).toHaveBeenCalledWith('v1', { quiet: true });
         expect(page?.notify).not.toHaveBeenCalled();
@@ -1080,103 +1164,129 @@ describe('VoteCastComponent', () => {
       if (!canManage) expect(fixture.componentInstance.hasMenu()).toBe(false);
     });
 
-  describe('Umlaufverfahren (§000914, §000915)', () => {
-    const circular = (over: Partial<Vote> = {}) =>
-      vote({
-        kind: 'circular',
-        meetingId: null,
-        agendaItemId: null,
-        applicationId: null,
-        config: { options: ['yes', 'no', 'abstain'], majorityRule: 'members_majority' },
-        ...over,
+    describe('Umlaufverfahren (§000914, §000915)', () => {
+      const circular = (over: Partial<Vote> = {}) =>
+        vote({
+          kind: 'circular',
+          meetingId: null,
+          agendaItemId: null,
+          applicationId: null,
+          config: { options: ['yes', 'no', 'abstain'], majorityRule: 'members_majority' },
+          ...over,
+        });
+
+      async function withApi(
+        v: Vote,
+        opts: { canManage?: boolean; canCast?: boolean; fail?: boolean } = {},
+      ) {
+        const view = await setup({
+          vote: v,
+          canManage: opts.canManage ?? false,
+          canCast: opts.canCast ?? true,
+          page: { split: true },
+        });
+        const api = view.fixture.debugElement.injector.get(ApiClient) as unknown as Record<
+          string,
+          jest.Mock
+        >;
+        api['openVote'] = jest.fn(() => of(void 0));
+        api['objectToCircular'] = jest.fn(() =>
+          opts.fail
+            ? throwError(() => conflict('vote_not_open'))
+            : of(circular({ status: 'cancelled', cancelReason: 'objection' })),
+        );
+        return { ...view, api };
+      }
+
+      it('a manager starts a draft', async () => {
+        const draft = await withApi(circular({ status: 'draft' }), { canManage: true });
+        expect(draft.fixture.componentInstance.pollAction()).toBe('start');
+        draft.fixture.componentInstance.onMenu('start');
+        expect(draft.api['openVote']).toHaveBeenCalledWith('v1');
+        expect(draft.toast.success).toHaveBeenCalledWith('Umlaufverfahren gestartet');
       });
 
-    async function withApi(v: Vote, opts: { canManage?: boolean; canCast?: boolean; fail?: boolean } = {}) {
-      const view = await setup({
-        vote: v,
-        canManage: opts.canManage ?? false,
-        canCast: opts.canCast ?? true,
-        page: { split: true },
+      it('a manager never ends an open one by hand', async () => {
+        const open = await withApi(circular(), { canManage: true });
+        expect(open.fixture.componentInstance.pollAction()).toBeNull();
       });
-      const api = view.fixture.debugElement.injector.get(ApiClient) as unknown as Record<string, jest.Mock>;
-      api['openVote'] = jest.fn(() => of(void 0));
-      api['objectToCircular'] = jest.fn(() =>
-        opts.fail
-          ? throwError(() => conflict('vote_not_open'))
-          : of(circular({ status: 'cancelled', cancelReason: 'objection' })),
-      );
-      return { ...view, api };
-    }
 
-    it('a manager starts a draft', async () => {
-      const draft = await withApi(circular({ status: 'draft' }), { canManage: true });
-      expect(draft.fixture.componentInstance.pollAction()).toBe('start');
-      draft.fixture.componentInstance.onMenu('start');
-      expect(draft.api['openVote']).toHaveBeenCalledWith('v1');
-      expect(draft.toast.success).toHaveBeenCalledWith('Umlaufverfahren gestartet');
-    });
+      it('an eligible member objects with a button and a confirmation (§F/meetings/voting/000947)', async () => {
+        const { api, toast, page, fixture } = await withApi(circular());
+        const cmp = fixture.componentInstance;
+        expect(cmp.canObject()).toBe(true);
+        expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).toBeNull();
+        await userEvent.click(screen.getByRole('button', { name: 'Widersprechen' }));
+        expect(cmp.confirmObject()).toBe(true);
+        expect(screen.getByText(/beendet die Abstimmung für alle Mitglieder/)).toBeInTheDocument();
+        expect(api['objectToCircular']).not.toHaveBeenCalled();
+        cmp.doObject();
+        expect(api['objectToCircular']).toHaveBeenCalledWith('v1');
+        expect(cmp.confirmObject()).toBe(false);
+        expect(cmp.vote()?.status).toBe('cancelled');
+        expect(toast.success).toHaveBeenCalledWith('Umlaufverfahren durch Widerspruch abgebrochen');
+        expect(page?.notify).toHaveBeenCalledWith({ id: 'v1', kind: 'updated' });
+      });
 
-    it('a manager never ends an open one by hand', async () => {
-      const open = await withApi(circular(), { canManage: true });
-      expect(open.fixture.componentInstance.pollAction()).toBeNull();
-    });
+      it('a refused objection says why and reads the vote again', async () => {
+        const { toast, getVote, fixture } = await withApi(circular(), { fail: true });
+        const cmp = fixture.componentInstance;
+        cmp.confirmObject.set(true);
+        cmp.doObject();
+        expect(toast.error).toHaveBeenCalled();
+        expect(cmp.objecting()).toBe(false);
+        expect(cmp.confirmObject()).toBe(false);
+        expect(getVote).toHaveBeenCalledTimes(2);
+      });
 
-    it('an eligible member objects with a button and a confirmation (§F/meetings/voting/000947)', async () => {
-      const { api, toast, page, fixture } = await withApi(circular());
-      const cmp = fixture.componentInstance;
-      expect(cmp.canObject()).toBe(true);
-      expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).toBeNull();
-      await userEvent.click(screen.getByRole('button', { name: 'Widersprechen' }));
-      expect(cmp.confirmObject()).toBe(true);
-      expect(screen.getByText(/beendet die Abstimmung für alle Mitglieder/)).toBeInTheDocument();
-      expect(api['objectToCircular']).not.toHaveBeenCalled();
-      cmp.doObject();
-      expect(api['objectToCircular']).toHaveBeenCalledWith('v1');
-      expect(cmp.confirmObject()).toBe(false);
-      expect(cmp.vote()?.status).toBe('cancelled');
-      expect(toast.success).toHaveBeenCalledWith('Umlaufverfahren durch Widerspruch abgebrochen');
-      expect(page?.notify).toHaveBeenCalledWith({ id: 'v1', kind: 'updated' });
-    });
+      it.each([
+        ['without a ballot', circular(), false],
+        ['on a closed one', circular({ status: 'closed', result: 'passed' }), true],
+        ['on a motion', vote(), true],
+      ])('offers no objection %s', async (_name, v, canCast) => {
+        const { fixture } = await withApi(v, { canCast });
+        expect(fixture.componentInstance.canObject()).toBe(false);
+      });
 
-    it('a refused objection says why and reads the vote again', async () => {
-      const { toast, getVote, fixture } = await withApi(circular(), { fail: true });
-      const cmp = fixture.componentInstance;
-      cmp.confirmObject.set(true);
-      cmp.doObject();
-      expect(toast.error).toHaveBeenCalled();
-      expect(cmp.objecting()).toBe(false);
-      expect(cmp.confirmObject()).toBe(false);
-      expect(getVote).toHaveBeenCalledTimes(2);
+      it('objects to nothing without a vote', async () => {
+        const { fixture } = await setup({ routeId: null });
+        fixture.componentInstance.doObject();
+        expect(fixture.componentInstance.objecting()).toBe(false);
+      });
     });
-
-    it.each([
-      ['without a ballot', circular(), false],
-      ['on a closed one', circular({ status: 'closed', result: 'passed' }), true],
-      ['on a motion', vote(), true],
-    ])('offers no objection %s', async (_name, v, canCast) => {
-      const { fixture } = await withApi(v, { canCast });
-      expect(fixture.componentInstance.canObject()).toBe(false);
-    });
-
-    it('objects to nothing without a vote', async () => {
-      const { fixture } = await setup({ routeId: null });
-      fixture.componentInstance.doObject();
-      expect(fixture.componentInstance.objecting()).toBe(false);
-    });
-  });
   });
 
   describe('vote on a step of a Haushaltsplan (§F/finance/budget/000838)', () => {
     const planVote = (over: Partial<Vote> = {}) =>
-      vote({ meetingId: null, agendaItemId: null, applicationId: null, planVersionId: 'pv1', status: 'draft', ...over });
+      vote({
+        meetingId: null,
+        agendaItemId: null,
+        applicationId: null,
+        planVersionId: 'pv1',
+        status: 'draft',
+        ...over,
+      });
 
-    async function withPlan(v: Vote, opts: { readable?: boolean; canManage?: boolean; fail?: boolean } = {}) {
-      const view = await setup({ vote: v, canManage: opts.canManage ?? true, planReadable: opts.readable ?? true, page: { split: true } });
-      const api = view.fixture.debugElement.injector.get(ApiClient) as unknown as Record<string, jest.Mock>;
+    async function withPlan(
+      v: Vote,
+      opts: { readable?: boolean; canManage?: boolean; fail?: boolean } = {},
+    ) {
+      const view = await setup({
+        vote: v,
+        canManage: opts.canManage ?? true,
+        planReadable: opts.readable ?? true,
+        page: { split: true },
+      });
+      const api = view.fixture.debugElement.injector.get(ApiClient) as unknown as Record<
+        string,
+        jest.Mock
+      >;
       const answer = () => (opts.fail ? throwError(() => conflict('vote_not_open')) : of(void 0));
       api['openVote'] = jest.fn(answer);
       api['closeVote'] = jest.fn(answer);
-      const navigate = jest.spyOn(view.fixture.debugElement.injector.get(Router), 'navigate').mockResolvedValue(true);
+      const navigate = jest
+        .spyOn(view.fixture.debugElement.injector.get(Router), 'navigate')
+        .mockResolvedValue(true);
       return { ...view, api, navigate };
     }
     const items = async () => {
@@ -1197,11 +1307,16 @@ describe('VoteCastComponent', () => {
       const view = await withPlan(planVote({ status: 'open' }), { canManage: false });
       expect(await items()).toEqual(['Haushaltsplan öffnen']);
       await userEvent.click(screen.getByRole('menuitem', { name: 'Haushaltsplan öffnen' }));
-      expect(view.navigate).toHaveBeenCalledWith(['/budget/plan'], { queryParams: { planVersion: 'pv1' } });
+      expect(view.navigate).toHaveBeenCalledWith(['/budget/plan'], {
+        queryParams: { planVersion: 'pv1' },
+      });
     });
 
     it('offers no link to a member who cannot read the plan, and asks nothing for another vote', async () => {
-      const member = await withPlan(planVote({ status: 'open' }), { canManage: false, readable: false });
+      const member = await withPlan(planVote({ status: 'open' }), {
+        canManage: false,
+        readable: false,
+      });
       expect(member.planOfVersionReadable).toHaveBeenCalledWith('pv1');
       expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).toBeNull();
       TestBed.resetTestingModule();
@@ -1213,9 +1328,17 @@ describe('VoteCastComponent', () => {
       const late = new Subject<boolean>();
       const view = await setup({ vote: planVote({ status: 'open' }) });
       view.planOfVersionReadable.mockReturnValueOnce(late);
-      view.getVote.mockReturnValue(of({ ...planVote({ id: 'v2', planVersionId: 'pv2', status: 'open' }), canCast: true, canManage: false }));
+      view.getVote.mockReturnValue(
+        of({
+          ...planVote({ id: 'v2', planVersionId: 'pv2', status: 'open' }),
+          canCast: true,
+          canManage: false,
+        }),
+      );
       view.params.next(convertToParamMap({ id: 'v2' }));
-      view.getVote.mockReturnValue(of({ ...vote({ id: 'v3', meetingId: null }), canCast: true, canManage: false }));
+      view.getVote.mockReturnValue(
+        of({ ...vote({ id: 'v3', meetingId: null }), canCast: true, canManage: false }),
+      );
       view.params.next(convertToParamMap({ id: 'v3' }));
       late.next(true);
       view.fixture.detectChanges();

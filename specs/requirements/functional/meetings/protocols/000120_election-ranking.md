@@ -8,7 +8,7 @@ updated: 2026-11-06
 implementation:
   - backend/app/modules/protocol/markdown.py
   - typst/template/protocol.typ
-  - frontend/src/app/features/voting/election-result/election-result.component.ts
+  - frontend/vendor/ui-kit/views/voting/src/election-result-view.component.ts
 scope:
   - backend/app/modules/protocol
   - frontend/src/app/features/meetings

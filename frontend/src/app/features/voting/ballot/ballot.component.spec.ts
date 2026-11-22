@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { MyBallot } from '@core/api/models';
 import { runAxe } from '../../../../testing/a11y';
-import { BallotComponent, type BallotCaster } from './ballot.component';
+import { BallotViewComponent, type BallotCaster } from '@stupa-makers/ui-kit/views/voting';
 
 interface SetupOpts {
   own?: MyBallot | null;
@@ -21,7 +21,7 @@ async function setup(opts: SetupOpts = {}) {
   const caster = jest.fn(opts.caster ?? (() => of({ status: 'cast' })));
   const castDone = jest.fn();
   const castFailed = jest.fn();
-  const r = await render(BallotComponent, {
+  const r = await render(BallotViewComponent, {
     inputs: {
       voteId: 'v1',
       options: ['yes', 'no', 'abstain'],
@@ -47,7 +47,7 @@ const choice = (name: string) =>
   });
 const confirmButton = () => screen.getByRole('button', { name: /abgeben/ });
 
-describe('BallotComponent', () => {
+describe('BallotViewComponent', () => {
   it('casts in two steps: a pick does not send, the button does', async () => {
     const { caster, castDone } = await setup();
     const user = userEvent.setup();
@@ -58,7 +58,9 @@ describe('BallotComponent', () => {
     expect(caster).not.toHaveBeenCalled();
     expect(choice('Ja')).toHaveAttribute('aria-pressed', 'true');
     expect(confirmButton()).toHaveTextContent('Stimme abgeben: Ja');
-    expect(screen.queryByText('Die Stimme lässt sich danach nicht ändern.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Die Stimme lässt sich danach nicht ändern.'),
+    ).not.toBeInTheDocument();
 
     await user.click(choice('Nein'));
     expect(confirmButton()).toHaveTextContent('Stimme abgeben: Nein');
@@ -147,7 +149,11 @@ describe('BallotComponent', () => {
     const user = userEvent.setup();
     await user.click(choice('Ja'));
     await user.click(confirmButton());
-    expect(castFailed).toHaveBeenCalledWith({ asDelegation: false, alreadyVoted: false, error: {} });
+    expect(castFailed).toHaveBeenCalledWith({
+      asDelegation: false,
+      alreadyVoted: false,
+      error: {},
+    });
   });
 
   /** §F/meetings/voting/000932: one cast for the own ballot and the represented members. */

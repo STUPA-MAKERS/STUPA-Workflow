@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { MyBallot, PollConfig } from '@core/api/models';
 import { runAxe } from '../../../../testing/a11y';
-import { BallotComponent, type BallotCaster } from './ballot.component';
+import { BallotViewComponent, type BallotCaster } from '@stupa-makers/ui-kit/views/voting';
 
 const DATE_POLL: PollConfig = {
   mode: 'date',
@@ -24,7 +24,7 @@ async function setup(poll: PollConfig, opts: { own?: MyBallot; secret?: boolean 
     of({ status: 'cast' }),
   );
   const castDone = jest.fn();
-  const r = await render(BallotComponent, {
+  const r = await render(BallotViewComponent, {
     inputs: {
       voteId: 'p1',
       options: poll.mode === 'date' ? [] : [...poll.options.map((o) => o.id), 'abstain'],
@@ -43,7 +43,7 @@ function row(text: RegExp) {
   return within(screen.getByRole('radiogroup', { name: text }));
 }
 
-describe('BallotComponent · poll', () => {
+describe('BallotViewComponent · poll', () => {
   describe('date mode', () => {
     /**
      * While one date lacks its answer, the button stays off. A second click changes the answer
@@ -82,14 +82,18 @@ describe('BallotComponent · poll', () => {
     it('shows the cast answers of an open poll, none of a secret one', async () => {
       const own: MyBallot = { cast: true, choice: null, answers: { o1: 'yes', o2: 'no' } };
       await setup(DATE_POLL, { own });
-      expect(row(/ 3\.11\./).getByRole('radio', { name: 'Ja' })).toHaveAttribute('aria-checked', 'true');
+      expect(row(/ 3\.11\./).getByRole('radio', { name: 'Ja' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
       expect(screen.queryByRole('button', { name: 'Antworten abgeben' })).toBeNull();
     });
 
     it('a secret poll shows no answer after the cast', async () => {
       const own: MyBallot = { cast: true, choice: null, answers: { o1: 'yes', o2: 'no' } };
       await setup({ ...DATE_POLL, secret: true }, { own, secret: true });
-      for (const b of screen.getAllByRole('radio')) expect(b).toHaveAttribute('aria-checked', 'false');
+      for (const b of screen.getAllByRole('radio'))
+        expect(b).toHaveAttribute('aria-checked', 'false');
     });
   });
 
@@ -103,7 +107,12 @@ describe('BallotComponent · poll', () => {
   });
 
   it('a multi poll counts "n von höchstens m gewählt" and sends the picks', async () => {
-    const { caster } = await setup({ mode: 'multi', options: TEXT_OPTIONS, maxChoices: 2, secret: false });
+    const { caster } = await setup({
+      mode: 'multi',
+      options: TEXT_OPTIONS,
+      maxChoices: 2,
+      secret: false,
+    });
     const user = userEvent.setup();
     await user.click(screen.getByRole('checkbox', { name: 'Pizza' }));
     expect(screen.getByText('1 von höchstens 2 gewählt')).toBeInTheDocument();
