@@ -33,8 +33,8 @@ describe('veryHighContrastApp (§ui-kit:000614)', () => {
 });
 
 describe('surfaceEdges (§ui-kit:000605)', () => {
-  it('draws the white edge around the calendar grid and the pane of the start page', () => {
-    expect(RULES).toMatch(/\.dash--wide \.dash__today \{\s*border: var\(--vh-edge\) !important;/);
+  it('draws the white edge around the calendar grid and the pane of the start page and the audit chain check', () => {
+    expect(RULES).toMatch(/\.dash--wide \.dash__today, \.al__verify \{\s*border: var\(--vh-edge\) !important;/);
     expect(RULES).toMatch(/\.cal__grid::after \{[^}]*border: var\(--vh-edge\);/);
   });
 
