@@ -19,6 +19,7 @@ module.exports = {
     '^@stupa-makers/ui-kit/shell$': '<rootDir>/vendor/ui-kit/shell/src/public-api.ts',
     '^@stupa-makers/ui-kit/pwa$': '<rootDir>/vendor/ui-kit/pwa/src/public-api.ts',
     '^@stupa-makers/ui-kit/screens$': '<rootDir>/vendor/ui-kit/screens/src/public-api.ts',
+    '^@stupa-makers/ui-kit/views/(.*)$': '<rootDir>/vendor/ui-kit/views/$1/src/public-api.ts',
     '^@stupa-makers/ui-kit$': '<rootDir>/vendor/ui-kit/src/public-api.ts',
     '\\.(css|scss)$': '<rootDir>/src/testing/style-mock.js',
   },

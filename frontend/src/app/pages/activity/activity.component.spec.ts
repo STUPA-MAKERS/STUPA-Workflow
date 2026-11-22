@@ -14,7 +14,7 @@ import {
 import type { TranslationKey } from '@core/i18n/translations';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { retryLoadError } from '../../../testing/load-error';
-import { ActivityComponent, KIND_ICON, groupByDay, splitUrl } from './activity.component';
+import { ActivityComponent, KIND_ICON, dayLabel, splitUrl } from './activity.component';
 
 const NOW = new Date();
 const at = (daysAgo: number, hour = 10): string =>
@@ -235,19 +235,14 @@ describe('splitUrl', () => {
   });
 });
 
-describe('groupByDay', () => {
+describe('dayLabel', () => {
   const t = (key: TranslationKey): string => key;
   const now = new Date(2026, 10, 18, 12, 0);
 
-  it('labels today, yesterday and older days and keeps the order', () => {
-    const rows = [
-      entry({ id: 'a', at: new Date(2026, 10, 18, 9).toISOString() }),
-      entry({ id: 'b', at: new Date(2026, 10, 18, 8).toISOString() }),
-      entry({ id: 'c', at: new Date(2026, 10, 17, 9).toISOString() }),
-      entry({ id: 'd', at: new Date(2026, 10, 16, 9).toISOString() }),
-    ];
-    const days = groupByDay(rows, 'de', t, now);
-    expect(days.map((d) => d.label)).toEqual(['activity.today', 'activity.yesterday', 'Mo, 16.11.2026']);
-    expect(days[0].entries.map((e) => e.id)).toEqual(['a', 'b']);
+  it('labels today, yesterday and older days', () => {
+    const label = (d: Date): string => dayLabel(d.toISOString(), 'de', t, now);
+    expect(label(new Date(2026, 10, 18, 9))).toBe('activity.today');
+    expect(label(new Date(2026, 10, 17, 9))).toBe('activity.yesterday');
+    expect(label(new Date(2026, 10, 16, 9))).toBe('Mo, 16.11.2026');
   });
 });

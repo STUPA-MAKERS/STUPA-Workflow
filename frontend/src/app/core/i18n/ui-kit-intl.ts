@@ -10,7 +10,8 @@ import type { TranslationKey } from './translations';
 
 /**
  * The texts of the kit that STUPA has in its own catalog: the frame (shell, rail, bottom bar),
- * the account menu, the search palette, the update and offline notices and the load bar. The kit reads
+ * the account menu, the search palette, the update and offline notices, the load bar and the
+ * activity view. The kit reads
  * them through the app, so the wording of the app, the admin overrides and the extra UI
  * languages apply to them as before. Every other kit text comes from the kit catalog.
  */
@@ -38,6 +39,9 @@ export const UI_KIT_APP_KEYS: Partial<Record<UiKitTextKey, TranslationKey>> = {
   'palette.keysSelect': 'search.keys.select',
   'palette.keysOpen': 'search.keys.open',
   'palette.archived': 'search.archived',
+  'activity.loading': 'activity.loading',
+  'activity.new': 'activity.new',
+  'activity.more': 'activity.loadMore',
 };
 
 /**
