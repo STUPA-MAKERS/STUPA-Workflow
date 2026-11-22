@@ -34,8 +34,29 @@ export function measureOpaqueHeads(): OpaqueHeadReport {
     const box = el.getBoundingClientRect();
     return box.height > 0 && box.width >= window.innerWidth * 0.9;
   });
-  const read = (state: string): string[] =>
-    bars.filter((el) => alpha(getComputedStyle(el).backgroundColor) < 1).map((el) => `${name(el)} (${state})`);
+  // A bar may paint its colour on a child that fills it (the public header paints `.pub`), or
+  // on a layer of its parent behind it (the head of a list column, `.ld-pane--head::before`).
+  const covers = (outer: DOMRect, inner: DOMRect): boolean =>
+    outer.top <= inner.top + 1 && outer.bottom >= inner.bottom - 1 && outer.left <= inner.left + 1 && outer.right >= inner.right - 1;
+  const filledByChild = (el: HTMLElement, box: DOMRect): boolean =>
+    Array.from(el.children).some(
+      (c) => alpha(getComputedStyle(c).backgroundColor) >= 1 && covers(c.getBoundingClientRect(), box),
+    );
+  const filledByParentLayer = (el: HTMLElement, box: DOMRect): boolean => {
+    const parent = el.parentElement;
+    if (!parent) return false;
+    const layer = getComputedStyle(parent, '::before');
+    if (layer.content === 'none' || layer.position !== 'absolute' || alpha(layer.backgroundColor) < 1) return false;
+    const p = parent.getBoundingClientRect();
+    const top = p.top + (parseFloat(layer.top) || 0);
+    return top <= box.top + 1 && top + (parseFloat(layer.height) || 0) >= box.bottom - 1;
+  };
+  const opaque = (el: HTMLElement): boolean => {
+    if (alpha(getComputedStyle(el).backgroundColor) >= 1) return true;
+    const box = el.getBoundingClientRect();
+    return filledByChild(el, box) || filledByParentLayer(el, box);
+  };
+  const read = (state: string): string[] => bars.filter((el) => !opaque(el)).map((el) => `${name(el)} (${state})`);
 
   const stripped = Array.from(document.querySelectorAll('[class*="--"]')).flatMap((el) =>
     Array.from(el.classList)
