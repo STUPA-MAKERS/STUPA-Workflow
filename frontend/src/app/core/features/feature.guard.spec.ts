@@ -44,7 +44,8 @@ describe('featureMatch', () => {
     expect(routeFeatures({})).toEqual([]);
   });
 
-  it.each(FEATURES)('guards at least one route of %s', (key) => {
+  /** Push has no page of its own: it gates the push groups of the account page. */
+  it.each(FEATURES.filter((key) => key !== 'push'))('guards at least one route of %s', (key) => {
     expect(flat(routes).some((route) => routeFeatures(route).includes(key))).toBe(true);
   });
 

@@ -176,6 +176,11 @@ export class AccountNotificationsComponent {
   protected readonly endpoint = signal<string | null>(null);
   /** The device switch is busy: the browser asks, or the server stores. */
   protected readonly pushBusy = signal(false);
+  /**
+   * The state the device switch shows while it is busy. The switch goes back to the real
+   * state afterwards, so a refused subscription turns the switch off again.
+   */
+  private readonly pushWanted = signal<boolean | null>(null);
 
   /** The push groups show: the feature is on and the browser has push. */
   protected readonly pushShown = computed(
@@ -270,6 +275,7 @@ export class AccountNotificationsComponent {
 
   private async switchDevice(enabled: boolean): Promise<void> {
     this.pushBusy.set(true);
+    this.pushWanted.set(enabled);
     try {
       if (enabled) {
         const device = await this.push.enable();
@@ -285,6 +291,7 @@ export class AccountNotificationsComponent {
       this.error.set('account.notifications.push.error');
     } finally {
       this.support.set(this.push.support());
+      this.pushWanted.set(null);
       this.pushBusy.set(false);
     }
   }
@@ -316,7 +323,7 @@ export class AccountNotificationsComponent {
           key: THIS_DEVICE,
           label: this.i18n.translate('account.notifications.push.thisDevice'),
           control: 'switch',
-          value: on,
+          value: this.pushWanted() ?? on,
           disabled: this.pushBusy() || (!on && support !== 'ready'),
           ...(hint ? { meta: this.i18n.translate(hint) } : {}),
         },
