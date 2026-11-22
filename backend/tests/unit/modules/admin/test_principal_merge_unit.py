@@ -200,7 +200,7 @@ async def test_preview_counts_every_area() -> None:
     assert areas["applications"].rewritten == 2 * 5
     assert areas["notifications"].combined == 4
     assert areas["notifications"].rewritten == 0
-    assert areas["sessions"].removed == 2 * 3
+    assert areas["sessions"].removed == 2 * 4
     assert areas["memberships"].removed == 2
     assert areas["calendar"].removed == 1
     assert session.dml == 0
