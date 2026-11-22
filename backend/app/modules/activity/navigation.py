@@ -42,5 +42,5 @@ async def navigation_status(session: AsyncSession, principal: Principal) -> Navi
         else None
     )
     live = Feature.MEETINGS in features and await MeetingService(session).any_live(principal)
-    activity = await ActivityService(session).has_new(principal)
+    activity = Feature.ACTIVITY in features and await ActivityService(session).has_new(principal)
     return NavigationStatus(tasks=tasks + todos, tickets=tickets, live=live, activity=activity)

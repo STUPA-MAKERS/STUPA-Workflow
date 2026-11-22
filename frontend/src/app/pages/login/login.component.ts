@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
+import { FeatureService } from '@core/features/feature.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
@@ -51,6 +52,7 @@ type Phase = 'form' | 'sending' | 'sent' | 'error';
 export class LoginComponent {
   private readonly api = inject(ApiClient);
   private readonly auth = inject(AuthService);
+  private readonly features = inject(FeatureService);
   private readonly route = inject(ActivatedRoute);
 
   /** The page was opened from an invalid login link (`?link=invalid`). */
@@ -69,9 +71,9 @@ export class LoginComponent {
       (!this.altchaRequired() || this.altchaSolution() !== null),
   );
 
-  /** Start the OIDC login. It leaves the SPA and comes back to the dashboard. */
+  /** Start the OIDC login. It leaves the SPA and comes back to the start page. */
   ssoLogin(): void {
-    this.auth.login('/activity');
+    this.auth.login(this.features.home());
   }
 
   onAltchaSolved(solution: string): void {

@@ -13,6 +13,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import type { Uuid } from '@core/api/models';
+import { FeatureService } from '@core/features/feature.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
@@ -169,6 +170,9 @@ export class GremiumDialogComponent {
   private readonly api = inject(AdminApiService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
+  private readonly features = inject(FeatureService);
+  /** The link to the public protocols shows only while that page exists (spec 000758). */
+  protected readonly publicPagesOn = computed(() => this.features.isOn('meetings', 'public'));
 
   readonly open = input(false);
   /** The gremium to edit. `null` creates a new gremium. */

@@ -22,6 +22,7 @@ import type { FeatureSwitches } from '../admin.models';
 
 /** The name of each feature, as the navigation shows it. */
 export const FEATURE_LABELS: Readonly<Record<FeatureKey, TranslationKey>> = {
+  activity: 'nav.activity',
   todos: 'nav.todos',
   calendar: 'nav.calendar',
   meetings: 'nav.meetings',
@@ -29,6 +30,8 @@ export const FEATURE_LABELS: Readonly<Record<FeatureKey, TranslationKey>> = {
   budget: 'nav.budget',
   invoices: 'nav.invoices',
   tickets: 'nav.tickets',
+  graph: 'nav.graph',
+  public: 'admin.features.public',
 };
 
 /** One place that still needs a feature, from the 409 `feature_in_use` of the save. */
@@ -47,6 +50,7 @@ const USE_TEXT: Readonly<Record<FeatureUse['kind'], TranslationKey>> = {
 
 /** The switches with every feature on: the state of a config without an entry. */
 const ALL_ON: FeatureSwitches = {
+  activity: true,
   todos: true,
   calendar: true,
   meetings: true,
@@ -54,6 +58,8 @@ const ALL_ON: FeatureSwitches = {
   budget: true,
   invoices: true,
   tickets: true,
+  graph: true,
+  public: true,
 };
 
 /** The features that are on: the own switch and each needed feature is on. */

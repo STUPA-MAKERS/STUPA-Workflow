@@ -429,6 +429,7 @@ export const MOCK_HELP_TICKETS: HelpTicketsSettings = {
 
 /** The feature switches of the mock: every feature on, as the backend defaults them. */
 export const MOCK_FEATURES: FeatureSwitches = {
+  activity: true,
   todos: true,
   calendar: true,
   meetings: true,
@@ -436,6 +437,8 @@ export const MOCK_FEATURES: FeatureSwitches = {
   budget: true,
   invoices: true,
   tickets: true,
+  graph: true,
+  public: true,
 };
 
 /** The SSO login lifetimes of the mock: the defaults of the server. */

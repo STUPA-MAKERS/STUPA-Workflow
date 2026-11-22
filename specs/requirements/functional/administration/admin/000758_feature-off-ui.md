@@ -4,7 +4,7 @@ title: A feature that is off does not show in the UI
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-12
+updated: 2026-11-22
 tests:
   - "frontend/src/app/layout/nav.service.spec.ts:NavService"
   - "frontend/src/app/core/features/feature.guard.spec.ts:featureMatch"
@@ -35,7 +35,9 @@ Another page must leave out the parts that belong to the feature and must not sh
 section or a dead link in their place. Examples: the Kalender omits the meetings while `Sitzungen`
 is off and the due cards while `Boards` is off. The Antrag omits the Kostenstelle while `Budget` is
 off. The start page omits the tiles of a feature that is off. The accessibility statement omits
-`Barriere melden` while `Tickets` is off, because the report of a barrier is a ticket.
+`Barriere melden` while `Tickets` is off, because the report of a barrier is a ticket. The Gremium dialog of the admin omits the link
+to the public protocols while `Öffentliche Seiten` is off. While `Aktivität` is off, the start
+page of a signed-in person is `Anträge` (001300).
 
 The public site configuration must name the state of each feature, so that the public pages follow
 the switches without a session.

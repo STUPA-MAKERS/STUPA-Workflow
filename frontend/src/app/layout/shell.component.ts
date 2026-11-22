@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
 import { PrefetchService } from '@core/cache/prefetch.service';
+import { FeatureService } from '@core/features/feature.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { KeyboardService } from '@core/pwa/keyboard.service';
 import {
@@ -127,6 +128,7 @@ export class ShellComponent {
   protected readonly palette = inject(CommandPalette);
   private readonly navService = inject(NavService);
   private readonly branding = inject(BrandingService);
+  private readonly features = inject(FeatureService);
   private readonly i18n = inject(I18nService);
 
   /** The on-screen keyboard is open: the bottom bar may step aside (styles.scss). */
@@ -157,7 +159,7 @@ export class ShellComponent {
 
   /** The mark without the wordmark: the upload of the branding, else the built-in one. */
   readonly brand = computed<ShellBrand>(() => ({
-    home: '/activity',
+    home: this.features.home(),
     label: this.branding.appName(),
     mark: this.branding.markSrc(),
   }));
