@@ -6,6 +6,7 @@ import type { Meeting, MyBallot, Vote } from '@core/api/models';
 import { runAxe } from '../../../../testing/a11y';
 import { VotePanelViewComponent } from '@stupa-makers/ui-kit/views/voting';
 import type { VoteContext } from './vote-context';
+import { applicationLink, meetingLink } from '../voting-api.provider';
 
 function vote(overrides: Partial<Vote> = {}): Vote {
   return {
@@ -63,6 +64,8 @@ async function setup(
       notice: inputs.notice ?? null,
       layout: inputs.layout ?? 'page',
       caster,
+      meetingLink,
+      applicationLink,
     },
     on: { castDone, castFailed },
   });
