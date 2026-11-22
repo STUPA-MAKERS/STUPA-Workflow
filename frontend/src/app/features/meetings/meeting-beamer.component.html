@@ -16,7 +16,7 @@
     <h1 class="bm__q">{{ v.question }}</h1>
 
     @if (tx.bars && v.counts && v.poll) {
-      <app-poll-result
+      <app-poll-result-view
         variant="beamer"
         [poll]="v.poll"
         [result]="v.pollResult ?? null"
@@ -25,7 +25,7 @@
         [total]="v.present"
       />
     } @else if (tx.bars && v.counts && v.election) {
-      <app-election-result
+      <app-election-result-view
         variant="beamer"
         [election]="v.election"
         [result]="v.status === 'closed' ? v.result : null"
@@ -33,14 +33,19 @@
         [counts]="v.counts"
       />
     } @else if (tx.bars && v.counts) {
-      <app-vote-bars variant="beamer" [options]="v.options" [counts]="v.counts" />
+      <app-vote-bars-view variant="beamer" [options]="v.options" [counts]="v.counts" />
     } @else {
       <div class="bm__turnout" role="status">
         <p class="bm__count">
           <span class="bm__big mono">{{ v.voted }}</span>
           <span class="bm__of">{{ 'beamer.ofPresent' | t: { n: v.present } }}</span>
         </p>
-        <app-seg-bar size="xl" [segments]="[{ value: v.voted, tone: 'filled' }]" [total]="v.present" [label]="tx.turnout" />
+        <app-seg-bar
+          size="xl"
+          [segments]="[{ value: v.voted, tone: 'filled' }]"
+          [total]="v.present"
+          [label]="tx.turnout"
+        />
         <p class="bm__hint">{{ tx.hiddenKey | t }}</p>
       </div>
     }
@@ -50,13 +55,15 @@
     <div class="bm__bottom">
       <div class="bm__bottomText">
         @if (v.status === 'open') {
-          <p class="bm__foot"><app-meta-line>
-            <app-status-text kind="accent">{{ 'meetings.voteStatus.open' | t }}</app-status-text>
-            <span>{{ tx.rules }}</span>
-            @if (tx.quorumWarning; as warn) {
-              <span class="bm__warn">{{ warn }}</span>
-            }
-          </app-meta-line></p>
+          <p class="bm__foot">
+            <app-meta-line>
+              <app-status-text kind="accent">{{ 'meetings.voteStatus.open' | t }}</app-status-text>
+              <span>{{ tx.rules }}</span>
+              @if (tx.quorumWarning; as warn) {
+                <span class="bm__warn">{{ warn }}</span>
+              }
+            </app-meta-line>
+          </p>
         } @else {
           <p class="bm__outcome" role="status" [class.bm__outcome--stack]="!!tx.composition">
             @if (v.poll) {
@@ -67,10 +74,10 @@
                 {{ electionKey(v.result) | t }}
               </span>
             } @else {
-            <span class="bm__result" [class.bm__result--passed]="tx.passed">
-              <app-icon [name]="tx.passed ? 'check' : 'x'" [size]="30" />
-              {{ (tx.passed ? 'vote.result.passed' : 'vote.result.rejected') | t }}
-            </span>
+              <span class="bm__result" [class.bm__result--passed]="tx.passed">
+                <app-icon [name]="tx.passed ? 'check' : 'x'" [size]="30" />
+                {{ (tx.passed ? 'vote.result.passed' : 'vote.result.rejected') | t }}
+              </span>
             }
             <span class="bm__note">{{ tx.outcome }}</span>
           </p>
@@ -102,7 +109,10 @@
         @if (presence(); as p) {
           <p class="bm__presence">
             <app-icon name="users" [size]="26" />
-            {{ 'guests.beamer.presence' | t: { n: p.members + p.guests, members: p.members, guests: p.guests } }}
+            {{
+              'guests.beamer.presence'
+                | t: { n: p.members + p.guests, members: p.members, guests: p.guests }
+            }}
           </p>
         }
       </div>

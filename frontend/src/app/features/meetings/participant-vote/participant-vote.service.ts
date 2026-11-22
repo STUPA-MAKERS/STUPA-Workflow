@@ -6,7 +6,7 @@ import type { Meeting, MeetingVote, MyBallot, Vote } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { RailStatusService } from '../../../layout/rail-status.service';
-import type { BallotCaster, BallotFailure } from '../../voting/ballot/ballot.component';
+import type { BallotCaster, BallotFailure } from '@stupa-makers/ui-kit/views/voting';
 
 const NOT_CAST: MyBallot = { cast: false, choice: null };
 
@@ -88,7 +88,9 @@ export class ParticipantVoteService {
     if (this.vote()?.status !== 'open') return null;
     const d = this.delegation();
     if (d?.blocked) {
-      return this.i18n.translate('voting.cast.delegation.blocked', { name: d.delegatedToName || '?' });
+      return this.i18n.translate('voting.cast.delegation.blocked', {
+        name: d.delegatedToName || '?',
+      });
     }
     if (this.own() === null && this.proxyName() === null) {
       return this.i18n.translate('voting.live.notEligible');

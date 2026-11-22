@@ -6,8 +6,10 @@ import type { ElectionConfig, ElectionResult } from '@core/api/models';
 import { TestBed } from '@angular/core/testing';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
+import { provideAppUiKit } from '@core/i18n/ui-kit-intl';
 import { runAxe } from '../../../../testing/a11y';
-import { ElectionResultComponent } from './election-result.component';
+import { ElectionResultViewComponent } from '@stupa-makers/ui-kit/views/voting';
+import { provideVotingApi } from '../voting-api.provider';
 
 const ELECTION: ElectionConfig = {
   seats: 2,
@@ -39,7 +41,7 @@ async function setup(over: {
   inCard?: boolean;
 }) {
   const changed = jest.fn();
-  const view = await render(ElectionResultComponent, {
+  const view = await render(ElectionResultViewComponent, {
     inputs: {
       election: over.election ?? ELECTION,
       result: over.result === undefined ? 'runoff' : over.result,
@@ -52,7 +54,12 @@ async function setup(over: {
       inCard: over.inCard ?? false,
     },
     on: { changed },
-    providers: [provideHttpClient(), provideHttpClientTesting()],
+    providers: [
+      provideHttpClient(),
+      provideHttpClientTesting(),
+      provideVotingApi(),
+      provideAppUiKit(),
+    ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
   const toasts = () =>
@@ -63,12 +70,20 @@ async function setup(over: {
   return { ...view, http, changed, toasts };
 }
 
-describe('ElectionResultComponent', () => {
+describe('ElectionResultViewComponent', () => {
   it('shows the bars best first with the tags and the runoff banner', async () => {
     const { container } = await setup({});
     expect(screen.getByText('Stichwahl nötig')).toBeInTheDocument();
-    const labels = screen.getAllByRole('listitem').map((li) => li.querySelector('.bars__label')?.textContent?.trim());
-    expect(labels).toEqual(['Anna gewählt', 'Ben Gleichstand', 'Cem Gleichstand', 'Dana', 'Enthaltungen']);
+    const labels = screen
+      .getAllByRole('listitem')
+      .map((li) => li.querySelector('.bars__label')?.textContent?.trim());
+    expect(labels).toEqual([
+      'Anna gewählt',
+      'Ben Gleichstand',
+      'Cem Gleichstand',
+      'Dana',
+      'Enthaltungen',
+    ]);
     expect(
       screen.getByText('Gleichstand an der Grenze: Stichwahl um 1 Posten zwischen Ben, Cem.'),
     ).toBeInTheDocument();
@@ -84,8 +99,16 @@ describe('ElectionResultComponent', () => {
     };
     const { fixture } = await setup({ election: erased });
     const labels = () =>
-      screen.getAllByRole('listitem').map((li) => li.querySelector('.bars__label')?.textContent?.trim());
-    expect(labels()).toEqual(['Anna gewählt', 'Gelöscht Gleichstand', 'Cem Gleichstand', 'Dana', 'Enthaltungen']);
+      screen
+        .getAllByRole('listitem')
+        .map((li) => li.querySelector('.bars__label')?.textContent?.trim());
+    expect(labels()).toEqual([
+      'Anna gewählt',
+      'Gelöscht Gleichstand',
+      'Cem Gleichstand',
+      'Dana',
+      'Enthaltungen',
+    ]);
     const i18n = TestBed.inject(I18nService);
     try {
       i18n.setLocale('en');
@@ -128,9 +151,13 @@ describe('ElectionResultComponent', () => {
       election: { ...ELECTION, seats: 1 },
     });
     expect(screen.getByText('Gleichstand: das Los steht aus')).toBeInTheDocument();
-    expect(screen.getByText('Gleichstand zwischen Anna, Ben. Das Los entscheidet.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Gleichstand zwischen Anna, Ben. Das Los entscheidet.'),
+    ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Los ziehen' }));
-    expect(screen.getByText('Das Los ist endgültig und lässt sich nicht zurücknehmen.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Das Los ist endgültig und lässt sich nicht zurücknehmen.'),
+    ).toBeInTheDocument();
     screen
       .getByRole('button', { name: /^Jetzt Los ziehen/ })
       .dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 2 }));
@@ -169,7 +196,13 @@ describe('ElectionResultComponent', () => {
 
   it('tells a member that the lead draws the lot, and shows a drawn lot', async () => {
     const lot = { among: ['c1', 'c2'], seats: 1, drawn: null };
-    const tie: ElectionResult = { counts: { c1: 2, c2: 2 }, abstentions: 0, ballots: 4, elected: [], lot };
+    const tie: ElectionResult = {
+      counts: { c1: 2, c2: 2 },
+      abstentions: 0,
+      ballots: 4,
+      elected: [],
+      lot,
+    };
     const { fixture } = await setup({ result: 'tie', electionResult: tie, canManage: false });
     expect(screen.queryByRole('button', { name: 'Los ziehen' })).toBeNull();
     expect(screen.getByText('Die Sitzungsleitung zieht das Los.')).toBeInTheDocument();
@@ -197,7 +230,10 @@ describe('ElectionResultComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: /^Jetzt Los ziehen/ }));
     http
       .expectOne('/api/votes/e1/draw-lot')
-      .flush({ code: 'lot_already_drawn', detail: 'lot_already_drawn' }, { status: 409, statusText: 'Conflict' });
+      .flush(
+        { code: 'lot_already_drawn', detail: 'lot_already_drawn' },
+        { status: 409, statusText: 'Conflict' },
+      );
     expect(changed).not.toHaveBeenCalled();
     expect(toasts().some((m) => m.startsWith('Aktion fehlgeschlagen.'))).toBe(true);
     fixture.detectChanges();
@@ -235,7 +271,13 @@ describe('ElectionResultComponent', () => {
     await setup({
       result: 'no_majority',
       election: { ...ELECTION, seats: 1, majorityRule: 'members_majority' },
-      electionResult: { counts: { c1: 3, c2: 2 }, abstentions: 0, ballots: 5, elected: [], runoff: null },
+      electionResult: {
+        counts: { c1: 3, c2: 2 },
+        abstentions: 0,
+        ballots: 5,
+        elected: [],
+        runoff: null,
+      },
     });
     expect(screen.getByText('Keine Mehrheit der Mitglieder')).toBeInTheDocument();
   });
@@ -251,7 +293,9 @@ describe('ElectionResultComponent', () => {
     const cmp = fixture.componentInstance;
     cmp.drawLot();
     cmp.drawLot();
-    http.expectOne({ method: 'POST', url: '/api/votes/e1/draw-lot' }).flush(null, { status: 500, statusText: 'Error' });
+    http
+      .expectOne({ method: 'POST', url: '/api/votes/e1/draw-lot' })
+      .flush(null, { status: 500, statusText: 'Error' });
     http.verify();
     expect(toasts()).toContain('Aktion fehlgeschlagen.');
     expect(changed).not.toHaveBeenCalled();
@@ -300,12 +344,17 @@ describe('ElectionResultComponent', () => {
       await setup({
         election: MEMBERS,
         result: 'no_majority',
-        electionResult: { ...MISSED, nextRoundLot: { among: ['c2', 'c3'], seats: 1, drawn: ['c3'] } },
+        electionResult: {
+          ...MISSED,
+          nextRoundLot: { among: ['c2', 'c3'], seats: 1, drawn: ['c3'] },
+        },
         canNextRound: true,
         round: 2,
       });
       expect(screen.getByRole('button', { name: 'Dritter Wahlgang' })).toBeInTheDocument();
-      expect(screen.getByText('Das Los bestimmt für den dritten Wahlgang: Cem')).toBeInTheDocument();
+      expect(
+        screen.getByText('Das Los bestimmt für den dritten Wahlgang: Cem'),
+      ).toBeInTheDocument();
     });
 
     it.each([

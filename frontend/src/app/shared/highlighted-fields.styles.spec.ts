@@ -80,8 +80,8 @@ describe('highlightedFields (§ui-kit:000598)', () => {
     ['pages/applications/agenda-dialog/agenda-dialog.component.scss', '.agd__row--on'],
     ['features/meetings/attendance-sheet/attendance-sheet.component.scss', '.as__opt--on'],
     ['features/apply/apply-wizard.component.scss', '.wz__type.is-selected'],
-    ['features/voting/ballot/ballot.component.scss', '.choice--on'],
-    ['features/voting/ballot/ballot.component.scss', '.pchoice--on'],
+    ['../../vendor/ui-kit/views/voting/src/ballot-view.component.scss', '.choice--on'],
+    ['../../vendor/ui-kit/views/voting/src/ballot-view.component.scss', '.pchoice--on'],
     ['features/public-meeting/guest-view.component.scss', '.gv__item--now'],
   ])('%s %s paints the chosen row black on yellow', (file, selector) => {
     const body = rule(readFileSync(join(APP, file), 'utf8'), selector);

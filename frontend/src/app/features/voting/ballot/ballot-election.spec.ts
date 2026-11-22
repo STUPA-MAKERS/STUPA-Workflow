@@ -4,8 +4,9 @@ import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { ElectionCandidate, ElectionConfig, MyBallot } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
+import { provideAppUiKit } from '@core/i18n/ui-kit-intl';
 import { runAxe } from '../../../../testing/a11y';
-import { BallotComponent, type BallotCaster } from './ballot.component';
+import { BallotViewComponent, type BallotCaster } from '@stupa-makers/ui-kit/views/voting';
 
 const CANDIDATES = [
   { id: 'c1', name: 'Anna Berg' },
@@ -31,7 +32,7 @@ async function setup(
   const caster = jest.fn(opts.caster ?? (() => of({ status: 'cast' })));
   const castDone = jest.fn();
   const castFailed = jest.fn();
-  const r = await render(BallotComponent, {
+  const r = await render(BallotViewComponent, {
     inputs: {
       voteId: 'e1',
       options: ['c1', 'c2', 'c3', 'abstain'],
@@ -42,13 +43,14 @@ async function setup(
       election,
     },
     on: { castDone, castFailed },
+    providers: [provideAppUiKit()],
   });
   return { ...r, caster, castDone, castFailed };
 }
 
 const confirmButton = () => screen.getByRole('button', { name: /abgeben/ });
 
-describe('BallotComponent · election', () => {
+describe('BallotViewComponent · election', () => {
   it('labels an erased candidate in the language of the viewer', async () => {
     const candidates = CANDIDATES.map((c) =>
       c.id === 'c2' ? { ...c, name: 'Gelöscht', erased: true } : c,
@@ -69,7 +71,7 @@ describe('BallotComponent · election', () => {
   });
 
   it('names the single candidate of a Ja/Nein election above the choices', async () => {
-    const r = await render(BallotComponent, {
+    const r = await render(BallotViewComponent, {
       inputs: {
         voteId: 'e1',
         options: ['yes', 'no', 'abstain'],
@@ -128,7 +130,9 @@ describe('BallotComponent · election', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Anna Berg' }));
     expect(screen.getByText('1 von 2 Stimmen vergeben')).toBeInTheDocument();
     expect(confirmButton()).toHaveTextContent(/^Stimmen abgeben \(1 Name, 1 Enthaltung\)$/);
-    expect(confirmButton()).toHaveAccessibleName('Stimmen abgeben (1 Name, 1 Enthaltung): Anna Berg');
+    expect(confirmButton()).toHaveAccessibleName(
+      'Stimmen abgeben (1 Name, 1 Enthaltung): Anna Berg',
+    );
     await user.click(screen.getByRole('checkbox', { name: 'Cem Aydin' }));
     expect(screen.getByRole('checkbox', { name: 'Ben Ott' })).toBeDisabled();
     expect(confirmButton()).toHaveTextContent(/^Stimmen abgeben \(2 Namen\)$/);
@@ -146,8 +150,14 @@ describe('BallotComponent · election', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('checkbox', { name: 'Anna Berg' }));
     await user.click(screen.getByRole('button', { name: 'Ganz enthalten' }));
-    expect(screen.getByRole('checkbox', { name: 'Anna Berg' })).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByRole('button', { name: 'Ganz enthalten' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('checkbox', { name: 'Anna Berg' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    expect(screen.getByRole('button', { name: 'Ganz enthalten' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     expect(confirmButton()).toHaveTextContent(/^Stimmen abgeben \(2 Enthaltungen\)$/);
     expect(confirmButton()).not.toHaveAttribute('aria-label');
     await user.click(confirmButton());
@@ -156,7 +166,10 @@ describe('BallotComponent · election', () => {
 
   it('shows the cast candidates of an open ballot and nothing of a secret one', async () => {
     await setup(2, { own: { cast: true, choice: null, choices: ['c2'] } });
-    expect(screen.getByRole('checkbox', { name: 'Ben Ott' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('checkbox', { name: 'Ben Ott' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
     expect(screen.getByText('Danke! Deine Stimme: Ben Ott · 1 Enthaltung')).toBeInTheDocument();
     expect(screen.queryByText(/Stimmen vergeben/)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Ganz enthalten' })).toBeNull();
@@ -169,14 +182,22 @@ describe('BallotComponent · election', () => {
     await user.click(confirmButton());
     expect(caster).toHaveBeenCalledWith(['c3'], false);
     expect(screen.getByText('Danke! Deine Stimme ist abgegeben.')).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Cem Aydin' })).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByRole('radio', { name: 'Enthaltung' })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('radio', { name: 'Cem Aydin' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    expect(screen.getByRole('radio', { name: 'Enthaltung' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
   });
 
   it('gives the represented member a candidate list of its own', async () => {
     const { caster } = await setup(1, { own: null, proxyName: 'Jonas Weber' });
     const user = userEvent.setup();
-    expect(screen.getByRole('radiogroup', { name: 'Als Vertretung für Jonas Weber' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('radiogroup', { name: 'Als Vertretung für Jonas Weber' }),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole('radio', { name: 'Anna Berg' }));
     expect(confirmButton()).toHaveTextContent('Für Jonas Weber abgeben: Anna Berg');
     await user.click(confirmButton());
@@ -188,7 +209,9 @@ describe('BallotComponent · election', () => {
     const { caster } = await setup(3, { own: null, proxyName: 'Jonas Weber' });
     const user = userEvent.setup();
     await user.click(screen.getByRole('checkbox', { name: 'Anna Berg' }));
-    expect(confirmButton()).toHaveTextContent(/^Für Jonas Weber abgeben \(1 Name, 2 Enthaltungen\)$/);
+    expect(confirmButton()).toHaveTextContent(
+      /^Für Jonas Weber abgeben \(1 Name, 2 Enthaltungen\)$/,
+    );
     await user.click(screen.getByRole('checkbox', { name: 'Ben Ott' }));
     expect(confirmButton()).toHaveAccessibleName(
       'Für Jonas Weber abgeben (2 Namen, 1 Enthaltung): Anna Berg, Ben Ott',
@@ -205,7 +228,10 @@ describe('BallotComponent · election', () => {
 
   it('has no counter and no extra accessible name once every row is cast', async () => {
     const { fixture } = await setup(2, { own: { cast: true, choice: null, choices: ['c1'] } });
-    const cmp = fixture.componentInstance as unknown as { confirmLabel(): string; confirmAria(): string };
+    const cmp = fixture.componentInstance as unknown as {
+      confirmLabel(): string;
+      confirmAria(): string;
+    };
     expect(cmp.confirmLabel()).toBe('Stimme abgeben');
     expect(cmp.confirmAria()).toBe('');
   });
@@ -245,7 +271,11 @@ describe('BallotComponent · election', () => {
     expect(cmp.picked()['proxy']).toEqual([]);
     expect(cmp.candidateMode()).toBe(true);
     fixture.componentRef.setInput('election', null);
-    const plain = fixture.componentInstance as unknown as { candidateMode(): boolean; multiSeat(): boolean; seats(): number };
+    const plain = fixture.componentInstance as unknown as {
+      candidateMode(): boolean;
+      multiSeat(): boolean;
+      seats(): number;
+    };
     expect(plain.candidateMode()).toBe(false);
     expect(plain.multiSeat()).toBe(false);
     expect(plain.seats()).toBe(1);

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/angular';
 import type { PollConfig, PollResult } from '@core/api/models';
 import { runAxe } from '../../../../testing/a11y';
-import { PollResultComponent } from './poll-result.component';
+import { PollResultViewComponent } from '@stupa-makers/ui-kit/views/voting';
 
 const SINGLE: PollConfig = {
   mode: 'single',
@@ -29,15 +29,17 @@ async function setup(inputs: {
   answered?: number;
   total?: number;
 }) {
-  return render(PollResultComponent, { inputs: { answered: 0, total: 0, ...inputs } });
+  return render(PollResultViewComponent, { inputs: { answered: 0, total: 0, ...inputs } });
 }
 
 /** The labels of the rows, top to bottom (the tag included). */
 function rows(): string[] {
-  return screen.getAllByRole('listitem').map((li) => li.querySelector('.bars__label')!.textContent!.trim());
+  return screen
+    .getAllByRole('listitem')
+    .map((li) => li.querySelector('.bars__label')!.textContent!.trim());
 }
 
-describe('PollResultComponent', () => {
+describe('PollResultViewComponent', () => {
   it('lists the options highest first and fills the bar of every tied top option', async () => {
     const result: PollResult = {
       counts: { o1: 4, o2: 1, o3: 4 },
@@ -50,9 +52,7 @@ describe('PollResultComponent', () => {
     expect(rows()).toEqual(['Pizza', 'Salat', 'Pasta', 'Enthaltungen']);
     expect(screen.queryByText(/Meiste Stimmen/i)).toBeNull();
     expect(screen.getAllByText('40 %', { exact: false })).toHaveLength(2);
-    expect(
-      screen.getByText('10 von 12 haben geantwortet'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('10 von 12 haben geantwortet')).toBeInTheDocument();
     expect(screen.queryByText('Zahl = Ja, (+n) = Vielleicht')).toBeNull();
     expect(await runAxe(container)).toHaveNoViolations();
   });

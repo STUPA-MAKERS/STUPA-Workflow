@@ -8,8 +8,8 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import type { ElectionConfig, ElectionResult, MeetingVote, Vote } from '@core/api/models';
 import { vote as meetingVote } from '../../../testing/meeting-fixtures';
 import { type BeamerVote, MeetingBeamerComponent } from '../meetings/meeting-beamer.component';
-import { VoteCardComponent } from '../meetings/vote-card/vote-card.component';
-import { VotePanelComponent } from './vote-panel/vote-panel.component';
+import { VoteCardViewComponent, VotePanelViewComponent } from '@stupa-makers/ui-kit/views/voting';
+import { provideVotingApi } from './voting-api.provider';
 
 const ELECTION: ElectionConfig = {
   seats: 1,
@@ -41,9 +41,14 @@ function card(over: Partial<MeetingVote> = {}): MeetingVote {
 
 describe('election views', () => {
   it('the meeting card: the election ballot for a voter', async () => {
-    await render(VoteCardComponent, {
-      inputs: { vote: card({ status: 'open' }), meetingStatus: 'live', canVote: true, canManage: false },
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+    await render(VoteCardViewComponent, {
+      inputs: {
+        vote: card({ status: 'open' }),
+        meetingStatus: 'live',
+        canVote: true,
+        canManage: false,
+      },
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideVotingApi()],
     });
     expect(screen.getByText('Wahl · 1 Posten')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Anna' })).toBeInTheDocument();
@@ -51,43 +56,60 @@ describe('election views', () => {
   });
 
   it('the meeting card: casts the list and reports a refused ballot', async () => {
-    const view = await render(VoteCardComponent, {
+    const view = await render(VoteCardViewComponent, {
       inputs: { vote: card({ status: 'open', id: 'e1' }), meetingStatus: 'live', canVote: true },
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideVotingApi()],
     });
     const http = view.fixture.debugElement.injector.get(HttpTestingController);
     await userEvent.click(screen.getByRole('radio', { name: 'Ben' }));
     await userEvent.click(screen.getByRole('button', { name: 'Stimme abgeben: Ben' }));
     const req = http.expectOne('/api/votes/e1/ballot');
     expect(req.request.body).toEqual({ choice: ['c2'], asDelegation: false });
-    req.flush({ code: 'vote_not_open', detail: 'Nicht offen' }, { status: 409, statusText: 'Conflict' });
-    const toasts = view.fixture.debugElement.injector.get(ToastService).toasts().map((t) => t.message);
+    req.flush(
+      { code: 'vote_not_open', detail: 'Nicht offen' },
+      { status: 409, statusText: 'Conflict' },
+    );
+    const toasts = view.fixture.debugElement.injector
+      .get(ToastService)
+      .toasts()
+      .map((t) => t.message);
     expect(toasts).toContain('Aktion fehlgeschlagen.: Nicht offen');
   });
 
   it('the meeting card: a 409 already_voted says so', async () => {
-    const view = await render(VoteCardComponent, {
+    const view = await render(VoteCardViewComponent, {
       inputs: { vote: card({ status: 'open', id: 'e2' }), meetingStatus: 'live', canVote: true },
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideVotingApi()],
     });
     const http = view.fixture.debugElement.injector.get(HttpTestingController);
     await userEvent.click(screen.getByRole('radio', { name: 'Anna' }));
     await userEvent.click(screen.getByRole('button', { name: 'Stimme abgeben: Anna' }));
-    http.expectOne('/api/votes/e2/ballot').flush({ code: 'already_voted' }, { status: 409, statusText: 'Conflict' });
-    const toasts = view.fixture.debugElement.injector.get(ToastService).toasts().map((t) => t.message);
+    http
+      .expectOne('/api/votes/e2/ballot')
+      .flush({ code: 'already_voted' }, { status: 409, statusText: 'Conflict' });
+    const toasts = view.fixture.debugElement.injector
+      .get(ToastService)
+      .toasts()
+      .map((t) => t.message);
     expect(toasts).toContain('Deine Stimme ist bereits abgegeben.');
   });
 
   it('the meeting card: the closed tie with the lot for the manager', async () => {
     const changed = jest.fn();
-    const view = await render(VoteCardComponent, {
+    const view = await render(VoteCardViewComponent, {
       inputs: {
-        vote: card({ id: 'e1', status: 'closed', result: 'tie', counts: { c1: 4, c2: 4, abstain: 1 }, electionResult: TIE }),
+        vote: card({
+          id: 'e1',
+          status: 'closed',
+          result: 'tie',
+          counts: { c1: 4, c2: 4, abstain: 1 },
+          electionResult: TIE,
+        }),
         meetingStatus: 'live',
         canManage: true,
       },
       on: { electionChanged: changed },
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideVotingApi()],
     });
     expect(screen.getByText('Los steht aus')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Los ziehen' }));
@@ -110,15 +132,26 @@ describe('election views', () => {
       closesAt: null,
       result: 'elected',
       secret: true,
-      tally: { counts: { c1: 5, c2: 3, abstain: 1 }, eligible: 9, voted: 9, quorumMet: true, leading: null },
+      tally: {
+        counts: { c1: 5, c2: 3, abstain: 1 },
+        eligible: 9,
+        voted: 9,
+        quorumMet: true,
+        leading: null,
+      },
       kind: 'election',
       election: ELECTION,
       electionResult: { counts: { c1: 5, c2: 3 }, abstentions: 1, ballots: 9, elected: ['c1'] },
       round: 2,
     };
-    await render(VotePanelComponent, {
+    await render(VotePanelViewComponent, {
       inputs: { vote: v, caster: () => of({}) },
-      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideVotingApi(),
+      ],
     });
     expect(screen.getByText('Stichwahl (2. Wahlgang) · 1 Posten')).toBeInTheDocument();
     expect(screen.getByText('Gewählt: Anna')).toBeInTheDocument();
@@ -145,7 +178,7 @@ describe('election views', () => {
     };
     const view = await render(MeetingBeamerComponent, {
       inputs: { logoSrc: 'x.svg', vote: beamer },
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideVotingApi()],
     });
     expect(screen.getByText('Los steht aus')).toBeInTheDocument();
     expect(screen.getByText('Gleichstand: das Los steht aus · 9 Stimmen')).toBeInTheDocument();
@@ -179,9 +212,14 @@ describe('election views', () => {
       kind: 'election',
       election: { ...ELECTION, secret: false },
     };
-    await render(VotePanelComponent, {
+    await render(VotePanelViewComponent, {
       inputs: { vote: v, caster: () => of({}) },
-      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideVotingApi(),
+      ],
     });
     expect(screen.getByText('Wahl · 1 Posten')).toBeInTheDocument();
   });
@@ -205,9 +243,9 @@ describe('election views', () => {
     };
     const { container } = await render(MeetingBeamerComponent, {
       inputs: { logoSrc: 'x.svg', vote: beamer },
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideVotingApi()],
     });
-    expect(container.querySelector('app-election-result')).not.toBeNull();
+    expect(container.querySelector('app-election-result-view')).not.toBeNull();
     expect(screen.getByLabelText('Anna: 1 Stimmen, 100 %')).toBeInTheDocument();
   });
 });

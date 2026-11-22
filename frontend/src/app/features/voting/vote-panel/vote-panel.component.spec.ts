@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { Meeting, MyBallot, Vote } from '@core/api/models';
 import { runAxe } from '../../../../testing/a11y';
-import { VotePanelComponent } from './vote-panel.component';
+import { VotePanelViewComponent } from '@stupa-makers/ui-kit/views/voting';
 import type { VoteContext } from './vote-context';
 
 function vote(overrides: Partial<Vote> = {}): Vote {
@@ -22,7 +22,15 @@ function vote(overrides: Partial<Vote> = {}): Vote {
     result: null,
     secret: false,
     majorityRule: 'simple',
-    tally: { counts: {}, eligible: 19, voted: 14, present: 19, revealed: false, quorumMet: true, leading: null },
+    tally: {
+      counts: {},
+      eligible: 19,
+      voted: 14,
+      present: 19,
+      revealed: false,
+      quorumMet: true,
+      leading: null,
+    },
     ...overrides,
   };
 }
@@ -32,18 +40,20 @@ const CONTEXT: VoteContext = {
   position: 3,
 };
 
-async function setup(inputs: {
-  vote?: Vote;
-  context?: VoteContext;
-  own?: MyBallot | null;
-  proxyName?: string | null;
-  notice?: string | null;
-  layout?: 'page' | 'phone' | 'card';
-} = {}) {
+async function setup(
+  inputs: {
+    vote?: Vote;
+    context?: VoteContext;
+    own?: MyBallot | null;
+    proxyName?: string | null;
+    notice?: string | null;
+    layout?: 'page' | 'phone' | 'card';
+  } = {},
+) {
   const caster = jest.fn(() => of({ status: 'cast' }));
   const castDone = jest.fn();
   const castFailed = jest.fn();
-  const r = await render(VotePanelComponent, {
+  const r = await render(VotePanelViewComponent, {
     providers: [provideRouter([])],
     inputs: {
       vote: inputs.vote ?? vote(),
@@ -59,16 +69,17 @@ async function setup(inputs: {
   return { ...r, caster, castDone, castFailed };
 }
 
-describe('VotePanelComponent', () => {
+describe('VotePanelViewComponent', () => {
   it('shows status, meeting, item, rule and question (board Arbeit-Abstimmungen)', async () => {
     await setup();
     expect(screen.getByText('Offen')).toHaveClass('st--accent');
-    expect(screen.getByRole('link', { name: '34. Sitzung des Studierendenparlaments · TOP 3' })).toHaveAttribute(
-      'href',
-      '/meetings/m1',
-    );
+    expect(
+      screen.getByRole('link', { name: '34. Sitzung des Studierendenparlaments · TOP 3' }),
+    ).toHaveAttribute('href', '/meetings/m1');
     expect(screen.getByText('Einfache Mehrheit')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Soll der Antrag gefördert werden?' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Soll der Antrag gefördert werden?' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('14 von 19 Anwesenden haben abgestimmt')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Stimme abgeben' })).toBeInTheDocument();
   });
@@ -94,7 +105,11 @@ describe('VotePanelComponent', () => {
     await setup({
       vote: vote({
         majorityRule: undefined,
-        config: { options: ['yes', 'no'], majorityRule: 'two_thirds', quorum: { type: 'percent', value: 50 } },
+        config: {
+          options: ['yes', 'no'],
+          majorityRule: 'two_thirds',
+          quorum: { type: 'percent', value: 50 },
+        },
       }),
     });
     expect(screen.getByText('Zweidrittelmehrheit · Quorum 50 %')).toBeInTheDocument();
@@ -136,10 +151,21 @@ describe('VotePanelComponent', () => {
       context: { meeting: null, position: null },
       vote: vote({
         meetingId: null,
-        tally: { counts: { yes: 2, no: 1 }, eligible: 12, voted: 3, present: 0, revealed: true, quorumMet: false, leading: 'yes' },
+        tally: {
+          counts: { yes: 2, no: 1 },
+          eligible: 12,
+          voted: 3,
+          present: 0,
+          revealed: true,
+          quorumMet: false,
+          leading: 'yes',
+        },
       }),
     });
-    expect(screen.getByRole('link', { name: 'Antrag öffnen' })).toHaveAttribute('href', '/applications/a1');
+    expect(screen.getByRole('link', { name: 'Antrag öffnen' })).toHaveAttribute(
+      'href',
+      '/applications/a1',
+    );
     expect(screen.getByText('3 von 12 Stimmberechtigten haben abgestimmt')).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Ergebnis, 3 Stimmen' })).toBeInTheDocument();
     expect(screen.queryByText(/Zwischenstand/)).not.toBeInTheDocument();
@@ -147,7 +173,10 @@ describe('VotePanelComponent', () => {
 
   /** Only the status and the rules remain, as two chips with no dot between them (spec 001306). */
   it('shows no meeting line and no link for a motion without both', async () => {
-    await setup({ context: { meeting: null, position: null }, vote: vote({ meetingId: null, applicationId: null }) });
+    await setup({
+      context: { meeting: null, position: null },
+      vote: vote({ meetingId: null, applicationId: null }),
+    });
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(screen.queryByText('·')).not.toBeInTheDocument();
     expect(document.querySelectorAll('.vpn__meta .vpn__part')).toHaveLength(2);
@@ -158,7 +187,15 @@ describe('VotePanelComponent', () => {
       vote: vote({
         status: 'closed',
         result: 'tie',
-        tally: { counts: { yes: 4, no: 4, abstain: 0 }, eligible: 19, voted: 8, present: 0, revealed: true, quorumMet: true, leading: null },
+        tally: {
+          counts: { yes: 4, no: 4, abstain: 0 },
+          eligible: 19,
+          voted: 8,
+          present: 0,
+          revealed: true,
+          quorumMet: true,
+          leading: null,
+        },
       }),
     });
     expect(screen.getByText('Geschlossen')).toBeInTheDocument();
@@ -173,7 +210,16 @@ describe('VotePanelComponent', () => {
         status: 'closed',
         result: 'passed',
         quorum: { type: 'count', value: 10 },
-        tally: { counts: { yes: 12, no: 6, abstain: 2 }, eligible: 20, voted: 20, present: 0, revealed: true, quorumMet: true, leading: 'yes', ...tally },
+        tally: {
+          counts: { yes: 12, no: 6, abstain: 2 },
+          eligible: 20,
+          voted: 20,
+          present: 0,
+          revealed: true,
+          quorumMet: true,
+          leading: 'yes',
+          ...tally,
+        },
         ...extra,
       });
 
@@ -185,14 +231,20 @@ describe('VotePanelComponent', () => {
     /** Without `voted`, the sum of the counts is the number of ballots. */
     it('names a missed quorum of a vote that failed on majority', async () => {
       await setup({
-        vote: closed({ voted: undefined, quorumMet: false, failedReason: 'majority' }, { result: 'rejected' }),
+        vote: closed(
+          { voted: undefined, quorumMet: false, failedReason: 'majority' },
+          { result: 'rejected' },
+        ),
       });
       expect(screen.getByText('20 von 20 Stimmen · Quorum: nicht erreicht')).toBeInTheDocument();
     });
 
     it('does not repeat the quorum when the result already names it', async () => {
       await setup({
-        vote: closed({ voted: 5, quorumMet: false, failedReason: 'quorum' }, { result: 'rejected' }),
+        vote: closed(
+          { voted: 5, quorumMet: false, failedReason: 'quorum' },
+          { result: 'rejected' },
+        ),
       });
       expect(screen.getByText('5 von 20 Stimmen')).toBeInTheDocument();
       expect(screen.queryByText(/Quorum: /)).not.toBeInTheDocument();
@@ -211,13 +263,17 @@ describe('VotePanelComponent', () => {
 
   it('shows the warning note instead of a ballot', async () => {
     await setup({ own: null, notice: 'Du bist für diese Abstimmung nicht stimmberechtigt.' });
-    expect(screen.getByText('Du bist für diese Abstimmung nicht stimmberechtigt.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Du bist für diese Abstimmung nicht stimmberechtigt.'),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('offers only the represented ballot to a substitute', async () => {
     await setup({ own: null, proxyName: 'Jonas Weber' });
-    expect(screen.getByRole('heading', { name: 'Als Vertretung für Jonas Weber' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Als Vertretung für Jonas Weber' }),
+    ).toBeInTheDocument();
   });
 
   /**
@@ -233,11 +289,15 @@ describe('VotePanelComponent', () => {
     expect(title.closest('app-sheet-bar')).not.toBeNull();
     const meta = fixture.nativeElement.querySelector('.vpn__meta') as HTMLElement;
     expect(meta).toHaveClass('sheet-line');
-    expect(meta.textContent?.replace(/\s+/g, '')).toBe('Offen34.SitzungdesStudierendenparlaments·TOP3EinfacheMehrheit');
+    expect(meta.textContent?.replace(/\s+/g, '')).toBe(
+      'Offen34.SitzungdesStudierendenparlaments·TOP3EinfacheMehrheit',
+    );
     expect(screen.getByRole('heading', { name: 'Deine Stimme' })).toBeInTheDocument();
-    const progress = fixture.nativeElement.querySelector('app-vote-progress') as HTMLElement;
-    const ballot = fixture.nativeElement.querySelector('app-ballot') as HTMLElement;
-    expect(progress.compareDocumentPosition(ballot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const progress = fixture.nativeElement.querySelector('app-vote-progress-view') as HTMLElement;
+    const ballot = fixture.nativeElement.querySelector('app-ballot-view') as HTMLElement;
+    expect(
+      progress.compareDocumentPosition(ballot) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('has no a11y violations', async () => {
@@ -250,9 +310,9 @@ describe('VotePanelComponent', () => {
     expect(screen.getByText('Abstimmung offen')).toHaveClass('st--accent');
     expect(screen.getByRole('heading', { level: 3 })).toBeInTheDocument();
     expect(fixture.nativeElement).toHaveClass('vpn--card');
-    expect(document.querySelector('app-ballot')).toHaveClass('ballot--compact');
-    expect(document.querySelector('app-ballot')).not.toHaveClass('ballot--phone');
-    expect(document.querySelector('app-vote-progress')).not.toBeNull();
+    expect(document.querySelector('app-ballot-view')).toHaveClass('ballot--compact');
+    expect(document.querySelector('app-ballot-view')).not.toHaveClass('ballot--phone');
+    expect(document.querySelector('app-vote-progress-view')).not.toBeNull();
   });
 
   it('names a closed or cancelled card', async () => {
@@ -272,13 +332,25 @@ describe('VotePanelComponent', () => {
           guestsVote: true,
           status: 'closed',
           result: 'passed',
-          tally: { counts: { yes: 17, no: 4, abstain: 3 }, eligible: 26, voted: 24, present: 26, revealed: true, quorumMet: true, leading: 'yes', presentMembers: 19, presentGuests: 7 },
+          tally: {
+            counts: { yes: 17, no: 4, abstain: 3 },
+            eligible: 26,
+            voted: 24,
+            present: 26,
+            revealed: true,
+            quorumMet: true,
+            leading: 'yes',
+            presentMembers: 19,
+            presentGuests: 7,
+          },
         }),
         own: null,
       });
       expect(screen.getByText(/Einfache Mehrheit der abgegebenen Stimmen/)).toBeInTheDocument();
       expect(
-        screen.getByText('19 Mitglieder + 7 Gäste anwesend · Abgegeben 24 · Mehrheit der abgegebenen Stimmen'),
+        screen.getByText(
+          '19 Mitglieder + 7 Gäste anwesend · Abgegeben 24 · Mehrheit der abgegebenen Stimmen',
+        ),
       ).toBeInTheDocument();
     });
 
@@ -288,19 +360,35 @@ describe('VotePanelComponent', () => {
           config: { options: ['yes', 'no', 'abstain'], majorityRule: 'simple', guestsVote: true },
           status: 'closed',
           result: 'rejected',
-          tally: { counts: { yes: 1, no: 2 }, eligible: 0, quorumMet: true, leading: 'no', presentMembers: 19, presentGuests: null },
+          tally: {
+            counts: { yes: 1, no: 2 },
+            eligible: 0,
+            quorumMet: true,
+            leading: 'no',
+            presentMembers: 19,
+            presentGuests: null,
+          },
         }),
         own: null,
       });
-      expect(screen.getByText('Abgegeben 3 · Mehrheit der abgegebenen Stimmen')).toBeInTheDocument();
+      expect(
+        screen.getByText('Abgegeben 3 · Mehrheit der abgegebenen Stimmen'),
+      ).toBeInTheDocument();
     });
 
     it('ignores a missing member count', async () => {
       await setup({
-        vote: vote({ guestsVote: true, status: 'closed', result: 'passed', tally: { counts: { yes: 1 }, eligible: 0, voted: 1, quorumMet: true, leading: 'yes' } }),
+        vote: vote({
+          guestsVote: true,
+          status: 'closed',
+          result: 'passed',
+          tally: { counts: { yes: 1 }, eligible: 0, voted: 1, quorumMet: true, leading: 'yes' },
+        }),
         own: null,
       });
-      expect(screen.getByText('Abgegeben 1 · Mehrheit der abgegebenen Stimmen')).toBeInTheDocument();
+      expect(
+        screen.getByText('Abgegeben 1 · Mehrheit der abgegebenen Stimmen'),
+      ).toBeInTheDocument();
     });
   });
 

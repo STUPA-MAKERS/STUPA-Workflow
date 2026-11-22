@@ -1,16 +1,24 @@
 import { provideHttpClient } from '@angular/common/http';
 import { renderDeferred } from '../../../testing/defer';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import type { Delegation, MeetingDelegationContext, VoteDelegationStatus } from '@core/api/delegations.service';
+import type {
+  Delegation,
+  MeetingDelegationContext,
+  VoteDelegationStatus,
+} from '@core/api/delegations.service';
 import type { AgendaItem, Attendance, Meeting, Vote } from '@core/api/models';
 import { MEDIA } from '@stupa-makers/ui-kit';
-import { AGENDA, DELEGATION_CONTEXT, item, matchMediaQueries, meeting, vote } from '../../../testing/meeting-fixtures';
+import {
+  AGENDA,
+  DELEGATION_CONTEXT,
+  item,
+  matchMediaQueries,
+  meeting,
+  vote,
+} from '../../../testing/meeting-fixtures';
 import { MeetingFollowViewComponent, plainText } from './meeting-follow-view.component';
 
 const CONTEXT_URL = '/api/delegations/meetings/m-1/context';
@@ -45,15 +53,43 @@ const ME: Attendance = {
 
 /** A delegation of the meeting, from Jonas Weber to the member. */
 const INCOMING: Delegation = {
-  id: 'd-2', meetingId: 'm-1', meetingTitle: null, meetingDate: null, gremiumId: 'g-1', gremiumName: null,
-  delegatorId: 'pr-4', delegatorName: 'Jonas Weber', delegateId: 'pr-1', delegateName: 'Paul Neumann',
-  delegateVoting: true, viaPool: false, createdAt: '2026-10-01T00:00:00Z', revocable: false, direction: 'incoming',
+  id: 'd-2',
+  meetingId: 'm-1',
+  meetingTitle: null,
+  meetingDate: null,
+  gremiumId: 'g-1',
+  gremiumName: null,
+  delegatorId: 'pr-4',
+  delegatorName: 'Jonas Weber',
+  delegateId: 'pr-1',
+  delegateName: 'Paul Neumann',
+  delegateVoting: true,
+  viaPool: false,
+  createdAt: '2026-10-01T00:00:00Z',
+  revocable: false,
+  direction: 'incoming',
 };
 
 /** Two other members of the roster: the minute-taker and an absent member. */
 const OTHERS: Attendance[] = [
-  { principalId: 'pr-9', displayName: 'Mara Keller', email: null, status: 'present', source: 'lead', note: null, isSelf: false },
-  { principalId: 'pr-3', displayName: 'Tom Brandt', email: null, status: 'absent', source: 'lead', note: null, isSelf: false },
+  {
+    principalId: 'pr-9',
+    displayName: 'Mara Keller',
+    email: null,
+    status: 'present',
+    source: 'lead',
+    note: null,
+    isSelf: false,
+  },
+  {
+    principalId: 'pr-3',
+    displayName: 'Tom Brandt',
+    email: null,
+    status: 'absent',
+    source: 'lead',
+    note: null,
+    isSelf: false,
+  },
 ];
 
 function rest(over: Partial<Vote> = {}): Vote {
@@ -64,13 +100,25 @@ function rest(over: Partial<Vote> = {}): Vote {
     agendaItemId: 't-2',
     question: 'Wird der Nachtragshaushalt beschlossen?',
     eligibleGroup: 'g-1',
-    config: { options: ['yes', 'no', 'abstain'], majorityRule: 'simple', quorum: { type: 'count', value: 12 } },
+    config: {
+      options: ['yes', 'no', 'abstain'],
+      majorityRule: 'simple',
+      quorum: { type: 'count', value: 12 },
+    },
     status: 'open',
     opensAt: null,
     closesAt: null,
     result: null,
     secret: false,
-    tally: { counts: {}, eligible: 19, voted: 14, present: 19, revealed: false, quorumMet: true, leading: null },
+    tally: {
+      counts: {},
+      eligible: 19,
+      voted: 14,
+      present: 19,
+      revealed: false,
+      quorumMet: true,
+      leading: null,
+    },
     canCast: true,
     myBallot: { cast: false, choice: null },
     representedCast: false,
@@ -110,7 +158,12 @@ async function setup(opts: Options = {}) {
   /** Answer the reads of the vote card. */
   const voteReads = (
     v: Vote,
-    status: VoteDelegationStatus = { blocked: false, delegatedToName: null, exercising: false, delegatedByName: null },
+    status: VoteDelegationStatus = {
+      blocked: false,
+      delegatedToName: null,
+      exercising: false,
+      delegatedByName: null,
+    },
   ) => {
     http.match(`/api/votes/${v.id}`).forEach((r) => r.flush(v));
     http.match(`/api/delegations/votes/${v.id}/status`).forEach((r) => r.flush(status));
@@ -124,7 +177,12 @@ afterEach(() => restore());
 describe('MeetingFollowViewComponent', () => {
   /** § 000922 */
   it('opens the late excuse of an own absence and hands the new roster on', async () => {
-    const absent: Attendance = { ...ME, status: 'absent', source: 'lead', lateExcuseUntil: '2099-01-01T00:00:00Z' };
+    const absent: Attendance = {
+      ...ME,
+      status: 'absent',
+      source: 'lead',
+      lateExcuseUntil: '2099-01-01T00:00:00Z',
+    };
     const { http, lateExcused, context, fixture } = await setup({
       meeting: member({ status: 'closed', currentAgendaItemId: null }),
       attendance: [absent],
@@ -144,7 +202,12 @@ describe('MeetingFollowViewComponent', () => {
   });
 
   it('closes the late excuse on "Abbrechen"', async () => {
-    const absent: Attendance = { ...ME, status: 'absent', source: 'lead', lateExcuseUntil: '2099-01-01T00:00:00Z' };
+    const absent: Attendance = {
+      ...ME,
+      status: 'absent',
+      source: 'lead',
+      lateExcuseUntil: '2099-01-01T00:00:00Z',
+    };
     const { lateExcused, context, fixture } = await setup({
       meeting: member({ status: 'closed', currentAgendaItemId: null }),
       attendance: [absent],
@@ -153,7 +216,12 @@ describe('MeetingFollowViewComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: /^Deine Anwesenheit:/ }));
     fixture.detectChanges();
     await userEvent.click(screen.getByRole('button', { name: 'Nachträglich entschuldigen' }));
-    await userEvent.click(within(screen.getByRole('dialog', { name: 'Nachträglich entschuldigen' })).getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog', { name: 'Nachträglich entschuldigen' })).getByRole(
+        'button',
+        { name: 'Abbrechen' },
+      ),
+    );
     fixture.detectChanges();
     expect(screen.queryByRole('dialog', { name: 'Nachträglich entschuldigen' })).toBeNull();
     expect(lateExcused).not.toHaveBeenCalled();
@@ -166,10 +234,14 @@ describe('MeetingFollowViewComponent', () => {
     it('says when the meeting starts and offers the calendar subscription', async () => {
       const { context } = await setup({ meeting: planned() });
       context();
-      expect(screen.getByRole('heading', { level: 1, name: 'Konstituierende Sitzung' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Konstituierende Sitzung' }),
+      ).toBeInTheDocument();
       expect(screen.getByText('Geplant')).toBeInTheDocument();
       expect(screen.getByText('StuPa · Do, 15.10.2026 · 18:00')).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: 'Die Sitzung beginnt am Do, 15.10.2026 um 18:00' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'Die Sitzung beginnt am Do, 15.10.2026 um 18:00' }),
+      ).toBeInTheDocument();
       const subscribe = screen.getByRole('button', { name: 'Kalender abonnieren' });
       expect(subscribe).toHaveAttribute('aria-expanded', 'false');
       expect(screen.queryByRole('contentinfo')).toBeNull();
@@ -178,10 +250,14 @@ describe('MeetingFollowViewComponent', () => {
     it('says the date alone without a time, and that the date is open without one', async () => {
       const { fixture, context } = await setup({ meeting: { ...planned(), startTime: null } });
       context();
-      expect(screen.getByRole('heading', { name: 'Die Sitzung beginnt am Do, 15.10.2026' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'Die Sitzung beginnt am Do, 15.10.2026' }),
+      ).toBeInTheDocument();
       fixture.componentRef.setInput('meeting', { ...planned(), date: null, gremiumName: null });
       fixture.detectChanges();
-      expect(screen.getByRole('heading', { name: 'Der Termin der Sitzung steht noch nicht fest.' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'Der Termin der Sitzung steht noch nicht fest.' }),
+      ).toBeInTheDocument();
     });
 
     it('reports the own attendance as present or excused only', async () => {
@@ -207,7 +283,12 @@ describe('MeetingFollowViewComponent', () => {
     /** The card reports an own delegation, so the member cannot report "Anwesend". */
     it('shows the delegation setup with its deadline and locks "Anwesend" while delegated', async () => {
       const { context, fixture } = await setup({ meeting: planned() });
-      context({ allowVoteDelegation: true, canDelegate: true, meetingStarted: false, deadline: '2026-10-15T15:00:00Z' });
+      context({
+        allowVoteDelegation: true,
+        canDelegate: true,
+        meetingStarted: false,
+        deadline: '2026-10-15T15:00:00Z',
+      });
       expect(screen.getByText(/^Einrichtbar bis Do, 15\.10\.2026/)).toBeInTheDocument();
       expect(screen.getByRole('radio', { name: 'Anwesend' })).toBeEnabled();
       const card = fixture.debugElement.query((el) => el.name === 'app-meeting-delegation-card');
@@ -217,9 +298,21 @@ describe('MeetingFollowViewComponent', () => {
         canDelegate: true,
         meetingStarted: false,
         myDelegation: {
-          id: 'd-1', meetingId: 'm-1', meetingTitle: null, meetingDate: null, gremiumId: 'g-1', gremiumName: null,
-          delegatorId: 'pr-1', delegatorName: 'Paul Neumann', delegateId: 'pr-7', delegateName: 'Emma Vogel',
-          delegateVoting: true, viaPool: true, createdAt: '2026-10-01T00:00:00Z', revocable: true, direction: 'outgoing',
+          id: 'd-1',
+          meetingId: 'm-1',
+          meetingTitle: null,
+          meetingDate: null,
+          gremiumId: 'g-1',
+          gremiumName: null,
+          delegatorId: 'pr-1',
+          delegatorName: 'Paul Neumann',
+          delegateId: 'pr-7',
+          delegateName: 'Emma Vogel',
+          delegateVoting: true,
+          viaPool: true,
+          createdAt: '2026-10-01T00:00:00Z',
+          revocable: true,
+          direction: 'outgoing',
         },
       });
       expect(screen.getByText('Du wirst vertreten von Emma Vogel.')).toBeInTheDocument();
@@ -242,7 +335,9 @@ describe('MeetingFollowViewComponent', () => {
       const { context } = await setup({ meeting: planned() });
       context();
       await userEvent.click(screen.getByRole('button', { name: /Bericht des Finanzreferats/ }));
-      expect(screen.getByRole('heading', { level: 1, name: 'Bericht des Finanzreferats' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Bericht des Finanzreferats' }),
+      ).toBeInTheDocument();
       expect(screen.queryByText('Kalender abonnieren')).toBeNull();
       await userEvent.click(screen.getByRole('button', { name: /Bericht des Finanzreferats/ }));
       expect(screen.getByText('Kalender abonnieren')).toBeInTheDocument();
@@ -261,7 +356,9 @@ describe('MeetingFollowViewComponent', () => {
       const { context } = await setup();
       context();
       expect(screen.getByText(/^StuPa · Do, 15\.10\.2026 · seit \d\d:04$/)).toBeInTheDocument();
-      expect(screen.getByRole('heading', { level: 1, name: 'Bericht des Finanzreferats' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Bericht des Finanzreferats' }),
+      ).toBeInTheDocument();
       expect(screen.getByText('Jetzt')).toBeInTheDocument();
       expect(screen.getByText('Mara Keller führt das Protokoll')).toBeInTheDocument();
       const dock = screen.getByRole('contentinfo', { name: 'Stand der Sitzung' });
@@ -274,11 +371,17 @@ describe('MeetingFollowViewComponent', () => {
       const { context } = await setup();
       context();
       await userEvent.click(screen.getByRole('button', { name: /Antrag Kulturfestival/ }));
-      expect(screen.getByRole('heading', { level: 1, name: 'Antrag Kulturfestival' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Antrag Kulturfestival' }),
+      ).toBeInTheDocument();
       const dock = screen.getByRole('contentinfo', { name: 'Stand der Sitzung' });
-      expect(within(dock).getByText('Jetzt läuft TOP 2 · Bericht des Finanzreferats')).toBeInTheDocument();
+      expect(
+        within(dock).getByText('Jetzt läuft TOP 2 · Bericht des Finanzreferats'),
+      ).toBeInTheDocument();
       await userEvent.click(within(dock).getByRole('button', { name: 'Zurück zu Jetzt' }));
-      expect(screen.getByRole('heading', { level: 1, name: 'Bericht des Finanzreferats' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Bericht des Finanzreferats' }),
+      ).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: /Begrüßung/ }));
       await userEvent.click(screen.getByRole('button', { name: /Bericht des Finanzreferats/ }));
       expect(within(dock).queryByRole('button', { name: 'Zurück zu Jetzt' })).toBeNull();
@@ -289,10 +392,14 @@ describe('MeetingFollowViewComponent', () => {
       const view = await setup();
       view.context();
       await userEvent.click(screen.getByRole('button', { name: /Antrag Kulturfestival/ }));
-      expect(screen.getByRole('heading', { level: 1, name: 'Antrag Kulturfestival' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Antrag Kulturfestival' }),
+      ).toBeInTheDocument();
       view.fixture.componentRef.setInput('meeting', member());
       view.fixture.detectChanges();
-      expect(screen.getByRole('heading', { level: 1, name: 'Antrag Kulturfestival' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Antrag Kulturfestival' }),
+      ).toBeInTheDocument();
       view.fixture.componentRef.setInput('meeting', member({ currentAgendaItemId: 't-1' }));
       view.fixture.detectChanges();
       expect(screen.getByRole('heading', { level: 1, name: 'Begrüßung' })).toBeInTheDocument();
@@ -303,7 +410,12 @@ describe('MeetingFollowViewComponent', () => {
       const open = vote({ id: 'v-1', agendaItemId: 't-2', voted: 14, present: 19 });
       const { context, voteReads, http } = await setup({ meeting: member({ votes: [open] }) });
       context();
-      voteReads(rest(), { blocked: false, delegatedToName: null, exercising: true, delegatedByName: 'Jonas Weber' });
+      voteReads(rest(), {
+        blocked: false,
+        delegatedToName: null,
+        exercising: true,
+        delegatedByName: 'Jonas Weber',
+      });
       const side = screen.getByRole('complementary', { name: 'Teilnahme' });
       expect(within(side).getByText('Abstimmung offen')).toBeInTheDocument();
       const unit = within(side).getByRole('group', { name: 'Deine Stimme, auch für Jonas Weber' });
@@ -335,14 +447,26 @@ describe('MeetingFollowViewComponent', () => {
     /** There is no ballot line in the dock after the close. */
     it('shows the result of the shown item once its vote closed', async () => {
       const done = vote({ id: 'v-9', agendaItemId: 't-2', status: 'closed', result: 'passed' });
-      const { context, voteReads } = await setup({ meeting: member({ votes: [vote({ id: 'v-0', agendaItemId: 't-1', status: 'closed' }), done] }) });
+      const { context, voteReads } = await setup({
+        meeting: member({
+          votes: [vote({ id: 'v-0', agendaItemId: 't-1', status: 'closed' }), done],
+        }),
+      });
       context();
       voteReads(
         rest({
           id: 'v-9',
           status: 'closed',
           result: 'passed',
-          tally: { counts: { yes: 15, no: 3, abstain: 2 }, eligible: 20, voted: 20, present: 0, revealed: true, quorumMet: true, leading: 'yes' },
+          tally: {
+            counts: { yes: 15, no: 3, abstain: 2 },
+            eligible: 20,
+            voted: 20,
+            present: 0,
+            revealed: true,
+            quorumMet: true,
+            leading: 'yes',
+          },
         }),
       );
       expect(screen.getByText('Abstimmung geschlossen')).toBeInTheDocument();
@@ -359,7 +483,9 @@ describe('MeetingFollowViewComponent', () => {
       expect(text()).toContain('Zwischenstand.');
       fixture.componentRef.setInput(
         'agenda',
-        AGENDA.map((a) => (a.id === 't-2' ? { ...a, body: 'Zwischenstand. Der Haushalt ist ausgeglichen.' } : a)),
+        AGENDA.map((a) =>
+          a.id === 't-2' ? { ...a, body: 'Zwischenstand. Der Haushalt ist ausgeglichen.' } : a,
+        ),
       );
       fixture.detectChanges();
       expect(text()).toContain('Der Haushalt ist ausgeglichen.');
@@ -367,25 +493,57 @@ describe('MeetingFollowViewComponent', () => {
 
     /** The card shows the newest result; the list holds the earlier one of the item. */
     it('lists the earlier results of the shown item and the votes without an item', async () => {
-      const first = vote({ id: 'v-7', agendaItemId: 't-2', status: 'closed', result: 'rejected', question: 'Erste Lesung?' });
-      const last = vote({ id: 'v-9', agendaItemId: 't-2', status: 'closed', result: 'passed', question: 'Zweite Lesung?' });
-      const loose = vote({ id: 'v-5', agendaItemId: null, status: 'closed', result: 'passed', question: 'Antrag zur Geschäftsordnung?' });
-      const other = vote({ id: 'v-3', agendaItemId: 't-1', status: 'closed', result: 'passed', question: 'Begrüßung?' });
-      const { context, voteReads } = await setup({ meeting: member({ votes: [other, first, loose, last] }) });
+      const first = vote({
+        id: 'v-7',
+        agendaItemId: 't-2',
+        status: 'closed',
+        result: 'rejected',
+        question: 'Erste Lesung?',
+      });
+      const last = vote({
+        id: 'v-9',
+        agendaItemId: 't-2',
+        status: 'closed',
+        result: 'passed',
+        question: 'Zweite Lesung?',
+      });
+      const loose = vote({
+        id: 'v-5',
+        agendaItemId: null,
+        status: 'closed',
+        result: 'passed',
+        question: 'Antrag zur Geschäftsordnung?',
+      });
+      const other = vote({
+        id: 'v-3',
+        agendaItemId: 't-1',
+        status: 'closed',
+        result: 'passed',
+        question: 'Begrüßung?',
+      });
+      const { context, voteReads } = await setup({
+        meeting: member({ votes: [other, first, loose, last] }),
+      });
       context();
-      voteReads(rest({ id: 'v-9', status: 'closed', result: 'passed', question: 'Zweite Lesung?' }));
+      voteReads(
+        rest({ id: 'v-9', status: 'closed', result: 'passed', question: 'Zweite Lesung?' }),
+      );
       const more = screen.getByRole('region', { name: 'Weitere Ergebnisse zu diesem TOP' });
       expect(within(more).getByRole('heading', { name: 'Erste Lesung?' })).toBeInTheDocument();
       expect(within(more).getByText('Abgelehnt')).toBeInTheDocument();
       expect(within(more).queryByText('Zweite Lesung?')).toBeNull();
       expect(within(more).queryByText('Begrüßung?')).toBeNull();
       const looseBox = screen.getByRole('region', { name: 'Abstimmungen ohne TOP' });
-      expect(within(looseBox).getByRole('heading', { name: 'Antrag zur Geschäftsordnung?' })).toBeInTheDocument();
+      expect(
+        within(looseBox).getByRole('heading', { name: 'Antrag zur Geschäftsordnung?' }),
+      ).toBeInTheDocument();
     });
 
     /** A member sees an absence as "Abwesend", never a reason. */
     it('lists the attendance of all members in the attendance sheet', async () => {
-      const { context } = await setup({ attendance: [{ ...ME, status: 'present', source: 'self' }, ...OTHERS] });
+      const { context } = await setup({
+        attendance: [{ ...ME, status: 'present', source: 'self' }, ...OTHERS],
+      });
       context();
       await userEvent.click(screen.getByRole('button', { name: 'Deine Anwesenheit: Anwesend' }));
       const sheet = screen.getByRole('dialog', { name: 'Deine Anwesenheit' });
@@ -397,19 +555,28 @@ describe('MeetingFollowViewComponent', () => {
     });
 
     it('opens the attendance from the dock', async () => {
-      const { context, attendanceChange } = await setup({ attendance: [{ ...ME, status: 'present', source: 'self' }] });
+      const { context, attendanceChange } = await setup({
+        attendance: [{ ...ME, status: 'present', source: 'self' }],
+      });
       context();
       await userEvent.click(screen.getByRole('button', { name: 'Deine Anwesenheit: Anwesend' }));
       const sheet = screen.getByRole('dialog', { name: 'Deine Anwesenheit' });
       await userEvent.click(within(sheet).getByRole('radio', { name: 'Abwesend' }));
-      expect(attendanceChange).toHaveBeenCalledWith({ member: expect.objectContaining({ principalId: 'pr-1' }), status: 'excused' });
+      expect(attendanceChange).toHaveBeenCalledWith({
+        member: expect.objectContaining({ principalId: 'pr-1' }),
+        status: 'excused',
+      });
     });
 
     /** An external substitute has no row, so there is no chip. */
     it('names the own attendance in the dock', async () => {
-      const { context, fixture } = await setup({ attendance: [{ ...ME, status: 'absent', source: 'lead' }] });
+      const { context, fixture } = await setup({
+        attendance: [{ ...ME, status: 'absent', source: 'lead' }],
+      });
       context();
-      expect(screen.getByRole('button', { name: 'Deine Anwesenheit: Abwesend' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Deine Anwesenheit: Abwesend' }),
+      ).toBeInTheDocument();
       fixture.componentRef.setInput('attendance', [ME]);
       fixture.detectChanges();
       expect(screen.getByRole('button', { name: 'Deine Anwesenheit: Offen' })).toBeInTheDocument();
@@ -425,7 +592,12 @@ describe('MeetingFollowViewComponent', () => {
     it('says that the meeting runs while the room has no item yet', async () => {
       const { context } = await setup({ meeting: member({ currentAgendaItemId: null }) });
       context();
-      expect(screen.getByRole('heading', { level: 2, name: 'Die Sitzung läuft · noch kein TOP aufgerufen' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', {
+          level: 2,
+          name: 'Die Sitzung läuft · noch kein TOP aufgerufen',
+        }),
+      ).toBeInTheDocument();
       expect(screen.getByText(/Bis dahin kannst du die Tagesordnung lesen\.$/)).toBeInTheDocument();
       expect(screen.queryByText(/Die Sitzung beginnt/)).toBeNull();
       expect(screen.queryByText('Kalender abonnieren')).toBeNull();
@@ -434,9 +606,17 @@ describe('MeetingFollowViewComponent', () => {
     });
 
     it('says that the agenda is empty while the room has no item and no agenda', async () => {
-      const { context } = await setup({ meeting: member({ currentAgendaItemId: null }), agenda: [] });
+      const { context } = await setup({
+        meeting: member({ currentAgendaItemId: null }),
+        agenda: [],
+      });
       context();
-      expect(screen.getByRole('heading', { level: 2, name: 'Die Sitzung läuft · noch kein TOP aufgerufen' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', {
+          level: 2,
+          name: 'Die Sitzung läuft · noch kein TOP aufgerufen',
+        }),
+      ).toBeInTheDocument();
       expect(screen.getByText(/Die Tagesordnung hat noch keinen TOP\.$/)).toBeInTheDocument();
       expect(screen.queryByText('Kalender abonnieren')).toBeNull();
     });
@@ -445,10 +625,16 @@ describe('MeetingFollowViewComponent', () => {
   describe('closed meeting', () => {
     it('opens on the last item of the room and closes the dock', async () => {
       const { context } = await setup({
-        meeting: member({ status: 'closed', closedAt: '2026-10-15T19:12:00Z', currentAgendaItemId: 't-3' }),
+        meeting: member({
+          status: 'closed',
+          closedAt: '2026-10-15T19:12:00Z',
+          currentAgendaItemId: 't-3',
+        }),
       });
       context();
-      expect(screen.getByRole('heading', { level: 1, name: 'Antrag Kulturfestival' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Antrag Kulturfestival' }),
+      ).toBeInTheDocument();
       expect(screen.queryByText('Jetzt')).toBeNull();
       expect(screen.getByText(/^StuPa · Do, 15\.10\.2026 · \d\d:04–\d\d:12$/)).toBeInTheDocument();
       const dock = screen.getByRole('contentinfo', { name: 'Stand der Sitzung' });
@@ -459,20 +645,31 @@ describe('MeetingFollowViewComponent', () => {
     /** §ui-kit:000101: the row of the Antrag stands above the title, as on the page of the lead. */
     it('shows the row of the Antrag above the sheet, not below the title', async () => {
       const { context, container } = await setup({
-        meeting: member({ status: 'closed', closedAt: '2026-10-15T19:12:00Z', currentAgendaItemId: 't-3' }),
+        meeting: member({
+          status: 'closed',
+          closedAt: '2026-10-15T19:12:00Z',
+          currentAgendaItemId: 't-3',
+        }),
       });
       context();
       const lists = container.querySelectorAll('app-todo-linked-list');
       expect(lists).toHaveLength(1);
       const sheet = container.querySelector('app-top-sheet')!;
       expect(sheet.contains(lists[0])).toBe(false);
-      expect(lists[0].compareDocumentPosition(sheet) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(
+        lists[0].compareDocumentPosition(sheet) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
       expect(within(lists[0] as HTMLElement).getByText(/^Antrag · Abstimmung/)).toBeInTheDocument();
     });
 
     it('opens on the first item without an item of the room, and names one item', async () => {
       const { context } = await setup({
-        meeting: member({ status: 'closed', closedAt: null, startedAt: null, currentAgendaItemId: null }),
+        meeting: member({
+          status: 'closed',
+          closedAt: null,
+          startedAt: null,
+          currentAgendaItemId: null,
+        }),
         agenda: [item()],
       });
       context();
@@ -495,7 +692,10 @@ describe('MeetingFollowViewComponent', () => {
   describe('narrow screen (board Schmal-Teilnahme)', () => {
     it('puts the vote above the sheet and opens the agenda as a sheet', async () => {
       const open = vote({ id: 'v-1', agendaItemId: 't-2' });
-      const { context, voteReads } = await setup({ meeting: member({ votes: [open] }), media: [MEDIA.narrow, MEDIA.notPhone, MEDIA.belowWide] });
+      const { context, voteReads } = await setup({
+        meeting: member({ votes: [open] }),
+        media: [MEDIA.narrow, MEDIA.notPhone, MEDIA.belowWide],
+      });
       context();
       voteReads(rest());
       expect(screen.queryByRole('region', { name: 'Tagesordnung' })).toBeNull();
@@ -503,7 +703,9 @@ describe('MeetingFollowViewComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: /Tagesordnung/ }));
       const sheet = screen.getByRole('dialog', { name: 'Tagesordnung' });
       await userEvent.click(within(sheet).getByRole('button', { name: /Antrag Kulturfestival/ }));
-      expect(screen.getByRole('heading', { level: 1, name: 'Antrag Kulturfestival' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Antrag Kulturfestival' }),
+      ).toBeInTheDocument();
     });
 
     /**
@@ -517,15 +719,24 @@ describe('MeetingFollowViewComponent', () => {
         media: [MEDIA.narrow, MEDIA.notPhone, MEDIA.belowWide],
       });
       context({ allowVoteDelegation: true, incoming: [INCOMING] });
-      voteReads(rest(), { blocked: false, delegatedToName: null, exercising: true, delegatedByName: 'Jonas Weber' });
+      voteReads(rest(), {
+        blocked: false,
+        delegatedToName: null,
+        exercising: true,
+        delegatedByName: 'Jonas Weber',
+      });
       const strip = container.querySelector<HTMLElement>('app-participant-vote.fv__strip');
       expect(strip).not.toBeNull();
       expect(strip!.closest('.fv__body')).toBeNull();
       expect(within(strip!).getByText('Abstimmung offen · TOP 2')).toBeInTheDocument();
-      expect(within(strip!).getByLabelText('14 von 19 Anwesenden haben abgestimmt')).toHaveTextContent('14 von 19');
-      expect(strip!.querySelector('app-ballot')).toHaveClass('ballot--columns');
+      expect(
+        within(strip!).getByLabelText('14 von 19 Anwesenden haben abgestimmt'),
+      ).toHaveTextContent('14 von 19');
+      expect(strip!.querySelector('app-ballot-view')).toHaveClass('ballot--columns');
       const dock = screen.getByRole('contentinfo', { name: 'Stand der Sitzung' });
-      expect(within(dock).getByText('Du vertrittst Jonas Weber in dieser Sitzung.')).toBeInTheDocument();
+      expect(
+        within(dock).getByText('Du vertrittst Jonas Weber in dieser Sitzung.'),
+      ).toBeInTheDocument();
       expect(within(dock).queryByText(/Deine Stimme/)).toBeNull();
       expect(within(dock).queryByText(/von 3 · Bericht des Finanzreferats/)).toBeNull();
       expect(screen.queryByRole('region', { name: 'Vertretung' })).toBeNull();
@@ -541,7 +752,8 @@ describe('MeetingFollowViewComponent', () => {
 
   describe('phone (board Teilnahme-Telefon)', () => {
     const PHONE = [MEDIA.phone, MEDIA.belowWide];
-    const long = 'Lea Hoffmann stellt den **Antrag** vor. Die Party findet am 16.10. in der Mensa statt; erwartet werden rund 350 Erstsemester. Es gibt Rückfragen zum Pfand, zur Awareness und zum Posten für DJ und Technik.';
+    const long =
+      'Lea Hoffmann stellt den **Antrag** vor. Die Party findet am 16.10. in der Mensa statt; erwartet werden rund 350 Erstsemester. Es gibt Rückfragen zum Pfand, zur Awareness und zum Posten für DJ und Technik.';
 
     /** There is no dock on a phone, because the app bar is at the bottom. */
     it('shows the item, the vote, an excerpt of the minutes and the own boxes', async () => {
@@ -572,7 +784,11 @@ describe('MeetingFollowViewComponent', () => {
     /** §ui-kit:000101: the row of the Antrag stands above the title of the phone. */
     it('shows the row of the Antrag above the title of the item', async () => {
       const { context, container } = await setup({
-        meeting: member({ status: 'closed', closedAt: '2026-10-15T19:12:00Z', currentAgendaItemId: 't-3' }),
+        meeting: member({
+          status: 'closed',
+          closedAt: '2026-10-15T19:12:00Z',
+          currentAgendaItemId: 't-3',
+        }),
         media: PHONE,
       });
       context();
@@ -586,7 +802,10 @@ describe('MeetingFollowViewComponent', () => {
     it('says when an item has no text yet and offers no full view of a short text', async () => {
       const { context } = await setup({
         meeting: member({ status: 'closed', currentAgendaItemId: 't-1' }),
-        agenda: [item({ body: '' }), item({ id: 't-2', title: 'Kurz', position: 1, body: 'Kurz.' })],
+        agenda: [
+          item({ body: '' }),
+          item({ id: 't-2', title: 'Kurz', position: 1, body: 'Kurz.' }),
+        ],
         media: PHONE,
       });
       context();
@@ -594,7 +813,11 @@ describe('MeetingFollowViewComponent', () => {
       expect(screen.getByText('Protokoll')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Ganzen TOP lesen' })).toBeNull();
       await userEvent.click(screen.getByRole('button', { name: 'Tagesordnung öffnen' }));
-      await userEvent.click(within(screen.getByRole('dialog', { name: 'Tagesordnung' })).getByRole('button', { name: /Kurz/ }));
+      await userEvent.click(
+        within(screen.getByRole('dialog', { name: 'Tagesordnung' })).getByRole('button', {
+          name: /Kurz/,
+        }),
+      );
       expect(screen.getByText('Kurz.')).toBeInTheDocument();
     });
 
@@ -602,7 +825,11 @@ describe('MeetingFollowViewComponent', () => {
       const { context } = await setup({ media: PHONE });
       context();
       await userEvent.click(screen.getByRole('button', { name: 'Tagesordnung öffnen' }));
-      await userEvent.click(within(screen.getByRole('dialog', { name: 'Tagesordnung' })).getByRole('button', { name: /Begrüßung/ }));
+      await userEvent.click(
+        within(screen.getByRole('dialog', { name: 'Tagesordnung' })).getByRole('button', {
+          name: /Begrüßung/,
+        }),
+      );
       expect(screen.queryByText('Jetzt')).toBeNull();
       await userEvent.click(screen.getByRole('button', { name: 'Zurück zu Jetzt' }));
       expect(screen.getByText('Jetzt')).toBeInTheDocument();
@@ -610,9 +837,17 @@ describe('MeetingFollowViewComponent', () => {
 
     /** Both the icon button of the header and the button below the line open it. */
     it('says that the meeting runs while the room has no item yet, and opens the agenda', async () => {
-      const { context } = await setup({ meeting: member({ currentAgendaItemId: null }), media: PHONE });
+      const { context } = await setup({
+        meeting: member({ currentAgendaItemId: null }),
+        media: PHONE,
+      });
       context();
-      expect(screen.getByRole('heading', { level: 2, name: 'Die Sitzung läuft · noch kein TOP aufgerufen' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', {
+          level: 2,
+          name: 'Die Sitzung läuft · noch kein TOP aufgerufen',
+        }),
+      ).toBeInTheDocument();
       expect(screen.queryByText('Kalender abonnieren')).toBeNull();
       expect(screen.queryByText(/TOP \d von/)).toBeNull();
       const open = screen.getAllByRole('button', { name: 'Tagesordnung öffnen' });
@@ -633,8 +868,10 @@ describe('MeetingFollowViewComponent', () => {
   });
 
   it('turns Markdown into one plain line', () => {
-    expect(plainText('# Titel\n\n- **fett** und _kursiv_\n> Zitat [Link](https://x.y)\n:::antrag{#a}\n:::\n1. `code`')).toBe(
-      'Titel fett und kursiv Zitat Link code',
-    );
+    expect(
+      plainText(
+        '# Titel\n\n- **fett** und _kursiv_\n> Zitat [Link](https://x.y)\n:::antrag{#a}\n:::\n1. `code`',
+      ),
+    ).toBe('Titel fett und kursiv Zitat Link code');
   });
 });

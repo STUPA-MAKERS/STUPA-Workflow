@@ -15,7 +15,7 @@ implementation:
   - backend/app/modules/voting/election.py
   - backend/app/modules/voting/router.py
   - backend/app/modules/protocol/markdown.py
-  - frontend/src/app/features/voting/election-result/election-result.component.ts
+  - frontend/vendor/ui-kit/views/voting/src/election-result-view.component.ts
 scope:
   - backend/app/modules/voting
   - backend/app/modules/protocol

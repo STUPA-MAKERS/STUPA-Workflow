@@ -1,6 +1,6 @@
 import type { TranslationKey } from '@core/i18n/translations';
 
-import type { BallotFailure } from './ballot.component';
+import type { BallotFailure } from '@stupa-makers/ui-kit/views/voting';
 
 /** The refusals of a cast that have their own text, by the code of the server. */
 const REFUSAL_TEXT: Readonly<Record<string, TranslationKey>> = {

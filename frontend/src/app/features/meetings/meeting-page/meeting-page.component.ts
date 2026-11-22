@@ -62,7 +62,7 @@ import {
 } from '../attendance-sheet/attendance-sheet.component';
 import { type DockPanel, SessionDockComponent } from '../session-dock/session-dock.component';
 import { type SaveState, TopSheetComponent } from '../top-sheet/top-sheet.component';
-import { VoteCardComponent } from '../vote-card/vote-card.component';
+import { VoteCardViewComponent } from '@stupa-makers/ui-kit/views/voting';
 import { firstMeetingLink } from '../meeting-kind.util';
 import { voteSnippet, votesInText } from '../meetings.util';
 import { voteOptionLabel } from '../meetings-display.util';
@@ -73,9 +73,22 @@ import { topLead } from '../top-application-lead.util';
 import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { clock, weekdayDate } from '@shared/date-format';
 import { pageItemTitle } from '../../../layout/page-title.service';
+import { provideVotingApi } from '../../voting/voting-api.provider';
 
 /** The ids of the session menu. */
-type SessionAction = 'todos' | 'links' | 'open' | 'agenda' | 'settings' | 'attendance' | 'votes' | 'keeper' | 'beamer' | 'qr' | 'close' | 'delete';
+type SessionAction =
+  | 'todos'
+  | 'links'
+  | 'open'
+  | 'agenda'
+  | 'settings'
+  | 'attendance'
+  | 'votes'
+  | 'keeper'
+  | 'beamer'
+  | 'qr'
+  | 'close'
+  | 'delete';
 
 /**
  * The session page of the meeting lead and the minute-taker (`/meetings/:id`).
@@ -111,6 +124,7 @@ type SessionAction = 'todos' | 'links' | 'open' | 'agenda' | 'settings' | 'atten
  */
 @Component({
   selector: 'app-meeting-page',
+  providers: [provideVotingApi()],
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
@@ -130,7 +144,7 @@ type SessionAction = 'todos' | 'links' | 'open' | 'agenda' | 'settings' | 'atten
     SessionDockComponent,
     TopSheetComponent,
     TodoLinkedListComponent,
-    VoteCardComponent,
+    VoteCardViewComponent,
     AttendanceSheetComponent,
     JoinQrComponent,
     AvatarComponent,
@@ -390,7 +404,11 @@ export class MeetingPageComponent {
   });
   protected readonly presenceTitle = computed(() =>
     this.viewers().length
-      ? this.i18n.translate('meetings.page.viewers', { names: this.viewers().map((v) => v.name).join(', ') })
+      ? this.i18n.translate('meetings.page.viewers', {
+          names: this.viewers()
+            .map((v) => v.name)
+            .join(', '),
+        })
       : this.i18n.translate('meetings.viewers.empty'),
   );
 
@@ -454,7 +472,11 @@ export class MeetingPageComponent {
       // of sight (spec 000551).
       { id: 'todos', label: t('todos.meeting.sheet'), icon: 'link' },
       // The linked rows of the open item; above the phone width the edge tab opens them (spec 001800).
-      ...when(this.phone() && !!this.top(), { id: 'links', label: t('todos.linked.top'), icon: 'link' }),
+      ...when(this.phone() && !!this.top(), {
+        id: 'links',
+        label: t('todos.linked.top'),
+        icon: 'link',
+      }),
       ...when(m.canManage, { id: 'settings', label: t('meetings.settings.title'), icon: 'edit' }),
       ...when(!this.phone() || noDock, {
         id: 'attendance',
@@ -468,7 +490,9 @@ export class MeetingPageComponent {
       }),
       ...when(this.phone() && keeper, {
         id: 'keeper',
-        label: t(m.status === 'live' ? 'meetings.handover.title' : 'meetings.dock.pickProtokollant'),
+        label: t(
+          m.status === 'live' ? 'meetings.handover.title' : 'meetings.dock.pickProtokollant',
+        ),
         icon: m.status === 'live' ? 'swap' : 'clipcheck',
       }),
       ...when(!this.wide() && m.status !== 'closed' && m.canManage, {
@@ -501,7 +525,9 @@ export class MeetingPageComponent {
     // The items come from the page inputs, not from the child: the child gets its inputs only
     // after this menu is first read.
     const protocol =
-      m.status === 'closed' && p ? protocolMenuItems(protocolActions(m, p, true), p, this.phone(), t) : [];
+      m.status === 'closed' && p
+        ? protocolMenuItems(protocolActions(m, p, true), p, this.phone(), t)
+        : [];
     return [
       ...(protocol.length ? [{ label: t('meetings.protocolMenu.caption'), items: protocol }] : []),
       { items: main },
@@ -591,23 +617,27 @@ export class MeetingPageComponent {
   protected readonly canAddVote = computed(() => {
     const m = this.meeting();
     const t = this.top();
-    if (!t || !m.canManageVotes || this.locked() || m.status === 'closed' || t.planReading) return false;
+    if (!t || !m.canManageVotes || this.locked() || m.status === 'closed' || t.planReading)
+      return false;
     return (
       !(t.applicationId || t.planVersionId) || this.votes().every((v) => v.status === 'cancelled')
     );
   });
 
   /** The add button of an application item: open the vote, or only prepare it. */
-  protected readonly addVoteKey = computed<'meetings.vote.openFor' | 'meetings.vote.prepareTitle'>(() =>
-    this.meeting().status === 'live' && !this.anyOpenVote()
-      ? 'meetings.vote.openFor'
-      : 'meetings.vote.prepareTitle',
+  protected readonly addVoteKey = computed<'meetings.vote.openFor' | 'meetings.vote.prepareTitle'>(
+    () =>
+      this.meeting().status === 'live' && !this.anyOpenVote()
+        ? 'meetings.vote.openFor'
+        : 'meetings.vote.prepareTitle',
   );
 
   /** The name of the add button in the head of the vote sheet (spec 001802). */
   protected readonly addVoteLabel = computed(() => {
     const t = this.top();
-    return t?.applicationId || t?.planVersionId ? this.addVoteKey() : ('meetings.vote.addQuestion' as const);
+    return t?.applicationId || t?.planVersionId
+      ? this.addVoteKey()
+      : ('meetings.vote.addQuestion' as const);
   });
 
   /**
@@ -628,9 +658,13 @@ export class MeetingPageComponent {
       (this.dockVotes() === null || this.meeting().status === 'closed'),
   );
   /** The edge tab of the linked rows: above the phone width, while an item is open (spec 001800). */
-  protected readonly showLinkTab = computed(() => !this.phone() && !!this.top() && !this.linksOpen());
+  protected readonly showLinkTab = computed(
+    () => !this.phone() && !!this.top() && !this.linksOpen(),
+  );
   /** The edge tab of the attendance sheet: above the phone width, beside the dock chip (spec 001801). */
-  protected readonly showAttendanceTab = computed(() => !this.phone() && this.panel() !== 'attendance');
+  protected readonly showAttendanceTab = computed(
+    () => !this.phone() && this.panel() !== 'attendance',
+  );
 
   /** The own ballot of the open vote, for the dock. */
   protected readonly myVote = computed<string | null>(() => {

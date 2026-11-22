@@ -40,13 +40,14 @@ import {
 import { problemDetail } from '@core/api/problem';
 import type { Observable } from 'rxjs';
 import { RailStatusService } from '../../layout/rail-status.service';
-import type { BallotCaster, BallotFailure } from './ballot/ballot.component';
-import { VotePanelComponent } from './vote-panel/vote-panel.component';
+import type { BallotCaster, BallotFailure } from '@stupa-makers/ui-kit/views/voting';
+import { VotePanelViewComponent } from '@stupa-makers/ui-kit/views/voting';
 import { NO_CONTEXT, type VoteContext, loadVoteContext } from './vote-panel/vote-context';
 import { voteChangeText, voteSubject, type SeenVote } from './vote-announce.util';
 import { VotingPageService, visibleTicks } from './voting-page/voting-page.service';
 import { BEAMER_FROM_PARAM } from './beamer-link.util';
 import { TodoLinkedListComponent } from '../todos/linked-list/todo-linked-list.component';
+import { applicationLink, meetingLink, provideVotingApi } from './voting-api.provider';
 
 type Phase = 'loading' | 'error' | 'ready';
 
@@ -91,6 +92,7 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  */
 @Component({
   selector: 'app-vote-cast',
+  providers: [provideVotingApi()],
   host: { '[class.vc-host--split]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -105,12 +107,14 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
     ScrollFadeDirective,
     TodoLinkedListComponent,
     TranslatePipe,
-    VotePanelComponent,
+    VotePanelViewComponent,
   ],
   templateUrl: './vote-cast.component.html',
   styleUrl: './vote-cast.component.scss',
 })
 export class VoteCastComponent implements OnDestroy {
+  protected readonly meetingLink = meetingLink;
+  protected readonly applicationLink = applicationLink;
   private readonly api = inject(ApiClient);
   private readonly auth = inject(AuthService);
   private readonly delegations = inject(DelegationsApiService);
@@ -356,7 +360,9 @@ export class VoteCastComponent implements OnDestroy {
         this.runPoll(id);
         return;
       case 'plan':
-        void this.router.navigate(['/budget/plan'], { queryParams: { planVersion: this.loaded()?.planVersionId } });
+        void this.router.navigate(['/budget/plan'], {
+          queryParams: { planVersion: this.loaded()?.planVersionId },
+        });
         return;
       default:
         return;
@@ -627,9 +633,10 @@ export class VoteCastComponent implements OnDestroy {
     if (!vote) return;
     const { meeting, position } = this.context();
     const t: Translate = (key, params) => this.i18n.translate(key, params);
-    this.announcer.announce(voteChangeText(t, before, vote, voteSubject(t, vote.question, meeting?.title, position)));
+    this.announcer.announce(
+      voteChangeText(t, before, vote, voteSubject(t, vote.question, meeting?.title, position)),
+    );
   }
-
 
   /**
    * Read the delegation status. It explains a handed-over voting right, or it unlocks

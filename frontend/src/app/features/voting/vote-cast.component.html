@@ -5,8 +5,12 @@
       <div class="vc__sk" aria-hidden="true">
         <span class="vc__skTitle"><span class="skel-text vc__skTitle1"></span></span>
         <span class="vc__skTitle"><span class="skel-text vc__skTitle2"></span></span>
-        <span class="vc__skMeta"><span class="skel-text skel-text--muted vc__skMetaBar"></span></span>
-        <span class="vc__skKicker"><span class="skel-text skel-text--accent vc__skKickerBar"></span></span>
+        <span class="vc__skMeta"
+          ><span class="skel-text skel-text--muted vc__skMetaBar"></span
+        ></span>
+        <span class="vc__skKicker"
+          ><span class="skel-text skel-text--accent vc__skKickerBar"></span
+        ></span>
         @for (o of [0, 1, 2]; track o) {
           <span class="vc__skOption">
             <span class="skel-box vc__skRadio"></span>
@@ -20,12 +24,16 @@
 
   @case ('error') {
     <div class="vc vc--empty" [class.vc--sheet]="split()">
-      <app-empty-state plain icon="vote"
+      <app-empty-state
+        plain
+        icon="vote"
         fill
         [heading]="'voting.cast.error.heading' | t"
         [body]="'voting.cast.error.body' | t"
       >
-        <a routerLink="/voting" queryParamsHandling="preserve" class="vc__link">{{ 'voting.cast.toOverview' | t }}</a>
+        <a routerLink="/voting" queryParamsHandling="preserve" class="vc__link">{{
+          'voting.cast.toOverview' | t
+        }}</a>
       </app-empty-state>
     </div>
   }
@@ -39,7 +47,9 @@
         [attr.aria-label]="'voting.cast.heading' | t"
       >
         <div class="vc__body" appScrollFade="y">
-          <app-vote-panel
+          <app-vote-panel-view
+            [meetingLink]="meetingLink"
+            [applicationLink]="applicationLink"
             [vote]="v"
             [context]="context()"
             [own]="own()"
@@ -79,14 +89,23 @@
                 </app-button-group>
               </span>
             }
-          </app-vote-panel>
-          <app-todo-linked-list kind="vote" headingId="vc-todos" [targetId]="v.id" [actions]="true" [gremiumId]="context().meeting?.gremiumId ?? null" [linkLabel]="v.question ?? ''" />
+          </app-vote-panel-view>
+          <app-todo-linked-list
+            kind="vote"
+            headingId="vc-todos"
+            [targetId]="v.id"
+            [actions]="true"
+            [gremiumId]="context().meeting?.gremiumId ?? null"
+            [linkLabel]="v.question ?? ''"
+          />
         </div>
       </article>
     } @else {
       <div class="vc vc--empty" [class.vc--sheet]="split()">
         <app-empty-state plain icon="vote" fill [heading]="'voting.cast.notEligible' | t">
-          <a routerLink="/voting" queryParamsHandling="preserve" class="vc__link">{{ 'voting.cast.toOverview' | t }}</a>
+          <a routerLink="/voting" queryParamsHandling="preserve" class="vc__link">{{
+            'voting.cast.toOverview' | t
+          }}</a>
         </app-empty-state>
       </div>
     }

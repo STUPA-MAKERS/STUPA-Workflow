@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import type { VoteContext } from '../../voting/vote-panel/vote-context';
-import { VotePanelComponent } from '../../voting/vote-panel/vote-panel.component';
+import { VotePanelViewComponent } from '@stupa-makers/ui-kit/views/voting';
 import { ParticipantVoteService } from './participant-vote.service';
+import { applicationLink, meetingLink } from '../../voting/voting-api.provider';
 
 /**
  * The vote card of the participant view: "Abstimmung offen", the
@@ -16,11 +17,13 @@ import { ParticipantVoteService } from './participant-vote.service';
   selector: 'app-participant-vote',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [VotePanelComponent],
+  imports: [VotePanelViewComponent],
   templateUrl: './participant-vote.component.html',
   styleUrl: './participant-vote.component.scss',
 })
 export class ParticipantVoteComponent {
+  protected readonly meetingLink = meetingLink;
+  protected readonly applicationLink = applicationLink;
   protected readonly state = inject(ParticipantVoteService);
 
   readonly layout = input<'card' | 'strip'>('card');
