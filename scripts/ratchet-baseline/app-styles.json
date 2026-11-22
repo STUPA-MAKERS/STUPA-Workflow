@@ -557,7 +557,7 @@
   "frontend/src/app/pages/expenses/transfer-leg/transfer-leg.component.ts": 2,
   "frontend/src/app/pages/forbidden.component.ts": 1,
   "frontend/src/app/pages/graph/_graph-kinds.scss": 50,
-  "frontend/src/app/pages/graph/graph-canvas.component.html": 22,
+  "frontend/src/app/pages/graph/graph-canvas.component.html": 21,
   "frontend/src/app/pages/graph/graph-canvas.component.scss": 186,
   "frontend/src/app/pages/graph/graph-canvas.component.ts": 1,
   "frontend/src/app/pages/graph/graph.component.html": 52,
