@@ -135,8 +135,8 @@ describe('GroupMappingsComponent', () => {
   it('shows each section as rows "group → target", a gremium role after its gremium', async () => {
     const { c } = await setup();
     expect(c.sections().map((sec: { kind: string }) => sec.kind)).toEqual(['global', 'membership', 'role']);
-    expect(c.sections()[0].rows[0]).toEqual({ id: 'm1', oidcGroup: 'stupa-vorstand', target: 'Vorstand', role: null });
-    expect(c.sections()[2].rows[0]).toEqual({
+    expect(c.sections()[0].byId.get('m1')).toEqual({ id: 'm1', oidcGroup: 'stupa-vorstand', target: 'Vorstand', role: null });
+    expect(c.sections()[2].byId.get('rm1')).toEqual({
       id: 'rm1',
       oidcGroup: 'stupa-praesidium',
       target: 'StuPa',

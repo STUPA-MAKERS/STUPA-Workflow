@@ -1,35 +1,31 @@
 import { ChangeDetectionStrategy, Component, type OnDestroy, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
-import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
+import { LocalizedDatePipe, formatMoment } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { backupStatus } from '@shared/ui';
 import {
   ButtonComponent,
   ButtonGroupComponent,
-  CellDirective,
-  type ColumnDef,
   ConfirmDialogComponent,
-  DataTableComponent,
   DialogComponent,
   downloadBlob,
-  EmptyStateComponent,
   FilePickerComponent,
   formatBytes,
   IconComponent,
   InputComponent,
   NoteComponent,
-  RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-  StatusTextComponent,
   ToastService,
-  PageHeaderComponent,
   SectionComponent,
   DialogBodyDirective,
+  type Action,
+  type ListRow,
+  type LoadState as ListState,
 } from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import { RecordSectionComponent, SectionsScreenComponent } from '@stupa-makers/ui-kit/screens';
 import { AdminApiService } from '../admin-api.service';
 import type { Backup, BackupKind } from '../admin.models';
 
@@ -72,22 +68,17 @@ const POLL_TIMEOUT_MS = 30 * 60 * 1000;
     SectionComponent,
     FilePickerComponent,
     ConfirmDialogComponent,
-    EmptyStateComponent,
+    RecordSectionComponent,
+    SectionsScreenComponent,
     FormsModule,
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
     ButtonGroupComponent,
-    DataTableComponent,
-    CellDirective,
     DialogComponent,
     IconComponent,
     InputComponent,
     NoteComponent,
-    PageHeaderComponent,
-    BreadcrumbsComponent,
-    StatusTextComponent,
-    RowMenuComponent,
   ],
   templateUrl: './backups.component.html',
   styleUrl: './backups.component.scss',
@@ -124,27 +115,66 @@ export class BackupsComponent implements OnDestroy {
    * seven values fit the width of the admin sheet without a sideways scroll.
    * Every column but the kind has a width floor; the kind takes the slack.
    */
-  protected readonly columns = computed<ColumnDef[]>(() => [
-    {
-      key: 'createdAt',
-      label: this.i18n.translate('admin.backups.col.created'),
-      width: '8.5rem',
-      card: 'title',
-    },
-    { key: 'kind', label: this.i18n.translate('admin.backups.col.kindNote') },
-    { key: 'status', label: this.i18n.translate('admin.backups.col.status'), width: '6rem' },
-    { key: 'size', label: this.i18n.translate('admin.backups.col.size'), width: '4.5rem' },
-    { key: 'contents', label: this.i18n.translate('admin.backups.col.contents'), width: '7.5rem' },
-    {
-      key: 'actions',
-      label: this.i18n.translate('admin.common.actions'),
-      align: 'end',
-      width: '3.5rem',
-      card: 'actions',
-    },
-  ]);
+  /** The read of the list failed (002405). */
+  protected readonly loadError = signal(false);
+  /** The backups as the list state of the record section (002258). */
+  protected readonly list = computed<ListState<readonly ListRow[]>>(() => {
+    if (this.loading()) return { state: 'loading' };
+    if (this.loadError())
+      return { state: 'error', message: this.i18n.translate('admin.backups.loadFailed'), retry: () => this.retry() };
+    const rows = this.rows().map((r) => this.listRow(r));
+    return rows.length
+      ? { state: 'ready', data: rows }
+      : { state: 'empty', icon: 'db', heading: this.i18n.translate('admin.backups.empty') };
+  });
+  private readonly byId = computed(() => new Map(this.rows().map((r) => [r.id, r])));
 
-  /** True while any archive is still being built, which is what drives the poll. */
+  /** One backup as a row: the time, the kind, the note, the size and the contents, the status, the menu. */
+  private listRow(r: Backup): ListRow {
+    const t = (key: TranslationKey): string => this.i18n.translate(key);
+    const st = backupStatus(r.status);
+    const meta = [
+      this.kindLabel(r.kind),
+      r.pinned ? t('admin.backups.pinned') : null,
+      r.note?.trim() || null,
+      r.sizeBytes === null || r.sizeBytes === undefined ? null : this.sizeLabel(r.sizeBytes),
+      r.objectCount === null || r.objectCount === undefined
+        ? null
+        : this.i18n.translate('admin.backups.objectCount', { count: r.objectCount }),
+      r.status === 'failed' ? (r.error ?? null) : null,
+    ].filter((x): x is string => !!x);
+    const actions: Action[] =
+      r.status === 'done'
+        ? this.rowMenu(r)[0].items.map((i) => ({
+            key: i.id,
+            label: i.label,
+            icon: i.icon,
+            kind: i.danger ? 'danger' : undefined,
+            disabled: !!i.disabledReason,
+            disabledReason: i.disabledReason ?? undefined,
+          }))
+        : [];
+    return {
+      id: r.id,
+      title: formatMoment(r.createdAt, this.i18n.formatLocale(), 'medium'),
+      meta,
+      status: { label: t(st.key), kind: st.kind },
+      actions,
+    };
+  }
+
+  /** An item of the row menu of a backup. */
+  protected onRowAction(id: string, key: string): void {
+    const row = this.byId().get(id);
+    if (row) this.onRowMenu(row, { id: key, label: key });
+  }
+
+  /** The retry of a failed read. */
+  protected retry(): void {
+    this.loading.set(true);
+    this.reload();
+  }
+
   protected readonly anyRunning = computed(() =>
     this.rows().some((r) => r.status === 'pending' || r.status === 'running'),
   );
@@ -172,10 +202,14 @@ export class BackupsComponent implements OnDestroy {
         this.rows.set(list.items);
         this.enabled.set(list.enabled);
         this.restoreEnabled.set(list.restoreEnabled);
+        this.loadError.set(false);
         this.loading.set(false);
         this.syncPolling();
       },
-      error: () => this.loading.set(false),
+      error: () => {
+        this.loadError.set(true);
+        this.loading.set(false);
+      },
     });
   }
 

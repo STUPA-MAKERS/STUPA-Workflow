@@ -75,7 +75,7 @@ async function setup(api = makeApi()) {
 
 /** Opens the ⋮ of a row and picks one item. */
 async function pick(row: number, item: string): Promise<HTMLElement> {
-  await userEvent.click(screen.getAllByRole('button', { name: /^Aktionen: / })[row]);
+  await userEvent.click(screen.getAllByRole('button', { name: /^Weitere Aktionen: / })[row]);
   const entry = await screen.findByRole('menuitem', { name: item });
   await userEvent.click(entry);
   return entry;
@@ -88,7 +88,7 @@ describe('BackupsComponent', () => {
   it('loads the catalogue on init', async () => {
     const { api } = await setup();
     expect(api.listBackups).toHaveBeenCalled();
-    expect(screen.getByText('Vor der Abstimmung')).toBeInTheDocument();
+    expect(screen.getByText(/Vor der Abstimmung/)).toBeInTheDocument();
   });
 
   it('formats sizes in units a person can read', async () => {
@@ -102,6 +102,26 @@ describe('BackupsComponent', () => {
     expect(cmp.sizeLabel(3_221_225_472)).toBe('3,0 GB');
   });
 
+  it('shows the face with the error text when the list fails, and loads again on retry (002405)', async () => {
+    let fail = true;
+    const api = makeApi({
+      listBackups: jest.fn(() => (fail ? throwError(() => new Error('down')) : of(list()))),
+    });
+    const { fixture } = await setup(api);
+    expect(screen.getByText('Die Sicherungen konnten nicht geladen werden.', { selector: 'app-empty-state *' })).toBeInTheDocument();
+    fail = false;
+    (fixture.componentInstance as unknown as { retry: () => void }).retry();
+    fixture.detectChanges();
+    expect(api.listBackups).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(/Vor der Abstimmung/)).toBeInTheDocument();
+  });
+
+  it('shows the empty face when there are no backups', async () => {
+    const api = makeApi({ listBackups: jest.fn(() => of(list({ items: [] }))) });
+    await setup(api);
+    expect(screen.getByText('Noch keine Sicherungen vorhanden.')).toBeInTheDocument();
+  });
+
   it('explains itself instead of offering a button when backups are not configured', async () => {
     const api = makeApi({ listBackups: jest.fn(() => of(list({ enabled: false }))) });
     await setup(api);
@@ -111,7 +131,7 @@ describe('BackupsComponent', () => {
   it('hides restore when the platform cannot decrypt its own archives', async () => {
     const api = makeApi({ listBackups: jest.fn(() => of(list({ restoreEnabled: false }))) });
     await setup(api);
-    await userEvent.click(screen.getAllByRole('button', { name: /^Aktionen: / })[0]);
+    await userEvent.click(screen.getAllByRole('button', { name: /^Weitere Aktionen: / })[0]);
     await screen.findByRole('menuitem', { name: 'Herunterladen' });
     expect(screen.queryByRole('menuitem', { name: 'Wiederherstellen' })).not.toBeInTheDocument();
   });
@@ -164,10 +184,10 @@ describe('BackupsComponent', () => {
   it('names the archive in each row menu and draws a pin, not a paperclip', async () => {
     await setup();
     const labels = screen
-      .getAllByRole('button', { name: /^Aktionen: / })
+      .getAllByRole('button', { name: /^Weitere Aktionen: / })
       .map((b) => b.getAttribute('aria-label'));
     expect(labels.every((l) => /: \d{2}\.\d{2}\.\d{4}/.test(l ?? ''))).toBe(true);
-    await userEvent.click(screen.getAllByRole('button', { name: /^Aktionen: / })[0]);
+    await userEvent.click(screen.getAllByRole('button', { name: /^Weitere Aktionen: / })[0]);
     await screen.findByRole('menuitem', { name: 'Anheften' });
     const container = document.body;
     expect(container.querySelector('[data-icon="clip"], [data-icon="clipslash"]')).toBeNull();
@@ -218,7 +238,7 @@ describe('BackupsComponent', () => {
     /** The second row is pinned, so its delete item is disabled. */
     it('refuses a pinned archive in the UI, not only in the API', async () => {
       await setup();
-      await userEvent.click(screen.getAllByRole('button', { name: /^Aktionen: / })[1]);
+      await userEvent.click(screen.getAllByRole('button', { name: /^Weitere Aktionen: / })[1]);
       const del = await screen.findByRole('menuitem', { name: 'Löschen' });
       expect(del).toHaveAttribute('aria-disabled', 'true');
     });

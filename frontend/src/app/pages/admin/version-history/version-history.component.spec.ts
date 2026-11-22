@@ -66,6 +66,20 @@ async function setup(over: Record<string, unknown> = {}) {
 }
 
 describe('VersionHistoryComponent', () => {
+  it('lists the versions in an ordered list, shows the face on a failed load and the empty face', async () => {
+    const { container, fixture, api } = await setup();
+    expect(container.querySelector('ol.rowgroup')).not.toBeNull();
+    api.listConfigRevisions.mockReturnValueOnce(throwError(() => new Error('down')));
+    fixture.componentInstance.reload();
+    fixture.detectChanges();
+    expect(container.querySelector('app-empty-state')?.textContent).toContain('konnten nicht geladen werden');
+    api.listConfigRevisions.mockReturnValueOnce(of([]));
+    fixture.componentInstance.reload();
+    fixture.detectChanges();
+    expect(container.querySelector('ol.rowgroup')).toBeNull();
+    expect(container.querySelector('app-empty-state')).not.toBeNull();
+  });
+
   /**
    * Exactly one "Aktiv" status text shows, for the head revision. Only an older version offers the
    * restore, and it names the version.
