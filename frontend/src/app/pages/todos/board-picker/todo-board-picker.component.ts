@@ -26,13 +26,9 @@ import {
   SideSheetComponent,
   SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
+import { BOARD_ICON } from '@stupa-makers/ui-kit/views/board';
 
-export const BOARD_ICON: Record<TodoBoardKind, IconName> = {
-  personal: 'user',
-  gremium: 'landmark',
-  free: 'kanban',
-  team: 'ticket',
-};
+export { BOARD_ICON } from '@stupa-makers/ui-kit/views/board';
 
 /** The icon of the meta-board "Alle". */
 export const ALL_ICON: IconName = 'grid';

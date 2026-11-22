@@ -1,14 +1,14 @@
 import { fireEvent, render, screen } from '@testing-library/angular';
-import { TodoDueChipComponent } from './todo-due-chip.component';
+import { TodoDueChipViewComponent } from '@stupa-makers/ui-kit/views/board';
 
 async function setup(value: string | null, disabled = false) {
   const changed = jest.fn();
-  const view = await render(TodoDueChipComponent, { inputs: { value, disabled }, on: { changed } });
+  const view = await render(TodoDueChipViewComponent, { inputs: { value, disabled }, on: { changed } });
   const native = view.container.querySelector('input[type="date"]') as HTMLInputElement;
   return { ...view, changed, native };
 }
 
-describe('TodoDueChipComponent', () => {
+describe('TodoDueChipViewComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('shows the date, opens the picker of the browser and removes the date', async () => {

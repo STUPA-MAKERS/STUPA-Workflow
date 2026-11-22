@@ -34,7 +34,7 @@ const SURFACES: readonly (readonly [string, string])[] = [
   ['../../vendor/ui-kit/views/chat/src/chat-view.component.scss', '.chat__box'],
   ['features/todos/card-detail/todo-card-detail.component.scss', '.cd__area'],
   ['features/todos/link-picker/todo-link-picker.component.scss', '.lp__search'],
-  ['pages/todos/board-view/todo-board-view.component.scss', '.bv__quick'],
+  ['../../vendor/ui-kit/views/board/src/todo-board-view.component.scss', '.bv__quick'],
   ['pages/applications/agenda-dialog/agenda-dialog.component.scss', '.agd__note'],
   ['pages/admin/committees/gremium-dialog/gremium-dialog.component.scss', '.gd__mail'],
   ['../../vendor/ui-kit/views/meeting/src/attendance-sheet-view.component.scss', '.as__note'],
@@ -66,7 +66,7 @@ describe('highlightedFields (§ui-kit:000598)', () => {
       'pages/budget/cost-centre-select/cost-centre-select.component.scss',
       ".ccs__opt[aria-selected='true']",
     ],
-    ['features/todos/move-sheet/todo-move-sheet.component.scss', '.ms__row--on'],
+    ['../../vendor/ui-kit/views/board/src/todo-move-sheet-view.component.scss', '.ms__row--on'],
     ['features/todos/link-picker/todo-link-picker.component.scss', '.lp__hit--on'],
     ['features/todos/pick-dialog/todo-pick-dialog.component.scss', '.pd__row--on'],
     [

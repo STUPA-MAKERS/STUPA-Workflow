@@ -44,7 +44,7 @@
   }
   // A card of a board is a surface, so it has the white edge too. A column of a board is a
   // surface that holds the cards, so it has the edge as well.
-  app-todo-card-tile,
+  app-todo-card-tile-view,
   .bv__col {
     border: var(--vh-edge) !important;
   }
