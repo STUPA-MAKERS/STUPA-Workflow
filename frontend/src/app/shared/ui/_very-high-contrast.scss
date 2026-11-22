@@ -23,11 +23,10 @@
   // page: the chain check of the Audit-Log, on a wide screen the pane "Heute" of the start page,
   // the sheet of the apply wizard, the pane of the graph, the report box of the accessibility
   // statement, the canvas, the inspector and the JSON of the flow editor, the columns of the
-  // to-do row view, the week of the calendar. A card of `sc.card` has it from the mixin. The day column of the calendar is a plain row group without a surface (001770),
+  // to-do row view, the cards of Backups and Datenschutz, the week of the calendar. The day column of the calendar is a plain row group without a surface (001770),
   // and each day of the month is a segment with its own edge, so the month has no frame.
   // The edge is a border, so content that scrolls inside the box does not paint over it.
-  .dash--wide .dash__today, .al__verify, .wz__sheet, .gr__pane, .as__report, .fe__sheet, .fe__panel,
-  .fe__json pre, .br__col, .br__list {
+  .dash--wide .dash__today, .al__verify, .bk__card, .pv__card, .wz__sheet, .gr__pane, .as__report, .fe__sheet, .fe__panel, .fe__json pre, .br__col, .br__list {
     border: var(--vh-edge) !important;
   }
   // The columns of the week paint over an outline, so its edge is a layer on top.
