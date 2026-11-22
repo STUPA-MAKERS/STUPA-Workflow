@@ -118,6 +118,7 @@ def test_uses_of_keeps_the_uses_of_the_given_features() -> None:
         ("/api/todos/boards/{board_id}", {Feature.TODOS}),
         ("/api/ws/todos", {Feature.TODOS}),
         ("/api/calendar/{token}.ics", {Feature.CALENDAR}),
+        ("/api/push/actions/{token}", {Feature.PUSH}),
         ("/api/admin/calendars", {Feature.CALENDAR}),
         ("/api/public/calendar.ics", {Feature.CALENDAR, Feature.PUBLIC}),
         ("/api/meetings", {Feature.MEETINGS}),

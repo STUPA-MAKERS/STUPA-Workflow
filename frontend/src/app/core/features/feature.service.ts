@@ -12,6 +12,7 @@ export const FEATURES = [
   'tickets',
   'graph',
   'public',
+  'push',
 ] as const;
 
 /** The key of a feature with a switch. */

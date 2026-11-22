@@ -33,7 +33,8 @@ from app.modules.notifications.models import (
     NotificationPreference,
     NotificationSettings,
 )
-from app.modules.notifications.queue import MailQueue
+from app.modules.notifications.push_service import PushButton, PushNote, PushService
+from app.modules.notifications.queue import MailQueue, PushQueue
 from app.modules.notifications.recipients import RecipientResolver, SpecExpander
 from app.modules.notifications.schemas import (
     MailPreviewOut,
@@ -505,8 +506,9 @@ class NotificationService:
         builtin_html: dict[str, str] | None = None,
         attachments: tuple[MailAttachment, ...] = (),
         reply_to: str | None = None,
+        push_buttons: tuple[PushButton, ...] = (),
     ) -> bool:
-        """Send one notification kind.
+        """Send one notification kind, and its push to the devices that want it.
 
         The method drops the recipients that opted out. It prefers the DB template
         ``template_key`` and falls back to the builtin. It wraps the mail in the
@@ -514,7 +516,10 @@ class NotificationService:
         gets it as ``link``, and the mail shows it (see `links`). ``builtin_html`` is
         the HTML body of the builtin; without it the layout escapes the text body.
         ``attachments`` go with the mail, whichever template renders it. ``reply_to``
-        sets the Reply-To header.
+        sets the Reply-To header. ``push_buttons`` go with the push (002508, 002509).
+
+        The push filters on its own switch, not on the mail switch (002501), so a
+        recipient without the mail can still get the push, and the other way round.
 
         Returns:
             True when the method enqueued a mail.
@@ -523,38 +528,109 @@ class NotificationService:
         link }}`` stays safe under StrictUndefined.
         """
         wanted = await filter_recipients_by_preference(self.session, recipients, kind)
-        if not wanted:
+        pushing = await self._push_possible(recipients, kind)
+        if not wanted and not pushing:
             return False
         full_context = {"link": link.url if link is not None else "", **context}
-        tpl = await self._get_template_by_key(template_key)
-        if tpl is not None:
-            return await self._render_and_enqueue(
-                tpl,
-                wanted,
-                context=full_context,
-                lang=lang,
-                idempotency_parts=idempotency_parts,
-                reason=kind,
-                link=link,
-                attachments=attachments,
-                reply_to=reply_to,
-            )
-        try:
-            rendered = await self._render_builtin(
-                subject_i18n=builtin_subject,
-                body_i18n=builtin_body,
-                body_html_i18n=builtin_html,
-                context=full_context,
-                lang=lang,
-            )
-        except TemplateRenderError as exc:
-            logger.warning("builtin template %r render failed: %s", template_key, exc)
+        rendered = await self._render_kind(
+            template_key,
+            builtin_subject=builtin_subject,
+            builtin_body=builtin_body,
+            builtin_html=builtin_html,
+            context=full_context,
+            lang=lang,
+        )
+        if rendered is None:
+            return False
+        if pushing:
+            await self._push(rendered, recipients, kind, idempotency_parts, link, push_buttons)
+        if not wanted:
             return False
         return await self._enqueue(
             await self._message(
                 rendered, wanted, kind, idempotency_parts, link, attachments, reply_to=reply_to
             )
         )
+
+    async def _render_kind(
+        self,
+        template_key: str,
+        *,
+        builtin_subject: dict[str, str],
+        builtin_body: dict[str, str],
+        builtin_html: dict[str, str] | None,
+        context: dict[str, Any],
+        lang: str | None,
+    ) -> RenderedMail | None:
+        """Render the DB template ``template_key``, else the builtin; None on an error."""
+        tpl = await self._get_template_by_key(template_key)
+        try:
+            return (
+                await self._render(tpl, context=context, lang=lang)
+                if tpl is not None
+                else await self._render_builtin(
+                    subject_i18n=builtin_subject,
+                    body_i18n=builtin_body,
+                    body_html_i18n=builtin_html,
+                    context=context,
+                    lang=lang,
+                )
+            )
+        except TemplateRenderError as exc:
+            logger.warning("template %r render failed: %s", template_key, exc)
+            return None
+
+    def _push_queue(self) -> PushQueue | None:
+        return self.queue if isinstance(self.queue, PushQueue) else None
+
+    async def _push_possible(self, recipients: list[str], kind: str) -> bool:
+        """Return whether a push of ``kind`` may reach one of ``recipients``.
+
+        Push is best effort: an error here logs and counts as no push, so it never
+        stops the mail.
+        """
+        if self._push_queue() is None or not recipients:
+            return False
+        try:
+            return await PushService(self.session, self.settings).has_receivers(recipients, kind)
+        except Exception:
+            logger.exception("push receiver check failed")
+            return False
+
+    async def _push(
+        self,
+        rendered: RenderedMail,
+        recipients: list[str],
+        kind: str,
+        idempotency_parts: tuple[str, ...],
+        link: MailLink | None,
+        buttons: tuple[PushButton, ...] = (),
+    ) -> None:
+        """Enqueue the push of an event next to its mail (§F/collaboration/notifications/002503).
+
+        The title names the kind, the short line is the mail subject, a tap opens the
+        link of the mail. A failure logs and leaves the mail alone.
+        """
+        queue = self._push_queue()
+        if queue is None:
+            return
+        note = PushNote(
+            kind=kind,
+            line=rendered.subject,
+            lang=rendered.lang,
+            url=link.url if link is not None else None,
+            tag=compute_idempotency_key(*idempotency_parts).removeprefix("mail:")[:32],
+            buttons=buttons,
+        )
+        try:
+            brand = await self.brand()
+            jobs = await PushService(self.session, self.settings).jobs(
+                note, recipients, fallback_title=brand.name
+            )
+            for job in jobs:
+                await queue.enqueue_push(job)
+        except Exception:
+            logger.exception("push enqueue failed (kind=%s)", kind)
 
     async def handle_notify_action(
         self,
@@ -637,10 +713,10 @@ class NotificationService:
         spec = CATALOGUE_BY_KEY.get(template_key)
         reason = spec.kind if spec is not None else DEFAULT_NOTIFY_TEMPLATE_KEY
         resolved = await self.resolver.resolve(specs, application_id=application_id)
-        recipients = await filter_recipients_by_preference(
-            self.session, resolved, _filter_kind(reason, specs)
-        )
-        if not recipients:
+        kind = _filter_kind(reason, specs)
+        recipients = await filter_recipients_by_preference(self.session, resolved, kind)
+        pushing = await self._push_possible(resolved, kind)
+        if not recipients and not pushing:
             logger.info("notify action resolved no recipients — skipped")
             return 0
         idem = (
@@ -648,24 +724,20 @@ class NotificationService:
             *((audience,) if audience is not None else ()),
         )
         full_context = {"link": link.url if link is not None else "", **context}
-        tpl = await self._get_template_by_key(template_key)
-        if tpl is not None:
-            ok = await self._render_and_enqueue(
-                tpl,
-                recipients,
-                context=full_context,
-                lang=lang,
-                idempotency_parts=idem,
-                reason=reason,
-                link=link,
-            )
-            return int(ok)
-        rendered = await self._render_builtin(
-            subject_i18n=spec.subject_i18n if spec else _BUILTIN_NOTIFY_SUBJECT,
-            body_i18n=spec.body_i18n if spec else _BUILTIN_NOTIFY_BODY,
+        rendered = await self._render_kind(
+            template_key,
+            builtin_subject=spec.subject_i18n if spec else _BUILTIN_NOTIFY_SUBJECT,
+            builtin_body=spec.body_i18n if spec else _BUILTIN_NOTIFY_BODY,
+            builtin_html=None,
             context=full_context,
             lang=lang,
         )
+        if rendered is None:
+            return 0
+        if pushing:
+            await self._push(rendered, resolved, kind, idem, link)
+        if not recipients:
+            return 0
         return int(
             await self._enqueue(await self._message(rendered, recipients, reason, idem, link))
         )

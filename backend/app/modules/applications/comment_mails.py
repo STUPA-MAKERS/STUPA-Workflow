@@ -39,11 +39,7 @@ from app.modules.flow.models import State
 from app.modules.notifications.chat_mail import initials
 from app.modules.notifications.links import application_link
 from app.modules.notifications.queue import MailQueue
-from app.modules.notifications.service import NotificationService, filter_recipients_by_preference
-from app.modules.notifications.templating import (
-    TemplateRenderError,
-    render_mail,
-)
+from app.modules.notifications.service import NotificationService
 from app.modules.notifications.texts.comments import (
     APPLICANT_AUTHOR_FALLBACK,
     APPLICANT_TEMPLATE_KEY,
@@ -158,35 +154,18 @@ async def send_comment_notifications(
         else (BUILTIN_TEAM_SUBJECT, BUILTIN_TEAM_BODY, BUILTIN_TEAM_BODY_HTML)
     )
 
-    recipients = await filter_recipients_by_preference(session, resolved, "comment")
-    if not recipients:
+    sent = await service.send_kind_mail(
+        list(resolved),
+        kind="comment",
+        template_key=template_key,
+        builtin_subject=builtin[0],
+        builtin_body=builtin[1],
+        builtin_html=builtin[2],
+        context=context,
+        idempotency_parts=("comment", str(comment_id), template_key),
+        lang=lang,
+        link=link,
+    )
+    if not sent:
         logger.info("comment notification resolved no recipients — skipped")
-        return 0
-
-    idem = ("comment", str(comment_id), template_key)
-    tpl = await service._get_template_by_key(template_key)
-    if tpl is not None:
-        ok = await service._render_and_enqueue(
-            tpl,
-            recipients,
-            context=context,
-            lang=lang,
-            idempotency_parts=idem,
-            reason="comment",
-            link=link,
-        )
-        return int(ok)
-    try:
-        rendered = render_mail(
-            subject_i18n=builtin[0],
-            body_i18n=builtin[1],
-            body_html_i18n=builtin[2],
-            context=await service.render_context(context),
-            lang=lang,
-            default_lang=settings.mail_default_lang,
-        )
-    except TemplateRenderError as exc:
-        logger.warning("comment builtin render failed: %s", exc)
-        return 0
-    msg = await service._message(rendered, recipients, "comment", idem, link)
-    return int(await service._enqueue(msg))
+    return int(sent)
