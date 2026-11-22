@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import { type CanActivateFn, Router } from '@angular/router';
 import { FeatureService } from '@core/features/feature.service';
-import { from } from 'rxjs';
+import { from, of } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
 import { AuthService } from './auth.service';
 
@@ -23,9 +23,9 @@ export const homeRedirectGuard: CanActivateFn = () => {
 
   return auth.ensureLoaded().pipe(
     switchMap((principal) =>
-      from(features.ready).pipe(
-        map(() => (principal ? router.createUrlTree([features.home()]) : true)),
-      ),
+      principal
+        ? from(features.ready).pipe(map(() => router.createUrlTree([features.home()])))
+        : of(true),
     ),
   );
 };
