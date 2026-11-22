@@ -1,36 +1,39 @@
-<section class="al admin-page">
-  <app-page-header [flush]="true" [title]="'admin.audit.title' | t">
-    <app-breadcrumbs crumbs />
-  </app-page-header>
-
-  <div class="al__verify" [class]="'al__verify al__verify--' + (verifyView()?.kind ?? 'muted')" role="status">
-    <app-icon
-      class="al__verifyIcon"
-      [name]="verifyView()?.kind === 'error' ? 'alert' : verifyView()?.kind === 'ok' ? 'shieldok' : 'shield'"
-      [size]="22"
-    />
-    <div class="al__verifyText">
-      @if (verifyView(); as v) {
-        <span class="al__verifyTitle">{{ v.title }}</span>
-        @if (v.sub) {
-          <span class="al__verifySub">{{ v.sub }}</span>
+<app-records-screen
+  class="al"
+  [head]="{ title: 'admin.audit.title' | t }"
+  [rows]="rows()"
+  [filtersLabel]="'admin.audit.filter.label' | t"
+  [keepOnError]="entries().length > 0"
+  [skeleton]="6"
+>
+  <ng-template screenIntro>
+    <div class="al__verify" [class]="'al__verify al__verify--' + (verifyView()?.kind ?? 'muted')" role="status">
+      <app-icon
+        class="al__verifyIcon"
+        [name]="verifyView()?.kind === 'error' ? 'alert' : verifyView()?.kind === 'ok' ? 'shieldok' : 'shield'"
+        [size]="22"
+      />
+      <div class="al__verifyText">
+        @if (verifyView(); as v) {
+          <span class="al__verifyTitle">{{ v.title }}</span>
+          @if (v.sub) {
+            <span class="al__verifySub">{{ v.sub }}</span>
+          }
+        } @else {
+          <span class="skel skel--bar al__verifySkel" aria-hidden="true"></span>
+          <span class="sr-only">{{ 'admin.audit.loading' | t }}</span>
         }
-      } @else {
-        <span class="skel skel--bar al__verifySkel" aria-hidden="true"></span>
-        <span class="sr-only">{{ 'admin.audit.loading' | t }}</span>
+      </div>
+      @if (canVerify()) {
+        <app-button-group>
+          <app-button variant="tonal" size="sm" [loading]="verifying()" (click)="runVerify()">
+            <app-icon name="shieldok" /> {{ 'admin.audit.verify.now' | t }}
+          </app-button>
+        </app-button-group>
       }
     </div>
-    @if (canVerify()) {
-      <app-button-group>
-        <app-button variant="tonal" size="sm" [loading]="verifying()" (click)="runVerify()">
-          <app-icon name="shieldok" /> {{ 'admin.audit.verify.now' | t }}
-        </app-button>
-      </app-button-group>
-    }
-  </div>
-
-  <app-sticky-bar>
-  <div class="al__filters" role="group" [attr.aria-label]="'admin.audit.filter.label' | t">
+  </ng-template>
+  <ng-template screenFilters>
     <app-filter-select
       [label]="'admin.audit.filter.action' | t"
       [text]="actionChip()"
@@ -57,90 +60,77 @@
     @if (activeFilterCount()) {
       <button type="button" class="al__reset" (click)="resetFilters()">{{ 'admin.audit.filter.reset' | t }}</button>
     }
-  </div>
-  </app-sticky-bar>
-
-  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.audit.error' | t" (retry)="retry()">
-    <ng-template #loading>
-      <app-skeleton variant="rows" [count]="6" [label]="'admin.audit.loading' | t" />
-    </ng-template>
-    <ng-template #content>
-      @if (entries().length) {
-        <ul class="rowgroup al__list">
-          @for (e of entries(); track e.id) {
-            <li class="al__item">
-              <app-expand-row
-                [title]="actionLabel(e.action)"
-                [sub]="(e.at | ldate: 'medium') + ' · ' + actorLabel(e) + (targetText(e) ? ' · ' + targetText(e) : '')"
-                [open]="isOpen(e.id)"
-                (openChange)="toggle(e.id)"
+  </ng-template>
+  <ng-template screenRecord let-row>
+    @let e = entryOf(row.id);
+    <li class="al__item">
+      <app-expand-row
+        [title]="actionLabel(e.action)"
+        [sub]="(e.at | ldate: 'medium') + ' · ' + actorLabel(e) + (targetText(e) ? ' · ' + targetText(e) : '')"
+        [open]="isOpen(e.id)"
+        (openChange)="toggle(e.id)"
+      >
+      @if (isOpen(e.id)) {
+        <div class="al__details" [id]="'al-detail-' + e.id">
+          <dl appFacts layout="rows" class="al__meta">
+            <dt>{{ 'admin.audit.detail.action' | t }}</dt>
+            <dd>{{ actionLabel(e.action) }}</dd>
+            @if (e.targetType || e.targetId) {
+              <dt>{{ 'admin.audit.detail.target' | t }}</dt>
+              <dd class="al__wrap"><app-meta-line>
+                @if (e.targetType) {<span>{{ targetTypeLabel(e.targetType) }}</span>}@if (e.targetLabel) {<span>{{ e.targetLabel }}</span>}@if (e.targetId) {<span class="mono">{{ e.targetId }}</span>}@if (revisionId(e); as rev) {<span class="mono">rev {{ rev }}</span>}
+              </app-meta-line></dd>
+            }
+            <dt>{{ 'admin.audit.detail.actor' | t }}</dt>
+            <dd class="al__wrap">{{ actorDisplay(e) }}</dd>
+            @for (row of dataRows(e); track row.key) {
+              <dt [class.mono]="!row.known">{{ row.label }}</dt>
+              <dd class="al__wrap" [class.mono]="!row.known">{{ row.value }}</dd>
+            }
+          </dl>
+          @if (revisionId(e)) {
+            <div class="al__diff">
+              <app-load-state
+                [state]="diffState(e)"
+                [errorText]="'admin.config.history.diffFailed' | t"
+                (retry)="retryDiff(e)"
               >
-              @if (isOpen(e.id)) {
-                <div class="al__details" [id]="'al-detail-' + e.id">
-                  <dl appFacts layout="rows" class="al__meta">
-                    <dt>{{ 'admin.audit.detail.action' | t }}</dt>
-                    <dd>{{ actionLabel(e.action) }}</dd>
-                    @if (e.targetType || e.targetId) {
-                      <dt>{{ 'admin.audit.detail.target' | t }}</dt>
-                      <dd class="al__wrap"><app-meta-line>
-                        @if (e.targetType) {<span>{{ targetTypeLabel(e.targetType) }}</span>}@if (e.targetLabel) {<span>{{ e.targetLabel }}</span>}@if (e.targetId) {<span class="mono">{{ e.targetId }}</span>}@if (revisionId(e); as rev) {<span class="mono">rev {{ rev }}</span>}
-                      </app-meta-line></dd>
-                    }
-                    <dt>{{ 'admin.audit.detail.actor' | t }}</dt>
-                    <dd class="al__wrap">{{ actorDisplay(e) }}</dd>
-                    @for (row of dataRows(e); track row.key) {
-                      <dt [class.mono]="!row.known">{{ row.label }}</dt>
-                      <dd class="al__wrap" [class.mono]="!row.known">{{ row.value }}</dd>
-                    }
-                  </dl>
-                  @if (revisionId(e)) {
-                    <div class="al__diff">
-                      <app-load-state
-                        [state]="diffState(e)"
-                        [errorText]="'admin.config.history.diffFailed' | t"
-                        (retry)="retryDiff(e)"
-                      >
-                        <ng-template #loading>
-                          <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
-                        </ng-template>
-                        <ng-template #content>
-                          @if (diffOf(e); as d) {
-                            <app-config-diff [diff]="d.diff" compact />
-                          }
-                        </ng-template>
-                      </app-load-state>
-                    </div>
+                <ng-template #loading>
+                  <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
+                </ng-template>
+                <ng-template #content>
+                  @if (diffOf(e); as d) {
+                    <app-config-diff [diff]="d.diff" compact />
                   }
-                  @if (targetLink(e) || isRevertable(e)) {
-                    <div class="al__actions">
-                      @if (targetLink(e); as link) {
-                        <a class="al__open" [routerLink]="link">{{ 'admin.audit.openTarget' | t }}</a>
-                      }
-                      @if (isRevertable(e)) {
-                        <app-button-group>
-                          <app-button variant="danger" size="sm" [disabled]="reverting()" (click)="askRevert(e)">
-                            {{ 'admin.audit.revert.action' | t }}
-                          </app-button>
-                        </app-button-group>
-                      }
-                    </div>
-                  }
-                </div>
-              }
-              </app-expand-row>
-            </li>
+                </ng-template>
+              </app-load-state>
+            </div>
           }
-        </ul>
-      } @else {
-        <app-empty-state [icon]="activeFilterCount() ? 'searchOff' : 'clipcheck'" shape="table" [heading]="'admin.audit.empty' | t" />
+          @if (targetLink(e) || isRevertable(e)) {
+            <div class="al__actions">
+              @if (targetLink(e); as link) {
+                <a class="al__open" [routerLink]="link">{{ 'admin.audit.openTarget' | t }}</a>
+              }
+              @if (isRevertable(e)) {
+                <app-button-group>
+                  <app-button variant="danger" size="sm" [disabled]="reverting()" (click)="askRevert(e)">
+                    {{ 'admin.audit.revert.action' | t }}
+                  </app-button>
+                </app-button-group>
+              }
+            </div>
+          }
+        </div>
       }
-
-      @if (hasMore()) {
-        <app-load-more [label]="'admin.audit.loadMore' | t" [loading]="loadingMore()" (more)="loadMore()" />
-      }
-    </ng-template>
-  </app-load-state>
-</section>
+      </app-expand-row>
+    </li>
+  </ng-template>
+  <ng-template screenListFoot>
+    @if (hasMore()) {
+      <app-load-more [label]="'admin.audit.loadMore' | t" [loading]="loadingMore()" (more)="loadMore()" />
+    }
+  </ng-template>
+</app-records-screen>
 
 <app-confirm-dialog
   [open]="!!confirmRevert()"

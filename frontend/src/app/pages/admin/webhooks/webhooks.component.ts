@@ -14,26 +14,26 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
 import {
-  FabComponent,
   ButtonComponent,
   ButtonGroupComponent,
   ConfirmDialogComponent,
   DialogComponent,
   EmptyStateComponent,
   InputComponent,
+  type Action,
+  type ListRow,
+  type LoadState,
   RowMenuComponent,
   type RowMenuSection,
-  SkeletonComponent,
   StatusTextComponent,
   SwitchComponent,
   ToastService,
-  PageHeaderComponent,
   SectionComponent,
   ErrorTextComponent,
   FactsComponent,
   DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import { RecordsScreenComponent, ScreenRecordDirective } from '@stupa-makers/ui-kit/screens';
 import { type StatusView, webhookDeliveryStatus } from '@shared/status-kind.util';
 import { withEntry } from '@shared/util/immutable';
 import { AdminApiService } from '../admin-api.service';
@@ -42,7 +42,6 @@ import {
   type WebhookDeliveryState,
   type WebhookDeliveryStatus,
 } from '../admin.models';
-import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 function emptyHook(): WebhookConfig {
   return { id: '', name: '', url: '', active: true };
@@ -109,10 +108,8 @@ function withMember(set: ReadonlySet<string>, id: string, on: boolean): Readonly
     DialogBodyDirective,
     FactsComponent,
     ErrorTextComponent,
-    LoadStateComponent,
     SectionComponent,
     ExpandRowComponent,
-    FabComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
     FormsModule,
@@ -122,12 +119,11 @@ function withMember(set: ReadonlySet<string>, id: string, on: boolean): Readonly
     ButtonGroupComponent,
     DialogComponent,
     InputComponent,
-    PageHeaderComponent,
-    BreadcrumbsComponent,
     RowMenuComponent,
-    SkeletonComponent,
     StatusTextComponent,
     SwitchComponent,
+    RecordsScreenComponent,
+    ScreenRecordDirective,
   ],
   templateUrl: './webhooks.component.html',
   styleUrl: './webhooks.component.scss',
@@ -145,9 +141,22 @@ export class WebhooksComponent {
   protected readonly loading = signal(true);
   /** The read of the webhooks failed (§ui-kit:000576). */
   protected readonly loadError = signal(false);
-  protected readonly loadState = loadStateOf(this.loading, this.loadError);
 
   protected readonly hooks = signal<readonly WebhookConfig[]>([]);
+  /** The rows of the records screen (§ui-kit:002257). */
+  protected readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
+    if (this.loading()) return { state: 'loading' };
+    if (this.loadError())
+      return {
+        state: 'error',
+        message: this.i18n.translate('admin.webhook.error'),
+        retry: () => this.load(),
+      };
+    const rows = this.hooks().map((h) => ({ id: h.id, title: h.name || h.url }));
+    return rows.length
+      ? { state: 'ready', data: rows }
+      : { state: 'empty', icon: 'webhook', heading: this.i18n.translate('admin.webhook.none') };
+  });
   protected readonly draft = signal<WebhookConfig | null>(null);
   protected readonly editingIndex = signal<number | null>(null);
   /** The webhook whose delete the user confirms now. */
@@ -169,6 +178,23 @@ export class WebhooksComponent {
   protected readonly rowMenu = computed<readonly RowMenuSection[]>(() => [
     { items: [{ id: 'delete', label: this.i18n.translate('admin.common.remove'), icon: 'trash', danger: true }] },
   ]);
+  /** "Webhook hinzufügen" as the FAB, with `webhook.manage`. */
+  protected readonly actions = computed<readonly Action[]>(() =>
+    this.canManage()
+      ? [{ key: 'add', label: this.i18n.translate('fab.webhook'), priority: 'fab' }]
+      : [],
+  );
+
+  /** The webhook of a row of the records screen. */
+  protected hookOf(id: string): WebhookConfig {
+    return this.hooks().find((h) => h.id === id)!;
+  }
+
+  /** The place of a webhook in the list, for the edit dialog. */
+  protected indexOf(id: string): number {
+    return this.hooks().findIndex((h) => h.id === id);
+  }
+
   /** The delivery status loads one time, as soon as the permission is known. */
   private statusRequested = false;
 

@@ -171,7 +171,7 @@
           </span>
         </div>
       } @else if (error()) {
-        <app-load-error [message]="'graph.loadError' | t" (retry)="retry()" />
+        <app-load-error face [message]="'graph.loadError' | t" (retry)="retry()" />
       } @else if (empty()) {
         @if (filtered()) {
           <app-empty-state icon="searchOff" [heading]="'graph.emptyFiltered' | t" />

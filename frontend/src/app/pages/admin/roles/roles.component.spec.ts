@@ -398,4 +398,21 @@ describe('AdminRolesComponent', () => {
     retryLoadError();
     expect(api.listRoles).toHaveBeenCalledTimes(2);
   });
+
+  it('shows the empty state without roles, and "Rolle anlegen" opens the dialog', async () => {
+    const api = makeApi();
+    api.listRoles.mockReturnValueOnce(of([]));
+    const { inst } = await setup(api);
+    expect(screen.getByText('Noch keine globalen Rollen.')).toBeInTheDocument();
+    inst.onAction('add');
+    expect(inst.addOpen()).toBe(true);
+  });
+
+  it('gives the records screen loading rows, and saves nothing without a change', async () => {
+    const { inst, api } = await setup();
+    inst.loading.set(true);
+    expect(inst.rows()).toEqual({ state: 'loading' });
+    inst.onAction('save');
+    expect(api.saveRolePermissions).not.toHaveBeenCalled();
+  });
 });

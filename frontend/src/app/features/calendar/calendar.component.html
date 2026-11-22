@@ -76,7 +76,9 @@
               </div>
             </app-list-group>
           } @empty {
-            @if (!loading() && !error()) {
+            @if (error()) {
+              <app-empty-state icon="alert" [heading]="'calendar.error' | t" />
+            } @else if (!loading()) {
               <app-empty-state icon="cal" shape="date" [heading]="'calendar.list.empty' | t" />
             }
           }
@@ -275,7 +277,7 @@
       <div class="cal__panelScroll" appScrollFade="y">
         <section class="cal__dayList" aria-live="polite" [attr.aria-label]="dayHeading()">
           @if (error()) {
-            <app-load-error [message]="'calendar.error' | t" (retry)="reload()" />
+            <app-load-error face [message]="'calendar.error' | t" (retry)="reload()" />
           } @else if (firstLoad()) {
             <app-skeleton class="skel-in" variant="items" [count]="3" [lead]="true" [grouped]="true" [label]="'common.loading' | t" />
           } @else if (!dayEntries().length && !loading()) {

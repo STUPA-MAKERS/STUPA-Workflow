@@ -20,7 +20,7 @@
     [heading]="'admin.gremien.members' | t"
   >
 
-    <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.gremien.membersLoadFailed' | t" (retry)="loadMembers()">
+    <app-load-state [state]="loadState()" [keepContent]="true" [hasContent]="visible().length > 0" [errorText]="'admin.gremien.membersLoadFailed' | t" (retry)="loadMembers()">
       <ng-template #loading>
         <app-skeleton variant="rows" [count]="5" [label]="'common.loading' | t" />
       </ng-template>

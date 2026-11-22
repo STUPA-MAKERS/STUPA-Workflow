@@ -51,7 +51,7 @@
   </div>
 } @else if (error()) {
   <div class="cd cd--state">
-    <app-load-error [message]="'todos.card.error' | t" (retry)="reload()" />
+    <app-load-error face [message]="'todos.card.error' | t" (retry)="reload()" />
   </div>
 } @else if (card(); as card) {
   <article class="cd" aria-labelledby="cd-title">

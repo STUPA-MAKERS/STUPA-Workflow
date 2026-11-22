@@ -8,7 +8,7 @@
     </app-button-group>
   </span>
 
-  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.substitutes.loadFailed' | t" (retry)="retry()">
+  <app-load-state [state]="loadState()" [keepContent]="true" [hasContent]="entries().length > 0" [errorText]="'admin.substitutes.loadFailed' | t" (retry)="retry()">
     <ng-template #loading>
       <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />
     </ng-template>

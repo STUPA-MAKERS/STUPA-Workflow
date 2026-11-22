@@ -8,7 +8,7 @@
     }
   </app-page-header>
 
-  <app-load-state [state]="loadError() ? 'error' : 'ok'" [keepContent]="true" [errorText]="'admin.forms.overviewError' | t" (retry)="retryLoad()">
+  <app-load-state [state]="loadError() ? 'error' : 'ok'" [keepContent]="true" [hasContent]="types().length > 0 || groups().length > 0" [errorText]="'admin.forms.overviewError' | t" (retry)="retryLoad()">
     <ng-template #content>
       @if (loading() || types().length || groups().length) {
         <div class="fl__blocks">

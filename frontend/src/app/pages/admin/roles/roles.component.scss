@@ -9,11 +9,6 @@
   container-type: inline-size;
 }
 
-.ar__list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
 .ar__name {
   font-weight: var(--fw-semibold);
 }
@@ -81,8 +76,3 @@
   }
 }
 
-.ar__headTools {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}

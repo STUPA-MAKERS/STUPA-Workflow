@@ -1,77 +1,68 @@
-<section class="wh admin-page">
-  <app-page-header [flush]="true" [title]="'admin.calendars.title' | t">
-    <app-breadcrumbs crumbs />
-  </app-page-header>
-
-  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.calendars.error' | t" (retry)="load()">
-    <ng-template #loading>
-      <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
-    </ng-template>
-    <ng-template #content>
-      @if (calendars().length) {
-        <ul class="rowgroup wh__list" [attr.aria-label]="'admin.calendars.list' | t">
-          @for (c of calendars(); track c.id) {
-            @let st = state(c);
-            <li>
-              <app-expand-row
-                [title]="c.name"
-                toggle="chevron"
-                [toggleLabel]="('admin.calendars.fetch.title' | t) + ': ' + c.name"
-                [open]="openId() === c.id"
-                (openChange)="toggle(c)"
-                (activate)="openEdit(c)"
-              >
-                <app-status-text status [kind]="st.kind">{{ st.key | t }}</app-status-text>
-                <span sub
-                  >{{ scopeLabel(c) }} · {{ intervalLabel(c.intervalMinutes) }} ·
-                  <span class="mono">{{ c.url }}</span></span
-                >
-                <app-button-group ngProjectAs="[trail]">
-                  <app-row-menu
-                    trail
-                    [sections]="rowMenu()"
-                    [label]="('ui.rowMenu.trigger' | t) + ': ' + c.name"
-                    (selected)="onMenu($event.id, c)"
-                  />
-                </app-button-group>
-                <app-section class="wh__status" [level]="2" [heading]="'admin.calendars.fetch.title' | t">
-                  <dl appFacts class="wh__grid">
-                    <div>
-                      <dt>{{ 'admin.calendars.fetch.state' | t }}</dt>
-                      <dd>
-                        <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>{{ 'admin.calendars.fetch.lastAttempt' | t }}</dt>
-                      <dd class="mono">{{ c.lastAttemptAt ? (c.lastAttemptAt | ldate: 'short') : '—' }}</dd>
-                    </div>
-                    <div>
-                      <dt>{{ 'admin.calendars.fetch.lastSuccess' | t }}</dt>
-                      <dd class="mono">{{ c.lastSuccessAt ? (c.lastSuccessAt | ldate: 'short') : '—' }}</dd>
-                    </div>
-                    <div>
-                      <dt>{{ 'admin.calendars.fetch.entries' | t }}</dt>
-                      <dd class="mono">{{ c.entryCount }}</dd>
-                    </div>
-                    <div class="facts__wide">
-                      <dt>{{ 'admin.calendars.fetch.reason' | t }}</dt>
-                      <dd>{{ reasonLabel(c.lastError) }}</dd>
-                    </div>
-                  </dl>
-                </app-section>
-              </app-expand-row>
-            </li>
-          }
-        </ul>
-      } @else {
-        <app-empty-state icon="cal" [heading]="'admin.calendars.none' | t" />
-      }
-    </ng-template>
-  </app-load-state>
-
-  <app-fab [label]="'fab.calendar' | t" (activate)="openAdd()" />
-</section>
+<app-records-screen
+  class="wh"
+  [head]="{ title: 'admin.calendars.title' | t }"
+  [rows]="rows()"
+  [actions]="actions()"
+  [listLabel]="'admin.calendars.list' | t"
+  [keepOnError]="calendars().length > 0"
+  [skeleton]="3"
+  (action)="$event.key === 'add' && openAdd()"
+>
+  <ng-template screenRecord let-row>
+    @let c = calendarOf(row.id);
+    @let st = state(c);
+    <li>
+      <app-expand-row
+        [title]="c.name"
+        toggle="chevron"
+        [toggleLabel]="('admin.calendars.fetch.title' | t) + ': ' + c.name"
+        [open]="openId() === c.id"
+        (openChange)="toggle(c)"
+        (activate)="openEdit(c)"
+      >
+        <app-status-text status [kind]="st.kind">{{ st.key | t }}</app-status-text>
+        <span sub
+          >{{ scopeLabel(c) }} · {{ intervalLabel(c.intervalMinutes) }} ·
+          <span class="mono">{{ c.url }}</span></span
+        >
+        <app-button-group ngProjectAs="[trail]">
+          <app-row-menu
+            trail
+            [sections]="rowMenu()"
+            [label]="('ui.rowMenu.trigger' | t) + ': ' + c.name"
+            (selected)="onMenu($event.id, c)"
+          />
+        </app-button-group>
+        <app-section class="wh__status" [level]="2" [heading]="'admin.calendars.fetch.title' | t">
+          <dl appFacts class="wh__grid">
+            <div>
+              <dt>{{ 'admin.calendars.fetch.state' | t }}</dt>
+              <dd>
+                <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
+              </dd>
+            </div>
+            <div>
+              <dt>{{ 'admin.calendars.fetch.lastAttempt' | t }}</dt>
+              <dd class="mono">{{ c.lastAttemptAt ? (c.lastAttemptAt | ldate: 'short') : '—' }}</dd>
+            </div>
+            <div>
+              <dt>{{ 'admin.calendars.fetch.lastSuccess' | t }}</dt>
+              <dd class="mono">{{ c.lastSuccessAt ? (c.lastSuccessAt | ldate: 'short') : '—' }}</dd>
+            </div>
+            <div>
+              <dt>{{ 'admin.calendars.fetch.entries' | t }}</dt>
+              <dd class="mono">{{ c.entryCount }}</dd>
+            </div>
+            <div class="facts__wide">
+              <dt>{{ 'admin.calendars.fetch.reason' | t }}</dt>
+              <dd>{{ reasonLabel(c.lastError) }}</dd>
+            </div>
+          </dl>
+        </app-section>
+      </app-expand-row>
+    </li>
+  </ng-template>
+</app-records-screen>
 
 <app-dialog
   [open]="draft() !== null"

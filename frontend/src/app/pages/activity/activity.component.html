@@ -46,7 +46,7 @@
           <app-skeleton variant="items" [count]="10" [lead]="true" [grouped]="true" [label]="'activity.loading' | t" />
         </div>
       } @else if (error()) {
-        <app-load-error [message]="'activity.loadError' | t" (retry)="retry()" />
+        <app-load-error face [message]="'activity.loadError' | t" (retry)="retry()" />
       } @else if (!entries().length) {
         @if (filtered()) {
           <app-empty-state icon="searchOff" [heading]="'activity.emptyFiltered' | t" />

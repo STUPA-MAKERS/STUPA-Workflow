@@ -12,7 +12,7 @@
     [heading]="'admin.deleg.active' | t"
   >
 
-    <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.deleg.error' | t" (retry)="reload()">
+    <app-load-state [state]="loadState()" [keepContent]="true" [hasContent]="delegations().length > 0" [errorText]="'admin.deleg.error' | t" (retry)="reload()">
       <ng-template #loading>
         <app-skeleton variant="rows" [count]="3" [label]="'admin.deleg.loading' | t" />
       </ng-template>

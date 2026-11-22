@@ -1,4 +1,5 @@
 import {
+  booleanAttribute,
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -8,7 +9,7 @@ import {
   output,
   untracked,
 } from '@angular/core';
-import { ToastService } from '@stupa-makers/ui-kit';
+import { EmptyStateComponent, ToastService } from '@stupa-makers/ui-kit';
 import { ServerReachabilityService } from '@core/api/server-reachability.service';
 import { I18nService } from '@core/i18n/i18n.service';
 
@@ -25,6 +26,9 @@ import { I18nService } from '@core/i18n/i18n.service';
  * } @else { … }
  * ```
  *
+ * With `face`, the element also shows the empty-state face with `message` in the page, for a
+ * failed load that has no content to show (§ui-kit:002405). The retry stays in the toast only.
+ *
  * When the load failed because the browser is offline or the server is unreachable
  * ({@link ServerReachabilityService}), the offline bar already names the cause, so no toast
  * shows. When that state ends, the element emits `retry` once, and the page loads again by
@@ -35,8 +39,11 @@ import { I18nService } from '@core/i18n/i18n.service';
   selector: 'app-load-error',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: '',
-  styles: ':host { display: none; }',
+  imports: [EmptyStateComponent],
+  template: `@if (face()) {
+    <app-empty-state icon="alert" [heading]="message()" />
+  }`,
+  styles: ':host { display: contents; }',
 })
 export class LoadErrorComponent {
   private readonly toast = inject(ToastService);
@@ -45,6 +52,8 @@ export class LoadErrorComponent {
 
   /** The text of the toast, for example "Anträge konnten nicht geladen werden." */
   readonly message = input.required<string>();
+  /** Show the face with `message` too, where the failed load leaves the page empty. */
+  readonly face = input(false, { transform: booleanAttribute });
   /** Load the content again: the action of the toast, or the end of the offline state. */
   readonly retry = output<void>();
 

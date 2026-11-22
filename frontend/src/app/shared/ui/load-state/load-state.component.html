@@ -12,8 +12,9 @@
     }
   }
   @case ('error') {
-    <app-load-error [message]="errorText()" (retry)="retry.emit()" />
-    @if (keepContent()) {
+    @let keep = keepContent() && hasContent();
+    <app-load-error [face]="!keep" [message]="errorText()" (retry)="retry.emit()" />
+    @if (keep) {
       @if (content(); as tpl) {
         <ng-container [ngTemplateOutlet]="tpl" />
       }

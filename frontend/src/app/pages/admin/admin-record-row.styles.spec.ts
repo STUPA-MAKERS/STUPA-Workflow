@@ -26,7 +26,8 @@ function declarationsOf(scss: string, selector: string): string {
 describe('AdminRecordRows', () => {
   it.each(LISTS)('$name lists its records in the shared record row group', ({ name }) => {
     const html = read(`${name}.html`);
-    expect(html).toMatch(/class="rowgroup rowgroup--records\b/);
+    // On the kit records screen (§ui-kit:002257) `variant="records"` draws the record row group.
+    expect(html).toMatch(/class="rowgroup rowgroup--records\b|<app-records-screen[^>]*\svariant="records"/);
     expect(html).toMatch(/\browgroup__title\b/);
   });
 

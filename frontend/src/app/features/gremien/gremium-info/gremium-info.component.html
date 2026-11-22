@@ -56,7 +56,7 @@
     />
   }
 } @else if (info() === null) {
-  <app-load-error [message]="'gremien.info.error' | t" (retry)="reload.emit()" />
+  <app-load-error face [message]="'gremien.info.error' | t" (retry)="reload.emit()" />
 } @else {
   <app-skeleton variant="lines" [count]="4" [label]="'gremien.info.loading' | t" />
 }

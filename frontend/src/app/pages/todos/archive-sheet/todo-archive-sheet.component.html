@@ -31,6 +31,8 @@
           }
         </ul>
         <span class="sr-only" role="status">{{ 'todos.archive.loading' | t }}</span>
+      } @else if (!items().length && failed()) {
+        <app-empty-state icon="alert" fill [heading]="'todos.archive.error' | t" />
       } @else if (!items().length) {
         <app-empty-state icon="archive" fill rows="3" [heading]="'todos.archive.empty' | t" />
       }

@@ -23,8 +23,9 @@ export function loadStateOf(loading: Signal<boolean>, failed: Signal<boolean>): 
  * - `forbidden`: a warning note with `forbiddenText`. Without the text it shows nothing,
  *   for a section that hides itself without the right.
  * - `error`: an error toast with `errorText` and "Erneut versuchen", which emits `retry`
- *   (`app-load-error`, §ui-kit:000576). The content area stays empty. With `keepContent` the
- *   `#content` template shows too: a list keeps the rows it had, or shows its empty state.
+ *   (`app-load-error`, §ui-kit:000576), and the empty-state face with `errorText`
+ *   (§ui-kit:002405). With `keepContent` and `hasContent` the `#content` template shows
+ *   instead of the face: a list keeps the rows it had.
  * - `ok`: the `#content` template.
  *
  * The content is a template, so the page builds its form only once the data is there.
@@ -54,11 +55,16 @@ export class LoadStateComponent {
   /** The text of the `error` toast. */
   readonly errorText = input.required<string>();
   /**
-   * Show `#content` in the `error` state too. For a list, which keeps the rows that it showed
-   * before the error and shows its empty state without them (§ui-kit:000576). A form that needs the
+   * Show `#content` in the `error` state too, while `hasContent` holds. For a list, which keeps
+   * the rows that it showed before the error (§ui-kit:000576). A form that needs the
    * data to build its fields leaves it off.
    */
   readonly keepContent = input(false);
+  /**
+   * Whether the content has something to keep, such as rows from before. Without it, a failed
+   * load shows the face with `errorText`, never the empty state of the list (§ui-kit:002405).
+   */
+  readonly hasContent = input(true);
   /** Load again: the action of the `error` toast, or the end of the offline state. */
   readonly retry = output<void>();
 

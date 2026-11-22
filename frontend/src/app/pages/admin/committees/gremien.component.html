@@ -17,7 +17,7 @@
     </app-note>
   }
 
-  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.gremien.error' | t" (retry)="reload(true)">
+  <app-load-state [state]="loadState()" [keepContent]="true" [hasContent]="gremien().length > 0" [errorText]="'admin.gremien.error' | t" (retry)="reload(true)">
     <ng-template #loading>
       <app-skeleton variant="rows" [count]="4" [label]="'admin.gremien.loading' | t" />
     </ng-template>

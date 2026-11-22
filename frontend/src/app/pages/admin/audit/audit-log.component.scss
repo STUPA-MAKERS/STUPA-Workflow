@@ -46,12 +46,6 @@
   color: var(--color-danger);
 }
 
-.al__filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
 .al__reset {
   padding: 0 var(--space-2);
   border: 0;
@@ -68,11 +62,6 @@
   }
 }
 
-.al__list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
 .al__action {
   font-weight: var(--fw-semibold);
 }

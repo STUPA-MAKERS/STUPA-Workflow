@@ -1,7 +1,6 @@
 import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
 import { LoadMoreComponent } from '@shared/ui/load-more/load-more.component';
-import { ButtonGroupComponent, MetaLineComponent, PageHeaderComponent, StickyBarComponent as _Sb, FactsComponent } from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import { ButtonGroupComponent, MetaLineComponent, FactsComponent } from '@stupa-makers/ui-kit';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -19,16 +18,24 @@ import {
   ButtonComponent,
   ConfigDiffComponent,
   ConfirmDialogComponent,
-  EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
   filterChipText,
   IconComponent,
+  type ListRow,
+  type LoadState as ScreenLoadState,
   RangeChipComponent,
   type RangeValue,
   SkeletonComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import {
+  RecordsScreenComponent,
+  ScreenFiltersDirective,
+  ScreenIntroDirective,
+  ScreenListFootDirective,
+  ScreenRecordDirective,
+} from '@stupa-makers/ui-kit/screens';
 import { AdminApiService } from '../admin-api.service';
 import { checkedAt, formatCount, triggerLabel } from '../admin-health/admin-health.util';
 import type {
@@ -263,8 +270,6 @@ type VerifyState =
     LoadStateComponent,
     ExpandRowComponent,
     LoadMoreComponent,
-    _Sb,
-    EmptyStateComponent,
     RouterLink,
     TranslatePipe,
     LocalizedDatePipe,
@@ -274,10 +279,13 @@ type VerifyState =
     ConfirmDialogComponent,
     IconComponent,
     FilterSelectComponent,
-    PageHeaderComponent,
-    BreadcrumbsComponent,
     SkeletonComponent,
     RangeChipComponent,
+    RecordsScreenComponent,
+    ScreenFiltersDirective,
+    ScreenIntroDirective,
+    ScreenListFootDirective,
+    ScreenRecordDirective,
   ],
   templateUrl: './audit-log.component.html',
   styleUrl: './audit-log.component.scss',
@@ -294,9 +302,31 @@ export class AuditLogComponent {
   protected readonly hasMore = signal(false);
   protected readonly loading = signal(false);
   protected readonly loadError = signal(false);
-  /** The first page loads: skeleton rows. A later page loads inside the list. */
-  protected readonly loadState = computed<LoadState>(() =>
-    this.loading() && !this.entries().length ? 'loading' : this.loadError() ? 'error' : 'ok',
+  /**
+   * The rows of the records screen (§ui-kit:002257). The first page loads as skeleton rows; a
+   * later page loads inside the list, so the rows stay ready. A failed later page keeps the rows
+   * (`keepOnError` while entries show); a failed first page shows the face (§ui-kit:002405).
+   */
+  protected readonly rows = computed<ScreenLoadState<readonly ListRow[]>>(() => {
+    const entries = this.entries();
+    if (this.loading() && !entries.length) return { state: 'loading' };
+    if (this.loadError())
+      return {
+        state: 'error',
+        message: this.i18n.translate('admin.audit.error'),
+        retry: () => this.retry(),
+      };
+    return entries.length
+      ? { state: 'ready', data: entries.map((e) => ({ id: String(e.id), title: e.action })) }
+      : {
+          state: 'empty',
+          icon: this.activeFilterCount() ? 'searchOff' : 'clipcheck',
+          heading: this.i18n.translate('admin.audit.empty'),
+        };
+  });
+  /** The entries by the id of their row. */
+  private readonly byId = computed(
+    () => new Map(this.entries().map((e) => [String(e.id), e] as const)),
   );
   /** A further page loads, for "Mehr laden". */
   protected readonly loadingMore = computed(() => this.loading() && this.entries().length > 0);
@@ -390,6 +420,11 @@ export class AuditLogComponent {
     });
     this.reload();
 
+  }
+
+  /** The entry of a row of the records screen. */
+  protected entryOf(id: string): AuditEntry {
+    return this.byId().get(id)!;
   }
 
   private chipText(label: TranslationKey, options: FilterSelectOption[], value: string): string {

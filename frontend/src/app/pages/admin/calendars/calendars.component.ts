@@ -12,29 +12,27 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
-import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 import {
   ButtonComponent,
   ButtonGroupComponent,
   ConfirmDialogComponent,
   DialogComponent,
-  EmptyStateComponent,
-  FabComponent,
   InputComponent,
-  PageHeaderComponent,
+  type Action,
+  type ListRow,
+  type LoadState,
   RowMenuComponent,
   type RowMenuSection,
   SectionComponent,
   SegmentedComponent,
   SelectFieldComponent,
   type SelectOption,
-  SkeletonComponent,
   StatusTextComponent,
   ToastService,
   FactsComponent,
   DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import { RecordsScreenComponent, ScreenRecordDirective } from '@stupa-makers/ui-kit/screens';
 import { AdminOptionsService } from '../admin-options.service';
 
 /** The scope choice of the dialog. */
@@ -123,23 +121,19 @@ function withSaved(
     FormsModule,
     TranslatePipe,
     LocalizedDatePipe,
-    LoadStateComponent,
     ExpandRowComponent,
-    BreadcrumbsComponent,
     ButtonComponent,
     ButtonGroupComponent,
     ConfirmDialogComponent,
     DialogComponent,
-    EmptyStateComponent,
-    FabComponent,
     InputComponent,
-    PageHeaderComponent,
     RowMenuComponent,
     SectionComponent,
     SegmentedComponent,
     SelectFieldComponent,
-    SkeletonComponent,
     StatusTextComponent,
+    RecordsScreenComponent,
+    ScreenRecordDirective,
   ],
   templateUrl: './calendars.component.html',
   styleUrl: '../webhooks/webhooks.component.scss',
@@ -153,9 +147,26 @@ export class AdminCalendarsComponent {
   /** True until the first answer, so the page never shows "none" before it knows. */
   protected readonly loading = signal(true);
   protected readonly loadError = signal(false);
-  protected readonly loadState = loadStateOf(this.loading, this.loadError);
 
   protected readonly calendars = signal<readonly ExternalCalendar[]>([]);
+  /** The rows of the records screen (§ui-kit:002257). */
+  protected readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
+    if (this.loading()) return { state: 'loading' };
+    if (this.loadError())
+      return {
+        state: 'error',
+        message: this.i18n.translate('admin.calendars.error'),
+        retry: () => this.load(),
+      };
+    const rows = this.calendars().map((c) => ({ id: c.id, title: c.name }));
+    return rows.length
+      ? { state: 'ready', data: rows }
+      : { state: 'empty', icon: 'cal', heading: this.i18n.translate('admin.calendars.none') };
+  });
+  /** "Kalender abonnieren" as the FAB. */
+  protected readonly actions = computed<readonly Action[]>(() => [
+    { key: 'add', label: this.i18n.translate('fab.calendar'), priority: 'fab' },
+  ]);
   protected readonly gremien = signal<readonly SelectOption[]>([]);
   /** The calendar whose fetch details are open. */
   protected readonly openId = signal<string | null>(null);
@@ -226,6 +237,11 @@ export class AdminCalendarsComponent {
         this.loading.set(false);
       },
     });
+  }
+
+  /** The calendar of a row of the records screen. */
+  protected calendarOf(id: string): ExternalCalendar {
+    return this.calendars().find((c) => c.id === id)!;
   }
 
   protected tr(key: string): string {

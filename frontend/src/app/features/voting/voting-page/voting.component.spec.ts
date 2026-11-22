@@ -382,10 +382,13 @@ describe('VotingComponent', () => {
 
   describe('states', () => {
     /** §ui-kit:000576: a toast and the empty placeholder, no rows. */
-    it('shows an error toast and the empty placeholder when the request fails', async () => {
+    it('shows an error toast and the face with the error text when the request fails', async () => {
       await start('/voting', { listError: true });
       expect(loadErrorToast()).toContain('Die Abstimmungen konnten nicht geladen werden.');
-      expect(screen.getByRole('heading', { name: 'Keine Abstimmungen' })).toBeInTheDocument();
+      expect(document.querySelector('app-empty-state')?.textContent).toContain(
+        'Die Abstimmungen konnten nicht geladen werden.',
+      );
+      expect(screen.queryByRole('heading', { name: 'Keine Abstimmungen' })).toBeNull();
       expect(screen.queryByText(/offen$/)).not.toBeInTheDocument();
     });
 

@@ -3,7 +3,7 @@
     <app-breadcrumbs crumbs />
   </app-page-header>
 
-  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'budget.tree.error' | t" (retry)="reload()">
+  <app-load-state [state]="loadState()" [keepContent]="true" [hasContent]="budgets().length > 0" [errorText]="'budget.tree.error' | t" (retry)="reload()">
     <ng-template #loading>
       <app-data-table
         surface="rowgroup"

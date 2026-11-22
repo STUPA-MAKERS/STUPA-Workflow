@@ -40,6 +40,18 @@ describe('LoadErrorComponent', () => {
     expect(loadErrorToast()).toBeNull();
   });
 
+  /** §ui-kit:002405: with `face`, the face shows the error text, and the retry stays in the toast. */
+  it('shows the face with the error text when asked to', async () => {
+    const view = await render(`<app-load-error face message="Konnte nicht geladen werden." />`, {
+      imports: [LoadErrorComponent],
+      providers: [{ provide: ServerReachabilityService, useValue: reachMock() }],
+    });
+    expect(view.container.querySelector('app-empty-state')?.textContent).toContain('Konnte nicht geladen werden.');
+    expect(view.container.querySelector('button')).toBeNull();
+    expect(loadErrorToast()).toBe('Konnte nicht geladen werden.');
+    expect(await runAxe(view.container)).toHaveNoViolations();
+  });
+
   it('adds nothing to the page that axe can flag', async () => {
     const { container } = await setup();
     expect(await runAxe(container)).toHaveNoViolations();

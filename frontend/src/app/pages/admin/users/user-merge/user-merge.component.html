@@ -53,6 +53,7 @@
           <app-load-state
             [state]="pickState()"
             [keepContent]="true"
+            [hasContent]="candidates().length > 0"
             [errorText]="'admin.users.loadFailed' | t"
             (retry)="retrySearch()"
           >

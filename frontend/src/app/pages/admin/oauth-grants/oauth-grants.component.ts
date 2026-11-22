@@ -10,20 +10,23 @@ import {
   ButtonComponent,
   ButtonGroupComponent,
   ConfirmDialogComponent,
-  EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
   filterChipText,
+  type ListRow,
+  type LoadState,
   NoteComponent,
-  SkeletonComponent,
   ToastService,
-  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import {
+  RecordsScreenComponent,
+  ScreenFiltersDirective,
+  ScreenListFootDirective,
+  ScreenRecordDirective,
+} from '@stupa-makers/ui-kit/screens';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, OAuthGrantAdmin } from '../admin.models';
 import { personLabel } from '@shared/person-label.util';
-import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 /**
  * The most scope tags per row. A token usually carries every scope, and all of them would
@@ -56,19 +59,18 @@ const PAGE_SIZE = 25;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    LoadStateComponent,
     ConfirmDialogComponent,
     TranslatePipe,
     LocalizedDatePipe,
     AvatarComponent,
     ButtonComponent,
     ButtonGroupComponent,
-    EmptyStateComponent,
     FilterSelectComponent,
     NoteComponent,
-    PageHeaderComponent,
-    BreadcrumbsComponent,
-    SkeletonComponent,
+    RecordsScreenComponent,
+    ScreenFiltersDirective,
+    ScreenListFootDirective,
+    ScreenRecordDirective,
   ],
   templateUrl: './oauth-grants.component.html',
   styleUrl: './oauth-grants.component.scss',
@@ -84,7 +86,25 @@ export class AdminOAuthGrantsComponent {
   readonly offset = signal(0);
   readonly loading = signal(true);
   readonly loadError = signal(false);
-  readonly loadState = loadStateOf(this.loading, this.loadError);
+  /** The rows of the records screen (§ui-kit:002257); a load error keeps what showed before. */
+  readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
+    if (this.loading()) return { state: 'loading' };
+    if (this.loadError())
+      return {
+        state: 'error',
+        message: this.i18n.translate('admin.oauthGrants.error'),
+        retry: () => this.load(),
+      };
+    const rows = this.grants().map((g) => ({ id: g.id, title: g.clientId }));
+    return rows.length
+      ? { state: 'ready', data: rows }
+      : { state: 'empty', icon: 'key', heading: this.i18n.translate('admin.oauthGrants.empty') };
+  });
+
+  /** The grant of a row of the records screen. */
+  protected grantOf(id: string): OAuthGrantAdmin {
+    return this.grants().find((g) => g.id === id)!;
+  }
 
   /** Owner filter. An empty string means "every principal". */
   readonly principalId = signal<Uuid | ''>('');

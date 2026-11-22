@@ -17,18 +17,6 @@
   min-width: 0;
 }
 
-.au__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
-
-.au__list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
 
 .au__off {
   --li-color: var(--color-text-muted);
