@@ -10,16 +10,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.modules.applications.comment_mails as mod
 from app.modules.applications.comment_mails import send_comment_notifications
+from app.modules.notifications import service as service_mod
 from app.modules.notifications.layout import append_link_text
 from app.modules.notifications.mail import MailMessage, compute_idempotency_key
+from app.modules.notifications.service import NotificationService
 from app.settings import load_settings
 from tests._support.notifications_fakes import FakeQueue, FakeResolver, FakeSession
 
 SETTINGS = load_settings()
 
 
-class _FakeService:
-    """Replace NotificationService: no template in the database, collect each enqueue."""
+class _FakeService(NotificationService):
+    """Replace NotificationService: no template in the database, collect each enqueue.
+
+    The real `send_kind_mail` runs on top: the preference filter, the render and the push
+    check (no push, because the fake queue takes no push jobs).
+    """
 
     last: _FakeService | None = None
 
@@ -40,7 +46,14 @@ class _FakeService:
         return {"platformName": "Plattform", **context}
 
     async def _message(
-        self, rendered: Any, recipients: list[str], reason: str, idem: Any, link: Any
+        self,
+        rendered: Any,
+        recipients: list[str],
+        reason: str,
+        idem: Any,
+        link: Any,
+        *_args: Any,
+        **_kw: Any,
     ) -> MailMessage:
         return MailMessage(
             to=tuple(recipients),
@@ -99,9 +112,7 @@ async def test_principal_public_comment_mails_applicant() -> None:
     assert "Bitte Angebot nachreichen." in msg.text
     assert msg.html == "<html>comment</html>"
     base = SETTINGS.public_base_url.rstrip("/")
-    assert (
-        f"Antrag öffnen: {base}/applications/{app_id}#comment-{comment_id}" in msg.text
-    )
+    assert f"Antrag öffnen: {base}/applications/{app_id}#comment-{comment_id}" in msg.text
 
 
 async def test_principal_comment_links_a_guest_to_the_applicant_page() -> None:
@@ -181,9 +192,8 @@ async def test_applicant_comment_mails_actionable_team(
 
     For a guest application, the team opens the application at the comment.
     """
-    async def fake_actionable(
-        session: Any, *, application_id: Any, state: Any
-    ) -> list[str]:
+
+    async def fake_actionable(session: Any, *, application_id: Any, state: Any) -> list[str]:
         return ["team@x.de", "vorstand@x.de"]
 
     monkeypatch.setattr(mod, "actionable_principal_emails", fake_actionable)
@@ -211,9 +221,7 @@ async def test_applicant_comment_mails_actionable_team(
     assert "Beamer" in msg.subject
     assert "Wann wird entschieden?" in msg.text
     base = SETTINGS.public_base_url.rstrip("/")
-    assert (
-        f"Antrag öffnen: {base}/applications/{app_id}#comment-{comment_id}" in msg.text
-    )
+    assert f"Antrag öffnen: {base}/applications/{app_id}#comment-{comment_id}" in msg.text
 
 
 async def test_preference_optout_blocks_comment_mail() -> None:
@@ -235,13 +243,13 @@ async def test_preference_optout_blocks_comment_mail() -> None:
 def _capture_context(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     """Record the render context of each builtin mail."""
     seen: list[dict[str, Any]] = []
-    real = mod.render_mail
+    real = service_mod.render_mail
 
     def spy(**kwargs: Any) -> Any:
         seen.append(kwargs["context"])
         return real(**kwargs)
 
-    monkeypatch.setattr(mod, "render_mail", spy)
+    monkeypatch.setattr(service_mod, "render_mail", spy)
     return seen
 
 
@@ -314,9 +322,7 @@ async def test_applicant_comment_mail_keeps_the_display_name(
 ) -> None:
     """The team mail keeps the display name of the author."""
 
-    async def fake_actionable(
-        session: Any, *, application_id: Any, state: Any
-    ) -> list[str]:
+    async def fake_actionable(session: Any, *, application_id: Any, state: Any) -> list[str]:
         return ["team@x.de"]
 
     monkeypatch.setattr(mod, "actionable_principal_emails", fake_actionable)
