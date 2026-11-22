@@ -2,7 +2,7 @@
 id: "002407"
 title: The FAB fold animates only clip, transform and opacity
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-22
 tests:
