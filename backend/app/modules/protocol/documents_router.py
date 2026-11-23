@@ -15,6 +15,13 @@ session, a person without that right and a PDF without a Sitzung get 404, the sa
 answer as for an unknown id, so the answer does not tell that the PDF exists. The id
 alone is no protection: a text, a mail or a browser history can show it.
 
+``POST /api/meetings/{meeting_id}/documents/paperless`` copies the PDF version of one
+Paperless document into the platform (§F/integrations/paperless/002528). The person
+needs the write right of the protocol and the permission `paperless.use`. The copy
+passes each check of an upload, keeps the number of the Paperless document and gets an
+audit entry (§F/integrations/paperless/002531). The answer is 404 while the part
+`Aus Paperless einfügen` is off and 503 `paperless_unavailable` when Paperless fails.
+
 The routes are in `protocol` and not in `media`, because they read the meeting, and
 `media` imports no higher module (§S/backend/python/000651).
 
@@ -32,14 +39,26 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from app.deps import DbSession, get_current_applicant, get_current_principal
+from app.modules.audit.actions import AuditAction
+from app.modules.audit.service import record as audit_record
 from app.modules.auth.principal import Applicant, Principal
 from app.modules.files.body import read_capped
 from app.modules.media.router import ServiceDep as MediaDep
 from app.modules.media.router import document_response
 from app.modules.media.schemas import MarkdownDocumentOut
+from app.modules.paperless.client import PaperlessError
+from app.modules.paperless.connection import Connection, insert_on
+from app.modules.paperless.schemas import InsertIn
 from app.modules.protocol.router import PrincipalDep, ServiceDep
 from app.shared.antiabuse import enforce_document_body_cap, rate_limit_media_documents
-from app.shared.errors import ForbiddenError, NotFoundError, ProblemDetail, UnauthorizedError
+from app.shared.errors import (
+    ForbiddenError,
+    NotFoundError,
+    PayloadTooLargeError,
+    ProblemDetail,
+    ServiceUnavailableError,
+    UnauthorizedError,
+)
 
 router = APIRouter(tags=["protocol"])
 
@@ -73,6 +92,57 @@ async def upload_document(
     await protocols.authorize_write_meeting(meeting_id, principal)
     data = await read_capped(file, media.max_document_bytes)
     out = await media.upload_document(data, file.filename, meeting_id)
+    await session.commit()
+    return out
+
+
+@router.post(
+    "/meetings/{meeting_id}/documents/paperless",
+    response_model=MarkdownDocumentOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limit_media_documents)],
+    responses=_errors(401, 403, 404, 413, 415, 429, 503),
+)
+async def insert_paperless_document(
+    meeting_id: UUID,
+    data: InsertIn,
+    protocols: ServiceDep,
+    media: MediaDep,
+    principal: PrincipalDep,
+    session: DbSession,
+    connection: Connection,
+) -> MarkdownDocumentOut:
+    """Copy the PDF version of one Paperless document for a text of the protocol.
+
+    The name of the copy is the title of the document. The copy has the limits of an
+    upload: at most 20 MiB and 100 pages, unencrypted.
+    """
+    if not principal.has("paperless.use"):
+        raise ForbiddenError("Missing permission paperless.use.")
+    await protocols.authorize_write_meeting(meeting_id, principal)
+    client = await connection.client() if insert_on(await connection.row()) else None
+    if client is None:
+        raise NotFoundError("The insert from Paperless is off.")
+    try:
+        title = await client.title(data.document_id)
+        content = await client.download(data.document_id, media.max_document_bytes)
+    except PaperlessError as exc:
+        if exc.code == "too_large":
+            raise PayloadTooLargeError(f"PDF exceeds {media.max_document_bytes} bytes.") from exc
+        raise ServiceUnavailableError(
+            "Paperless does not answer.", code="paperless_unavailable"
+        ) from exc
+    out = await media.upload_document(
+        content, f"{title}.pdf", meeting_id, paperless_document_id=data.document_id
+    )
+    await audit_record(
+        session,
+        actor=principal.sub,
+        action=AuditAction.PAPERLESS_INSERTED,
+        target_type="markdown_document",
+        target_id=str(out.id),
+        data={"meetingId": str(meeting_id), "documentId": data.document_id},
+    )
     await session.commit()
     return out
 

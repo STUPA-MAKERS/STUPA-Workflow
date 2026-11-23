@@ -139,6 +139,10 @@ class AuditAction(StrEnum):
         PAPERLESS_FILED: The platform filed one document in Paperless. The target is the
             element (``protocol``, ``application`` or ``budget_plan``). ``data`` holds
             the kind of the file and the number of the Paperless document.
+        PAPERLESS_INSERTED: A person copied one Paperless document into a protocol text
+            (§F/integrations/paperless/002528). The target is the stored PDF
+            (``markdown_document``). ``data`` holds the Sitzung and the number of the
+            Paperless document.
         PII_EXPORT: GDPR export (Art. 15). ANONYMIZATION and the ``ERASURE_*`` entries
             cover erasure (Art. 17) and its request queue, RETENTION_ANONYMIZE covers
             retention (Art. 5(1)(e)).
@@ -283,6 +287,7 @@ class AuditAction(StrEnum):
     GREMIUM_NOTIFY = "gremium_notify"
     PAPERLESS_CONNECTION = "paperless_connection"
     PAPERLESS_FILED = "paperless_filed"
+    PAPERLESS_INSERTED = "paperless_inserted"
 
 
 REVERTABLE_BUDGET_ACTIONS: frozenset[AuditAction] = frozenset(

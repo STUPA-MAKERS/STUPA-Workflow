@@ -70,7 +70,9 @@ class MarkdownDocument(CreatedAtMixin, Base):
     reference. ``pages`` feeds the file badge (spec 000863). ``meeting_id`` is the
     Sitzung of the upload: only a person who can read that Sitzung reads the PDF
     (§NF/security/files/000979). A row without a Sitzung is readable only through the
-    public route of a public protocol.
+    public route of a public protocol. ``paperless_document_id`` is the number of the
+    Paperless document of which the PDF is a copy (§F/integrations/paperless/002528),
+    and None for an upload.
     """
 
     __tablename__ = "markdown_document"
@@ -88,3 +90,4 @@ class MarkdownDocument(CreatedAtMixin, Base):
     meeting_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("meeting.id", ondelete="SET NULL"), nullable=True
     )
+    paperless_document_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)

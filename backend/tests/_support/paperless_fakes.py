@@ -29,6 +29,7 @@ class FakePaperless:
     Attributes:
         down: Each request fails with a connect error.
         status: Each request gets this error status.
+        files: The PDF version of a document, which the download route answers.
         consume: `ok` makes a document of an upload at the first task read, `fail`
             makes the task fail, `wait` keeps it open.
     """
@@ -41,6 +42,7 @@ class FakePaperless:
     uploads: list[dict[str, Any]] = field(default_factory=list[dict[str, Any]])
     documents: dict[int, dict[str, Any]] = field(default_factory=dict[int, dict[str, Any]])
     tasks: dict[str, int | None] = field(default_factory=dict[str, int | None])
+    files: dict[int, bytes] = field(default_factory=dict[int, bytes])
 
     def _id(self) -> int:
         return 1 + sum(len(entries) for entries in self.names.values()) + len(self.documents)
@@ -52,10 +54,11 @@ class FakePaperless:
     def _list(self, where: str, request: httpx.Request) -> httpx.Response:
         if request.method == "GET":
             wanted = request.url.params.get("name__iexact", "").lower()
+            ids = request.url.params.get("id__in")
             rows = [
                 {"id": entry_id, "name": name}
                 for name, entry_id in self.names[where].items()
-                if name.lower() == wanted
+                if (str(entry_id) in ids.split(",") if ids else name.lower() == wanted)
             ]
             return httpx.Response(200, json={"count": len(rows), "results": rows})
         body = json.loads(request.content)
@@ -122,6 +125,18 @@ class FakePaperless:
             self.documents[document_id].update(json.loads(request.content))
         return httpx.Response(200, json=self.documents[document_id])
 
+    def _search(self, request: httpx.Request) -> httpx.Response:
+        """The documents whose title holds the query; without one, the newest first."""
+        wanted = request.url.params.get("query", "").lower()
+        rows = [
+            {key: row[key] for key in ("id", "title", "created", "document_type")}
+            for row in self.documents.values()
+            if wanted in str(row["title"]).lower()
+        ]
+        if "query" not in request.url.params:
+            rows.reverse()
+        return httpx.Response(200, json={"count": len(rows), "results": rows})
+
     def handle(self, request: httpx.Request) -> httpx.Response:
         """Answer one request of the client."""
         self.requests.append(request)
@@ -137,7 +152,9 @@ class FakePaperless:
         if path == "tasks":
             return self._task(request)
         if path == "documents":
-            return httpx.Response(200, json={"count": 0, "results": []})
+            return self._search(request)
+        if path.endswith("/download"):
+            return httpx.Response(200, content=self.files[int(path.split("/")[1])])
         return self._document(int(path.split("/")[1]), request)
 
     def client(
