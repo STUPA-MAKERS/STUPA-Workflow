@@ -2,7 +2,7 @@
 id: "002530"
 title: An admin can file the final documents that exist
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

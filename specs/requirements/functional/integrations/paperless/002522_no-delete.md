@@ -2,7 +2,7 @@
 id: "002522"
 title: The platform deletes no document in Paperless
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

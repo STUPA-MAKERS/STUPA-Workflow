@@ -2,7 +2,7 @@
 id: "002513"
 title: Each call to Paperless uses the token of the connection
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

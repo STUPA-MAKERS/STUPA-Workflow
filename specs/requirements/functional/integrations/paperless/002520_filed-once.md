@@ -2,7 +2,7 @@
 id: "002520"
 title: A file is filed only once
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

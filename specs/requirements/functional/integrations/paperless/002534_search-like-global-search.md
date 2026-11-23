@@ -2,7 +2,7 @@
 id: "002534"
 title: The Paperless search looks like the global search
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

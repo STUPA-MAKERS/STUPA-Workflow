@@ -2,7 +2,7 @@
 id: "002526"
 title: The admin page lists the filings that failed
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

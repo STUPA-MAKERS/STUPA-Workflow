@@ -2,7 +2,7 @@
 id: "002532"
 title: An erasure names the filed Paperless documents
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

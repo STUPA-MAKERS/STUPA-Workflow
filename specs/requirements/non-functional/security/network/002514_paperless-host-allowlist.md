@@ -2,7 +2,7 @@
 id: "002514"
 title: The Paperless address needs a host from the deploy settings
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

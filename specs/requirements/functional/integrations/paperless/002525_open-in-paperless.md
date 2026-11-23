@@ -2,7 +2,7 @@
 id: "002525"
 title: An element with a filed document links to Paperless
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

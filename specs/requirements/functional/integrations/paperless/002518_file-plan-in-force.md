@@ -2,7 +2,7 @@
 id: "002518"
 title: A Haushaltsplan is filed when it comes into force
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

@@ -2,7 +2,7 @@
 id: "002517"
 title: The PDF of an Antrag is filed at each decision
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

@@ -2,7 +2,7 @@
 id: "002535"
 title: The attachments of an Antrag are filed with its PDF
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

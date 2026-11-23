@@ -2,7 +2,7 @@
 id: "002511"
 title: An admin connects one Paperless instance
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

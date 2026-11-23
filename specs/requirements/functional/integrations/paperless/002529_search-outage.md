@@ -2,7 +2,7 @@
 id: "002529"
 title: The Paperless search tells an outage and keeps the editor
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

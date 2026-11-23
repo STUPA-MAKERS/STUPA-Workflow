@@ -2,7 +2,7 @@
 id: "002528"
 title: An insert from Paperless copies the document as an embedded PDF
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

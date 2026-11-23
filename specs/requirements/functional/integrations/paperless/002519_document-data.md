@@ -2,7 +2,7 @@
 id: "002519"
 title: A filed document carries type, date, Gremium and link
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

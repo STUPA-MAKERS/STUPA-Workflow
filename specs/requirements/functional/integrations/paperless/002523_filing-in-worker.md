@@ -2,7 +2,7 @@
 id: "002523"
 title: Filing runs in the worker and never blocks an action
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null
