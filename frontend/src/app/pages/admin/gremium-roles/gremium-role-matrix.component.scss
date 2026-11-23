@@ -15,7 +15,7 @@
   display: grid;
   // One column per right of the catalogue: auto-fit makes as many columns as the row has cells and
   // collapses the empty ones, so a new right gets its own column instead of a second grid line.
-  grid-template-columns: minmax(10rem, 2fr) repeat(auto-fit, minmax(4.25rem, 1fr)) 3rem;
+  grid-template-columns: minmax(10rem, 2fr) repeat(auto-fit, minmax(min(100%, 4.25rem), 1fr)) 3rem;
   align-items: center;
   min-height: 3.75rem;
   padding: var(--space-1) var(--space-2) var(--space-1) var(--space-5);
