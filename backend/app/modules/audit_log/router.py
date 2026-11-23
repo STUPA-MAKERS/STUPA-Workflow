@@ -64,11 +64,15 @@ async def list_audit(
     until: Annotated[AwareDatetime | None, Query()] = None,
     before: Annotated[int | None, Query(ge=1)] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
+    q: Annotated[str | None, Query(max_length=200)] = None,
+    label_action: Annotated[list[str] | None, Query(alias="labelAction", max_length=100)] = None,
 ) -> AuditPageOut:
     """Read the audit log with keyset paging.
 
     The ``before`` cursor pages backwards and the newest entry comes first. Filter
-    by ``action``, by ``actor``, or by the time window ``since``/``until``. The
+    by ``action``, by ``actor``, or by the time window ``since``/``until``. ``q`` is
+    the search of the page (§002693); ``labelAction`` names the action keys whose shown
+    label holds the search, because the labels live in the frontend. The
     window bounds must carry a time zone, because the ``at`` column is timestamptz
     and asyncpg rejects a naive value with a 500; Pydantic rejects it with 422.
     """
@@ -79,6 +83,8 @@ async def list_audit(
         until=until,
         before=before,
         limit=limit,
+        q=q,
+        label_actions=tuple(label_action or ()),
     )
     names = await service.resolve_actor_names([e.actor for e in items])
     labels = await service.resolve_target_labels([(e.target_type, e.target_id) for e in items])
