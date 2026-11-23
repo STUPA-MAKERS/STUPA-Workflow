@@ -127,16 +127,14 @@ export class AdminListComponent {
   /** The scroll box of the open page while the panes sit side by side. */
   private readonly body = viewChild<ElementRef<HTMLElement>>('body');
   /**
-   * The open page is scrolled down. Only then has the round frame round top corners, so a
-   * control at the top right of the page head is not cut at rest (ui-kit:000193).
+   * Marks the page body with `data-scrolled` while it is scrolled down. Only then has the round
+   * frame round top corners, so a control at the top right of the page head is not cut at rest
+   * (ui-kit:000193). A native passive listener, so a scroll runs no change detection (002160).
    */
-  readonly scrolled = signal(false);
-
-  /** The page body scrolled: keep {@link scrolled} current. */
-  onBodyScroll(): void {
-    const body = this.body()?.nativeElement;
-    this.scrolled.set(!!body && body.scrollTop > 0);
-  }
+  private readonly markScrolled = (e: Event): void => {
+    const body = e.currentTarget as HTMLElement;
+    body.toggleAttribute('data-scrolled', body.scrollTop > 0);
+  };
 
   /** The list and the open page sit side by side. */
   readonly split = injectListDetailPage(this.layout).split;
@@ -191,8 +189,15 @@ export class AdminListComponent {
         // page starts at the top.
         const body = this.body()?.nativeElement;
         if (body) body.scrollTop = 0;
-        this.scrolled.set(false);
+        body?.removeAttribute('data-scrolled');
       });
+
+    effect((onCleanup) => {
+      const body = this.body()?.nativeElement;
+      if (!body) return;
+      body.addEventListener('scroll', this.markScrolled, { passive: true });
+      onCleanup(() => body.removeEventListener('scroll', this.markScrolled));
+    });
 
     effect(() =>
       this.pageFrame.crumbRoot.set(this.split() ? this.mode().home.replace(/^\//, '') : null),
