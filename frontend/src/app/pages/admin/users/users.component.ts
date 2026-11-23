@@ -1,6 +1,6 @@
 import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -13,7 +13,6 @@ import {
   FilterSelectComponent,
   type FilterSelectOption,
   liveSearch,
-  NoteComponent,
   RowMenuComponent,
   type IconName,
   type RowMenuItem,
@@ -29,7 +28,6 @@ import {
 import {
   RecordsScreenComponent,
   ScreenFiltersDirective,
-  ScreenIntroDirective,
   ScreenRecordDirective,
   ScreenSearchDirective,
 } from '@stupa-makers/ui-kit/screens';
@@ -98,16 +96,13 @@ function lastLoginFilters(lastLogin: LastLoginFilter, now: number): PrincipalFil
     ButtonGroupComponent,
     RecordsScreenComponent,
     ScreenFiltersDirective,
-    ScreenIntroDirective,
     ScreenRecordDirective,
     ScreenSearchDirective,
     ExpandRowComponent,
-    RouterLink,
     TranslatePipe,
     LocalizedDatePipe,
     StatusTextComponent,
     AvatarComponent,
-    NoteComponent,
     RowMenuComponent,
     SearchPillComponent,
     FilterSelectComponent,
@@ -158,8 +153,9 @@ export class UsersComponent {
   /** The global group mappings. Empty without `admin.group_mappings`. */
   private readonly groupMappings = signal<GroupMapping[]>([]);
 
-  /** The group-mappings page needs its own permission. The hint links to it only then. */
-  protected readonly canManageMappings = computed(() => this.auth.can('admin.group_mappings'));
+  /** Reading the group mappings needs its own permission. Without it the roles column shows
+   * the bootstrap roles only. */
+  protected readonly canReadMappings = computed(() => this.auth.can('admin.group_mappings'));
 
   /** "Mit anderem Konto zusammenführen" needs its own permission (admin only by default). */
   protected readonly canMerge = computed(() => this.auth.can('admin.users.merge'));
@@ -240,7 +236,7 @@ export class UsersComponent {
    */
   constructor() {
     this.api.listRoles().subscribe((r) => this.roles.set(r));
-    if (this.canManageMappings()) {
+    if (this.canReadMappings()) {
       this.api.listGroupMappings().subscribe({
         next: (m) => this.groupMappings.set(m),
         error: () => this.groupMappings.set([]),
