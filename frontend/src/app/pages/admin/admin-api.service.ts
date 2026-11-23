@@ -45,6 +45,10 @@ import {
   type MeetingSettings,
   type FeatureSwitches,
   type HelpTicketsSettings,
+  type PaperlessConnection,
+  type PaperlessConnectionIn,
+  type PaperlessFailedFiling,
+  type PaperlessTestResult,
   type LoginSettings,
   type AuditPage,
   type Branding,
@@ -123,6 +127,8 @@ import {
   MOCK_MEETING_SETTINGS,
   MOCK_FEATURES,
   MOCK_HELP_TICKETS,
+  MOCK_PAPERLESS,
+  MOCK_PAPERLESS_FAILED,
   MOCK_LOGIN_SETTINGS,
   MOCK_MAIL_TEMPLATES,
   MOCK_PERMISSIONS,
@@ -1534,6 +1540,60 @@ export class AdminApiService {
       return of(structuredCopy(this.store.helpTickets));
     }
     return this.http.put<HelpTicketsSettings>(`${this.base}/admin/help-tickets`, body);
+  }
+
+  /** The Paperless connection and the failed filings of the mock mode. */
+  private readonly mockPaperless = signal<PaperlessConnection>({ ...MOCK_PAPERLESS });
+  private readonly mockPaperlessFailed = signal<readonly PaperlessFailedFiling[]>(MOCK_PAPERLESS_FAILED);
+
+  /**
+   * GET /admin/paperless — the Paperless connection and the switch of each part, without
+   * the token. Every route of the page needs P(admin.paperless).
+   */
+  getPaperless(): Observable<PaperlessConnection> {
+    if (this.mock) return of(this.mockPaperless());
+    return this.http.get<PaperlessConnection>(`${this.base}/admin/paperless`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** PUT /admin/paperless — 422 `paperless_host_not_allowed` for a host the deploy does not allow. */
+  putPaperless(body: PaperlessConnectionIn): Observable<PaperlessConnection> {
+    if (this.mock) {
+      const { token, ...rest } = body;
+      this.mockPaperless.update((stored) => ({ ...stored, ...rest, tokenSet: stored.tokenSet || !!token }));
+      return of(this.mockPaperless());
+    }
+    return this.http.put<PaperlessConnection>(`${this.base}/admin/paperless`, body);
+  }
+
+  /** POST /admin/paperless/test — calls Paperless with the stored connection. */
+  testPaperless(): Observable<PaperlessTestResult> {
+    if (this.mock) return of({ ok: true, error: null });
+    return this.http.post<PaperlessTestResult>(`${this.base}/admin/paperless/test`, {});
+  }
+
+  /** GET /admin/paperless/failed-filings — the filings whose job failed for the last time. */
+  listPaperlessFailed(): Observable<PaperlessFailedFiling[]> {
+    if (this.mock) return of([...this.mockPaperlessFailed()]);
+    return this.http.get<PaperlessFailedFiling[]>(`${this.base}/admin/paperless/failed-filings`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** POST /admin/paperless/failed-filings/{id}/retry — starts the job again. */
+  retryPaperlessFiling(id: string): Observable<void> {
+    if (this.mock) {
+      this.mockPaperlessFailed.update((list) => list.filter((f) => f.id !== id));
+      return of(undefined);
+    }
+    return this.http.post<void>(`${this.base}/admin/paperless/failed-filings/${id}/retry`, {});
+  }
+
+  /** POST /admin/paperless/backfill — starts a job for each final document without one. */
+  backfillPaperless(): Observable<{ readonly started: number }> {
+    if (this.mock) return of({ started: 3 });
+    return this.http.post<{ readonly started: number }>(`${this.base}/admin/paperless/backfill`, {});
   }
 
   /** The feature switches of the mock mode. */

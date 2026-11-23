@@ -23,6 +23,8 @@ import type {
   MeetingSettings,
   FeatureSwitches,
   HelpTicketsSettings,
+  PaperlessConnection,
+  PaperlessFailedFiling,
   LoginSettings,
   MailTemplate,
   FormOverviewItem,
@@ -820,6 +822,37 @@ export const MOCK_HELP_TICKETS: HelpTicketsSettings = {
   notifyNew: true,
   retentionMonths: 12,
 };
+
+/** The Paperless connection of the mock: connected, with the protocols filed. */
+export const MOCK_PAPERLESS: PaperlessConnection = {
+  baseUrl: 'https://paperless.example.org',
+  tokenSet: true,
+  fileProtocols: true,
+  fileApplications: false,
+  filePlans: false,
+  insertEnabled: false,
+  allowedHosts: ['paperless.example.org'],
+};
+
+/** The failed filings of the mock. */
+export const MOCK_PAPERLESS_FAILED: readonly PaperlessFailedFiling[] = [
+  {
+    id: 'pf-1',
+    kind: 'protocol',
+    elementId: 'm-1',
+    title: '3. ordentliche Sitzung',
+    failedAt: '2026-11-20T09:12:00Z',
+    error: 'unreachable',
+  },
+  {
+    id: 'pf-2',
+    kind: 'attachment',
+    elementId: 'a-1',
+    title: 'Erstsemesterfahrt – Angebot.pdf',
+    failedAt: '2026-11-19T16:40:00Z',
+    error: 'rejected',
+  },
+];
 
 /** The feature switches of the mock: every feature on, as the backend defaults them. */
 export const MOCK_FEATURES: FeatureSwitches = {

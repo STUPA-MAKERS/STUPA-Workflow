@@ -5,7 +5,14 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/paperless/test_paperless.py:test_a_host_outside_the_allowlist_is_refused"
+  - "backend/tests/unit/modules/paperless/test_client.py:test_a_host_outside_the_allowlist_gets_no_request"
+  - "backend/tests/unit/modules/paperless/test_client.py:test_an_error_answer_is_a_cause_code"
+implementation:
+  - backend/app/modules/paperless/client.py
+  - backend/app/modules/paperless/connection.py
+  - backend/app/settings.py
 scope:
   - backend/app/
 ---
