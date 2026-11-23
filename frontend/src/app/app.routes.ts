@@ -660,6 +660,15 @@ export const routes: Routes = [
               ),
           },
           {
+            path: 'paperless',
+            data: { title: 'admin.paperless.title', permission: ['admin.paperless'], parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/paperless/paperless.component').then(
+                (m) => m.PaperlessComponent,
+              ),
+          },
+          {
             path: 'help-tickets',
             data: { title: 'admin.helpTickets.title', permission: ['admin.site', 'ticket.manage'], parent: ['admin'] },
             canActivate: [authGuard],

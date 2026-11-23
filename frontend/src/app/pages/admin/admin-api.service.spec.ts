@@ -120,6 +120,30 @@ describe('AdminApiService — mock mode', () => {
       });
     });
   });
+  /** § F/integrations/paperless/002511: the page works in the mock mode. */
+  it('keeps the Paperless connection and the failed filings in mock mode', async () => {
+    const s = svc();
+    const before = await firstValueFrom(s.getPaperless());
+    expect(before.tokenSet).toBe(true);
+    const saved = await firstValueFrom(
+      s.putPaperless({
+        baseUrl: 'https://paperless.example.org',
+        token: 'secret',
+        fileProtocols: true,
+        fileApplications: false,
+        filePlans: false,
+        insertEnabled: false,
+      }),
+    );
+    expect(saved).toEqual(expect.objectContaining({ tokenSet: true, fileProtocols: true }));
+    expect(saved).not.toHaveProperty('token');
+    expect(await firstValueFrom(s.testPaperless())).toEqual({ ok: true, error: null });
+    expect(await firstValueFrom(s.backfillPaperless())).toEqual({ started: 3 });
+    const failed = await firstValueFrom(s.listPaperlessFailed());
+    expect(failed.length).toBeGreaterThan(0);
+    await firstValueFrom(s.retryPaperlessFiling(failed[0].id));
+    expect(await firstValueFrom(s.listPaperlessFailed())).toHaveLength(failed.length - 1);
+  });
 });
 
 describe('AdminApiService — real mode (contract)', () => {
@@ -420,6 +444,33 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(req.request.body).toEqual({ confirmTtlHours: 24, linkTtlDays: 30 });
     req.flush({ confirmTtlHours: 24, linkTtlDays: 30 });
     expect(saved).toEqual({ confirmTtlHours: 24, linkTtlDays: 30 });
+  });
+
+  /** § F/integrations/paperless/002511, 002526, 002530 */
+  it('wires the Paperless routes', () => {
+    s.getPaperless().subscribe();
+    const read = http.expectOne({ method: 'GET', url: '/api/admin/paperless' });
+    expect(read.request.context.get(SKIP_LOADING)).toBe(true);
+    read.flush({});
+    const body = {
+      baseUrl: 'https://paperless.example.org',
+      fileProtocols: true,
+      fileApplications: false,
+      filePlans: false,
+      insertEnabled: false,
+    };
+    s.putPaperless(body).subscribe();
+    const put = http.expectOne({ method: 'PUT', url: '/api/admin/paperless' });
+    expect(put.request.body).toEqual(body);
+    put.flush({});
+    s.testPaperless().subscribe();
+    http.expectOne({ method: 'POST', url: '/api/admin/paperless/test' }).flush({ ok: true, error: null });
+    s.listPaperlessFailed().subscribe();
+    http.expectOne({ method: 'GET', url: '/api/admin/paperless/failed-filings' }).flush([]);
+    s.retryPaperlessFiling('f1').subscribe();
+    http.expectOne({ method: 'POST', url: '/api/admin/paperless/failed-filings/f1/retry' }).flush(null);
+    s.backfillPaperless().subscribe();
+    http.expectOne({ method: 'POST', url: '/api/admin/paperless/backfill' }).flush({ started: 0 });
   });
 
   it('GETs and PUTs the meeting settings', () => {

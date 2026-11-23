@@ -147,6 +147,7 @@ import { formatMoney } from '@shared/format-money';
 import { withoutKey } from '@shared/util/immutable';
 import { pageItemTitle } from '../../layout/page-title.service';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import { openInPaperless, paperlessLink } from '@core/api/paperless.service';
 
 /** Field types whose old and new value do not fit on one line of the history. The
  *  history opens them as blocks below the change ("Werte anzeigen"). */
@@ -309,6 +310,8 @@ export class ApplicationsDetailComponent {
   readonly error = signal(false);
 
   readonly app = signal<Application | null>(null);
+  /** The filed document of the Antrag in Paperless, for a holder of `paperless.use` (002525). */
+  private readonly paperlessUrl = paperlessLink('application', computed(() => this.app()?.id));
   readonly versions = signal<ApplicationVersion[]>([]);
   readonly comments = signal<ApplicationComment[]>([]);
   /** The first read of the comments is out: the chat shows placeholder bubbles. */
@@ -1048,6 +1051,7 @@ export class ApplicationsDetailComponent {
         icon: 'history',
       }),
       pdf,
+      ...when(!!this.paperlessUrl(), { id: 'paperless', label: t('paperless.open'), icon: 'link' }),
     ];
     const danger = [
       ...when(this.canDelete(), {
@@ -1161,6 +1165,9 @@ export class ApplicationsDetailComponent {
         break;
       case 'pdf':
         this.openPdf(app.id, this.title());
+        break;
+      case 'paperless':
+        openInPaperless(this.paperlessUrl() ?? '');
         break;
     }
   }

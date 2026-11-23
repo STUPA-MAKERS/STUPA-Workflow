@@ -37,6 +37,7 @@ export const ADMIN_AREA_PERMISSIONS = [
   'webhook.manage',
   'admin.calendars',
   'admin.features',
+  'admin.paperless',
   'ticket.manage',
   'audit.read',
   'backup.manage',

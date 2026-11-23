@@ -38,6 +38,7 @@ from worker.drafts import process_draft_reminders
 from worker.files_drafts import purge_draft_attachments
 from worker.mail import on_startup as mail_on_startup
 from worker.mail import send_mail
+from worker.paperless import process_paperless_filings
 from worker.protocol import backfill_public_protocols, heal_public_protocols, render_protocol
 from worker.protocol import on_startup as protocol_on_startup
 from worker.push import send_push
@@ -150,7 +151,8 @@ class WorkerSettings:
     03:50 archives cards longer than ``archive_after_days`` in the done column. The
     deadline and vote scan runs every minute; it is idempotent and uses SKIP LOCKED.
     The fetch of the external calendars runs every minute at second 30 and fetches
-    only the calendars whose interval is over.
+    only the calendars whose interval is over. The Paperless filing runs every minute at
+    second 45: it opens a job for each new final file and runs the due jobs.
     Task reminders run hourly (thresholds in days); ``task_reminder_log`` prevents
     duplicate sends. Draft reminders run hourly too; ``draft_reminder_at`` sends each
     draft one reminder at most. Expired wizard drafts go hourly with their objects. The public
@@ -184,6 +186,7 @@ class WorkerSettings:
         func(scheduled_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
         migrate_builtin_cd_logos,
         fetch_external_calendars,
+        process_paperless_filings,
     ]
     cron_jobs = [
         cron(refresh_budget_stats, hour=3, minute=0),
@@ -192,6 +195,7 @@ class WorkerSettings:
         cron(archive_done_todos, hour=3, minute=50),
         cron(process_deadlines, second=0),
         cron(fetch_external_calendars, second=30),
+        cron(process_paperless_filings, second=45),
         cron(process_task_reminders, minute=10),
         cron(process_draft_reminders, minute=15),
         cron(purge_draft_attachments, minute=20),

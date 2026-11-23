@@ -1371,6 +1371,57 @@ export interface HelpTicketsSettings {
   readonly retentionMonths: number | null;
 }
 
+/**
+ * The page "Paperless" (`GET`/`PUT /admin/paperless`, permission `admin.paperless`): the
+ * connection to one Paperless-ngx instance and the switch of each part. The server never
+ * returns the token; `tokenSet` tells only whether one is stored.
+ */
+export interface PaperlessConnection {
+  readonly baseUrl: string | null;
+  readonly tokenSet: boolean;
+  readonly fileProtocols: boolean;
+  readonly fileApplications: boolean;
+  readonly filePlans: boolean;
+  readonly insertEnabled: boolean;
+  /** The hosts of the deploy setting `PAPERLESS_HOST_ALLOWLIST`. */
+  readonly allowedHosts: readonly string[];
+}
+
+/** The body of `PUT /admin/paperless`. Without `token` the stored token stays. */
+export interface PaperlessConnectionIn {
+  readonly baseUrl: string | null;
+  readonly token?: string;
+  readonly fileProtocols: boolean;
+  readonly fileApplications: boolean;
+  readonly filePlans: boolean;
+  readonly insertEnabled: boolean;
+}
+
+/** The result of `POST /admin/paperless/test`. `error` is the cause code of a failure. */
+export interface PaperlessTestResult {
+  readonly ok: boolean;
+  readonly error: string | null;
+}
+
+/** The kind of a filed file. */
+export type PaperlessFilingKind =
+  | 'protocol'
+  | 'protocol_public'
+  | 'application'
+  | 'attachment'
+  | 'plan';
+
+/** A filing whose job failed for the last time (`GET /admin/paperless/failed-filings`). */
+export interface PaperlessFailedFiling {
+  readonly id: string;
+  readonly kind: PaperlessFilingKind;
+  readonly elementId: string;
+  readonly title: string;
+  readonly failedAt: string | null;
+  /** The cause code of the newest failure. */
+  readonly error: string | null;
+}
+
 /** Versioned site config: active version + editable draft. */
 /** `GET`/`PUT /admin/site-config`: the active branding and its version. */
 export interface SiteConfig {
