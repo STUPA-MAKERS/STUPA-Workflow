@@ -9,6 +9,7 @@ implementation:
   - backend/app/modules/forms/service.py
   - backend/app/modules/budget/form_options.py
   - frontend/src/app/pages/admin/forms/form-editor.component.ts
+  - frontend/vendor/ui-kit/views/form-editor/src/form-editor-view.component.ts
 scope:
   - backend/app/modules/forms
   - backend/app/modules/budget
