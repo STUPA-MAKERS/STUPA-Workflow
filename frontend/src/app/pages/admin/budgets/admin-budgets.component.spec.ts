@@ -8,6 +8,7 @@ import { axe } from 'jest-axe';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import { retryLoadError } from '../../../../testing/load-error';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from '../../budget/budget-tree.api';
 import { BudgetPlanApi, type PlanSteps } from '../../budget/plan/budget-plan.api';
 import { FY25, FY26, QSM, TOP, fy, node, plan, version } from '../../budget/plan/budget-plan.fixtures';
@@ -143,16 +144,11 @@ describe('AdminBudgetsComponent', () => {
       const view = await setup({ tree: of([VSM, { ...QSM, active: false }]) });
       expect(screen.getByText('VS-Mittel')).toBeInTheDocument();
       expect(screen.queryByText('Beiträge')).toBeNull();
-      expect(screen.getAllByText('01.03.')).toHaveLength(2);
-      expect(screen.getByText('Mit Haushaltsplan')).toBeInTheDocument();
-      expect(screen.getByText('Ohne Haushaltsplan')).toBeInTheDocument();
+      expect(screen.getAllByText(/Beginn des Haushaltsjahrs: 01\.03\./)).toHaveLength(2);
+      expect(screen.getByText(/Mit Haushaltsplan/)).toBeInTheDocument();
+      expect(screen.getByText(/Ohne Haushaltsplan/)).toBeInTheDocument();
       expect(screen.getByText('Inaktiv')).toBeInTheDocument();
-      expect(screen.getAllByRole('columnheader').map((h) => h.textContent?.trim())).toEqual([
-        'Haushalt',
-        'Beginn des Haushaltsjahrs',
-        'Haushaltsplan',
-        'Aktionen',
-      ]);
+      expect(screen.queryByRole('columnheader')).toBeNull();
       expect(await axe(view.container)).toHaveNoViolations();
     });
 
@@ -160,7 +156,7 @@ describe('AdminBudgetsComponent', () => {
       const view = await setup({ tree: refuse(500), gremienFail: true });
       expect(screen.queryByText('VS-Mittel')).toBeNull();
       view.api.tree.mockReturnValueOnce(of([VSM]));
-      (view.fixture.debugElement.query(By.directive(LoadErrorComponent)).componentInstance as LoadErrorComponent).retry.emit();
+      retryLoadError();
       view.fixture.detectChanges();
       expect(screen.getByText('VS-Mittel')).toBeInTheDocument();
       const dialog = await openEdit('VS-Mittel');

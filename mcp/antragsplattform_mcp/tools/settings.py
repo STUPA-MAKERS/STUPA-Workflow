@@ -254,9 +254,14 @@ async def webhook_delivery_status() -> list:
 
 
 @group.tool
-async def list_agent_grants(principal_id: str | None = None) -> dict:
-    """List the live agent tokens of every person, newest first (admin.users)."""
-    return await api().get("/admin/oauth-grants", params=params(principalId=principal_id))
+async def list_agent_grants(principal_id: str | None = None, q: str | None = None) -> dict:
+    """List the live agent tokens of every person, newest first (admin.users).
+
+    `q` keeps the tokens whose owner name, owner e-mail, client or scope holds each word.
+    """
+    return await api().get(
+        "/admin/oauth-grants", params=params(principalId=principal_id, q=q)
+    )
 
 
 @group.tool

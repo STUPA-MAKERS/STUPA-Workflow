@@ -42,7 +42,7 @@
               </div>
             </section>
           } @else if (searched()) {
-            <app-empty-state icon="searchOff" shape="date" [heading]="'calendar.search.none' | t" />
+            <app-empty-state fill icon="searchOff" shape="date" [heading]="'calendar.search.none' | t" />
           }
         } @else {
           @if (error()) {
@@ -77,9 +77,9 @@
             </app-list-group>
           } @empty {
             @if (error()) {
-              <app-empty-state icon="alert" [heading]="'calendar.error' | t" />
+              <app-empty-state fill icon="alert" [heading]="'calendar.error' | t" />
             } @else if (!loading()) {
-              <app-empty-state icon="cal" shape="date" [heading]="'calendar.list.empty' | t" />
+              <app-empty-state fill icon="cal" shape="date" [heading]="'calendar.list.empty' | t" />
             }
           }
           <div class="cal-list__more">

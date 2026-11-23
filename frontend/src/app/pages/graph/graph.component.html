@@ -172,9 +172,9 @@
         <app-load-error face [message]="'graph.loadError' | t" (retry)="retry()" />
       } @else if (empty()) {
         @if (filtered()) {
-          <app-empty-state icon="searchOff" [heading]="'graph.emptyFiltered' | t" />
+          <app-empty-state fill icon="searchOff" [heading]="'graph.emptyFiltered' | t" />
         } @else {
-          <app-empty-state icon="shapes" [heading]="'graph.empty' | t" [body]="'graph.emptyBody' | t" />
+          <app-empty-state fill icon="shapes" [heading]="'graph.empty' | t" [body]="'graph.emptyBody' | t" />
         }
       } @else {
         <app-graph-canvas-view

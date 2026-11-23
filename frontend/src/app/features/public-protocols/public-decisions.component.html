@@ -45,7 +45,7 @@
       } @else if (error() && items().length === 0) {
         <app-note kind="error" icon="alert" role="alert">{{ 'publicDecisions.error' | t }}</app-note>
       } @else if (items().length === 0) {
-        <app-empty-state icon="searchOff" shape="date"
+        <app-empty-state fill icon="searchOff" shape="date"
           [heading]="'publicDecisions.empty.filtered' | t"
           [body]="'publicDecisions.empty.filteredBody' | t"
         />

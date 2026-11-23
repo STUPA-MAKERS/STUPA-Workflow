@@ -152,6 +152,38 @@ describe('AdminGremienComponent', () => {
     expect(nav).toHaveBeenCalledWith(['/admin/committees', 'g-2', 'members']);
   });
 
+  /** §002692: "Stellvertretungen" follows "Mitglieder" and needs admin.delegations. */
+  it('opens the substitutes page from the ⋮ menu of a row', async () => {
+    const { fixture } = await setup({ perms: ['admin.gremien', 'admin.delegations'] });
+    const nav = jest.spyOn(fixture.debugElement.injector.get(Router), 'navigate').mockResolvedValue(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: AStA' }));
+    const items = (await screen.findAllByRole('menuitem')).map((m) => m.textContent?.trim());
+    expect(items.indexOf('Stellvertretungen')).toBe(items.indexOf('Mitglieder') + 1);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Stellvertretungen' }));
+    expect(nav).toHaveBeenCalledWith(['/admin/committees', 'g-2', 'substitutes']);
+  });
+
+  it('has no "Stellvertretungen" without admin.delegations', async () => {
+    await setup();
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: AStA' }));
+    await screen.findAllByRole('menuitem');
+    expect(screen.queryByRole('menuitem', { name: 'Stellvertretungen' })).toBeNull();
+  });
+
+  /** §002690, §002691: the search of Benutzer filters by name and slug. */
+  it('searches the gremien by name and slug', async () => {
+    const { fixture } = await setup();
+    const pill = screen.getByRole('searchbox', { name: 'Gremien durchsuchen' });
+    await userEvent.type(pill, 'asta');
+    fixture.detectChanges();
+    expect(screen.queryByRole('button', { name: /^Studierendenparlament/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /^AStA/ })).toBeInTheDocument();
+    await userEvent.clear(pill);
+    await userEvent.type(pill, 'nobody');
+    fixture.detectChanges();
+    expect(screen.getByText('Keine Treffer.')).toBeInTheDocument();
+  });
+
   it('tags a gremium that publishes its protocols and names the setting', async () => {
     await setup();
     expect(

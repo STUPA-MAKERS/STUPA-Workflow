@@ -1,45 +1,46 @@
-import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { type Delegation, DelegationsApiService } from '@core/api/delegations.service';
-import type { Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ConfirmDialogComponent,
-  EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
+  filterChipText,
   IconComponent,
+  type ListRow,
+  type LoadState,
   RowMenuComponent,
   type RowMenuSection,
-  SkeletonComponent,
+  SearchPillComponent,
   ToastService,
-  PageHeaderComponent,
-  SectionComponent,
   ButtonGroupComponent,
 } from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
-import { AdminApiService } from '../admin-api.service';
-import type { Gremium } from '../admin.models';
-import { SubstitutePoolComponent } from './substitute-pool.component';
+import {
+  RecordsScreenComponent,
+  ScreenFiltersDirective,
+  ScreenRecordDirective,
+  ScreenSearchDirective,
+} from '@stupa-makers/ui-kit/screens';
 import { localToday } from '@shared/date-format';
-import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
+import { hitCount, listSearch, searchedRows } from '../list-search';
+
+/** The period chip: the delegations of the meetings from today on, or of the past ones. */
+type Period = 'active' | 'past';
 
 /**
- * The admin overview of the delegations (`/admin/delegations`).
+ * The admin overview of the delegations (`/admin/delegations`), a list page of Verwaltung
+ * (§002690) with the search of Benutzer (§002691).
  *
- * "Aktive Vertretungen": the delegations of the meetings from today on (or without a date), newest
- * meeting last, each with meeting, date, from → to, the tags "Stimmrecht" and "Pool", and
- * "Widerrufen" in the ⋮ menu (danger, with a confirmation). An admin may revoke at any time. The
- * delegations of past meetings stay behind "Frühere Vertretungen".
+ * The chip "Zeitraum" shows the delegations of the meetings from today on (or without a
+ * date), newest meeting last, or those of the past meetings, newest first. Each row has
+ * meeting, date, from → to, the tags "Stimmrecht" and "Pool", and "Widerrufen" in the ⋮
+ * menu (danger, with a confirmation). An admin may revoke at any time. A member creates
+ * the own delegation on the meeting page; the gremium must allow it.
  *
- * "Stellvertretungen": the substitute pool of one gremium (`app-substitute-pool`); the
- * gremium chip picks the gremium. A member creates the own delegation on the meeting
- * page; the gremium must allow it.
- *
- * The disclosure is a native button, because it needs aria-expanded on the button itself.
+ * The substitute pool of a gremium has its own page below the Gremien (§002692).
  */
 @Component({
   selector: 'app-delegations',
@@ -47,41 +48,33 @@ import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-stat
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ButtonGroupComponent,
-    LoadStateComponent,
-    SectionComponent,
     ConfirmDialogComponent,
-    EmptyStateComponent,
-    NgTemplateOutlet,
     RouterLink,
     TranslatePipe,
     LocalizedDatePipe,
     IconComponent,
     FilterSelectComponent,
-    PageHeaderComponent,
-    BreadcrumbsComponent,
+    RecordsScreenComponent,
+    ScreenFiltersDirective,
+    ScreenRecordDirective,
+    ScreenSearchDirective,
+    SearchPillComponent,
     RowMenuComponent,
-    SkeletonComponent,
-    SubstitutePoolComponent,
   ],
   templateUrl: './delegations.component.html',
   styleUrl: './delegations.component.scss',
 })
 export class DelegationsComponent {
   private readonly api = inject(DelegationsApiService);
-  private readonly admin = inject(AdminApiService);
   private readonly toast = inject(ToastService);
   private readonly i18n = inject(I18nService);
 
   protected readonly delegations = signal<Delegation[]>([]);
   protected readonly loading = signal(true);
   protected readonly loadError = signal(false);
-  protected readonly loadState = loadStateOf(this.loading, this.loadError);
   protected readonly busy = signal(false);
   protected readonly confirmRevoke = signal<Delegation | null>(null);
-  protected readonly showPast = signal(false);
-
-  protected readonly gremien = signal<Gremium[]>([]);
-  protected readonly gremiumId = signal('');
+  protected readonly period = signal<Period>('active');
 
   private readonly today = localToday();
 
@@ -117,20 +110,62 @@ export class DelegationsComponent {
     ),
   );
 
-  protected readonly gremiumOptions = computed<FilterSelectOption[]>(() =>
-    this.gremien().map((g) => ({ value: g.id, label: g.name })),
+  /** The options of the chip "Zeitraum". */
+  protected readonly periodOptions = computed<FilterSelectOption[]>(() => [
+    { value: 'active', label: this.i18n.translate('admin.deleg.active') },
+    { value: 'past', label: this.i18n.translate('admin.deleg.past') },
+  ]);
+  /** The text of the chip: "Zeitraum: Aktive Vertretungen". */
+  protected readonly periodText = computed(() =>
+    filterChipText(
+      this.i18n.translate('admin.deleg.filter.period'),
+      this.periodOptions().find((o) => o.value === this.period())?.label,
+    ),
   );
-  protected readonly poolGremiumId = computed(() => this.gremiumId() as Uuid);
+
+  /** The search of the list (§002690, §002691). */
+  protected readonly search = listSearch();
+  /** The rows of the records screen (§ui-kit:002257). */
+  protected readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
+    if (this.loading()) return { state: 'loading' };
+    if (this.loadError())
+      return {
+        state: 'error',
+        message: this.i18n.translate('admin.deleg.error'),
+        retry: () => this.reload(),
+      };
+    const list = this.period() === 'past' ? this.past() : this.active();
+    const rows = this.search
+      .filter(list, (d) => [d.meetingTitle, this.who(d, 'from'), this.who(d, 'to')])
+      .map((d) => ({ id: d.id, title: d.meetingTitle ?? '' }));
+    return searchedRows(
+      rows.length
+        ? { state: 'ready', data: rows }
+        : {
+            state: 'empty',
+            icon: 'handshake',
+            heading: this.i18n.translate(
+              this.period() === 'past' ? 'admin.deleg.nonePast' : 'admin.deleg.none',
+            ),
+          },
+      this.search,
+      this.i18n.translate('admin.list.noHits'),
+    );
+  });
+  /** The hits of the search for the pill. */
+  protected readonly hits = computed(() => hitCount(this.rows(), this.search));
 
   constructor() {
     this.reload();
-    this.admin.listGremienOptions().subscribe({
-      next: (list) => {
-        this.gremien.set(list);
-        if (!this.gremiumId() && list.length) this.gremiumId.set(list[0].id);
-      },
-      error: () => this.gremien.set([]),
-    });
+  }
+
+  /** The delegation of a row of the records screen. */
+  protected delegationOf(id: string): Delegation {
+    return this.delegations().find((d) => d.id === id)!;
+  }
+
+  protected setPeriod(value: string): void {
+    this.period.set(value === 'past' ? 'past' : 'active');
   }
 
   protected who(d: Delegation, side: 'from' | 'to'): string {

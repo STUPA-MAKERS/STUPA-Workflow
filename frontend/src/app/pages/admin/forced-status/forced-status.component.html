@@ -3,6 +3,19 @@
   [rows]="rows()"
   [filtersLabel]="'admin.forced.filters' | t"
 >
+  <ng-template screenSearch>
+    <div role="search">
+      <app-search-pill
+        size="md"
+        [clearable]="true"
+        [placeholder]="'admin.forced.search' | t"
+        [label]="'admin.forced.search' | t"
+        [results]="hits()"
+        [value]="search.text()"
+        (valueChange)="search.set($event)"
+      />
+    </div>
+  </ng-template>
   <ng-template screenFilters>
     <app-filter-select
       [label]="'admin.forced.filter.reason' | t"
