@@ -22,7 +22,7 @@ older schema has no place for them, and removes the columns, the tables and the
 permission.
 
 Revision ID: e41b7d90a6c2
-Revises: c7a94e12d5b3
+Revises: e3f61a7c9b20
 Create Date: 2026-11-23 17:00:00.000000
 """
 
@@ -33,7 +33,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "e41b7d90a6c2"
-down_revision: str | None = "c7a94e12d5b3"
+down_revision: str | None = "e3f61a7c9b20"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
