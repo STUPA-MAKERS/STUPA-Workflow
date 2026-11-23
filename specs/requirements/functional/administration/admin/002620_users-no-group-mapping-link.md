@@ -6,9 +6,9 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-23
 tests:
-  - "frontend/src/app/pages/admin/users/users.component.spec.ts:has no link to the group mappings (spec 002620)"
-  - "frontend/src/app/pages/admin/committees/gremien.component.spec.ts:has no link to the group mappings (spec 002620)"
-  - "frontend/src/app/pages/admin/committees/gremium-members.component.spec.ts:names the gremium without a count (spec 000560) and has no mappings link (spec 002620)"
+  - "frontend/src/app/pages/admin/users/users.component.spec.ts:UsersComponent"
+  - "frontend/src/app/pages/admin/committees/gremien.component.spec.ts:AdminGremienComponent"
+  - "frontend/src/app/pages/admin/committees/gremium-members.component.spec.ts:GremiumMembersComponent"
 implementation:
   - frontend/src/app/pages/admin/users/users.component.html
   - frontend/src/app/pages/admin/committees/gremien.component.html
