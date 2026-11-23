@@ -3,7 +3,7 @@
 @use './graph-kinds' as kinds;
 
 // The drawing fills the page. One layer over it holds the filters at the top, the panel of
-// the chosen node under them and the state of the build-up at the foot.
+// the chosen node under them, and "Schritte" and the state of the build-up at the foot.
 
 :host {
   @include lp.stack;
@@ -132,12 +132,18 @@
   max-width: 22rem;
   min-width: 11rem;
 }
-// "Schritte" (spec 001434) stays beside the search: it is no part of the scroll area.
+// "Schritte" (spec 001434) is a surface of its own at the start corner of the foot, opposite
+// the zoom buttons: the name above the minus, the field and the plus.
 .gr__depth {
   display: flex;
   flex: none;
+  flex-direction: column;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-1);
+  box-shadow: var(--shadow-md);
   color: var(--color-text-muted);
   font-size: 0.84375rem;
   font-weight: var(--fw-medium);
@@ -212,11 +218,11 @@
 .gr__panelHead,
 .gr__sheetHead {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-3);
 }
-.gr__sheetHead {
-  align-items: center;
+.gr__panelHead {
+  justify-content: space-between;
 }
 .gr__panelText {
   flex: 1 1 auto;
@@ -229,22 +235,14 @@
   line-height: 1.3;
   overflow-wrap: anywhere;
 }
-.gr__panelSub {
+.gr__panelSub,
+.gr__hint {
   margin: 0;
   color: var(--color-text-muted);
   font-size: 0.8125rem;
 }
 .gr__panelSub + .gr__panelSub {
   margin-top: var(--space-1);
-}
-.gr__hint {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-}
-.gr__panelHead {
-  align-items: center;
-  justify-content: space-between;
 }
 .gr__actions {
   align-self: flex-start;
@@ -262,10 +260,12 @@
   @include kinds.colors;
 }
 
-// The foot of the layer: the state of the build-up. It leaves the corner of the zoom
-// buttons free.
+// The foot of the layer: "Schritte" and the state of the build-up. It leaves the corner of
+// the zoom buttons free.
 .gr__foot {
   display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
   margin-top: auto;
   margin-inline-end: calc(var(--control-height) + var(--space-5));
   min-width: 0;
@@ -303,7 +303,7 @@
   .gr__float {
     padding: 0;
   }
-  // The search and "Schritte" in one line, the filters in a line of their own.
+  // The search in one line, the filters in a line of their own.
   .gr__bar {
     flex-wrap: wrap;
     padding: var(--space-3) var(--space-4) var(--space-2);
@@ -354,6 +354,7 @@
     box-shadow: inset 0 0 0 2px var(--vh-hi);
   }
   .gr__bar,
+  .gr__depth,
   .gr__panel,
   .gr__pill {
     border: 2px solid var(--color-text);
