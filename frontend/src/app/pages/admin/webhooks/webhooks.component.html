@@ -124,88 +124,74 @@
 
         <app-section [level]="3" [heading]="'admin.webhook.events' | t">
           @for (g of groups(); track g.group) {
-            <fieldset class="wh__group">
-              <legend class="wh__legend">{{ groupLabel(g.group) }}</legend>
-              <ul class="wh__events">
-                @for (ev of g.events; track ev.name) {
-                  @let sub = subscriptionOf(ev.name);
-                  <li class="wh__event" [class.wh__event--on]="sub !== null">
-                    <app-checkbox
-                      [name]="'wh-ev-' + ev.name"
-                      [ngModel]="sub !== null"
-                      (ngModelChange)="setEvent(ev, $event)"
-                      >{{ eventLabel(ev.name) }}</app-checkbox
-                    >
-                    @if (sub) {
-                      <ul class="wh__fields" [attr.aria-label]="eventLabel(ev.name)">
-                        @for (f of ev.fields; track f.key) {
-                          <li class="wh__field">
-                            <app-checkbox
-                              [name]="'wh-f-' + ev.name + '-' + f.key"
-                              [ngModel]="sub.fields.includes(f.key)"
-                              (ngModelChange)="setField(ev, f.key, $event)"
-                              >{{ fieldLabel(f.key) }}</app-checkbox
-                            >
-                            @if (f.personal) {
-                              <app-status-text kind="warn">{{
-                                'admin.webhook.personal' | t
-                              }}</app-status-text>
-                            }
-                          </li>
-                        }
-                      </ul>
+            <app-section [level]="4" [heading]="groupLabel(g.group)">
+              @for (ev of g.events; track ev.name) {
+                @let sub = subscriptionOf(ev.name);
+                <app-checkbox
+                  [name]="'wh-ev-' + ev.name"
+                  [ngModel]="sub !== null"
+                  (ngModelChange)="setEvent(ev, $event)"
+                  >{{ eventLabel(ev.name) }}</app-checkbox
+                >
+                @if (sub) {
+                  <app-field-group [surface]="3" role="group" [attr.aria-label]="eventLabel(ev.name)">
+                    @for (f of ev.fields; track f.key) {
+                      <app-checkbox
+                        [name]="'wh-f-' + ev.name + '-' + f.key"
+                        [ngModel]="sub.fields.includes(f.key)"
+                        (ngModelChange)="setField(ev, f.key, $event)"
+                        >{{ fieldLabel(f.key) }}
+                        @if (f.personal) {
+                          <app-status-text kind="warn">{{ 'admin.webhook.personal' | t }}</app-status-text>
+                        }</app-checkbox
+                      >
                     }
-                  </li>
+                  </app-field-group>
                 }
-              </ul>
-            </fieldset>
+              }
+            </app-section>
           }
         </app-section>
 
         <app-section [level]="3" [heading]="'admin.webhook.filters' | t">
-          <div class="wh__filters">
+          <app-filter-select
+            size="md"
+            [multiple]="true"
+            [filled]="true"
+            [label]="'admin.webhook.filter.gremien' | t"
+            [options]="gremiumOptions()"
+            [values]="d.gremiumIds"
+            (valuesChange)="patch('gremiumIds', $event)"
+            [resetLabel]="'admin.webhook.filter.all' | t"
+          />
+          <app-filter-select
+            size="md"
+            [multiple]="true"
+            [filled]="true"
+            [label]="'admin.webhook.filter.types' | t"
+            [options]="typeOptions()"
+            [values]="d.typeIds"
+            (valuesChange)="patch('typeIds', $event)"
+            [resetLabel]="'admin.webhook.filter.all' | t"
+          />
+          @if (hasTransition()) {
             <app-filter-select
               size="md"
               [multiple]="true"
               [filled]="true"
-              [label]="'admin.webhook.filter.gremien' | t"
-              [options]="gremiumOptions()"
-              [values]="d.gremiumIds"
-              (valuesChange)="patch('gremiumIds', $event)"
+              [label]="'admin.webhook.filter.states' | t"
+              [options]="stateOptions()"
+              [values]="d.stateKeys"
+              (valuesChange)="patch('stateKeys', $event)"
               [resetLabel]="'admin.webhook.filter.all' | t"
             />
-            <app-filter-select
-              size="md"
-              [multiple]="true"
-              [filled]="true"
-              [label]="'admin.webhook.filter.types' | t"
-              [options]="typeOptions()"
-              [values]="d.typeIds"
-              (valuesChange)="patch('typeIds', $event)"
-              [resetLabel]="'admin.webhook.filter.all' | t"
-            />
-            @if (hasTransition()) {
-              <app-filter-select
-                size="md"
-                [multiple]="true"
-                [filled]="true"
-                [label]="'admin.webhook.filter.states' | t"
-                [options]="stateOptions()"
-                [values]="d.stateKeys"
-                (valuesChange)="patch('stateKeys', $event)"
-                [resetLabel]="'admin.webhook.filter.all' | t"
-              />
-            }
-          </div>
+          }
         </app-section>
 
         @if (previews().length) {
           <app-section [level]="3" [heading]="'admin.webhook.preview' | t">
             @for (p of previews(); track p.name) {
-              <figure class="wh__preview">
-                <figcaption class="wh__previewHead">{{ eventLabel(p.name) }}</figcaption>
-                <pre class="wh__json" tabindex="0">{{ p.body }}</pre>
-              </figure>
+              <app-markdown-view [src]="p.markdown" />
             }
           </app-section>
         }

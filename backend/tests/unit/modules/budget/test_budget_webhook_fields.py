@@ -5,25 +5,13 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from decimal import Decimal
-from typing import Any
 
 from app.modules.budget.tree_models import Budget, BudgetExpense, FiscalYear, Invoice
 from app.modules.budget.webhook_fields import emit_booking_created, emit_invoice_created
 from app.modules.webhooks.catalog import EVENTS
 from app.modules.webhooks.models import Webhook
+from tests._support.webhooks_fakes import FakeSession
 from tests.unit.conftest import ActiveWebhooks
-
-
-class _Session:
-    def __init__(self, year: FiscalYear | None = None) -> None:
-        self.year = year
-        self.added: list[Any] = []
-
-    async def get(self, _model: object, _ident: object) -> FiscalYear | None:
-        return self.year
-
-    def add(self, obj: Any) -> None:
-        self.added.append(obj)
 
 
 def _hook(event: str) -> Webhook:
@@ -57,7 +45,9 @@ async def test_booking_with_application(active_webhooks: ActiveWebhooks) -> None
     )
     expense.id = uuid.uuid4()
     node = _node()
-    session = _Session(year)
+    year.id = expense.fiscal_year_id
+    session = FakeSession()
+    session.store[year.id] = year
     assert await emit_booking_created(session, expense, node, kind="expense") == 1  # type: ignore[arg-type]
     data = session.added[0].payload["data"]
     assert data["amount"] == "12.50"
@@ -71,7 +61,7 @@ async def test_transfer_without_application(active_webhooks: ActiveWebhooks) -> 
     active_webhooks.hooks = [_hook("booking.created")]
     expense = BudgetExpense(amount=Decimal(1), description="d", fiscal_year_id=uuid.uuid4())
     expense.id = uuid.uuid4()
-    session = _Session(None)
+    session = FakeSession()
     await emit_booking_created(session, expense, _node(), kind="transfer")  # type: ignore[arg-type]
     data = session.added[0].payload["data"]
     assert data["applicationId"] is None
@@ -90,7 +80,7 @@ async def test_invoice_with_dates(active_webhooks: ActiveWebhooks) -> None:
         due_date=dt.date(2026, 12, 4),
     )
     inv.id = uuid.uuid4()
-    session = _Session()
+    session = FakeSession()
     assert await emit_invoice_created(session, inv) == 1  # type: ignore[arg-type]
     data = session.added[0].payload["data"]
     assert data["grossAmount"] == "119.00"
@@ -103,7 +93,7 @@ async def test_invoice_without_dates(active_webhooks: ActiveWebhooks) -> None:
     active_webhooks.hooks = [_hook("invoice.created")]
     inv = Invoice(gross_amount=Decimal(1), currency=None)
     inv.id = uuid.uuid4()
-    session = _Session()
+    session = FakeSession()
     await emit_invoice_created(session, inv)  # type: ignore[arg-type]
     data = session.added[0].payload["data"]
     assert data["issueDate"] is None

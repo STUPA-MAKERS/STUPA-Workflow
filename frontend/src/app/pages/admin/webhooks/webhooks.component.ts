@@ -36,7 +36,9 @@ import {
   ErrorTextComponent,
   FactsComponent,
   DialogBodyDirective,
+  FieldGroupComponent,
 } from '@stupa-makers/ui-kit';
+import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
 import { RecordsScreenComponent, ScreenRecordDirective } from '@stupa-makers/ui-kit/screens';
 import { type StatusView, webhookDeliveryStatus } from '@shared/status-kind.util';
 import { withEntry } from '@shared/util/immutable';
@@ -198,6 +200,8 @@ function withMember(set: ReadonlySet<string>, id: string, on: boolean): Readonly
     ScreenRecordDirective,
     FilterSelectComponent,
     CheckboxComponent,
+    FieldGroupComponent,
+    MarkdownViewComponent,
   ],
   templateUrl: './webhooks.component.html',
   styleUrl: './webhooks.component.scss',
@@ -275,7 +279,15 @@ export class WebhooksComponent {
     if (!d) return [];
     return d.subscriptions.flatMap((sub) => {
       const event = this.catalog().find((e) => e.name === sub.event);
-      return event ? [{ name: event.name, body: previewBody(event, sub.fields) }] : [];
+      return event
+        ? [
+            {
+              name: event.name,
+              body: previewBody(event, sub.fields),
+              markdown: `**${this.eventLabel(event.name)}**\n\n\`\`\`json\n${previewBody(event, sub.fields)}\n\`\`\``,
+            },
+          ]
+        : [];
     });
   });
   /** "Webhook hinzufügen" as the FAB, with `webhook.manage`. */

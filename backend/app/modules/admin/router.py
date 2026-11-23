@@ -1375,10 +1375,12 @@ async def webhook_catalog() -> list[WebhookCatalogEvent]:
     responses=_errors(401, 403, 404, 409),
 )
 async def send_webhook_test(
-    webhook_id: UUID, service: ServiceDep, _principal: WebhookAdmin
+    webhook_id: UUID, session: DbSession, service: ServiceDep, _principal: WebhookAdmin
 ) -> WebhookTestOut:
     """Queue a test delivery with example values (§F/integrations/webhooks/002416)."""
-    return await service.send_test_delivery(webhook_id)
+    result = await service.send_test_delivery(webhook_id)
+    await session.commit()
+    return result
 
 
 @router.get(

@@ -1436,7 +1436,7 @@ async def test_send_test_delivery() -> None:
     assert delivery.event == "webhook.test"
     assert delivery.status == "pending"
     assert delivery.payload["data"] == {"vote.closed": {"result": "passed"}}
-    assert session.committed == 1
+    assert session.committed == 0
 
 
 async def test_send_test_delivery_refuses_missing_and_inactive() -> None:

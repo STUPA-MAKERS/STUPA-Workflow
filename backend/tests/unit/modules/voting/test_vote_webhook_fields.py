@@ -4,26 +4,14 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from typing import Any
 
 from app.modules.gremien.models import Gremium
 from app.modules.voting.models import Vote
 from app.modules.voting.webhook_fields import emit_vote_event
 from app.modules.webhooks.catalog import EVENTS
 from app.modules.webhooks.models import Webhook
+from tests._support.webhooks_fakes import FakeSession
 from tests.unit.conftest import ActiveWebhooks
-
-
-class _Session:
-    def __init__(self, gremium: Gremium | None) -> None:
-        self.gremium = gremium
-        self.added: list[Any] = []
-
-    async def scalar(self, _stmt: object) -> Gremium | None:
-        return self.gremium
-
-    def add(self, obj: Any) -> None:
-        self.added.append(obj)
 
 
 def _hook(event: str) -> Webhook:
@@ -55,7 +43,7 @@ async def test_closed_vote_with_gremium(active_webhooks: ActiveWebhooks) -> None
         result="passed",
     )
     vote.id = uuid.uuid4()
-    session = _Session(gremium)
+    session = FakeSession(scalars=[[gremium]])
     n = await emit_vote_event(session, "vote.closed", vote, counts={"yes": 2})  # type: ignore[arg-type]
     assert n == 1
     data = session.added[0].payload["data"]
@@ -70,7 +58,7 @@ async def test_opened_vote_without_gremium(active_webhooks: ActiveWebhooks) -> N
     active_webhooks.hooks = [_hook("vote.opened")]
     vote = Vote(eligible_group="all", question=None, kind="vote")
     vote.id = uuid.uuid4()
-    session = _Session(None)
+    session = FakeSession()
     await emit_vote_event(session, "vote.opened", vote)  # type: ignore[arg-type]
     data = session.added[0].payload["data"]
     assert data["gremium"] is None

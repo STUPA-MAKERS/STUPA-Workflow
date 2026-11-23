@@ -279,7 +279,6 @@ class WebhookOps(ConfigServiceBase):
         )
         self.session.add(delivery)
         await self.session.flush()
-        await self.session.commit()
         return WebhookTestOut(deliveryId=delivery.id)
 
     async def list_webhook_delivery_status(self) -> list[WebhookDeliveryStatusOut]:
