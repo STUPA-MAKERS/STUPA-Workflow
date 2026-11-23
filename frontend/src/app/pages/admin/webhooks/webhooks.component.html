@@ -122,19 +122,18 @@
           'admin.webhook.active' | t
         }}</app-switch>
 
-        <app-section [level]="3" [heading]="'admin.webhook.events' | t">
-          @for (g of groups(); track g.group) {
-            <app-section [level]="4" [heading]="groupLabel(g.group)">
+        @for (g of groups(); track g.group) {
+            <app-section [level]="3" [heading]="groupLabel(g.group)">
               @for (ev of g.events; track ev.name) {
                 @let sub = subscriptionOf(ev.name);
-                <app-checkbox
-                  [name]="'wh-ev-' + ev.name"
-                  [ngModel]="sub !== null"
-                  (ngModelChange)="setEvent(ev, $event)"
-                  >{{ eventLabel(ev.name) }}</app-checkbox
-                >
-                @if (sub) {
-                  <app-field-group [surface]="3" role="group" [attr.aria-label]="eventLabel(ev.name)">
+                <app-field-group role="group" [attr.aria-label]="eventLabel(ev.name)">
+                  <app-checkbox
+                    [name]="'wh-ev-' + ev.name"
+                    [ngModel]="sub !== null"
+                    (ngModelChange)="setEvent(ev, $event)"
+                    >{{ eventLabel(ev.name) }}</app-checkbox
+                  >
+                  @if (sub) {
                     @for (f of ev.fields; track f.key) {
                       <app-checkbox
                         [name]="'wh-f-' + ev.name + '-' + f.key"
@@ -146,12 +145,11 @@
                         }</app-checkbox
                       >
                     }
-                  </app-field-group>
-                }
+                  }
+                </app-field-group>
               }
             </app-section>
-          }
-        </app-section>
+        }
 
         <app-section [level]="3" [heading]="'admin.webhook.filters' | t">
           <app-filter-select
