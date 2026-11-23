@@ -47,6 +47,7 @@ from app.modules.files.models import Attachment
 from app.modules.files.scanner import ScannerError, VirusScanner
 from app.modules.files.service import FilesService
 from app.modules.tickets.mail_parse import MailFile, ParsedMail
+from app.modules.tickets.mail_send import queue_confirmation
 from app.modules.tickets.models import (
     Ticket,
     TicketMail,
@@ -227,11 +228,12 @@ class MailImporter:
         stored = await self._store_files(mail.files, ticket_id=ticket.id)
         await self._record(box, ticket.id, None, mail, source, stored)
         await emit_ticket_created(self.session, ticket, reporter_email=mail.sender)
+        confirmation = await queue_confirmation(self.session, box, ticket)
         self._tickets.add_event(
             ticket,
             "created",
             {
-                "confirmationSent": False,
+                "confirmationSent": confirmation is not None,
                 **({"followUpOf": format_number(follows.number)} if follows is not None else {}),
             },
         )

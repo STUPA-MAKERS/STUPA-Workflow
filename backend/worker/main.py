@@ -46,7 +46,7 @@ from worker.retention import process_retention
 from worker.scan import on_startup as scan_on_startup
 from worker.scan import scan_attachment
 from worker.task_reminders import process_task_reminders
-from worker.ticket_mail import fetch_ticket_mails
+from worker.ticket_mail import fetch_ticket_mails, send_ticket_mails
 from worker.tickets import anonymize_tickets
 from worker.todos import archive_done_todos
 from worker.watchdog import watchdog_on_shutdown, watchdog_on_startup
@@ -192,6 +192,7 @@ class WorkerSettings:
         fetch_external_calendars,
         process_paperless_filings,
         fetch_ticket_mails,
+        send_ticket_mails,
     ]
     cron_jobs = [
         cron(refresh_budget_stats, hour=3, minute=0),
@@ -203,6 +204,7 @@ class WorkerSettings:
         cron(fetch_external_calendars, second=30),
         cron(process_paperless_filings, second=45),
         cron(fetch_ticket_mails, second=15),
+        cron(send_ticket_mails, second={5, 35}),
         cron(process_task_reminders, minute=10),
         cron(process_draft_reminders, minute=15),
         cron(purge_draft_attachments, minute=20),

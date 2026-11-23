@@ -23,7 +23,7 @@ import { TodosApiService, type TodoLinkedCard } from '@core/api/todos.service';
 import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { DraftAttachmentsService } from '../../features/apply/draft-attachments.service';
-import { TicketDetailComponent, reportScanState } from './ticket-detail.component';
+import { MAIL_STATE_POLL_MS, TicketDetailComponent, reportScanState } from './ticket-detail.component';
 import { TicketsPageService } from './tickets-page.service';
 import { loadErrorToast, retryLoadError, toastWith } from '../../../testing/load-error';
 import { toastMock } from '../../../testing/toast';
@@ -236,6 +236,7 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
     deleteMyNote: jest.fn(() => of(undefined)),
     attachmentUrl: (id: string) => `/api/attachments/${id}/download`,
     mailSourceUrl: (ticketId: string, mailId: string) => `/api/tickets/${ticketId}/mails/${mailId}/source`,
+    resendMail: jest.fn(() => of({})),
   };
   const todosApi = {
     linked: jest.fn(() => todos),
@@ -1059,6 +1060,7 @@ describe('TicketDetailComponent', () => {
       { body: 'Fix ist offen.' },
       undefined,
       undefined,
+      null,
     );
     cmp.sendNote({ body: '@Ada hilft', mentions: ['p-ada'] });
     expect(api.addNote).toHaveBeenLastCalledWith(
@@ -1067,6 +1069,7 @@ describe('TicketDetailComponent', () => {
       { body: '@Ada hilft', mentions: ['p-ada'] },
       undefined,
       ['p-ada'],
+      null,
     );
     expect(cmp.notes().map((n) => n.id)).toEqual(['n1', 'n9']);
 
@@ -1279,6 +1282,7 @@ describe('TicketDetailComponent', () => {
       expect.objectContaining({ attachmentIds: ['d1'], draftToken: 'tok' }),
       undefined,
       undefined,
+      null,
     );
     const failed = cmp.messages().at(-1)!;
     expect(failed.attachments).toEqual([file]);
@@ -1413,6 +1417,7 @@ describe('TicketDetailComponent', () => {
         { body: 'Antwort', visibility: 'public' },
         'public',
         undefined,
+        null,
       );
     });
 
@@ -1523,6 +1528,135 @@ describe('TicketDetailComponent', () => {
       });
       expect(answer.body).toBe(ticket.notes[0].body);
       expect(answer.attachments?.at(-1)).toMatchObject({ id: 'm2', scanState: 'scanning' });
+    });
+
+    describe('answers by mail', () => {
+      const out = {
+        id: 'o1',
+        noteId: 'n1',
+        direction: 'out' as const,
+        fromName: null,
+        fromAddress: 'buero@stupa.example',
+        cc: ['ben@example.org'],
+        to: ['anna@example.org'],
+        subject: 'Re: Raumanfrage [T-7K3QX9MD]',
+        automatic: false,
+        source: 'gone' as const,
+        sourceSize: 0,
+        skipped: [],
+        state: 'sent' as const,
+        at: '2026-10-14T19:20:00Z',
+      };
+      const mailTicket = (over: Partial<TicketDetail> = {}): TicketDetail =>
+        inAsta({
+          source: 'mail',
+          reporter: { principalId: null, displayName: 'Anna Beispiel', email: 'anna@example.org', anonymized: false },
+          mails: [out],
+          mailAnswer: { to: ['anna@example.org'], cc: ['ben@example.org'], enabled: true },
+          ...over,
+        });
+      const open = (ticket: TicketDetail) =>
+        start('/tickets/t40', { areas: [PLAT, ASTA], get: () => of(ticket) });
+
+      it('offers a public message, names the recipients and shows the state of a mail', async () => {
+        const { cmp } = await open(mailTicket());
+        expect(cmp.visibilityOptions()).toEqual(['internal', 'public']);
+        expect(
+          screen.getByText(/Öffentliche Nachrichten gehen als Mail an anna@example.org \(Cc: ben@example.org\)\./),
+        ).toBeInTheDocument();
+        const [, answer] = cmp.messages();
+        expect(answer.body).toBe(
+          `${mailTicket().notes[0].body}\n\nGesendet an anna@example.org (Cc: ben@example.org)`,
+        );
+        expect(answer.state).toBeUndefined();
+      });
+
+      it('says that the Postfach is off', async () => {
+        await open(mailTicket({ mailAnswer: { to: ['anna@example.org'], cc: [], enabled: false } }));
+        expect(screen.getByText(/Das Postfach dieses Bereichs ist ausgeschaltet/)).toBeInTheDocument();
+        expect(screen.queryByTestId('td-recipients')).toBeNull();
+      });
+
+      it('sends a public message to the chosen recipients and an internal one to nobody', async () => {
+        const { cmp, api } = await open(mailTicket());
+        cmp.sendNote({ body: 'Antwort', visibility: 'public' });
+        expect(api.addNote).toHaveBeenLastCalledWith(
+          't40',
+          'Antwort',
+          { body: 'Antwort', visibility: 'public' },
+          'public',
+          undefined,
+          null,
+        );
+        cmp.openRecipients();
+        expect(cmp.recipientsDraft()).toEqual({ to: 'anna@example.org', cc: 'ben@example.org' });
+        cmp.recipientsDraft.set({ to: '', cc: 'kein' });
+        cmp.saveRecipients();
+        expect(cmp.recipientsError()).toBe('tickets.mail.recipients.toMissing');
+        cmp.recipientsDraft.set({ to: 'Anna@Example.org', cc: 'kein' });
+        expect(cmp.recipientsError()).toBe('tickets.mail.recipients.invalid');
+        expect(cmp.recipientsOpen()).toBe(true);
+        cmp.recipientsDraft.set({ to: 'Anna@Example.org', cc: 'carla@example.org; anna@example.org' });
+        cmp.saveRecipients();
+        expect(cmp.recipientsOpen()).toBe(false);
+        expect(cmp.recipientsLine()).toBe('anna@example.org (Cc: carla@example.org)');
+        cmp.sendNote({ body: 'Noch etwas', visibility: 'public' });
+        expect(api.addNote).toHaveBeenLastCalledWith(
+          't40',
+          'Noch etwas',
+          { body: 'Noch etwas', visibility: 'public' },
+          'public',
+          undefined,
+          { to: ['anna@example.org'], cc: ['carla@example.org'] },
+        );
+        cmp.sendNote({ body: 'Intern', visibility: 'internal' });
+        expect(api.addNote).toHaveBeenLastCalledWith(
+          't40',
+          'Intern',
+          { body: 'Intern', visibility: 'internal' },
+          'internal',
+          undefined,
+          null,
+        );
+      });
+
+      it('names the refusal while the Postfach is off', async () => {
+        const { cmp, api, toast } = await open(mailTicket());
+        api.addNote.mockReturnValueOnce(
+          throwError(() => new HttpErrorResponse({ status: 409, error: { code: 'mailbox_off' } })),
+        );
+        cmp.sendNote({ body: 'Antwort', visibility: 'public' });
+        expect(toast.error).toHaveBeenLastCalledWith(
+          'Das Postfach dieses Bereichs ist ausgeschaltet. Öffentliche Nachrichten sind gerade nicht möglich.',
+        );
+      });
+
+      it('sends a failed mail again, discards its message and reads a waiting mail again', async () => {
+        jest.useFakeTimers();
+        try {
+          const failed = mailTicket({ mails: [{ ...out, state: 'failed', error: 'connect_failed' }] });
+          const { cmp, api, toast } = await open(failed);
+          const [, answer] = cmp.messages();
+          expect(answer.state).toBe('failed');
+          expect(answer.body).toContain('Mail an anna@example.org');
+          api.get.mockReturnValue(of(mailTicket({ mails: [{ ...out, state: 'sending' }] })));
+          cmp.retryNote({ id: 'n1' });
+          expect(api.resendMail).toHaveBeenCalledWith('t40', 'o1');
+          expect(cmp.messages()[1].state).toBe('sending');
+          api.get.mockReturnValue(of(mailTicket()));
+          TestBed.tick();
+          jest.advanceTimersByTime(MAIL_STATE_POLL_MS);
+          expect(cmp.messages()[1].state).toBeUndefined();
+          api.resendMail.mockReturnValueOnce(throwError(() => new Error('offline')));
+          cmp.ticket.set(failed);
+          cmp.retryNote({ id: 'n1' });
+          expect(toast.error).toHaveBeenLastCalledWith('Die Mail konnte nicht erneut gesendet werden.');
+          cmp.discardNote({ id: 'n1' });
+          expect(api.deleteNote).toHaveBeenCalledWith('t40', 'n1');
+        } finally {
+          jest.useRealTimers();
+        }
+      });
     });
 
     it('sets and clears the Kategorie', async () => {

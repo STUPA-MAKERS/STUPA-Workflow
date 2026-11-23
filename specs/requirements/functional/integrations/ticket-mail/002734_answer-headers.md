@@ -5,7 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_send.py:test_a_sent_mail_carries_the_thread_headers_and_the_number"
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_send.py:test_an_answer_to_a_sent_mail_comes_back_to_the_ticket"
+implementation:
+  - backend/app/modules/tickets/mail_send.py
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets

@@ -89,6 +89,8 @@ TICKET_EVENT_KINDS: tuple[str, ...] = (
 )
 #: The directions of a stored mail: ``in`` came through the fetch, ``out`` was sent.
 TICKET_MAIL_DIRECTIONS: tuple[str, ...] = ("in", "out")
+#: The states of a sent mail.
+TICKET_MAIL_STATES: tuple[str, ...] = ("sending", "sent", "failed")
 #: The id of the built-in Bereich ``Plattform``. The migration creates the row.
 PLATFORM_AREA_ID = uuid.UUID("7a11e700-0000-4000-8000-000000000001")
 
@@ -150,6 +152,10 @@ class TicketMailbox(UUIDPkMixin, TimestampMixin, Base):
         last_error: The short cause code of the newest failure, never a text of an
             exception.
         fetched_at: The moment of the last fetch without a failure.
+        signature: The text that ends each sent mail. ``{name}`` stands for the writer
+            (§F/integrations/ticket-mail/002736).
+        confirm: The switch "Eingang bestätigen": a new ticket from a mail gets a
+            confirmation (§F/integrations/ticket-mail/002738).
     """
 
     __tablename__ = "ticket_mailbox"
@@ -173,6 +179,8 @@ class TicketMailbox(UUIDPkMixin, TimestampMixin, Base):
     failures: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    signature: Mapped[str] = mapped_column(Text, default="", server_default="")
+    confirm: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
 
 class TicketCategory(UUIDPkMixin, Base):
@@ -328,7 +336,14 @@ class TicketMail(UUIDPkMixin, Base):
         source_scan: NULL before a scan, ``clean``, or the signature of the finding.
         skipped: The files that did not become files of the message, each with
             ``name``, ``size`` and ``reason`` (``size`` or ``type``).
-        automatic: The mail came from a machine.
+        automatic: The mail came from a machine. A sent mail with this mark is the
+            confirmation of a new ticket.
+        to_addresses: The addresses of ``To`` of a sent mail.
+        state: The state of a sent mail: ``sending``, ``sent`` or ``failed``; NULL for
+            an imported mail (§F/integrations/ticket-mail/002737).
+        attempts: The failed sends in sequence.
+        send_error: The short cause code of the newest failed send.
+        next_try_at: The moment from which the worker tries the send again.
     """
 
     __tablename__ = "ticket_mail"
@@ -353,13 +368,26 @@ class TicketMail(UUIDPkMixin, Base):
         JSONB, default=list, server_default=text("'[]'::jsonb")
     )
     automatic: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    to_addresses: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
+    state: Mapped[str | None] = mapped_column(Text, nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    send_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    next_try_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
         CheckConstraint(f"direction IN ({_in(TICKET_MAIL_DIRECTIONS)})", name="direction"),
+        CheckConstraint(f"state IS NULL OR state IN ({_in(TICKET_MAIL_STATES)})", name="state"),
         UniqueConstraint("mailbox_id", "message_id", name="uq_ticket_mail_mailbox_message"),
         Index("ix_ticket_mail_ticket_id", "ticket_id"),
         Index("ix_ticket_mail_message_id", "message_id"),
+        Index(
+            "ix_ticket_mail_sending",
+            "next_try_at",
+            postgresql_where=text("state = 'sending'"),
+        ),
     )
 
 
