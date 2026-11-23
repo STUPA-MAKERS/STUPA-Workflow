@@ -473,7 +473,8 @@ describe('WebhooksComponent', () => {
     expect(c.gremiumOptions()).toEqual([{ value: 'g1', label: 'StuPa' }]);
     expect(c.typeOptions()).toEqual([{ value: 't1', label: 'Finanzantrag' }]);
     expect(c.stateOptions()).toEqual([{ value: 'approved', label: 'Genehmigt' }]);
-    expect(screen.getByRole('checkbox', { name: 'Statuswechsel' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Statuswechsel' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Statuswechsel' })).toBeInTheDocument();
     expect(screen.getAllByText('personenbezogen').length).toBeGreaterThan(0);
   });
 

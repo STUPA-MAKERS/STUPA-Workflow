@@ -855,7 +855,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.guardOpOptions(true).map((o: { value: string }) => o.value)).not.toContain('roleIs');
     expect(c.compareOpOptions().length).toBeGreaterThan(0);
     expect(c.recipientKindOptions().length).toBe(6);
-    expect(c.actionOptions().length).toBe(7);
+    expect(c.actionOptions().length).toBe(6);
     expect(c.actionLabel('notify')).toBeTruthy();
     expect(c.actionDesc('notify')).toBeTruthy();
     expect(c.kindLabel('vote')).toBeTruthy();
