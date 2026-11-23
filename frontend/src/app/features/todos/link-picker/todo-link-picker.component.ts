@@ -23,7 +23,8 @@ import {
 } from '@angular/core';
 import type { Uuid } from '@core/api/models';
 import { PaperlessService } from '@core/api/paperless.service';
-import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { first, switchMap } from 'rxjs';
 import {
   TodosApiService,
   type LinkEnd,
@@ -137,7 +138,15 @@ export class TodoLinkPickerComponent {
    * write right (spec 001410), a Paperless document `paperless.use` and its switch
    * (§F/integrations/paperless/002766, 002767).
    */
-  private readonly paperlessOn = toSignal(inject(PaperlessService).linksOn(), { initialValue: false });
+  private readonly paperless = inject(PaperlessService);
+  /** The picker asks for the part when it opens first, so a page with a closed picker sends nothing. */
+  private readonly paperlessOn = toSignal(
+    toObservable(this.open).pipe(
+      first((open) => open),
+      switchMap(() => this.paperless.linksOn()),
+    ),
+    { initialValue: false },
+  );
   readonly chips = computed(() =>
     KIND_CHIPS.filter((chip) => {
       const feature = chip.value === 'all' ? undefined : LINK_FEATURE[chip.value];
