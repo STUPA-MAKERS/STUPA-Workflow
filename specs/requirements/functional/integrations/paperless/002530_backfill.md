@@ -15,7 +15,7 @@ scope:
 
 The admin page `Paperless` must have the action `Bestehende Dokumente ablegen`. The action must
 start jobs for each final protocol, each decided Antrag and each Haushaltsplan in force that
-has no filed document.
+has no filed document. The action must start jobs only for a part whose switch is on (002512).
 
 Reason: The integration can go on after years of use. The archive must then also get the
 documents from before.
