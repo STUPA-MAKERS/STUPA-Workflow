@@ -33,6 +33,25 @@ describe('SettingsRows', () => {
   });
 });
 
+/**
+ * §ui-kit:000631: a settings row with a choice (Erledigte Tickets anonymisieren) takes the kit
+ * anatomy `.rowgroup__setting`, which keeps the switch at the end edge on a narrow row. The page
+ * does not lay the row out by itself.
+ */
+describe('SettingsRow with a choice', () => {
+  const name = 'pages/admin/help-tickets/help-tickets.component';
+
+  it('uses the kit anatomy for the row with the months', () => {
+    expect(read(`${name}.html`)).toMatch(
+      /<div class="rowgroup__setting">\s*<span id="ht-anon" class="rowgroup__label">/,
+    );
+  });
+
+  it('sets no layout of its own for the row', () => {
+    expect(read(`${name}.scss`)).not.toMatch(/rowgroup__setting|rowgroup__label|ht__label/);
+  });
+});
+
 const ADMIN = 'pages/admin';
 /** The flow inspectors move into the kit views (§ui-kit:002277), which carry the row group. */
 const SKIP = /^flow\//;

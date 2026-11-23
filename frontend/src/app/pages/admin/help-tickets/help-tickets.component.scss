@@ -17,13 +17,6 @@
   align-items: center;
   gap: var(--space-3) var(--space-4);
 }
-.ht__label {
-  flex: 1 1 12rem;
-  min-width: 0;
-  color: var(--color-text);
-  font-size: var(--fs-body);
-  line-height: var(--lh-body);
-}
 
 .ht__blocks,
 .ht__skelBlocks {
