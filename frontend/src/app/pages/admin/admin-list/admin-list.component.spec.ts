@@ -246,6 +246,18 @@ describe('AdminListComponent in account mode', () => {
     expect(links(view.container)).toEqual(['/account/profile', '/account/notifications']);
   });
 
+  it('names push under "Benachrichtigungen" only while the feature push is on', async () => {
+    await setup([], '/account', true, 'account');
+    expect(screen.getByText('Mail und Push je Anlass ein- und ausschalten')).toBeInTheDocument();
+  });
+
+  it('names only the mails while the feature push is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['push']));
+    await setup([], '/account', true, 'account');
+    localStorage.removeItem('ap.features.off');
+    expect(screen.getByText('E-Mails je Anlass ein- und ausschalten')).toBeInTheDocument();
+  });
+
   it('leads an account page back to /account', async () => {
     const view = await setup(['mcp.use'], '/account/grants', false, 'account');
     const router = view.fixture.debugElement.injector.get(Router);

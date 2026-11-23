@@ -568,6 +568,40 @@ async def set_notification_preferences(preferences: list[dict[str, Any]]) -> dic
 
 
 @group.tool
+async def list_push_devices() -> dict:
+    """List the devices of the logged-in user that get push notifications, newest first.
+
+    A device is added only in the browser, because the browser makes the subscription.
+    """
+    return await api().get("/push/devices")
+
+
+@group.tool
+async def remove_push_device(device_id: str) -> dict:
+    """Remove one push device of the logged-in user. It gets no push after that."""
+    return await api().delete(f"/push/devices/{device_id}")
+
+
+@group.tool
+async def get_push_preferences() -> dict:
+    """Get the push switch of every notification kind of the logged-in user.
+
+    The push switches are separate from the mail switches of
+    `get_notification_preferences`.
+    """
+    return await api().get("/push/preferences")
+
+
+@group.tool
+async def set_push_preferences(preferences: list[dict[str, Any]]) -> dict:
+    """Set the push switches of the logged-in user; the server returns all of them.
+
+    Use the same shape that `get_push_preferences` returns.
+    """
+    return await api().put("/push/preferences", json={"preferences": preferences})
+
+
+@group.tool
 async def get_site_config() -> dict:
     """Get the active site and branding config and its version."""
     return await api().get("/admin/site-config")

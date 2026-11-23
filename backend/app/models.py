@@ -73,6 +73,11 @@ from app.modules.notifications.models import (
     NotificationSettings,
     TaskReminderLog,
 )
+from app.modules.notifications.push_models import (
+    PushPreference,
+    PushSubscription,
+    PushVapidKey,
+)
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.site_config.models import SiteConfigVersion
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
@@ -133,6 +138,9 @@ __all__ = [
     "MarkdownDocument",
     "MarkdownImage",
     "NotificationPreference",
+    "PushPreference",
+    "PushSubscription",
+    "PushVapidKey",
     "NotificationSettings",
     "TaskReminderLog",
     "Meeting",

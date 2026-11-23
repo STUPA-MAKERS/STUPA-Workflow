@@ -151,7 +151,7 @@
       "to": "meetings"
     },
     {
-      "count": 1,
+      "count": 2,
       "from": "admin",
       "to": "notifications"
     },
@@ -256,7 +256,7 @@
       "to": "meetings"
     },
     {
-      "count": 36,
+      "count": 35,
       "from": "applications",
       "to": "notifications"
     },
@@ -511,7 +511,7 @@
       "to": "meetings"
     },
     {
-      "count": 6,
+      "count": 7,
       "from": "calendar",
       "to": "notifications"
     },
@@ -1031,7 +1031,7 @@
       "to": "audit"
     },
     {
-      "count": 5,
+      "count": 7,
       "from": "notifications",
       "to": "auth"
     },
@@ -1041,12 +1041,12 @@
       "to": "gremien"
     },
     {
-      "count": 16,
+      "count": 23,
       "from": "notifications",
       "to": "shared"
     },
     {
-      "count": 2,
+      "count": 5,
       "from": "notifications",
       "to": "site_config"
     },
@@ -1101,7 +1101,7 @@
       "to": "meetings"
     },
     {
-      "count": 6,
+      "count": 7,
       "from": "privacy",
       "to": "notifications"
     },
@@ -1204,6 +1204,36 @@
       "count": 12,
       "from": "protocol",
       "to": "voting"
+    },
+    {
+      "count": 3,
+      "from": "push_actions",
+      "to": "auth"
+    },
+    {
+      "count": 1,
+      "from": "push_actions",
+      "to": "calendar"
+    },
+    {
+      "count": 1,
+      "from": "push_actions",
+      "to": "notifications"
+    },
+    {
+      "count": 1,
+      "from": "push_actions",
+      "to": "shared"
+    },
+    {
+      "count": 1,
+      "from": "push_actions",
+      "to": "site_config"
+    },
+    {
+      "count": 3,
+      "from": "push_actions",
+      "to": "todos"
     },
     {
       "count": 1,
@@ -1366,7 +1396,7 @@
       "to": "meetings"
     },
     {
-      "count": 5,
+      "count": 6,
       "from": "todos",
       "to": "notifications"
     },
@@ -1441,7 +1471,7 @@
       "to": "meetings"
     },
     {
-      "count": 5,
+      "count": 6,
       "from": "voting",
       "to": "notifications"
     },
@@ -1641,6 +1671,12 @@
       "layer": 2,
       "name": "protocol",
       "path": "backend/app/modules/protocol"
+    },
+    {
+      "id": "push_actions",
+      "layer": 1,
+      "name": "push_actions",
+      "path": "backend/app/modules/push_actions"
     },
     {
       "id": "search",

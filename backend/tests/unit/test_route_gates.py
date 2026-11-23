@@ -18,7 +18,8 @@ stale entry of the list.
 Groups of ``OBJECT_CHECK_ROUTES`` that authorize no object:
 
 - Self: the route reads or writes only the data of the caller (``/auth/me``, the
-  own grants, preferences, calendar feed and avatar, the OAuth consent).
+  own grants, preferences, push devices and push switches, calendar feed and avatar, the
+  OAuth consent). The public push key is the same for every account.
 - Master data: ``GET /api/committees`` serves id, name and variant to any member, and
   the avatar of a principal is the same Gravatar image that the person list shows.
   ``GET /api/calendar/people`` serves id and name of the active accounts to any session
@@ -192,6 +193,12 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("PUT", "/api/meetings/{meeting_id}/votes/{vote_id}"): _MEETING_VOTES,
     ("GET", "/api/notifications/preferences"): _SELF,
     ("PUT", "/api/notifications/preferences"): _SELF,
+    ("GET", "/api/push/key"): _SELF,
+    ("GET", "/api/push/devices"): _SELF,
+    ("POST", "/api/push/devices"): _SELF,
+    ("DELETE", "/api/push/devices/{device_id}"): "PushService.remove (own device)",
+    ("GET", "/api/push/preferences"): _SELF,
+    ("PUT", "/api/push/preferences"): _SELF,
     ("GET", "/api/oauth/consent-request"): _SELF,
     ("POST", "/api/oauth/consent"): "self: oauth_router.consent (mcp.use after the deny path)",
     ("GET", "/api/oauth/finish"): _SELF,

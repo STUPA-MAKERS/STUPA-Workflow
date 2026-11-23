@@ -33,6 +33,7 @@ from app.modules.files.service import FilesService
 from app.modules.flow.models import State
 from app.modules.gremien.membership_sync import sync_principal_memberships
 from app.modules.meetings.models import Meeting, MeetingAttendance
+from app.modules.notifications.push_models import PushSubscription
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.protocol.erasure import erase_candidate_names
 from app.modules.tickets.models import Ticket, TicketNote
@@ -152,6 +153,9 @@ class PrincipalService:
         await erase_appointments(self.session, principal_id)
         await self.session.execute(
             delete(AuthSession).where(AuthSession.principal_id == principal_id)
+        )
+        await self.session.execute(
+            delete(PushSubscription).where(PushSubscription.principal_id == principal_id)
         )
         await audit_record(
             self.session,

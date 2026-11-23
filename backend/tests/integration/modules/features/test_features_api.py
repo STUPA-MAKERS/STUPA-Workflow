@@ -64,6 +64,7 @@ ROUTES: dict[Feature, tuple[tuple[str, str], ...]] = {
     Feature.INVOICES: (("GET", "/api/invoices"), ("POST", "/api/invoices/parse")),
     Feature.TICKETS: (("GET", "/api/tickets"), ("POST", "/api/tickets")),
     Feature.GRAPH: (("GET", "/api/graph"),),
+    Feature.PUSH: (("GET", "/api/push/key"), ("GET", "/api/push/devices")),
     #: Each public page also needs the feature of its records, so these routes close with
     #: `Sitzungen` and with `Kalender` too (§F/administration/admin/000756).
     Feature.PUBLIC: (

@@ -141,9 +141,15 @@ export class AdminListComponent {
   /** The text of "Einstellungen durchsuchen". */
   readonly query = signal('');
 
+  /** The line under the title: the line of the feature while it is on. */
+  private descOf(p: FramePage): TranslationKey {
+    return p.featureDesc && this.features.isOn(p.featureDesc.feature) ? p.featureDesc.desc : p.desc;
+  }
+
   /** The groups with the pages the principal may open and the search finds. */
   readonly groups = computed<NavGroup[]>(() => {
-    const { groups, pages } = this.mode();
+    const { groups } = this.mode();
+    const pages = this.mode().pages.map((p) => ({ ...p, desc: this.descOf(p) }));
     const q = this.query().trim().toLocaleLowerCase();
     const hit = (p: FramePage): boolean =>
       !q ||

@@ -833,6 +833,7 @@ export const MOCK_FEATURES: FeatureSwitches = {
   tickets: true,
   graph: true,
   public: true,
+  push: true,
 };
 
 /** The SSO login lifetimes of the mock: the defaults of the server. */
