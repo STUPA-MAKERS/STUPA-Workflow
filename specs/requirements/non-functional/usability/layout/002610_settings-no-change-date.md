@@ -2,7 +2,7 @@
 id: "002610"
 title: A settings screen of Verwaltung shows no change date
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 tests:
