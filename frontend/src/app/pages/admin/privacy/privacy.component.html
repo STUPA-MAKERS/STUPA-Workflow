@@ -217,9 +217,11 @@
       <ng-template appCell="filedAt" let-d>{{ $any(d).filedAt | ldate: 'mediumDate' }}</ng-template>
       <ng-template appCell="open" let-d>
         @if ($any(d).url) {
-          <a appButton="text" size="sm" target="_blank" rel="noopener" [href]="$any(d).url">{{
-            'admin.privacy.paperless.open' | t
-          }}</a>
+          <app-button-group>
+            <a appButton="text" size="sm" target="_blank" rel="noopener" [href]="$any(d).url">{{
+              'admin.privacy.paperless.open' | t
+            }}</a>
+          </app-button-group>
         }
       </ng-template>
     </app-data-table>
