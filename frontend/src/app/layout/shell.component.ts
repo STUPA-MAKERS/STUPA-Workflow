@@ -105,7 +105,11 @@ import { SiteFooterComponent } from './site-footer/site-footer.component';
       }
 
       @if (shell.current() === 'rail') {
-        <app-search-palette shellOverlays />
+        <ng-container shellOverlays>
+          @defer {
+            <app-search-palette />
+          }
+        </ng-container>
       }
     </app-shell>
   `,

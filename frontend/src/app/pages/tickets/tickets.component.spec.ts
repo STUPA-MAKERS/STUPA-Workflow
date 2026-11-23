@@ -568,6 +568,8 @@ describe('TicketsComponent', () => {
       expect(row.sub).toContain('AStA-Büro');
       expect(cmp.chips().map((c) => c.key)).toEqual(['area', 'kind', 'assignee']);
       cmp.setFilter('area', 'a-asta');
+      cmp.setFilter('area', '');
+      cmp.setArea('');
       cmp.setArea('a-asta');
       await go('/tickets?area=a-asta');
       expect(cmp.areaFilter()).toBe('a-asta');

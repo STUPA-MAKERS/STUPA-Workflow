@@ -272,7 +272,7 @@ async def test_search_every_kind(
     assert [h.kind for h in hits] == ["application", "meeting", "agenda_item", "ticket", "todo"]
     assert seen["apps"]["q"] == "pla" and seen["apps"]["owner_sub"] is None
     assert seen["apps"]["limit"] == PER_KIND
-    assert seen["tickets"] == {"q": "pla", "limit": PER_KIND}
+    assert seen["tickets"] == {"q": "pla", "limit": PER_KIND, "areas": None}
     todo_sql = str(session.statements[-2])
     assert "todo_card.id !=" in todo_sql
 

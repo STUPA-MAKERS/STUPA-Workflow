@@ -4,7 +4,7 @@ import { CalendarApiService } from '@core/api/calendar.service';
 import { TicketsApiService, type TicketArea, type TicketDetail } from '@core/api/tickets.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { toastMock } from '../../../testing/toast';
-import { TicketNewDialogComponent, manualBody } from './ticket-new-dialog.component';
+import { TicketNewDialogComponent, manualAddress, manualBody } from './ticket-new-dialog.component';
 
 const PLAT: TicketArea = {
   id: 'a-plat',
@@ -73,6 +73,13 @@ describe('TicketNewDialogComponent', () => {
     expect(bare).toEqual({ areaId: 'a-asta', title: 'x', body: '', message: '', reporterId: 'p7' });
   });
 
+  it('takes the address of the form only when it is an e-mail address', () => {
+    expect(manualAddress({ email: ' anna@example.org ' })).toBe('anna@example.org');
+    expect(manualAddress({ email: 'anna' })).toBe('');
+    expect(manualAddress({})).toBe('');
+    expect(manualBody({}, ASTA, null)).toEqual({ areaId: 'a-asta', title: '', body: '', message: '', email: '' });
+  });
+
   it('starts on the Bereich of the list filter and clears the Kategorie with a new Bereich', async () => {
     const { cmp, fill } = await setup({ preset: 'a-asta' });
     expect(screen.getByRole('heading', { name: 'Ticket anlegen' })).toBeInTheDocument();
@@ -82,6 +89,19 @@ describe('TicketNewDialogComponent', () => {
     expect(cmp.value().category).toBe('question');
     await fill({ areaId: 'a-asta' });
     expect(cmp.value().category).toBe('');
+  });
+
+  it('opens without a Bereich', async () => {
+    const { cmp } = await setup({ areas: [] });
+    expect(cmp.area()).toBeNull();
+    expect(cmp.value().areaId).toBe('');
+  });
+
+  it('falls back to the first Bereich for an unknown one', async () => {
+    const { cmp, fill } = await setup({ preset: 'gone' });
+    expect(cmp.area().id).toBe('a-plat');
+    await fill({ areaId: 'gone' });
+    expect(cmp.area().id).toBe('a-plat');
   });
 
   it('shows no Bereich field with one Bereich, and no Kategorie field without a Kategorie', async () => {

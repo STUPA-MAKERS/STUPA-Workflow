@@ -13,6 +13,7 @@ import {
   addressesValid,
   parseAddresses,
   recipientsText,
+  reporterEventText,
   sentLine,
   skippedLine,
   withSkipped,
@@ -248,6 +249,15 @@ describe('tickets.util', () => {
       expect(sentLine(mail(), t)).toBe('');
       expect(sentLine(undefined, t)).toBe('');
       expect(recipientsText(['a@x.org', 'b@x.org'], [], t)).toBe('a@x.org, b@x.org');
+    });
+
+    it('names a sent mail without stored recipients, and a status change with an unknown status', () => {
+      const out = mail({ direction: 'out', cc: [], state: 'sent' });
+      expect(sentLine({ ...out, to: undefined }, t)).toBe('Gesendet an ');
+      expect(reporterEventText({ from: 'new', to: 'done' }, t)).toBe(
+        reporterEventText({ from: 'unknown', to: 'done' }, t),
+      );
+      expect(reporterEventText({ from: 'new', to: 'unknown' }, t)).toBe(reporterEventText({ from: 'new', to: 'new' }, t));
     });
 
     it('reads the addresses that a person typed', () => {
