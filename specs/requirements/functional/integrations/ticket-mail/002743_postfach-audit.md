@@ -5,7 +5,13 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/tickets/test_ticket_mailbox.py:test_a_new_password_is_in_the_audit_by_name_only"
+  - "backend/tests/unit/modules/tickets/test_ticket_mailbox.py:test_the_switch_is_a_change_with_an_audit_entry"
+  - "backend/tests/unit/modules/tickets/test_ticket_mailbox.py:test_delete_removes_the_postfach_with_an_audit_entry"
+implementation:
+  - backend/app/modules/tickets/mailbox.py
+  - backend/app/modules/audit/actions.py
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/admin/help-tickets

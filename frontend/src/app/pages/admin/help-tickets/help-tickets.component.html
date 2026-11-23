@@ -142,3 +142,15 @@
   (saved)="onAreaSaved($event)"
   (deleted)="onAreaDeleted($event)"
 />
+
+@if (canMail()) {
+  <app-ticket-mailbox-dialog
+    [open]="mailArea() !== null"
+    [area]="mailArea()"
+    [mailbox]="mailAreaBox()"
+    [allowedHosts]="allowedHosts()"
+    (closed)="mailArea.set(null)"
+    (saved)="onMailboxSaved($event)"
+    (deleted)="onMailboxDeleted($event)"
+  />
+}

@@ -817,3 +817,101 @@ def test_the_reporter_routes_take_no_mentions(env: _Env) -> None:
     body = {"body": "n", "mentions": [str(uuid.uuid4())]}
     assert client.post(f"/api/tickets/mine/{TID}/notes", json=body).status_code == 422
     assert client.patch(f"/api/tickets/mine/{TID}/notes/{TID}", json=body).status_code == 422
+
+
+class _FakeMailboxes:
+    """The Postfach service double: it keeps the calls and counts the commits."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, Any]] = []
+        self.commits = 0
+        self.session = self
+
+    async def commit(self) -> None:
+        self.commits += 1
+
+    def _out(self) -> Any:
+        from app.modules.tickets.mailbox_schemas import MailboxOut
+
+        return MailboxOut(
+            area_id=AREA,
+            address="buero@example.org",
+            imap_host="mail.example.org",
+            imap_port=993,
+            imap_user="buero",
+            smtp_host="mail.example.org",
+            smtp_port=465,
+            smtp_user="buero",
+            done_folder="Erledigt",
+            enabled=False,
+        )
+
+    async def listing(self) -> Any:
+        from app.modules.tickets.mailbox_schemas import MailboxList
+
+        return MailboxList(items=(self._out(),), allowed_hosts=("mail.example.org",))
+
+    async def create(self, area_id: uuid.UUID, payload: Any, actor: str) -> Any:
+        self.calls.append(("create", (area_id, payload, actor)))
+        return self._out()
+
+    async def patch(self, area_id: uuid.UUID, payload: Any, actor: str) -> Any:
+        self.calls.append(("patch", (area_id, payload, actor)))
+        return self._out()
+
+    async def delete(self, area_id: uuid.UUID, actor: str) -> None:
+        self.calls.append(("delete", (area_id, actor)))
+
+    async def test(self, area_id: uuid.UUID) -> dict[str, Any]:
+        self.calls.append(("test", area_id))
+        return {"imap": {"ok": True}, "smtp": {"ok": False, "error": "timeout"}}
+
+
+def test_the_postfach_routes_need_admin_ticket_mail(env: _Env) -> None:
+    """Spec 002721: a save without ``admin.ticket_mail`` is 403, also with ``admin.site``."""
+    boxes = _FakeMailboxes()
+    env.app.dependency_overrides[router_mod.get_mailbox_service] = lambda: boxes
+    client = TestClient(env.app)
+    url = f"/api/admin/ticket-areas/{AREA}/mailbox"
+    body = {
+        "address": "buero@example.org",
+        "imapHost": "mail.example.org",
+        "imapPort": 993,
+        "imapUser": "buero",
+        "imapPassword": "geheim",
+        "smtpHost": "mail.example.org",
+        "smtpPort": 465,
+        "smtpUser": "buero",
+        "smtpPassword": "geheim",
+    }
+    assert client.get("/api/admin/ticket-mailboxes").status_code == 401
+    env.login(Principal(sub="site", permissions={"admin.site", "ticket.manage"}))
+    assert client.get("/api/admin/ticket-mailboxes").status_code == 403
+    assert client.post(url, json=body).status_code == 403
+    assert client.patch(url, json={"enabled": True}).status_code == 403
+    assert client.delete(url).status_code == 403
+    assert client.post(f"{url}/test").status_code == 403
+    assert boxes.calls == []
+    env.login(Principal(sub="adm", permissions={"admin.ticket_mail"}))
+    listed = client.get("/api/admin/ticket-mailboxes")
+    assert listed.status_code == 200
+    assert listed.json()["allowedHosts"] == ["mail.example.org"]
+    assert "geheim" not in listed.text
+    assert client.post(url, json=body).status_code == 201
+    assert boxes.calls[-1][1][2] == "adm"
+    assert client.post(url, json={**body, "address": "kein"}).status_code == 422
+    assert client.post(url, json={**body, "imapHost": "http://x/"}).status_code == 422
+    assert client.post(url, json={**body, "imapPort": 0}).status_code == 422
+    patched = client.patch(url, json={"enabled": True})
+    assert patched.status_code == 200
+    assert boxes.calls[-1][1][1].model_fields_set == {"enabled"}
+    assert client.post(f"{url}/test").json() == {
+        "imap": {"ok": True, "error": None},
+        "smtp": {"ok": False, "error": "timeout"},
+    }
+    assert client.delete(url).status_code == 204
+    assert boxes.commits == 3
+    assert isinstance(
+        router_mod.get_mailbox_service(object(), object()),  # type: ignore[arg-type]
+        router_mod.TicketMailboxService,
+    )

@@ -40,6 +40,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -120,6 +121,49 @@ class TicketArea(UUIDPkMixin, TimestampMixin, Base):
         ),
         Index("ix_ticket_area_gremium_id", "gremium_id"),
     )
+
+
+class TicketMailbox(UUIDPkMixin, TimestampMixin, Base):
+    """The Postfach of a Bereich: one address with an IMAP and an SMTP account.
+
+    A Bereich has at most one Postfach (§F/integrations/ticket-mail/002720), and the
+    Postfach goes with its Bereich. No read of the API returns a password
+    (§NF/security/network/002746).
+
+    Attributes:
+        area_id: The Bereich, unique.
+        address: The e-mail address of the Postfach.
+        done_folder: The IMAP folder that takes each imported mail.
+        enabled: The switch. While it is off, the platform opens no connection.
+        uid_validity: The ``UIDVALIDITY`` of the inbox at the last fetch.
+        last_uid: The highest UID of the inbox that the fetch took.
+        failures: The failed fetch runs in sequence.
+        last_error: The short cause code of the newest failure, never a text of an
+            exception.
+        fetched_at: The moment of the last fetch without a failure.
+    """
+
+    __tablename__ = "ticket_mailbox"
+
+    area_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ticket_area.id", ondelete="CASCADE"), unique=True
+    )
+    address: Mapped[str] = mapped_column(CITEXT)
+    imap_host: Mapped[str] = mapped_column(Text)
+    imap_port: Mapped[int] = mapped_column(Integer)
+    imap_user: Mapped[str] = mapped_column(Text)
+    imap_password: Mapped[str] = mapped_column(Text)
+    smtp_host: Mapped[str] = mapped_column(Text)
+    smtp_port: Mapped[int] = mapped_column(Integer)
+    smtp_user: Mapped[str] = mapped_column(Text)
+    smtp_password: Mapped[str] = mapped_column(Text)
+    done_folder: Mapped[str] = mapped_column(Text)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    uid_validity: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    last_uid: Mapped[int] = mapped_column(BigInteger, default=0, server_default=text("0"))
+    failures: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class TicketCategory(UUIDPkMixin, Base):

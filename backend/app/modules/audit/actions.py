@@ -143,6 +143,10 @@ class AuditAction(StrEnum):
             (§F/integrations/paperless/002528). The target is the stored PDF
             (``markdown_document``). ``data`` holds the Sitzung and the number of the
             Paperless document.
+        TICKET_MAILBOX: A create, a change or a delete of the Postfach of a Bereich
+            (§F/integrations/ticket-mail/002743). The target is the Bereich
+            (``ticket_area``). ``data`` holds the operation and the names of the changed
+            fields, never a password.
         PII_EXPORT: GDPR export (Art. 15). ANONYMIZATION and the ``ERASURE_*`` entries
             cover erasure (Art. 17) and its request queue, RETENTION_ANONYMIZE covers
             retention (Art. 5(1)(e)).
@@ -288,6 +292,7 @@ class AuditAction(StrEnum):
     PAPERLESS_CONNECTION = "paperless_connection"
     PAPERLESS_FILED = "paperless_filed"
     PAPERLESS_INSERTED = "paperless_inserted"
+    TICKET_MAILBOX = "ticket_mailbox"
 
 
 REVERTABLE_BUDGET_ACTIONS: frozenset[AuditAction] = frozenset(
