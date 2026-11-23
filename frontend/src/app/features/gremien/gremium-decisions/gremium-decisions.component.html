@@ -47,11 +47,11 @@
   <app-skeleton variant="rows" [count]="5" [label]="'gremien.decisions.loading' | t" />
 } @else if (!groups().length) {
   @if (error()) {
-    <app-empty-state icon="alert" [heading]="'gremien.decisions.error' | t" />
+    <app-empty-state fill icon="alert" [heading]="'gremien.decisions.error' | t" />
   } @else if (filterActive()) {
-    <app-empty-state icon="searchOff" rows="3" [heading]="'gremien.decisions.noMatch' | t" />
+    <app-empty-state fill icon="searchOff" rows="3" [heading]="'gremien.decisions.noMatch' | t" />
   } @else {
-    <app-empty-state icon="vote" rows="3" [heading]="'gremien.decisions.empty' | t" />
+    <app-empty-state fill icon="vote" rows="3" [heading]="'gremien.decisions.empty' | t" />
   }
 } @else {
   @for (g of groups(); track g.key) {
