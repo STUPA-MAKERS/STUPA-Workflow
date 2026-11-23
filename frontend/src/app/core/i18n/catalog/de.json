@@ -2326,6 +2326,7 @@
   "admin.gremiumPerm.info.write": "Info bearbeiten",
   "admin.gremiumPerm.members.notify": "Mitglieder benachrichtigen",
   "admin.audit.title": "Audit-Log",
+  "admin.audit.search": "Audit-Log durchsuchen",
   "admin.audit.empty": "Keine Audit-Einträge.",
   "admin.audit.error": "Audit-Log konnte nicht geladen werden.",
   "admin.audit.loadMore": "Mehr laden",

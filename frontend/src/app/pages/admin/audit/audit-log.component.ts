@@ -26,6 +26,7 @@ import {
   type LoadState as ScreenLoadState,
   RangeChipComponent,
   type RangeValue,
+  SearchPillComponent,
   SkeletonComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
@@ -35,6 +36,7 @@ import {
   ScreenIntroDirective,
   ScreenListFootDirective,
   ScreenRecordDirective,
+  ScreenSearchDirective,
 } from '@stupa-makers/ui-kit/screens';
 import { AdminApiService } from '../admin-api.service';
 import { checkedAt, formatCount, triggerLabel } from '../admin-health/admin-health.util';
@@ -44,7 +46,10 @@ import type {
   AuditVerification,
   ConfigRevisionDiff,
 } from '../admin.models';
+import { debounced } from '@shared/debounced';
 import { expandSet } from '@shared/expand-set';
+import type { Subscription } from 'rxjs';
+import { searchWords, textsMatch } from '../list-search';
 import type { LoadState } from '@shared/forms/settings-form';
 import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
 
@@ -288,6 +293,8 @@ type VerifyState =
     ScreenIntroDirective,
     ScreenListFootDirective,
     ScreenRecordDirective,
+    ScreenSearchDirective,
+    SearchPillComponent,
   ],
   templateUrl: './audit-log.component.html',
   styleUrl: './audit-log.component.scss',
@@ -322,8 +329,8 @@ export class AuditLogComponent {
       ? { state: 'ready', data: entries.map((e) => ({ id: String(e.id), title: e.action })) }
       : {
           state: 'empty',
-          icon: this.activeFilterCount() ? 'searchOff' : 'clipcheck',
-          heading: this.i18n.translate('admin.audit.empty'),
+          icon: this.activeFilterCount() || this.query() ? 'searchOff' : 'clipcheck',
+          heading: this.i18n.translate(this.query() ? 'admin.list.noHits' : 'admin.audit.empty'),
         };
   });
   /** The entries by the id of their row. */
@@ -355,6 +362,21 @@ export class AuditLogComponent {
   protected readonly verifying = signal(false);
 
   protected readonly action = signal('');
+  /** The text in the search pill (§002690). The server searches it as `q` (§002693). */
+  protected readonly searchText = signal('');
+  /** The search of the last load. */
+  private readonly query = signal('');
+  /**
+   * The hits for the pill while a search is set: the loaded entries once no page follows. The
+   * list pages by keyset and has no total, so a search with more pages shows no number.
+   */
+  protected readonly hits = computed(() =>
+    this.query() && !this.loading() && !this.hasMore() ? this.entries().length : null,
+  );
+  /** A typed search loads page one after a short pause. */
+  private readonly searchLater = debounced(() => this.runSearch());
+  /** The request in flight; a new search or filter cancels it. */
+  private pending?: Subscription;
   protected readonly actor = signal('');
   protected readonly since = signal('');
   protected readonly until = signal('');
@@ -460,6 +482,32 @@ export class AuditLogComponent {
         this.toast.show(this.i18n.translate(key), 'error');
       },
     });
+  }
+
+  /** The pill changed: load again after the pause. */
+  protected setSearch(text: string): void {
+    this.searchText.set(text);
+    this.searchLater();
+  }
+
+  /** Enter in the pill: load now. */
+  protected runSearch(): void {
+    this.searchLater.cancel();
+    const q = this.searchText().trim();
+    if (q === this.query()) return;
+    this.query.set(q);
+    this.reload();
+  }
+
+  /**
+   * The action keys whose label holds every word of the search: the labels live in the
+   * frontend, so the page sends these keys with `q` (§002693).
+   */
+  private labelActions(q: string): string[] {
+    const words = searchWords(q);
+    return words.length
+      ? AUDIT_ACTIONS.filter((a) => textsMatch(words, [this.actionLabel(a)]))
+      : [];
   }
 
   protected setAction(v: string): void {
@@ -596,6 +644,8 @@ export class AuditLogComponent {
 
   /** After a filter change, drop the list and load again from the newest entry. */
   private reload(): void {
+    this.pending?.unsubscribe();
+    this.loading.set(false);
     this.entries.set([]);
     this.cursor.set(null);
     this.hasMore.set(false);
@@ -611,7 +661,7 @@ export class AuditLogComponent {
     if (this.loading()) return;
     this.loading.set(true);
     this.loadError.set(false);
-    this.api
+    this.pending = this.api
       .listAuditLog({
         limit: PAGE_SIZE,
         before: reset ? undefined : (this.cursor() ?? undefined),
@@ -619,6 +669,8 @@ export class AuditLogComponent {
         actor: this.actor() || undefined,
         since: this.since() ? localDayBound(this.since(), false) : undefined,
         until: this.until() ? localDayBound(this.until(), true) : undefined,
+        q: this.query() || undefined,
+        labelActions: this.labelActions(this.query()),
       })
       .subscribe({
         next: (page) => {

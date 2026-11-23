@@ -55,9 +55,7 @@ class _FakeService:
     async def revertable_flags(self, entries: list[AuditEntry]) -> dict[int, bool]:
         return self.revertable
 
-    async def resolve_actor_names(
-        self, subs: list[str | None]
-    ) -> dict[str, str | None]:
+    async def resolve_actor_names(self, subs: list[str | None]) -> dict[str, str | None]:
         return self.names
 
     async def resolve_target_labels(
@@ -65,9 +63,7 @@ class _FakeService:
     ) -> dict[tuple[str, str], str]:
         return self.target_labels
 
-    async def resolve_data_ids(
-        self, data_dicts: list[dict[str, Any] | None]
-    ) -> dict[str, str]:
+    async def resolve_data_ids(self, data_dicts: list[dict[str, Any] | None]) -> dict[str, str]:
         return self.data_ids
 
     async def list_actors(self) -> list[tuple[str, str | None]]:
@@ -175,6 +171,22 @@ def test_list_passes_cursor_filters_to_service() -> None:
     assert service.cursor_kwargs["actor"] == "u-1"
     assert service.cursor_kwargs["before"] == 42
     assert service.cursor_kwargs["limit"] == 10
+    assert service.cursor_kwargs["q"] is None
+    assert service.cursor_kwargs["label_actions"] == ()
+
+
+def test_list_passes_the_search() -> None:
+    """§002693: `q` and every `labelAction` reach the query."""
+    service = _FakeService()
+    client = _client(service, _principal("audit.read"))
+    resp = client.get(
+        "/api/admin/audit",
+        params=[("q", "anna status"), ("labelAction", "login"), ("labelAction", "logout")],
+    )
+    assert resp.status_code == 200
+    assert service.cursor_kwargs is not None
+    assert service.cursor_kwargs["q"] == "anna status"
+    assert service.cursor_kwargs["label_actions"] == ("login", "logout")
 
 
 def test_list_rejects_naive_since_with_422() -> None:
@@ -304,9 +316,7 @@ def test_post_verify_while_a_check_runs_is_409() -> None:
 
 def test_post_verify_inside_the_cooldown_is_429() -> None:
     service = _FakeService()
-    service.refuse = RateLimitedError(
-        "too soon", retry_after=120, code="audit_verify_cooldown"
-    )
+    service.refuse = RateLimitedError("too soon", retry_after=120, code="audit_verify_cooldown")
     resp = _client(service, _principal("audit.verify")).post("/api/admin/audit/verify")
     assert resp.status_code == 429
     assert resp.headers["Retry-After"] == "120"

@@ -14,6 +14,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any
+
+from sqlalchemy import Select
+from sqlalchemy.dialects import postgresql
 
 from app.modules.audit.service import AuditService
 from tests._support.audit_fakes import fake_session, result
@@ -105,3 +109,36 @@ async def test_list_actors_empty_log() -> None:
     db = fake_session(result())
     out = await AuditService(db).list_actors()
     assert out == []
+
+
+def _sql(stmt: Select[Any]) -> str:
+    return str(stmt.compile(dialect=postgresql.dialect())).lower()
+
+
+async def test_query_cursor_search_matches_each_word() -> None:
+    """§002693: each word of `q` filters the action, actor, target, data and actor name."""
+    db = fake_session(result("e1"))
+    items, _ = await AuditService(db).query_cursor(q="  status  anna ", limit=5)
+    assert items == ["e1"]
+    sql = _sql(db.statements[0])
+    assert sql.count("ilike") >= 2 * 6
+    assert "cast(audit_entry.data as text)" in sql
+    assert "merged_into" in sql
+
+
+async def test_query_cursor_search_adds_the_label_actions() -> None:
+    """§002693: the action keys whose label holds the search match as well."""
+    db = fake_session(result())
+    await AuditService(db).query_cursor(q="Anmeldung", label_actions=("login",), limit=5)
+    sql = _sql(db.statements[0])
+    assert "ilike" in sql
+    assert " in (" in sql
+
+
+async def test_query_cursor_blank_search_and_label_actions_add_nothing() -> None:
+    """Without words in `q` there is no search, and `label_actions` alone adds no clause."""
+    db = fake_session(result())
+    await AuditService(db).query_cursor(q="   ", label_actions=("login",), limit=5)
+    sql = _sql(db.statements[0])
+    assert "ilike" not in sql
+    assert " in (" not in sql

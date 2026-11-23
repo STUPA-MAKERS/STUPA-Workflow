@@ -699,17 +699,20 @@ async def list_audit(
     until: str | None = None,
     before: int | None = None,
     limit: int | None = None,
+    q: str | None = None,
 ) -> dict:
     """Read the audit log.
 
     The log is keyset-paged. Pass the smallest id you have seen as `before` to get
-    the next page. Give `since` and `until` as ISO datetimes. Requires audit.read.
+    the next page. Give `since` and `until` as ISO datetimes. `q` searches: each word
+    must occur in the action key, the actor (sub, name or e-mail), the target or the
+    data of an entry. Requires audit.read.
     """
     return await api().get(
         "/admin/audit",
         params=params(
             action=action, actor=actor, since=since, until=until,
-            before=before, limit=limit,
+            before=before, limit=limit, q=q,
         ),
     )
 

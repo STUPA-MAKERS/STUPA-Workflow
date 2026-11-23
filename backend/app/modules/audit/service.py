@@ -16,12 +16,12 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Collection, Sequence
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import ColumnElement, Row, Select, delete, func, select, text
+from sqlalchemy import ColumnElement, Row, Select, Text, and_, cast, delete, func, or_, select, text
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,6 +37,7 @@ from app.modules.audit.models import (
 )
 from app.shared.errors import ConflictError, RateLimitedError
 from app.shared.paging import Page
+from app.shared.search import escape_like
 
 logger = logging.getLogger("app.audit")
 
@@ -105,6 +106,37 @@ def _entry_filters(
         AuditEntry.id < before if before is not None else None,
     )
     return tuple(clause for clause in clauses if clause is not None)
+
+
+def _search_clause(
+    words: Sequence[str],
+    actions: Collection[str],
+    named: Callable[[str], Select[str]],
+) -> ColumnElement[bool]:
+    """Build the WHERE clause of the search of the audit page (§002693).
+
+    An entry matches when each word occurs, without regard to case, in its action key,
+    its actor ``sub``, the name or e-mail of its actor (``named``), its target type or
+    id, or its ``data``. An entry also matches when its action is one of ``actions``:
+    the page sends the action keys whose shown label holds the search.
+    """
+
+    def word_clause(word: str) -> ColumnElement[bool]:
+        like = f"%{escape_like(word)}%"
+        columns = (
+            AuditEntry.action,
+            AuditEntry.actor,
+            AuditEntry.target_type,
+            AuditEntry.target_id,
+            cast(AuditEntry.data, Text),
+        )
+        return or_(
+            *(func.coalesce(col, "").ilike(like, escape="\\") for col in columns),
+            AuditEntry.actor.in_(named(word)),
+        )
+
+    by_words = and_(*(word_clause(w) for w in words))
+    return or_(by_words, AuditEntry.action.in_(tuple(actions))) if actions else by_words
 
 
 @dataclass(frozen=True, slots=True)
@@ -427,12 +459,16 @@ class AuditService:
         until: datetime | None = None,
         before: int | None = None,
         limit: int = 50,
+        q: str | None = None,
+        label_actions: Collection[str] = (),
     ) -> tuple[list[AuditEntry], bool]:
         """Read a keyset-paged audit view, ordered by ``id`` descending.
 
         ``before`` is the keyset cursor. The query returns entries with
         ``id < before``. It reads ``limit + 1`` rows to find ``has_more`` without a
-        separate COUNT.
+        separate COUNT. ``q`` is the search of the page and ``label_actions`` the
+        action keys whose shown label holds it (`_search_clause`); without words in
+        ``q`` there is no search and ``label_actions`` has no effect.
 
         This query has NO Gremium filter, on purpose. ``audit.read`` is a global,
         platform-wide read view. If the platform ever needs a scoped audit, restrict
@@ -442,8 +478,13 @@ class AuditService:
         Returns:
             The page items and a flag that states whether more rows follow.
         """
+        from app.modules.auth.identity import subs_named
+
+        words = (q or "").split()
+        search = (_search_clause(words, label_actions, subs_named),) if words else ()
         stmt: Select[AuditEntry] = select(AuditEntry).where(
-            *_entry_filters(action=action, actor=actor, since=since, until=until, before=before)
+            *_entry_filters(action=action, actor=actor, since=since, until=until, before=before),
+            *search,
         )
 
         rows = (

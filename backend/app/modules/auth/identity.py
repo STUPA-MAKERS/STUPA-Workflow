@@ -16,11 +16,12 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import Row, Select, select
+from sqlalchemy import Row, Select, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.modules.auth.models import Principal as PrincipalRow
+from app.shared.search import escape_like
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,3 +89,19 @@ async def refs_by_id(session: AsyncSession, ids: Iterable[UUID]) -> dict[UUID, P
         return {}
     rows = (await session.execute(_select().where(PrincipalRow.id.in_(wanted)))).all()
     return {row[1]: _ref(row) for row in rows}
+
+
+def subs_named(word: str) -> Select[str]:
+    """Select the ``sub`` of each principal whose shown name or e-mail holds ``word``.
+
+    The match ignores case. A merged account matches by its own name and by the name
+    of the account it was merged into, because a display shows the latter.
+    """
+    like = f"%{escape_like(word)}%"
+    shown = aliased(PrincipalRow)
+    columns = (PrincipalRow.display_name, PrincipalRow.email, shown.display_name, shown.email)
+    return (
+        select(PrincipalRow.sub)
+        .outerjoin(shown, shown.id == PrincipalRow.merged_into)
+        .where(or_(*(col.ilike(like, escape="\\") for col in columns)))
+    )

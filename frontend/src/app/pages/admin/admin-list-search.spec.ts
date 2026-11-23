@@ -19,6 +19,7 @@ const PAGES = [
   'webhooks/webhooks.component',
   'cd-variants/cd-variants.component',
   'forced-status/forced-status.component',
+  'audit/audit-log.component',
 ];
 
 const read = (rel: string): string => readFileSync(join(__dirname, rel), 'utf8');

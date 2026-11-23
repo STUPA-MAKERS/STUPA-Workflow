@@ -782,6 +782,23 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(all.request.params.get('until')).toBe('u');
     all.flush({ items: [], nextCursor: null, hasMore: false });
 
+    s.listAuditLog({ q: ' anna ', labelActions: ['login', 'logout'] }).subscribe();
+    const search = http.expectOne((r) => r.url === '/api/admin/audit');
+    expect(search.request.params.get('q')).toBe('anna');
+    expect(search.request.params.getAll('labelAction')).toEqual(['login', 'logout']);
+    search.flush({ items: [], nextCursor: null, hasMore: false });
+
+    s.listAuditLog({ q: '  ', labelActions: ['login'] }).subscribe();
+    const blank = http.expectOne((r) => r.url === '/api/admin/audit');
+    expect(blank.request.params.get('q')).toBeNull();
+    expect(blank.request.params.get('labelAction')).toBeNull();
+    blank.flush({ items: [], nextCursor: null, hasMore: false });
+
+    s.listAuditLog({ q: 'x' }).subscribe();
+    const noLabels = http.expectOne((r) => r.url === '/api/admin/audit');
+    expect(noLabels.request.params.get('labelAction')).toBeNull();
+    noLabels.flush({ items: [], nextCursor: null, hasMore: false });
+
     s.listAuditLog({ before: 0 }).subscribe();
     const zero = http.expectOne((r) => r.url === '/api/admin/audit');
     expect(zero.request.params.get('before')).toBe('0');
@@ -1446,6 +1463,12 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(byAction.items.map((e) => e.action)).toEqual(['role_change']);
     const byActor = await firstValueFrom(s.listAuditLog({ actor: 'kc|kim.kasse' }));
     expect(byActor.items.every((e) => e.actor === 'kc|kim.kasse')).toBe(true);
+    const byWord = await firstValueFrom(s.listAuditLog({ q: 'kim.kasse' }));
+    expect(byWord.items.length).toBeGreaterThan(0);
+    expect(byWord.items.every((e) => JSON.stringify(e).includes('kim.kasse'))).toBe(true);
+    const byLabel = await firstValueFrom(s.listAuditLog({ q: 'zzz-none', labelActions: ['role_change'] }));
+    expect(byLabel.items.map((e) => e.action)).toEqual(['role_change']);
+    expect((await firstValueFrom(s.listAuditLog({ q: 'zzz-none' }))).items).toEqual([]);
     expect((await firstValueFrom(s.listAuditActors())).length).toBeGreaterThan(0);
   });
 
