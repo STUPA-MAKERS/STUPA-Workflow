@@ -9,7 +9,6 @@ import { catchError, finalize, tap } from 'rxjs/operators';
 import {
   ButtonComponent,
   ButtonGroupComponent,
-  CellDirective,
   type ColumnDef,
   ConfirmDialogComponent,
   downloadBlob,
@@ -48,6 +47,7 @@ import {
   type Action,
   SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
+import { PlanFiguresViewComponent, PlanTableViewComponent, PlanTreeRowViewComponent } from '@stupa-makers/ui-kit/views/plan-table';
 import { AuthService } from '@core/auth/auth.service';
 import { FeatureService } from '@core/features/feature.service';
 import { errorStatus, problemCode } from '@core/api/problem';
@@ -203,6 +203,9 @@ type YearBeforeField = 'prevAmount' | 'prevActual';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PlanFiguresViewComponent,
+    PlanTableViewComponent,
+    PlanTreeRowViewComponent,
     SheetBodyDirective,
     DialogBodyDirective,
     NgTemplateOutlet,
@@ -212,7 +215,6 @@ type YearBeforeField = 'prevAmount' | 'prevActual';
     LoadErrorComponent,
     ButtonComponent,
     ButtonGroupComponent,
-    CellDirective,
     ConfirmDialogComponent,
     CostCentreCreateComponent,
     CostCentreSelectComponent,
@@ -556,7 +558,6 @@ export class BudgetPlanComponent {
       ...(tight || !this.compared() ? [] : [money('change', this.i18n.translate('budget.plan.col.change'))]),
     ];
   });
-  readonly rowId = (row: unknown): string => (row as PlanRow).id;
   /** The plan has an Ansatz to compare against: the version before a Nachtrag, or a plan of the year before. */
   readonly compared = computed(() => this.nachtrag() || this.showsYearBefore());
 
@@ -1587,6 +1588,9 @@ export class BudgetPlanComponent {
   );
   /** The version in which the person typed an amount that needs the wide form. */
   private readonly wideFor = signal<string | null>(null);
+
+  /** The amount field of a table row shows the typed or the saved Ansatz. */
+  readonly amountValue = (row: PlanRow): string | number => this.fieldValue(row, 'amount');
 
   /** The amount a field shows: the text a person types, else the amount of the save that runs, else the saved amount. */
   fieldValue(row: PlanRow, field: 'amount' | 'blocked'): string | number {

@@ -10,6 +10,8 @@ tests:
 implementation:
   - frontend/src/app/pages/budget/plan/budget-plan.component.html
   - frontend/src/app/pages/budget/plan/budget-plan.component.scss
+  - frontend/vendor/ui-kit/views/plan-table/src/plan-tree-row-view.component.scss
+  - frontend/vendor/ui-kit/views/plan-table/src/plan-table-view.component.html
   - frontend/src/app/pages/budget/plan/budget-plan.component.ts
 scope:
   - frontend/src/app/pages/budget/plan

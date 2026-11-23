@@ -645,6 +645,18 @@ export const UI_KIT_APP_KEYS: Partial<Record<UiKitTextKey, TranslationKey>> = {
   'admin.forms.untitled': 'admin.forms.untitled',
   'admin.forms.untitledQuestion': 'admin.forms.untitledQuestion',
   'formly.select.placeholder': 'formly.select.placeholder',
+  'budget.dash.collapse': 'budget.dash.collapse',
+  'budget.dash.expand': 'budget.dash.expand',
+  'budget.cc.inactive': 'budget.cc.inactive',
+  'budget.plan.marks.transferable': 'budget.plan.marks.transferable',
+  'budget.plan.marks.coverable': 'budget.plan.marks.coverable',
+  'budget.plan.marks.blockedBadge': 'budget.plan.marks.blockedBadge',
+  'budget.plan.amountOf': 'budget.plan.amountOf',
+  'budget.plan.income': 'budget.plan.income',
+  'budget.plan.expense': 'budget.plan.expense',
+  'budget.plan.difference': 'budget.plan.difference',
+  'budget.plan.balanced': 'budget.plan.balanced',
+  'budget.plan.unbalanced': 'budget.plan.unbalanced',
 };
 
 /**
