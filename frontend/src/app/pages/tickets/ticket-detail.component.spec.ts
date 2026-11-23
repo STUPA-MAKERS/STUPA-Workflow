@@ -23,7 +23,12 @@ import { TodosApiService, type TodoLinkedCard } from '@core/api/todos.service';
 import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { DraftAttachmentsService } from '../../features/apply/draft-attachments.service';
-import { MAIL_STATE_POLL_MS, TicketDetailComponent, reportScanState } from './ticket-detail.component';
+import {
+  MAIL_STATE_POLL_MS,
+  TicketDetailComponent,
+  bodyAuthor,
+  reportScanState,
+} from './ticket-detail.component';
 import { TicketsPageService } from './tickets-page.service';
 import { loadErrorToast, retryLoadError, toastWith } from '../../../testing/load-error';
 import { toastMock } from '../../../testing/toast';
@@ -300,6 +305,23 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
 }
 
 const notFound = () => new HttpErrorResponse({ status: 404 });
+
+describe('bodyAuthor', () => {
+  const sender = { principalId: null, displayName: null, email: null, anonymized: false };
+
+  it('gives a sender without an account a writer, so the first message has the avatar', () => {
+    expect(bodyAuthor({ ...sender, displayName: 'Anna Beispiel', email: 'a@b.test' })).toEqual({
+      principalId: null,
+      displayName: 'Anna Beispiel',
+    });
+    expect(bodyAuthor({ ...sender, email: 'a@b.test' })?.displayName).toBe('a@b.test');
+  });
+
+  it('keeps the account of a reporter and gives an anonymized ticket no writer', () => {
+    expect(bodyAuthor({ ...sender, principalId: 'p1', displayName: 'Max' })?.principalId).toBe('p1');
+    expect(bodyAuthor({ ...sender, anonymized: true })).toBeNull();
+  });
+});
 
 describe('TicketDetailComponent', () => {
   afterEach(() => localStorage.clear());
