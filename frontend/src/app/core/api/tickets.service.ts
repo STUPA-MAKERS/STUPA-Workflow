@@ -362,6 +362,26 @@ export interface TicketDetail extends TicketListItem {
   readonly mails?: readonly TicketMail[];
   /** The recipients of a public message on a mail ticket; null on another ticket. */
   readonly mailAnswer?: TicketMailAnswer | null;
+  /**
+   * The clean files that the person can file in Paperless; null without `paperless.use`
+   * and while the Paperless connection is off.
+   */
+  readonly paperless?: TicketPaperless | null;
+}
+
+/** One clean file of a ticket with the state of its filing in Paperless. */
+export interface TicketPaperlessFile {
+  readonly id: Uuid;
+  readonly filename: string;
+  /** `none` before the action, `pending` while the job runs, `filed` with a document. */
+  readonly state: 'none' | 'pending' | 'filed' | 'failed';
+  /** The address of the document in Paperless; null before `filed`. */
+  readonly url: string | null;
+}
+
+/** The files of a ticket for the action "In Paperless ablegen". */
+export interface TicketPaperless {
+  readonly files: readonly TicketPaperlessFile[];
 }
 
 /**
@@ -657,12 +677,23 @@ export class TicketsApiService {
     return `${this.base}/attachments/${attachmentId}/download`;
   }
 
-  /** The download of the full source of a mail of a ticket (`.eml`). */
   /** "Erneut senden": start the send of a failed mail again. */
   resendMail(ticketId: Uuid, mailId: Uuid): Observable<TicketMail> {
     return this.http.post<TicketMail>(`${this.base}/tickets/${ticketId}/mails/${mailId}/resend`, {});
   }
 
+  /**
+   * "In Paperless ablegen": open the job that files one clean file of a ticket
+   * (§F/integrations/ticket-mail/002742). The answer is the file with its new state.
+   */
+  fileInPaperless(ticketId: Uuid, attachmentId: Uuid): Observable<TicketPaperlessFile> {
+    return this.http.post<TicketPaperlessFile>(
+      `${this.base}/tickets/${ticketId}/files/${attachmentId}/paperless`,
+      {},
+    );
+  }
+
+  /** The download of the full source of a mail of a ticket (`.eml`). */
   mailSourceUrl(ticketId: Uuid, mailId: Uuid): string {
     return `${this.base}/tickets/${ticketId}/mails/${mailId}/source`;
   }

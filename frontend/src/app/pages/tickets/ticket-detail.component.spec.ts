@@ -242,6 +242,7 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
     attachmentUrl: (id: string) => `/api/attachments/${id}/download`,
     mailSourceUrl: (ticketId: string, mailId: string) => `/api/tickets/${ticketId}/mails/${mailId}/source`,
     resendMail: jest.fn(() => of({})),
+    fileInPaperless: jest.fn(() => of({})),
   };
   const todosApi = {
     linked: jest.fn(() => todos),
@@ -1678,6 +1679,33 @@ describe('TicketDetailComponent', () => {
         } finally {
           jest.useRealTimers();
         }
+      });
+
+      describe('In Paperless ablegen', () => {
+        const file = { id: 'f1', filename: 'rechnung.pdf', state: 'none' as const, url: null };
+
+        it('shows no section without files for Paperless', async () => {
+          await open(mailTicket());
+          expect(screen.queryByText('In Paperless ablegen')).toBeNull();
+        });
+
+        it('files a clean file and then links the document. §F/integrations/ticket-mail/002742', async () => {
+          const { cmp, api, toast } = await open(mailTicket({ paperless: { files: [file] } }));
+          api.fileInPaperless.mockReturnValueOnce(of({ ...file, state: 'pending' }));
+          cmp.fileInPaperless(file);
+          expect(api.fileInPaperless).toHaveBeenCalledWith('t40', 'f1');
+          expect(cmp.ticket()?.paperless?.files[0].state).toBe('pending');
+          cmp.ticket.set(
+            mailTicket({ paperless: { files: [{ ...file, state: 'filed', url: 'https://p.test/documents/7/details' }] } }),
+          );
+          TestBed.tick();
+          expect(screen.getByText('In Paperless öffnen').closest('a')?.getAttribute('href')).toBe(
+            'https://p.test/documents/7/details',
+          );
+          api.fileInPaperless.mockReturnValueOnce(throwError(() => new Error('offline')));
+          cmp.fileInPaperless(file);
+          expect(toast.error).toHaveBeenLastCalledWith('Die Datei konnte nicht abgelegt werden.');
+        });
       });
     });
 

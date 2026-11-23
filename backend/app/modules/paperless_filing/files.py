@@ -42,10 +42,12 @@ from app.modules.paperless_filing.sources import application_title
 from app.modules.pdf.typst_client import TypstClient, TypstError
 from app.modules.protocol.filename import protocol_pdf_filename
 from app.modules.protocol.public import meeting_day
+from app.modules.tickets.models import Ticket, TicketArea, TicketNote
+from app.modules.tickets.numbers import format_number
 from app.settings import Settings
 from app.shared.errors import AppError, NotFoundError
 
-DocumentType = Literal["Protokoll", "Antrag", "Haushaltsplan"]
+DocumentType = Literal["Protokoll", "Antrag", "Haushaltsplan", "Ticket"]
 
 PDF = "application/pdf"
 
@@ -138,6 +140,8 @@ class FileBuilder:
                 return await self._application(filing)
             case "attachment":
                 return await self._attachment(filing)
+            case "ticket_file":
+                return await self._ticket_file(filing)
             case _:
                 return await self._plan(filing)
 
@@ -217,6 +221,39 @@ class FileBuilder:
             document_type="Antrag",
             gremium=await self._gremium(app.gremium_id),
             link=self._link(f"/applications/{app.id}"),
+        )
+
+    async def _ticket_file(self, filing: PaperlessFiling) -> Prepared:
+        """One file of a ticket, only with a clean virus scan.
+
+        The title names the number of the ticket (§F/integrations/ticket-mail/002742).
+        The file belongs to the ticket or to a message of it.
+        """
+        attachment = await self.session.get(Attachment, filing.source_id)
+        ticket = await self.session.get(Ticket, filing.element_id)
+        note = (
+            await self.session.get(TicketNote, attachment.ticket_note_id)
+            if attachment is not None and attachment.ticket_note_id is not None
+            else None
+        )
+        if (
+            attachment is None
+            or ticket is None
+            or ticket.id not in {attachment.ticket_id, note.ticket_id if note else None}
+            or not attachment.scanned
+            or attachment.scan_result != "clean"
+        ):
+            raise BuildError("source_missing", final=True)
+        area = await self.session.get(TicketArea, ticket.area_id)
+        return Prepared(
+            filename=attachment.filename,
+            content=await self._stored(attachment.storage_key),
+            mime=attachment.mime,
+            title=f"{format_number(ticket.number)} – {attachment.filename}",
+            created=self._day(filing.source_at),
+            document_type="Ticket",
+            gremium=await self._gremium(area.gremium_id if area is not None else None),
+            link=self._link(f"/tickets/{ticket.id}"),
         )
 
     async def _plan(self, filing: PaperlessFiling) -> Prepared:

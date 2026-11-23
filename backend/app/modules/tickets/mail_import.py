@@ -254,7 +254,7 @@ class MailImporter:
         await self.session.flush()
         stored = await self._store_files(mail.files, ticket_note_id=note.id)
         await self._record(box, ticket.id, note.id, mail, source, stored)
-        self._tickets.sender_answered(ticket)
+        await self._tickets.sender_answered(ticket, body=mail.text)
         return Taken(
             "message", ticket_id=ticket.id, note_id=note.id, attachment_ids=stored.attachment_ids
         )

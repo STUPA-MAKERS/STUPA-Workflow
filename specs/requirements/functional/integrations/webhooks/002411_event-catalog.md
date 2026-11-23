@@ -39,7 +39,9 @@ name with `422`.
 | `protocol.finalized` | Protokolle | A protocol is final. |
 | `booking.created` | Haushalt | A booking is made: an expense, an income or a transfer. |
 | `invoice.created` | Haushalt | An invoice is created or imported. |
-| `ticket.created` | Tickets | A ticket is reported. |
+| `ticket.created` | Tickets | A ticket is new: from the help menu, a mail or the team. |
+| `ticket.message` | Tickets | The sender of a ticket writes one more message. |
+| `ticket.status` | Tickets | The status of a ticket changes. |
 
 The ID keys and the fields of each event are in P/integrations/webhooks/000963.
 

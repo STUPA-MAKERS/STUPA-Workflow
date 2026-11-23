@@ -166,6 +166,27 @@ class TicketAttachment(FrozenCamelModel, frozen=True):
         )
 
 
+class TicketPaperlessFile(FrozenCamelModel, frozen=True):
+    """One clean file of a ticket with the state of its filing in Paperless.
+
+    Attributes:
+        state: ``none`` before the action, ``pending`` while the job runs, ``filed``
+            with a document, ``failed`` after the last try.
+        url: The address of the document in Paperless; null before ``filed``.
+    """
+
+    id: UUID
+    filename: str
+    state: Literal["none", "pending", "filed", "failed"]
+    url: str | None = None
+
+
+class TicketPaperless(FrozenCamelModel, frozen=True):
+    """The files of a ticket that a person can file in Paperless."""
+
+    files: tuple[TicketPaperlessFile, ...] = ()
+
+
 class TicketEventOut(FrozenCamelModel, frozen=True):
     """An event of the ticket timeline."""
 
@@ -289,6 +310,7 @@ class TicketDetail(TicketListItem, frozen=True):
     sender_blocked: bool = Field(default=False, serialization_alias="senderBlocked")
     mails: tuple[TicketMailOut, ...] = Field(default_factory=tuple)
     mail_answer: TicketMailAnswer | None = Field(default=None, serialization_alias="mailAnswer")
+    paperless: TicketPaperless | None = None
 
 
 class TicketPatch(FrozenStrictCamelModel, frozen=True):

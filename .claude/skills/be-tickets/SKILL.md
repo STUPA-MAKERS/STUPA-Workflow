@@ -278,6 +278,26 @@ erasure does it for the tickets of the request's e-mail
 (`privacy.service.anonymize_reported_tickets`). The Art. 15 export has a sheet "Tickets" (with text and context) and lists the ticket attachments in "Anhänge", and "Ticket-Sperren" lists the sender blocks. The account merge moves
 reporter, assignee, note author and event actor (area `tickets`).
 
+**Ticket mails and privacy (specs 002747, 002748):** `privacy.py` reads for `privacy`:
+`mail_counts_of(session, email)` counts the stored mails per Postfach address that name the
+address as sender, receiver or Cc; `mail_ticket_ids_of` gives the tickets from a mail of the
+address (sender or Cc); `public_messages_of` gives their public messages for the export.
+
+**Webhooks (specs 002749 to 002751):** `webhook_fields.py` emits `ticket.created`,
+`ticket.message` (a public message of the sender, from the page or from a mail) and
+`ticket.status` (old and new status; no event when both are equal). Each event has the fields
+`number`, `title`, `area` (id and name of the Bereich) and `url`, and passes the Gremium of
+the Bereich for the Gremium filter. `TicketService.sender_answered` emits the message event
+and the status event of the answer of a sender; `patch` emits `ticket.status`.
+
+**File in Paperless (spec 002742):** `paperless.py` — `file_in_paperless(session, ticket,
+attachment_id, actor=)` opens a `paperless_filing` job of the kind `ticket_file` for one clean
+file of the ticket (409 `paperless_off` without a connection, 409 `file_not_clean`, a failed
+job runs again), no commit. Route `POST /api/tickets/{id}/files/{attachmentId}/paperless`
+(202): work right of the ticket and `paperless.use`, behind the feature `paperless`.
+`TicketDetail.paperless.files` (`state` `none|pending|filed|failed`, `url`) is null without
+`paperless.use`. The page lists the files in the details pane. See be-paperless.
+
 **Status, source and tickets by hand (specs 002708 to 002713, 002718):**
 - Statuses `new|in_progress|waiting|done|rejected`. `waiting` ("Wartet auf Antwort") is open:
   `closed_at` stays empty, so the retention clock does not run (`OPEN` = not in

@@ -183,9 +183,11 @@
       @if (answer.enabled) {
         <app-note icon="mail">
           {{ 'tickets.mail.goesTo' | t: { people: recipientsLine() } }}
-          <app-button variant="text" size="sm" data-testid="td-recipients" (click)="openRecipients()">{{
-            'tickets.mail.recipients.change' | t
-          }}</app-button>
+          <app-button-group>
+            <app-button variant="text" size="sm" data-testid="td-recipients" (click)="openRecipients()">{{
+              'tickets.mail.recipients.change' | t
+            }}</app-button>
+          </app-button-group>
         </app-note>
       } @else {
         <app-note icon="mail" kind="warn">{{ 'tickets.mail.off' | t }}</app-note>
@@ -328,6 +330,43 @@
         [items]="todos()"
         [showTitle]="false"
       />
+    </app-section>
+  }
+
+  @if (paperlessFiles().length) {
+    <app-section [heading]="'tickets.paperless.title' | t">
+      <app-field-group>
+        @for (file of paperlessFiles(); track file.id) {
+          <app-field-row [label]="file.filename">
+            @switch (file.state) {
+              @case ('filed') {
+                <app-button-group>
+                  <a appButton="text" size="sm" target="_blank" rel="noopener" [href]="file.url">{{
+                    'tickets.paperless.open' | t
+                  }}</a>
+                </app-button-group>
+              }
+              @case ('pending') {
+                <span role="status">{{ 'tickets.paperless.pending' | t }}</span>
+              }
+              @default {
+                @if (file.state === 'failed') {
+                  <span>{{ 'tickets.paperless.failed' | t }}</span>
+                }
+                <app-button-group>
+                  <app-button
+                    variant="text"
+                    size="sm"
+                    [attr.data-testid]="'td-paperless-' + file.id"
+                    (click)="fileInPaperless(file)"
+                    >{{ (file.state === 'failed' ? 'tickets.paperless.retry' : 'tickets.paperless.file') | t }}</app-button
+                  >
+                </app-button-group>
+              }
+            }
+          </app-field-row>
+        }
+      </app-field-group>
     </app-section>
   }
 

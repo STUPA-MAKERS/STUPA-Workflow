@@ -5,7 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/privacy/test_privacy_ticket_mails.py:test_the_export_holds_the_mail_ticket_without_the_internal_message"
+implementation:
+  - backend/app/modules/tickets/privacy.py
+  - backend/app/modules/privacy/service.py
 scope:
   - backend/app/modules/privacy
   - backend/app/modules/tickets

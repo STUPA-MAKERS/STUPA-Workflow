@@ -5,7 +5,12 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/tickets/test_ticket_webhooks.py:test_created_follows_the_gremium_filter"
+  - "backend/tests/unit/modules/tickets/test_ticket_webhooks.py:test_created_names_the_area_and_the_source"
+implementation:
+  - backend/app/modules/tickets/webhook_fields.py
+  - backend/app/modules/webhooks/catalog.py
 scope:
   - backend/app/modules/webhooks
   - backend/app/modules/tickets

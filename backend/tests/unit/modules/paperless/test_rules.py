@@ -56,7 +56,7 @@ def test_a_part_is_on_only_with_its_switch_and_a_connection() -> None:
     assert part_since(on, "protocols") == _SINCE
     assert part_since(on, "applications") is None
     assert part_since(on, "plans") is None
-    assert open_kinds(on) == ("protocol", "protocol_public")
+    assert open_kinds(on) == ("protocol", "protocol_public", "ticket_file")
 
     without_token = _settings(token=None, file_protocols=True, protocols_since=_SINCE)
     assert part_since(without_token, "protocols") is None
@@ -76,6 +76,7 @@ def test_a_part_is_on_only_with_its_switch_and_a_connection() -> None:
         "application",
         "attachment",
         "plan",
+        "ticket_file",
     )
 
 

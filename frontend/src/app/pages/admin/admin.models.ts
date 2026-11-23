@@ -1287,6 +1287,17 @@ export interface ErasureRequest {
   readonly reason?: string | null;
   /** The Paperless documents of the data of the request. They stay after the erasure. */
   readonly paperlessDocuments?: readonly PaperlessDocument[];
+  /** The mails of the address per Postfach, in the answer of the execution only. */
+  readonly ticketMails?: readonly TicketMailCount[];
+}
+
+/**
+ * The mails of an erased address in one Postfach (§F/administration/privacy/002747). They
+ * stay on the mail server. `mailbox` is null for a Postfach that is removed.
+ */
+export interface TicketMailCount {
+  readonly mailbox: string | null;
+  readonly count: number;
 }
 
 /** A document that the platform filed in Paperless (§F/administration/privacy/002532). */
@@ -1298,9 +1309,10 @@ export interface PaperlessDocument {
   readonly filedAt?: string | null;
 }
 
-/** The answer of the erasure of an account: what stays in Paperless. */
+/** The answer of the erasure of an account: what stays in Paperless and on the mail servers. */
 export interface PrincipalErasure {
   readonly paperlessDocuments: readonly PaperlessDocument[];
+  readonly ticketMails?: readonly TicketMailCount[];
 }
 
 /** Platform-wide DSGVO config (global retention default, P privacy.manage). */
@@ -1462,7 +1474,8 @@ export type PaperlessFilingKind =
   | 'protocol_public'
   | 'application'
   | 'attachment'
-  | 'plan';
+  | 'plan'
+  | 'ticket_file';
 
 /** A filing whose job failed for the last time (`GET /admin/paperless/failed-filings`). */
 export interface PaperlessFailedFiling {
