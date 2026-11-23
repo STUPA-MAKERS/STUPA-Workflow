@@ -31,9 +31,11 @@ import {
   ToastService,
   FactsComponent,
   DialogBodyDirective,
+  SearchPillComponent,
 } from '@stupa-makers/ui-kit';
-import { RecordsScreenComponent, ScreenRecordDirective } from '@stupa-makers/ui-kit/screens';
+import { RecordsScreenComponent, ScreenRecordDirective, ScreenSearchDirective } from '@stupa-makers/ui-kit/screens';
 import { AdminOptionsService } from '../admin-options.service';
+import { hitCount, listSearch, searchedRows } from '../list-search';
 
 /** The scope choice of the dialog. */
 type Scope = 'all' | 'gremium';
@@ -116,6 +118,8 @@ function withSaved(
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SearchPillComponent,
+    ScreenSearchDirective,
     DialogBodyDirective,
     FactsComponent,
     FormsModule,
@@ -149,6 +153,11 @@ export class AdminCalendarsComponent {
   protected readonly loadError = signal(false);
 
   protected readonly calendars = signal<readonly ExternalCalendar[]>([]);
+  /** The search of the list (§002690, §002691). */
+  protected readonly search = listSearch();
+  /** The hits of the search for the pill. */
+  protected readonly hits = computed(() => hitCount(this.rows(), this.search));
+
   /** The rows of the records screen (§ui-kit:002257). */
   protected readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
     if (this.loading()) return { state: 'loading' };
@@ -158,10 +167,16 @@ export class AdminCalendarsComponent {
         message: this.i18n.translate('admin.calendars.error'),
         retry: () => this.load(),
       };
-    const rows = this.calendars().map((c) => ({ id: c.id, title: c.name }));
-    return rows.length
-      ? { state: 'ready', data: rows }
-      : { state: 'empty', icon: 'cal', heading: this.i18n.translate('admin.calendars.none') };
+    const rows = this.search
+      .filter(this.calendars(), (c) => [c.name, c.url, this.scopeLabel(c)])
+      .map((c) => ({ id: c.id, title: c.name }));
+    return searchedRows(
+      rows.length
+        ? { state: 'ready', data: rows }
+        : { state: 'empty', icon: 'cal', heading: this.i18n.translate('admin.calendars.none') },
+      this.search,
+      this.i18n.translate('admin.list.noHits'),
+    );
   });
   /** "Kalender abonnieren" as the FAB. */
   protected readonly actions = computed<readonly Action[]>(() => [

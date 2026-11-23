@@ -8,7 +8,7 @@ import { of, throwError } from 'rxjs';
 import { AdminApiService } from '../admin-api.service';
 import type { GremiumMembership, GremiumRole } from '../admin.models';
 import { PageFrameService } from '../../../layout/page-frame.service';
-import { GremiumMembersComponent, MEMBER_PREVIEW } from './gremium-members.component';
+import { GremiumMembersComponent } from './gremium-members.component';
 import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
 
 const ROLES: GremiumRole[] = [
@@ -106,13 +106,12 @@ const names = () =>
 describe('GremiumMembersComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('names the gremium without a count (spec 000560) and has no mappings link (spec 002620)', async () => {
+  it('names the gremium without a count (spec 000560)', async () => {
     await setup();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'Mitglieder: Studierendenparlament',
     );
     expect(screen.queryByText('6 Mitglieder')).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Gruppen-Zuordnung' })).toBeNull();
   });
 
   /**
@@ -130,40 +129,29 @@ describe('GremiumMembersComponent', () => {
     expect(within(list).queryAllByRole('button')).toHaveLength(0);
   });
 
-  it('shows the first rows and all of them on request', async () => {
-    const many = Array.from({ length: MEMBER_PREVIEW + 2 }, (_, i) =>
-      member(`q-${i}`, `Person ${String(i).padStart(2, '0')}`, 'r-x'),
-    );
-    await setup({ api: makeApi({ listGremiumMemberships: jest.fn(() => of(many)) }) });
-    expect(names()).toHaveLength(MEMBER_PREVIEW);
-    expect(screen.queryByText(`${MEMBER_PREVIEW} von ${MEMBER_PREVIEW + 2}`)).toBeNull();
-    await userEvent.click(
-      screen.getByRole('button', { name: `Alle ${MEMBER_PREVIEW + 2} anzeigen` }),
-    );
-    expect(names()).toHaveLength(MEMBER_PREVIEW + 2);
-    await userEvent.click(screen.getByRole('button', { name: 'Weniger anzeigen' }));
-    expect(names()).toHaveLength(MEMBER_PREVIEW);
+  /** §002690, §002691: the search of Benutzer filters by name, e-mail and role. */
+  it('searches the members by name, e-mail and role', async () => {
+    const { fixture } = await setup();
+    const pill = screen.getByRole('searchbox', { name: 'Mitglieder durchsuchen' });
+    await userEvent.type(pill, 'mitglied zoe');
+    fixture.detectChanges();
+    expect(names()).toEqual(['Zoe']);
+    await userEvent.clear(pill);
+    await userEvent.type(pill, 'p-4@x');
+    fixture.detectChanges();
+    expect(names()).toEqual(['p-4@x.de']);
+    await userEvent.clear(pill);
+    await userEvent.type(pill, 'nobody');
+    fixture.detectChanges();
+    expect(screen.getByText('Keine Treffer.')).toBeInTheDocument();
   });
 
-  it('hides the pool without its permissions', async () => {
-    const { delegations } = await setup({ perms: ['admin.gremien'] });
+  /** §002692: the pool has its own page; the members page loads none. */
+  it('shows no mappings link and no pool', async () => {
+    const { delegations } = await setup({ perms: ['admin.gremien', 'admin.delegations'] });
+    expect(screen.queryByRole('link', { name: 'Gruppen-Zuordnung' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Stellvertretungen' })).toBeNull();
     expect(delegations.substitutes).not.toHaveBeenCalled();
-  });
-
-  /** The page passes its members, so the pool loads none itself. */
-  it('shows the pool with admin.delegations or with session.manage in the gremium', async () => {
-    const { delegations: delegations0, api: api0 } = await setup({
-      perms: ['admin.gremien', 'admin.delegations'],
-    });
-    expect(screen.getByRole('heading', { name: 'Stellvertretungen' })).toBeInTheDocument();
-    expect(delegations0.substitutes).toHaveBeenCalledWith('g-1');
-    expect(api0.listGremiumMemberships).toHaveBeenCalledTimes(1);
-  });
-
-  it('shows the pool with admin.delegations or with session.manage in the gremium (2)', async () => {
-    await setup({ perms: ['admin.gremien'], pools: ['session.manage'] });
-    expect(screen.getByRole('heading', { name: 'Stellvertretungen' })).toBeInTheDocument();
   });
 
   /** §ui-kit:000576: the toast names the error, the list shows its empty placeholder. */

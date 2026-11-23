@@ -4,7 +4,7 @@ title: An admin page lists the forced status changes
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-19
+updated: 2026-11-23
 implementation:
   - backend/app/modules/flow/forced_report.py
   - backend/app/modules/flow/forced_router.py
@@ -17,7 +17,7 @@ scope:
 
 # An admin page lists the forced status changes
 
-The admin page `Erzwungene Status` (`Forced status changes`) must show one list of the forced
+The admin page `Erzwungene Statusänderungen` (`Forced status changes`) must show one list of the forced
 status changes, the newest first. Each row names the Antrag, the time, the path (from state, to
 state), the reason and the note, and opens the Antrag. Filters narrow the list by reason, by
 path and by period. The default period is the last 90 days. The page shows no counts and no

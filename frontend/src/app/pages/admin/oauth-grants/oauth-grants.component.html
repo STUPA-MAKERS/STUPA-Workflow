@@ -6,6 +6,21 @@
   [keepOnError]="true"
   [skeleton]="4"
 >
+  <ng-template screenSearch>
+    <div role="search">
+      <app-search-pill
+        size="md"
+        [clearable]="true"
+        [placeholder]="'admin.oauthGrants.search' | t"
+        [label]="'admin.oauthGrants.search' | t"
+        [busy]="loading() && grants().length > 0"
+        [results]="hits()"
+        [value]="searchText()"
+        (valueChange)="setSearch($event)"
+        (commit)="runSearch()"
+      />
+    </div>
+  </ng-template>
   <ng-template screenFilters>
     <app-filter-select
       icon="user"

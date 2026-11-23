@@ -7,6 +7,19 @@
   [skeleton]="3"
   (action)="$event.key === 'add' && openAdd()"
 >
+  <ng-template screenSearch>
+    <div role="search">
+      <app-search-pill
+        size="md"
+        [clearable]="true"
+        [placeholder]="'admin.webhook.search' | t"
+        [label]="'admin.webhook.search' | t"
+        [results]="hits()"
+        [value]="search.text()"
+        (valueChange)="search.set($event)"
+      />
+    </div>
+  </ng-template>
   <ng-template screenRecord let-row>
     @let h = hookOf(row.id);
     @let i = indexOf(row.id);

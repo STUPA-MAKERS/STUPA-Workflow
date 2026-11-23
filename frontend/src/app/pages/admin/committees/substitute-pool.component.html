@@ -1,49 +1,50 @@
-<app-section class="sp" headingId="sp-title" [level]="2" [heading]="'admin.substitutes.title' | t">
-  <span sectionAction class="sp__actions">
-    <ng-content select="[poolActions]" />
-    <app-button-group>
-      <app-button variant="text" size="sm" (click)="openAdd()">
-        <app-icon name="plus" /> {{ 'admin.substitutes.add' | t }}
-      </app-button>
-    </app-button-group>
-  </span>
-
-  <app-load-state [state]="loadState()" [keepContent]="true" [hasContent]="entries().length > 0" [errorText]="'admin.substitutes.loadFailed' | t" (retry)="retry()">
-    <ng-template #loading>
-      <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />
-    </ng-template>
-    <ng-template #content>
-      @if (entries().length) {
-      <ul class="rowgroup rowgroup--records sp__list" aria-labelledby="sp-title">
-        @for (s of entries(); track s.id) {
-          <li class="sp__row">
-            <span class="sp__pair">
-              <span class="sp__member rowgroup__title" [class.sp__all]="!memberName(s)">{{
-                memberName(s) || ('admin.substitutes.allMembers' | t)
-              }}</span>
-              <app-icon class="sp__arrow" name="arrow" [size]="16" />
-              <span class="sr-only">{{ 'admin.substitutes.by' | t }}</span>
-              <span class="sp__who">
-                <app-avatar size="sm" [name]="entryName(s)" [principalId]="s.substituteId" [decorative]="true" />
-                <span class="sp__name">{{ entryName(s) }}</span>
-              </span>
-            </span>
-  <app-button-group>
-    <app-row-menu
-                [sections]="rowMenu()"
-                [label]="('ui.rowMenu.trigger' | t) + ': ' + entryName(s)"
-                (selected)="remove(s)"
-              />
-  </app-button-group>
-          </li>
-        }
-      </ul>
-    } @else {
-      <app-empty-state icon="users" shape="person" rows="3" [heading]="'admin.substitutes.empty' | t" />
-      }
-    </ng-template>
-  </app-load-state>
-</app-section>
+<app-records-screen
+  class="sp"
+  [head]="{ title: ('admin.substitutes.title' | t) + ': ' + (gremiumName() ?? '…') }"
+  [rows]="rows()"
+  [actions]="actions()"
+  variant="records"
+  [keepOnError]="entries().length > 0"
+  [skeleton]="3"
+  (action)="$event.key === 'add' && openAdd()"
+>
+  <ng-template screenSearch>
+    <div role="search">
+      <app-search-pill
+        size="md"
+        [clearable]="true"
+        [placeholder]="'admin.substitutes.listSearch' | t"
+        [label]="'admin.substitutes.listSearch' | t"
+        [results]="hits()"
+        [value]="listSearch.text()"
+        (valueChange)="listSearch.set($event)"
+      />
+    </div>
+  </ng-template>
+  <ng-template screenRecord let-row>
+    @let s = entryOf(row.id);
+    <li class="sp__row">
+      <span class="sp__pair">
+        <span class="sp__member rowgroup__title" [class.sp__all]="!memberName(s)">{{
+          memberName(s) || ('admin.substitutes.allMembers' | t)
+        }}</span>
+        <app-icon class="sp__arrow" name="arrow" [size]="16" />
+        <span class="sr-only">{{ 'admin.substitutes.by' | t }}</span>
+        <span class="sp__who">
+          <app-avatar size="sm" [name]="entryName(s)" [principalId]="s.substituteId" [decorative]="true" />
+          <span class="sp__name">{{ entryName(s) }}</span>
+        </span>
+      </span>
+      <app-button-group>
+        <app-row-menu
+          [sections]="rowMenu()"
+          [label]="('ui.rowMenu.trigger' | t) + ': ' + entryName(s)"
+          (selected)="remove(s)"
+        />
+      </app-button-group>
+    </li>
+  </ng-template>
+</app-records-screen>
 
 <app-dialog
   [open]="addOpen()"

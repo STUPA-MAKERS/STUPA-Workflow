@@ -128,13 +128,34 @@ describe('DelegationsComponent', () => {
     expect(screen.queryByText('3')).toBeNull();
   });
 
-  it('keeps the delegations of past meetings behind a toggle', async () => {
-    await setup();
+  it('shows the delegations of past meetings with the chip "Zeitraum"', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
     expect(screen.queryByText('Alte Sitzung')).toBeNull();
-    const toggle = screen.getByRole('button', { name: /Frühere Vertretungen/ });
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await userEvent.click(toggle);
+    expect(c.periodText()).toBe('Zeitraum: Aktive Vertretungen');
+    c.setPeriod('past');
+    fixture.detectChanges();
     expect(screen.getByText('Alte Sitzung')).toBeInTheDocument();
+    expect(screen.queryByText('Sitzung A')).toBeNull();
+    c.setPeriod('anything');
+    expect(c.period()).toBe('active');
+  });
+
+  /** §002690, §002691: the search finds the meeting and both persons. */
+  it('searches the delegations by meeting and person', async () => {
+    const { fixture } = await setup();
+    const pill = screen.getByRole('searchbox', { name: 'Vertretungen durchsuchen' });
+    await userEvent.type(pill, 'cleo');
+    fixture.detectChanges();
+    const rows = within(activeList()).getAllByRole('listitem');
+    expect(rows.map((r) => r.querySelector('.dl__title')?.textContent?.trim())).toEqual([
+      'Sitzung B',
+    ]);
+    await userEvent.clear(pill);
+    await userEvent.type(pill, 'nobody');
+    fixture.detectChanges();
+    expect(screen.getByText('Keine Treffer.')).toBeInTheDocument();
   });
 
   it('revokes after the confirmation and removes the row', async () => {
@@ -181,33 +202,14 @@ describe('DelegationsComponent', () => {
   it('says so when no delegation is active', async () => {
     await setup(makeApi({ list: jest.fn(() => of([])) }));
     expect(screen.getByText('Keine aktiven Vertretungen.')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Frühere Vertretungen/ })).toBeNull();
   });
 
-  it('shows the pool of the first gremium and switches it with the gremium chip', async () => {
+  /** §002692: the pool has its own page below the Gremien. */
+  it('shows no substitute pool', async () => {
     const api = makeApi();
     await setup(api);
-    expect(api.substitutes).toHaveBeenLastCalledWith('g-1');
-    await userEvent.click(screen.getByRole('button', { name: 'Gremium: Studierendenparlament' }));
-    await userEvent.click(screen.getByRole('option', { name: 'AStA' }));
-    expect(api.substitutes).toHaveBeenLastCalledWith('g-2');
-  });
-
-  it('shows no gremium chip for a single gremium and no pool without a gremium', async () => {
-    const one = makeAdmin({
-      listGremienOptions: jest.fn(() => of([{ id: 'g-1', name: 'StuPa' }])),
-    });
-    await setup(makeApi(), one);
-    expect(screen.queryByRole('button', { name: /^Gremium:/ })).toBeNull();
-    expect(screen.getByRole('heading', { name: 'Stellvertretungen' })).toBeInTheDocument();
-  });
-
-  it('shows no gremium chip for a single gremium and no pool without a gremium (2)', async () => {
-    await setup(
-      makeApi(),
-      makeAdmin({ listGremienOptions: jest.fn(() => throwError(() => ({ status: 500 }))) }),
-    );
     expect(screen.queryByRole('heading', { name: 'Stellvertretungen' })).toBeNull();
+    expect(api.substitutes).not.toHaveBeenCalled();
   });
 
   /** Past meetings sort newest first. */

@@ -89,6 +89,7 @@ describe('AdminOAuthGrantsComponent', () => {
       limit: 25,
       offset: 0,
       principalId: null,
+      q: null,
     });
     expect(screen.getByText('Alex Admin')).toBeInTheDocument();
     expect(screen.getByText('antragsplattform-mcp')).toBeInTheDocument();
@@ -138,6 +139,35 @@ describe('AdminOAuthGrantsComponent', () => {
     expect(screen.getByText('Alex Admin')).toBeInTheDocument();
   });
 
+  /** The search runs on the server as `q` and restarts at page one (§002691). */
+  it('searches on the server and shows the total as hits', async () => {
+    const { api, inst } = await setup();
+    inst.offset.set(25);
+    inst.setSearch('  claude ');
+    inst.runSearch();
+    expect(inst.offset()).toBe(0);
+    expect(api.listOAuthGrants).toHaveBeenLastCalledWith({
+      limit: 25,
+      offset: 0,
+      principalId: null,
+      q: 'claude',
+    });
+    expect(inst.hits()).toBe(2);
+    const calls = api.listOAuthGrants.mock.calls.length;
+    inst.runSearch();
+    expect(api.listOAuthGrants.mock.calls.length).toBe(calls);
+  });
+
+  it('shows "Keine Treffer" for a search without grants', async () => {
+    const api = makeApi();
+    const { inst, fixture } = await setup(api);
+    api.listOAuthGrants.mockReturnValue(of(page([])));
+    inst.setSearch('nobody');
+    inst.runSearch();
+    fixture.detectChanges();
+    expect(screen.getByText('Keine Treffer.')).toBeInTheDocument();
+  });
+
   /** "Alle Personen" clears the filter and reloads without it. */
   it('filters by principal and restarts at page one', async () => {
     const { api, inst } = await setup();
@@ -148,6 +178,7 @@ describe('AdminOAuthGrantsComponent', () => {
       limit: 25,
       offset: 0,
       principalId: 'p-1',
+      q: null,
     });
     expect(inst.principalChipText()).toBe('Person: Alex Admin');
     inst.setPrincipal('');
@@ -156,6 +187,7 @@ describe('AdminOAuthGrantsComponent', () => {
       limit: 25,
       offset: 0,
       principalId: null,
+      q: null,
     });
   });
 

@@ -35,8 +35,9 @@ import {
   type ListRow,
   type LoadState,
   DialogBodyDirective,
+  SearchPillComponent,
 } from '@stupa-makers/ui-kit';
-import { RecordsScreenComponent, ScreenRecordDirective } from '@stupa-makers/ui-kit/screens';
+import { RecordsScreenComponent, ScreenRecordDirective, ScreenSearchDirective } from '@stupa-makers/ui-kit/screens';
 import { AdminApiService } from '../admin-api.service';
 import {
   CD_LOGO_ACCEPT,
@@ -61,6 +62,7 @@ import {
   squareVerdict,
   variantInitials,
 } from './cd-variants.util';
+import { hitCount, listSearch, searchedRows } from '../list-search';
 
 /** Dialog state of the create/edit form. */
 interface VariantForm {
@@ -115,6 +117,8 @@ function emptyForm(): VariantForm {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SearchPillComponent,
+    ScreenSearchDirective,
     DialogBodyDirective,
     MetaLineComponent,
     FilePickerComponent,
@@ -148,6 +152,11 @@ export class AdminCdVariantsComponent {
   readonly variants = signal<CdVariant[]>([]);
   readonly loading = signal(true);
   readonly loadError = signal(false);
+  /** The search of the list (§002690, §002691). */
+  protected readonly search = listSearch();
+  /** The hits of the search for the pill. */
+  protected readonly hits = computed(() => hitCount(this.rows(), this.search));
+
   /** The rows of the records screen (§ui-kit:002257). */
   readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
     if (this.loading()) return { state: 'loading' };
@@ -157,10 +166,16 @@ export class AdminCdVariantsComponent {
         message: this.i18n.translate('admin.cdVariants.error'),
         retry: () => this.retryLoad(),
       };
-    const rows = this.variants().map((v) => ({ id: v.id, title: v.key }));
-    return rows.length
-      ? { state: 'ready', data: rows }
-      : { state: 'empty', icon: 'palette', heading: this.i18n.translate('admin.cdVariants.empty') };
+    const rows = this.search
+      .filter(this.variants(), (v) => [v.name, v.key])
+      .map((v) => ({ id: v.id, title: v.key }));
+    return searchedRows(
+      rows.length
+        ? { state: 'ready', data: rows }
+        : { state: 'empty', icon: 'palette', heading: this.i18n.translate('admin.cdVariants.empty') },
+      this.search,
+      this.i18n.translate('admin.list.noHits'),
+    );
   });
   /** "Variante anlegen" as the FAB. */
   protected readonly actions = computed<readonly Action[]>(() => [

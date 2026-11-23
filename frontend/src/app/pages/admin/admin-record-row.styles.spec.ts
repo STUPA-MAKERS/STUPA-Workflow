@@ -8,7 +8,7 @@ import { join } from 'node:path';
 const LISTS = [
   { name: 'oauth-grants/oauth-grants.component', row: 'og__row', title: 'og__name' },
   { name: 'delegations/delegations.component', row: 'dl__row', title: 'dl__title' },
-  { name: 'delegations/substitute-pool.component', row: 'sp__row', title: 'sp__member' },
+  { name: 'committees/substitute-pool.component', row: 'sp__row', title: 'sp__member' },
   { name: 'committees/gremium-members.component', row: 'gmm__row', title: 'gmm__name' },
   { name: 'cd-variants/cd-variants.component', row: 'cdv__variant', title: 'cdv__name' },
   { name: 'help-tickets/help-tickets.component', row: 'ht__row', title: 'ht__name' },
