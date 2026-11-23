@@ -1619,7 +1619,6 @@
   "admin.loginSettings.pwa": "Sign-in in the installed app valid for",
   "admin.loginSettings.daysUnit": "days",
   "admin.loginSettings.range": "A whole number from 1 to {max} days.",
-  "admin.loginSettings.updatedAt": "Last changed on {date}",
   "admin.loginSettings.loadError": "The settings could not be loaded.",
   "admin.loginSettings.forbidden": "These settings need the right to manage people.",
   "admin.forms.col.version": "Version",
