@@ -15,55 +15,5 @@
   color: var(--color-text-muted);
 }
 
-// Side by side the detail is the sheet, and its body is a round frame as wide as the fields,
-// 24px inside the sheet, which scrolls. A field that scrolls past an end keeps its round
-// corners, so the cut looks intended (spec 000193). The body is the scroll box, so a sticky bar
-// sticks at its top edge. The top corners are round only while the page is scrolled down: at
-// rest the page head starts at the top edge, and a round corner would cut a control at the right
-// end of the head (001483).
-.adl--split .adl__detail {
-  padding: 0;
-  overflow: hidden;
-  // A sticky bar of the page lies on the sheet, so it takes the colour of the sheet.
-  --stb-bg: var(--color-surface-1);
-}
-.adl--split .adl__body {
-  position: relative;
-  display: flex;
-  flex: 1 1 0;
-  flex-direction: column;
-  min-height: 0;
-  margin: var(--space-6);
-  padding: 0 0 var(--space-2);
-  border-radius: 0 0 var(--radius-field) var(--radius-field);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  --ld-sticky-top: 0px;
-}
-.adl--split .adl__body--scrolled {
-  border-top-left-radius: var(--radius-field);
-  border-top-right-radius: var(--radius-field);
-}
-.adl--split .adl__body > ::ng-deep * {
-  flex-shrink: 0;
-}
-.adl__body:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-// The empty detail (`app-detail-none`) brings its own sheet.
-.adl--split .adl__body:has(app-detail-none) {
-  margin: 0;
-  padding: 0;
-}
-
-// The page ends with room for the floating button of an admin page and 16px below and above it.
-.adl__body:has(app-fab) {
-  padding-bottom: calc(56px + 2 * var(--space-4));
-}
-.adl--split .adl__body:has(app-fab) {
-  padding-bottom: calc(56px + var(--space-4));
-}
-.adl--split {
-  --fab-inset: var(--space-6);
-}
+// Side by side the page scrolls in a round frame inside the sheet (000193).
+@include lp.framed-detail('adl');

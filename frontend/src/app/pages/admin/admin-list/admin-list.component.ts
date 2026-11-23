@@ -128,7 +128,7 @@ export class AdminListComponent {
   private readonly body = viewChild<ElementRef<HTMLElement>>('body');
   /**
    * The open page is scrolled down. Only then has the round frame round top corners, so a
-   * control at the top right of the page head is not cut at rest (001483).
+   * control at the top right of the page head is not cut at rest (ui-kit:000193).
    */
   readonly scrolled = signal(false);
 

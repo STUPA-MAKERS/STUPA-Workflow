@@ -259,7 +259,7 @@
   "frontend/src/app/pages/admin/_widths.scss": 23,
   "frontend/src/app/pages/admin/admin-home.component.ts": 1,
   "frontend/src/app/pages/admin/admin-list/admin-list.component.html": 11,
-  "frontend/src/app/pages/admin/admin-list/admin-list.component.scss": 49,
+  "frontend/src/app/pages/admin/admin-list/admin-list.component.scss": 12,
   "frontend/src/app/pages/admin/admin-list/admin-list.component.ts": 2,
   "frontend/src/app/pages/admin/audit/audit-log.component.html": 23,
   "frontend/src/app/pages/admin/audit/audit-log.component.scss": 103,

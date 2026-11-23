@@ -107,7 +107,7 @@ function links(container: Element): string[] {
   );
 }
 
-describe('AdminListComponent (spec 001480, 001481, 001483)', () => {
+describe('AdminListComponent (spec 001480, 001481, ui-kit:000193)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('is an ordinary list/detail page: the list in the list slot, the page in the detail', async () => {
@@ -222,18 +222,18 @@ describe('AdminListComponent (spec 001480, 001481, 001483)', () => {
     expect(screen.queryByRole('heading', { name: 'Verwaltung', level: 1 })).toBeNull();
   });
 
-  it('rounds the top corners of the page body only while it is scrolled down (001483)', async () => {
+  it('rounds the top corners of the page body only while it is scrolled down (ui-kit:000193)', async () => {
     const view = await setup(ALL);
     const body = view.container.querySelector<HTMLElement>('.adl__body')!;
-    expect(body).not.toHaveClass('adl__body--scrolled');
+    expect(body).not.toHaveAttribute('data-scrolled');
     Object.defineProperty(body, 'scrollTop', { configurable: true, value: 40 });
     body.dispatchEvent(new Event('scroll'));
     view.fixture.detectChanges();
-    expect(body).toHaveClass('adl__body--scrolled');
+    expect(body).toHaveAttribute('data-scrolled');
     Object.defineProperty(body, 'scrollTop', { configurable: true, value: 0 });
     body.dispatchEvent(new Event('scroll'));
     view.fixture.detectChanges();
-    expect(body).not.toHaveClass('adl__body--scrolled');
+    expect(body).not.toHaveAttribute('data-scrolled');
   });
 
   it('one pane at a time: no fill and no crumb root', async () => {

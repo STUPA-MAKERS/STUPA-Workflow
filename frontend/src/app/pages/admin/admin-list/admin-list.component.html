@@ -36,7 +36,7 @@
       <div
         #body
         class="adl__body"
-        [class.adl__body--scrolled]="scrolled()"
+        [attr.data-scrolled]="scrolled() ? '' : null"
         [attr.tabindex]="split() ? 0 : null"
         (scroll)="onBodyScroll()"
       >
