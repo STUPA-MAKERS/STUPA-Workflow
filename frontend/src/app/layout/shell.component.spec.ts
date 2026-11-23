@@ -162,12 +162,16 @@ describe('ShellComponent', () => {
 
     /** No route with `footer: true` is open, so a signed-in page has no footer. */
     it('frames a signed-in principal with the rail, without the public bar', async () => {
-      const { container } = await setup(MEMBER);
+      const { container, fixture } = await setup(MEMBER);
       expect(mainNav()).toBeInTheDocument();
       expect(container.querySelector('app-nav-rail')).not.toBeNull();
       expect(container.querySelector('app-bottom-bar')).toBeNull();
       expect(container.querySelector('app-public-header')).toBeNull();
       expect(container.querySelector('app-site-footer')).toBeNull();
+      // The search palette loads after the start, so it stays out of the start bundle (002003).
+      expect(container.querySelector('app-command-palette')).toBeNull();
+      const [block] = await fixture.getDeferBlocks();
+      await block.render(DeferBlockState.Complete);
       expect(container.querySelector('app-command-palette')).not.toBeNull();
     });
 
