@@ -204,6 +204,7 @@ describe('WebhooksComponent', () => {
   it('keeps the dialog open and toasts on a save failure', async () => {
     const { c, toast } = await setup([], { saveError: true });
     c.openAdd();
+    c.patch('name', 'Hook');
     c.patch('url', 'https://hook.test');
     c.save();
     expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
