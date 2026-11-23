@@ -603,7 +603,7 @@ export const routes: Routes = [
             data: { title: 'admin.substitutes.title', permission: 'admin.delegations', parent: ['admin', 'admin/committees'] },
             canActivate: [authGuard],
             loadComponent: () =>
-              import('./pages/admin/delegations/substitute-pool.component').then(
+              import('./pages/admin/committees/substitute-pool.component').then(
                 (m) => m.SubstitutePoolComponent,
               ),
           },

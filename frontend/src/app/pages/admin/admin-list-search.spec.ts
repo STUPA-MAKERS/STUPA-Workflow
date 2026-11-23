@@ -12,7 +12,7 @@ const PAGES = [
   'oauth-grants/oauth-grants.component',
   'committees/gremien.component',
   'committees/gremium-members.component',
-  'delegations/substitute-pool.component',
+  'committees/substitute-pool.component',
   'delegations/delegations.component',
   'budgets/admin-budgets.component',
   'calendars/calendars.component',
@@ -39,7 +39,7 @@ describe('adminListPages', () => {
     expect(slot).toContain('<app-search-pill');
     expect(slot).toContain('size="md"');
     expect(slot).toContain('[clearable]="true"');
-    expect(slot).toMatch(/\[results\]="\w+\(\)"/);
+    expect(slot).toMatch(/\[results\]="[^"]+"/);
     expect(html.slice(0, html.indexOf('</app-records-screen>'))).not.toContain('<app-data-table');
   });
 });

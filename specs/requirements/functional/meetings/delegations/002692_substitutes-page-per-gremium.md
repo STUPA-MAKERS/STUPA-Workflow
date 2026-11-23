@@ -6,10 +6,10 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 tests:
-  - "frontend/src/app/pages/admin/delegations/substitute-pool.component.spec.ts:SubstitutePoolComponent"
+  - "frontend/src/app/pages/admin/committees/substitute-pool.component.spec.ts:SubstitutePoolComponent"
   - "frontend/src/app/pages/admin/committees/gremien.component.spec.ts:AdminGremienComponent"
 implementation:
-  - frontend/src/app/pages/admin/delegations/substitute-pool.component.ts
+  - frontend/src/app/pages/admin/committees/substitute-pool.component.ts
   - frontend/src/app/pages/admin/committees/gremien.component.ts
   - frontend/src/app/app.routes.ts
 scope:

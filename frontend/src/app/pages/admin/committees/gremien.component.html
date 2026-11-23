@@ -8,9 +8,11 @@
   (action)="onAction($event.key)"
 >
   <ng-template screenHeadTools>
-    <app-button variant="text" (click)="defaultsOpen.set(true)">{{
-      'admin.gremien.defaults.open' | t
-    }}</app-button>
+    <app-button-group>
+      <app-button variant="text" (click)="defaultsOpen.set(true)">{{
+        'admin.gremien.defaults.open' | t
+      }}</app-button>
+    </app-button-group>
   </ng-template>
   <ng-template screenIntro>
     @if (canMappings()) {
