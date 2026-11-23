@@ -14,12 +14,12 @@ scope:
 # The tickets from before the Bereiche belong to Plattform
 
 The migration must put each existing ticket into the Bereich `Plattform` with the source help
-menu, and must keep its number of the form `T-0042`, its kind as the Kategorie, its status, its
-messages and its events. The setting `notifyNew` must become the setting of `Plattform`.
+menu, and must keep its kind as the Kategorie, its status, its messages and its events. The
+migration must give each existing ticket a new random number (002714). A number of the old form
+`T-0042` must find no ticket. The setting `notifyNew` must become the setting of `Plattform`.
 
 Reason: The holders of `ticket.manage` must find each ticket and each rule after the update as
-before. The old numbers stand in mails and in to-do cards, so they must stay valid beside the
-random numbers of the new tickets (002714).
+before. One form of the number for all tickets leaves no number that a person can guess.
 
-Test: An integration test migrates a database with a ticket and expects the ticket in
-`Plattform` with the same number.
+Test: An integration test migrates a database with the ticket `T-0042` and expects the ticket in
+`Plattform` with a number of the new form and no ticket for `T-0042`.
