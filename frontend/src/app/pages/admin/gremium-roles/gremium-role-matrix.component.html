@@ -28,6 +28,7 @@
         class="rowgroup rm__table"
         [class.rowgroup--bg3]="surface() === 3"
         role="table"
+        [style.--rm-perms]="permissions.length"
         [attr.aria-label]="
           ('admin.gremiumRoles.matrixTitle' | t) + (gremiumName() ? ': ' + gremiumName() : '')
         "

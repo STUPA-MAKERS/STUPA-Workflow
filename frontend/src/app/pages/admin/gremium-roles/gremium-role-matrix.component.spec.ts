@@ -117,6 +117,13 @@ describe('GremiumRoleMatrixComponent', () => {
     expect(keys).toEqual(ALL);
   });
 
+  /** A grid with fewer columns than rights wraps every row into a second line (002590). */
+  it('gives the grid one column per right, so every role stays on one line', async () => {
+    await setup();
+    const table = screen.getByRole('table');
+    expect(table.style.getPropertyValue('--rm-perms')).toBe(String(ALL.length));
+  });
+
   /** The member role names the groups that give the membership. */
   it('sorts the forced roles first and shows the groups of each role', async () => {
     await setup();
