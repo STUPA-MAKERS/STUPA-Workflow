@@ -110,7 +110,6 @@
           name="name"
         />
         <app-input
-          class="wh__urlField"
           [label]="'admin.webhook.url' | t"
           [error]="d.url && errors().length ? tr(errors()[0]) : ''"
           [ngModel]="d.url"
@@ -118,9 +117,11 @@
           name="url"
           placeholder="https://"
         />
-        <app-switch [checked]="d.active" (checkedChange)="patch('active', $event)">{{
-          'admin.webhook.active' | t
-        }}</app-switch>
+        <div class="rowgroup rowgroup--settings">
+          <app-switch [checked]="d.active" (checkedChange)="patch('active', $event)">{{
+            'admin.webhook.active' | t
+          }}</app-switch>
+        </div>
 
         @for (g of groups(); track g.group) {
             <app-section [level]="3" [heading]="groupLabel(g.group)">
