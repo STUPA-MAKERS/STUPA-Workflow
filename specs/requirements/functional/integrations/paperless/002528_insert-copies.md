@@ -13,7 +13,7 @@ scope:
 
 # An insert from Paperless copies the document as an embedded PDF
 
-A pick in the list of 002527 must copy the PDF version of the document from Paperless into the
+A pick in the Paperless search (002534) must copy the PDF version of the document from Paperless into the
 platform. The copy must pass each check of a PDF upload (NF/security/files/000869). The editor
 must insert it as an embedded PDF (000862) with the title of the document as its name. The
 platform must store the number of the Paperless document with the copy.
