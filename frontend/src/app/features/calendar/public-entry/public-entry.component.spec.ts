@@ -1,10 +1,9 @@
-import { Router, provideRouter } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { PublicAppointment, PublicMeeting } from '@core/api/calendar.service';
 import { runAxe } from '../../../../testing/a11y';
-import { PublicEntryComponent } from './public-entry.component';
-import type { PublicEntry } from './public-entry.component';
+import { PublicEntryViewComponent as PublicEntryComponent } from '@stupa-makers/ui-kit/views/calendar';
+import type { PublicEntry } from '@stupa-makers/ui-kit/views/calendar';
 
 const TERMIN: PublicAppointment = {
   id: 'a-7',
@@ -29,13 +28,12 @@ const MEETING: PublicMeeting = {
 
 async function setup(entry: PublicEntry | null, open = true) {
   localStorage.setItem('ap.locale', 'de');
-  const on = { closed: jest.fn() };
+  const on = { closed: jest.fn(), protocolOpen: jest.fn() };
   const view = await render(PublicEntryComponent, {
     inputs: { open, entry },
     on,
-    providers: [provideRouter([{ path: '**', children: [] }])],
   });
-  return { ...view, on, router: view.fixture.debugElement.injector.get(Router) };
+  return { ...view, on };
 }
 
 describe('PublicEntryComponent', () => {
@@ -69,9 +67,8 @@ describe('PublicEntryComponent', () => {
     expect(within(dialog).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Begrüßung', 'Haushalt 2027']);
     expect(await runAxe(view.container)).toHaveNoViolations();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Protokoll ansehen' }));
-    await view.fixture.whenStable();
     expect(view.on.closed).toHaveBeenCalled();
-    expect(view.router.url).toBe('/protocols/p-35');
+    expect(view.on.protocolOpen).toHaveBeenCalledWith('p-35');
   });
 
   it('shows no agenda and no link for a meeting without TOPs and without a protocol', async () => {

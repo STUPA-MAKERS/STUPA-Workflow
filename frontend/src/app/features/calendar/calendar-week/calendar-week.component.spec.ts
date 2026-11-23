@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { calendarEntry } from '../../../../testing/calendar-fixtures';
 import { runAxe } from '../../../../testing/a11y';
 import { weekOf } from '../calendar-grid.util';
-import { CalendarWeekComponent } from './calendar-week.component';
+import { CalendarWeekViewComponent as CalendarWeekComponent } from '@stupa-makers/ui-kit/views/calendar';
 
 const DAYS = weekOf('2026-11-11', new Date(2026, 10, 11));
 const TIMED = calendarEntry('timed', { title: 'Jour fixe', startTime: '14:00:00', endTime: '15:30:00' });
@@ -196,7 +196,7 @@ describe('wholeDay (§ui-kit:000746)', () => {
 
 describe('wholeDay head (§ui-kit:000746)', () => {
   it('keeps the time and the title of a long block in view', () => {
-    const scss = readFileSync(join(__dirname, 'calendar-week.component.scss'), 'utf8');
+    const scss = readFileSync(join(__dirname, '../../../../../vendor/ui-kit/views/calendar/src/calendar-week-view.component.scss'), 'utf8');
     const rule = /\.cw__block:not\(\.cw__block--short\)\s*\{[\s\S]*?\n\}/.exec(scss)?.[0] ?? '';
     expect(rule).toContain('overflow: clip');
     expect(rule.match(/position: sticky/g)).toHaveLength(2);
@@ -204,7 +204,7 @@ describe('wholeDay head (§ui-kit:000746)', () => {
 });
 
 describe('dayLinesOnPull (§ui-kit:000743)', () => {
-  const scss = readFileSync(join(__dirname, 'calendar-week.component.scss'), 'utf8');
+  const scss = readFileSync(join(__dirname, '../../../../../vendor/ui-kit/views/calendar/src/calendar-week-view.component.scss'), 'utf8');
   const scroll = /\.cw__scroll\s*\{[^}]*\}/.exec(scss)?.[0] ?? '';
 
   it('draws the day lines on the scroll area, under the columns', () => {

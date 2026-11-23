@@ -30,10 +30,10 @@
     border: var(--vh-edge) !important;
   }
   // The columns of the week paint over an outline, so its edge is a layer on top.
-  app-calendar-week.cal__grid {
+  app-calendar-week-view.cal__grid {
     position: relative;
   }
-  app-calendar-week.cal__grid::after {
+  app-calendar-week-view.cal__grid::after {
     content: '';
     position: absolute;
     inset: 0;
@@ -44,7 +44,7 @@
   }
   // A card of a board is a surface, so it has the white edge too. A column of a board is a
   // surface that holds the cards, so it has the edge as well.
-  app-todo-card-tile,
+  app-todo-card-tile-view,
   .bv__col {
     border: var(--vh-edge) !important;
   }

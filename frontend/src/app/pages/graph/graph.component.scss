@@ -1,6 +1,6 @@
 @use 'breakpoints' as bp;
 @use 'list-pane' as lp;
-@use './graph-kinds' as kinds;
+@use '../../../../vendor/ui-kit/views/graph/src/graph-kinds' as kinds;
 
 // The drawing fills the page. One layer over it holds the filters at the top, the panel of
 // the chosen node under them, and "Schritte" and the state of the build-up at the foot.
@@ -40,7 +40,7 @@
 .gr__body:has(.gr__canvas) {
   padding: 0;
 }
-// The skeleton is the canvas: it fills the body as `app-graph-canvas` does.
+// The skeleton is the canvas: it fills the body as `app-graph-canvas-view` does.
 .gr__skel {
   position: absolute;
   inset: 0;
@@ -60,7 +60,7 @@
   stroke-width: 1.5;
   stroke-dasharray: 4 3;
 }
-// A node of `app-graph-canvas`: a 36px dot with its title under it.
+// A node of `app-graph-canvas-view`: a 36px dot with its title under it.
 .gr__skelNode {
   position: absolute;
   top: calc(50% + var(--y) - 18px);

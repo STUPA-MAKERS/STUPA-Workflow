@@ -20,7 +20,7 @@ import {
   settle,
   step,
   zoomAt,
-} from './graph-layout';
+} from '@stupa-makers/ui-kit/views/graph';
 
 const body = (id: string, x: number, y: number): Body => ({ id, x, y, vx: 0, vy: 0 });
 const distance = (a: Body, b: Body): number => Math.hypot(a.x - b.x, a.y - b.y);

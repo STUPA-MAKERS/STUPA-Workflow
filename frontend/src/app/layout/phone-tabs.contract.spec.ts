@@ -15,7 +15,7 @@ const PAGES: [base: string, paged: string, handler: string][] = [
   ['pages/applications/applications-detail.component', 'phone()', 'selectTab'],
   ['pages/tickets/ticket-detail.component', 'phone()', 'selectTab'],
   ['features/gremien/gremium-detail/gremium-detail.component', 'phone()', 'selectTab'],
-  ['pages/todos/board-view/todo-board-view.component', 'true', 'selectPhoneColumn'],
+  ['../../vendor/ui-kit/views/board/src/todo-board-view.component', 'true', 'selectPhoneColumn'],
 ];
 
 describe('the pages with tabs on a phone', () => {
@@ -32,7 +32,7 @@ describe('the pages with tabs on a phone', () => {
   });
 
   it('keeps no pager of its own on the board', () => {
-    const ts = read('pages/todos/board-view/todo-board-view.component.ts');
+    const ts = read('../../vendor/ui-kit/views/board/src/todo-board-view.component.ts');
     expect(ts).not.toContain('placeInk');
     expect(ts).not.toContain('scrollTo(');
   });

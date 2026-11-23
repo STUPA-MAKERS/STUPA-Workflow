@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/angular';
-import { TodoMoveSheetComponent, type MoveColumn } from './todo-move-sheet.component';
+import { TodoMoveSheetViewComponent, type MoveColumn } from '@stupa-makers/ui-kit/views/board';
 
 const COLUMNS: MoveColumn[] = [
   { id: 'c-1', name: 'Offen' },
@@ -11,7 +11,7 @@ async function setup(current: string | null = 'c-2', canTransfer = false) {
   const moved = jest.fn();
   const transfer = jest.fn();
   const dismissed = jest.fn();
-  const view = await render(TodoMoveSheetComponent, {
+  const view = await render(TodoMoveSheetViewComponent, {
     inputs: { open: false, columns: COLUMNS, current, canTransfer },
     on: { moved, transfer, dismissed },
   });
@@ -22,7 +22,7 @@ async function setup(current: string | null = 'c-2', canTransfer = false) {
   return { ...view, moved, transfer, dismissed, openSheet };
 }
 
-describe('TodoMoveSheetComponent', () => {
+describe('TodoMoveSheetViewComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('starts on the column of the card at the top and moves to the chosen place', async () => {

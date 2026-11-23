@@ -114,7 +114,7 @@ describe('touch styles', () => {
 
   /**
    * Nothing shrinks on press (001314). A press state of its own paints the ripple. An `:active` rule
-   * that shows the grab cursor is no press: the canvas of the flow editor and the graph.
+   * that shows the grab cursor is no press: the canvas of the flow editor (the graph canvas is in the kit).
    */
   it('shrinks no pressed element of the app and paints the ripple in a press state of its own', () => {
     const files = [...scssFiles(SRC)];
@@ -129,15 +129,12 @@ describe('touch styles', () => {
       })
       .map((file) => relative(SRC, file))
       .sort();
-    expect(own).toEqual([
-      'app/pages/admin/flow/flow-editor.component.scss',
-      'app/pages/graph/graph-canvas.component.scss',
-    ]);
+    expect(own).toEqual(['app/pages/admin/flow/flow-editor.component.scss']);
   });
 
   it('gives the app cards and the page header actions the press and the chrome text', () => {
     expect(read('pages/home.component.scss')).toContain('@include press.press;');
-    expect(read('features/todos/card-tile/todo-card-tile.component.scss')).toMatch(
+    expect(read('../../vendor/ui-kit/views/board/src/todo-card-tile-view.component.scss')).toMatch(
       /:host\(:active\),\s*:host\(\[data-press-key\]\) \{\s*@include press\.paint;/,
     );
     expect(read('../styles.scss')).toMatch(/\.sheet-back-link \{[^}]*@include press\.press;/);

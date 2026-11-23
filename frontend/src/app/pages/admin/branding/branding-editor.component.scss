@@ -247,12 +247,8 @@
 .br__skSwitch {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-4);
-  min-height: 2.75rem;
-}
-.br__skSwitchLabel {
-  flex: 1 1 auto;
-  min-width: 0;
 }
 .br__skToggle {
   flex: none;
