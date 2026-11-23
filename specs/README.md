@@ -739,7 +739,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/compatibility/deploy/000981](requirements/non-functional/compatibility/deploy/000981_pinned-digests.md) | Images and CI actions are pinned by digest | approved |
 | [NF/compatibility/links/000592](requirements/non-functional/compatibility/links/000592_old-german-urls.md) | An old German URL redirects to its English URL | approved |
 | [NF/compatibility/pwa/002150](requirements/non-functional/compatibility/pwa/002150_app-version-header.md) | Every answer of the server carries the app version | approved |
-| [NF/compatibility/pwa/002340](requirements/non-functional/compatibility/pwa/002340_reload-loads-page-from-network.md) | The reload to a new app version loads the page from the network | draft |
+| [NF/compatibility/pwa/002340](requirements/non-functional/compatibility/pwa/002340_reload-loads-page-from-network.md) | The reload to a new app version loads the page from the network | approved |
 | [NF/compatibility/pwa/002341](requirements/non-functional/compatibility/pwa/002341_version-check-on-return.md) | The app checks the version when the page comes back | draft |
 | [NF/performance/loading/000190](requirements/non-functional/performance/loading/000190_batch-reads.md) | A list reads its rows in one request | approved |
 | [NF/performance/loading/000847](requirements/non-functional/performance/loading/000847_read-after-write-is-fresh.md) | A read after a write does not stand on a read from before it | approved |

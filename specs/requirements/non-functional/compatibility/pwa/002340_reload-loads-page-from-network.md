@@ -2,9 +2,9 @@
 id: "002340"
 title: The reload to a new app version loads the page from the network
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-22
+updated: 2026-11-23
 tests:
   - "frontend/src/app/core/pwa/app-version.service.spec.ts:AppVersionService"
   - "frontend/src/app/core/pwa/ngsw-navigation.spec.ts:navigationRequestStrategy"
