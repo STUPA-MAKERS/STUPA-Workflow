@@ -2,7 +2,7 @@
 id: "002693"
 title: The Audit-Log searches on the server
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 tests:
