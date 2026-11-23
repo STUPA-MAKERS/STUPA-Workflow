@@ -447,16 +447,8 @@ describe('AdminGremienComponent', () => {
     expect(within(first).getByText('stupa · 23 Mitglieder · 2 Rollen')).toBeInTheDocument();
   });
 
-  it('links to the group mappings only with that permission', async () => {
+  it('has no link to the group mappings (spec 002620)', async () => {
     await setup();
-    expect(screen.getByRole('link', { name: 'Gruppen-Zuordnung' })).toHaveAttribute(
-      'href',
-      '/admin/group-mappings',
-    );
-  });
-
-  it('links to the group mappings only with that permission (2)', async () => {
-    await setup({ perms: ['admin.gremien'] });
     expect(screen.queryByRole('link', { name: 'Gruppen-Zuordnung' })).toBeNull();
   });
 

@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  afterNextRender,
   type ElementRef,
   computed,
   effect,
@@ -126,6 +127,16 @@ export class AdminListComponent {
   private readonly layout = viewChild(ListDetailLayoutComponent);
   /** The scroll box of the open page while the panes sit side by side. */
   private readonly body = viewChild<ElementRef<HTMLElement>>('body');
+  /**
+   * Marks the page body with `data-scrolled` while it is scrolled down. Only then has the round
+   * frame round top corners, so a control at the top right of the page head is not cut at rest
+   * (ui-kit:000193). A native passive listener, so a scroll runs no change detection (002160).
+   */
+  private readonly markScrolled = (e: Event): void => {
+    const body = e.currentTarget as HTMLElement;
+    body.toggleAttribute('data-scrolled', body.scrollTop > 0);
+  };
+
   /** The list and the open page sit side by side. */
   readonly split = injectListDetailPage(this.layout).split;
 
@@ -181,10 +192,18 @@ export class AdminListComponent {
         if (body) body.scrollTop = 0;
       });
 
+    // The body is in the template of this component, so it exists after the first render.
+    const destroyRef = inject(DestroyRef);
+    afterNextRender(() => {
+      const body = this.body()!.nativeElement;
+      body.addEventListener('scroll', this.markScrolled, { passive: true });
+      destroyRef.onDestroy(() => body.removeEventListener('scroll', this.markScrolled));
+    });
+
     effect(() =>
       this.pageFrame.crumbRoot.set(this.split() ? this.mode().home.replace(/^\//, '') : null),
     );
-    inject(DestroyRef).onDestroy(() => this.pageFrame.crumbRoot.set(null));
+    destroyRef.onDestroy(() => this.pageFrame.crumbRoot.set(null));
   }
 
   /** The full path of an entry. */

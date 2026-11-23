@@ -2921,7 +2921,6 @@
   "admin.gremien.membersLoadFailed": "Could not load the members.",
   "admin.users.col.groups": "SSO groups (last sign-in)",
   "admin.users.noGroups": "No groups.",
-  "admin.users.manageGroupMappings": "Group mapping",
   "admin.gremien.loading": "Loading committees …",
   "admin.gremien.error": "Committees could not be loaded.",
   "admin.gremien.empty": "No committees created yet.",

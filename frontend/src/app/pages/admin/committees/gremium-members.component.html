@@ -6,15 +6,6 @@
   [listLabel]="'admin.gremien.members' | t"
   [keepOnError]="members().length > 0"
 >
-  <ng-template screenIntro>
-    @if (canManageMappings()) {
-      <app-note>
-        <a class="gmm__noteLink" routerLink="/admin/group-mappings">{{
-          'admin.users.manageGroupMappings' | t
-        }}</a>
-      </app-note>
-    }
-  </ng-template>
   <ng-template screenSearch>
     <div role="search">
       <app-search-pill

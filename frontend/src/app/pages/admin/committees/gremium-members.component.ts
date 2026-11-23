@@ -7,9 +7,8 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import type { Uuid } from '@core/api/models';
-import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { i18nLabel } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -19,7 +18,6 @@ import {
   CapitalizePipe,
   type ListRow,
   type LoadState,
-  NoteComponent,
   SearchPillComponent,
 } from '@stupa-makers/ui-kit';
 import {
@@ -55,8 +53,7 @@ interface Member {
  *
  * A list page of Verwaltung (§002690) with the search of Benutzer (§002691). The members come
  * only from the OIDC groups of the IdP, so the list is read-only: avatar, name, e-mail and the
- * gremium role. The note links to the group mappings, where the memberships come from. The
- * membership rows carry the name and the e-mail of the member, so the page loads no principal
+ * gremium role. The membership rows carry the name and the e-mail of the member, so the page loads no principal
  * list. The substitute pool has its own page (§002692). The last crumb shows the name of the
  * gremium once it loads.
  */
@@ -65,11 +62,9 @@ interface Member {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink,
     TranslatePipe,
     CapitalizePipe,
     AvatarComponent,
-    NoteComponent,
     RecordsScreenComponent,
     ScreenIntroDirective,
     ScreenRecordDirective,
@@ -82,7 +77,6 @@ interface Member {
 export class GremiumMembersComponent {
   private readonly api = inject(AdminApiService);
   private readonly i18n = inject(I18nService);
-  private readonly auth = inject(AuthService);
 
   private readonly route = inject(ActivatedRoute);
   protected readonly gremiumId = (this.route.snapshot.paramMap.get('id') ?? '') as Uuid;
@@ -91,8 +85,6 @@ export class GremiumMembersComponent {
   protected readonly loading = signal(true);
   protected readonly failed = signal(false);
 
-  /** The note links to the mappings page only with its permission. */
-  protected readonly canManageMappings = computed(() => this.auth.can('admin.group_mappings'));
 
   readonly gremium = signal<Gremium | null>(null);
   private readonly gremiumRoles = signal<GremiumRole[]>([]);

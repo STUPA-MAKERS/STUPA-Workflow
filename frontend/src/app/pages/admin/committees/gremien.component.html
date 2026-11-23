@@ -14,15 +14,6 @@
       }}</app-button>
     </app-button-group>
   </ng-template>
-  <ng-template screenIntro>
-    @if (canMappings()) {
-      <app-note>
-        <a class="grem__noteLink" routerLink="/admin/group-mappings">{{
-          'admin.users.manageGroupMappings' | t
-        }}</a>
-      </app-note>
-    }
-  </ng-template>
   <ng-template screenSearch>
     <div role="search">
       <app-search-pill

@@ -171,19 +171,15 @@ describe('UsersComponent', () => {
     expect(inst.roleIds(PRINCIPALS[1])).toEqual([]);
   });
 
-  it('shows a link to the group mappings when permitted', async () => {
+  it('has no link to the group mappings (spec 002620)', async () => {
     await setup();
-    expect(screen.getByRole('link', { name: 'Gruppen-Zuordnung' })).toHaveAttribute(
-      'href',
-      '/admin/group-mappings',
-    );
+    expect(screen.queryByRole('link', { name: 'Gruppen-Zuordnung' })).toBeNull();
   });
 
-  it('without admin.group_mappings: no link and no mapping request', async () => {
+  it('without admin.group_mappings: no mapping request', async () => {
     const api = makeApi();
     const { inst } = await setup(api, makeAuth(null, false));
     expect(api.listGroupMappings).not.toHaveBeenCalled();
-    expect(screen.queryByRole('link', { name: 'Gruppen-Zuordnung' })).toBeNull();
     expect(inst.roleIds(PRINCIPALS[0])).toEqual(['r-admin']);
   });
 

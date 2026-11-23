@@ -9,7 +9,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import type { Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { FeatureService } from '@core/features/feature.service';
@@ -24,7 +24,6 @@ import {
   IconComponent,
   type ListRow,
   type LoadState,
-  NoteComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
@@ -104,10 +103,8 @@ interface Setting {
     SectionComponent,
     ExpandRowComponent,
     ConfirmDialogComponent,
-    RouterLink,
     TranslatePipe,
     IconComponent,
-    NoteComponent,
     RecordsScreenComponent,
     ScreenHeadToolsDirective,
     ScreenIntroDirective,
@@ -185,8 +182,6 @@ export class AdminGremienComponent {
   readonly confirmDelete = signal<Gremium | null>(null);
   readonly deleting = signal(false);
 
-  /** The note links to the group mappings only with that permission. */
-  protected readonly canMappings = computed(() => this.auth.can('admin.group_mappings'));
   /** "Stellvertretungen" in the ⋮ menu: the page needs `admin.delegations` and Sitzungen on. */
   protected readonly canPool = computed(
     () => this.auth.can('admin.delegations') && this.features.isOn('meetings'),

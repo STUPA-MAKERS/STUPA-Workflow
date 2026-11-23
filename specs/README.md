@@ -103,6 +103,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/001230](requirements/functional/administration/admin/001230_platform-name-from-branding.md) | Every visible name of the platform comes from the branding | approved |
 | [F/administration/admin/001231](requirements/functional/administration/admin/001231_seeded-mail-subject-branding.md) | The seeded subject of the access link mail names the branding | approved |
 | [F/administration/admin/002601](requirements/functional/administration/admin/002601_gremien-page-opens-asked-row.md) | The Gremien page opens and shows the Gremium of the link | approved |
+| [F/administration/admin/002620](requirements/functional/administration/admin/002620_users-no-group-mapping-link.md) | Benutzer and Gremien have no link to the Gruppen-Zuordnung | approved |
 | [F/administration/admin/002691](requirements/functional/administration/admin/002691_admin-list-search.md) | The search of a Verwaltung list finds the text of a row | approved |
 | [F/administration/audit/000291](requirements/functional/administration/audit/000291_record-in-tx.md) | An audit entry is written in the same transaction | approved |
 | [F/administration/audit/000292](requirements/functional/administration/audit/000292_chain-check.md) | The audit chain is checked every night | approved |

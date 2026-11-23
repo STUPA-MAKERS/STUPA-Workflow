@@ -106,16 +106,12 @@ const names = () =>
 describe('GremiumMembersComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('names the gremium without a count (spec 000560) and links to the group mappings', async () => {
+  it('names the gremium without a count (spec 000560)', async () => {
     await setup();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'Mitglieder: Studierendenparlament',
     );
     expect(screen.queryByText('6 Mitglieder')).toBeNull();
-    expect(screen.getByRole('link', { name: 'Gruppen-Zuordnung' })).toHaveAttribute(
-      'href',
-      '/admin/group-mappings',
-    );
   });
 
   /**
@@ -151,7 +147,7 @@ describe('GremiumMembersComponent', () => {
   });
 
   /** §002692: the pool has its own page; the members page loads none. */
-  it('hides the mappings link without its permission and shows no pool', async () => {
+  it('shows no mappings link and no pool', async () => {
     const { delegations } = await setup({ perms: ['admin.gremien', 'admin.delegations'] });
     expect(screen.queryByRole('link', { name: 'Gruppen-Zuordnung' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Stellvertretungen' })).toBeNull();
