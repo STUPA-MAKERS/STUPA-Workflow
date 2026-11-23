@@ -877,6 +877,7 @@ export const MOCK_PAPERLESS: PaperlessConnection = {
   fileApplications: false,
   filePlans: false,
   insertEnabled: false,
+  linkEnabled: false,
   allowedHosts: ['paperless.example.org'],
 };
 

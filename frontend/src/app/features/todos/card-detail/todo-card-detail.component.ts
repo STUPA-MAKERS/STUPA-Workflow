@@ -16,6 +16,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { LinkToDirective } from '../../../shared/link-to.directive';
 import { catchError, forkJoin, map, of, switchMap, type Observable, type Subscription } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { API_BASE_URL } from '@core/api/api.config';
@@ -101,7 +102,6 @@ import {
   linkTitle,
   relativeDays,
   sheetMove,
-  splitUrl,
 } from '../todos.util';
 import { dayMonthYear, isoDay, weekdayDate } from '@shared/date-format';
 import { formatMoney, moneyNumber } from '@shared/format-money';
@@ -173,6 +173,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     FormsModule,
     NgTemplateOutlet,
     RouterLink,
+    LinkToDirective,
     TranslatePipe,
     AvatarComponent,
     ButtonComponent,
@@ -629,10 +630,6 @@ export class TodoCardDetailComponent {
 
   linkTitle(link: TodoLink): string {
     return linkTitle(link, this.t);
-  }
-
-  route(url: string) {
-    return splitUrl(url);
   }
 
   /** The card as a link end: the picker leaves it and its links out (spec 001408). */

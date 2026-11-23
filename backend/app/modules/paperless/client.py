@@ -8,6 +8,8 @@ has no call with the method DELETE (§F/integrations/paperless/002522).
 
 `search` and `download` serve the insert from Paperless (§F/integrations/paperless/002527,
 002528). `search` has a time limit of 5 seconds (§F/integrations/paperless/002529).
+`search` and `document` serve the links to Paperless documents
+(§F/integrations/paperless/002765, 002766).
 
 A failure is a `PaperlessError` with a short cause code and never the text of an
 exception or of an answer, because such a text can hold the token or an internal address
@@ -373,6 +375,10 @@ class PaperlessClient:
         body = await self._send(
             "GET", "/api/documents/", params=params, timeout_seconds=timeout_seconds
         )
+        return await self._hits(body, timeout_seconds)
+
+    async def _hits(self, body: object, timeout_seconds: float) -> list[DocumentHit]:
+        """Read the rows of a document list, with the name of each document type."""
         rows = body.get("results") if isinstance(body, dict) else None
         if not isinstance(rows, list):
             raise PaperlessError("format")
@@ -392,6 +398,30 @@ class PaperlessClient:
             )
             for document_id, row in found
         ]
+
+    async def document(
+        self, document_id: int, timeout_seconds: float = SEARCH_TIMEOUT_SECONDS
+    ) -> DocumentHit | None:
+        """Read the title, the type and the date of one document, or None without it.
+
+        The read is a list with a filter by the number, so a document that Paperless
+        does not have is an empty answer and not an error.
+
+        Raises:
+            PaperlessError: A call fails or the answer is not the list of the API.
+        """
+        body = await self._send(
+            "GET",
+            "/api/documents/",
+            params={
+                "id__in": str(document_id),
+                "page_size": "1",
+                "fields": "id,title,created,document_type",
+            },
+            timeout_seconds=timeout_seconds,
+        )
+        hits = await self._hits(body, timeout_seconds)
+        return next((hit for hit in hits if hit.document_id == document_id), None)
 
     async def title(self, document_id: int) -> str:
         """Read the title of one document.

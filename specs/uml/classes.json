@@ -4327,7 +4327,8 @@
             "expense",
             "budget",
             "ticket",
-            "todo"
+            "todo",
+            "paperless"
           ]
         },
         {
@@ -4352,7 +4353,8 @@
             "expense",
             "budget",
             "ticket",
-            "todo"
+            "todo",
+            "paperless"
           ]
         },
         {
@@ -5436,6 +5438,51 @@
     {
       "attributes": [
         {
+          "name": "document_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "title",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "document_type",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "created",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "stored_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "PaperlessDocument",
+      "module": "paperless",
+      "name": "PaperlessDocument",
+      "path": "backend/app/modules/paperless/models.py",
+      "table": "paperless_document"
+    },
+    {
+      "attributes": [
+        {
           "name": "kind",
           "nullable": false,
           "primaryKey": false,
@@ -5634,6 +5681,12 @@
         },
         {
           "name": "insert_enabled",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "link_enabled",
           "nullable": false,
           "primaryKey": false,
           "type": "BOOLEAN"

@@ -32,6 +32,7 @@ export interface PaperlessDraft {
   readonly fileApplications: boolean;
   readonly filePlans: boolean;
   readonly insertEnabled: boolean;
+  readonly linkEnabled: boolean;
 }
 
 /** The switch of each part of the integration, with its label and its group. */
@@ -40,10 +41,11 @@ const SWITCHES = [
   { key: 'fileApplications', label: 'admin.paperless.fileApplications', group: 'filing' },
   { key: 'filePlans', label: 'admin.paperless.filePlans', group: 'filing' },
   { key: 'insertEnabled', label: 'admin.paperless.insertEnabled', group: 'insert' },
+  { key: 'linkEnabled', label: 'admin.paperless.linkEnabled', group: 'link' },
 ] as const satisfies readonly {
   readonly key: keyof PaperlessDraft;
   readonly label: TranslationKey;
-  readonly group: 'filing' | 'insert';
+  readonly group: 'filing' | 'insert' | 'link';
 }[];
 
 type SwitchKey = (typeof SWITCHES)[number]['key'];
@@ -145,6 +147,7 @@ export class PaperlessComponent {
       fileApplications: s.fileApplications,
       filePlans: s.filePlans,
       insertEnabled: s.insertEnabled,
+      linkEnabled: s.linkEnabled,
     }),
     initial: {
       baseUrl: '',
@@ -153,6 +156,7 @@ export class PaperlessComponent {
       fileApplications: false,
       filePlans: false,
       insertEnabled: false,
+      linkEnabled: false,
     },
     body: () => {
       const d = this.draft();
@@ -164,6 +168,7 @@ export class PaperlessComponent {
         fileApplications: d.fileApplications,
         filePlans: d.filePlans,
         insertEnabled: d.insertEnabled,
+        linkEnabled: d.linkEnabled,
       };
     },
     dirty: (s) => {
@@ -238,6 +243,11 @@ export class PaperlessComponent {
         key: 'insert',
         label: this.i18n.translate('admin.paperless.insert'),
         rows: this.switchRows('insert', d),
+      },
+      {
+        key: 'link',
+        label: this.i18n.translate('admin.paperless.link'),
+        rows: this.switchRows('link', d),
       },
       {
         key: 'actions',
@@ -341,7 +351,7 @@ export class PaperlessComponent {
   }
 
   /** The switch rows of one group (§F/integrations/paperless/002512). */
-  private switchRows(group: 'filing' | 'insert', d: PaperlessDraft) {
+  private switchRows(group: 'filing' | 'insert' | 'link', d: PaperlessDraft) {
     return SWITCHES.filter((s) => s.group === group).map(({ key, label }) => ({
       key,
       label: this.i18n.translate(label),

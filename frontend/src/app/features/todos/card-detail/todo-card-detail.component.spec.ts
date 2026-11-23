@@ -755,7 +755,6 @@ describe('TodoCardDetailComponent', () => {
     expect(linkButton.textContent?.trim()).toBe('');
     fireEvent.click(linkButton);
     expect(cmp.pickerOpen()).toBe(true);
-    expect(cmp.route('/meetings/m-1?item=t-1')).toEqual({ path: '/meetings/m-1', query: { item: 't-1' } });
   });
 
   it('archives the card', async () => {

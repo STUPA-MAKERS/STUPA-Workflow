@@ -5,7 +5,14 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/todos/test_paperless_links.py:test_a_card_links_a_document_and_the_document_is_stored_once"
+  - "backend/tests/integration/modules/todos/test_paperless_links.py:test_the_row_id_names_the_document_number"
+implementation:
+  - backend/app/modules/paperless/links.py
+  - backend/app/modules/paperless/models.py
+  - backend/app/modules/todos/link_service.py
+  - backend/app/modules/todos/models.py
 scope:
   - backend/app/
   - frontend/src/app/

@@ -668,6 +668,7 @@ describe('TopSheetComponent', () => {
       provide: PaperlessService,
       useValue: {
         insertOn: () => of(on),
+        linksOn: () => of(false),
         search: () => of([{ documentId: 418, title: 'Angebot', documentType: null, created: null }]),
         insert: jest.fn(() => of(copy)),
       },

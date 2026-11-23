@@ -30,6 +30,7 @@ from app.modules.paperless.connection import (
     Part,
     get_connection_service,
     insert_on,
+    links_on,
     part_since,
 )
 from app.modules.paperless.models import PaperlessSettings
@@ -167,10 +168,10 @@ async def read_paperless_document(
 
 @router.get("/insert", responses=_ERRORS)
 async def read_paperless_insert(_user: PaperlessUser, connection: Connection) -> InsertStateOut:
-    """Tell whether the part `Aus Paperless einfügen` is on."""
+    """Tell whether the insert from Paperless and the links to Paperless are on."""
     row = await connection.row()
     await connection.session.commit()
-    return InsertStateOut(enabled=insert_on(row))
+    return InsertStateOut(enabled=insert_on(row), link_enabled=links_on(row))
 
 
 @router.get("/search", responses={**_ERRORS, 404: _PROBLEM, 503: _PROBLEM})

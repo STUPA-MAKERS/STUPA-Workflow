@@ -5,7 +5,13 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/todos/test_paperless_links.py:test_the_switch_hides_the_links_and_keeps_them"
+  - "frontend/src/app/pages/admin/paperless/paperless.component.spec.ts:PaperlessComponent"
+implementation:
+  - backend/app/modules/paperless/connection.py
+  - backend/app/modules/todos/links.py
+  - frontend/src/app/pages/admin/paperless/paperless.component.ts
 scope:
   - backend/app/
   - frontend/src/app/

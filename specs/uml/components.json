@@ -818,6 +818,11 @@
     {
       "count": 3,
       "from": "graph",
+      "to": "paperless"
+    },
+    {
+      "count": 3,
+      "from": "graph",
       "to": "shared"
     },
     {
@@ -1071,7 +1076,7 @@
       "to": "audit"
     },
     {
-      "count": 5,
+      "count": 6,
       "from": "paperless",
       "to": "shared"
     },
@@ -1514,6 +1519,11 @@
       "count": 6,
       "from": "todos",
       "to": "notifications"
+    },
+    {
+      "count": 3,
+      "from": "todos",
+      "to": "paperless"
     },
     {
       "count": 19,

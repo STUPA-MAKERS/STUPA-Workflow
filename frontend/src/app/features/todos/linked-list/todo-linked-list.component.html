@@ -122,7 +122,7 @@
               <app-icon class="tl__icon" [name]="icon(row)" [size]="18" />
               <span class="tl__text">
                 @if (row.url; as url) {
-                  <a class="tl__link" [routerLink]="route(url).path" [queryParams]="route(url).query">{{ title(row) }}</a>
+                  <a class="tl__link" [appLinkTo]="url">{{ title(row) }}</a>
                 } @else {
                   <span class="tl__plain" [class.tl__muted]="!row.accessible">{{ title(row) }}</span>
                 }

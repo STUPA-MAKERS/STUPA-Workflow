@@ -20,15 +20,19 @@ of its own module:
   budget pages (``has_budget_read``), so only a budget reader links one;
 * ticket — the work right in the Bereich of the ticket (``ticket.manage``, or
   ``ticket.work`` in its Gremium);
-* todo — the board read rule (``BoardAccess``).
+* todo — the board read rule (``BoardAccess``);
+* paperless (a Paperless document) — ``paperless.use`` (§F/integrations/paperless/002764).
+  The title, the type and the date come from the row of the document, never from a call
+  to Paperless (002765). The url is the address of the document in Paperless.
 
 A card also gives read access to its links (spec 000487): a target that the viewer
 cannot read by the rule of its kind resolves as ``granted`` when a card on a board
 that the viewer reads links it. A granted target has no url, the card opens it in a
 read-only sheet (``link_view``). The grant stops after one step: it comes only from
-cards that the viewer reads by the board rule, never from a granted card. A ticket and
-a gremium give no grant. A granted Termin gives its title, its start, its end and its
-place only, never its description, its invitations or its answers. The link picker and
+cards that the viewer reads by the board rule, never from a granted card. A ticket, a
+gremium and a Paperless document give no grant. A granted Termin gives its title, its
+start, its end and its place only, never its description, its invitations or its
+answers. The link picker and
 the link check of ``POST .../links`` use the rule of the kind only, so a person links
 only what the person reads.
 
@@ -65,6 +69,16 @@ from app.modules.calendar.models import Appointment
 from app.modules.flow.models import State
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
+from app.modules.paperless.client import SEARCH_LIMIT, PaperlessError
+from app.modules.paperless.links import (
+    LINK_KIND as PAPERLESS,
+)
+from app.modules.paperless.links import (
+    PAPERLESS_USE,
+    DocumentLinks,
+    StoredDocument,
+    links_part_on,
+)
 from app.modules.site_config.features import Feature, active_features
 from app.modules.tickets.access import area_scope, works_anywhere
 from app.modules.tickets.models import Ticket
@@ -81,7 +95,7 @@ from app.modules.todos.models import (
 from app.modules.todos.schemas import TodoLinkDetail, TodoLinkTarget
 from app.modules.voting.listing import read_scope as vote_read_scope
 from app.modules.voting.models import Vote
-from app.shared.errors import ForbiddenError
+from app.shared.errors import ForbiddenError, ServiceUnavailableError
 from app.shared.search import dialect_of, escape_like, trigram_rank
 
 #: The most hits of one kind in the link picker.
@@ -96,8 +110,9 @@ VOTE_STATUSES = ("open", "draft", "closed", "cancelled")
 LinkRef = tuple[str, uuid.UUID]
 #: The kinds that a card opens to its readers (spec 000487): every kind but the ticket,
 #: which holds the report of a person outside the team, the gremium, and the cost centre,
-#: which every reader of the card sees anyway.
-GRANT_KINDS: frozenset[str] = frozenset(LINK_KINDS) - {"ticket", "gremium", "budget"}
+#: which every reader of the card sees anyway, and the Paperless document, which needs
+#: its permission (§F/integrations/paperless/002764).
+GRANT_KINDS: frozenset[str] = frozenset(LINK_KINDS) - {"ticket", "gremium", "budget", PAPERLESS}
 #: The feature that a link kind belongs to; a kind without an entry has no switch.
 LINK_FEATURE: dict[str, Feature] = {
     "meeting": Feature.MEETINGS,
@@ -108,6 +123,7 @@ LINK_FEATURE: dict[str, Feature] = {
     "expense": Feature.BUDGET,
     "budget": Feature.BUDGET,
     "ticket": Feature.TICKETS,
+    PAPERLESS: Feature.PAPERLESS,
 }
 #: No id passes the gate of its kind without the rule.
 NONE: frozenset[uuid.UUID] = frozenset()
@@ -215,10 +231,32 @@ def card_url(card_id: uuid.UUID) -> str:
     return f"/todos?card={card_id}"
 
 
+def _document_target(doc: StoredDocument) -> Resolved:
+    """A Paperless document with its stored values (002765)."""
+    return Resolved(
+        accessible=True,
+        title=doc.title,
+        url=doc.url,
+        detail=TodoLinkDetail(date=doc.created, document_type=doc.document_type),
+    )
+
+
+def paperless_unavailable() -> ServiceUnavailableError:
+    """The error of a link change or a link search while Paperless does not answer."""
+    return ServiceUnavailableError("Paperless does not answer.", code="paperless_unavailable")
+
+
 async def link_kinds_on(session: AsyncSession) -> tuple[str, ...]:
-    """Return the link kinds whose feature is on, in the order of the link picker."""
+    """Return the link kinds whose feature is on, in the order of the link picker.
+
+    The kind of the Paperless documents also needs its own switch
+    (§F/integrations/paperless/002767).
+    """
     on = await active_features(session)
-    return tuple(k for k in LINK_KINDS if k not in LINK_FEATURE or LINK_FEATURE[k] in on)
+    kinds = tuple(k for k in LINK_KINDS if k not in LINK_FEATURE or LINK_FEATURE[k] in on)
+    if PAPERLESS in kinds and not await links_part_on(session):
+        return tuple(k for k in kinds if k != PAPERLESS)
+    return kinds
 
 
 class LinkResolver:
@@ -230,6 +268,8 @@ class LinkResolver:
         self.access = access
         self._meeting_scope: tuple[set[uuid.UUID] | None, set[uuid.UUID]] | None = None
         self._gremium_scope: tuple[set[uuid.UUID] | None] | None = None
+        #: Paperless did not answer the newest search over all kinds (002766).
+        self.paperless_down: bool = False
 
     async def _meetings_scope(
         self, principal: Principal
@@ -339,6 +379,7 @@ class LinkResolver:
             "budget": self._budgets,
             "ticket": self._tickets,
             "todo": self._todos,
+            PAPERLESS: self._paperless,
         }
         found = {
             kind: await handlers[kind](
@@ -364,6 +405,69 @@ class LinkResolver:
             return False
         resolved = await self.resolve([(kind, target_id)], principal, grants=False)
         return resolved[(kind, target_id)].accessible
+
+    async def prepare(self, refs: Iterable[LinkRef], principal: Principal) -> None:
+        """Store the Paperless documents of new links, with their values of now (002765).
+
+        A ref of another kind, a document that Paperless does not have and a person
+        without ``paperless.use`` change nothing: the read rule then refuses the link.
+
+        Raises:
+            ServiceUnavailableError: ``paperless_unavailable`` (HTTP 503).
+        """
+        wanted = [target_id for kind, target_id in refs if kind == PAPERLESS]
+        if not wanted or not principal.has(PAPERLESS_USE):
+            return
+        if PAPERLESS not in await link_kinds_on(self.session):
+            return
+        documents = DocumentLinks(self.session)
+        try:
+            for target_id in wanted:
+                await documents.store(target_id)
+        except PaperlessError as exc:
+            raise paperless_unavailable() from exc
+
+    async def _paperless(
+        self,
+        ids: AbstractSet[uuid.UUID],
+        principal: Principal,
+        open_ids: frozenset[uuid.UUID] = NONE,
+    ) -> dict[uuid.UUID, Resolved]:
+        """Resolve Paperless documents from their rows, only with ``paperless.use``."""
+        if not principal.has(PAPERLESS_USE):
+            return {}
+        stored = await DocumentLinks(self.session).stored(ids)
+        return {target_id: _document_target(doc) for target_id, doc in stored.items()}
+
+    async def _paperless_targets(
+        self, term: str, principal: Principal, limit: int, *, strict: bool
+    ) -> list[TodoLinkTarget]:
+        """The hits of Paperless as link targets (002766).
+
+        With ``strict`` an outage is an error. Without it the answer is empty and
+        ``paperless_down`` tells the outage, so the other kinds keep their hits.
+
+        Raises:
+            ServiceUnavailableError: ``paperless_unavailable`` with ``strict`` (HTTP 503).
+        """
+        if not principal.has(PAPERLESS_USE):
+            return []
+        try:
+            found = await DocumentLinks(self.session).search(term, limit)
+        except PaperlessError as exc:
+            if strict:
+                raise paperless_unavailable() from exc
+            self.paperless_down = True
+            return []
+        return [
+            TodoLinkTarget(
+                kind=PAPERLESS,
+                target_id=doc.id,
+                title=doc.title,
+                detail=TodoLinkDetail(date=doc.created, document_type=doc.document_type),
+            )
+            for doc in found
+        ]
 
     async def _state_labels(self, apps: Iterable[Application]) -> dict[uuid.UUID, dict[str, str]]:
         ids = {a.current_state_id for a in apps if a.current_state_id is not None}
@@ -721,10 +825,20 @@ class LinkResolver:
         """Search the link targets that the principal may read, ``PER_KIND`` per kind.
 
         A term below ``MIN_TERM`` characters finds the newest cards for the kind ``todo``
-        (``recent_cards``) and nothing for any other kind. A kind of a feature that is
-        off finds nothing (§F/administration/admin/000758).
+        (``recent_cards``), the newest documents for the kind ``paperless`` and nothing
+        for any other kind. A kind of a feature that is off finds nothing
+        (§F/administration/admin/000758). The kind ``paperless`` asks Paperless, with at
+        most 20 hits (§F/integrations/paperless/002766).
+
+        Raises:
+            ServiceUnavailableError: ``paperless_unavailable`` for the kind ``paperless``
+                while Paperless does not answer (HTTP 503).
         """
         term = q.strip()
+        if kind == PAPERLESS:
+            if PAPERLESS not in await link_kinds_on(self.session):
+                return []
+            return await self._paperless_targets(term, principal, SEARCH_LIMIT, strict=True)
         if len(term) < MIN_TERM:
             return await self.recent_cards(principal) if kind == "todo" else []
         on = await link_kinds_on(self.session)
@@ -742,6 +856,8 @@ class LinkResolver:
         exclude_card_id: uuid.UUID | None,
     ) -> list[TodoLinkTarget]:
         """The readable targets of one kind that match ``term``, in candidate order."""
+        if kind == PAPERLESS:
+            return await self._paperless_targets(term, principal, PER_KIND, strict=False)
         ids = await self._candidates(kind, term, principal, exclude_card_id)
         return await self._as_targets(kind, ids, principal)
 

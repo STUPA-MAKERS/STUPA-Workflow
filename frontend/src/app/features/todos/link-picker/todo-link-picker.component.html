@@ -30,7 +30,7 @@
     </button>
   </div>
   <div class="lp__chips" role="group" [attr.aria-label]="'todos.picker.kind' | t">
-    @for (chip of chips; track chip.value) {
+    @for (chip of chips(); track chip.value) {
       <button
         type="button"
         class="chip lp__chip"
@@ -44,7 +44,7 @@
   </div>
   <div class="lp__results" aria-live="polite">
     @if (failed()) {
-      <p class="lp__note lp__note--error">{{ 'todos.picker.error' | t }}</p>
+      <ng-container [ngTemplateOutlet]="note" [ngTemplateOutletContext]="{ $implicit: 'todos.picker.error', error: true }" />
     } @else if (search.applied() && !search.pending() && !groups().length) {
       <app-empty-state icon="searchOff"
         class="lp__empty"
@@ -55,30 +55,40 @@
     }
     @for (group of groups(); track group.key) {
       <p class="lp__group">{{ group.label | t }}</p>
-      <ul class="lp__list">
-        @for (hit of group.hits; track hit.kind + hit.targetId) {
-          <li>
-            <button
-              type="button"
-              class="lp__hit"
-              [class.lp__hit--on]="isLinked(hit)"
-              [attr.aria-pressed]="isLinked(hit)"
-              (click)="pick(hit)"
-            >
-              <app-icon class="lp__icon" [name]="icon(hit)" [size]="18" />
-              <span class="lp__text">
-                <span class="lp__title">{{ hit.title }}</span>
-                <span class="lp__sub">{{ sub(hit) }}</span>
-              </span>
-              @if (isLinked(hit)) {
-                <app-icon class="lp__check" name="check" [size]="18" />
-              }
-            </button>
-          </li>
-        }
-      </ul>
+      @if (group.hits.length) {
+        <ul class="lp__list">
+          @for (hit of group.hits; track hit.kind + hit.targetId) {
+            <li>
+              <button
+                type="button"
+                class="lp__hit"
+                [class.lp__hit--on]="isLinked(hit)"
+                [attr.aria-pressed]="isLinked(hit)"
+                (click)="pick(hit)"
+              >
+                <app-icon class="lp__icon" [name]="icon(hit)" [size]="18" />
+                <span class="lp__text">
+                  <span class="lp__title">{{ hit.title }}</span>
+                  <span class="lp__sub">{{ sub(hit) }}</span>
+                </span>
+                @if (isLinked(hit)) {
+                  <app-icon class="lp__check" name="check" [size]="18" />
+                }
+              </button>
+            </li>
+          }
+        </ul>
+      }
+      @if (group.note; as text) {
+        <ng-container [ngTemplateOutlet]="note" [ngTemplateOutletContext]="{ $implicit: text, error: false }" />
+      }
     }
   </div>
+</ng-template>
+
+<!-- A note in the results: the failed search, or Paperless that does not answer (002766). -->
+<ng-template #note let-text let-error="error">
+  <p [class]="error ? 'lp__note lp__note--error' : 'lp__note'">{{ text | t }}</p>
 </ng-template>
 
 <ng-template #pop>

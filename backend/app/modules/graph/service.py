@@ -23,6 +23,8 @@ from app.modules.budget.access import has_budget_read
 from app.modules.graph import relations as reads
 from app.modules.graph.build import Filters, Node, Ref, Relation, page_of, shown
 from app.modules.graph.schemas import GraphEdge, GraphNode, GraphPage, GraphRef
+from app.modules.paperless.links import LINK_KIND as PAPERLESS
+from app.modules.paperless.links import PAPERLESS_USE
 from app.modules.todos.access import BoardAccess
 from app.modules.todos.grouping import grouped
 from app.modules.todos.links import LinkResolver, Resolved, link_kinds_on
@@ -116,14 +118,18 @@ class GraphService:
     ) -> GraphPage:
         """Read one page of the graph, the newest nodes first.
 
-        A kind of a feature that is off is no kind of the graph (spec 001432).
+        A kind of a feature that is off is no kind of the graph (spec 001432). The kind
+        of the Paperless documents is no kind for a person without ``paperless.use``, so
+        that person gets neither the node nor its lines
+        (§F/integrations/paperless/002768).
 
         Raises:
             ValidationProblem: The cursor is not a count.
         """
         offset = offset_of(cursor)
         session = self.links.session
-        on = frozenset(await link_kinds_on(session))
+        hidden = frozenset() if principal.has(PAPERLESS_USE) else frozenset({PAPERLESS})
+        on = frozenset(await link_kinds_on(session)) - hidden
         kinds = on if filters.kinds is None else on & filters.kinds
         # A neighbour of a hit shows with every kind (spec 001434), so the relations of
         # every kind are read unless only the hits show.

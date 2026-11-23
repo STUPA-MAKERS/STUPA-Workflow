@@ -35,6 +35,7 @@ TodoLinkKind = Literal[
     "budget",
     "ticket",
     "todo",
+    "paperless",
 ]
 TodoEventKind = Literal[
     "created",
@@ -113,6 +114,7 @@ class TodoLinkDetail(FrozenCamelModel, frozen=True):
     start_time: str | None = Field(default=None, serialization_alias="startTime")
     end_time: str | None = Field(default=None, serialization_alias="endTime")
     place: str | None = None
+    document_type: str | None = Field(default=None, serialization_alias="documentType")
 
 
 class TodoLinkOut(FrozenCamelModel, frozen=True):

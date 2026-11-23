@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import { of, throwError } from 'rxjs';
 import { TodosApiService, type TodoLinkTarget } from '@core/api/todos.service';
+import { PaperlessService } from '@core/api/paperless.service';
 import { AuthService } from '@core/auth/auth.service';
 import { MEDIA } from '@stupa-makers/ui-kit';
 import { asPhone } from '../../../../testing/todo-fixtures';
@@ -13,14 +14,17 @@ const HITS: TodoLinkTarget[] = [
   { kind: 'todo', targetId: 'k-2', title: 'Haushalt Kapitel 3', detail: { boardName: 'StuPa' } },
 ];
 
-async function setup(opts: { fail?: boolean; linked?: string[]; budgetWrite?: boolean } = {}) {
-  const linkTargets = jest.fn(() => (opts.fail ? throwError(() => new Error('x')) : of(HITS)));
+const found = (hits: TodoLinkTarget[], paperlessDown = false) => ({ hits, paperlessDown });
+
+async function setup(opts: { fail?: boolean; linked?: string[]; budgetWrite?: boolean; paperless?: boolean } = {}) {
+  const linkSearch = jest.fn(() => (opts.fail ? throwError(() => new Error('x')) : of(found(HITS))));
   const picked = jest.fn();
   const view = await render(TodoLinkPickerComponent, {
     inputs: { open: false, exclude: { kind: 'todo', id: 'k-1' }, linked: new Set(opts.linked ?? []) },
     on: { picked },
     providers: [
-      { provide: TodosApiService, useValue: { linkTargets } },
+      { provide: TodosApiService, useValue: { linkSearch } },
+      { provide: PaperlessService, useValue: { linksOn: () => of(opts.paperless ?? false) } },
       ...(opts.budgetWrite === undefined
         ? []
         : [{ provide: AuthService, useValue: { can: () => opts.budgetWrite } }]),
@@ -36,7 +40,7 @@ async function setup(opts: { fail?: boolean; linked?: string[]; budgetWrite?: bo
     view.fixture.componentInstance.search.flush();
     view.fixture.detectChanges();
   };
-  return { ...view, linkTargets, picked, open, type };
+  return { ...view, linkSearch, picked, open, type };
 }
 
 describe('TodoLinkPickerComponent', () => {
@@ -62,10 +66,10 @@ describe('TodoLinkPickerComponent', () => {
   });
 
   it('opens on the first render when open is true from the start', async () => {
-    const linkTargets = jest.fn(() => of(HITS));
+    const linkSearch = jest.fn(() => of(found(HITS)));
     await render(TodoLinkPickerComponent, {
       inputs: { open: true, exclude: { kind: 'todo', id: 'k-1' }, linked: new Set<string>() },
-      providers: [{ provide: TodosApiService, useValue: { linkTargets } }],
+      providers: [{ provide: TodosApiService, useValue: { linkSearch } }],
     });
     expect(screen.getByRole('dialog', { name: 'Verknüpfen' }).closest('.lp-layer')?.parentElement).toBe(document.body);
     expect(document.querySelectorAll('.lp-layer')).toHaveLength(1);
@@ -116,10 +120,10 @@ describe('TodoLinkPickerComponent', () => {
 
   /** An empty field takes the hits away at once. */
   it('searches, groups the hits and marks a linked target', async () => {
-    const { open, type, linkTargets, picked } = await setup({ linked: ['application:a-1'] });
+    const { open, type, linkSearch, picked } = await setup({ linked: ['application:a-1'] });
     await open();
     type('Haushalt');
-    expect(linkTargets).toHaveBeenLastCalledWith('Haushalt', 'all', { kind: 'todo', id: 'k-1' });
+    expect(linkSearch).toHaveBeenLastCalledWith('Haushalt', 'all', { kind: 'todo', id: 'k-1' });
     expect(screen.getByText('Anträge', { selector: '.lp__group' })).toBeInTheDocument();
     expect(screen.getByText('Sitzungen und TOPs')).toBeInTheDocument();
     expect(screen.getByText('To-Dos', { selector: '.lp__group' })).toBeInTheDocument();
@@ -143,8 +147,8 @@ describe('TodoLinkPickerComponent', () => {
       { kind: 'invoice', targetId: 'i-1', title: 'RE-7', detail: { number: 'RE-7', counterparty: 'Druckhaus' } },
       { kind: 'expense', targetId: 'e-1', title: 'Plakate', detail: { costCentre: 'VS-800' } },
     ];
-    const { open, type, linkTargets, picked, fixture } = await setup();
-    linkTargets.mockReturnValue(of(hits));
+    const { open, type, linkSearch, picked, fixture } = await setup();
+    linkSearch.mockReturnValue(of(found(hits)));
     await open();
     type('Pla');
     const groups = [...document.querySelectorAll('.lp__group')].map((g) => g.textContent?.trim());
@@ -164,25 +168,25 @@ describe('TodoLinkPickerComponent', () => {
       ['Buchungen', 'expense'],
     ] as const) {
       fireEvent.click(screen.getByRole('button', { name: label }));
-      expect(linkTargets).toHaveBeenLastCalledWith('Pla', kind, { kind: 'todo', id: 'k-1' });
+      expect(linkSearch).toHaveBeenLastCalledWith('Pla', kind, { kind: 'todo', id: 'k-1' });
     }
   });
 
   it('narrows the kind and searches again; the same kind does nothing', async () => {
-    const { open, type, linkTargets } = await setup();
+    const { open, type, linkSearch } = await setup();
     await open();
     type('Haushalt');
-    const calls = linkTargets.mock.calls.length;
+    const calls = linkSearch.mock.calls.length;
     fireEvent.click(screen.getByRole('button', { name: 'Alle' }));
-    expect(linkTargets).toHaveBeenCalledTimes(calls);
+    expect(linkSearch).toHaveBeenCalledTimes(calls);
     fireEvent.click(screen.getByRole('button', { name: 'TOPs' }));
     expect(screen.getByRole('button', { name: 'TOPs' })).toHaveAttribute('aria-pressed', 'true');
-    expect(linkTargets).toHaveBeenLastCalledWith('Haushalt', 'agenda_item', { kind: 'todo', id: 'k-1' });
+    expect(linkSearch).toHaveBeenLastCalledWith('Haushalt', 'agenda_item', { kind: 'todo', id: 'k-1' });
   });
 
   it('shows the shared empty state when nothing matches', async () => {
     const empty = await setup();
-    empty.linkTargets.mockReturnValue(of([]));
+    empty.linkSearch.mockReturnValue(of(found([])));
     await empty.open();
     empty.type('zz');
     expect(screen.getByText('Keine Treffer.').closest('app-empty-state')).not.toBeNull();
@@ -193,6 +197,40 @@ describe('TodoLinkPickerComponent', () => {
     await failing.open();
     failing.type('zz');
     expect(screen.getByText('Die Suche ist fehlgeschlagen.')).toBeInTheDocument();
+  });
+
+  it('does not offer the kind Paperless while the links to Paperless are off (002767)', async () => {
+    const { open } = await setup();
+    await open();
+    expect(screen.getByRole('button', { name: 'To-Dos' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Paperless' })).toBeNull();
+  });
+
+  it('lists the newest documents of the kind Paperless and links a hit (002766)', async () => {
+    const doc: TodoLinkTarget = {
+      kind: 'paperless',
+      targetId: 'p-41',
+      title: 'Angebot Beamer',
+      detail: { documentType: 'Angebot', date: '2026-10-30' },
+    };
+    const { open, type, linkSearch, picked } = await setup({ paperless: true });
+    linkSearch.mockReturnValue(of(found([doc])));
+    await open();
+    fireEvent.click(screen.getByRole('button', { name: 'Paperless' }));
+    expect(linkSearch).toHaveBeenLastCalledWith('', 'paperless', { kind: 'todo', id: 'k-1' });
+    fireEvent.click(await screen.findByRole('button', { name: /Angebot Beamer/ }));
+    expect(picked).toHaveBeenCalledWith(doc);
+    type('Beamer');
+    expect(linkSearch).toHaveBeenLastCalledWith('Beamer', 'paperless', { kind: 'todo', id: 'k-1' });
+  });
+
+  it('keeps the hits of the other kinds and names the outage of Paperless (002766)', async () => {
+    const { open, type, linkSearch } = await setup({ paperless: true });
+    linkSearch.mockReturnValue(of(found(HITS, true)));
+    await open();
+    type('Haushalt');
+    expect(screen.getByRole('button', { name: /Haushalt 2027/ })).toBeInTheDocument();
+    expect(screen.getByText('Paperless ist nicht erreichbar')).toBeInTheDocument();
   });
 
   it('closes with the × and with Escape', async () => {

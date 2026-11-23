@@ -27,7 +27,6 @@ import {
   moveErrorText,
   replaceTile,
   sortedColumns,
-  splitUrl,
 } from './todos.util';
 import type { Translate } from '@core/i18n/translations';
 import { personName } from '@shared/person-label.util';
@@ -178,11 +177,6 @@ describe('todos.util', () => {
       expect(linkLine(link({ kind: 'vote', title: 'Annehmen?', detail: null }), TODAY, 'de-DE', t)).toBe(
         'Abstimmung · Annehmen?',
       );
-    });
-
-    it('splits an app url into path and query', () => {
-      expect(splitUrl('/meetings/m-1?item=a-1&x=2')).toEqual({ path: '/meetings/m-1', query: { item: 'a-1', x: '2' } });
-      expect(splitUrl('/applications/a-1')).toEqual({ path: '/applications/a-1', query: {} });
     });
   });
 

@@ -140,6 +140,7 @@ describe('AdminApiService — mock mode', () => {
         fileApplications: false,
         filePlans: false,
         insertEnabled: false,
+      linkEnabled: false,
       }),
     );
     expect(saved).toEqual(expect.objectContaining({ tokenSet: true, fileProtocols: true }));
@@ -472,6 +473,7 @@ describe('AdminApiService — real mode (contract)', () => {
       fileApplications: false,
       filePlans: false,
       insertEnabled: false,
+      linkEnabled: false,
     };
     s.putPaperless(body).subscribe();
     const put = http.expectOne({ method: 'PUT', url: '/api/admin/paperless' });

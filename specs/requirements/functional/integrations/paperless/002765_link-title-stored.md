@@ -5,7 +5,14 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/todos/test_paperless_links.py:test_an_outage_keeps_the_stored_title_and_the_other_hits"
+  - "backend/tests/integration/modules/todos/test_paperless_links.py:test_a_card_links_a_document_and_the_document_is_stored_once"
+  - "frontend/src/app/features/todos/linked-list/todo-linked-list.component.spec.ts:TodoLinkedListComponent"
+implementation:
+  - backend/app/modules/paperless/links.py
+  - backend/app/modules/todos/links.py
+  - frontend/src/app/features/todos/linked-list/todo-linked-list.component.html
 scope:
   - backend/app/
   - frontend/src/app/

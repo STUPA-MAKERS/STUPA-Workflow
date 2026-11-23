@@ -227,9 +227,9 @@
 <ng-template #action let-c let-close="close">
   <app-button-group class="gr__actions" [main]="true">
     @if (c.route; as to) {
-      <a class="gr__open" appButton="fill" [routerLink]="to.path" [queryParams]="to.query">
+      <a class="gr__open" appButton="fill" [appLinkTo]="to">
         {{ 'graph.panel.open' | t }}
-        <app-icon name="arrow" />
+        <app-icon [name]="c.external ? 'ext' : 'arrow'" />
       </a>
     }
     @if (close) {

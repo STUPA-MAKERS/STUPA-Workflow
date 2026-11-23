@@ -5,7 +5,13 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/todos/test_paperless_links.py:test_the_graph_shows_the_document_only_with_the_permission"
+  - "frontend/src/app/pages/graph/graph.component.spec.ts:GraphComponent"
+implementation:
+  - backend/app/modules/graph/service.py
+  - backend/app/modules/graph/relations.py
+  - frontend/src/app/pages/graph/graph.component.ts
 scope:
   - backend/app/
   - frontend/src/app/

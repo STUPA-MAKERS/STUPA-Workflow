@@ -1,13 +1,14 @@
-"""ORM models of the Paperless integration: the connection and the filings."""
+"""ORM models of the Paperless integration: the connection, the filings, the linked documents."""
 
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     Index,
     Integer,
@@ -43,6 +44,8 @@ class PaperlessSettings(Base):
         protocols_since: The moment the switch went on. An event before it is filed
             only by the action `Bestehende Dokumente ablegen`.
         insert_enabled: The switch `Aus Paperless einfügen`.
+        link_enabled: The switch `Paperless-Dokumente verknüpfen`
+            (§F/integrations/paperless/002767).
     """
 
     __tablename__ = "paperless_settings"
@@ -59,6 +62,7 @@ class PaperlessSettings(Base):
     file_plans: Mapped[bool] = mapped_column(Boolean, server_default="false", default=False)
     plans_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     insert_enabled: Mapped[bool] = mapped_column(Boolean, server_default="false", default=False)
+    link_enabled: Mapped[bool] = mapped_column(Boolean, server_default="false", default=False)
 
     __table_args__ = (CheckConstraint("id = 1", name="singleton"),)
 
@@ -136,3 +140,28 @@ class PaperlessFiling(UUIDPkMixin, CreatedAtMixin, Base):
             postgresql_where=text("state IN ('pending','uploaded')"),
         ),
     )
+
+
+class PaperlessDocument(UUIDPkMixin, Base):
+    """A Paperless document that a link names (§F/integrations/paperless/002763).
+
+    The row is the end of each link to the document, so the platform stores a document
+    once. The id comes from the number of the document (`links.document_ref`). The row
+    keeps the title, the type and the date from the moment of the newest link, and no
+    page calls Paperless to show them (§F/integrations/paperless/002765).
+
+    Attributes:
+        document_id: The number of the document in Paperless.
+        title: The title of the document.
+        document_type: The name of its document type, or NULL without one.
+        created: The date of the document.
+        stored_at: The moment of the newest link, which read these values.
+    """
+
+    __tablename__ = "paperless_document"
+
+    document_id: Mapped[int] = mapped_column(Integer, unique=True)
+    title: Mapped[str] = mapped_column(Text, server_default="")
+    document_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created: Mapped[date | None] = mapped_column(Date, nullable=True)
+    stored_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

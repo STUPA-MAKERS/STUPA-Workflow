@@ -74,6 +74,26 @@ describe('TodoLinkedListComponent', () => {
     expect(document.querySelectorAll('[data-testid="tl-link-row"]')).toHaveLength(2);
   });
 
+  it('opens a Paperless document in a new tab and hides it without the right (002764, 002765)', async () => {
+    const href = 'https://paperless.example.org/documents/41/details';
+    await setup(() =>
+      of(
+        linksOf(
+          [],
+          [
+            linkRow({ id: 'l-5', kind: 'paperless', title: 'Angebot Beamer', url: href, detail: { documentType: 'Angebot' } }),
+            linkRow({ id: 'l-6', kind: 'paperless', targetId: 'p-2', accessible: false, title: null, url: null }),
+          ],
+        ),
+      ),
+    );
+    const link = screen.getByRole('link', { name: 'Angebot Beamer' });
+    expect(link).toHaveAttribute('href', href);
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(screen.getByText('Paperless-Dokument · Angebot')).toBeInTheDocument();
+    expect(screen.getByText('Paperless-Dokument (kein Zugriff)')).toHaveClass('tl__muted');
+  });
+
   it('leaves out the heading on request and keeps the name of the section', async () => {
     await setup(() => of(linksOf([card()])), { showTitle: false });
     const heading = screen.getByRole('heading', { name: 'Verknüpft' });

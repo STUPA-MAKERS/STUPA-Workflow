@@ -11,7 +11,10 @@ A link connects any two elements of the kinds of ``LINK_KINDS`` and has no direc
   or ``event_link_taken``.
 - ``DELETE /links/{id}`` removes a link from both ends under the same rule.
 - ``GET /links/targets`` searches the elements that the caller reads (at most 5 per
-  kind), without the excluded element and its links (spec 001408).
+  kind), without the excluded element and its links (spec 001408). The kind ``paperless``
+  asks Paperless (§F/integrations/paperless/002766): 503 ``paperless_unavailable`` for
+  an outage. The search over all kinds then answers the other kinds with the header
+  ``X-Paperless-Unavailable: 1``.
 - ``GET /links/{id}/view`` is the read sheet of the other end of a card that the caller
   reads (spec 000487).
 """
@@ -41,6 +44,8 @@ from app.shared.errors import ConflictError, ProblemDetail
 router = APIRouter(prefix="/links", tags=["links"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
+#: Tells that the search over all kinds got no answer of Paperless (002766).
+PAPERLESS_DOWN_HEADER = "X-Paperless-Unavailable"
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
@@ -73,7 +78,7 @@ async def list_links(
     "",
     response_model=LinksOut,
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(401, 403, 404, 409, 422),
+    responses=_errors(401, 403, 404, 409, 422, 503),
 )
 async def add_link(payload: LinkCreate, service: LinkServiceDep, principal: Member) -> LinksOut:
     """Link two elements; the answer is the links of ``a``.
@@ -90,10 +95,11 @@ async def add_link(payload: LinkCreate, service: LinkServiceDep, principal: Memb
     return await service.of(*one, principal)
 
 
-@router.get("/targets", response_model=list[TodoLinkTarget], responses=_errors(401, 422))
+@router.get("/targets", response_model=list[TodoLinkTarget], responses=_errors(401, 422, 503))
 async def link_targets(
     service: LinkServiceDep,
     principal: Member,
+    response: Response,
     q: Annotated[str, Query(max_length=200)] = "",
     kind: TodoLinkKind | Literal["all"] = "all",
     exclude_kind: Annotated[TodoLinkKind | None, Query(alias="excludeKind")] = None,
@@ -101,13 +107,17 @@ async def link_targets(
 ) -> list[TodoLinkTarget]:
     """Search the elements that the caller may read (at most 5 per kind).
 
-    Below two characters the kind ``todo`` lists the newest cards and any other kind
-    nothing (specs 000548, 001408).
+    Below two characters the kind ``todo`` lists the newest cards, the kind ``paperless``
+    the newest documents and any other kind nothing (specs 000548, 001408,
+    §F/integrations/paperless/002766).
     """
     if not token_reads(principal):
         return []
     exclude = (exclude_kind, exclude_id) if exclude_kind and exclude_id else None
-    return await service.targets(q, kind, principal, exclude=exclude)
+    found = await service.targets(q, kind, principal, exclude=exclude)
+    if service.paperless_down:
+        response.headers[PAPERLESS_DOWN_HEADER] = "1"
+    return found
 
 
 @router.delete(

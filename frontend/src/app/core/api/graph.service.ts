@@ -30,6 +30,7 @@ export const GRAPH_KINDS: readonly GraphKind[] = [
   'budget',
   'ticket',
   'todo',
+  'paperless',
 ];
 
 /** `link` is a link that a person made, `builtin` a relation of the data (spec 001424). */

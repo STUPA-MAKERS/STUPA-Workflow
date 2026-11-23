@@ -5,7 +5,13 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/todos/test_paperless_links.py:test_an_outage_keeps_the_stored_title_and_the_other_hits"
+  - "frontend/src/app/features/todos/link-picker/todo-link-picker.component.spec.ts:TodoLinkPickerComponent"
+implementation:
+  - backend/app/modules/todos/links.py
+  - backend/app/modules/todos/links_router.py
+  - frontend/src/app/features/todos/link-picker/todo-link-picker.component.ts
 scope:
   - backend/app/
   - frontend/src/app/
