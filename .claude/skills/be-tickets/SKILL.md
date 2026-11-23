@@ -1,6 +1,6 @@
 ---
 name: be-tickets
-description: Tickets from the help menu — problem reports, questions and ideas (ticket/ticket_note/ticket_event, number T-7K3QX9MD: eight random characters, numbers.py). Covers the public one-way report POST /api/tickets (session, or ALTCHA + rate limit + body cap while tickets.publicEnabled), the ticket.manage work routes (list/counts/assignees/detail/patch/notes), draft attachments bound with ticket_id, note files, the sender block (ticket_sender_block, "Absender sperren"), the mails ticket_created/ticket_received/ticket_message/ticket_answer, the "Hilfe & Tickets" settings (help.wikiUrl, tickets.publicEnabled/notifyNew/retentionMonths, GET/PUT /api/admin/help-tickets), the retention cron anonymize_tickets, privacy export/erasure and the search source. Use when working on tickets, the help menu backend, TicketService, ticket mails, ticket retention or ticket attachments in backend/app/modules/tickets.
+description: Tickets from the help menu — problem reports, questions and ideas (ticket/ticket_note/ticket_event, number T-7K3QX9MD: eight random characters, numbers.py). Covers the public one-way report POST /api/tickets (session, or ALTCHA + rate limit + body cap while tickets.publicEnabled), the Bereiche (ticket_area/ticket_category, work right ticket.manage or the Gremium permission ticket.work, areas.py, /admin/ticket-areas), the work routes (list/counts/assignees/areas/detail/patch/notes), draft attachments bound with ticket_id, note files, the sender block (ticket_sender_block, "Absender sperren"), the mails ticket_created/ticket_received/ticket_message/ticket_answer, the "Hilfe & Tickets" settings (help.wikiUrl, tickets.publicEnabled/notifyNew/retentionMonths, GET/PUT /api/admin/help-tickets), the retention cron anonymize_tickets, privacy export/erasure and the search source. Use when working on tickets, the help menu backend, TicketService, ticket mails, ticket retention or ticket attachments in backend/app/modules/tickets.
 ---
 
 # Tickets — `backend/app/modules/tickets`
@@ -9,32 +9,64 @@ description: Tickets from the help menu — problem reports, questions and ideas
 `{ number }` only, and the reporter gets a confirmation mail. A reporter **account** then
 reads its own tickets under `/tickets/mine` (the tab "Tickets" in the app): the report, the
 `public` notes and the status changes, and it writes its own messages. A report without
-an account stays one-way. Holders of `ticket.manage` work on the tickets: status,
-assignee, kind, notes (`internal` or `public`), a timeline of events and the technical
-context of the report.
+an account stays one-way. Each ticket belongs to one **Bereich**. The team of a Bereich
+works on its tickets: status, assignee, Kategorie, move to another Bereich, notes
+(`internal` or `public`), a timeline of events and the technical context of the report.
 
 **Key files:**
 - `models.py` — `TicketSenderBlock` (see below), `Ticket` (number: eight random characters from `numbers.draw_number`, unique, `free_number` draws again on a used one; kind, status, reporter
   `reporter_principal_id` XOR `reporter_email` until `anonymized_at`, `assignee_id`,
   `duplicate_of_id`, `context` JSONB, `closed_at` = retention clock), `TicketNote` (soft
   delete, `visibility` `internal|public`, `author_id` NULL only for a reporter note on an
-  anonymized ticket), `TicketEvent` (`created|status|assignee|kind|todo_done`).
+  anonymized ticket), `TicketEvent` (`created|status|assignee|kind|category|area|todo_done`),
+  `TicketArea` (name unique, `gremium_id` nullable, `platform` with a one-row partial
+  unique index, `notify_new`), `TicketCategory` (per Bereich, `position`, unique name per
+  Bereich, deferrable). `Ticket.area_id` (default `PLATFORM_AREA_ID`), `Ticket.category_id`,
+  `Ticket.kind` nullable (only a ticket of `Plattform` has a kind).
 - `schemas.py` — wire models (camelCase). `TicketCreate` caps every string, because the
   route is public. `TicketPatch.assigneeId: null` unassigns (`model_fields_set`).
 - `service.py` — `TicketService` (create, list with `q`, counts, assignees, detail with
-  `contextTarget`, patch, notes, anonymize), `ticket_managers` (role assignments plus OIDC
-  group mappings plus the admin role; active, not merged), `format_number`,
+  `contextTarget`, patch, notes, anonymize; every work method takes `areas: AreaScope`),
+  `format_number`,
   `TicketTodoHooks` (the to-do coupling: `openTodoCount`, `completeTodos`, and
   `readable_cards`, so a `todo_done` event shows the card title only to a reader of its
   board; the implementation is `todos/hooks.py`).
 - `router.py` — the routes; `get_ticket_service` is where the todos module wires its
   hooks; `get_ticket_mail_sender` is the override point for tests.
-- `access.py` — `TICKET_MANAGE`.
+- `access.py` — `TICKET_MANAGE`, `TICKET_WORK`, `AreaScope` (`None` = every Bereich, else
+  the ids), `area_scope(session, principal)`, `works_in`, `works_anywhere`, `area_workers`
+  (the team of Bereiche: the holders of `ticket.manage` plus the members whose Gremium role
+  has `ticket.work` in the Gremium of the Bereich), `works_on_ticket`, `works_on_tickets`.
+- `areas.py` — `TicketAreaService` (listing with `mine`, create, patch, delete; no commit,
+  the router commits; audit `config_change` on `ticket_area`).
 - Mails: `mails.py` and `mention_mails.py` (the texts are in `notifications/texts/tickets.py` and `texts/mentions.py`). Outside the module: `worker/tickets.py`
   (retention cron), `auth/people.py` (`PersonRef`, `person_of`, `person_refs`),
   `files/{drafts,service,router}.py` (ticket attachments), `site_config/branding.py`
   (`HelpSettings`, `TicketSettings`, `PublicBranding`), `site_config/reads.py` (`active_branding`) and `admin/site_config_service.py`
   (`help_tickets`, `put_help_tickets`).
+
+**Bereiche and the work right (specs 002700 to 002707, 002715, 002717):**
+- The built-in Bereich `Plattform` (`PLATFORM_AREA_ID`, seeded by the migration
+  `e41b7d90a6c2`) takes every report of the help menu. It has no Gremium, its Kategorien
+  are the four kinds, and nobody renames or deletes it (409 `ticket_area_platform_fixed`).
+- A person works in a Bereich with `ticket.manage` (every Bereich) or with the Gremium
+  permission `ticket.work` in the Gremium of the Bereich (forced roles `vorstand` and
+  `manager` have it). The router dependency `require_worker` gives a `TicketWorker` with
+  the scope: 403 without any Bereich, and a ticket outside the scope answers 404. The
+  sender-block routes stay `ticket.manage`.
+- `PATCH /tickets/{id}`: `categoryId` (a Kategorie of the Bereich of the ticket, null
+  clears; 422 `category_invalid`; event `category` with both names) and `areaId` (move to
+  any Bereich, also one the mover cannot read; 422 `area_invalid`; the move clears kind and
+  Kategorie, clears the assignee without the right there, and writes the event `area` with
+  `from`, `to`, `fromName`, `toName`). The answer of a move is the detail without the scope.
+- `GET /tickets?area=` filters, `GET /tickets/assignees?area=` gives the team of one
+  Bereich (404 outside the scope), `GET /tickets/areas` lists every Bereich with `mine`.
+- `GET|POST /api/admin/ticket-areas`, `PATCH|DELETE /api/admin/ticket-areas/{id}`
+  (`admin.site`): 409 `ticket_area_name_taken`, 409 `ticket_area_has_tickets`, 422
+  `ticket_categories_invalid`. `categories` in a PATCH is the whole ordered list.
+- `GET /api/auth/me` carries `works_on_tickets`; the frontend `AuthService.worksOnTickets`
+  opens the team view. Search, activity, to-do links (`works_on_ticket`) and the ticket
+  attachments use the same scope.
 
 **API surface:**
 - `POST /api/tickets` — dependencies in the order of `POST /applications`:
@@ -50,8 +82,8 @@ context of the report.
   `GET|PATCH /api/tickets/{id}`, `POST /api/tickets/{id}/notes`,
   `PATCH|DELETE /api/tickets/{id}/notes/{noteId}` (403 `not_note_author`),
   `POST|DELETE /api/tickets/{id}/block-sender` (returns `TicketDetail`),
-  `GET /api/tickets/blocked-senders`, `DELETE /api/tickets/blocked-senders/{blockId}` (204) — all
-  `ticket.manage`; an unknown ticket or note is 404. PATCH 422 codes:
+  `GET /api/tickets/blocked-senders`, `DELETE /api/tickets/blocked-senders/{blockId}` (204) — the
+  work right of the Bereich (the block routes: `ticket.manage`); an unknown ticket or note is 404. PATCH 422 codes:
   `assignee_not_allowed` (not a holder), `duplicate_invalid` (`duplicateOfId` only with
   `rejected`, never itself).
 - `GET /api/tickets/mine` (`status`, `kind`, `q`; paged), `GET /api/tickets/mine/{id}`
@@ -113,8 +145,8 @@ context of the report.
   them (be-privacy).
 - `PersonRef`: name, else e-mail, else the deleted person (`null/null`).
 
-**Mails:** `ticket_created` to the holders of `ticket.manage` (not the reporter), only while
-`tickets.notifyNew`, opt-out kind, link `/tickets/{id}`. `ticket_received` to the reporter
+**Mails:** `ticket_created` to the team of the Bereich (`area_workers`, not the reporter), only while
+`notify_new` of the Bereich (the old branding value `tickets.notifyNew` became the switch of `Plattform`), opt-out kind, link `/tickets/{id}`. `ticket_received` to the reporter
 (account e-mail or given e-mail) in `context.language`, else `de`, with `wikiUrl`; its kind
 is not in `NOTIFICATION_KINDS`, so nobody can switch it off; only a report of an account
 links `/tickets/{id}` (the tab), a report without a session stays one-way. A new `public`
@@ -138,7 +170,7 @@ erasure does it for the tickets of the request's e-mail
 (`privacy.service.anonymize_reported_tickets`). The Art. 15 export has a sheet "Tickets" (with text and context) and lists the ticket attachments in "Anhänge", and "Ticket-Sperren" lists the sender blocks. The account merge moves
 reporter, assignee, note author and event actor (area `tickets`).
 
-**Search:** source `ticket` behind `ticket.manage`, reuses `TicketService.list`; title
+**Search:** source `ticket` behind the work right (the Bereiche of the reader), reuses `TicketService.list`; title
 `T-7K3QX9MD · <title>`, subtitle the status in the reader's language, url `/tickets/{id}`.
 
 **Conventions & gotchas:**
@@ -151,6 +183,8 @@ reporter, assignee, note author and event actor (area `tickets`).
 - `TicketContext.url` keeps a platform page only: an http(s) URL on the origin of
   `PUBLIC_BASE_URL` or a path with one leading `/` (`platform_page_url`). Any other value is
   dropped, not rejected, because the detail shows it as a link and the route is public.
+- `scripts/check_functional.py` counts every attribute assignment as a binding: set several
+  columns with `for name, value in values.items(): setattr(row, name, value)`.
 - `ticket.manage` is in `PERMISSION_CATALOGUE`, granted to the `admin` role by the
   migration, and in the OAuth scope `tickets:write`.
 - The unit coverage gate counts unit tests only: `tests/unit/modules/tickets` uses a

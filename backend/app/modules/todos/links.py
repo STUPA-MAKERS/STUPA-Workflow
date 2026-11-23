@@ -18,7 +18,8 @@ of its own module:
 * budget (a cost centre) — every reader of the card sees its name and path key (spec
   000552); the url to the cost centre page and the link picker follow the gate of the
   budget pages (``has_budget_read``), so only a budget reader links one;
-* ticket — ``ticket.manage``;
+* ticket — the work right in the Bereich of the ticket (``ticket.manage``, or
+  ``ticket.work`` in its Gremium);
 * todo — the board read rule (``BoardAccess``).
 
 A card also gives read access to its links (spec 000487): a target that the viewer
@@ -65,7 +66,7 @@ from app.modules.flow.models import State
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.site_config.features import Feature, active_features
-from app.modules.tickets.access import TICKET_MANAGE
+from app.modules.tickets.access import area_scope, works_anywhere
 from app.modules.tickets.models import Ticket
 from app.modules.tickets.service import format_number
 from app.modules.todos import link_store
@@ -665,9 +666,13 @@ class LinkResolver:
         principal: Principal,
         open_ids: frozenset[uuid.UUID] = NONE,
     ) -> dict[uuid.UUID, Resolved]:
-        if not principal.has(TICKET_MANAGE):
+        areas = await area_scope(self.session, principal)
+        if not works_anywhere(areas):
             return {}
-        tickets = list((await self.session.scalars(select(Ticket).where(Ticket.id.in_(ids)))).all())
+        in_scope = () if areas is None else (Ticket.area_id.in_(areas),)
+        tickets = list(
+            (await self.session.scalars(select(Ticket).where(Ticket.id.in_(ids), *in_scope))).all()
+        )
         return {
             t.id: Resolved(
                 accessible=True,
@@ -916,12 +921,13 @@ class LinkResolver:
         return list((await self.session.scalars(stmt)).all())
 
     async def _ticket_candidates(self, term: str, principal: Principal) -> list[uuid.UUID]:
-        """Reuses ``TicketService.list``, behind ``ticket.manage`` like ``GET /tickets``."""
-        if not principal.has(TICKET_MANAGE):
+        """Reuses ``TicketService.list`` with the Bereiche of the viewer, like ``GET /tickets``."""
+        areas = await area_scope(self.session, principal)
+        if not works_anywhere(areas):
             return []
         from app.modules.tickets.service import TicketService
 
-        page = await TicketService(self.session).list(q=term, limit=PER_KIND)
+        page = await TicketService(self.session).list(q=term, limit=PER_KIND, areas=areas)
         return [t.id for t in page.items]
 
     async def recent_cards(self, principal: Principal) -> list[TodoLinkTarget]:

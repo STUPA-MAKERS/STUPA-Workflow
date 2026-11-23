@@ -7,9 +7,10 @@ All run as background tasks after the commit of the report or the message, each
 with its own session, and all are best effort: a mail failure never fails the
 request.
 
-``ticket_created`` goes to the holders of ``ticket.manage`` while
-``tickets.notifyNew`` is on, without the reporter; each holder can switch it off
-(kind ``ticket_created``). ``ticket_received`` confirms the report to the reporter
+``ticket_created`` goes to the persons with the work right in the Bereich of the
+ticket while the switch ``notify_new`` of the Bereich is on, without the reporter;
+each person can switch it off (kind ``ticket_created``). ``ticket_received`` confirms
+the report to the reporter
 with the number and the handbook link. Its kind is not in ``NOTIFICATION_KINDS``, so
 nobody can switch it off. A report without a session can name any address, so for
 it the mail leaves out the title (``title`` is empty): the platform does not send
@@ -20,7 +21,8 @@ German.
 
 ``ticket_answer`` goes to the reporter account when the team writes a ``public``
 note. ``ticket_message`` goes to the team when the reporter writes: to the assignee
-while one holds ``ticket.manage``, else to every holder. An internal note, an edit
+while the person has the work right in the Bereich, else to every person with it. An
+internal note, an edit,
 a note on an anonymized ticket and an answer to a deactivated or merged reporter account
 send nothing. Each recipient can switch the kind
 off. A team author shows by name only, never by e-mail, as in the tab.
@@ -54,8 +56,9 @@ from app.modules.notifications.texts.tickets import (
     TICKET_RECEIVED_SUBJECT,
 )
 from app.modules.site_config.reads import active_branding
-from app.modules.tickets.models import Ticket, TicketNote
-from app.modules.tickets.service import TicketService, format_number, ticket_managers
+from app.modules.tickets.access import area_workers
+from app.modules.tickets.models import PLATFORM_AREA_ID, Ticket, TicketArea, TicketNote
+from app.modules.tickets.service import TicketService, format_number
 from app.settings import Settings
 
 logger = logging.getLogger("app.tickets")
@@ -74,16 +77,20 @@ async def notify_ticket_created(
     ticket_id: UUID,
     sessionmaker: async_sessionmaker[AsyncSession] | None = None,
 ) -> bool:
-    """Mail a new ticket to the holders of ``ticket.manage`` (best effort).
+    """Mail a new ticket to the team of its Bereich (best effort).
 
     Returns:
         True when a mail was enqueued.
     """
     try:
         async with _maker(sessionmaker)() as session:
-            branding = await active_branding(session)
             ticket = await session.get(Ticket, ticket_id)
-            if ticket is None or not branding.tickets.notify_new:
+            area = (
+                await session.get(TicketArea, ticket.area_id or PLATFORM_AREA_ID)
+                if ticket is not None
+                else None
+            )
+            if ticket is None or area is None or not area.notify_new:
                 return False
             reporter_address = await TicketService(session).reporter_address(ticket)
             reporter_name = (
@@ -100,7 +107,7 @@ async def notify_ticket_created(
             recipients = sorted(
                 {
                     email
-                    for _pid, _name, email in await ticket_managers(session)
+                    for _pid, _name, email in await area_workers(session, frozenset({area.id}))
                     if email and email.casefold() != own
                 }
             )
@@ -243,7 +250,7 @@ async def _mail_team(
     The assignee's own opt-out of ``ticket_message`` stays an opt-out: the mail then
     reaches nobody, as the assignee chose.
     """
-    managers = await ticket_managers(session)
+    managers = await area_workers(session, frozenset({ticket.area_id or PLATFORM_AREA_ID}))
     reporter_row = await session.get(PrincipalRow, ticket.reporter_principal_id)
     own = (reporter_row.email or "").casefold() if reporter_row is not None else ""
 

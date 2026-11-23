@@ -306,13 +306,14 @@ class SiteConfigService:
         writes it as a new active version with a config revision and the
         ``config_activation`` audit entry, as ``save`` does.
         """
+        active = branding_of(await self._active())
         help_settings = HelpSettings(wikiUrl=payload.wiki_url)
         ticket_settings = TicketSettings(
             publicEnabled=payload.public_enabled,
-            notifyNew=payload.notify_new,
+            notifyNew=active.tickets.notify_new,
             retentionMonths=payload.retention_months,
         )
-        branding = branding_of(await self._active()).model_copy(
+        branding = active.model_copy(
             update={"help": help_settings, "tickets": ticket_settings}
         )
         await self._write(
@@ -431,6 +432,5 @@ def _help_tickets_of(branding: Branding) -> HelpTicketsSettings:
     return HelpTicketsSettings(
         wikiUrl=branding.help.wiki_url,
         publicEnabled=branding.tickets.public_enabled,
-        notifyNew=branding.tickets.notify_new,
         retentionMonths=branding.tickets.retention_months,
     )

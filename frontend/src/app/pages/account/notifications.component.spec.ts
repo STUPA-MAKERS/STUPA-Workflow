@@ -24,7 +24,10 @@ async function setup(
     setNotificationPreferences: save,
     ...pushApi(push),
   };
-  const auth = { can: (p: string) => permissions.includes(p) };
+  const auth = {
+    can: (p: string) => permissions.includes(p),
+    worksOnTickets: () => permissions.includes('ticket.manage') || permissions.includes('ticket.work'),
+  };
   const device = pushDevice(push);
   const view = await render(AccountNotificationsComponent, {
     providers: [
@@ -215,7 +218,7 @@ describe('AccountNotificationsComponent', () => {
     await render(AccountNotificationsComponent, {
       providers: [
         { provide: ApiClient, useValue: api },
-        { provide: AuthService, useValue: { can: () => false } },
+        { provide: AuthService, useValue: { can: () => false, worksOnTickets: () => false } },
         { provide: PushDeviceService, useValue: pushDevice({}) },
       ],
     });
@@ -247,6 +250,15 @@ describe('AccountNotificationsComponent', () => {
     await setup(prefs, save, ['ticket.manage']);
     expect(screen.getAllByRole('switch')).toHaveLength(3);
     expect(screen.getByText('Nachrichten zu Tickets')).toBeInTheDocument();
+  });
+
+  it('shows every ticket mail to a person with ticket.work in a Gremium', async () => {
+    const prefs: NotificationPreference[] = [
+      { kind: 'ticket_created', enabled: true },
+      { kind: 'ticket_message', enabled: true },
+    ];
+    await setup(prefs, jest.fn((p: NotificationPreference[]) => of(p)), ['ticket.work']);
+    expect(screen.getAllByRole('switch')).toHaveLength(2);
   });
 
   it('falls back to the raw kind for a kind without a translation', async () => {

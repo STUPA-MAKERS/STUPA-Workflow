@@ -17,7 +17,7 @@ from app.modules.applications.service import ApplicationsService
 from app.modules.auth.principal import Principal
 from app.modules.livevote.service import MeetingService
 from app.modules.site_config.features import Feature, active_features
-from app.modules.tickets.access import TICKET_MANAGE
+from app.modules.tickets.access import area_scope, works_anywhere
 from app.modules.tickets.service import TicketService
 from app.modules.todos.service import TodoService
 from app.shared.errors import ForbiddenError
@@ -36,10 +36,9 @@ async def navigation_status(session: AsyncSession, principal: Principal) -> Navi
     features = await active_features(session)
     tasks = len(await ApplicationsService(session).list_tasks(principal))
     todos = await _open_todos(session, principal) if Feature.TODOS in features else 0
+    areas = await area_scope(session, principal) if Feature.TICKETS in features else frozenset()
     tickets = (
-        (await TicketService(session).counts()).new
-        if Feature.TICKETS in features and principal.has(TICKET_MANAGE)
-        else None
+        (await TicketService(session).counts(areas=areas)).new if works_anywhere(areas) else None
     )
     live = Feature.MEETINGS in features and await MeetingService(session).any_live(principal)
     activity = Feature.ACTIVITY in features and await ActivityService(session).has_new(principal)

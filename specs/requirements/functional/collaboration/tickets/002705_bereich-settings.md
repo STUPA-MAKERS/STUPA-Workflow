@@ -5,7 +5,14 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/tickets/test_ticket_areas.py:test_delete_refuses_a_bereich_with_a_ticket"
+  - "backend/tests/integration/modules/tickets/test_ticket_areas_api.py:test_an_admin_keeps_the_bereiche"
+implementation:
+  - backend/app/modules/tickets/areas.py
+  - backend/app/modules/tickets/router.py
+  - frontend/src/app/pages/admin/help-tickets/help-tickets.component.ts
+  - frontend/src/app/pages/admin/help-tickets/ticket-area-dialog.component.ts
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/admin/help-tickets

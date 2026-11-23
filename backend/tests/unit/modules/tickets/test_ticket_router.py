@@ -25,6 +25,7 @@ from app.modules.tickets import router as router_mod
 from app.modules.tickets.router import (
     _deliver_note_mail,
     _deliver_ticket_mails,
+    get_area_service,
     get_note_mail_sender,
     get_ticket_mail_sender,
     get_ticket_service,
@@ -32,6 +33,7 @@ from app.modules.tickets.router import (
 from app.modules.tickets.schemas import (
     ReporterTicketDetail,
     ReporterTicketItem,
+    TicketAreaOut,
     TicketBlockedSender,
     TicketCounts,
     TicketDetail,
@@ -48,12 +50,16 @@ NOW = datetime(2026, 10, 1, tzinfo=UTC)
 NOTE_ID = uuid.UUID("00000000-0000-0000-0000-0000000000a1")
 TID = uuid.uuid4()
 MANAGER = Principal(sub="mgr", permissions={"ticket.manage"})
+WORKER = Principal(sub="worker")
+AREA = uuid.uuid4()
+NO_AREA: frozenset[uuid.UUID] = frozenset()
 
 
 def _item() -> TicketListItem:
     return TicketListItem(
         id=TID,
         number="T-AAAA0001",
+        area_id=AREA,
         kind="bug",
         title="t",
         status="new",
@@ -86,16 +92,19 @@ class _FakeService:
         self.calls: list[tuple[str, Any]] = []
         self.swallow = False
         self.added_mentions: list[uuid.UUID] = []
+        self.scopes: list[Any] = []
 
     async def create(self, payload: Any, **kw: Any) -> _Created | SwallowedReport:
         self.calls.append(("create", kw))
         return SwallowedReport(number="AAAA0043") if self.swallow else _Created()
 
-    async def block_sender(self, ticket_id: uuid.UUID, _p: Principal) -> TicketDetail:
+    async def block_sender(self, ticket_id: uuid.UUID, _p: Principal, **_kw: Any) -> TicketDetail:
         self.calls.append(("block", ticket_id))
         return _detail().model_copy(update={"sender_blocked": True})
 
-    async def unblock_sender(self, ticket_id: uuid.UUID, _p: Principal) -> TicketDetail:
+    async def unblock_sender(
+        self, ticket_id: uuid.UUID, _p: Principal, **_kw: Any
+    ) -> TicketDetail:
         self.calls.append(("unblock", ticket_id))
         return _detail()
 
@@ -109,18 +118,24 @@ class _FakeService:
         self.calls.append(("list", kw))
         return Page[TicketListItem](items=[_item()], total=1, limit=kw["limit"], offset=0)
 
-    async def counts(self) -> TicketCounts:
+    async def counts(self, **kw: Any) -> TicketCounts:
+        self.scopes.append(kw["areas"])
         return TicketCounts(new=2)
 
-    async def assignees(self) -> list[PersonRef]:
+    async def assignees(self, areas: Any = None) -> list[PersonRef]:
+        self.scopes.append(areas)
         return [PersonRef(principal_id=uuid.uuid4(), display_name="Ada")]
 
-    async def detail(self, ticket_id: uuid.UUID, _p: Principal) -> TicketDetail:
+    async def detail(self, ticket_id: uuid.UUID, _p: Principal, **kw: Any) -> TicketDetail:
         self.calls.append(("detail", ticket_id))
+        self.scopes.append(kw["areas"])
         return _detail()
 
-    async def patch(self, ticket_id: uuid.UUID, payload: Any, _p: Principal) -> TicketDetail:
+    async def patch(
+        self, ticket_id: uuid.UUID, payload: Any, _p: Principal, **kw: Any
+    ) -> TicketDetail:
         self.calls.append(("patch", payload))
+        self.scopes.append(kw["areas"])
         return _detail()
 
     async def add_note(self, *a: Any, **kw: Any) -> TicketNoteOut:
@@ -131,7 +146,7 @@ class _FakeService:
         self.calls.append(("edit_note", (a, kw)))
         return _note()
 
-    async def delete_note(self, *_a: Any) -> None:
+    async def delete_note(self, *_a: Any, **_kw: Any) -> None:
         self.calls.append(("delete_note", None))
 
     async def reporter_list(self, me: uuid.UUID, **kw: Any) -> Page[ReporterTicketItem]:
@@ -187,6 +202,7 @@ class _Env:
         self.mails = mails
         self.note_mails = _Mails()
         self.public = True
+        self.areas: dict[str, frozenset[uuid.UUID]] = {}
         self.account: uuid.UUID | None = uuid.uuid4()
 
     def login(self, principal: Principal | None) -> None:
@@ -208,6 +224,10 @@ def env(monkeypatch: pytest.MonkeyPatch) -> _Env:
     async def _pid(_db: object, _sub: str) -> uuid.UUID | None:
         return state.account
 
+    async def _scope(_db: object, principal: Principal) -> frozenset[uuid.UUID] | None:
+        return None if principal.has("ticket.manage") else state.areas.get(principal.sub, NO_AREA)
+
+    monkeypatch.setattr(router_mod, "area_scope", _scope)
     monkeypatch.setattr(router_mod, "active_branding", _branding)
     monkeypatch.setattr(router_mod, "principal_id_of", _pid)
     app.dependency_overrides[get_session] = _session
@@ -382,6 +402,107 @@ def test_the_work_routes_answer(env: _Env) -> None:
     assert env.service.calls[-1] == ("delete_block", TID)
     assert client.patch(f"/api/tickets/{TID}/notes/{TID}", json={"body": "m"}).status_code == 200
     assert client.delete(f"/api/tickets/{TID}/notes/{TID}").status_code == 204
+
+
+def test_a_worker_reaches_the_work_routes_with_the_own_bereiche(env: _Env) -> None:
+    """Spec 002703: ``ticket.work`` in a Gremium opens the routes for its Bereiche only."""
+    env.areas[WORKER.sub] = frozenset({AREA})
+    env.login(WORKER)
+    client = TestClient(env.app)
+    assert client.get("/api/tickets", params={"area": str(AREA)}).status_code == 200
+    _kind, kw = env.service.calls[-1]
+    assert (kw["areas"], kw["area_ids"]) == (frozenset({AREA}), [AREA])
+    assert client.get("/api/tickets/counts").status_code == 200
+    assert client.get(f"/api/tickets/{TID}").status_code == 200
+    moved = client.patch(f"/api/tickets/{TID}", json={"areaId": str(uuid.uuid4())})
+    assert moved.status_code == 200
+    assert env.service.scopes == [frozenset({AREA})] * 3
+    assert client.get("/api/tickets/assignees", params={"area": str(AREA)}).status_code == 200
+    assert client.get("/api/tickets/assignees").status_code == 200
+    assert env.service.scopes[-2:] == [frozenset({AREA}), frozenset({AREA})]
+    foreign = client.get("/api/tickets/assignees", params={"area": str(uuid.uuid4())})
+    assert foreign.status_code == 404
+    assert client.get("/api/tickets/blocked-senders").status_code == 403
+    assert client.post(f"/api/tickets/{TID}/block-sender").status_code == 403
+
+
+def test_a_manager_works_in_every_bereich(env: _Env) -> None:
+    env.login(MANAGER)
+    client = TestClient(env.app)
+    other = uuid.uuid4()
+    assert client.get("/api/tickets/assignees", params={"area": str(other)}).status_code == 200
+    assert env.service.scopes[-1] == frozenset({other})
+    assert client.get("/api/tickets/counts").status_code == 200
+    assert env.service.scopes[-1] is None
+
+
+class _FakeAreas:
+    """The Bereich service double of the area routes."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, Any]] = []
+        self.session = self
+        self.commits = 0
+
+    async def commit(self) -> None:
+        self.commits += 1
+
+    def _out(self, **kw: Any) -> TicketAreaOut:
+        return TicketAreaOut(id=AREA, name="Finanzen", **kw)
+
+    async def listing(self, scope: Any = None) -> list[TicketAreaOut]:
+        self.calls.append(("listing", scope))
+        return [self._out(mine=scope is None or AREA in scope)]
+
+    async def create(self, payload: Any, actor: str) -> TicketAreaOut:
+        self.calls.append(("create", (payload, actor)))
+        return self._out()
+
+    async def patch(self, area_id: uuid.UUID, payload: Any, actor: str) -> TicketAreaOut:
+        self.calls.append(("patch", (area_id, payload, actor)))
+        return self._out()
+
+    async def delete(self, area_id: uuid.UUID, actor: str) -> None:
+        self.calls.append(("delete", (area_id, actor)))
+
+
+def test_the_area_routes(env: _Env) -> None:
+    """Specs 002702 and 002705: the list for the team, the changes behind ``admin.site``."""
+    areas = _FakeAreas()
+    env.app.dependency_overrides[get_area_service] = lambda: areas
+    client = TestClient(env.app)
+    assert client.get("/api/tickets/areas").status_code == 401
+    assert client.get("/api/admin/ticket-areas").status_code == 401
+    env.areas[WORKER.sub] = frozenset({AREA})
+    env.login(WORKER)
+    listed = client.get("/api/tickets/areas")
+    assert listed.status_code == 200
+    assert listed.json()[0] == {
+        "id": str(AREA),
+        "name": "Finanzen",
+        "gremiumId": None,
+        "platform": False,
+        "notifyNew": True,
+        "categories": [],
+        "mine": True,
+    }
+    assert client.get("/api/admin/ticket-areas").status_code == 403
+    assert client.post("/api/admin/ticket-areas", json={"name": "X"}).status_code == 403
+    env.login(Principal(sub="adm", permissions={"admin.site"}))
+    assert client.get("/api/tickets/areas").status_code == 403
+    assert client.get("/api/admin/ticket-areas").status_code == 200
+    body = {"name": "Finanzen", "gremiumId": str(uuid.uuid4()), "categories": [{"name": "A"}]}
+    assert client.post("/api/admin/ticket-areas", json=body).status_code == 201
+    assert areas.calls[-1][1][1] == "adm"
+    two = {"name": "X", "gremiumId": [str(uuid.uuid4()), str(uuid.uuid4())]}
+    assert client.post("/api/admin/ticket-areas", json=two).status_code == 422
+    assert client.post("/api/admin/ticket-areas", json={"name": ""}).status_code == 422
+    patched = client.patch(f"/api/admin/ticket-areas/{AREA}", json={"notifyNew": False})
+    assert patched.status_code == 200
+    assert areas.calls[-1][1][1].model_fields_set == {"notify_new"}
+    assert client.delete(f"/api/admin/ticket-areas/{AREA}").status_code == 204
+    assert areas.calls[-1] == ("delete", (AREA, "adm"))
+    assert areas.commits == 3
 
 
 def test_the_default_wiring() -> None:

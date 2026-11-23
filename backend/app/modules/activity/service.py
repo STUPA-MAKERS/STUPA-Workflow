@@ -76,7 +76,7 @@ from app.modules.flow.models import State
 from app.modules.meetings.models import Meeting, MeetingAttendance
 from app.modules.meetings.rules import MeetingRules
 from app.modules.site_config.features import Feature, active_features
-from app.modules.tickets.access import TICKET_MANAGE
+from app.modules.tickets.access import area_scope, works_in
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote
 from app.modules.tickets.service import format_number
 from app.modules.todos.access import BoardAccess, member_gremium_ids, token_reads
@@ -872,24 +872,28 @@ class ActivityService:
         ]
 
     async def _gate_tickets(self, me: Me, ids: set[uuid.UUID]) -> dict[uuid.UUID, Gate]:
-        """Reuses the ticket gate: ``ticket.manage`` reads all, a reporter the own report."""
-        manage = me.principal.has(TICKET_MANAGE)
+        """Reuses the ticket gate: the work right in the Bereich, or the own report."""
+        areas = await area_scope(self.session, me.principal)
         rows = (
             await self.session.execute(
-                select(Ticket.id, Ticket.number, Ticket.title, Ticket.reporter_principal_id).where(
-                    Ticket.id.in_(ids)
-                )
+                select(
+                    Ticket.id,
+                    Ticket.number,
+                    Ticket.title,
+                    Ticket.reporter_principal_id,
+                    Ticket.area_id,
+                ).where(Ticket.id.in_(ids))
             )
         ).all()
         return {
             ticket_id: Gate(
                 title=f"{format_number(number)} · {title}",
                 url=f"/tickets/{ticket_id}",
-                internal=manage,
-                reporter=not manage,
+                internal=works_in(areas, area_id),
+                reporter=not works_in(areas, area_id),
             )
-            for ticket_id, number, title, reporter in rows
-            if manage or (me.id is not None and reporter == me.id)
+            for ticket_id, number, title, reporter, area_id in rows
+            if works_in(areas, area_id) or (me.id is not None and reporter == me.id)
         }
 
     # ------------------------------------------------------------------ meetings

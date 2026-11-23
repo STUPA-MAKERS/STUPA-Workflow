@@ -34,6 +34,8 @@ the to-do cards. The to-dos read with any of ``todo.write``, ``todo.all`` and
 so a ``read`` token never opens the board "Plattform" (``ticket.manage``).
 ``committees:write`` lets the gremium permissions ``info.write`` and ``members.notify``
 through: the edit of the Info tab of a Gremium and the message to its members.
+``tickets:write`` lets the gremium permission ``ticket.work`` through: the work on the
+tickets of the Bereiche of a Gremium.
 """
 
 from __future__ import annotations
@@ -73,7 +75,7 @@ SCOPES: dict[str, frozenset[str]] = {
     "votes:write": frozenset({"vote.manage"}),
     "budget:write": frozenset({"budget.structure", "budget.book"}),
     "meetings:write": frozenset({"session.manage", "protocol.write", "protocol.finalize"}),
-    "tickets:write": frozenset({"ticket.manage"}),
+    "tickets:write": frozenset({"ticket.manage", "ticket.work"}),
     "todos:write": frozenset({"todo.write", "todo.configure", "todo.all", "todo.create_board"}),
     "committees:write": frozenset({"info.write", "members.notify"}),
     "forms:write": frozenset({"form.configure"}),

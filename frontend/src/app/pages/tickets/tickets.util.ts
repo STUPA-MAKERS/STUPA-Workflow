@@ -1,5 +1,6 @@
 import type { PersonRef } from '@core/api/models';
 import type {
+  TicketArea,
   TicketEvent,
   TicketEventPayload,
   TicketKind,
@@ -27,6 +28,30 @@ export const KIND_LABEL: Record<TicketKind, TranslationKey> = {
   idea: 'tickets.kind.idea',
   barrier: 'tickets.kind.barrier',
 };
+
+/** The icon of a ticket: the icon of its kind, else the ticket of a Bereich without kinds. */
+export function ticketIcon(kind: TicketKind | null): IconName {
+  return kind ? KIND_ICON[kind] : 'ticket';
+}
+
+/** The Bereich of a ticket in the list of the Bereiche; null while the list loads. */
+export function areaOf(areaId: string, areas: readonly TicketArea[]): TicketArea | null {
+  return areas.find((a) => a.id === areaId) ?? null;
+}
+
+/**
+ * The Kategorie of a ticket by name: the kind in the Bereich "Plattform", else the
+ * Kategorie of its Bereich. The empty string: no Kategorie.
+ */
+export function categoryName(
+  ticket: { readonly kind: TicketKind | null; readonly categoryId: string | null; readonly areaId: string },
+  areas: readonly TicketArea[],
+  t: Translate,
+): string {
+  if (ticket.kind) return t(KIND_LABEL[ticket.kind]);
+  const area = areaOf(ticket.areaId, areas);
+  return area?.categories.find((c) => c.id === ticket.categoryId)?.name ?? '';
+}
 
 export const STATUS_LABEL: Record<TicketStatus, TranslationKey> = {
   new: 'tickets.status.new',
@@ -122,6 +147,18 @@ export function eventText(event: TicketEvent, reporter: string, t: Translate): s
       const to = t(KIND_LABEL[p.to as TicketKind] ?? 'tickets.kind.bug');
       return t('tickets.event.kind', { actor, from, to });
     }
+    case 'category': {
+      const none = t('tickets.detail.noCategory');
+      const from = typeof p.from === 'string' ? p.from : none;
+      const to = typeof p.to === 'string' ? p.to : none;
+      return t('tickets.event.kind', { actor, from, to });
+    }
+    case 'area':
+      return t('tickets.event.area', {
+        actor,
+        from: p.fromName ?? t('tickets.event.areaGone'),
+        to: p.toName ?? t('tickets.event.areaGone'),
+      });
     case 'todo_done':
       return p.cardTitle
         ? t('tickets.event.todoDone', { actor, title: p.cardTitle })
