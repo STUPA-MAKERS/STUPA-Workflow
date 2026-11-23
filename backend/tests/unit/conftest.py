@@ -93,3 +93,17 @@ def active_webhooks(
 
     monkeypatch.setattr(events_mod, "active_webhooks", _active)
     return holder
+
+
+@pytest.fixture(autouse=True)
+def paperless_links_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stub the switch of the Paperless links as off, so a session fake needs no row for it.
+
+    The links to Paperless documents have their tests on a real Postgres
+    (`tests/integration/modules/todos/test_paperless_links.py`).
+    """
+
+    async def _off(_session: AsyncSession) -> bool:
+        return False
+
+    monkeypatch.setattr("app.modules.todos.links.links_part_on", _off)

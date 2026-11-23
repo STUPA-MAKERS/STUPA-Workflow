@@ -1612,6 +1612,7 @@ class TodoService:
         if label_ids and not set(label_ids) <= {label.id for label in await self._labels(board.id)}:
             raise _invalid("A label is not on this board.", "label_not_on_board", "labelIds")
         links = list(dict.fromkeys((link.kind, link.target_id) for link in payload.links))
+        await self.links.prepare(links, principal)
         for kind, target_id in links:
             if not await self.links.readable(kind, target_id, principal):
                 raise _invalid("The link target was not found.", "link_target_not_found", "links")

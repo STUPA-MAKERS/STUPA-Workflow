@@ -175,7 +175,8 @@ describe('GraphComponent', () => {
   it('does not offer the kinds of a feature that is off', async () => {
     localStorage.setItem('ap.features.off', JSON.stringify(['invoices']));
     const { cmp } = await start();
-    expect(cmp.kinds()).toEqual(GRAPH_KINDS.filter((k) => k !== 'invoice'));
+    // A Paperless document is a kind only with `paperless.use` and its switch (002768).
+    expect(cmp.kinds()).toEqual(GRAPH_KINDS.filter((k) => k !== 'invoice' && k !== 'paperless'));
     expect(cmp.kindOptions().map((o) => o.label)).not.toContain('Rechnung');
     expect(cmp.kindOptions().map((o) => o.label)).toContain('TOP');
   });

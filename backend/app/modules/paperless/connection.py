@@ -1,6 +1,6 @@
 """The Paperless connection: the read, the save, the test and the client of the worker.
 
-One row holds the address, the token and the four switches. A save checks the host of
+One row holds the address, the token and the five switches. A save checks the host of
 the address against the deploy setting `PAPERLESS_HOST_ALLOWLIST`
 (§NF/security/network/002514) and writes an audit entry without the token
 (§F/integrations/paperless/002531). No read returns the token
@@ -86,6 +86,7 @@ class ConnectionService:
             file_applications=bool(row.file_applications),
             file_plans=bool(row.file_plans),
             insert_enabled=bool(row.insert_enabled),
+            link_enabled=bool(row.link_enabled),
             allowed_hosts=tuple(self.settings.paperless_host_allowlist),
         )
 
@@ -125,6 +126,7 @@ class ConnectionService:
                 file_plans=data.file_plans,
                 plans_since=_since(data.file_plans, before.plans_since, now),
                 insert_enabled=data.insert_enabled,
+                link_enabled=data.link_enabled,
             )
         )
         token_changed = token != old_token
@@ -141,6 +143,7 @@ class ConnectionService:
                 "fileApplications": data.file_applications,
                 "filePlans": data.file_plans,
                 "insertEnabled": data.insert_enabled,
+                "linkEnabled": data.link_enabled,
             },
         )
         return self._out(await self.row())
@@ -190,6 +193,15 @@ def insert_on(row: PaperlessSettings) -> bool:
     (§F/integrations/paperless/002512).
     """
     return bool(row.base_url and row.token and row.insert_enabled)
+
+
+def links_on(row: PaperlessSettings) -> bool:
+    """Tell whether the part `Paperless-Dokumente verknüpfen` is on.
+
+    The part is off while its switch is off or the connection has no address
+    (§F/integrations/paperless/002512, 002767).
+    """
+    return bool(row.base_url and row.token and row.link_enabled)
 
 
 def get_connection_service(db: DbSession, settings: SettingsDep) -> ConnectionService:

@@ -335,6 +335,7 @@ def test_the_connection_saves_and_no_read_returns_the_token(
             "fileApplications": False,
             "filePlans": False,
             "insertEnabled": False,
+            "linkEnabled": False,
             "allowedHosts": [HOST],
         }
         assert client.post("/api/admin/paperless/test").json() == {
@@ -754,7 +755,8 @@ def test_the_search_needs_the_permission_and_the_switch(
         assert client.get("/api/paperless/insert").status_code == 403
         assert client.get("/api/paperless/search").status_code == 403
     with _client(migrated, settings, monkeypatch, fake, _USER) as client:
-        assert client.get("/api/paperless/insert").json() == {"enabled": False}
+        state = client.get("/api/paperless/insert").json()
+        assert state == {"enabled": False, "linkEnabled": False}
         assert client.get("/api/paperless/search").status_code == 404
     assert [r for r in fake.requests if r.url.path == "/api/documents/"] == []
 
@@ -762,7 +764,7 @@ def test_the_search_needs_the_permission_and_the_switch(
         on = client.put("/api/admin/paperless", json={**body, "insertEnabled": True})
         assert on.status_code == 200
     with _client(migrated, settings, monkeypatch, fake, _USER) as client:
-        assert client.get("/api/paperless/insert").json() == {"enabled": True}
+        assert client.get("/api/paperless/insert").json() == {"enabled": True, "linkEnabled": False}
         newest = client.get("/api/paperless/search")
         assert [hit["documentId"] for hit in newest.json()] == [42, 41]
         found = client.get("/api/paperless/search", params={"q": "beamer"})

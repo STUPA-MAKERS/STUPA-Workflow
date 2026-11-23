@@ -22,6 +22,7 @@ from app.modules.calendar.models import Appointment, Invitation
 from app.modules.graph.build import Ref, Relation
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
+from app.modules.paperless.models import PaperlessDocument
 from app.modules.tickets.models import Ticket
 from app.modules.todos.models import Link, TodoCard
 from app.modules.voting.models import Vote
@@ -103,6 +104,7 @@ def _id_reads() -> Mapping[str, Select[Any]]:
         "budget": select(Budget.id),
         "ticket": select(Ticket.id),
         "todo": select(TodoCard.id).where(TodoCard.archived_at.is_(None)),
+        "paperless": select(PaperlessDocument.id),
     }
 
 
@@ -121,7 +123,8 @@ def _date_read(kind: str, ids: Collection[uuid.UUID]) -> Select[Any, Any, Any]:
 
     The date of a node (spec 001425): the date of a meeting and of its TOPs, the start of
     a Termin, the invoice date of an invoice and of a Buchung, the due date of a card,
-    and else the creation. A Gremium and a cost centre have no date.
+    the date of a Paperless document, and else the creation. A Gremium and a cost centre
+    have no date.
     """
     wanted = list(ids)
     none = null()
@@ -162,6 +165,10 @@ def _date_read(kind: str, ids: Collection[uuid.UUID]) -> Select[Any, Any, Any]:
             return select(TodoCard.id, TodoCard.due_date, TodoCard.created_at).where(
                 TodoCard.id.in_(wanted)
             )
+        case "paperless":
+            return select(
+                PaperlessDocument.id, PaperlessDocument.created, PaperlessDocument.stored_at
+            ).where(PaperlessDocument.id.in_(wanted))
         case _:
             raise ValueError(f"unknown kind: {kind}")
 

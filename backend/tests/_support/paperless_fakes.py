@@ -126,12 +126,16 @@ class FakePaperless:
         return httpx.Response(200, json=self.documents[document_id])
 
     def _search(self, request: httpx.Request) -> httpx.Response:
-        """The documents whose title holds the query; without one, the newest first."""
+        """The documents whose title holds the query; without one, the newest first.
+
+        ``id__in`` keeps only the documents with these numbers.
+        """
         wanted = request.url.params.get("query", "").lower()
+        ids = request.url.params.get("id__in")
         rows = [
             {key: row[key] for key in ("id", "title", "created", "document_type")}
             for row in self.documents.values()
-            if wanted in str(row["title"]).lower()
+            if wanted in str(row["title"]).lower() and (not ids or str(row["id"]) in ids.split(","))
         ]
         if "query" not in request.url.params:
             rows.reverse()

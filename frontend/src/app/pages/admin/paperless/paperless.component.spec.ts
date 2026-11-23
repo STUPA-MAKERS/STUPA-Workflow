@@ -20,6 +20,7 @@ const STORED: PaperlessConnection = {
   fileApplications: false,
   filePlans: false,
   insertEnabled: false,
+      linkEnabled: false,
   allowedHosts: ['paperless.example.org'],
 };
 
@@ -146,6 +147,7 @@ describe('PaperlessComponent', () => {
       fileApplications: true,
       filePlans: false,
       insertEnabled: false,
+      linkEnabled: false,
     });
     expect(toast.success).toHaveBeenCalledWith('Gespeichert.');
     fixture.detectChanges();
@@ -355,6 +357,14 @@ describe('PaperlessComponent', () => {
     api.listPaperlessFailed.mockReturnValueOnce(new Subject<PaperlessFailedFiling[]>());
     await setup({ api });
     expect(screen.queryByLabelText(/Adresse von Paperless/)).toBeNull();
-    expect(document.querySelectorAll('.sts__skelSwitch')).toHaveLength(4);
+    expect(document.querySelectorAll('.sts__skelSwitch')).toHaveLength(5);
+  });
+
+  it('saves the switch of the links to Paperless (002767)', async () => {
+    const api = makeApi();
+    await setup({ api });
+    await userEvent.click(sw('Paperless-Dokumente verknüpfen'));
+    await userEvent.click(save());
+    expect(api.putPaperless).toHaveBeenCalledWith(expect.objectContaining({ linkEnabled: true }));
   });
 });

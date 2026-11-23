@@ -17,7 +17,8 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate } from '@core/i18n/translations';
 import { dayMonth } from '@shared/date-format';
 import { formatMoney, moneyNumber } from '@shared/format-money';
-import { LINK_ICON, LINK_KIND_LABEL, eventDays, linkSub, linkTitle, splitUrl } from '../todos.util';
+import { LinkToDirective } from '../../../shared/link-to.directive';
+import { LINK_ICON, LINK_KIND_LABEL, eventDays, linkSub, linkTitle } from '../todos.util';
 import {
   type AvatarSize,
   AvatarStackComponent,
@@ -93,6 +94,7 @@ const cardRow = (card: TodoLinkedCard): LinkRow => ({
     NgTemplateOutlet,
     SectionComponent,
     RouterLink,
+    LinkToDirective,
     TranslatePipe,
     AvatarStackComponent,
     ButtonComponent,
@@ -277,9 +279,6 @@ export class TodoLinkedListComponent {
     return linkSub(row, this.i18n.formatLocale(), this.i18n.uiLocale(), this.t);
   }
 
-  route(url: string) {
-    return splitUrl(url);
-  }
 
   /** "Veranstaltung · 20.11.–21.11.2026 · AStA": the server puts a linked Event first. */
   eventSub(card: TodoLinkedCard): string {

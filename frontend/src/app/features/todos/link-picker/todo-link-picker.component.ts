@@ -22,7 +22,15 @@ import {
   viewChild,
 } from '@angular/core';
 import type { Uuid } from '@core/api/models';
-import { TodosApiService, type LinkEnd, type TodoLinkKind, type TodoLinkTarget } from '@core/api/todos.service';
+import { PaperlessService } from '@core/api/paperless.service';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import {
+  TodosApiService,
+  type LinkEnd,
+  type LinkSearch,
+  type TodoLinkKind,
+  type TodoLinkTarget,
+} from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate, TranslationKey } from '@core/i18n/translations';
@@ -45,6 +53,8 @@ interface PickerGroup {
   readonly key: string;
   readonly label: TranslationKey;
   readonly hits: readonly TodoLinkTarget[];
+  /** A note under the hits: Paperless does not answer (002766). */
+  readonly note?: TranslationKey;
 }
 
 const KIND_CHIPS: readonly { readonly value: PickerKind; readonly label: TranslationKey }[] = [
@@ -60,6 +70,7 @@ const KIND_CHIPS: readonly { readonly value: PickerKind; readonly label: Transla
   { value: 'budget', label: 'todos.picker.budgets' },
   { value: 'ticket', label: 'todos.picker.tickets' },
   { value: 'todo', label: 'todos.picker.todos' },
+  { value: 'paperless', label: 'todos.picker.paperless' },
 ];
 
 /** The rights of which one links a cost centre (spec 001410). */
@@ -75,6 +86,7 @@ const LINK_FEATURE: Partial<Record<TodoLinkKind, FeatureKey>> = {
   expense: 'budget',
   budget: 'budget',
   ticket: 'tickets',
+  paperless: 'paperless',
 };
 
 /** The key of a link target in the `linked` set. */
@@ -107,6 +119,7 @@ export class TodoLinkPickerComponent {
   private readonly i18n = inject(I18nService);
   private readonly features = inject(FeatureService);
   private readonly auth = inject(AuthService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly t: Translate = (key, params) => this.i18n.translate(key, params);
 
   readonly open = model(false);
@@ -121,16 +134,24 @@ export class TodoLinkPickerComponent {
   protected readonly escLabel = isApplePlatform() ? '⎋' : 'Esc';
   /**
    * The chips of the kinds that this platform has (spec 000758). A cost centre needs a budget
-   * write right (spec 001410).
+   * write right (spec 001410), a Paperless document `paperless.use` and its switch
+   * (§F/integrations/paperless/002766, 002767).
    */
-  readonly chips = KIND_CHIPS.filter((chip) => {
-    const feature = chip.value === 'all' ? undefined : LINK_FEATURE[chip.value];
-    const allowed = chip.value !== 'budget' || BUDGET_WRITE.some((p) => this.auth.can(p));
-    return allowed && (feature === undefined || this.features.isOn(feature));
-  });
+  private readonly paperlessOn = toSignal(inject(PaperlessService).linksOn(), { initialValue: false });
+  readonly chips = computed(() =>
+    KIND_CHIPS.filter((chip) => {
+      const feature = chip.value === 'all' ? undefined : LINK_FEATURE[chip.value];
+      const allowed =
+        (chip.value !== 'budget' || BUDGET_WRITE.some((p) => this.auth.can(p))) &&
+        (chip.value !== 'paperless' || this.paperlessOn());
+      return allowed && (feature === undefined || this.features.isOn(feature));
+    }),
+  );
   readonly kind = signal<PickerKind>('all');
   readonly hits = signal<TodoLinkTarget[]>([]);
   readonly failed = signal(false);
+  /** Paperless did not answer the newest search (§F/integrations/paperless/002766). */
+  readonly paperlessDown = signal(false);
 
   private readonly document = inject(DOCUMENT);
   private readonly appRef = inject(ApplicationRef);
@@ -145,18 +166,42 @@ export class TodoLinkPickerComponent {
   /** Stops the fade-out of a closing panel, when it opens again before the fade ends. */
   private stopLeave: (() => void) | null = null;
 
-  readonly search = liveSearch<TodoLinkTarget[]>({
+  readonly search = liveSearch<LinkSearch>({
     run: (q) => {
       this.failed.set(false);
-      return this.api.linkTargets(q, this.kind(), this.exclude());
+      return this.api.linkSearch(q, this.kind(), this.exclude());
     },
-    result: (hits) => this.hits.set(hits),
-    reset: () => this.hits.set([]),
+    result: (found) => {
+      this.hits.set(found.hits);
+      this.paperlessDown.set(found.paperlessDown);
+    },
+    reset: () => {
+      this.hits.set([]);
+      this.paperlessDown.set(false);
+      this.newest();
+    },
     error: () => {
       this.hits.set([]);
+      this.paperlessDown.set(false);
       this.failed.set(true);
     },
   });
+
+  /** Without a term the kind `paperless` lists the newest documents (002766). */
+  private newest(): void {
+    if (this.kind() !== 'paperless') return;
+    this.api
+      .linkSearch('', 'paperless', this.exclude())
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (found) => {
+          if (this.kind() !== 'paperless' || this.search.applied()) return;
+          this.hits.set(found.hits);
+          this.paperlessDown.set(found.paperlessDown);
+        },
+        error: () => this.failed.set(true),
+      });
+  }
 
   readonly groups = computed<PickerGroup[]>(() => {
     const by = (kinds: TodoLinkKind[]) => this.hits().filter((h) => kinds.includes(h.kind));
@@ -171,8 +216,14 @@ export class TodoLinkPickerComponent {
       { key: 'budget', label: 'todos.picker.budgets', hits: by(['budget']) },
       { key: 'ticket', label: 'todos.picker.tickets', hits: by(['ticket']) },
       { key: 'todo', label: 'todos.picker.todos', hits: by(['todo']) },
+      {
+        key: 'paperless',
+        label: 'todos.picker.paperless',
+        hits: by(['paperless']),
+        note: this.paperlessDown() ? 'paperless.search.unavailable' : undefined,
+      },
     ];
-    return all.filter((g) => g.hits.length);
+    return all.filter((g) => g.hits.length || g.note);
   });
 
   /**

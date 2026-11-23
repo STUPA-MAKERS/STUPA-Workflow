@@ -5,7 +5,13 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/todos/test_paperless_links.py:test_a_link_needs_the_permission"
+  - "frontend/src/app/features/todos/linked-list/todo-linked-list.component.spec.ts:TodoLinkedListComponent"
+implementation:
+  - backend/app/modules/todos/link_rights.py
+  - backend/app/modules/todos/link_service.py
+  - backend/app/modules/todos/links.py
 scope:
   - backend/app/
   - frontend/src/app/

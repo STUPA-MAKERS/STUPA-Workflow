@@ -33,6 +33,7 @@ export const KIND_FEATURE: Readonly<Partial<Record<GraphKind, FeatureKey>>> = {
   expense: 'budget',
   budget: 'budget',
   ticket: 'tickets',
+  paperless: 'paperless',
 };
 
 /** The key of a node: its kind and its id. */

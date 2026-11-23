@@ -1436,6 +1436,7 @@ export interface PaperlessConnection {
   readonly fileApplications: boolean;
   readonly filePlans: boolean;
   readonly insertEnabled: boolean;
+  readonly linkEnabled: boolean;
   /** The hosts of the deploy setting `PAPERLESS_HOST_ALLOWLIST`. */
   readonly allowedHosts: readonly string[];
 }
@@ -1448,6 +1449,7 @@ export interface PaperlessConnectionIn {
   readonly fileApplications: boolean;
   readonly filePlans: boolean;
   readonly insertEnabled: boolean;
+  readonly linkEnabled: boolean;
 }
 
 /** The result of `POST /admin/paperless/test`. `error` is the cause code of a failure. */

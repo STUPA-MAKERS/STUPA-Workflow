@@ -42,6 +42,7 @@ export const LINK_ICON: Record<TodoLinkKind, IconName> = {
   budget: 'pie',
   ticket: 'chat',
   todo: 'circleok',
+  paperless: 'archive',
 };
 
 export const LINK_KIND_LABEL: Record<TodoLinkKind, TranslationKey> = {
@@ -56,6 +57,7 @@ export const LINK_KIND_LABEL: Record<TodoLinkKind, TranslationKey> = {
   budget: 'todos.linkKind.budget',
   ticket: 'todos.linkKind.ticket',
   todo: 'todos.linkKind.todo',
+  paperless: 'todos.linkKind.paperless',
 };
 
 /** The state of a vote link: the result once closed, else the status. */
@@ -186,6 +188,8 @@ function linkFacts(
       return [d.boardName, d.columnName];
     case 'gremium':
       return [];
+    case 'paperless':
+      return [d.documentType, d.date ? weekdayDate(d.date, locale) : null];
     default:
       return assertNever(kind);
   }
@@ -340,16 +344,6 @@ export function defaultBoard(
     boards[0] ??
     null
   );
-}
-
-/** An app route of a link ("/meetings/m-1?item=a-1") as router path and query. */
-export function splitUrl(url: string): {
-  readonly path: string;
-  readonly query: Readonly<Record<string, string>>;
-} {
-  const [path, search = ''] = url.split('?');
-  const query = Object.fromEntries(new URLSearchParams(search));
-  return { path, query };
 }
 
 /**

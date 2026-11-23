@@ -9,6 +9,9 @@ The routes of ``/api/links`` (spec 001409) use this service. A link has no direc
   kind and may change at least one of them (spec 001404, ``LinkRights``).
 * Only a card gives read access to its links (specs 000487, 001405): the links of a
   card resolve with ``grants``, the links of any other element without.
+* A link with a Paperless document needs ``paperless.use`` and the change right of the
+  other element. Two Paperless documents do not link. A new link stores the title, the
+  type and the date of the document (§F/integrations/paperless/002763-002765).
 * A link with a card end writes the card events ``linked`` and ``unlinked`` and touches
   the board, and an Event keeps its Antrag, Buchung or invoice to itself
   (``event_link_taken``).
@@ -44,6 +47,8 @@ from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, Vali
 
 #: The kind that gives read access to its links (spec 001405).
 GRANTING_KIND = "todo"
+#: The kind of a Paperless document (§F/integrations/paperless/002763).
+PAPERLESS_KIND = "paperless"
 
 
 def _invalid(msg: str, code: str, field_name: str) -> ValidationProblem:
@@ -78,6 +83,11 @@ class LinkService:
         """Build the service on a session, with the given to-do service or a new one."""
         cards = todos or TodoService(session)
         return cls(session, cards, LinkRights(session, cards.access))
+
+    @property
+    def paperless_down(self) -> bool:
+        """Tell if Paperless did not answer the newest search over all kinds (002766)."""
+        return self.todos.links.paperless_down
 
     async def _reads(self, end: LinkEnd, principal: Principal) -> bool:
         """Tell if the principal reads the element by the rule of its kind."""
@@ -150,6 +160,12 @@ class LinkService:
             ForbiddenError: ``link_forbidden`` (HTTP 403), also for a cost centre end
                 without a budget write right (spec 001410).
         """
+        if not all(
+            LinkRights.may_touch(end[0], principal)
+            for end in (one, other)
+            if end[0] == PAPERLESS_KIND
+        ):
+            raise ForbiddenError("A Paperless link needs paperless.use.", code="link_forbidden")
         for field_name, end in (("a", one), ("b", other)):
             if not await self._reads(end, principal):
                 raise _invalid("The element was not found.", "link_target_not_found", field_name)
@@ -159,6 +175,23 @@ class LinkService:
             raise ForbiddenError(
                 "A cost centre link needs a budget write right.", code="link_forbidden"
             )
+
+    async def _prepare(self, one: LinkEnd, other: LinkEnd, principal: Principal) -> None:
+        """Check and store the Paperless end of a new link (002763-002765).
+
+        Raises:
+            ValidationProblem: ``link_paperless_pair`` (HTTP 422).
+            ForbiddenError: ``link_forbidden`` without ``paperless.use`` (HTTP 403).
+            ServiceUnavailableError: ``paperless_unavailable`` (HTTP 503).
+        """
+        ends = [end for end in (one, other) if end[0] == PAPERLESS_KIND]
+        if len(ends) > 1:
+            raise _invalid(
+                "Two Paperless documents cannot link each other.", "link_paperless_pair", "b"
+            )
+        if ends and not LinkRights.may_touch(PAPERLESS_KIND, principal):
+            raise ForbiddenError("A Paperless link needs paperless.use.", code="link_forbidden")
+        await self.todos.links.prepare(ends, principal)
 
     async def _cards(
         self, ends: Sequence[LinkEnd], principal: Principal
@@ -183,8 +216,11 @@ class LinkService:
         """Link two elements; the caller commits, and a parallel equal link then fails.
 
         Raises:
-            ValidationProblem: ``link_self`` or ``link_target_not_found`` (HTTP 422).
+            ValidationProblem: ``link_self``, ``link_paperless_pair`` or
+                ``link_target_not_found`` (HTTP 422).
             ForbiddenError: ``link_forbidden`` (HTTP 403).
+            ServiceUnavailableError: ``paperless_unavailable`` for a Paperless end while
+                Paperless does not answer (HTTP 503).
             ConflictError: ``link_exists``, or ``event_link_taken`` when a card end is an
                 Event and another Event links the Antrag, Buchung or invoice (HTTP 409).
         """
@@ -194,6 +230,7 @@ class LinkService:
             await link_kinds_on(self.session)
         ):
             raise _invalid("The element was not found.", "link_target_not_found", "b")
+        await self._prepare(one, other, principal)
         await self._check_change(one, other, principal)
         cards = await self._cards((one, other), principal)
         if await link_store.link_between(self.session, one, other) is not None:

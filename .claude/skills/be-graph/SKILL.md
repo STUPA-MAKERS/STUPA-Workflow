@@ -29,3 +29,5 @@ description: The graph page backend — GET /api/graph answers the elements a pe
 **MCP:** `graph_read` (`tools/session.py`).
 
 **Related:** be-todos (links, `LinkResolver`), be-search, frontend, mcp
+
+A Paperless document (kind `paperless`, be-paperless) is a node only for a person with `paperless.use` while the links to Paperless are on: `GraphService.page` takes the kind out of the kinds for any other person, so that person gets neither the node nor its lines (spec F/integrations/paperless/002768). Its date is the date of the document, else the moment of the link.

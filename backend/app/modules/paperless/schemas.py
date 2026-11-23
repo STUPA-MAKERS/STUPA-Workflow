@@ -30,6 +30,7 @@ class ConnectionIn(FrozenStrictCamelModel, frozen=True):
     file_applications: bool = Field(default=False, alias="fileApplications")
     file_plans: bool = Field(default=False, alias="filePlans")
     insert_enabled: bool = Field(default=False, alias="insertEnabled")
+    link_enabled: bool = Field(default=False, alias="linkEnabled")
 
     @model_validator(mode="after")
     def _one_token_change(self) -> Self:
@@ -51,6 +52,7 @@ class ConnectionOut(FrozenCamelModel, frozen=True):
     file_applications: bool = Field(serialization_alias="fileApplications")
     file_plans: bool = Field(serialization_alias="filePlans")
     insert_enabled: bool = Field(serialization_alias="insertEnabled")
+    link_enabled: bool = Field(serialization_alias="linkEnabled")
     allowed_hosts: tuple[str, ...] = Field(serialization_alias="allowedHosts")
 
 
@@ -98,9 +100,14 @@ class FiledDocumentOut(FrozenCamelModel, frozen=True):
 
 
 class InsertStateOut(FrozenCamelModel, frozen=True):
-    """Whether the part `Aus Paperless einfügen` is on (§F/integrations/paperless/002512)."""
+    """Whether the parts that a person with `paperless.use` uses are on (002512).
+
+    ``enabled`` is the part `Aus Paperless einfügen`, ``linkEnabled`` the part
+    `Paperless-Dokumente verknüpfen` (§F/integrations/paperless/002767).
+    """
 
     enabled: bool
+    link_enabled: bool = Field(default=False, serialization_alias="linkEnabled")
 
 
 class DocumentHitOut(FrozenCamelModel, frozen=True):

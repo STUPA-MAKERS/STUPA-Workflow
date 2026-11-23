@@ -1992,7 +1992,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/auth/me/profile')) {
       return ok(MOCK_PROFILE);
     }
-    if (p.endsWith('/paperless/insert')) return ok({ enabled: true });
+    if (p.endsWith('/paperless/insert')) return ok({ enabled: true, linkEnabled: true });
     if (p.endsWith('/paperless/search')) return ok(mockPaperlessSearch(req.params.get('q') ?? ''));
     if (p.endsWith('/auth/me')) {
       return mockAnonymous()

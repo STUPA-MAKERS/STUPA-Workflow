@@ -5116,5 +5116,9 @@
   "paperless.insert.error.tooLarge": "The document is too large (at most 20 MB and 100 pages).",
   "paperless.insert.error.forbidden": "You lack the right to insert.",
   "paperless.insert.error.failed": "The document could not be inserted.",
-  "admin.audit.action.paperless_inserted": "Document inserted from Paperless"
+  "admin.audit.action.paperless_inserted": "Document inserted from Paperless",
+  "todos.linkKind.paperless": "Paperless document",
+  "todos.picker.paperless": "Paperless",
+  "admin.paperless.link": "Link",
+  "admin.paperless.linkEnabled": "Link Paperless documents"
 }

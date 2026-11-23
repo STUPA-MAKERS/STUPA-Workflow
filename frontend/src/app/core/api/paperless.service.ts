@@ -36,6 +36,14 @@ export interface PaperlessCopy {
   readonly url: string;
 }
 
+/** The parts of the integration that a person with `paperless.use` uses. */
+interface PartState {
+  readonly enabled: boolean;
+  readonly linkEnabled?: boolean;
+}
+
+const PARTS_OFF: PartState = { enabled: false, linkEnabled: false };
+
 interface ElementDocument {
   readonly url: string | null;
   readonly documentId: number | null;
@@ -49,7 +57,7 @@ export class PaperlessService {
   private readonly features = inject(FeatureService);
 
   /** The answer of `GET /paperless/insert`, read once per session. */
-  private insertState: Observable<boolean> | null = null;
+  private partState: Observable<PartState> | null = null;
 
   /**
    * The right to see the entry while the feature `paperless` is on
@@ -80,15 +88,26 @@ export class PaperlessService {
    * `false` without the right and after an error. The answer is read once.
    */
   insertOn(): Observable<boolean> {
-    if (!this.canUse()) return of(false);
-    this.insertState ??= this.http
-      .get<{ readonly enabled: boolean }>(`${this.base}/paperless/insert`, { context: skipLoading() })
+    return this.parts().pipe(map((state) => state.enabled));
+  }
+
+  /**
+   * Whether the part `Paperless-Dokumente verknüpfen` is on (§F/integrations/paperless/002767).
+   * `false` without the right and after an error. The answer is read once.
+   */
+  linksOn(): Observable<boolean> {
+    return this.parts().pipe(map((state) => state.linkEnabled === true));
+  }
+
+  private parts(): Observable<PartState> {
+    if (!this.canUse()) return of(PARTS_OFF);
+    this.partState ??= this.http
+      .get<PartState>(`${this.base}/paperless/insert`, { context: skipLoading() })
       .pipe(
-        map((state) => state.enabled),
-        catchError(() => of(false)),
+        catchError(() => of(PARTS_OFF)),
         shareReplay(1),
       );
-    return this.insertState;
+    return this.partState;
   }
 
   /**

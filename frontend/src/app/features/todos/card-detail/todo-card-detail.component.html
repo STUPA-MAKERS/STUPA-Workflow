@@ -542,7 +542,7 @@
               <app-icon class="cd__linkIcon" [name]="linkIcon(link)" [size]="18" />
               <span class="cd__linkText">
                 @if (link.url) {
-                  <a class="cd__linkTitle" [routerLink]="route(link.url).path" [queryParams]="route(link.url).query">{{ linkTitle(link) }}</a>
+                  <a class="cd__linkTitle" [appLinkTo]="link.url">{{ linkTitle(link) }}</a>
                 } @else if (link.granted) {
                   <button type="button" class="cd__linkTitle cd__linkOpen" data-testid="cd-link-view" (click)="viewLink(link)">{{ linkTitle(link) }}</button>
                 } @else {

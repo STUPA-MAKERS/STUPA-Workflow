@@ -12,10 +12,12 @@ one of them. The change right of an end is the right that changes the element it
 * invoice, expense — ``budget.book``;
 * budget — ``budget.structure``;
 * ticket — the work right in the Bereich of the ticket;
-* todo — the write right on the board of the card (``BoardAccess.can_write``).
+* todo — the write right on the board of the card (``BoardAccess.can_write``);
+* paperless — no person changes a Paperless document, so the other end gives the right.
 
 A link with a cost centre end also needs ``budget.book`` or ``budget.structure``, whatever
-the other end is (``may_touch``, spec 001410).
+the other end is (``may_touch``, spec 001410). A link with a Paperless end also needs
+``paperless.use`` (§F/integrations/paperless/002764).
 """
 
 from __future__ import annotations
@@ -46,7 +48,10 @@ GLOBAL_RIGHT: dict[str, str] = {
     "budget": "budget.structure",
 }
 #: The rights of which one is needed for any link with an end of the kind (spec 001410).
-GATE_RIGHTS: dict[str, tuple[str, ...]] = {"budget": ("budget.book", "budget.structure")}
+GATE_RIGHTS: dict[str, tuple[str, ...]] = {
+    "budget": ("budget.book", "budget.structure"),
+    "paperless": ("paperless.use",),
+}
 #: The gremium rights that change a vote.
 VOTE_RIGHTS: tuple[str, ...] = ("vote.manage", "session.manage")
 

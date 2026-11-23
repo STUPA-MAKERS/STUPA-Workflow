@@ -201,6 +201,11 @@ class FakeLinks:
         self.hits = hits or []
         self.searched: list[tuple[str, str, uuid.UUID | None]] = []
         self.grants: bool | None = None
+        self.paperless_down = False
+        self.prepared: list[LinkRef] = []
+
+    async def prepare(self, refs: Iterable[LinkRef], _principal: Principal) -> None:
+        self.prepared.extend(refs)
 
     async def resolve(
         self, refs: Iterable[LinkRef], _principal: Principal, *, grants: bool = True

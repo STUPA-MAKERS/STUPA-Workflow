@@ -53,6 +53,7 @@ class _FakeLinks:
     def __init__(self) -> None:
         self.calls: list[tuple[str, tuple[Any, ...], dict[str, Any]]] = []
         self.session = _Tx()
+        self.paperless_down = False
 
     async def of(self, *args: Any) -> LinksOut:
         self.calls.append(("of", args, {}))

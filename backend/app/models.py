@@ -78,7 +78,11 @@ from app.modules.notifications.push_models import (
     PushSubscription,
     PushVapidKey,
 )
-from app.modules.paperless.models import PaperlessFiling, PaperlessSettings
+from app.modules.paperless.models import (
+    PaperlessDocument,
+    PaperlessFiling,
+    PaperlessSettings,
+)
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.site_config.models import SiteConfigVersion
 from app.modules.tickets.models import (
@@ -160,6 +164,7 @@ __all__ = [
     "OAuthAuthorizationCode",
     "OAuthToken",
     "ErasureRequest",
+    "PaperlessDocument",
     "PaperlessFiling",
     "PaperlessSettings",
     "Principal",

@@ -27,7 +27,9 @@ done (`completed_at`).
   `LINK_KINDS` is also the picker order: application, meeting, agenda_item, vote,
   appointment (a Termin, `calendar_appointment`; read rule `calendar.appointments.readable`,
   a granted Termin gives title, start, end and place only), gremium, invoice, expense
-  (`budget_expense`), budget (the cost centre), ticket, todo.
+  (`budget_expense`), budget (the cost centre), ticket, todo, paperless (a Paperless
+  document, row `paperless_document`, migration `b9e2c47f1a36`; `LinkResolver.prepare`
+  stores the document before a new link, see be-paperless).
   Migration `527854b79d68` adds `vote_id`, `gremium_id`, `invoice_id`, `expense_id`;
   `b3b70dda7d08` adds `budget_id`; `d85b3e6a1f47` adds `appointment_id`.
   `TodoCardEvent` has `start_time`/`end_time` (migration `c7d21f9a4e63`): a time needs its

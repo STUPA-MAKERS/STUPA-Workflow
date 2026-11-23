@@ -141,6 +141,7 @@ _DATA_TABLES = (
     "pdf_asset",
     "paperless_filing",
     "paperless_settings",
+    "paperless_document",
 )
 
 
