@@ -33,6 +33,21 @@
       }
     </div>
   </ng-template>
+  <ng-template screenSearch>
+    <div role="search">
+      <app-search-pill
+        size="md"
+        [clearable]="true"
+        [placeholder]="'admin.audit.search' | t"
+        [label]="'admin.audit.search' | t"
+        [busy]="loading() && entries().length > 0"
+        [results]="hits()"
+        [value]="searchText()"
+        (valueChange)="setSearch($event)"
+        (commit)="runSearch()"
+      />
+    </div>
+  </ng-template>
   <ng-template screenFilters>
     <app-filter-select
       [label]="'admin.audit.filter.action' | t"

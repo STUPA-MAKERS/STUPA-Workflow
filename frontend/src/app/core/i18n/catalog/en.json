@@ -2327,6 +2327,7 @@
   "admin.gremiumPerm.members.notify": "Notify members",
   "admin.gremiumPerm.ticket.work": "Work on tickets",
   "admin.audit.title": "Audit log",
+  "admin.audit.search": "Search the audit log",
   "admin.audit.empty": "No audit entries.",
   "admin.audit.error": "Could not load the audit log.",
   "admin.audit.loadMore": "Load more",

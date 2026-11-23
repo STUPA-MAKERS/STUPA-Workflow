@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import uuid
 
-from app.modules.auth.identity import PrincipalRef, refs_by_id, refs_by_sub
+from sqlalchemy.dialects import postgresql
+
+from app.modules.auth.identity import PrincipalRef, refs_by_id, refs_by_sub, subs_named
 from tests._support.auth_fakes import fake_session, result
 from tests._support.identity_rows import id_ref, sub_ref
 
@@ -30,9 +32,7 @@ async def test_plain_and_merged_by_sub() -> None:
     )
     refs = await refs_by_sub(db, ["a", "old", None])
     assert refs["a"] == PrincipalRef(id=plain, display_name="Anna", email=None, own_name="Anna")
-    assert refs["old"] == PrincipalRef(
-        id=target, display_name=None, email="neu@x", own_name="Alt"
-    )
+    assert refs["old"] == PrincipalRef(id=target, display_name=None, email="neu@x", own_name="Alt")
     assert refs["old"].name == "neu@x"
     assert refs["old"].label == "Alt"
     assert refs["a"].name == "Anna"
@@ -42,9 +42,7 @@ async def test_by_id_keys_the_stored_id() -> None:
     old, target = uuid.uuid4(), uuid.uuid4()
     db = fake_session(result(id_ref(old, "Alt", None, merged=(target, "Neu", None))))
     refs = await refs_by_id(db, [old])
-    assert refs == {
-        old: PrincipalRef(id=target, display_name="Neu", email=None, own_name="Alt")
-    }
+    assert refs == {old: PrincipalRef(id=target, display_name="Neu", email=None, own_name="Alt")}
 
 
 def test_anonymized_account_has_no_name() -> None:
@@ -52,3 +50,12 @@ def test_anonymized_account_has_no_name() -> None:
     assert PrincipalRef(id=uuid.uuid4(), display_name=None, email=None).name is None
     ref = PrincipalRef(id=uuid.uuid4(), display_name="Neu", email=None)
     assert ref.label == "Neu"
+
+
+def test_subs_named_matches_own_and_merged_names() -> None:
+    """The search of the audit page finds an actor by its name, its e-mail or the merged name."""
+    stmt = subs_named("50%_a")
+    sql = str(stmt.compile(dialect=postgresql.dialect())).lower()
+    assert sql.count("ilike") == 4
+    assert "merged_into" in sql
+    assert "%50\\%\\_a%" in [str(v) for v in stmt.compile().params.values()]

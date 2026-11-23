@@ -6,6 +6,7 @@
  * path, which is not part of the API spec.
  */
 import { HttpClient, HttpParams } from '@angular/common/http';
+import { searchWords, textsMatch } from './list-search';
 import { skipLoading } from '@stupa-makers/ui-kit';
 import { Injectable, inject, signal } from '@angular/core';
 import { type Observable, map, of, throwError } from 'rxjs';
@@ -1240,15 +1241,30 @@ export class AdminApiService {
       actor?: string;
       since?: string;
       until?: string;
+      /** The search of the page (§002693): each word in the action, actor, target or data. */
+      q?: string;
+      /** The action keys whose shown label holds the search; they match as well. */
+      labelActions?: readonly string[];
     } = {},
   ): Observable<AuditPage> {
     const limit = opts.limit ?? 50;
     if (this.mock) {
+      const words = searchWords(opts.q ?? '');
       const items = this.store.audit.filter(
         (e) =>
           (!opts.action || e.action === opts.action) &&
           (!opts.actor || e.actor === opts.actor) &&
-          (opts.before == null || e.id < opts.before),
+          (opts.before == null || e.id < opts.before) &&
+          (!words.length ||
+            (opts.labelActions ?? []).includes(e.action) ||
+            textsMatch(words, [
+              e.action,
+              e.actor,
+              e.actorName,
+              e.targetType,
+              e.targetId,
+              JSON.stringify(e.data ?? {}),
+            ])),
       );
       const page = items.slice(0, limit);
       const hasMore = items.length > limit;
@@ -1264,9 +1280,13 @@ export class AdminApiService {
       ['actor', opts.actor || null],
       ['since', opts.since || null],
       ['until', opts.until || null],
+      ['q', opts.q?.trim() || null],
     ]);
+    const search = opts.q?.trim()
+      ? (opts.labelActions ?? []).reduce((p, a) => p.append('labelAction', a), params)
+      : params;
     return this.http.get<AuditPage>(`${this.base}/admin/audit`, {
-      params,
+      params: search,
       context: skipLoading(),
     });
   }
