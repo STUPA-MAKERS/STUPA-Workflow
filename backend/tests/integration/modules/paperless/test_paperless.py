@@ -46,6 +46,7 @@ from app.modules.paperless.filings import MAX_TRIES, filed_for_applications
 from app.modules.paperless.models import PaperlessFiling
 from app.modules.paperless.schemas import ConnectionIn
 from app.modules.paperless_filing.router import get_connection_service
+from app.modules.site_config.models import SiteConfigVersion
 from app.settings import Settings
 from tests._support.guest_apps import (
     build_api,
@@ -399,6 +400,36 @@ async def test_without_a_connection_the_worker_does_nothing(
     assert await _run(ctx) == 0
     assert await _filings(maker) == []
     assert fake.requests == []
+
+
+async def _feature(maker: Maker, *, on: bool) -> None:
+    """Set the feature switch `paperless` in the active site configuration."""
+    async with maker() as session:
+        await session.execute(
+            update(SiteConfigVersion)
+            .where(SiteConfigVersion.active.is_(True))
+            .values(branding={"features": {"paperless": on}})
+        )
+        await session.commit()
+
+
+async def test_while_the_feature_is_off_the_worker_calls_nothing(
+    maker: Maker,
+    settings: Settings,
+    ctx: dict[str, Any],
+    storage: MemoryStorage,
+    fake: FakePaperless,
+) -> None:
+    """§F/integrations/paperless/002762: the connection stays, the files wait."""
+    await _connect(maker, settings, protocols=True)
+    await _protocol(maker, storage)
+    await _feature(maker, on=False)
+    assert await _run(ctx) == 0
+    assert await _filings(maker) == []
+    assert fake.requests == []
+
+    await _feature(maker, on=True)
+    assert await _run(ctx, 2) == 2
 
 
 async def test_a_part_whose_switch_is_off_files_nothing(

@@ -75,7 +75,7 @@ export const ADMIN_PAGES: readonly AdminPage[] = [
   { link: 'notifications', title: 'admin.nav.notifications', desc: 'admin.nav.notificationsDesc', icon: 'bell', group: 'communication', permissions: ['admin.notifications'] },
   { link: 'mail-templates', title: 'admin.nav.mailTemplates', desc: 'admin.nav.mailTemplatesDesc', icon: 'mail', group: 'communication', permissions: ['admin.notifications'] },
   { link: 'webhooks', title: 'admin.nav.webhooks', desc: 'admin.nav.webhooksDesc', icon: 'webhook', group: 'communication', permissions: ['webhook.manage'] },
-  { link: 'paperless', title: 'admin.nav.paperless', desc: 'admin.nav.paperlessDesc', icon: 'archive', group: 'communication', permissions: ['admin.paperless'] },
+  { link: 'paperless', title: 'admin.nav.paperless', desc: 'admin.nav.paperlessDesc', icon: 'archive', group: 'communication', permissions: ['admin.paperless'], feature: 'paperless' },
   { link: 'help-tickets', title: 'admin.nav.helpTickets', desc: 'admin.nav.helpTicketsDesc', icon: 'help', group: 'communication', permissions: ['admin.site', 'ticket.manage'] },
   { link: 'audit', title: 'admin.nav.audit', desc: 'admin.nav.auditDesc', icon: 'shieldok', group: 'security', permissions: ['audit.read'] },
   { link: 'login-settings', title: 'admin.nav.loginSettings', desc: 'admin.nav.loginSettingsDesc', icon: 'key', group: 'security', permissions: ['admin.users'] },

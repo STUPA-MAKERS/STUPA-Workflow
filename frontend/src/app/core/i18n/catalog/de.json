@@ -4677,6 +4677,7 @@
   "admin.features.title": "Funktionen",
   "admin.features.public": "Öffentliche Seiten",
   "admin.features.push": "Push-Benachrichtigungen",
+  "admin.features.paperless": "Paperless",
   "admin.features.forbidden": "Für diese Einstellungen fehlt das Recht, Funktionen zu schalten.",
   "admin.features.needs": "Benötigt {name}",
   "admin.features.confirmTitle": "Funktionen ausschalten",

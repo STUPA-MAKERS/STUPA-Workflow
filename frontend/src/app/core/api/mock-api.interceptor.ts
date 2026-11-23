@@ -138,6 +138,7 @@ const MOCK_PRINCIPAL: Principal = {
     'webhook.manage',
     'admin.calendars',
     'admin.paperless',
+    'admin.features',
     'paperless.use',
     'calendar.manage',
     'calendar.publish',

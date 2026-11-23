@@ -4,6 +4,7 @@ import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { SKIP_LOADING } from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
+import { FeatureService } from '@core/features/feature.service';
 import { PaperlessService, openInPaperless, paperlessLink } from './paperless.service';
 
 @Component({ standalone: true, template: '' })
@@ -49,6 +50,19 @@ describe('PaperlessService', () => {
       .documentUrl('plan', 'p1')
       .subscribe((v) => (url = v));
     expect(url).toBeNull();
+  });
+
+  /** § F/integrations/paperless/002762: the feature switch. */
+  it('asks nothing while the feature is off', () => {
+    TestBed.inject(FeatureService).apply({ paperless: false });
+    const api = TestBed.inject(PaperlessService);
+    let url: string | null | undefined;
+    let insert: boolean | undefined;
+    api.documentUrl('plan', 'p1').subscribe((v) => (url = v));
+    api.insertOn().subscribe((v) => (insert = v));
+    expect([api.canUse(), url, insert]).toEqual([false, null, false]);
+    TestBed.inject(FeatureService).apply({});
+    expect(api.canUse()).toBe(true);
   });
 
   it('has no address after an error', () => {

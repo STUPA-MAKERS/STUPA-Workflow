@@ -13,6 +13,7 @@ export const FEATURES = [
   'graph',
   'public',
   'push',
+  'paperless',
 ] as const;
 
 /** The key of a feature with a switch. */

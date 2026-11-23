@@ -545,7 +545,7 @@ describe('AdminApiService — real mode (contract)', () => {
   });
 
   it('reads and replaces the feature switches', () => {
-    const switches = { activity: true, todos: true, calendar: true, meetings: true, voting: true, budget: false, invoices: true, tickets: true, graph: true, public: true, push: true };
+    const switches = { activity: true, todos: true, calendar: true, meetings: true, voting: true, budget: false, invoices: true, tickets: true, graph: true, public: true, push: true, paperless: true };
     let read: unknown;
     s.getFeatures().subscribe((v) => (read = v));
     http.expectOne({ method: 'GET', url: '/api/admin/features' }).flush(switches);

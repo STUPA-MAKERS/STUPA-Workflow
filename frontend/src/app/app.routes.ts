@@ -671,6 +671,7 @@ export const routes: Routes = [
           },
           {
             path: 'paperless',
+            canMatch: [featureMatch('paperless')],
             data: { title: 'admin.paperless.title', permission: ['admin.paperless'], parent: ['admin'] },
             canActivate: [authGuard],
             loadComponent: () =>

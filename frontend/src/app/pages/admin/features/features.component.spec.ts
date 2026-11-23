@@ -23,6 +23,7 @@ const ALL_ON: FeatureSwitches = {
   graph: true,
   public: true,
   push: true,
+  paperless: true,
 };
 
 function makeApi(initial: FeatureSwitches = ALL_ON) {
