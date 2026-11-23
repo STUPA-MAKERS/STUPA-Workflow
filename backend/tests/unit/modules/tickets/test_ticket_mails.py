@@ -29,7 +29,7 @@ NOW = datetime(2026, 10, 1, tzinfo=UTC)
 def _ticket(**kw: Any) -> Ticket:
     base: dict[str, Any] = {
         "id": uuid.uuid4(),
-        "number": 5,
+        "number": "AAAA0005",
         "kind": "question",
         "title": "Wie?",
         "body": "b",
@@ -143,7 +143,7 @@ async def test_created_goes_to_the_managers_without_the_reporter(
     (mail,) = sent
     assert mail["to"] == ["a@x.org", "b@x.org"]
     assert mail["kind"] == "ticket_created"
-    assert mail["context"]["number"] == "T-0005"
+    assert mail["context"]["number"] == "T-AAAA0005"
     assert mail["context"]["reporter"] == "gast@x.org"
     assert mail["link"].url.endswith(f"/tickets/{ticket.id}")
 
@@ -241,13 +241,13 @@ async def test_received_leaves_out_the_title_of_a_report_without_a_session(
     env = SandboxedEnvironment()
     for lang, quoted, tab in (("de", "„Wie?“", "„Tickets“"), ("en", '"Wie?"', '"Tickets"')):
         body = env.from_string(mails.TICKET_RECEIVED_BODY[lang])
-        linked = body.render(title="Wie?", number="T-0005", wikiUrl="w", link="L")
+        linked = body.render(title="Wie?", number="T-AAAA0005", wikiUrl="w", link="L")
         assert quoted in linked
         assert tab in linked
-        bare = body.render(title="", number="T-0005", wikiUrl="w", link="")
+        bare = body.render(title="", number="T-AAAA0005", wikiUrl="w", link="")
         assert "„" not in bare
         assert '"' not in bare
-        assert "T-0005" in bare
+        assert "T-AAAA0005" in bare
 
 
 async def test_received_skips_without_ticket_or_address(
@@ -334,7 +334,7 @@ async def test_a_message_of_the_reporter_goes_to_the_assignee(
     assert mail["to"] == ["mia@x.org"]
     assert mail["kind"] == "ticket_message"
     assert mail["context"] == {
-        "number": "T-0005",
+        "number": "T-AAAA0005",
         "title": "Wie?",
         "reporter": "Rex",
         "message": "Danke!",
@@ -416,7 +416,7 @@ async def test_a_public_answer_of_the_team_goes_to_the_reporter(
     assert mail["kind"] == "ticket_answer"
     assert mail["lang"] == "en"
     assert mail["context"] == {
-        "number": "T-0005",
+        "number": "T-AAAA0005",
         "title": "Wie?",
         "author": "Mia",
         "message": "Oben rechts.",

@@ -27,6 +27,9 @@ class Result:
     def all(self) -> list[Any]:
         return list(self._items)
 
+    def tuples(self) -> Result:
+        return self
+
     def first(self) -> Any:
         return self._items[0] if self._items else None
 

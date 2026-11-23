@@ -57,13 +57,13 @@ from app.modules.meetings.models import Meeting
 from app.modules.tickets.access import TICKET_MANAGE
 from app.modules.tickets.models import (
     CLOSED_STATUSES,
-    TICKET_NUMBER_SEQ,
     TICKET_STATUSES,
     Ticket,
     TicketEvent,
     TicketNote,
     TicketSenderBlock,
 )
+from app.modules.tickets.numbers import draw_number, format_number, number_part, parse_number
 from app.modules.tickets.schemas import (
     ContextTarget,
     NoteCreate,
@@ -95,8 +95,9 @@ from app.shared.mentions import (
 from app.shared.paging import Page
 from app.shared.search import escape_like
 
-#: ``T-0040``, ``t0040``, ``0040`` and ``40`` all name ticket 40.
-_NUMBER_RE = re.compile(r"^(?:t-?)?0*(\d{1,9})$", re.IGNORECASE)
+#: The draws of a free number before the service gives up. One draw meets a used number
+#: with a chance of the ticket count divided by 31 to the power of 8.
+NUMBER_DRAWS = 8
 #: The route of an application or a meeting in ``context.route``.
 _ROUTE_RE = re.compile(
     r"^/(applications|meetings)/"
@@ -135,13 +136,8 @@ class SwallowedReport:
     ``id`` is always None, so the router sends no mail.
     """
 
-    number: int
+    number: str
     id: None = None
-
-
-def format_number(number: int) -> str:
-    """Render a ticket number: ``T-`` and at least four digits."""
-    return f"T-{number:04d}"
 
 
 def _now() -> datetime:
@@ -207,6 +203,21 @@ class TicketService:
         self.files = files or FilesService(session)
         self.todos = todos
 
+    async def free_number(self, draws: int = NUMBER_DRAWS) -> str:
+        """Draw a number that no ticket has.
+
+        A draw that meets a used number is drawn again, because the number is the
+        reference of a ticket in mails and must point to one ticket.
+
+        Raises:
+            RuntimeError: Every draw met a used number.
+        """
+        candidate = draw_number()
+        taken = await self.session.scalar(select(Ticket.id).where(Ticket.number == candidate))
+        if taken is not None and draws <= 1:
+            raise RuntimeError("no free ticket number")
+        return candidate if taken is None else await self.free_number(draws - 1)
+
     async def create(
         self,
         payload: TicketCreate,
@@ -221,8 +232,8 @@ class TicketService:
         the reporter. The router makes sure that one of them is set.
 
         A report of a blocked sender (``matching_block``) passes every check of a
-        normal report first, so its errors look the same. It then takes a number from
-        ``ticket_number_seq`` and stores nothing: no ticket, no event, no bind. The
+        normal report first, so its errors look the same. It then draws a number
+        and stores nothing: no ticket, no event, no bind. The
         result is a ``SwallowedReport`` and the router sends no mail. The drafts stay
         unbound until the purge.
 
@@ -247,6 +258,7 @@ class TicketService:
             return await self._swallow(block_id)
         ticket = Ticket(
             id=uuid.uuid4(),
+            number=await self.free_number(),
             kind=payload.kind,
             title=payload.title.strip() or payload.title,
             body=payload.body,
@@ -345,11 +357,11 @@ class TicketService:
         )
 
     async def _swallow(self, block_id: uuid.UUID) -> SwallowedReport:
-        """Take a number for a blocked report and count the hit; store no ticket.
+        """Draw a number for a blocked report and count the hit; store no ticket.
 
         The log line names the block, never the address.
         """
-        number = await self.session.scalar(select(TICKET_NUMBER_SEQ.next_value()))
+        number = await self.free_number()
         await self.session.execute(
             update(TicketSenderBlock)
             .where(TicketSenderBlock.id == block_id)
@@ -357,7 +369,7 @@ class TicketService:
         )
         await self.session.commit()
         logger.info("report held back by sender block %s", block_id)
-        return SwallowedReport(number=int(number or 0))
+        return SwallowedReport(number=number)
 
     @staticmethod
     def block_target(ticket: Ticket) -> BlockTarget | None:
@@ -470,15 +482,16 @@ class TicketService:
             {pid for row in rows for pid in (row.principal_id, row.created_by)}
         )
         sources = {r.source_ticket_id for r in rows if r.source_ticket_id is not None}
-        numbers: dict[uuid.UUID, int] = (
-            {
-                tid: int(number)
-                for tid, number in (
+        numbers: dict[uuid.UUID, str] = (
+            dict(
+                (
                     await self.session.execute(
                         select(Ticket.id, Ticket.number).where(Ticket.id.in_(sources))
                     )
-                ).all()
-            }
+                )
+                .tuples()
+                .all()
+            )
             if sources
             else {}
         )
@@ -514,7 +527,7 @@ class TicketService:
     ) -> Page[TicketListItem]:
         """List the tickets, newest first, with the filters of ``GET /tickets``.
 
-        ``q`` matches the title, the body, the number (``T-0040``, ``0040``, ``40``),
+        ``q`` matches the title, the body, the number (``T-7K3QX9MD``, ``7k3q``),
         and the name and e-mail of the reporter.
         """
         reporter = aliased(PrincipalRow)
@@ -1277,7 +1290,7 @@ class TicketService:
 
 
 def _blocked_sender(
-    row: TicketSenderBlock, accounts: Mapping[uuid.UUID, _Account], numbers: Mapping[uuid.UUID, int]
+    row: TicketSenderBlock, accounts: Mapping[uuid.UUID, _Account], numbers: Mapping[uuid.UUID, str]
 ) -> TicketBlockedSender:
     """Build the wire form of one block from the loaded accounts and ticket numbers."""
     account = accounts.get(row.principal_id) if row.principal_id is not None else None
@@ -1327,11 +1340,18 @@ def _assignee_filter(
 def _search_filter(term: str, texts: Sequence[_Text]) -> tuple[ColumnElement[bool], ...]:
     """Return the condition of ``q``: a text column contains it, or it names the number.
 
-    A blank term adds no condition.
+    A full number matches its ticket. A part of a number matches every ticket whose
+    number contains it, so a person finds a ticket while typing. A blank term adds no
+    condition.
     """
     pattern = f"%{escape_like(term)}%"
-    number = _NUMBER_RE.match(term)
-    by_number = (Ticket.number == int(number.group(1)),) if number is not None else ()
+    full = parse_number(term)
+    part = number_part(term)
+    by_number = (
+        (Ticket.number == full,)
+        if full is not None
+        else ((Ticket.number.contains(part, autoescape=True),) if part is not None else ())
+    )
     matches = (*(text.ilike(pattern, escape="\\") for text in texts), *by_number)
     return (or_(*matches),) if term else ()
 

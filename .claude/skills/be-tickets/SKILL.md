@@ -1,6 +1,6 @@
 ---
 name: be-tickets
-description: Tickets from the help menu — problem reports, questions and ideas (ticket/ticket_note/ticket_event, number T-0001 from ticket_number_seq). Covers the public one-way report POST /api/tickets (session, or ALTCHA + rate limit + body cap while tickets.publicEnabled), the ticket.manage work routes (list/counts/assignees/detail/patch/notes), draft attachments bound with ticket_id, note files, the sender block (ticket_sender_block, "Absender sperren"), the mails ticket_created/ticket_received/ticket_message/ticket_answer, the "Hilfe & Tickets" settings (help.wikiUrl, tickets.publicEnabled/notifyNew/retentionMonths, GET/PUT /api/admin/help-tickets), the retention cron anonymize_tickets, privacy export/erasure and the search source. Use when working on tickets, the help menu backend, TicketService, ticket mails, ticket retention or ticket attachments in backend/app/modules/tickets.
+description: Tickets from the help menu — problem reports, questions and ideas (ticket/ticket_note/ticket_event, number T-7K3QX9MD: eight random characters, numbers.py). Covers the public one-way report POST /api/tickets (session, or ALTCHA + rate limit + body cap while tickets.publicEnabled), the ticket.manage work routes (list/counts/assignees/detail/patch/notes), draft attachments bound with ticket_id, note files, the sender block (ticket_sender_block, "Absender sperren"), the mails ticket_created/ticket_received/ticket_message/ticket_answer, the "Hilfe & Tickets" settings (help.wikiUrl, tickets.publicEnabled/notifyNew/retentionMonths, GET/PUT /api/admin/help-tickets), the retention cron anonymize_tickets, privacy export/erasure and the search source. Use when working on tickets, the help menu backend, TicketService, ticket mails, ticket retention or ticket attachments in backend/app/modules/tickets.
 ---
 
 # Tickets — `backend/app/modules/tickets`
@@ -14,7 +14,7 @@ assignee, kind, notes (`internal` or `public`), a timeline of events and the tec
 context of the report.
 
 **Key files:**
-- `models.py` — `TicketSenderBlock` (see below), `Ticket` (number from `ticket_number_seq`, kind, status, reporter
+- `models.py` — `TicketSenderBlock` (see below), `Ticket` (number: eight random characters from `numbers.draw_number`, unique, `free_number` draws again on a used one; kind, status, reporter
   `reporter_principal_id` XOR `reporter_email` until `anonymized_at`, `assignee_id`,
   `duplicate_of_id`, `context` JSONB, `closed_at` = retention clock), `TicketNote` (soft
   delete, `visibility` `internal|public`, `author_id` NULL only for a reporter note on an
@@ -43,9 +43,9 @@ context of the report.
   `require_public_or_session` (403 `tickets_public_disabled`),
   `verify_altcha_unless_authenticated` (400 `altcha_failed`). Without a session `email`
   is required (422). A session without an account row counts as no account.
-  201 `{ number: "T-0042" }`.
+  201 `{ number: "T-7K3QX9MD" }`.
 - `GET /api/tickets` (`status`, `kind` repeatable; `assignee` = uuid | `me` | `none`; `q`
-  matches title, body, number `T-0040`/`0040`/`40`, reporter name and e-mail; paged,
+  matches title, body, number `T-7K3QX9MD` or a part such as `7k3q`, reporter name and e-mail; paged,
   newest first), `GET /api/tickets/counts`, `GET /api/tickets/assignees`,
   `GET|PATCH /api/tickets/{id}`, `POST /api/tickets/{id}/notes`,
   `PATCH|DELETE /api/tickets/{id}/notes/{noteId}` (403 `not_note_author`),
@@ -107,7 +107,7 @@ context of the report.
   unblock lifts all of them (account and account e-mail, or e-mail and its accounts).
   `create` checks `matching_block` after the draft check: an account matches by id or by
   its e-mail, an address matches the address or an account with it, case-insensitive. A
-  match takes a number from the sequence, counts the hit, commits and answers the normal
+  match draws a number, counts the hit, commits and answers the normal
   201 `{ number }` (`SwallowedReport`) — no ticket row, no bound drafts, no mail. The log
   names the block id, never the address. The merge combines blocks; the erasure deletes
   them (be-privacy).
@@ -139,7 +139,7 @@ erasure does it for the tickets of the request's e-mail
 reporter, assignee, note author and event actor (area `tickets`).
 
 **Search:** source `ticket` behind `ticket.manage`, reuses `TicketService.list`; title
-`T-0040 · <title>`, subtitle the status in the reader's language, url `/tickets/{id}`.
+`T-7K3QX9MD · <title>`, subtitle the status in the reader's language, url `/tickets/{id}`.
 
 **Conventions & gotchas:**
 - The migration `071d20ab0e10` adds `ticket_note.visibility` (existing notes stay
