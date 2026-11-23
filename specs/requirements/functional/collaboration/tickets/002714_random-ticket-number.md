@@ -5,7 +5,13 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/tickets/test_ticket_service.py:test_a_used_number_is_drawn_again"
+  - "backend/tests/unit/modules/tickets/test_ticket_service.py:test_a_drawn_number_has_eight_characters_of_the_alphabet"
+implementation:
+  - backend/app/modules/tickets/numbers.py
+  - backend/app/modules/tickets/service.py
+  - backend/migrations/versions/c7a94e12d5b3_ticket_random_numbers.py
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets
