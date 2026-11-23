@@ -5,7 +5,13 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/tickets/test_ticket_paperless_webhooks.py:test_a_sender_message_is_an_event_and_a_team_message_is_not"
+  - "backend/tests/unit/modules/tickets/test_ticket_webhooks.py:test_message_holds_the_text"
+implementation:
+  - backend/app/modules/tickets/webhook_fields.py
+  - backend/app/modules/tickets/service.py
+  - backend/app/modules/webhooks/catalog.py
 scope:
   - backend/app/modules/webhooks
   - backend/app/modules/tickets

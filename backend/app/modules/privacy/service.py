@@ -37,6 +37,7 @@ from app.modules.notifications.push_models import PushSubscription
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.protocol.erasure import erase_candidate_names
 from app.modules.tickets.models import Ticket, TicketNote
+from app.modules.tickets.privacy import mail_ticket_ids_of, public_messages_of
 from app.modules.tickets.service import (
     TicketService,
     erase_sender_blocks,
@@ -529,7 +530,10 @@ class AuskunftService:
         email. The live account comes first: not merged, then active, then the newest
         login. The result also holds its attendance with excuse reasons, the tickets
         that the address reported (without a session or through the account) with
-        their attachment metadata, and the own ticket messages with file names.
+        their attachment metadata, and the own ticket messages with file names. A ticket
+        from a mail whose sender or ``Cc`` address is the address is part of the export
+        with its public messages and never with an internal message
+        (§F/administration/privacy/002748).
         Deleted messages keep their text until the anonymization, so they are part of
         the export.
 
@@ -566,8 +570,13 @@ class AuskunftService:
                 else ()
             ),
         )
+        mail_tickets = await mail_ticket_ids_of(self.session, email)
         trows = (
-            await self.session.scalars(select(Ticket).where(or_(*reporter)).order_by(Ticket.number))
+            await self.session.scalars(
+                select(Ticket)
+                .where(or_(*reporter, Ticket.id.in_(mail_tickets)))
+                .order_by(Ticket.number)
+            )
         ).all()
         tickets = [
             {
@@ -581,7 +590,13 @@ class AuskunftService:
             for t in trows
         ]
         ticket_files = await self._ticket_attachments(trows) if trows else []
-        ticket_notes = await self._ticket_notes(principal_row) if principal_row is not None else []
+        own_notes = await self._ticket_notes(principal_row) if principal_row is not None else []
+        ticket_notes = [
+            *(row for _note_id, row in own_notes),
+            *await public_messages_of(
+                self.session, mail_tickets, skip=[note_id for note_id, _row in own_notes]
+            ),
+        ]
         todos = await todo_export(
             self.session, [principal_row.id] if principal_row is not None else []
         )
@@ -802,8 +817,8 @@ class AuskunftService:
             for at in tarows
         ]
 
-    async def _ticket_notes(self, principal_row: Principal) -> list[dict[str, Any]]:
-        """Return the own ticket notes of the principal, with the names of their files."""
+    async def _ticket_notes(self, principal_row: Principal) -> list[tuple[UUID, dict[str, Any]]]:
+        """Return the own ticket notes of the principal by id, with the names of their files."""
         nrows = (
             await self.session.execute(
                 select(TicketNote, Ticket.number)
@@ -826,14 +841,17 @@ class AuskunftService:
             else {}
         )
         return [
-            {
-                "ticketNumber": format_number(number),
-                "visibility": note.visibility,
-                "createdAt": note.created_at,
-                "deletedAt": note.deleted_at,
-                "body": note.body,
-                "attachments": note_files.get(note.id, []),
-            }
+            (
+                note.id,
+                {
+                    "ticketNumber": format_number(number),
+                    "visibility": note.visibility,
+                    "createdAt": note.created_at,
+                    "deletedAt": note.deleted_at,
+                    "body": note.body,
+                    "attachments": note_files.get(note.id, []),
+                },
+            )
             for note, number in nrows
         ]
 

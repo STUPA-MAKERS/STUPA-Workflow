@@ -55,6 +55,9 @@ def _quiet(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _synced(*_a: object, **_k: object) -> bool:
         return True
 
+    monkeypatch.setattr(privacy_service, "mail_ticket_ids_of", _none)
+    monkeypatch.setattr(privacy_service, "public_messages_of", _none)
+    monkeypatch.setattr("app.modules.privacy.router.mail_counts_of_principal", _none)
     monkeypatch.setattr(privacy_service, "erase_candidacies", _none)
     monkeypatch.setattr(privacy_service, "erase_candidate_names", _none)
     monkeypatch.setattr(privacy_service, "sync_principal_memberships", _synced)
@@ -288,7 +291,7 @@ def test_the_erase_route_passes_the_object_storage(monkeypatch: pytest.MonkeyPat
         app.state.object_storage = storage
         resp = client.post(f"/api/admin/privacy/principals/{target}/erase")
     assert resp.status_code == 200
-    assert resp.json() == {"paperlessDocuments": []}
+    assert resp.json() == {"paperlessDocuments": [], "ticketMails": []}
     assert seen["principal_id"] == target
     assert seen["actor"] == "admin"
     assert seen["files"].storage is storage

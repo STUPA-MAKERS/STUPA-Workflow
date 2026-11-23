@@ -5,7 +5,14 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/tickets/test_ticket_paperless_webhooks.py:test_the_action_needs_paperless_use"
+  - "backend/tests/integration/modules/tickets/test_ticket_paperless_webhooks.py:test_the_worker_files_the_file_with_the_ticket_number"
+implementation:
+  - backend/app/modules/tickets/paperless.py
+  - backend/app/modules/tickets/router.py
+  - backend/app/modules/paperless_filing/files.py
+  - frontend/src/app/pages/tickets/ticket-detail.component.ts
 scope:
   - backend/app/modules/tickets
   - backend/app/modules/files

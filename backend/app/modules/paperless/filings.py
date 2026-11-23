@@ -56,6 +56,7 @@ AUDIT_TARGET: dict[str, str] = {
     "application": "application",
     "attachment": "application",
     "plan": "budget_plan",
+    "ticket_file": "ticket",
 }
 
 #: The kinds whose newer document replaces the document before it

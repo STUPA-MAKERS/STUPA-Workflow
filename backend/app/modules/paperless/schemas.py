@@ -10,7 +10,9 @@ from pydantic import Field, model_validator
 
 from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
-FilingKind = Literal["protocol", "protocol_public", "application", "attachment", "plan"]
+FilingKind = Literal[
+    "protocol", "protocol_public", "application", "attachment", "plan", "ticket_file"
+]
 
 #: The kinds of element whose page links to its document.
 ElementKind = Literal["protocol", "application", "plan"]

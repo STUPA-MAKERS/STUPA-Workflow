@@ -76,6 +76,7 @@ ROUTE_PATTERNS: Final[tuple[tuple[Feature, re.Pattern[str]], ...]] = tuple(
         (Feature.PAPERLESS, r"/paperless"),
         (Feature.PAPERLESS, r"/admin/paperless"),
         (Feature.PAPERLESS, r"/meetings/\{meeting_id\}/documents/paperless"),
+        (Feature.PAPERLESS, r"/tickets/\{ticket_id\}/files/\{attachment_id\}/paperless"),
     )
 )
 

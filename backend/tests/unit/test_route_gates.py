@@ -240,6 +240,8 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("POST", "/api/tickets/{ticket_id}/notes"): _TICKET_WORK,
     ("PATCH", "/api/tickets/{ticket_id}/notes/{note_id}"): _TICKET_WORK,
     ("DELETE", "/api/tickets/{ticket_id}/notes/{note_id}"): _TICKET_WORK,
+    ("GET", "/api/tickets/{ticket_id}/mails/{mail_id}/source"): _TICKET_WORK,
+    ("POST", "/api/tickets/{ticket_id}/mails/{mail_id}/resend"): _TICKET_WORK,
     ("GET", "/api/tickets/mine"): "TicketService.reporter_list (own tickets)",
     ("GET", "/api/tickets/mine/{ticket_id}"): _REPORTER,
     ("POST", "/api/tickets/mine/{ticket_id}/notes"): _REPORTER,

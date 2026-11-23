@@ -259,11 +259,17 @@ async def _plans(
 
 
 def open_kinds(settings: PaperlessSettings) -> tuple[str, ...]:
-    """The kinds of filing whose part is on. A job of another kind waits."""
+    """The kinds of filing whose part is on. A job of another kind waits.
+
+    A file of a ticket has no switch: a person files it by hand while the connection is
+    on (§F/integrations/ticket-mail/002742).
+    """
+    connected = bool(settings.base_url and settings.token)
     return (
         *(("protocol", "protocol_public") if part_since(settings, "protocols") else ()),
         *(("application", "attachment") if part_since(settings, "applications") else ()),
         *(("plan",) if part_since(settings, "plans") else ()),
+        *(("ticket_file",) if connected else ()),
     )
 
 

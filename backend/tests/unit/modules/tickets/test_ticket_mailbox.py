@@ -297,8 +297,9 @@ class _Imap:
 
     def login(self, user: str, _password: str) -> None:
         type(self).calls.append(f"login {user}")
-        if type(self).fail is not None:
-            raise type(self).fail
+        error = type(self).fail
+        if error is not None:
+            raise error
 
     def shutdown(self) -> None:
         type(self).calls.append("shutdown")
@@ -329,8 +330,9 @@ class _Smtp:
 
     def login(self, user: str, _password: str) -> None:
         type(self).calls.append(f"login {user}")
-        if type(self).fail is not None:
-            raise type(self).fail
+        error = type(self).fail
+        if error is not None:
+            raise error
 
     def close(self) -> None:
         type(self).calls.append("close")

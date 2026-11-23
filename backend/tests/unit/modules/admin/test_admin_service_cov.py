@@ -1421,7 +1421,7 @@ def test_webhook_catalog_out() -> None:
     from app.modules.admin.service.webhooks import catalog_out
 
     events = catalog_out()
-    assert len(events) == 14
+    assert len(events) == 16
     ticket = next(e for e in events if e.name == "ticket.created")
     assert {f.key for f in ticket.fields if f.personal} == {"body", "reporterEmail"}
 

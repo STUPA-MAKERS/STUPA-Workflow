@@ -59,6 +59,7 @@ from app.modules.tickets.mails import (
     notify_ticket_received,
 )
 from app.modules.tickets.mention_mails import notify_ticket_mentions
+from app.modules.tickets.paperless import PAPERLESS_USE
 from app.modules.tickets.schemas import (
     NoteBody,
     NoteCreate,
@@ -81,6 +82,7 @@ from app.modules.tickets.schemas import (
     TicketMailOut,
     TicketManualCreate,
     TicketNoteOut,
+    TicketPaperlessFile,
     TicketPatch,
     TicketRef,
     TicketStatus,
@@ -118,6 +120,7 @@ Manager = Annotated[Principal, Depends(require_principal(TICKET_MANAGE))]
 Reader = Annotated[Principal, Depends(require_principal())]
 SiteAdmin = Annotated[Principal, Depends(require_principal("admin.site"))]
 MailAdmin = Annotated[Principal, Depends(require_principal("admin.ticket_mail"))]
+PaperlessUser = Annotated[Principal, Depends(require_principal(PAPERLESS_USE))]
 
 
 @dataclass(frozen=True, slots=True)
@@ -647,6 +650,36 @@ async def resend_ticket_mail(
     mail = await service.resend_mail(ticket_id, mail_id, areas=worker.areas)
     await db.commit()
     return mail
+
+
+@router.post(
+    "/tickets/{ticket_id}/files/{attachment_id}/paperless",
+    response_model=TicketPaperlessFile,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses=_errors(401, 403, 404, 409),
+)
+async def file_ticket_file_in_paperless(
+    ticket_id: UUID,
+    attachment_id: UUID,
+    service: ServiceDep,
+    db: DbSession,
+    worker: Worker,
+    _user: PaperlessUser,
+) -> TicketPaperlessFile:
+    """File one clean file of the ticket in Paperless ("In Paperless ablegen").
+
+    The route needs the work right in the Bereich and ``paperless.use``. It opens a job,
+    and the worker files the document with the number of the ticket in its title. The
+    answer is the file with the state ``pending``; a second call for the same file adds
+    no second document, and a call for a ``failed`` file starts its job again. While
+    the Paperless connection is off the answer is 409 ``paperless_off``, and for a file
+    without a clean scan 409 ``file_not_clean``.
+    """
+    out = await service.file_in_paperless(
+        ticket_id, attachment_id, worker.principal, areas=worker.areas
+    )
+    await db.commit()
+    return out
 
 
 @router.get(

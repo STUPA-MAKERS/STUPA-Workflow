@@ -25,6 +25,7 @@ import {
   TicketsApiService,
   type MyTicketDetail,
   type TicketAttachment,
+  type TicketPaperlessFile,
   type TicketDetail,
   type TicketMail,
   type TicketMailRecipients,
@@ -57,6 +58,7 @@ import { chatPeople } from '@shared/ui/chat/chat-mentions';
 import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
 import {
   ButtonComponent,
+  ButtonLinkComponent,
   ButtonGroupComponent,
   CheckboxComponent,
   DialogComponent,
@@ -266,6 +268,7 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
+    ButtonLinkComponent,
     ButtonGroupComponent,
     ChatComponent,
     CheckboxComponent,
@@ -656,12 +659,36 @@ export class TicketDetailComponent {
     };
   });
 
+  /**
+   * The clean files of the ticket for "In Paperless ablegen"; empty without `paperless.use`,
+   * while the connection is off and for a reporter (§F/integrations/ticket-mail/002742).
+   */
+  protected readonly paperlessFiles = computed<readonly TicketPaperlessFile[]>(() =>
+    this.manager ? (this.ticket()?.paperless?.files ?? []) : [],
+  );
+
+  /** "In Paperless ablegen": open the job of one file and show its new state at once. */
+  fileInPaperless(file: TicketPaperlessFile): void {
+    const t = this.ticket();
+    if (!t) return;
+    this.api.fileInPaperless(t.id, file.id).subscribe({
+      next: (filed) => {
+        const cur = this.ticket();
+        if (!cur?.paperless || cur.id !== t.id) return;
+        const files = cur.paperless.files.map((f) => (f.id === filed.id ? filed : f));
+        this.ticket.set({ ...cur, paperless: { files } });
+      },
+      error: () => this.toast.show(this.t('tickets.paperless.error'), 'error'),
+    });
+  }
+
   constructor() {
     pageItemTitle(() => this.ticket()?.title);
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => this.load(pm.get('id')!));
     effect((onCleanup) => {
-      const waiting = this.ticket()?.mails?.some((m) => m.state === 'sending') ?? false;
-      if (!waiting) return;
+      const sending = this.ticket()?.mails?.some((m) => m.state === 'sending') ?? false;
+      const filing = this.paperlessFiles().some((f) => f.state === 'pending');
+      if (!sending && !filing) return;
       const timer = setTimeout(() => this.reload(), MAIL_STATE_POLL_MS);
       onCleanup(() => clearTimeout(timer));
     });

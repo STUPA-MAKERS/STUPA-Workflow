@@ -772,16 +772,63 @@ export const MOCK_WEBHOOK_CATALOG: readonly WebhookCatalogEvent[] = [
     group: 'tickets',
     idKeys: ['ticketId'],
     fields: [
-      { key: 'number', personal: false, example: 'T-0042' },
-      { key: 'kind', personal: false, example: 'problem' },
+      { key: 'number', personal: false, example: 'T-7K3QX9MD' },
       { key: 'title', personal: false, example: 'Upload hängt' },
+      {
+        key: 'area',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'Plattform' },
+      },
       {
         key: 'url',
         personal: false,
         example: 'https://example.org/tickets/3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f',
       },
+      { key: 'kind', personal: false, example: 'problem' },
+      { key: 'source', personal: false, example: 'mail' },
       { key: 'body', personal: true, example: 'Beim Hochladen passiert nichts.' },
       { key: 'reporterEmail', personal: true, example: 'erika@example.org' },
+    ],
+  },
+  {
+    name: 'ticket.message',
+    group: 'tickets',
+    idKeys: ['ticketId'],
+    fields: [
+      { key: 'number', personal: false, example: 'T-7K3QX9MD' },
+      { key: 'title', personal: false, example: 'Upload hängt' },
+      {
+        key: 'area',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'Plattform' },
+      },
+      {
+        key: 'url',
+        personal: false,
+        example: 'https://example.org/tickets/3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f',
+      },
+      { key: 'body', personal: true, example: 'Es geht wieder nicht.' },
+    ],
+  },
+  {
+    name: 'ticket.status',
+    group: 'tickets',
+    idKeys: ['ticketId'],
+    fields: [
+      { key: 'number', personal: false, example: 'T-7K3QX9MD' },
+      { key: 'title', personal: false, example: 'Upload hängt' },
+      {
+        key: 'area',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'Plattform' },
+      },
+      {
+        key: 'url',
+        personal: false,
+        example: 'https://example.org/tickets/3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f',
+      },
+      { key: 'fromStatus', personal: false, example: 'in_progress' },
+      { key: 'toStatus', personal: false, example: 'done' },
     ],
   },
 ];

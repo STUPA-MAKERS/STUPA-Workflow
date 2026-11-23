@@ -37,14 +37,30 @@ class ErasureRequestOut(FrozenCamelModel, frozen=True):
     paperless_documents: tuple[FiledDocumentOut, ...] = Field(
         default=(), alias="paperlessDocuments"
     )
+    ticket_mails: tuple[TicketMailCountOut, ...] = Field(default=(), alias="ticketMails")
+
+
+class TicketMailCountOut(FrozenCamelModel, frozen=True):
+    """The mails of an erased address in one Postfach that stay on the mail server.
+
+    ``mailbox`` is the address of the Postfach; null for a Postfach that is removed.
+    ``count`` is the number of mails that the platform imported or sent (002747).
+    """
+
+    mailbox: str | None = None
+    count: int
 
 
 class PrincipalErasureOut(FrozenCamelModel, frozen=True):
-    """What stays in Paperless after the erasure of an account (002532)."""
+    """What stays in Paperless and on the mail servers after the erasure of an account.
+
+    §F/administration/privacy/002532, 002747
+    """
 
     paperless_documents: tuple[FiledDocumentOut, ...] = Field(
         default=(), alias="paperlessDocuments"
     )
+    ticket_mails: tuple[TicketMailCountOut, ...] = Field(default=(), alias="ticketMails")
 
 
 class ErasureRejectBody(FrozenCamelModel, frozen=True):
@@ -85,3 +101,4 @@ class EmailErasureOut(FrozenCamelModel, frozen=True):
     paperless_documents: tuple[FiledDocumentOut, ...] = Field(
         default=(), alias="paperlessDocuments"
     )
+    ticket_mails: tuple[TicketMailCountOut, ...] = Field(default=(), alias="ticketMails")

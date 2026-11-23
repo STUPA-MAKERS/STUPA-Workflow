@@ -36,7 +36,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
-import type { AdminPrincipal, ErasureRequest, PaperlessDocument } from '../admin.models';
+import type { AdminPrincipal, ErasureRequest, PaperlessDocument, TicketMailCount } from '../admin.models';
 import { personLabel } from '@shared/person-label.util';
 
 /** The picker shows this many hits. A longer list means: type more. */
@@ -172,6 +172,26 @@ export class PrivacyComponent {
     else if (item.id === 'paperless') this.showPaperless(row.paperlessDocuments);
   }
 
+  /**
+   * The mails of the erased address per Postfach that the open dialog lists; `null`: no
+   * dialog (§F/administration/privacy/002747).
+   */
+  protected readonly ticketMails = signal<readonly TicketMailCount[] | null>(null);
+
+  protected readonly mailColumns = computed<ColumnDef[]>(() => [
+    { key: 'mailbox', label: this.i18n.translate('admin.privacy.mails.col.mailbox'), card: 'title' },
+    { key: 'count', label: this.i18n.translate('admin.privacy.mails.col.count'), width: '6rem', align: 'end' },
+  ]);
+
+  /** Show what stays outside the platform after an erasure: the documents, then the mails. */
+  private showRemains(done: {
+    readonly paperlessDocuments?: readonly PaperlessDocument[];
+    readonly ticketMails?: readonly TicketMailCount[];
+  }): void {
+    this.showPaperless(done.paperlessDocuments);
+    this.ticketMails.set(done.ticketMails?.length ? done.ticketMails : null);
+  }
+
   /** Open the list of the Paperless documents; without a document there is no dialog. */
   private showPaperless(documents: readonly PaperlessDocument[] | undefined): void {
     this.paperlessDocuments.set(documents?.length ? documents : null);
@@ -249,7 +269,7 @@ export class PrivacyComponent {
       next: (done) => {
         this.confirmExecute.set(null);
         this.toast.show(this.i18n.translate('admin.privacy.executed'), 'success');
-        this.showPaperless(done.paperlessDocuments);
+        this.showRemains(done);
         this.reload();
       },
       error: () => this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error'),
@@ -299,7 +319,7 @@ export class PrivacyComponent {
         this.confirmPrincipal.set(false);
         this.person.set(null);
         this.toast.show(this.i18n.translate('admin.privacy.principalErased'), 'success');
-        this.showPaperless(done.paperlessDocuments);
+        this.showRemains(done);
       },
       error: () => {
         this.confirmPrincipal.set(false);

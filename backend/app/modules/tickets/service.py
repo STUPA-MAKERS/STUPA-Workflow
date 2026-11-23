@@ -93,6 +93,7 @@ from app.modules.tickets.models import (
     TicketSenderBlock,
 )
 from app.modules.tickets.numbers import draw_number, format_number, number_part, parse_number
+from app.modules.tickets.paperless import PAPERLESS_USE, file_in_paperless, paperless_of
 from app.modules.tickets.schemas import (
     ContextTarget,
     NoteCreate,
@@ -111,12 +112,17 @@ from app.modules.tickets.schemas import (
     TicketMailOut,
     TicketManualCreate,
     TicketNoteOut,
+    TicketPaperlessFile,
     TicketPatch,
     TicketRef,
     TicketReporter,
     TicketSkippedFile,
 )
-from app.modules.tickets.webhook_fields import emit_ticket_created
+from app.modules.tickets.webhook_fields import (
+    emit_ticket_created,
+    emit_ticket_message,
+    emit_ticket_status,
+)
 from app.shared.errors import (
     ConflictError,
     ForbiddenError,
@@ -595,15 +601,20 @@ class TicketService:
         )
         logger.info("mail held back by sender block %s", block_id)
 
-    def sender_answered(self, ticket: Ticket) -> None:
+    async def sender_answered(self, ticket: Ticket, *, body: str) -> None:
         """Set ``in_progress`` after a message of the sender, without a commit.
 
         Only a ticket with the status ``waiting``, ``done`` or ``rejected`` changes. The
-        status event has no person, so the team sees that the answer is there.
+        status event has no person, so the team sees that the answer is there. The
+        message is the webhook event ``ticket.message``, and the status change is
+        ``ticket.status`` (§F/integrations/webhooks/002750, 002751).
         """
-        if ticket.status == "waiting" or ticket.status in CLOSED_STATUSES:
+        old = ticket.status
+        if old == "waiting" or old in CLOSED_STATUSES:
             self._set_status(ticket, "in_progress", None, None)
         ticket.updated_at = _now()
+        await emit_ticket_message(self.session, ticket, body=body)
+        await emit_ticket_status(self.session, ticket, old=old, new=ticket.status)
 
     def add_event(self, ticket: Ticket, kind: str, payload: dict[str, JsonValue]) -> None:
         """Add an event of the system to a ticket, without a commit."""
@@ -941,7 +952,28 @@ class TicketService:
             sender_blocked=await self._sender_blocked(ticket),
             mails=tuple(_mail_out(m) for m in mails),
             mail_answer=await self._mail_answer(ticket, mails),
+            paperless=(
+                await paperless_of(self.session, ticket) if principal.has(PAPERLESS_USE) else None
+            ),
         )
+
+    async def file_in_paperless(
+        self,
+        ticket_id: uuid.UUID,
+        attachment_id: uuid.UUID,
+        principal: Principal,
+        *,
+        areas: AreaScope = None,
+    ) -> TicketPaperlessFile:
+        """Open the job that files one file of a ticket in Paperless, without a commit.
+
+        Raises:
+            NotFoundError: No ticket has this id in the Bereiche ``areas``, or the ticket
+                has no such file (HTTP 404).
+            ConflictError: ``paperless_off`` or ``file_not_clean`` (HTTP 409).
+        """
+        ticket = await self._get(ticket_id, areas=areas)
+        return await file_in_paperless(self.session, ticket, attachment_id, actor=principal.sub)
 
     async def _mail_answer(
         self, ticket: Ticket, mails: Sequence[TicketMail]
@@ -1093,7 +1125,9 @@ class TicketService:
         new_kind = kind if kind is not None and kind != ticket.kind else None
         category_changes = "category_id" in fields and payload.category_id != ticket.category_id
         if new_status is not None:
+            old_status = ticket.status
             self._set_status(ticket, new_status, duplicate, actor)
+            await emit_ticket_status(self.session, ticket, old=old_status, new=new_status)
         if assignee_changes:
             self._event(
                 ticket,
@@ -1606,8 +1640,7 @@ class TicketService:
         ticket, me = await self._reporter_ticket(ticket_id, principal, lock=True)
         if await self._sender_blocked(ticket):
             raise ForbiddenError("The sender is blocked.", code=SENDER_BLOCKED)
-        if ticket.status == "waiting" or ticket.status in CLOSED_STATUSES:
-            self._set_status(ticket, "in_progress", None, None)
+        await self.sender_answered(ticket, body=payload.body)
         return await self._insert_note(
             ticket,
             me,

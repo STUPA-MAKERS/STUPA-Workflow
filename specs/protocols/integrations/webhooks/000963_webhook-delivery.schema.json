@@ -26,6 +26,8 @@
         "booking.created",
         "invoice.created",
         "ticket.created",
+        "ticket.message",
+        "ticket.status",
         "webhook.test"
       ]
     },
@@ -285,7 +287,11 @@
       "if": {
         "properties": {
           "event": {
-            "const": "ticket.created"
+            "enum": [
+              "ticket.created",
+              "ticket.message",
+              "ticket.status"
+            ]
           }
         }
       },
