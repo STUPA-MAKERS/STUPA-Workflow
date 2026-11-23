@@ -81,7 +81,14 @@ from app.modules.notifications.push_models import (
 from app.modules.paperless.models import PaperlessFiling, PaperlessSettings
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.site_config.models import SiteConfigVersion
-from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
+from app.modules.tickets.models import (
+    Ticket,
+    TicketArea,
+    TicketCategory,
+    TicketEvent,
+    TicketNote,
+    TicketSenderBlock,
+)
 from app.modules.todos.models import (
     Link,
     TodoAssignee,
@@ -174,6 +181,8 @@ __all__ = [
     "StatusEvent",
     "SubmissionVersion",
     "Ticket",
+    "TicketArea",
+    "TicketCategory",
     "TicketEvent",
     "TicketNote",
     "TicketSenderBlock",

@@ -344,13 +344,14 @@ class SearchService:
         ]
 
     async def _tickets(self, q: str, principal: Principal, lang: str) -> list[SearchHit]:
-        """Reuses `TicketService.list`, behind `ticket.manage` like `GET /api/tickets`."""
-        from app.modules.tickets.access import TICKET_MANAGE
+        """Reuses `TicketService.list` with the Bereiche of the caller, like `GET /api/tickets`."""
+        from app.modules.tickets.access import area_scope, works_anywhere
         from app.modules.tickets.service import TicketService
 
-        if not principal.has(TICKET_MANAGE):
+        areas = await area_scope(self.session, principal)
+        if not works_anywhere(areas):
             return []
-        page = await TicketService(self.session).list(q=q, limit=PER_KIND + 1)
+        page = await TicketService(self.session).list(q=q, limit=PER_KIND + 1, areas=areas)
         return [
             SearchHit(
                 kind="ticket",

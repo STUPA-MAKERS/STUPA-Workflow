@@ -49,7 +49,7 @@ from app.modules.files.models import Attachment
 from app.modules.files.queue import scan_queue_from_pool
 from app.modules.files.schemas import AttachmentOut, DraftAttachmentOut, SignedUrlOut
 from app.modules.files.service import AttachmentOwner, application_id_of
-from app.modules.tickets.access import TICKET_MANAGE
+from app.modules.tickets.access import works_on_ticket
 from app.modules.tickets.models import TicketNote
 from app.modules.tickets.service import reporter_reads_file
 from app.modules.todos.access import BoardAccess
@@ -203,9 +203,9 @@ async def _assert_owner_reader(
 
     The rule is the rule of reading the message itself:
 
-    * ``ticket`` (a report file) and ``ticket_note``: a principal with
-      ``ticket.manage``, or the reporter account of the ticket (a note only when it is
-      ``public``; never on an anonymized ticket); a note must not be deleted.
+    * ``ticket`` (a report file) and ``ticket_note``: a principal with the work
+      right in the Bereich of the ticket, or the reporter account of the ticket (a note
+      only when it is ``public``; never on an anonymized ticket); a note must not be deleted.
     * ``todo_comment``: a principal who reads the board of the card (``BoardAccess``:
       the board rule with the token scope cap, ``todo.read_all`` included; archived
       cards too); the comment must not be deleted.
@@ -240,7 +240,8 @@ async def _assert_ticket_reader(
     """
     if principal is None:
         raise missing
-    if not principal.has(TICKET_MANAGE) and not await reporter_reads_file(
+    works = await works_on_ticket(db, principal, owner.id, note=owner.kind == "ticket_note")
+    if not works and not await reporter_reads_file(
         db, principal, kind=owner.kind, owner_id=owner.id
     ):
         raise missing

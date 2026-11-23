@@ -69,6 +69,10 @@ class ScriptedSession:
         self.added.append(obj)
         self.store[obj.id] = obj
 
+    def add_all(self, objs: Any) -> None:
+        for obj in objs:
+            self.add(obj)
+
     async def get(self, model: type, ident: Any, **kw: Any) -> Any:
         self.get_kw.append(kw)
         obj = self.store.get(ident)

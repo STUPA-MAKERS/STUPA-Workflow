@@ -1021,13 +1021,54 @@ class TodoCardPatch(WireModel, frozen=True):
     dueDate: str | None = Field(default=None, description="ISO date; explicit null clears it")
 
 
+class TicketCategoryIn(WireModel, frozen=True):
+    id: str | None = Field(
+        default=None, description="The id of a stored Kategorie; leave out for a new one"
+    )
+    name: str
+
+
+class TicketAreaCreate(WireModel, frozen=True):
+    name: str
+    gremiumId: str | None = Field(
+        default=None, description="The Gremium whose roles grant ticket.work in the Bereich"
+    )
+    notifyNew: bool = Field(default=True, description="Mail each new ticket to the team")
+    categories: list[TicketCategoryIn] = Field(default_factory=list)
+
+
+class TicketAreaPatch(WireModel, frozen=True):
+    name: str | None = None
+    gremiumId: str | None = Field(
+        default=None, description="Explicit null leaves the Bereich without a Gremium"
+    )
+    notifyNew: bool | None = None
+    categories: list[TicketCategoryIn] | None = Field(
+        default=None,
+        description="The whole ordered list; a stored Kategorie that is left out is deleted",
+    )
+
+
 class TicketPatch(WireModel, frozen=True):
     status: TicketStatus | None = None
     assigneeId: str | None = Field(
         default=None,
-        description="A holder of ticket.manage (see the ticket assignees); explicit null unassigns",
+        description="A person with the work right in the Bereich of the ticket (see the "
+        "ticket assignees with `area`); explicit null unassigns",
     )
-    kind: TicketKind | None = None
+    kind: TicketKind | None = Field(
+        default=None, description="The Kategorie of a ticket of the Bereich Plattform"
+    )
+    categoryId: str | None = Field(
+        default=None,
+        description="A Kategorie of the Bereich of the ticket (see the ticket areas); "
+        "explicit null clears it. Not for a ticket of Plattform",
+    )
+    areaId: str | None = Field(
+        default=None,
+        description="Move the ticket to this Bereich: clears the Kategorie, and the "
+        "assignee without the work right there",
+    )
     duplicateOfId: str | None = Field(
         default=None, description="Another ticket's id; only together with status `rejected`"
     )

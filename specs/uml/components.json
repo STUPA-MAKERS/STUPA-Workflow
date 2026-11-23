@@ -21,7 +21,7 @@
       "to": "shared"
     },
     {
-      "count": 1,
+      "count": 2,
       "from": "account",
       "to": "tickets"
     },
@@ -1386,7 +1386,12 @@
       "to": "applications"
     },
     {
-      "count": 7,
+      "count": 2,
+      "from": "tickets",
+      "to": "audit"
+    },
+    {
+      "count": 11,
       "from": "tickets",
       "to": "auth"
     },
@@ -1394,6 +1399,11 @@
       "count": 7,
       "from": "tickets",
       "to": "files"
+    },
+    {
+      "count": 2,
+      "from": "tickets",
+      "to": "gremien"
     },
     {
       "count": 1,
@@ -1411,7 +1421,7 @@
       "to": "notifications"
     },
     {
-      "count": 18,
+      "count": 19,
       "from": "tickets",
       "to": "shared"
     },

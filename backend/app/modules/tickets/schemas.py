@@ -26,7 +26,9 @@ from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
 TicketKind = Literal["bug", "question", "idea", "barrier"]
 TicketStatus = Literal["new", "in_progress", "done", "rejected"]
-TicketEventKind = Literal["created", "status", "assignee", "kind", "todo_done"]
+TicketEventKind = Literal[
+    "created", "status", "assignee", "kind", "todo_done", "category", "area"
+]
 NoteVisibility = Literal["internal", "public"]
 
 #: The most draft attachments one report binds.
@@ -118,11 +120,18 @@ class TicketReporter(FrozenCamelModel, frozen=True):
 
 
 class TicketListItem(FrozenCamelModel, frozen=True):
-    """A ticket row of the work list."""
+    """A ticket row of the work list.
+
+    ``kind`` is the fixed Kategorie of a ticket of the Bereich ``Plattform`` and null
+    in every other Bereich. ``categoryId`` is the Kategorie of a ticket of another
+    Bereich, else null.
+    """
 
     id: UUID
     number: str
-    kind: TicketKind
+    area_id: UUID = Field(serialization_alias="areaId")
+    kind: TicketKind | None = None
+    category_id: UUID | None = Field(default=None, serialization_alias="categoryId")
     title: str
     status: TicketStatus
     reporter: TicketReporter
@@ -210,11 +219,18 @@ class TicketDetail(TicketListItem, frozen=True):
 
 
 class TicketPatch(FrozenStrictCamelModel, frozen=True):
-    """A change of status, assignee or kind. ``assigneeId: null`` unassigns."""
+    """A change of status, assignee, Kategorie or Bereich. ``assigneeId: null`` unassigns.
+
+    ``kind`` is the Kategorie of a ticket of ``Plattform``; ``categoryId`` is the
+    Kategorie of a ticket of another Bereich, and ``null`` clears it. ``areaId`` moves
+    the ticket to another Bereich.
+    """
 
     status: TicketStatus | None = None
     assignee_id: UUID | None = Field(default=None, alias="assigneeId")
     kind: TicketKind | None = None
+    category_id: UUID | None = Field(default=None, alias="categoryId")
+    area_id: UUID | None = Field(default=None, alias="areaId")
     duplicate_of_id: UUID | None = Field(default=None, alias="duplicateOfId")
     complete_todos: bool | None = Field(default=None, alias="completeTodos")
 
@@ -259,11 +275,14 @@ class ReporterNoteCreate(MessageFilesIn):
 
 
 class ReporterTicketItem(FrozenCamelModel, frozen=True):
-    """A ticket in the list of its reporter: no reporter, no assignee."""
+    """A ticket in the list of its reporter: no reporter, no assignee.
+
+    ``kind`` is null for a ticket outside the Bereich ``Plattform``.
+    """
 
     id: UUID
     number: str
-    kind: TicketKind
+    kind: TicketKind | None = None
     title: str
     status: TicketStatus
     created_at: datetime = Field(serialization_alias="createdAt")
@@ -314,3 +333,56 @@ class TicketCounts(FrozenCamelModel, frozen=True):
     in_progress: int = Field(default=0, serialization_alias="inProgress")
     done: int = 0
     rejected: int = 0
+
+
+class TicketCategoryOut(FrozenCamelModel, frozen=True):
+    """One Kategorie of a Bereich."""
+
+    id: UUID
+    name: str
+
+
+class TicketAreaOut(FrozenCamelModel, frozen=True):
+    """A Bereich with its Kategorien in their order.
+
+    ``platform`` marks the built-in Bereich: it has no Gremium, its Kategorien are the
+    four kinds of a report, and nobody deletes it. ``mine`` tells if the caller works
+    in the Bereich.
+    """
+
+    id: UUID
+    name: str
+    gremium_id: UUID | None = Field(default=None, serialization_alias="gremiumId")
+    platform: bool = False
+    notify_new: bool = Field(default=True, serialization_alias="notifyNew")
+    categories: tuple[TicketCategoryOut, ...] = Field(default_factory=tuple)
+    mine: bool = True
+
+
+class TicketCategoryIn(FrozenStrictCamelModel, frozen=True):
+    """A Kategorie in the save of a Bereich: ``id`` keeps a stored one, null adds one."""
+
+    id: UUID | None = None
+    name: str = Field(min_length=1, max_length=80)
+
+
+class TicketAreaCreate(FrozenStrictCamelModel, frozen=True):
+    """A new Bereich. It names at most one Gremium."""
+
+    name: str = Field(min_length=1, max_length=80)
+    gremium_id: UUID | None = Field(default=None, alias="gremiumId")
+    notify_new: bool = Field(default=True, alias="notifyNew")
+    categories: tuple[TicketCategoryIn, ...] = Field(default_factory=tuple, max_length=50)
+
+
+class TicketAreaPatch(FrozenStrictCamelModel, frozen=True):
+    """A change of a Bereich. A field that the body leaves out stays.
+
+    ``categories`` is the whole ordered list: a stored Kategorie that the list leaves
+    out is deleted, and its tickets lose their Kategorie.
+    """
+
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    gremium_id: UUID | None = Field(default=None, alias="gremiumId")
+    notify_new: bool | None = Field(default=None, alias="notifyNew")
+    categories: tuple[TicketCategoryIn, ...] | None = Field(default=None, max_length=50)
