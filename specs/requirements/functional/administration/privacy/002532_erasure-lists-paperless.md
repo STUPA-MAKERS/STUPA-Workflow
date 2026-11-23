@@ -5,7 +5,14 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/privacy/test_privacy_paperless.py:test_the_erasure_of_an_antrag_lists_its_paperless_documents"
+  - "backend/tests/integration/modules/privacy/test_privacy_paperless.py:test_the_erasure_of_an_account_lists_the_documents_of_its_antraege"
+  - "frontend/src/app/pages/admin/privacy/privacy.component.spec.ts:PrivacyComponent"
+implementation:
+  - backend/app/modules/privacy/paperless.py
+  - backend/app/modules/privacy/router.py
+  - frontend/src/app/pages/admin/privacy/privacy.component.ts
 scope:
   - backend/app/
   - frontend/src/app/

@@ -267,6 +267,11 @@ def test_the_erase_route_passes_the_object_storage(monkeypatch: pytest.MonkeyPat
         seen.update(kw, principal_id=principal_id)
 
     monkeypatch.setattr(PrincipalService, "erase", _erase)
+
+    async def _documents(_session: object, _principal_id: uuid.UUID) -> tuple[()]:
+        return ()
+
+    monkeypatch.setattr("app.modules.privacy.router.documents_of_principal", _documents)
     app = create_app()
     storage = object()
     app.state.object_storage = storage
@@ -282,7 +287,8 @@ def test_the_erase_route_passes_the_object_storage(monkeypatch: pytest.MonkeyPat
     with TestClient(app) as client:
         app.state.object_storage = storage
         resp = client.post(f"/api/admin/privacy/principals/{target}/erase")
-    assert resp.status_code == 204
+    assert resp.status_code == 200
+    assert resp.json() == {"paperlessDocuments": []}
     assert seen["principal_id"] == target
     assert seen["actor"] == "admin"
     assert seen["files"].storage is storage

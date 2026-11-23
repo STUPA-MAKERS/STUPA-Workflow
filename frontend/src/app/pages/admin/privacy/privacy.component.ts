@@ -10,6 +10,7 @@ import { erasureStatus } from '@shared/ui';
 import {
   AvatarComponent,
   ButtonComponent,
+  ButtonLinkComponent,
   ButtonGroupComponent,
   CellDirective,
   type ColumnDef,
@@ -35,7 +36,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
-import type { AdminPrincipal, ErasureRequest } from '../admin.models';
+import type { AdminPrincipal, ErasureRequest, PaperlessDocument } from '../admin.models';
 import { personLabel } from '@shared/person-label.util';
 
 /** The picker shows this many hits. A longer list means: type more. */
@@ -47,6 +48,9 @@ const PERSON_HITS = 6;
  * - Erasure requests (Art. 17): status as coloured text, subject, e-mail, date. An open
  *   request is rejected (with an optional reason) or executed; executing erases data and
  *   is the danger action. Both ask for a confirmation.
+ * - Paperless (§F/administration/privacy/002532): after an erasure with filed documents a
+ *   dialog lists them with number and link, because they stay in Paperless. An executed
+ *   request with documents opens the same list from its ⋮ menu.
  * - Access export (Art. 15): every record of an e-mail address as XLSX.
  * - Account erasure (Art. 17): clears the personal data of one account (danger). The
  *   person comes from a picker (name or e-mail). `?person=<sub>` preselects it; the
@@ -69,6 +73,7 @@ const PERSON_HITS = 6;
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
+    ButtonLinkComponent,
     ButtonGroupComponent,
     DataTableComponent,
     CellDirective,
@@ -124,8 +129,24 @@ export class PrivacyComponent {
     () => this.savedRetention() !== null && this.retentionMonths() !== this.savedRetention(),
   );
 
+  /** The Paperless documents that the open dialog lists; `null`: no dialog. */
+  protected readonly paperlessDocuments = signal<readonly PaperlessDocument[] | null>(null);
+
+  protected readonly paperlessColumns = computed<ColumnDef[]>(() => [
+    { key: 'title', label: this.i18n.translate('admin.privacy.paperless.col.title'), card: 'title' },
+    { key: 'documentId', label: this.i18n.translate('admin.privacy.paperless.col.number'), width: '6rem' },
+    { key: 'filedAt', label: this.i18n.translate('admin.privacy.paperless.col.filed'), width: '8rem' },
+    {
+      key: 'open',
+      label: this.i18n.translate('admin.common.actions'),
+      align: 'end',
+      width: '6rem',
+      card: 'actions',
+    },
+  ]);
+
   /** The ⋮ menu of an open request. */
-  protected readonly rowMenu = computed<RowMenuSection[]>(() => [
+  private readonly openMenu = computed<RowMenuSection[]>(() => [
     {
       items: [
         { id: 'reject', label: this.i18n.translate('admin.privacy.reject') },
@@ -134,9 +155,26 @@ export class PrivacyComponent {
     },
   ]);
 
+  /** The ⋮ menu of an executed request with Paperless documents. */
+  private readonly paperlessMenu = computed<RowMenuSection[]>(() => [
+    { items: [{ id: 'paperless', label: this.i18n.translate('admin.privacy.paperless.menu') }] },
+  ]);
+
+  /** The ⋮ menu of a request; empty: the row has no menu. */
+  protected rowMenu(row: ErasureRequest): RowMenuSection[] {
+    if (row.status === 'open') return this.openMenu();
+    return row.status === 'executed' && row.paperlessDocuments?.length ? this.paperlessMenu() : [];
+  }
+
   protected onRowMenu(row: ErasureRequest, item: RowMenuItem): void {
     if (item.id === 'reject') this.openReject(row);
     else if (item.id === 'execute') this.askExecute(row);
+    else if (item.id === 'paperless') this.showPaperless(row.paperlessDocuments);
+  }
+
+  /** Open the list of the Paperless documents; without a document there is no dialog. */
+  private showPaperless(documents: readonly PaperlessDocument[] | undefined): void {
+    this.paperlessDocuments.set(documents?.length ? documents : null);
   }
 
   protected readonly columns = computed<ColumnDef[]>(() => [
@@ -208,9 +246,10 @@ export class PrivacyComponent {
     const r = this.confirmExecute();
     if (!r) return;
     this.api.executeErasure(r.id).subscribe({
-      next: () => {
+      next: (done) => {
         this.confirmExecute.set(null);
         this.toast.show(this.i18n.translate('admin.privacy.executed'), 'success');
+        this.showPaperless(done.paperlessDocuments);
         this.reload();
       },
       error: () => this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error'),
@@ -256,10 +295,11 @@ export class PrivacyComponent {
     const p = this.person();
     if (!p) return;
     this.api.erasePrincipal(p.id).subscribe({
-      next: () => {
+      next: (done) => {
         this.confirmPrincipal.set(false);
         this.person.set(null);
         this.toast.show(this.i18n.translate('admin.privacy.principalErased'), 'success');
+        this.showPaperless(done.paperlessDocuments);
       },
       error: () => {
         this.confirmPrincipal.set(false);

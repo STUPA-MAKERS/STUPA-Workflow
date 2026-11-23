@@ -73,6 +73,7 @@ import {
   type GremiumRoleMapping,
   type GremiumRoleMappingBody,
   type ErasureRequest,
+  type PrincipalErasure,
   type ErasureStatus,
   type PrivacySettings,
   type GremiumRole,
@@ -1661,9 +1662,10 @@ export class AdminApiService {
     );
   }
 
-  erasePrincipal(id: Uuid): Observable<void> {
-    if (this.mock) return of(void 0);
-    return this.http.post<void>(`${this.base}/admin/privacy/principals/${id}/erase`, {});
+  /** Erase an account. The answer names the Paperless documents that stay (002532). */
+  erasePrincipal(id: Uuid): Observable<PrincipalErasure> {
+    if (this.mock) return of({ paperlessDocuments: [] });
+    return this.http.post<PrincipalErasure>(`${this.base}/admin/privacy/principals/${id}/erase`, {});
   }
 
   getPrivacySettings(): Observable<PrivacySettings> {

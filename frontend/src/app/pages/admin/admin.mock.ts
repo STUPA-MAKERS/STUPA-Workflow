@@ -1013,6 +1013,20 @@ export const MOCK_ERASURES: readonly ErasureRequest[] = [
     applicationId: 'a1000000-0000-0000-0000-000000000001',
     email: 'antrag@example.org',
     status: 'open',
+    paperlessDocuments: [
+      {
+        documentId: 412,
+        title: 'Erstsemesterfahrt',
+        url: 'https://paperless.example.org/documents/412/details',
+        filedAt: '2026-05-12T10:04:00+00:00',
+      },
+      {
+        documentId: 413,
+        title: 'Erstsemesterfahrt – Angebot.pdf',
+        url: 'https://paperless.example.org/documents/413/details',
+        filedAt: '2026-05-12T10:05:00+00:00',
+      },
+    ],
   },
   {
     id: 'e-2',
@@ -1029,6 +1043,20 @@ export const MOCK_ERASURES: readonly ErasureRequest[] = [
     email: null,
     status: 'executed',
     handledAt: '2026-05-21T08:00:00+00:00',
+    paperlessDocuments: [
+      {
+        documentId: 412,
+        title: 'Erstsemesterfahrt',
+        url: 'https://paperless.example.org/documents/412/details',
+        filedAt: '2026-05-12T10:04:00+00:00',
+      },
+      {
+        documentId: 413,
+        title: 'Erstsemesterfahrt – Angebot.pdf',
+        url: 'https://paperless.example.org/documents/413/details',
+        filedAt: '2026-05-12T10:05:00+00:00',
+      },
+    ],
   },
   {
     id: 'e-4',
