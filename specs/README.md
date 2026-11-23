@@ -822,7 +822,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/000931](requirements/non-functional/usability/controls/000931_back-closes-budget-dialogs.md) | The dialogs of the Haushalt close on Back | approved |
 | [NF/usability/controls/002163](requirements/non-functional/usability/controls/002163_bar-pill-at-press.md) | The pill of the navigation bar moves at the press | approved |
 | [NF/usability/controls/002164](requirements/non-functional/usability/controls/002164_ripple-in-surface.md) | The ripple is the ripple of Angular Material inside the pressed surface | approved |
-| [NF/usability/controls/002570](requirements/non-functional/usability/controls/002570_one-icon-look-in-a-group.md) | Every icon of a button group has one size and one colour | draft |
+| [NF/usability/controls/002570](requirements/non-functional/usability/controls/002570_one-icon-look-in-a-group.md) | Every icon of a button group has one size and one colour | approved |
 | [NF/usability/layout/000199](requirements/non-functional/usability/layout/000199_footer.md) | The footer shows only on start and public pages | approved |
 | [NF/usability/layout/000530](requirements/non-functional/usability/layout/000530_phone-start-search-pinned.md) | The search bar of the start page stays at the top on the phone | replaced |
 | [NF/usability/layout/000624](requirements/non-functional/usability/layout/000624_start-work-list-sticky-head.md) | The work list on Start keeps its column header and cuts at the window edge | replaced |
