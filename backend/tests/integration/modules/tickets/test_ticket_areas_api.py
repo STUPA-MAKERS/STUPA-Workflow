@@ -161,11 +161,12 @@ async def test_a_gremium_role_works_only_in_the_bereiche_of_its_gremium(
     )
     async with maker() as session:
         assert await works_on_tickets(session, plain) is False
-        assert await works_on_tickets(session, worker_a) is True
+        assert await works_on_tickets(session, worker_a) is False
         area_a = TicketArea(name="Bereich A", gremium_id=gremium_a)
         area_b = TicketArea(name="Bereich B", gremium_id=gremium_b)
         session.add_all([area_a, area_b])
         await session.flush()
+        assert await works_on_tickets(session, worker_a) is True
         in_a = Ticket(
             number="AAAAAAA2", area_id=area_a.id, title="A", body="a", reporter_email="r@x.org"
         )

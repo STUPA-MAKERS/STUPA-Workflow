@@ -166,6 +166,12 @@ class Settings(BaseSettings):
         internal network, so the SSRF guard does not apply and this list is the whole
         guard: an empty list allows no address.
 
+    Ticket mail:
+        `ticket_mail_host_allowlist` names the hosts that the IMAP host and the SMTP host
+        of a Postfach can have (§NF/security/network/002744). An admin sets the hosts of
+        a Postfach freely, so this list is the whole guard against a connection to an
+        internal host: an empty list allows no host.
+
     Delegation:
         The gremium flag `allow_vote_delegation` alone switches vote delegation; no
         server setting does. `local_timezone`
@@ -369,9 +375,14 @@ class Settings(BaseSettings):
     )
 
     paperless_host_allowlist: CsvList = []
+    ticket_mail_host_allowlist: CsvList = []
 
     @field_validator(
-        "cors_allow_origins", "webhook_host_allowlist", "paperless_host_allowlist", mode="before"
+        "cors_allow_origins",
+        "webhook_host_allowlist",
+        "paperless_host_allowlist",
+        "ticket_mail_host_allowlist",
+        mode="before",
     )
     @classmethod
     def _accept_csv_lists(cls, value: object) -> object:

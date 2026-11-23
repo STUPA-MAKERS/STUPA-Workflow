@@ -14,6 +14,7 @@ import {
   TicketsApiService,
   type TicketArea,
   type TicketBlockedSender,
+  type TicketMailbox,
 } from '@core/api/tickets.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -43,6 +44,7 @@ import { AdminApiService } from '../admin-api.service';
 import type { HelpTicketsSettings } from '../admin.models';
 import { personLabel } from '@shared/person-label.util';
 import { type AreaGremium, TicketAreaDialogComponent } from './ticket-area-dialog.component';
+import { TicketMailboxDialogComponent } from './ticket-mailbox-dialog.component';
 
 /** The choices of the retention chip, in months. */
 export const RETENTION_CHOICES: readonly number[] = [1, 3, 6, 12, 24, 36, 60, 120];
@@ -52,6 +54,8 @@ const DEFAULT_RETENTION = 12;
 /** The keys of the rows of the group "Bereiche": one per Bereich, and "Bereich anlegen". */
 const AREA_ROW = 'area:';
 const AREA_NEW = 'area-new';
+/** The key of a row of the group "Postfächer": one per Bereich. */
+const MAILBOX_ROW = 'mailbox:';
 
 /** An absolute http(s) URL. */
 export function isHttpUrl(text: string): boolean {
@@ -108,6 +112,7 @@ export function isHttpUrl(text: string): boolean {
     LoadStateComponent,
     SwitchComponent,
     TicketAreaDialogComponent,
+    TicketMailboxDialogComponent,
   ],
   templateUrl: './help-tickets.component.html',
   styleUrl: './help-tickets.component.scss',
@@ -131,6 +136,8 @@ export class HelpTicketsComponent {
 
   /** The blocked senders need `ticket.manage`. The server checks it again. */
   protected readonly canBlock = computed(() => this.auth.can('ticket.manage'));
+  /** The Postfächer need `admin.ticket_mail`. The server checks it again. */
+  protected readonly canMail = computed(() => this.auth.can('admin.ticket_mail'));
 
   /** The page needs the site right. The server checks it again. */
   protected readonly form: SettingsForm<HelpTicketsSettings, HelpTicketsSettings> = settingsForm<
@@ -232,6 +239,25 @@ export class HelpTicketsComponent {
         },
       ],
     },
+    ...(this.canMail()
+      ? [
+          {
+            key: 'mailboxes',
+            label: this.i18n.translate('admin.helpTickets.mailbox.title'),
+            rows: (this.areas() ?? []).map((a) => ({
+              key: MAILBOX_ROW + a.id,
+              label: a.name,
+              meta: this.mailboxParts(a).join(' · '),
+              control: 'action' as const,
+              action: {
+                key: MAILBOX_ROW + a.id,
+                label: a.name,
+                icon: this.mailboxOf(a) ? ('edit' as const) : ('plus' as const),
+              },
+            })),
+          },
+        ]
+      : []),
     ...(this.canBlock()
       ? [
           {
@@ -259,6 +285,15 @@ export class HelpTicketsComponent {
   protected readonly gremien = signal<AreaGremium[]>([]);
   /** The open dialog: a Bereich to edit, `'new'` to create one, null: closed. */
   protected readonly editing = signal<TicketArea | 'new' | null>(null);
+  /** Each Postfach; empty until the read ends. */
+  protected readonly mailboxes = signal<readonly TicketMailbox[]>([]);
+  protected readonly allowedHosts = signal<readonly string[]>([]);
+  /** The Bereich whose Postfach dialog is open. */
+  protected readonly mailArea = signal<TicketArea | null>(null);
+  protected readonly mailAreaBox = computed(() => {
+    const area = this.mailArea();
+    return area ? this.mailboxOf(area) : null;
+  });
   protected readonly editingArea = computed(() => {
     const e = this.editing();
     return e === 'new' ? null : e;
@@ -273,6 +308,43 @@ export class HelpTicketsComponent {
         error: () => this.gremien.set([]),
       });
     }
+    if (this.canMail()) this.loadMailboxes();
+  }
+
+  private loadMailboxes(): void {
+    this.tickets.adminMailboxes().subscribe({
+      next: (list) => {
+        this.mailboxes.set(list.items);
+        this.allowedHosts.set(list.allowedHosts);
+      },
+      error: () =>
+        this.toast.show(this.i18n.translate('admin.helpTickets.mailbox.error.load'), 'error'),
+    });
+  }
+
+  protected mailboxOf(area: TicketArea): TicketMailbox | null {
+    return this.mailboxes().find((m) => m.areaId === area.id) ?? null;
+  }
+
+  /** The line under the name: the address and the state of the switch, or "Kein Postfach". */
+  protected mailboxParts(area: TicketArea): string[] {
+    const box = this.mailboxOf(area);
+    if (!box) return [this.i18n.translate('admin.helpTickets.mailbox.none')];
+    const state = box.enabled ? 'admin.helpTickets.mailbox.on' : 'admin.helpTickets.mailbox.off';
+    const failing = box.error ? [this.i18n.translate('admin.helpTickets.mailbox.failing')] : [];
+    return [box.address, this.i18n.translate(state), ...failing];
+  }
+
+  protected onMailboxSaved(saved: TicketMailbox): void {
+    this.mailboxes.update((list) => [...list.filter((m) => m.areaId !== saved.areaId), saved]);
+    this.mailArea.set(null);
+    this.toast.show(this.i18n.translate('admin.helpTickets.mailbox.saved'), 'success');
+  }
+
+  protected onMailboxDeleted(area: TicketArea): void {
+    this.mailboxes.update((list) => list.filter((m) => m.areaId !== area.id));
+    this.mailArea.set(null);
+    this.toast.show(this.i18n.translate('admin.helpTickets.mailbox.deleted'), 'success');
   }
 
   private loadAreas(): void {
@@ -288,7 +360,10 @@ export class HelpTicketsComponent {
   /** A row of the group "Bereiche": a Bereich opens its dialog, the last row a new one. */
   protected onAreaAction(key: string): void {
     if (key === AREA_NEW) return this.editing.set('new');
-    const area = (this.areas() ?? []).find((a) => AREA_ROW + a.id === key);
+    const list = this.areas() ?? [];
+    const mail = list.find((a) => MAILBOX_ROW + a.id === key);
+    if (mail) return this.mailArea.set(mail);
+    const area = list.find((a) => AREA_ROW + a.id === key);
     if (area) this.editing.set(area);
   }
 

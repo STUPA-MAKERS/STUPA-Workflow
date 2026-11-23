@@ -35,6 +35,7 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response, status
+from fastapi.responses import StreamingResponse
 
 from app.deps import DbSession, Principal, SettingsDep, get_current_principal, require_principal
 from app.modules.auth.people import PersonRef
@@ -43,6 +44,14 @@ from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.site_config.reads import active_branding
 from app.modules.tickets.access import TICKET_MANAGE, AreaScope, area_scope, works_anywhere
 from app.modules.tickets.areas import TicketAreaService
+from app.modules.tickets.mailbox import TicketMailboxService
+from app.modules.tickets.mailbox_schemas import (
+    MailboxCreate,
+    MailboxList,
+    MailboxOut,
+    MailboxPatch,
+    MailboxTestOut,
+)
 from app.modules.tickets.mails import (
     notify_ticket_assigned,
     notify_ticket_created,
@@ -69,6 +78,7 @@ from app.modules.tickets.schemas import (
     TicketFollowUp,
     TicketKind,
     TicketListItem,
+    TicketMailOut,
     TicketManualCreate,
     TicketNoteOut,
     TicketPatch,
@@ -92,6 +102,7 @@ from app.shared.antiabuse import (
     verify_altcha_unless_authenticated,
 )
 from app.shared.errors import ForbiddenError, NotFoundError, ProblemDetail, ValidationProblem
+from app.shared.filenames import content_disposition
 from app.shared.paging import Page, PageParams
 
 router = APIRouter(tags=["tickets"])
@@ -106,6 +117,7 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 Manager = Annotated[Principal, Depends(require_principal(TICKET_MANAGE))]
 Reader = Annotated[Principal, Depends(require_principal())]
 SiteAdmin = Annotated[Principal, Depends(require_principal("admin.site"))]
+MailAdmin = Annotated[Principal, Depends(require_principal("admin.ticket_mail"))]
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,6 +167,14 @@ def get_area_service(session: DbSession) -> TicketAreaService:
 
 
 AreaServiceDep = Annotated[TicketAreaService, Depends(get_area_service)]
+
+
+def get_mailbox_service(session: DbSession, settings: SettingsDep) -> TicketMailboxService:
+    """Wire the service of the Postfächer."""
+    return TicketMailboxService(session, settings)
+
+
+MailboxServiceDep = Annotated[TicketMailboxService, Depends(get_mailbox_service)]
 
 
 def get_ticket_service(session: DbSession, request: Request) -> TicketService:
@@ -551,7 +571,7 @@ async def ticket_report_areas(areas: AreaServiceDep, _principal: Reader) -> list
     "/tickets/manual",
     response_model=TicketDetail,
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(401, 403, 404, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def create_manual_ticket(
     payload: TicketManualCreate,
@@ -570,7 +590,8 @@ async def create_manual_ticket(
     ``body`` is the note of the team; the person does not read it. ``message`` is the
     first public message: the account reads it in the tab "Tickets" and gets the mail
     ``ticket_answer``. A ticket for an address needs a Postfach of the Bereich, else
-    422 ``ticket_area_without_mailbox``.
+    422 ``ticket_area_without_mailbox``; its first public message goes out as a mail,
+    and it answers 409 ``mailbox_off`` while the Postfach is off.
     """
     ticket, note = await service.create_manual(payload, worker.principal, areas=worker.areas)
     await db.commit()
@@ -608,6 +629,46 @@ async def delete_blocked_sender(
 async def get_ticket(ticket_id: UUID, service: ServiceDep, worker: Worker) -> TicketDetail:
     """The whole ticket: body, context, attachments, notes and events."""
     return await service.detail(ticket_id, worker.principal, areas=worker.areas)
+
+
+@router.post(
+    "/tickets/{ticket_id}/mails/{mail_id}/resend",
+    response_model=TicketMailOut,
+    responses=_errors(401, 403, 404, 409),
+)
+async def resend_ticket_mail(
+    ticket_id: UUID, mail_id: UUID, service: ServiceDep, db: DbSession, worker: Worker
+) -> TicketMailOut:
+    """Send a mail of the ticket again after the state ``failed`` ("Erneut senden").
+
+    The worker starts with the first of eight tries again. A mail in another state
+    gives 409 ``mail_not_failed``, and a Postfach that is off 409 ``mailbox_off``.
+    """
+    mail = await service.resend_mail(ticket_id, mail_id, areas=worker.areas)
+    await db.commit()
+    return mail
+
+
+@router.get(
+    "/tickets/{ticket_id}/mails/{mail_id}/source",
+    response_class=StreamingResponse,
+    responses=_errors(401, 403, 404, 409, 503),
+)
+async def get_mail_source(
+    ticket_id: UUID, mail_id: UUID, service: ServiceDep, worker: Worker
+) -> StreamingResponse:
+    """The full source of a mail of the ticket as a download (``message/rfc822``).
+
+    Only a source with a clean scan result leaves the platform; each other one answers
+    409 ``mail_source_closed`` (§F/integrations/ticket-mail/002729).
+    """
+    stream, filename, size = await service.mail_source(ticket_id, mail_id, areas=worker.areas)
+    headers = {
+        "Content-Disposition": content_disposition("attachment", filename),
+        "Content-Length": str(size),
+        "X-Content-Type-Options": "nosniff",
+    }
+    return StreamingResponse(stream, media_type="message/rfc822", headers=headers)
 
 
 @router.patch(
@@ -674,7 +735,7 @@ async def unblock_sender(ticket_id: UUID, service: ServiceDep, principal: Manage
     "/tickets/{ticket_id}/notes",
     response_model=TicketNoteOut,
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(401, 403, 404, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def add_ticket_note(
     ticket_id: UUID,
@@ -691,6 +752,11 @@ async def add_ticket_note(
 
     ``visibility`` is ``internal`` (the default) or ``public``: the reporter account
     reads a public note in ``/tickets/mine`` and gets the mail ``ticket_answer``.
+
+    A public note on a mail ticket (a ticket from a mail or by hand for an address)
+    goes out as a mail through the Postfach of the Bereich to ``to`` and ``cc``; a list
+    that the body leaves out takes the addresses of ``mailAnswer`` of the ticket. While
+    the Postfach is off the route answers 409 ``mailbox_off``.
 
     ``mentions`` names persons with the work right in the Bereich of the ticket
     (``GET /tickets/assignees?area=``); another id gives 422 ``mention_not_member``.
@@ -829,3 +895,71 @@ async def delete_ticket_area(
     await areas.delete(area_id, principal.sub)
     await areas.session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/admin/ticket-mailboxes", response_model=MailboxList, responses=_errors(401, 403))
+async def admin_ticket_mailboxes(
+    mailboxes: MailboxServiceDep, _principal: MailAdmin
+) -> MailboxList:
+    """List each Postfach without its passwords, and the hosts that a Postfach can have."""
+    return await mailboxes.listing()
+
+
+@router.post(
+    "/admin/ticket-areas/{area_id}/mailbox",
+    response_model=MailboxOut,
+    status_code=status.HTTP_201_CREATED,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def create_ticket_mailbox(
+    area_id: UUID, payload: MailboxCreate, mailboxes: MailboxServiceDep, principal: MailAdmin
+) -> MailboxOut:
+    """Give a Bereich its Postfach.
+
+    A second Postfach gives 409 ``ticket_mailbox_exists``, a host outside
+    ``TICKET_MAIL_HOST_ALLOWLIST`` 422 ``mail_host_not_allowed``.
+    """
+    out = await mailboxes.create(area_id, payload, principal.sub)
+    await mailboxes.session.commit()
+    return out
+
+
+@router.patch(
+    "/admin/ticket-areas/{area_id}/mailbox",
+    response_model=MailboxOut,
+    responses=_errors(401, 403, 404, 422),
+)
+async def patch_ticket_mailbox(
+    area_id: UUID, payload: MailboxPatch, mailboxes: MailboxServiceDep, principal: MailAdmin
+) -> MailboxOut:
+    """Change the Postfach of a Bereich or its switch. A password that the body leaves out stays."""
+    out = await mailboxes.patch(area_id, payload, principal.sub)
+    await mailboxes.session.commit()
+    return out
+
+
+@router.delete(
+    "/admin/ticket-areas/{area_id}/mailbox",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses=_errors(401, 403, 404),
+)
+async def delete_ticket_mailbox(
+    area_id: UUID, mailboxes: MailboxServiceDep, principal: MailAdmin
+) -> Response:
+    """Remove the Postfach of a Bereich. The mails stay on the mail server."""
+    await mailboxes.delete(area_id, principal.sub)
+    await mailboxes.session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/admin/ticket-areas/{area_id}/mailbox/test",
+    response_model=MailboxTestOut,
+    responses=_errors(401, 403, 404),
+)
+async def test_ticket_mailbox(
+    area_id: UUID, mailboxes: MailboxServiceDep, _principal: MailAdmin
+) -> MailboxTestOut:
+    """Log in to the IMAP and the SMTP account of the stored Postfach and tell each result."""
+    return await mailboxes.test(area_id)

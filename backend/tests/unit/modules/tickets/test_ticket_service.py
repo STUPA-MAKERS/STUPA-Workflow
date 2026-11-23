@@ -757,7 +757,9 @@ async def test_anonymize_clears_the_reporter_the_context_and_the_files() -> None
     session = ScriptedSession()
     await _svc(session, files=files).anonymize(ticket, actor="sys")
     assert files.deleted == [(ticket.id, "sys")]
-    notes, clear = session.statements
+    notes, clear, _sources, mails = session.statements
+    assert str(mails).startswith("UPDATE ticket_mail SET")
+    assert files.removed_keys == []
     sql = str(notes.compile(compile_kwargs={"literal_binds": True}))
     assert sql.startswith("UPDATE ticket_note SET author_id")
     assert ME.hex in sql or str(ME) in sql
@@ -775,8 +777,9 @@ async def test_anonymize_of_a_report_without_an_account_touches_no_note() -> Non
     ticket = _ticket(reporter_principal_id=None, reporter_email="x@example.org")
     session = ScriptedSession()
     await _svc(session, files=FakeFiles()).anonymize(ticket, actor="sys")
-    (clear,) = session.statements
+    clear, _sources, mails = session.statements
     assert str(clear).startswith("UPDATE ticket_event")
+    assert str(mails).startswith("UPDATE ticket_mail SET")
 
 
 def test_the_service_builds_its_own_files_service() -> None:

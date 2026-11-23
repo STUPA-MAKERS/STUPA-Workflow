@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_fetch.py:test_the_mail_of_a_blocked_sender_becomes_no_ticket"
+implementation:
+  - backend/app/modules/tickets/mail_import.py
 scope:
   - backend/app/modules/tickets
   - backend/worker

@@ -5,7 +5,12 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_fetch.py:test_a_failed_commit_leaves_the_mail_for_the_next_run"
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_fetch.py:test_a_failure_of_one_postfach_does_not_stop_the_others"
+implementation:
+  - backend/worker/ticket_mail.py
+  - backend/worker/main.py
 scope:
   - backend/app/modules/tickets
   - backend/worker

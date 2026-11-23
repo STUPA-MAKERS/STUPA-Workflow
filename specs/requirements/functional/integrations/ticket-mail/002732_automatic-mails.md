@@ -5,7 +5,13 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_fetch.py:test_an_automatic_answer_is_an_event_and_no_message"
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_fetch.py:test_an_automatic_mail_without_a_ticket_stays_in_the_inbox"
+  - "backend/tests/unit/modules/tickets/test_ticket_mail_parse.py:test_a_mail_of_a_machine_is_automatic"
+implementation:
+  - backend/app/modules/tickets/mail_import.py
+  - backend/app/modules/tickets/mail_parse.py
 scope:
   - backend/app/modules/tickets
   - backend/worker
