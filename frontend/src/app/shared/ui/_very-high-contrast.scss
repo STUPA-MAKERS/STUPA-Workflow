@@ -30,10 +30,10 @@
     border: var(--vh-edge) !important;
   }
   // The columns of the week paint over an outline, so its edge is a layer on top.
-  app-calendar-week.cal__grid {
+  app-calendar-week-view.cal__grid {
     position: relative;
   }
-  app-calendar-week.cal__grid::after {
+  app-calendar-week-view.cal__grid::after {
     content: '';
     position: absolute;
     inset: 0;
