@@ -115,6 +115,7 @@ async def notify_ticket_created(
             )
             reporter = (
                 (reporter_name.display_name if reporter_name is not None else None)
+                or ticket.reporter_name
                 or reporter_address
                 or ""
             )
@@ -220,7 +221,9 @@ async def notify_ticket_note(
     """Mail a new public message to the other side of the ticket (best effort).
 
     A message of the reporter goes to the team (``ticket_message``), a public note
-    of the team to the reporter account (``ticket_answer``).
+    of the team to the reporter account (``ticket_answer``). A message from a mail has no
+    author and goes to the team; a note of the team on a ticket without a reporter account
+    sends nothing here.
 
     Returns:
         True when a mail was enqueued.
@@ -234,11 +237,9 @@ async def notify_ticket_note(
             if note is None or note.deleted_at is not None or note.visibility != "public":
                 return False
             ticket = await session.get(Ticket, note.ticket_id)
-            if (
-                ticket is None
-                or ticket.anonymized_at is not None
-                or ticket.reporter_principal_id is None
-            ):
+            if ticket is None or ticket.anonymized_at is not None:
+                return False
+            if ticket.reporter_principal_id is None and note.author_id is not None:
                 return False
             message = (
                 note.body if note.body.strip() else ", ".join(await _note_filenames(session, note))
@@ -267,7 +268,11 @@ async def _mail_team(
     reaches nobody, as the assignee chose.
     """
     managers = await area_workers(session, frozenset({ticket.area_id or PLATFORM_AREA_ID}))
-    reporter_row = await session.get(PrincipalRow, ticket.reporter_principal_id)
+    reporter_row = (
+        await session.get(PrincipalRow, ticket.reporter_principal_id)
+        if ticket.reporter_principal_id is not None
+        else None
+    )
     own = (reporter_row.email or "").casefold() if reporter_row is not None else ""
 
     def _addresses(rows: list[tuple[UUID, str | None, str | None]]) -> list[str]:
@@ -278,7 +283,9 @@ async def _mail_team(
     if not recipients:
         return False
     reporter = (
-        (reporter_row.display_name or reporter_row.email or "") if reporter_row is not None else ""
+        (reporter_row.display_name or reporter_row.email or "")
+        if reporter_row is not None
+        else (ticket.reporter_name or ticket.reporter_email or "")
     )
     return await NotificationService(session, queue=queue, settings=settings).send_kind_mail(
         recipients,

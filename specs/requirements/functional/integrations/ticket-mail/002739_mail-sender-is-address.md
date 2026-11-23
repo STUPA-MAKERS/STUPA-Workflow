@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_fetch.py:test_a_mail_with_the_address_of_an_account_is_no_ticket_of_the_account"
+implementation:
+  - backend/app/modules/tickets/mail_import.py
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets

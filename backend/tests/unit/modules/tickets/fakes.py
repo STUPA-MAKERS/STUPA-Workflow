@@ -96,7 +96,7 @@ class ScriptedSession:
 
     async def scalars(self, stmt: Any) -> Result:
         self.statements.append(stmt)
-        return Result(self.scalars_q.pop(0))
+        return Result(self.scalars_q.pop(0) if self.scalars_q else [])
 
     async def execute(self, stmt: Any) -> Result:
         self.statements.append(stmt)
@@ -118,6 +118,9 @@ class FakeFiles:
         self.removed: list[tuple[str, list[uuid.UUID], str]] = []
         self.locked: list[tuple[str, list[uuid.UUID]]] = []
 
+    async def remove_objects(self, storage_keys: Any) -> None:
+        self.removed_keys = list(storage_keys)
+
     async def message_attachments(
         self, owner: str, ids: list[uuid.UUID]
     ) -> dict[uuid.UUID, list[MessageAttachmentOut]]:
@@ -138,8 +141,6 @@ class FakeFiles:
     async def list_for_ticket(self, _ticket_id: uuid.UUID) -> list[AttachmentOut]:
         return self.attachments
 
-    async def delete_for_ticket(
-        self, ticket_id: uuid.UUID, *, notes: object, actor: str
-    ) -> int:
+    async def delete_for_ticket(self, ticket_id: uuid.UUID, *, notes: object, actor: str) -> int:
         self.deleted.append((ticket_id, actor))
         return 1

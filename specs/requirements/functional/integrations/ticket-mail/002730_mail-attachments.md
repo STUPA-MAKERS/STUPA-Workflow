@@ -5,7 +5,12 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_fetch.py:test_a_small_file_is_a_file_and_a_too_large_file_is_named"
+  - "frontend/src/app/pages/tickets/tickets.util.spec.ts:tickets.util"
+implementation:
+  - backend/app/modules/tickets/mail_import.py
+  - frontend/src/app/pages/tickets/tickets.util.ts
 scope:
   - backend/app/modules/tickets
   - backend/app/modules/files

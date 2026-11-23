@@ -1,9 +1,10 @@
-import type { PersonRef } from '@core/api/models';
+import type { PersonRef, ScanState } from '@core/api/models';
 import type {
   TicketArea,
   TicketEvent,
   TicketEventPayload,
   TicketKind,
+  TicketMail,
   TicketReporter,
   TicketSource,
   TicketStatus,
@@ -13,6 +14,7 @@ import type { IconName } from '@stupa-makers/ui-kit';
 import { daysUntil, shortDay } from '@shared/date-format';
 import { personLabel, personName } from '@shared/person-label.util';
 import {
+  formatBytes,
   type StatusKind,
 } from '@stupa-makers/ui-kit';
 
@@ -176,5 +178,40 @@ export function eventText(event: TicketEvent, reporter: string, t: Translate): s
       return p.cardTitle
         ? t('tickets.event.todoDone', { actor, title: p.cardTitle })
         : t('tickets.event.todoDoneHidden', { actor });
+    case 'mail_auto':
+      return t('tickets.event.mailAuto', {
+        name: typeof p.from === 'string' ? p.from : reporter,
+        subject: p.subject ?? '',
+      });
   }
+}
+
+/** The file name of the source of a mail in the thread. */
+export const MAIL_SOURCE_NAME = 'Original-Mail.eml';
+
+/** The scan state of a mail source as the chat shows it; null when the source is gone. */
+export function mailSourceScan(mail: TicketMail): ScanState | null {
+  if (mail.source === 'gone') return null;
+  if (mail.source === 'clean') return 'clean';
+  return mail.source === 'infected' ? 'quarantined' : 'scanning';
+}
+
+/**
+ * The line that names the files of a mail that were left out, with the size of each
+ * ("Nicht übernommen: plan.zip (2 MB, Dateityp nicht erlaubt)"); empty without one.
+ */
+export function skippedLine(mail: TicketMail | undefined, locale: string, t: Translate): string {
+  if (!mail?.skipped.length) return '';
+  const files = mail.skipped.map((f) =>
+    t(f.reason === 'size' ? 'tickets.mail.skippedSize' : 'tickets.mail.skippedType', {
+      name: f.name,
+      size: formatBytes(f.size, locale, 'file'),
+    }),
+  );
+  return t('tickets.mail.skipped', { files: files.join(', ') });
+}
+
+/** The text of a message with the line of its left-out files under it. */
+export function withSkipped(body: string, line: string): string {
+  return line ? (body ? `${body}\n\n${line}` : line) : body;
 }

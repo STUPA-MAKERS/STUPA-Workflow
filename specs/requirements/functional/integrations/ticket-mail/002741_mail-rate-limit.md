@@ -5,7 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_fetch.py:test_one_address_opens_at_most_20_tickets_an_hour"
+implementation:
+  - backend/app/modules/tickets/mail_import.py
+  - backend/worker/ticket_mail.py
 scope:
   - backend/app/modules/tickets
   - backend/worker

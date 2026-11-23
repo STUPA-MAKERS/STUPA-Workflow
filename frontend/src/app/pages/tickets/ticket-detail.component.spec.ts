@@ -235,6 +235,7 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
     ),
     deleteMyNote: jest.fn(() => of(undefined)),
     attachmentUrl: (id: string) => `/api/attachments/${id}/download`,
+    mailSourceUrl: (ticketId: string, mailId: string) => `/api/tickets/${ticketId}/mails/${mailId}/source`,
   };
   const todosApi = {
     linked: jest.fn(() => todos),
@@ -1481,6 +1482,47 @@ describe('TicketDetailComponent', () => {
       expect(line).toHaveTextContent('Raumanfrage');
       expect(cmp.categoryOptions().map((o) => o.label)).toEqual(['Keine', 'Raumanfrage']);
       expect(cmp.areaOptions().map((o) => o.label)).toEqual(['Plattform', 'AStA-Büro']);
+    });
+
+    it('shows the source and the left-out files of a mail on its message', async () => {
+      const mail = {
+        id: 'm1',
+        noteId: null,
+        direction: 'in' as const,
+        fromName: 'Anna Beispiel',
+        fromAddress: 'anna@example.org',
+        cc: [],
+        subject: 'Raumanfrage',
+        automatic: false,
+        source: 'clean' as const,
+        sourceSize: 2048,
+        skipped: [{ name: 'plan.pdf', size: 12 * 1024 * 1024, reason: 'size' as const }],
+        at: '2026-10-14T19:14:00Z',
+      };
+      const ticket = inAsta({
+        source: 'mail',
+        reporter: { principalId: null, displayName: 'Anna Beispiel', email: 'anna@example.org', anonymized: false },
+        mails: [
+          mail,
+          { ...mail, id: 'm2', noteId: 'n1', source: 'closed', skipped: [] },
+          { ...mail, id: 'm3', automatic: true },
+          { ...mail, id: 'm4', noteId: 'gone', source: 'gone' },
+        ],
+      });
+      const { cmp } = await start('/tickets/t40', { areas: [PLAT, ASTA], get: () => of(ticket) });
+      const [first, answer] = cmp.messages();
+      expect(first.authorLabel).toBe('Anna Beispiel');
+      expect(first.body).toBe(`${ticket.body}\n\nNicht übernommen: plan.pdf (12 MB, zu groß)`);
+      expect(first.attachments?.at(-1)).toEqual({
+        id: 'm1',
+        filename: 'Original-Mail.eml',
+        mime: 'message/rfc822',
+        size: 2048,
+        url: '/api/tickets/t40/mails/m1/source',
+        scanState: 'clean',
+      });
+      expect(answer.body).toBe(ticket.notes[0].body);
+      expect(answer.attachments?.at(-1)).toMatchObject({ id: 'm2', scanState: 'scanning' });
     });
 
     it('sets and clears the Kategorie', async () => {
