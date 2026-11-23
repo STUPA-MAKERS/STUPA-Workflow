@@ -2,7 +2,7 @@
 id: "002692"
 title: The Stellvertretungen of a Gremium have their own page
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 tests:
