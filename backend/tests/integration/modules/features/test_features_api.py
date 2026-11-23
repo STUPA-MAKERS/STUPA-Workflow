@@ -65,6 +65,12 @@ ROUTES: dict[Feature, tuple[tuple[str, str], ...]] = {
     Feature.TICKETS: (("GET", "/api/tickets"), ("POST", "/api/tickets")),
     Feature.GRAPH: (("GET", "/api/graph"),),
     Feature.PUSH: (("GET", "/api/push/key"), ("GET", "/api/push/devices")),
+    #: §F/integrations/paperless/002762. The copy route is a route of `Sitzungen` too.
+    Feature.PAPERLESS: (
+        ("GET", "/api/paperless/insert"),
+        ("GET", "/api/admin/paperless"),
+        ("POST", f"/api/meetings/{uuid.uuid4()}/documents/paperless"),
+    ),
     #: Each public page also needs the feature of its records, so these routes close with
     #: `Sitzungen` and with `Kalender` too (§F/administration/admin/000756).
     Feature.PUBLIC: (
@@ -78,7 +84,7 @@ ROUTES: dict[Feature, tuple[tuple[str, str], ...]] = {
 #: that need it and the public routes of its records.
 CLOSED_WITH: dict[Feature, int] = {
     Feature.BUDGET: len(ROUTES[Feature.INVOICES]),
-    Feature.MEETINGS: 2,
+    Feature.MEETINGS: 3,
     Feature.CALENDAR: 1,
 }
 

@@ -119,6 +119,12 @@ def test_uses_of_keeps_the_uses_of_the_given_features() -> None:
         ("/api/ws/todos", {Feature.TODOS}),
         ("/api/calendar/{token}.ics", {Feature.CALENDAR}),
         ("/api/push/actions/{token}", {Feature.PUSH}),
+        ("/api/paperless/documents/{kind}/{element_id}", {Feature.PAPERLESS}),
+        ("/api/admin/paperless/failed-filings", {Feature.PAPERLESS}),
+        (
+            "/api/meetings/{meeting_id}/documents/paperless",
+            {Feature.MEETINGS, Feature.PAPERLESS},
+        ),
         ("/api/admin/calendars", {Feature.CALENDAR}),
         ("/api/public/calendar.ics", {Feature.CALENDAR, Feature.PUBLIC}),
         ("/api/meetings", {Feature.MEETINGS}),
@@ -197,6 +203,12 @@ def test_every_route_of_the_app_is_in_the_expected_feature() -> None:
     assert all(p.startswith("/api/tickets") for p in by_feature[Feature.TICKETS])
     assert all(p.startswith("/api/activity") for p in by_feature[Feature.ACTIVITY])
     assert all(p.startswith("/api/graph") for p in by_feature[Feature.GRAPH])
+    assert by_feature[Feature.PAPERLESS]
+    assert all(
+        p.startswith(("/api/paperless", "/api/admin/paperless"))
+        or p == "/api/meetings/{meeting_id}/documents/paperless"
+        for p in by_feature[Feature.PAPERLESS]
+    )
     assert all(p.startswith("/api/public/") for p in by_feature[Feature.PUBLIC])
     assert not any(p.startswith("/api/public/meetings") for p in by_feature[Feature.PUBLIC])
     assert all(p.startswith(("/api/todos", "/api/ws/todos")) for p in by_feature[Feature.TODOS])

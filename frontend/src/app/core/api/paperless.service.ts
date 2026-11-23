@@ -15,6 +15,7 @@ import { type Observable, catchError, map, of, shareReplay, switchMap } from 'rx
 import { API_BASE_URL } from '@core/api/api.config';
 import type { Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
+import { FeatureService } from '@core/features/feature.service';
 import { skipLoading } from '@stupa-makers/ui-kit';
 
 /** The kinds of element whose page links to its filed document. */
@@ -45,13 +46,17 @@ export class PaperlessService {
   private readonly http = inject(HttpClient);
   private readonly base = inject(API_BASE_URL);
   private readonly auth = inject(AuthService);
+  private readonly features = inject(FeatureService);
 
   /** The answer of `GET /paperless/insert`, read once per session. */
   private insertState: Observable<boolean> | null = null;
 
-  /** The right to see the entry. The server checks it again. */
+  /**
+   * The right to see the entry while the feature `paperless` is on
+   * (§F/integrations/paperless/002762). The server checks both again.
+   */
   canUse(): boolean {
-    return this.auth.can('paperless.use');
+    return this.features.isOn('paperless') && this.auth.can('paperless.use');
   }
 
   /**

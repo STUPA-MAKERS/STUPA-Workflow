@@ -1,6 +1,7 @@
 """arq task of the Paperless integration: the filing cron.
 
-``process_paperless_filings`` runs every minute. Without a connection it does nothing.
+``process_paperless_filings`` runs every minute. Without a connection and while the
+feature `paperless` is off (§F/integrations/paperless/002762) it does nothing.
 It opens a job for each new file (`new_filings`), runs each due job in its own
 transaction, so one broken file does not undo the others, and gives the tag `Ersetzt` to
 the replaced documents. A job of a part whose switch is off waits
@@ -25,7 +26,9 @@ from app.modules.paperless.models import PaperlessSettings
 from app.modules.paperless_filing.files import FileBuilder
 from app.modules.paperless_filing.runner import FilingRunner
 from app.modules.paperless_filing.sources import new_filings, open_kinds
+from app.modules.site_config.features import Feature
 from app.settings import Settings
+from worker.features import job_feature_on
 
 logger = logging.getLogger("worker.paperless")
 
@@ -94,6 +97,8 @@ async def process_paperless_filings(ctx: dict[str, Any], now: datetime | None = 
     """
     moment = now or datetime.now(UTC)
     maker = _sessionmaker(ctx)
+    if not await job_feature_on(maker, Feature.PAPERLESS):
+        return 0
     row, client = await _open(ctx, maker)
     if client is None:
         return 0

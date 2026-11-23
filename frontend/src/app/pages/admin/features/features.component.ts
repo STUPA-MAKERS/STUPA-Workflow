@@ -33,6 +33,7 @@ export const FEATURE_LABELS: Readonly<Record<FeatureKey, TranslationKey>> = {
   graph: 'nav.graph',
   public: 'admin.features.public',
   push: 'admin.features.push',
+  paperless: 'admin.features.paperless',
 };
 
 /** One place that still needs a feature, from the 409 `feature_in_use` of the save. */
@@ -62,6 +63,7 @@ const ALL_ON: FeatureSwitches = {
   graph: true,
   public: true,
   push: true,
+  paperless: true,
 };
 
 /** The features that are on: the own switch and each needed feature is on. */

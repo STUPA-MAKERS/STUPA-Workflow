@@ -4620,6 +4620,7 @@
   "admin.features.title": "Features",
   "admin.features.public": "Public pages",
   "admin.features.push": "Push notifications",
+  "admin.features.paperless": "Paperless",
   "admin.features.forbidden": "You do not have the right to switch features.",
   "admin.features.needs": "Needs {name}",
   "admin.features.confirmTitle": "Switch features off",
