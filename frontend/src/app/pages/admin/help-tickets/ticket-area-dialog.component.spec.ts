@@ -11,6 +11,7 @@ const PLAT: TicketArea = {
   gremiumId: null,
   platform: true,
   notifyNew: true,
+  inApp: false,
   categories: [],
   mine: true,
 };
@@ -20,6 +21,7 @@ const ASTA: TicketArea = {
   gremiumId: 'g1',
   platform: false,
   notifyNew: false,
+  inApp: false,
   categories: [
     { id: 'c1', name: 'Raumanfrage' },
     { id: 'c2', name: 'Schlüssel' },
@@ -93,16 +95,26 @@ describe('TicketAreaDialogComponent', () => {
     const { cmp, fill, api, saved } = await setup();
     expect(screen.getByRole('heading', { name: 'Bereich anlegen' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Bereich löschen' })).toBeNull();
-    expect(cmp.value()).toEqual({ name: '', gremiumId: '', notifyNew: true, categories: [] });
+    expect(cmp.value()).toEqual({ name: '', gremiumId: '', notifyNew: true, inApp: false, categories: [] });
     await fill({ name: '  Fachschaft ', gremiumId: 'g1', notifyNew: true, categories: [{ name: ' Beratung' }] });
     cmp.save();
     expect(api.createArea).toHaveBeenCalledWith({
       name: 'Fachschaft',
       gremiumId: 'g1',
       notifyNew: true,
+      inApp: false,
       categories: [{ name: 'Beratung' }],
     });
     expect(saved).toHaveBeenCalled();
+  });
+
+  /** The switch "In der App erreichbar" (spec 002713). */
+  it('saves the switch "In der App erreichbar"', async () => {
+    const { cmp, fill, api } = await setup(ASTA);
+    expect(screen.getByText('In der App erreichbar')).toBeInTheDocument();
+    await fill({ ...cmp.value(), inApp: true });
+    cmp.save();
+    expect(api.updateArea).toHaveBeenCalledWith('a-asta', expect.objectContaining({ inApp: true }));
   });
 
   it('saves nothing without a name', async () => {
@@ -124,6 +136,7 @@ describe('TicketAreaDialogComponent', () => {
       name: 'AStA-Büro',
       gremiumId: null,
       notifyNew: false,
+      inApp: false,
       categories: [{ id: 'c2', name: 'Schlüsselausgabe' }, { name: 'Neu' }],
     });
   });
@@ -189,7 +202,13 @@ describe('TicketAreaDialogComponent', () => {
     expect(api.deleteArea).not.toHaveBeenCalled();
     await fill({ name: 'Büro', gremiumId: '', notifyNew: false, categories: [] });
     cmp.onAction('save');
-    expect(api.createArea).toHaveBeenCalledWith({ name: 'Büro', gremiumId: null, notifyNew: false, categories: [] });
+    expect(api.createArea).toHaveBeenCalledWith({
+      name: 'Büro',
+      gremiumId: null,
+      notifyNew: false,
+      inApp: false,
+      categories: [],
+    });
     cmp.onAction('cancel');
     expect(closed).toHaveBeenCalled();
   });

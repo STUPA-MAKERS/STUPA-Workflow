@@ -28,7 +28,7 @@ const HIDDEN_KINDS: ReadonlySet<string> = new Set(['vote', 'role_change']);
  * person who works in a Bereich (`ticket.manage`, or the Gremium permission
  * `ticket.work`), because nobody else gets these mails.
  */
-const TEAM_KINDS: ReadonlySet<string> = new Set(['ticket_created', 'ticket_message']);
+const TEAM_KINDS: ReadonlySet<string> = new Set(['ticket_created', 'ticket_message', 'ticket_assigned']);
 
 /** The feature whose mails a kind switches; a kind without an entry has no feature. */
 const KIND_FEATURE: ReadonlyMap<string, FeatureKey> = new Map<string, FeatureKey>([
@@ -38,6 +38,7 @@ const KIND_FEATURE: ReadonlyMap<string, FeatureKey> = new Map<string, FeatureKey
   ['ticket_created', 'tickets'],
   ['ticket_message', 'tickets'],
   ['ticket_answer', 'tickets'],
+  ['ticket_assigned', 'tickets'],
   ['todo_assigned', 'todos'],
   ['todo_mentioned', 'todos'],
   ['todo_due', 'todos'],

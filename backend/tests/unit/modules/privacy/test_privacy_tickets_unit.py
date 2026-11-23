@@ -160,7 +160,7 @@ async def test_the_export_lists_the_own_ticket_messages() -> None:
         scalar=[principal],
         execute=[
             FakeResult(),
-            FakeResult([(note, 12)]),
+            FakeResult([(note, "AAAA0012")]),
             FakeResult([(note.id, "antwort.pdf")]),
         ],
     )

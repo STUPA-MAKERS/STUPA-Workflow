@@ -5,7 +5,13 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/tickets/test_ticket_waiting.py:test_a_report_of_the_help_menu_has_the_source_help"
+  - "backend/tests/unit/modules/tickets/test_ticket_waiting.py:test_a_ticket_by_hand_has_the_source_team_and_a_first_message"
+implementation:
+  - backend/app/modules/tickets/models.py
+  - backend/app/modules/tickets/service.py
+  - frontend/src/app/pages/tickets/ticket-detail.component.html
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets

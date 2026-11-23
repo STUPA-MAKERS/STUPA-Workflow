@@ -268,7 +268,7 @@ async def test_blocked_senders_map_people_addresses_and_sources() -> None:
     )
     session = ScriptedSession(
         scalars=[[account, address, orphan]],
-        execute=[[(OTHER, "Otto", "otto@x"), (ME, "Ada", None)], [(source, 12)]],
+        execute=[[(OTHER, "Otto", "otto@x"), (ME, "Ada", None)], [(source, "AAAA0012")]],
     )
     first, second, third = await _svc(session).blocked_senders()
     assert first.kind == "principal"

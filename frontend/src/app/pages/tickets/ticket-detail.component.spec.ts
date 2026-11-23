@@ -14,6 +14,7 @@ import {
   type TicketArea,
   type TicketDetail,
   type TicketListItem,
+  type TicketFollowUp,
   type TicketNote,
   type TicketPage,
   type TicketPatch,
@@ -209,7 +210,7 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
     list: jest.fn(() => of<TicketPage>({ items: [], total: 0, limit: 8, offset: 0 })),
     getMine: jest.fn((id: string) => (opts.mine ?? (() => of(mine({ id }))))(id)),
     addMyNote: jest.fn((_id: string, body: string, _files?: unknown) =>
-      of<TicketNote>({
+      of<TicketNote | TicketFollowUp>({
         id: 'n9',
         author: { principalId: 'r1', displayName: 'Lea Hoffmann' },
         body,
@@ -372,13 +373,13 @@ describe('TicketDetailComponent', () => {
   it('pairs the fields side by side', async () => {
     await start('/tickets/t40', { split: true });
     expect(document.querySelectorAll('.td__pair')).toHaveLength(2);
-    expect(fieldLabels()).toEqual(['Gemeldet von', 'Gemeldet', 'E-Mail', 'Zugewiesen', 'Art']);
+    expect(fieldLabels()).toEqual(['Gemeldet von', 'Gemeldet', 'E-Mail', 'Zugewiesen', 'Kategorie', 'Quelle']);
   });
 
   it('puts the mail after the reporter in one column', async () => {
     await start('/tickets/t40', { split: false });
     expect(document.querySelectorAll('.td__pair')).toHaveLength(0);
-    expect(fieldLabels()).toEqual(['Gemeldet von', 'E-Mail', 'Gemeldet', 'Zugewiesen', 'Art']);
+    expect(fieldLabels()).toEqual(['Gemeldet von', 'E-Mail', 'Gemeldet', 'Zugewiesen', 'Kategorie', 'Quelle']);
   });
 
   it('shows the avatar of the assignee in the select, and the empty person without one', async () => {
@@ -437,14 +438,42 @@ describe('TicketDetailComponent', () => {
       get: () => of(detail({ status: 'in_progress' })),
     });
     expect(cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([
-      ['reset'],
+      ['wait', 'reset'],
       ['duplicate', 'block'],
     ]);
+  });
+
+  /** "Wartet auf Antwort" (spec 002708): an open state that the menu sets and ends. */
+  it('sets "Wartet auf Antwort" from the menu and ends it again', async () => {
+    const { cmp, api, setGet, harness } = await start('/tickets/t40', {
+      get: () => of(detail({ status: 'in_progress' })),
+    });
+    cmp.onMenu({ id: 'wait', label: '' });
+    expect(api.patch).toHaveBeenCalledWith('t40', { status: 'waiting' });
+    setGet(() => of(detail({ status: 'waiting' })));
+    await harness.navigateByUrl('/tickets/t41');
+    harness.detectChanges();
+    expect(cmp.statusLabel()).toBe('Wartet auf Antwort');
+    expect(cmp.open()).toBe(true);
+    expect(cmp.menuSections()[0].items.map((i) => i.id)).toEqual(['progress', 'reset']);
+    cmp.onMenu({ id: 'progress', label: '' });
+    expect(api.patch).toHaveBeenLastCalledWith('t41', { status: 'in_progress' });
+  });
+
+  /** The source of a ticket (spec 002711) and the ticket that it follows (spec 002710). */
+  it('names the source and the ticket that this one follows', async () => {
+    const { cmp } = await start('/tickets/t40', {
+      get: () => of(detail({ source: 'team', followUpOf: { id: 't12', number: 'T-AAAA0012' } })),
+    });
+    expect(cmp.sourceLabel()).toBe('Vom Team angelegt');
+    expect(screen.getByText('Folgt auf')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'T-AAAA0012' })).toHaveAttribute('href', '/tickets/t12');
   });
 
   it('offers only the duplicate for a new ticket', async () => {
     const { cmp } = await start('/tickets/t40', { get: () => of(detail({ status: 'new' })) });
     expect(cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([
+      ['wait'],
       ['duplicate', 'block'],
     ]);
   });
@@ -454,7 +483,7 @@ describe('TicketDetailComponent', () => {
     const { cmp, setGet, harness } = await start('/tickets/t40', {
       get: () => of(detail({ status: 'new', senderBlocked: true })),
     });
-    const items = cmp.menuSections()[0].items;
+    const items = cmp.menuSections()[1].items;
     expect(items.map((i) => i.id)).toEqual(['duplicate', 'unblock']);
     expect(items[1]).toMatchObject({ label: 'Absender entsperren', icon: 'lock' });
     setGet(() => of(detail({ status: 'done', anonymizedAt: '2026-10-15T00:00:00Z' })));
@@ -512,7 +541,7 @@ describe('TicketDetailComponent', () => {
       me: ' Tobias@Example.org',
       get: () => of(detail({ status: 'new' })),
     });
-    expect(cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([['duplicate']]);
+    expect(cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([['wait'], ['duplicate']]);
   });
 
   it('offers the block while the viewer is not known', async () => {
@@ -520,7 +549,7 @@ describe('TicketDetailComponent', () => {
       me: null,
       get: () => of(detail({ status: 'new' })),
     });
-    expect(cmp.menuSections()[0].items.map((i) => i.id)).toEqual(['duplicate', 'block']);
+    expect(cmp.menuSections()[1].items.map((i) => i.id)).toEqual(['duplicate', 'block']);
   });
 
   it('offers the block on a report without an e-mail', async () => {
@@ -534,7 +563,7 @@ describe('TicketDetailComponent', () => {
           }),
         ),
     });
-    expect(cmp.menuSections()[0].items.map((i) => i.id)).toEqual(['duplicate', 'block']);
+    expect(cmp.menuSections()[1].items.map((i) => i.id)).toEqual(['duplicate', 'block']);
   });
 
   it('says why a block was refused', async () => {
@@ -730,8 +759,8 @@ describe('TicketDetailComponent', () => {
     expect(cmp.reporter()).toBe('');
     expect(cmp.statusKind()).toBe('accent');
     expect(cmp.statusLabel()).toBe('Neu');
-    expect(cmp.kindLabel()).toBe('Fehler');
-    expect(cmp.kindIcon()).toBe('bug');
+    expect(cmp.kindLabel()).toBe('Keine');
+    expect(cmp.kindIcon()).toBe('ticket');
     expect(cmp.assigneeName()).toBe('Niemand');
     expect(cmp.menuSections()).toEqual([]);
     expect(cmp.messages()).toEqual([]);
@@ -1336,6 +1365,32 @@ describe('TicketDetailComponent', () => {
       expect(toast.error).toHaveBeenLastCalledWith('Die Notiz konnte nicht gespeichert werden.');
     });
 
+    /** A late message becomes a new ticket (spec 002710). */
+    it('says that a message opens a new ticket, and opens the ticket that the message became', async () => {
+      const { cmp, api, toast, router, settle } = await start('/tickets/t40', {
+        manager: false,
+        mine: (id) => of(mine({ id, status: 'done', replyOpensNew: id === 't40' })),
+      });
+      expect(cmp.replyOpensNew()).toBe(true);
+      expect(cmp.hints().map((h) => h.text)).toEqual([
+        'Dieses Ticket ist seit mehr als 14 Tagen geschlossen. Eine neue Nachricht legt ein neues Ticket an.',
+      ]);
+      api.addMyNote.mockReturnValueOnce(of({ followUp: { id: 't77', number: 'T-AAAA0077' } }));
+      cmp.sendNote({ body: 'Es ist wieder da.' });
+      await settle();
+      expect(toast.success).toHaveBeenCalledWith('Deine Nachricht ist das neue Ticket T-AAAA0077.');
+      expect(router.url).toBe('/tickets/t77');
+      expect(cmp.hints()).toEqual([]);
+    });
+
+    it('shows no hint about a new ticket while a block holds the reporter back', async () => {
+      const { cmp } = await start('/tickets/t40', {
+        manager: false,
+        mine: (id) => of(mine({ id, status: 'done', replyOpensNew: true, canReply: false })),
+      });
+      expect(cmp.hints()).toEqual([]);
+    });
+
     it('names a ticket of somebody else as not found', async () => {
       await start('/tickets/t99', { manager: false, mine: () => throwError(() => notFound()) });
       expect(screen.getByText('Ticket nicht gefunden')).toBeInTheDocument();
@@ -1387,6 +1442,7 @@ describe('TicketDetailComponent', () => {
       gremiumId: null,
       platform: true,
       notifyNew: true,
+      inApp: false,
       categories: [],
       mine: true,
     };
@@ -1396,6 +1452,7 @@ describe('TicketDetailComponent', () => {
       gremiumId: 'g1',
       platform: false,
       notifyNew: true,
+      inApp: false,
       categories: [{ id: 'c1', name: 'Raumanfrage' }],
       mine: true,
     };
@@ -1432,7 +1489,6 @@ describe('TicketDetailComponent', () => {
       expect(api.patch).not.toHaveBeenCalled();
       cmp.setCategory('');
       expect(api.patch).toHaveBeenCalledWith('t40', { categoryId: null });
-      expect(cmp.kindLabel()).toBe('Keine');
     });
 
     it('moves the ticket, says so and reads the new team', async () => {

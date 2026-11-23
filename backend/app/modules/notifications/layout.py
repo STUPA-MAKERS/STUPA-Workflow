@@ -94,6 +94,10 @@ _REASONS: dict[str, dict[str, str]] = {
         "de": "Sie erhalten diese E-Mail, weil Sie dieses Ticket gemeldet haben.",
         "en": "You are receiving this email because you reported this ticket.",
     },
+    "ticket_assigned": {
+        "de": "Sie erhalten diese E-Mail, weil Ihnen ein Ticket zugewiesen wurde.",
+        "en": "You are receiving this email because a ticket was assigned to you.",
+    },
     "ticket_received": {
         "de": "Sie erhalten diese E-Mail, weil Sie ein Problem, eine Frage oder "
         "eine Idee gemeldet haben.",

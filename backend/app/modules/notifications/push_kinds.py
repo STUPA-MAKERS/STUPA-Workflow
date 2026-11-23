@@ -41,6 +41,7 @@ PUSH_TITLES: Mapping[str, Mapping[str, str]] = {
     "ticket_created": {"de": "Neues Ticket", "en": "New ticket"},
     "ticket_message": {"de": "Neue Nachricht", "en": "New message"},
     "ticket_answer": {"de": "Neue Antwort", "en": "New answer"},
+    "ticket_assigned": {"de": "Ticket zugewiesen", "en": "Ticket assigned"},
     "todo_assigned": {"de": "To-Do zugewiesen", "en": "To-do assigned"},
     "todo_mentioned": {"de": "Neue Erwähnung", "en": "New mention"},
     "todo_due": {"de": "To-Do fällig", "en": "To-do due"},

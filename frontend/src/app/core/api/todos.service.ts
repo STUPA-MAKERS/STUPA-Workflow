@@ -72,7 +72,11 @@ export interface TodoLinkDetail {
   readonly meetingTitle?: string | null;
   readonly position?: number | null;
   readonly number?: string | null;
-  readonly status?: TicketStatus | null;
+  /**
+   * The state of a ticket. The board types of the kit name four states, so the type leaves
+   * out "waiting"; the value still arrives and the label map reads it as a string.
+   */
+  readonly status?: Exclude<TicketStatus, 'waiting'> | null;
   readonly boardName?: string | null;
   readonly columnName?: string | null;
   readonly isDone?: boolean | null;

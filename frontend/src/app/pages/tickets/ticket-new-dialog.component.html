@@ -1,0 +1,32 @@
+<app-dialog
+  size="md"
+  [open]="open()"
+  [heading]="'tickets.new.heading' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="closed.emit()"
+  [actions]="actions()"
+  (action)="onAction($event.key)"
+>
+  <ng-template dialogBody>
+    @if (person(); as chosen) {
+      <app-chip
+        [removable]="true"
+        [removeLabel]="'tickets.new.personRemove' | t: { name: chosen.name }"
+        (remove)="person.set(null)"
+      >
+        {{ chosen.name }}
+      </app-chip>
+    } @else {
+      <app-gremium-person-picker
+        [placeholder]="'tickets.new.person' | t"
+        [persons]="findPeople"
+        [taken]="taken()"
+        (picked)="onPicked($event)"
+      />
+      @if (tried()) {
+        <app-error-text>{{ 'tickets.new.personMissing' | t }}</app-error-text>
+      }
+    }
+    <app-form [form]="form()" [value]="value()" (valueChange)="onValue($event)" />
+  </ng-template>
+</app-dialog>

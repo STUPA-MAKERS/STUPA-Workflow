@@ -101,6 +101,7 @@ SOURCE_FEATURE: Mapping[str, frozenset[Feature]] = {
 TICKET_STATUS: Mapping[str, Mapping[str, str]] = {
     "new": {"de": "Neu", "en": "New"},
     "in_progress": {"de": "In Arbeit", "en": "In progress"},
+    "waiting": {"de": "Wartet auf Antwort", "en": "Waiting for reply"},
     "done": {"de": "Erledigt", "en": "Done"},
     "rejected": {"de": "Abgelehnt", "en": "Rejected"},
 }

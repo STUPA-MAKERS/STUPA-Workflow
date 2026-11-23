@@ -932,6 +932,13 @@
       "to": "Ticket"
     },
     {
+      "column": "follow_up_of_id",
+      "from": "Ticket",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Ticket"
+    },
+    {
       "column": "area_id",
       "from": "Ticket",
       "multiplicity": "*",
@@ -6586,6 +6593,7 @@
           "values": [
             "new",
             "in_progress",
+            "waiting",
             "done",
             "rejected"
           ]
@@ -6613,6 +6621,23 @@
           "nullable": true,
           "primaryKey": false,
           "type": "CHAR(32)"
+        },
+        {
+          "name": "follow_up_of_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "source",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "help",
+            "mail",
+            "team"
+          ]
         },
         {
           "name": "context",
@@ -6679,6 +6704,12 @@
         },
         {
           "name": "notify_new",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "in_app",
           "nullable": false,
           "primaryKey": false,
           "type": "BOOLEAN"

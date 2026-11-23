@@ -33,6 +33,7 @@ from app.modules.tickets.router import (
 from app.modules.tickets.schemas import (
     ReporterTicketDetail,
     ReporterTicketItem,
+    TicketAreaChoice,
     TicketAreaOut,
     TicketBlockedSender,
     TicketCounts,
@@ -93,6 +94,17 @@ class _FakeService:
         self.swallow = False
         self.added_mentions: list[uuid.UUID] = []
         self.scopes: list[Any] = []
+        self.follow_up: Any = None
+        self.manual_note: Any = None
+
+    async def reporter_follow_up(self, *a: Any, **kw: Any) -> Any:
+        self.calls.append(("reporter_follow_up", (a, kw)))
+        return self.follow_up
+
+    async def create_manual(self, payload: Any, _p: Principal, **kw: Any) -> tuple[Any, Any]:
+        self.calls.append(("create_manual", payload))
+        self.scopes.append(kw["areas"])
+        return _Created(), self.manual_note
 
     async def create(self, payload: Any, **kw: Any) -> _Created | SwallowedReport:
         self.calls.append(("create", kw))
@@ -102,9 +114,7 @@ class _FakeService:
         self.calls.append(("block", ticket_id))
         return _detail().model_copy(update={"sender_blocked": True})
 
-    async def unblock_sender(
-        self, ticket_id: uuid.UUID, _p: Principal, **_kw: Any
-    ) -> TicketDetail:
+    async def unblock_sender(self, ticket_id: uuid.UUID, _p: Principal, **_kw: Any) -> TicketDetail:
         self.calls.append(("unblock", ticket_id))
         return _detail()
 
@@ -195,12 +205,24 @@ class _Mails:
         self.sent.append(ticket_id)
 
 
+class _Db:
+    """The session double: the routes that commit count here."""
+
+    def __init__(self) -> None:
+        self.commits = 0
+
+    async def commit(self) -> None:
+        self.commits += 1
+
+
 class _Env:
     def __init__(self, app: FastAPI, service: _FakeService, mails: _Mails) -> None:
         self.app = app
         self.service = service
         self.mails = mails
         self.note_mails = _Mails()
+        self.assigned_mails = _Mails()
+        self.db = _Db()
         self.public = True
         self.areas: dict[str, frozenset[uuid.UUID]] = {}
         self.account: uuid.UUID | None = uuid.uuid4()
@@ -216,7 +238,7 @@ def env(monkeypatch: pytest.MonkeyPatch) -> _Env:
     state = _Env(app, service, mails)
 
     def _session() -> Iterator[object]:
-        yield object()
+        yield state.db
 
     async def _branding(_db: object) -> Branding:
         return Branding(tickets=TicketSettings(publicEnabled=state.public))
@@ -234,6 +256,7 @@ def env(monkeypatch: pytest.MonkeyPatch) -> _Env:
     app.dependency_overrides[get_ticket_service] = lambda: service
     app.dependency_overrides[get_ticket_mail_sender] = lambda: mails
     app.dependency_overrides[get_note_mail_sender] = lambda: state.note_mails
+    app.dependency_overrides[router_mod.get_assigned_mail_sender] = lambda: state.assigned_mails
     state.login(None)
     return state
 
@@ -365,6 +388,7 @@ def test_the_work_routes_answer(env: _Env) -> None:
     assert client.get("/api/tickets/counts").json() == {
         "new": 2,
         "inProgress": 0,
+        "waiting": 0,
         "done": 0,
         "rejected": 0,
     }
@@ -450,6 +474,9 @@ class _FakeAreas:
     def _out(self, **kw: Any) -> TicketAreaOut:
         return TicketAreaOut(id=AREA, name="Finanzen", **kw)
 
+    async def choices(self) -> list[TicketAreaChoice]:
+        return [TicketAreaChoice(id=AREA, name="Finanzen")]
+
     async def listing(self, scope: Any = None) -> list[TicketAreaOut]:
         self.calls.append(("listing", scope))
         return [self._out(mine=scope is None or AREA in scope)]
@@ -483,6 +510,7 @@ def test_the_area_routes(env: _Env) -> None:
         "gremiumId": None,
         "platform": False,
         "notifyNew": True,
+        "inApp": False,
         "categories": [],
         "mine": True,
     }
@@ -569,6 +597,72 @@ def test_a_message_of_the_reporter_mails_the_team(env: _Env) -> None:
     assert env.note_mails.sent == [NOTE_ID]
     client.patch(f"/api/tickets/mine/{TID}/notes/{TID}", json={"body": "m"})
     assert env.note_mails.sent == [NOTE_ID]
+
+
+def test_a_late_message_of_the_reporter_becomes_a_new_ticket(env: _Env) -> None:
+    """Spec 002710: the answer names the new ticket, and its mails are those of a report."""
+    env.login(Principal(sub="plain"))
+    env.service.follow_up = _Created()
+    resp = TestClient(env.app).post(f"/api/tickets/mine/{TID}/notes", json={"body": "n"})
+    assert resp.status_code == 201
+    assert resp.json() == {"followUp": {"id": str(TID), "number": "T-AAAA0042"}}
+    assert env.db.commits == 1
+    assert env.mails.sent == [TID]
+    assert env.note_mails.sent == []
+    assert "reporter_add_note" not in [kind for kind, _ in env.service.calls]
+
+
+def test_a_new_assignee_queues_the_assigned_mail(env: _Env) -> None:
+    """Spec 002718: only a patch that names an assignee asks for the mail."""
+    env.login(MANAGER)
+    client = TestClient(env.app)
+    assert client.patch(f"/api/tickets/{TID}", json={"status": "waiting"}).status_code == 200
+    assert client.patch(f"/api/tickets/{TID}", json={"assigneeId": None}).status_code == 200
+    assert env.assigned_mails.sent == []
+    assigned = client.patch(f"/api/tickets/{TID}", json={"assigneeId": str(uuid.uuid4())})
+    assert assigned.status_code == 200
+    assert env.assigned_mails.sent == [TID]
+
+
+def test_the_team_creates_a_ticket_by_hand(env: _Env) -> None:
+    """Spec 002712: the work right opens the route; a first message mails the person."""
+    client = TestClient(env.app)
+    body = {"areaId": str(AREA), "title": "Anruf", "reporterId": str(uuid.uuid4())}
+    assert client.post("/api/tickets/manual", json=body).status_code == 401
+    env.login(Principal(sub="plain"))
+    assert client.post("/api/tickets/manual", json=body).status_code == 403
+    env.areas[WORKER.sub] = frozenset({AREA})
+    env.login(WORKER)
+    created = client.post("/api/tickets/manual", json=body)
+    assert created.status_code == 201
+    assert created.json()["id"] == str(TID)
+    assert env.service.scopes[0] == frozenset({AREA})
+    assert env.db.commits == 1
+    assert env.note_mails.sent == []
+    env.service.manual_note = _note().model_copy(update={"id": NOTE_ID})
+    assert client.post("/api/tickets/manual", json={**body, "message": "Hallo"}).status_code == 201
+    assert env.note_mails.sent == [NOTE_ID]
+    assert client.post("/api/tickets/manual", json={**body, "title": ""}).status_code == 422
+
+
+def test_a_signed_in_person_reads_the_bereiche_of_the_ticket_dialog(env: _Env) -> None:
+    """Spec 002713: any session reads the list, a person without one does not."""
+    env.app.dependency_overrides[get_area_service] = _FakeAreas
+    client = TestClient(env.app)
+    assert client.get("/api/tickets/report-areas").status_code == 401
+    env.login(Principal(sub="plain"))
+    listed = client.get("/api/tickets/report-areas")
+    assert listed.status_code == 200
+    assert listed.json() == [
+        {"id": str(AREA), "name": "Finanzen", "platform": False, "categories": []}
+    ]
+
+
+def test_a_report_names_a_bereich_and_its_kategorie(env: _Env) -> None:
+    """Spec 002713: the body takes ``areaId`` and ``categoryId`` in place of a kind."""
+    env.login(Principal(sub="plain"))
+    body = {"title": "t", "body": "b", "areaId": str(AREA), "categoryId": str(uuid.uuid4())}
+    assert TestClient(env.app).post("/api/tickets", json=body).status_code == 201
 
 
 def test_validation_problem_is_the_shape_of_the_assignee_error() -> None:
@@ -709,11 +803,11 @@ def test_a_note_queues_the_mention_mail_of_the_added_mentions(env: _Env) -> None
     env.service.added_mentions = []
     edit = client.patch(f"/api/tickets/{TID}/notes/{TID}", json={"body": "m"})
     assert edit.status_code == 200
-    assert env.service.calls[-1][1][1] == {"mentions": None}
+    assert env.service.calls[-1][1][1]["mentions"] is None
     assert len(mentions.sent) == 1
     env.service.added_mentions = [ada]
     client.patch(f"/api/tickets/{TID}/notes/{TID}", json={"body": "m", "mentions": [str(ada)]})
-    assert env.service.calls[-1][1][1] == {"mentions": [ada]}
+    assert env.service.calls[-1][1][1]["mentions"] == [ada]
     assert len(mentions.sent) == 2
 
 

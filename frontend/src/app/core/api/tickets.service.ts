@@ -21,7 +21,9 @@ import { detailContext } from '@core/cache/cache.interceptor';
 import { httpParams } from './http-params';
 
 export type TicketKind = 'bug' | 'question' | 'idea' | 'barrier';
-export type TicketStatus = 'new' | 'in_progress' | 'done' | 'rejected';
+export type TicketStatus = 'new' | 'in_progress' | 'waiting' | 'done' | 'rejected';
+/** The way a ticket came: the help menu, a mail, or a person of the team wrote it by hand. */
+export type TicketSource = 'help' | 'mail' | 'team';
 
 /** The kinds in the order of the dialog and the filter. */
 export const TICKET_KINDS: readonly TicketKind[] = ['bug', 'question', 'idea', 'barrier'];
@@ -38,7 +40,12 @@ export interface TicketContext {
 }
 
 export interface TicketCreate {
-  readonly kind: TicketKind;
+  /** Required for the Bereich "Plattform"; not sent for another Bereich. */
+  readonly kind?: TicketKind;
+  /** A Bereich of `reportAreas`; without it the report goes to "Plattform". */
+  readonly areaId?: Uuid;
+  /** A Kategorie of that Bereich. */
+  readonly categoryId?: Uuid;
   readonly title: string;
   readonly body: string;
   /** Required without a session; the server ignores it with one. */
@@ -79,9 +86,46 @@ export interface TicketArea {
   readonly platform: boolean;
   /** A new ticket sends a mail to the team of the Bereich. */
   readonly notifyNew: boolean;
+  /** A signed-in person can choose the Bereich in the ticket dialog; always true for "Plattform". */
+  readonly inApp: boolean;
   readonly categories: readonly TicketCategory[];
   /** The caller works in the Bereich. */
   readonly mine: boolean;
+}
+
+/** A Bereich that a signed-in person can choose in the ticket dialog of the help menu. */
+export interface TicketAreaChoice {
+  readonly id: Uuid;
+  readonly name: string;
+  readonly platform: boolean;
+  readonly categories: readonly TicketCategory[];
+}
+
+/**
+ * A ticket that a person of the team writes by hand for an account. `body` is the note of
+ * the team, which the person does not read; `message` is the first public message.
+ */
+export interface TicketManualCreate {
+  readonly areaId: Uuid;
+  readonly title: string;
+  readonly body: string;
+  readonly kind?: TicketKind;
+  readonly categoryId?: Uuid;
+  readonly reporterId?: Uuid;
+  /** Needs a Postfach of the Bereich (422 `ticket_area_without_mailbox`). */
+  readonly email?: string;
+  readonly message: string;
+}
+
+/** A reference to another ticket. */
+export interface TicketRef {
+  readonly id: Uuid;
+  readonly number: string;
+}
+
+/** The answer to a message on a ticket that is closed for more than 14 days: the new ticket. */
+export interface TicketFollowUp {
+  readonly followUp: TicketRef;
 }
 
 /** A Kategorie in the save of a Bereich: `id` keeps a stored one, without it a new one. */
@@ -94,6 +138,7 @@ export interface TicketAreaInput {
   readonly name: string;
   readonly gremiumId: Uuid | null;
   readonly notifyNew: boolean;
+  readonly inApp: boolean;
   /** The whole ordered list; a stored Kategorie that it leaves out is deleted. */
   readonly categories: readonly TicketCategoryInput[];
 }
@@ -109,6 +154,8 @@ export interface TicketListItem {
   readonly categoryId: Uuid | null;
   readonly title: string;
   readonly status: TicketStatus;
+  /** Absent on an older server: the help menu. */
+  readonly source?: TicketSource;
   readonly reporter: TicketReporter;
   readonly assignee: PersonRef | null;
   readonly createdAt: IsoDateTime;
@@ -190,6 +237,8 @@ export interface TicketDetail extends TicketListItem {
   readonly notes: readonly TicketNote[];
   readonly events: readonly TicketEvent[];
   readonly duplicateOf: { readonly id: Uuid; readonly number: string } | null;
+  /** The closed ticket that a late message of the sender answered. */
+  readonly followUpOf?: TicketRef | null;
   /** The application or meeting of `context.route`, when the viewer may read it. */
   readonly contextTarget: {
     readonly kind: 'application' | 'meeting';
@@ -252,6 +301,8 @@ export interface MyTicketDetail extends MyTicketItem {
   readonly closedAt: IsoDateTime | null;
   /** False while a block holds back the reporter. */
   readonly canReply: boolean;
+  /** The ticket is closed for more than 14 days: a message becomes a new ticket. */
+  readonly replyOpensNew?: boolean;
 }
 
 export interface MyTicketPage {
@@ -279,6 +330,7 @@ export interface TicketPatch {
 export interface TicketCounts {
   readonly new: number;
   readonly inProgress: number;
+  readonly waiting?: number;
   readonly done: number;
   readonly rejected: number;
 }
@@ -333,9 +385,22 @@ export class TicketsApiService {
     return this.http.get<MyTicketDetail>(`${this.base}/tickets/mine/${id}`, { context: readContext(opts) });
   }
 
-  /** A message of the reporter: always public. */
-  addMyNote(id: Uuid, body: string, files: MessageFiles = {}): Observable<TicketNote> {
-    return this.http.post<TicketNote>(`${this.base}/tickets/mine/${id}/notes`, {
+  /** The Bereiche that a signed-in person can choose in the ticket dialog. */
+  reportAreas(): Observable<TicketAreaChoice[]> {
+    return this.http.get<TicketAreaChoice[]>(`${this.base}/tickets/report-areas`, { context: skipLoading() });
+  }
+
+  /** A ticket by hand for an account; the caller needs the work right in the Bereich. */
+  createManual(body: TicketManualCreate): Observable<TicketDetail> {
+    return this.http.post<TicketDetail>(`${this.base}/tickets/manual`, body);
+  }
+
+  /**
+   * A message of the reporter: always public. On a ticket that is closed for more than
+   * 14 days the answer is the new ticket that the message became.
+   */
+  addMyNote(id: Uuid, body: string, files: MessageFiles = {}): Observable<TicketNote | TicketFollowUp> {
+    return this.http.post<TicketNote | TicketFollowUp>(`${this.base}/tickets/mine/${id}/notes`, {
       body,
       ...messageFiles(files),
     });

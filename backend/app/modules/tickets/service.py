@@ -3,7 +3,8 @@
 The router resolves the Bereiche of the caller (``access.area_scope``) and passes
 them as ``areas`` to every method of the team; None stands for every Bereich. A ticket
 of a Bereich outside ``areas`` answers 404, and a list or a count leaves it out.
-``create`` and the ``reporter_*`` methods take no scope. The service still decides who
+``create`` and the ``reporter_*`` methods take no scope. ``create_manual`` and
+``reporter_follow_up`` do not commit; the router does. The service still decides who
 may be the assignee (a person with the work right in the Bereich of the ticket) and
 who may edit a note (its author).
 
@@ -31,11 +32,22 @@ import uuid
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal, Protocol
 
 from pydantic import JsonValue
-from sqlalchemy import ColumnElement, Select, String, cast, delete, func, or_, select, update
+from sqlalchemy import (
+    ColumnElement,
+    Select,
+    String,
+    case,
+    cast,
+    delete,
+    func,
+    or_,
+    select,
+    update,
+)
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -59,6 +71,7 @@ from app.modules.tickets.access import AreaScope, area_workers, works_in
 from app.modules.tickets.models import (
     CLOSED_STATUSES,
     PLATFORM_AREA_ID,
+    REOPEN_DAYS,
     TICKET_STATUSES,
     Ticket,
     TicketArea,
@@ -82,6 +95,7 @@ from app.modules.tickets.schemas import (
     TicketDetail,
     TicketEventOut,
     TicketListItem,
+    TicketManualCreate,
     TicketNoteOut,
     TicketPatch,
     TicketRef,
@@ -121,6 +135,14 @@ SENDER_IS_SELF = "sender_is_self"
 TICKET_ANONYMIZED = "ticket_anonymized"
 #: The problem code of a message of a reporter that a sender block holds back.
 SENDER_BLOCKED = "sender_blocked"
+#: The problem code of a report to a Bereich other than ``Plattform`` without a session.
+AREA_NEEDS_SESSION = "ticket_area_needs_session"
+#: The problem code of a report to a Bereich without the switch ``in_app``.
+AREA_NOT_REACHABLE = "ticket_area_not_reachable"
+#: The problem code of a ticket by hand for an address in a Bereich without a Postfach.
+AREA_WITHOUT_MAILBOX = "ticket_area_without_mailbox"
+#: The problem code of a ticket by hand that names no person, two, or an unknown account.
+REPORTER_INVALID = "ticket_reporter_invalid"
 
 #: What a block targets: an account id or a normalized e-mail address.
 BlockTarget = tuple[Literal["principal"], uuid.UUID] | tuple[Literal["email"], str]
@@ -229,10 +251,21 @@ class TicketService:
         result is a ``SwallowedReport`` and the router sends no mail. The drafts stay
         unbound until the purge.
 
+        ``areaId`` names the Bereich, else the report goes to ``Plattform``. A Bereich
+        other than ``Plattform`` takes a report only from an account and only while
+        its switch ``in_app`` is on.
+
         Raises:
+            ForbiddenError: A report to a Bereich other than ``Plattform`` without an
+                account (``ticket_area_needs_session``), or to a Bereich without the
+                switch (``ticket_area_not_reachable``) (HTTP 403).
             ValidationProblem: Attachments without a draft token, or a draft that is
-                missing, expired, foreign or infected (HTTP 422).
+                missing, expired, foreign or infected; an unknown Bereich
+                (``area_invalid``), a missing kind for ``Plattform``, or a Kategorie
+                of another Bereich (``category_invalid``) (HTTP 422).
         """
+        area_id = await self._report_area(payload, reporter_id)
+        await self._check_kind(area_id, payload.kind, payload.category_id)
         if payload.attachment_ids and not payload.draft_token:
             raise ValidationProblem(
                 "Attachments need the draft token of their upload.",
@@ -251,8 +284,10 @@ class TicketService:
         ticket = Ticket(
             id=uuid.uuid4(),
             number=await self.free_number(),
-            area_id=PLATFORM_AREA_ID,
+            area_id=area_id,
             kind=payload.kind,
+            category_id=payload.category_id,
+            source="help",
             title=payload.title.strip() or payload.title,
             body=payload.body,
             status="new",
@@ -283,6 +318,145 @@ class TicketService:
         )
         await self.session.commit()
         return ticket
+
+    async def _report_area(self, payload: TicketCreate, reporter_id: uuid.UUID | None) -> uuid.UUID:
+        """Return the Bereich of a report, after the check of the switch ``in_app``.
+
+        The check of the account comes first, so a person without a session learns
+        nothing about the Bereiche.
+        """
+        if payload.area_id is None or payload.area_id == PLATFORM_AREA_ID:
+            return PLATFORM_AREA_ID
+        if reporter_id is None:
+            raise ForbiddenError(
+                "Only the Bereich Plattform takes a report without a login.",
+                code=AREA_NEEDS_SESSION,
+            )
+        area = await self.session.get(TicketArea, payload.area_id)
+        if area is None:
+            raise ValidationProblem(
+                "The Bereich does not exist.",
+                code="area_invalid",
+                errors=[{"field": "areaId", "msg": "unknown Bereich"}],
+            )
+        if not area.in_app:
+            raise ForbiddenError(
+                "The Bereich takes no tickets from the app.", code=AREA_NOT_REACHABLE
+            )
+        return area.id
+
+    async def _check_kind(
+        self, area_id: uuid.UUID, kind: str | None, category_id: uuid.UUID | None
+    ) -> None:
+        """Check the kind and the Kategorie of a new ticket against its Bereich.
+
+        Raises:
+            ValidationProblem: ``Plattform`` without a kind, a kind outside
+                ``Plattform``, or a Kategorie of another Bereich (HTTP 422).
+        """
+        if area_id == PLATFORM_AREA_ID and kind is None:
+            raise ValidationProblem(
+                "A ticket of the Bereich Plattform needs a kind.",
+                errors=[{"field": "kind", "msg": "required for Plattform"}],
+            )
+        category = (
+            await self.session.get(TicketCategory, category_id) if category_id is not None else None
+        )
+        foreign = category_id is not None and (category is None or category.area_id != area_id)
+        if foreign or (kind is not None and area_id != PLATFORM_AREA_ID):
+            raise ValidationProblem(
+                "The Kategorie does not belong to the Bereich of the ticket.",
+                code="category_invalid",
+                errors=[{"field": "categoryId", "msg": "not a Kategorie of the Bereich"}],
+            )
+
+    async def create_manual(
+        self,
+        payload: TicketManualCreate,
+        principal: Principal,
+        *,
+        areas: AreaScope = None,
+    ) -> tuple[Ticket, TicketNote | None]:
+        """Store a ticket that a person of the team writes for an account, without a commit.
+
+        The source is ``team``. ``body`` is the note of the team; the view of the
+        person leaves it out. ``message`` becomes the first public note. The result is
+        the ticket and that note, else None.
+
+        A ticket for an address needs a Postfach of the Bereich, because the first
+        public message goes out as a mail. No Bereich has a Postfach yet, so an address
+        always answers 422.
+
+        Raises:
+            ForbiddenError: The caller has no work right in the Bereich (HTTP 403).
+            NotFoundError: The caller has no account row (HTTP 404).
+            ValidationProblem: An unknown Bereich (``area_invalid``), an address in a
+                Bereich without a Postfach (``ticket_area_without_mailbox``), no person
+                or two, or an unknown or inactive account
+                (``ticket_reporter_invalid``), a bad kind or Kategorie (HTTP 422).
+        """
+        if not works_in(areas, payload.area_id):
+            raise ForbiddenError("No work right in the Bereich.")
+        actor = await self._require_account(principal)
+        if await self.session.get(TicketArea, payload.area_id) is None:
+            raise ValidationProblem(
+                "The Bereich does not exist.",
+                code="area_invalid",
+                errors=[{"field": "areaId", "msg": "unknown Bereich"}],
+            )
+        if (payload.reporter_id is None) == (payload.email is None):
+            raise ValidationProblem(
+                "A ticket names exactly one person: an account or an address.",
+                code=REPORTER_INVALID,
+                errors=[{"field": "reporterId", "msg": "exactly one of reporterId and email"}],
+            )
+        if payload.reporter_id is None:
+            raise ValidationProblem(
+                "The Bereich has no Postfach, so it cannot write to an address.",
+                code=AREA_WITHOUT_MAILBOX,
+                errors=[{"field": "email", "msg": "the Bereich has no Postfach"}],
+            )
+        person = await self.session.get(PrincipalRow, payload.reporter_id)
+        if person is None or not person.active or person.merged_into is not None:
+            raise ValidationProblem(
+                "The account does not exist or is not active.",
+                code=REPORTER_INVALID,
+                errors=[{"field": "reporterId", "msg": "unknown or inactive account"}],
+            )
+        await self._check_kind(payload.area_id, payload.kind, payload.category_id)
+        ticket = Ticket(
+            id=uuid.uuid4(),
+            number=await self.free_number(),
+            area_id=payload.area_id,
+            kind=payload.kind,
+            category_id=payload.category_id,
+            source="team",
+            title=payload.title.strip() or payload.title,
+            body=payload.body,
+            status="new",
+            reporter_principal_id=person.id,
+            context={},
+        )
+        self.session.add(ticket)
+        await self.session.flush()
+        await emit_ticket_created(self.session, ticket, reporter_email=person.email)
+        self._event(ticket, "created", actor, {"confirmationSent": False})
+        note = (
+            TicketNote(
+                id=uuid.uuid4(),
+                ticket_id=ticket.id,
+                author_id=actor,
+                body=payload.message,
+                visibility="public",
+                mentions=[],
+            )
+            if payload.message.strip()
+            else None
+        )
+        if note is not None:
+            self.session.add(note)
+        await self.session.flush()
+        return ticket, note
 
     async def reporter_address(self, ticket: Ticket) -> str | None:
         """Return the address of the reporter: the account e-mail or the given e-mail."""
@@ -584,6 +758,7 @@ class TicketService:
         return TicketCounts(
             new=by_status.get("new", 0),
             in_progress=by_status.get("in_progress", 0),
+            waiting=by_status.get("waiting", 0),
             done=by_status.get("done", 0),
             rejected=by_status.get("rejected", 0),
         )
@@ -655,6 +830,11 @@ class TicketService:
             if ticket.duplicate_of_id is not None
             else None
         )
+        followed = (
+            await self.session.get(Ticket, ticket.follow_up_of_id)
+            if ticket.follow_up_of_id is not None
+            else None
+        )
         item = self._list_item(ticket, accounts)
         files = await self.files.message_attachments("ticket_note", [n.id for n in notes])
         return TicketDetail(
@@ -669,6 +849,11 @@ class TicketService:
             duplicate_of=(
                 TicketRef(id=duplicate.id, number=format_number(duplicate.number))
                 if duplicate is not None
+                else None
+            ),
+            follow_up_of=(
+                TicketRef(id=followed.id, number=format_number(followed.number))
+                if followed is not None
                 else None
             ),
             context_target=await self._context_target(ticket, principal),
@@ -708,7 +893,8 @@ class TicketService:
         """Change status, assignee, Kategorie or Bereich, and write one event per change.
 
         A status change into ``done`` or ``rejected`` sets ``closed_at``, a reopen
-        clears it. ``duplicateOfId`` goes with ``status: rejected`` only and names
+        clears it. ``waiting`` is an open status and leaves ``closed_at`` empty.
+        ``duplicateOfId`` goes with ``status: rejected`` only and names
         another ticket. ``completeTodos`` goes with ``done`` or ``rejected`` only.
 
         ``areaId`` moves the ticket to another Bereich, also to one outside ``areas``.
@@ -1138,13 +1324,15 @@ class TicketService:
         """List the tickets that the account reported, newest first.
 
         ``q`` matches the title, the body and the number. Anonymized tickets have no
-        reporter any more and never show.
+        reporter any more and never show. The body of a ticket that the team wrote by
+        hand is the note of the team, so ``q`` does not read it.
         """
+        own_body = case((Ticket.source == "team", ""), else_=Ticket.body)
         conds = (
             Ticket.reporter_principal_id == me,
             Ticket.anonymized_at.is_(None),
             *_status_kind_filter(statuses, kinds),
-            *_search_filter((q or "").strip(), (Ticket.title, Ticket.body)),
+            *_search_filter((q or "").strip(), (Ticket.title, own_body)),
         )
         total = await self.session.scalar(select(func.count(Ticket.id)).where(*conds))
         rows = list(
@@ -1200,7 +1388,7 @@ class TicketService:
         files = await self.files.message_attachments("ticket_note", [n.id for n in notes])
         return ReporterTicketDetail(
             **_reporter_item(ticket).model_dump(),
-            body=ticket.body,
+            body="" if ticket.source == "team" else ticket.body,
             attachments=tuple(
                 TicketAttachment.of(a) for a in await self.files.list_for_ticket(ticket.id)
             ),
@@ -1219,6 +1407,7 @@ class TicketService:
             ),
             closed_at=ticket.closed_at,
             can_reply=not await self._sender_blocked(ticket),
+            reply_opens_new=_reply_is_late(ticket),
         )
 
     async def reporter_add_note(
@@ -1230,6 +1419,11 @@ class TicketService:
         pepper: str,
     ) -> TicketNoteOut:
         """Add a message of the reporter. It is ``public`` and binds its files.
+
+        A message on a ticket with the status ``waiting``, ``done`` or ``rejected``
+        sets ``in_progress`` and writes a status event without a person, so the team
+        sees that the answer is there. The router sends a message on a ticket that is
+        closed for more than ``REOPEN_DAYS`` days to ``reporter_follow_up``.
 
         Raises:
             NotFoundError: Not a ticket of the caller (HTTP 404).
@@ -1245,6 +1439,8 @@ class TicketService:
         ticket, me = await self._reporter_ticket(ticket_id, principal, lock=True)
         if await self._sender_blocked(ticket):
             raise ForbiddenError("The sender is blocked.", code=SENDER_BLOCKED)
+        if ticket.status == "waiting" or ticket.status in CLOSED_STATUSES:
+            self._set_status(ticket, "in_progress", None, None)
         return await self._insert_note(
             ticket,
             me,
@@ -1255,6 +1451,75 @@ class TicketService:
             pepper=pepper,
             for_reporter=True,
         )
+
+    async def reporter_follow_up(
+        self,
+        ticket_id: uuid.UUID,
+        payload: ReporterNoteCreate,
+        principal: Principal,
+        *,
+        pepper: str,
+    ) -> Ticket | None:
+        """Turn a late message of the reporter into a new ticket, without a commit.
+
+        The result is None while the ticket is open or its close is at most
+        ``REOPEN_DAYS`` days old; the message then is a note (``reporter_add_note``).
+        Else the message becomes a new ticket in the same Bereich with the same title,
+        kind and Kategorie, and ``follow_up_of_id`` names the old ticket.
+
+        Raises:
+            NotFoundError: Not a ticket of the caller (HTTP 404).
+            ForbiddenError: A sender block holds back the reporter (HTTP 403,
+                ``sender_blocked``).
+            ValidationProblem: Files without a draft token, or a draft that is missing,
+                expired, foreign or infected (HTTP 422).
+        """
+        old, me = await self._reporter_ticket(ticket_id, principal, lock=True)
+        if not _reply_is_late(old):
+            return None
+        if await self._sender_blocked(old):
+            raise ForbiddenError("The sender is blocked.", code=SENDER_BLOCKED)
+        token = await check_message_drafts(
+            self.session,
+            attachment_ids=payload.attachment_ids,
+            token=payload.draft_token,
+            pepper=pepper,
+        )
+        language = (old.context or {}).get("language")
+        ticket = Ticket(
+            id=uuid.uuid4(),
+            number=await self.free_number(),
+            area_id=_area_of_id(old),
+            kind=old.kind,
+            category_id=old.category_id,
+            source="help",
+            title=old.title,
+            body=payload.body,
+            status="new",
+            reporter_principal_id=me,
+            follow_up_of_id=old.id,
+            context={"language": language} if language else {},
+        )
+        self.session.add(ticket)
+        await self.session.flush()
+        if token is not None:
+            await bind_drafts(
+                self.session,
+                attachment_ids=payload.attachment_ids,
+                token=token,
+                pepper=pepper,
+                ticket_id=ticket.id,
+            )
+        reporter = await self.reporter_address(ticket)
+        await emit_ticket_created(self.session, ticket, reporter_email=reporter)
+        self._event(
+            ticket,
+            "created",
+            me,
+            {"confirmationSent": reporter is not None, "followUpOf": format_number(old.number)},
+        )
+        await self.session.flush()
+        return ticket
 
     async def reporter_edit_note(
         self, ticket_id: uuid.UUID, note_id: uuid.UUID, body: str, principal: Principal
@@ -1396,6 +1661,7 @@ class TicketService:
             category_id=ticket.category_id,
             title=ticket.title,
             status=ticket.status,  # pyright: ignore[reportArgumentType]
+            source=ticket.source or "help",  # pyright: ignore[reportArgumentType]
             reporter=_reporter(ticket, accounts),
             assignee=(
                 _person(accounts, ticket.assignee_id) if ticket.assignee_id is not None else None
@@ -1617,6 +1883,15 @@ def _reporter_view_author(
     return PersonRef(
         principal_id=author_id if own else None,
         display_name=account.display_name if account is not None else None,
+    )
+
+
+def _reply_is_late(ticket: Ticket) -> bool:
+    """Tell if a message of the sender comes more than ``REOPEN_DAYS`` days after the close."""
+    return (
+        ticket.status in CLOSED_STATUSES
+        and ticket.closed_at is not None
+        and _now() - ticket.closed_at > timedelta(days=REOPEN_DAYS)
     )
 
 

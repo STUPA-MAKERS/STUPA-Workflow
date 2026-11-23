@@ -90,6 +90,7 @@ function area(over: Partial<TicketArea> = {}): TicketArea {
     gremiumId: null,
     platform: true,
     notifyNew: true,
+    inApp: true,
     categories: [],
     mine: true,
     ...over,
@@ -178,7 +179,9 @@ describe('TicketsComponent', () => {
     const { cmp } = await start();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = cmp as any;
-    expect(c.phoneMenu()[0].items.map((i: { id: string }) => i.id)).toEqual(['refresh']);
+    expect(c.phoneMenu().map((sec: { items: { id: string }[] }) => sec.items[0].id)).toEqual(['new', 'refresh']);
+    c.onPhoneMenu({ id: 'new', label: '' });
+    expect(c.newOpen()).toBe(true);
     const refresh = jest.spyOn(c, 'refreshList');
     c.onPhoneMenu({ id: 'other', label: '' });
     expect(refresh).not.toHaveBeenCalled();
@@ -186,13 +189,36 @@ describe('TicketsComponent', () => {
     expect(refresh).toHaveBeenCalled();
   });
 
+  /** "Ticket anlegen" (spec 002712): the new ticket opens and the list loads again. */
+  it('opens a ticket that the team wrote by hand and loads the list again', async () => {
+    const { cmp, api, router, harness } = await start();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = cmp as any;
+    await userEvent.click(screen.getByRole('button', { name: 'Ticket anlegen' }));
+    expect(c.newOpen()).toBe(true);
+    const calls = api.list.mock.calls.length;
+    c.onCreated({ id: 't99' });
+    await harness.fixture.whenStable();
+    expect(c.newOpen()).toBe(false);
+    expect(api.list.mock.calls.length).toBeGreaterThan(calls);
+    expect(router.url).toBe('/tickets/t99');
+  });
+
+  it('offers no "Ticket anlegen" to a reporter', async () => {
+    const { cmp } = await start('/tickets', { manager: false });
+    expect(screen.queryByRole('button', { name: 'Ticket anlegen' })).toBeNull();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((cmp as any).phoneMenu()).toHaveLength(1);
+  });
+
   it('groups the open tickets and folds the closed ones with their number', async () => {
     const { api, rail } = await start();
     expect(api.list).toHaveBeenCalledWith({
       kind: [],
+      area: [],
       assignee: null,
       q: null,
-      status: ['new', 'in_progress'],
+      status: ['new', 'in_progress', 'waiting'],
       limit: TICKET_PAGE,
       offset: 0,
     });
@@ -282,7 +308,7 @@ describe('TicketsComponent', () => {
     harness.detectChanges();
     expect(router.url).toBe('/tickets?status=done&kind=bug&assignee=me');
     expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ kind: ['bug'], assignee: 'me' }));
-    expect(cmp.kindChipLabel()).toBe('Art: Fehler');
+    expect(cmp.kindChipLabel()).toBe('Kategorie: Fehler');
     expect(cmp.assigneeChipLabel()).toBe('Zugewiesen: Mir');
     expect(cmp.statusChipLabel()).toBe('Status: Erledigt');
 
@@ -296,7 +322,7 @@ describe('TicketsComponent', () => {
     await harness.fixture.whenStable();
     harness.detectChanges();
     expect(router.url).toBe('/tickets');
-    expect(cmp.kindChipLabel()).toBe('Art');
+    expect(cmp.kindChipLabel()).toBe('Kategorie');
     expect(cmp.assigneeChipLabel()).toBe('Zugewiesen');
     expect(cmp.statusChipLabel()).toBe('Status: Offen');
   });
@@ -322,6 +348,7 @@ describe('TicketsComponent', () => {
       'Offen',
       'Neu',
       'In Bearbeitung',
+      'Wartet auf Antwort',
       'Erledigt',
       'Abgelehnt',
       'Alle',

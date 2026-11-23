@@ -170,6 +170,40 @@ erasure does it for the tickets of the request's e-mail
 (`privacy.service.anonymize_reported_tickets`). The Art. 15 export has a sheet "Tickets" (with text and context) and lists the ticket attachments in "Anhänge", and "Ticket-Sperren" lists the sender blocks. The account merge moves
 reporter, assignee, note author and event actor (area `tickets`).
 
+**Status, source and tickets by hand (specs 002708 to 002713, 002718):**
+- Statuses `new|in_progress|waiting|done|rejected`. `waiting` ("Wartet auf Antwort") is open:
+  `closed_at` stays empty, so the retention clock does not run (`OPEN` = not in
+  `CLOSED_STATUSES`).
+- A message of the sender (`reporter_add_note`) on a `waiting`, `done` or `rejected` ticket
+  sets `in_progress` and writes a `status` event without an actor.
+- `POST /api/tickets/mine/{id}/notes` first calls `reporter_follow_up`: when the close is
+  more than `REOPEN_DAYS` (14) days old, the message becomes a new ticket in the same
+  Bereich (`follow_up_of_id`, event `created` with `followUpOf`), and the answer is
+  `{ followUp: { id, number } }` in place of the note. `ReporterTicketDetail.replyOpensNew`
+  tells the app before the send. `TicketDetail.followUpOf` names the old ticket for the team.
+- `Ticket.source` `help|mail|team` (`TICKET_SOURCES`; `mail` has no writer until the
+  Postfach). The detail of the team shows it.
+- `POST /api/tickets/manual` (`create_manual`, work right in the Bereich): a ticket for an
+  account, source `team`. `body` is the note of the team and the view of the person leaves
+  it out (`reporter_detail`, the search of `reporter_list`); `message` becomes the first
+  public note and sends `ticket_answer`. An e-mail address answers 422
+  `ticket_area_without_mailbox`, because no Bereich has a Postfach yet. An unknown, inactive
+  or merged account, or both or neither of `reporterId` and `email`: 422
+  `ticket_reporter_invalid`.
+- `ticket_area.in_app` ("In der App erreichbar"): `GET /api/tickets/report-areas`
+  (`TicketAreaService.choices`: `Plattform` plus each Bereich with the switch) feeds the
+  dialog of the help menu. `POST /api/tickets` takes `areaId` and `categoryId`
+  (`_report_area`, `_check_kind`): without a session only `Plattform` (403
+  `ticket_area_needs_session`), a Bereich without the switch 403
+  `ticket_area_not_reachable`, `Plattform` needs a `kind`, another Bereich takes no kind.
+- Mail `ticket_assigned` (`notify_ticket_assigned`, opt-out kind of the team): to the new
+  assignee when a different person assigned the ticket. It reads the newest `assignee`
+  event, so a take-over by the own account sends nothing; idempotent per event id.
+- `create_manual` and `reporter_follow_up` do not commit (ratchet `service-commits`); the
+  router commits.
+- The migration `a8c3f15d7e42` (idempotent) widens `ck_ticket_status`, adds `ticket.source`,
+  `ticket.follow_up_of_id` and `ticket_area.in_app`.
+
 **Search:** source `ticket` behind the work right (the Bereiche of the reader), reuses `TicketService.list`; title
 `T-7K3QX9MD · <title>`, subtitle the status in the reader's language, url `/tickets/{id}`.
 

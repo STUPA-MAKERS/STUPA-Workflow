@@ -124,10 +124,12 @@
         </div>
       }
 
-      @if (ticket.duplicateOf; as dup) {
-        <app-note class="td__note" icon="copy">
-          {{ 'tickets.detail.duplicateOf' | t }}
-          <a class="td__link" [routerLink]="['/tickets', dup.id]" queryParamsHandling="preserve">{{ dup.number }}</a>
+      @for (hint of hints(); track hint.text) {
+        <app-note class="td__note" [icon]="hint.icon">
+          {{ hint.text }}
+          @if (hint.ref; as ref) {
+            <a class="td__link" [routerLink]="['/tickets', ref.id]" queryParamsHandling="preserve">{{ ref.number }}</a>
+          }
         </app-note>
       }
       @if (ticket.anonymizedAt) {
@@ -229,6 +231,9 @@
         @if (canMove()) {
           <ng-container *ngTemplateOutlet="areaRow" />
         }
+      }
+      @if (manager) {
+        <app-field-row [label]="'tickets.detail.source' | t">{{ sourceLabel() }}</app-field-row>
       }
     </app-field-group>
     <ng-template #reporterRow>

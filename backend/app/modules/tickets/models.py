@@ -8,7 +8,12 @@ anonymization clears both, so the check accepts no reporter once ``anonymized_at
 is set.
 
 ``closed_at`` is the retention clock. The status change into ``done`` or
-``rejected`` sets it, a reopen clears it. The retention cron anonymizes a ticket
+``rejected`` sets it, a reopen clears it. ``waiting`` (Wartet auf Antwort) is an open
+status and never starts the clock. ``source`` names the way the ticket came:
+``help`` (the help menu), ``mail`` or ``team`` (a person of the team wrote it by hand).
+The body of a ``team`` ticket is the note of the team, so the view of the reporter
+leaves it out. ``follow_up_of_id`` names the closed ticket that a late message of the
+sender answered (``REOPEN_DAYS``). The retention cron anonymizes a ticket
 ``tickets.retentionMonths`` after that moment.
 
 A note is ``internal`` (the holders of ``ticket.manage`` only) or ``public`` (the
@@ -55,9 +60,13 @@ from app.modules.tickets.numbers import draw_number
 #: The kinds of a ticket.
 TICKET_KINDS: tuple[str, ...] = ("bug", "question", "idea", "barrier")
 #: The statuses of a ticket.
-TICKET_STATUSES: tuple[str, ...] = ("new", "in_progress", "done", "rejected")
+TICKET_STATUSES: tuple[str, ...] = ("new", "in_progress", "waiting", "done", "rejected")
 #: The statuses that close a ticket and start the retention clock.
 CLOSED_STATUSES: frozenset[str] = frozenset({"done", "rejected"})
+#: The sources of a ticket: the help menu, a mail, or a person of the team.
+TICKET_SOURCES: tuple[str, ...] = ("help", "mail", "team")
+#: The days after the close in which a message of the sender opens the ticket again.
+REOPEN_DAYS = 14
 #: The visibilities of a note.
 TICKET_NOTE_VISIBILITIES: tuple[str, ...] = ("internal", "public")
 #: The kinds of a timeline event.
@@ -87,6 +96,8 @@ class TicketArea(UUIDPkMixin, TimestampMixin, Base):
             without a Gremium when the Gremium is deleted.
         platform: True only for the built-in Bereich ``Plattform``.
         notify_new: Mail each new ticket to the team of the Bereich.
+        in_app: A signed-in person can choose the Bereich in the ticket dialog of the
+            help menu. ``Plattform`` is reachable without the switch.
     """
 
     __tablename__ = "ticket_area"
@@ -97,6 +108,7 @@ class TicketArea(UUIDPkMixin, TimestampMixin, Base):
     )
     platform: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     notify_new: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    in_app: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     __table_args__ = (
         CheckConstraint("NOT platform OR gremium_id IS NULL", name="platform_without_gremium"),
@@ -145,6 +157,8 @@ class Ticket(UUIDPkMixin, TimestampMixin, Base):
         reporter_principal_id: The account of the reporter, else NULL.
         reporter_email: The e-mail of a reporter without a session, else NULL.
         duplicate_of_id: The ticket that this one duplicates (status ``rejected``).
+        follow_up_of_id: The closed ticket that this one follows, else NULL.
+        source: ``help``, ``mail`` or ``team``.
         context: The technical context of the report (url, route, appVersion, ...).
         closed_at: Entry into ``done`` or ``rejected``; NULL while open.
         anonymized_at: Set by the retention cron or by an erasure.
@@ -171,6 +185,10 @@ class Ticket(UUIDPkMixin, TimestampMixin, Base):
     duplicate_of_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("ticket.id", ondelete="SET NULL"), nullable=True
     )
+    follow_up_of_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ticket.id", ondelete="SET NULL"), nullable=True
+    )
+    source: Mapped[str] = mapped_column(Text, default="help", server_default="help")
     context: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     anonymized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -178,6 +196,7 @@ class Ticket(UUIDPkMixin, TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint(f"kind IN ({_in(TICKET_KINDS)})", name="kind"),
         CheckConstraint(f"status IN ({_in(TICKET_STATUSES)})", name="status"),
+        CheckConstraint(f"source IN ({_in(TICKET_SOURCES)})", name="source"),
         CheckConstraint(
             "anonymized_at IS NOT NULL OR num_nonnulls(reporter_principal_id, reporter_email) = 1",
             name="reporter",

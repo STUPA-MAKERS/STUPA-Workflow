@@ -17,7 +17,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from itertools import groupby
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit.actions import AuditAction
@@ -26,6 +26,7 @@ from app.modules.gremien.models import Gremium
 from app.modules.tickets.access import AreaScope, works_in
 from app.modules.tickets.models import Ticket, TicketArea, TicketCategory
 from app.modules.tickets.schemas import (
+    TicketAreaChoice,
     TicketAreaCreate,
     TicketAreaOut,
     TicketAreaPatch,
@@ -55,6 +56,7 @@ def _area_out(
         gremium_id=area.gremium_id,
         platform=area.platform,
         notify_new=area.notify_new,
+        in_app=bool(area.platform or area.in_app),
         categories=tuple(TicketCategoryOut(id=c.id, name=c.name) for c in categories),
         mine=works_in(scope, area.id),
     )
@@ -101,6 +103,35 @@ class TicketAreaService:
         )
         by_area = await self._categories()
         return [_area_out(area, by_area.get(area.id, ()), scope) for area in areas]
+
+    async def choices(self) -> list[TicketAreaChoice]:
+        """List the Bereiche that a signed-in person can choose in the ticket dialog.
+
+        These are ``Plattform`` and each Bereich with the switch ``in_app``.
+        ``Plattform`` comes first and has no Kategorien here, because its Kategorien
+        are the kinds of a report.
+        """
+        areas = list(
+            (
+                await self.session.scalars(
+                    select(TicketArea)
+                    .where(or_(TicketArea.platform, TicketArea.in_app))
+                    .order_by(TicketArea.platform.desc(), TicketArea.name)
+                )
+            ).all()
+        )
+        categories = await self._categories()
+        return [
+            TicketAreaChoice(
+                id=a.id,
+                name=a.name,
+                platform=a.platform,
+                categories=tuple(
+                    TicketCategoryOut(id=c.id, name=c.name) for c in categories.get(a.id, ())
+                ),
+            )
+            for a in areas
+        ]
 
     async def _categories(
         self, area_id: uuid.UUID | None = None
@@ -167,6 +198,7 @@ class TicketAreaService:
             gremium_id=payload.gremium_id,
             platform=False,
             notify_new=payload.notify_new,
+            in_app=payload.in_app,
         )
         self.session.add(area)
         await self.session.flush()
@@ -206,6 +238,7 @@ class TicketAreaService:
             **({"name": name} if name is not None else {}),
             **({"gremium_id": payload.gremium_id} if "gremium_id" in fields else {}),
             **({"notify_new": payload.notify_new} if payload.notify_new is not None else {}),
+            **({"in_app": payload.in_app} if payload.in_app is not None else {}),
         }
         for column, value in values.items():
             setattr(area, column, value)

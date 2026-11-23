@@ -30,6 +30,7 @@ describe('tickets.util', () => {
   it('knows the open states', () => {
     expect(isOpen('new')).toBe(true);
     expect(isOpen('in_progress')).toBe(true);
+    expect(isOpen('waiting')).toBe(true);
     expect(isOpen('done')).toBe(false);
     expect(isOpen('rejected')).toBe(false);
   });
@@ -165,6 +166,7 @@ describe('tickets.util', () => {
       gremiumId: 'g1',
       platform: false,
       notifyNew: true,
+      inApp: false,
       categories: [{ id: 'c1', name: 'Raumanfrage' }],
       mine: true,
     };

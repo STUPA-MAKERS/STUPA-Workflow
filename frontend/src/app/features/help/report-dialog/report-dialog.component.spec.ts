@@ -3,7 +3,12 @@ import { computed, signal } from '@angular/core';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { Subject, of, throwError } from 'rxjs';
-import { TicketsApiService, type TicketCreate, type TicketCreated } from '@core/api/tickets.service';
+import {
+  TicketsApiService,
+  type TicketAreaChoice,
+  type TicketCreate,
+  type TicketCreated,
+} from '@core/api/tickets.service';
 import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
 import { ThemeService, ToastService } from '@stupa-makers/ui-kit';
@@ -64,18 +69,27 @@ const ENV: ReportEnv = {
 };
 
 async function setup(
-  opts: { signedIn?: boolean; create?: jest.Mock; locale?: string; solution?: string | null } = {},
+  opts: {
+    signedIn?: boolean;
+    create?: jest.Mock;
+    locale?: string;
+    solution?: string | null;
+    areas?: readonly TicketAreaChoice[] | 'fail';
+  } = {},
 ) {
   localStorage.setItem('ap.locale', opts.locale ?? 'de');
   const drafts = new FakeDrafts();
   const create =
     opts.create ?? jest.fn((_b: TicketCreate) => of<TicketCreated>({ number: 'T-0043' }));
+  const reportAreas = jest.fn(() =>
+    opts.areas === 'fail' ? throwError(() => new Error('down')) : of([...(opts.areas ?? [])]),
+  );
   const toast = toastMock();
   const auth = jest.fn();
   const view = await render(ReportDialogComponent, {
     componentProviders: [{ provide: DraftAttachmentsService, useValue: drafts }],
     providers: [
-      { provide: TicketsApiService, useValue: { create } },
+      { provide: TicketsApiService, useValue: { create, reportAreas } },
       { provide: AuthService, useValue: { isAuthenticated: signal(opts.signedIn ?? true), markReportedTicket: auth } },
       {
         provide: BrandingService,
@@ -98,7 +112,7 @@ async function setup(
     await view.fixture.whenStable();
     view.fixture.detectChanges();
   };
-  return { ...view, c, drafts, create, toast, help, open, auth };
+  return { ...view, c, drafts, create, toast, help, open, auth, reportAreas };
 }
 
 const titleField = () => screen.getByLabelText(/Kurz: Was ist das Problem\?/) as HTMLInputElement;
@@ -123,6 +137,62 @@ function httpError(status: number, error: unknown = null): HttpErrorResponse {
 }
 
 describe('ReportDialogComponent', () => {
+  const PLATFORM: TicketAreaChoice = { id: 'a-plat', name: 'Plattform', platform: true, categories: [] };
+  const ASTA: TicketAreaChoice = {
+    id: 'a-asta',
+    name: 'AStA-Büro',
+    platform: false,
+    categories: [{ id: 'c1', name: 'Raumanfrage' }],
+  };
+
+  /** A Bereich with "In der App erreichbar" takes a ticket from a signed-in person (spec 002713). */
+  it('sends a ticket to a chosen Bereich with its Kategorie and without a kind', async () => {
+    const { open, c, create, fixture } = await setup({ areas: [PLATFORM, ASTA] });
+    await open();
+    expect(c.areaOptions().map((o) => o.label)).toEqual(['Plattform', 'AStA-Büro']);
+    expect(screen.getByRole('radiogroup', { name: 'Art' })).toBeInTheDocument();
+    c.setArea('a-asta');
+    c.categoryId.set('c1');
+    fixture.detectChanges();
+    expect(screen.queryByRole('radiogroup', { name: 'Art' })).toBeNull();
+    expect(c.categoryOptions().map((o) => o.label)).toEqual(['Keine', 'Raumanfrage']);
+    await fill();
+    await userEvent.click(sendButton());
+    const body = create.mock.calls[0][0] as TicketCreate;
+    expect(body).toMatchObject({ areaId: 'a-asta', categoryId: 'c1' });
+    expect(body.kind).toBeUndefined();
+  });
+
+  it('shows no Bereich select with Plattform alone', async () => {
+    const one = await setup({ areas: [PLATFORM] });
+    await one.open();
+    expect(one.c.areaOptions()).toHaveLength(1);
+    expect(screen.queryByLabelText('Bereich')).toBeNull();
+  });
+
+  it('keeps Plattform when the read of the Bereiche fails', async () => {
+    const failed = await setup({ areas: 'fail' });
+    await failed.open();
+    expect(failed.c.areas()).toEqual([]);
+    await fill();
+    await userEvent.click(sendButton());
+    expect(failed.create.mock.calls[0][0]).toMatchObject({ kind: 'bug' });
+  });
+
+  it('reads no Bereiche without a session', async () => {
+    const anon = await setup({ signedIn: false, areas: [PLATFORM, ASTA] });
+    await anon.open();
+    expect(anon.reportAreas).not.toHaveBeenCalled();
+    expect(anon.c.areas()).toEqual([]);
+  });
+
+  it('drops a chosen Bereich that is gone', async () => {
+    const gone = await setup({ areas: [PLATFORM] });
+    gone.c.areaId.set('a-asta');
+    await gone.open();
+    expect(gone.c.areaId()).toBe('');
+  });
+
   afterEach(() => localStorage.clear());
 
   /**
