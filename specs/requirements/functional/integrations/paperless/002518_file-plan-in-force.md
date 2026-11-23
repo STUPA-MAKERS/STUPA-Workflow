@@ -5,7 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/paperless/test_paperless.py:test_a_plan_in_force_is_filed"
+implementation:
+  - backend/app/modules/paperless_filing/sources.py
+  - backend/app/modules/paperless_filing/files.py
 scope:
   - backend/app/
   - frontend/src/app/

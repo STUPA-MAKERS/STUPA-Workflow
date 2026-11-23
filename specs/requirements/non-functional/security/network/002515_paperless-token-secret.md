@@ -5,7 +5,12 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/paperless/test_paperless.py:test_the_connection_saves_and_no_read_returns_the_token"
+  - "backend/tests/unit/modules/paperless/test_rules.py:test_no_oauth_scope_carries_a_paperless_permission"
+implementation:
+  - backend/app/modules/paperless/schemas.py
+  - backend/app/modules/paperless/connection.py
 scope:
   - backend/app/
 ---

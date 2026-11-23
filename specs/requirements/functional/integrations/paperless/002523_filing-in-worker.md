@@ -5,7 +5,15 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/paperless/test_paperless.py:test_a_job_fails_after_eight_tries_and_starts_again"
+  - "backend/tests/unit/modules/paperless/test_rules.py:test_the_wait_between_two_tries_doubles"
+  - "backend/tests/unit/modules/paperless/test_queue.py:test_a_broken_queue_does_not_fail_the_action"
+implementation:
+  - backend/worker/paperless.py
+  - backend/app/modules/paperless/queue.py
+  - backend/app/modules/paperless_filing/runner.py
+  - backend/app/modules/paperless/filings.py
 scope:
   - backend/app/
 ---

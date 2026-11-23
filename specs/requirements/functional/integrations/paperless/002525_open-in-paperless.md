@@ -5,7 +5,12 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/paperless/test_paperless.py:test_the_entry_opens_the_document_only_with_the_permission"
+  - "frontend/src/app/core/api/paperless.service.spec.ts:PaperlessService"
+implementation:
+  - backend/app/modules/paperless_filing/router.py
+  - frontend/src/app/core/api/paperless.service.ts
 scope:
   - frontend/src/app/
   - backend/app/

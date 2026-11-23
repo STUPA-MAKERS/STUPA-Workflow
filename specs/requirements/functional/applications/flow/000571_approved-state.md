@@ -10,7 +10,7 @@ implementation:
   - backend/app/shared/config_schemas.py
   - backend/app/modules/admin/service/flow.py
   - backend/migrations/versions/e4a91c27b6d3_state_outcome_flags.py
-  - frontend/src/app/pages/admin/flow/state-inspector.component.html
+  - frontend/vendor/ui-kit/views/flow-editor/src/state-inspector-view.component.html
   - frontend/src/app/pages/admin/flow/flow-graph-ops.util.ts
 scope:
   - backend/app/modules/flow

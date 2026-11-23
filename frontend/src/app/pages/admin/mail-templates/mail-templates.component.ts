@@ -6,9 +6,13 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { setI18n } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
+  BadgeComponent,
   ButtonComponent,
   ButtonGroupComponent,
+  type ContentLang,
+  ContentLangSwitchComponent,
   EmptyStateComponent,
+  FabComponent,
   FilterSelectComponent,
   type FilterSelectOption,
   IconComponent,
@@ -16,18 +20,15 @@ import {
   ListItemComponent,
   MEDIA,
   mediaQuery,
-  ScrollFadeDirective,
-  SkeletonComponent,
-  BadgeComponent,
-  ToastService,
-  FabComponent,
   PageHeaderComponent,
+  ScrollFadeDirective,
   SectionComponent,
+  SkeletonComponent,
+  ToastService,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import type { MailPreview, MailTemplate } from '../admin.models';
-import { type ContentLang, ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
 import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 type Lang = ContentLang;

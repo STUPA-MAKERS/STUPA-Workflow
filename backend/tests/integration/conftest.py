@@ -139,6 +139,8 @@ _DATA_TABLES = (
     "ui_language",
     "ui_translation",
     "pdf_asset",
+    "paperless_filing",
+    "paperless_settings",
 )
 
 

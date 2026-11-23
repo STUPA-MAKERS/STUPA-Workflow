@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/angular';
 import type { TransitionLists } from './flow-editor.models';
-import { TransitionListsComponent } from './transition-lists.component';
+import { TransitionListsViewComponent as TransitionListsComponent } from '@stupa-makers/ui-kit/views/flow-editor';
 
 const LISTS: TransitionLists = {
   incoming: [{ index: 0, from: 'a', to: 'b', label: 'Einreichen', guard: 'Kein Guard (Catch-all)', automatic: false, branch: null }],

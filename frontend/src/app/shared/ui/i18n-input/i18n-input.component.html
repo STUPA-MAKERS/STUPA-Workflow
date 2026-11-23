@@ -1,8 +1,0 @@
-<app-input
-  [label]="fieldLabel().label"
-  [ariaLabel]="fieldLabel().ariaLabel"
-  [placeholder]="fallback()"
-  [ngModel]="value()[lang()] ?? ''"
-  [ngModelOptions]="{ standalone: true }"
-  (ngModelChange)="set($event)"
-/>

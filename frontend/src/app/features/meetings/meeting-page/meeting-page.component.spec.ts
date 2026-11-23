@@ -6,7 +6,9 @@ import { provideRouter } from '@angular/router';
 import type { ComponentFixture } from '@angular/core/testing';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
+import { of } from 'rxjs';
 import type { AgendaItem, Attendance, Meeting, Protocol } from '@core/api/models';
+import { PaperlessService } from '@core/api/paperless.service';
 import type { LiveViewer } from '@core/ws/ws-messages';
 import { By } from '@angular/platform-browser';
 import { AvatarComponent, MEDIA } from '@stupa-makers/ui-kit';
@@ -522,6 +524,31 @@ describe('MeetingPageComponent', () => {
         sentAt: '2026-10-16T08:00:00Z',
         ...over,
       });
+
+    /** § F/integrations/paperless/002525 */
+    it('opens the filed final protocol in Paperless from the menu', async () => {
+      const link = jest
+        .spyOn(PaperlessService.prototype, 'documentUrl')
+        .mockReturnValue(of('https://paperless.example.org/documents/5/details'));
+      const open = jest.spyOn(window, 'open').mockReturnValue(null);
+      await setup({ meeting: closed, protocol: final() }, [MEDIA.wide]);
+      expect(link).toHaveBeenLastCalledWith('protocol', final().id);
+      const menu = await openMenu();
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'In Paperless öffnen' }));
+      expect(open).toHaveBeenCalledWith('https://paperless.example.org/documents/5/details', '_blank', 'noopener');
+      link.mockRestore();
+      open.mockRestore();
+    });
+
+    /** A draft has no filed document, so the page does not ask. */
+    it('asks Paperless nothing for a protocol that is not final', async () => {
+      const link = jest.spyOn(PaperlessService.prototype, 'documentUrl').mockReturnValue(of('https://x/documents/1/details'));
+      await setup({ meeting: closed }, [MEDIA.wide]);
+      expect(link).not.toHaveBeenCalled();
+      const menu = await openMenu();
+      expect(within(menu).queryByRole('menuitem', { name: 'In Paperless öffnen' })).toBeNull();
+      link.mockRestore();
+    });
 
     it('shows the protocol state as the status of the head and the finalize as its action', async () => {
       await setup({ meeting: closed }, [MEDIA.wide]);

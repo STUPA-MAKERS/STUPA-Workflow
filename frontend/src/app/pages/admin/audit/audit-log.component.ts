@@ -180,6 +180,8 @@ export const AUDIT_ACTIONS = [
   'backup_restore',
   'gremium_info_update',
   'gremium_notify',
+  'paperless_connection',
+  'paperless_filed',
 ] as const;
 
 /** Target type to router target: the detail page or the admin list that owns the target. */

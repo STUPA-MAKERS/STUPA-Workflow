@@ -1,0 +1,34 @@
+<app-settings-screen
+  [head]="{ title: 'admin.paperless.title' | t }"
+  [groups]="groups()"
+  [state]="screenState()"
+  [notice]="notice()"
+  [save]="{ dirty: dirty(), busy: saving(), disabled: !!urlError() }"
+  (change)="set($event.key, $event.value)"
+  (action)="act($event.key)"
+  (save)="save()"
+  (discard)="discard()"
+>
+  <ng-template screenGroup="connection">
+    <app-input
+      type="url"
+      name="baseUrl"
+      autocomplete="off"
+      [label]="'admin.paperless.url' | t"
+      [error]="urlError()"
+      [ngModel]="draft().baseUrl"
+      (ngModelChange)="patch({ baseUrl: $event })"
+    />
+  </ng-template>
+
+  <ng-template screenGroup="token">
+    <app-input
+      type="password"
+      name="token"
+      autocomplete="new-password"
+      [label]="tokenLabel()"
+      [ngModel]="draft().token"
+      (ngModelChange)="patch({ token: $event })"
+    />
+  </ng-template>
+</app-settings-screen>
