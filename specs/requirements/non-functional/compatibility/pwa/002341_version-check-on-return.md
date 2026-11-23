@@ -2,9 +2,9 @@
 id: "002341"
 title: The app checks the version when the page comes back
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-22
+updated: 2026-11-23
 tests:
   - "frontend/src/app/core/pwa/app-version.service.spec.ts:AppVersionService"
 implementation:
