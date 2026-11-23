@@ -28,6 +28,7 @@ from app.modules.applications.service.service_base import (
     _whitelist,
     _without_keys,
 )
+from app.modules.applications.webhook_fields import emit_application_event
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.budget.form_options import budget_field_options
@@ -155,6 +156,7 @@ class EditOps(ApplicationsServiceBase):
                 "changedFields": sorted({*diff["added"], *diff["removed"], *diff["changed"]}),
             },
         )
+        await emit_application_event(self.session, "application.updated", app)
         try:
             await self.session.commit()
         except IntegrityError as exc:
@@ -225,6 +227,8 @@ class EditOps(ApplicationsServiceBase):
                 .values(expires_at=now)
             )
         app.archived_at = now if archived else None
+        if archived:
+            await emit_application_event(self.session, "application.archived", app)
         await self.session.commit()
         await self.session.refresh(app)
         return await self._to_out(app, include_pii=False, strip_pii_fields=strip_pii_fields)

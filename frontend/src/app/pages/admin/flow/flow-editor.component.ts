@@ -199,7 +199,6 @@ export class FlowEditorComponent {
 
   protected readonly gremiumOptions = this.opts.gremiumOptions;
   protected readonly globalRoleOptions = this.opts.globalRoleOptions;
-  protected readonly webhookOptions = this.opts.webhookOptions;
   protected readonly budgetTree = this.opts.budgetTree;
 
   protected readonly graph = signal<FlowGraph>(autoLayout(emptyFlowGraph()));

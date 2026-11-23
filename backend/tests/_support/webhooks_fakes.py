@@ -3,7 +3,7 @@
 These fakes need no real database, no Redis, and no network.
 
 `FakeSession` supplies the methods that `WebhookService` uses: `add`, `flush`, `commit`,
-`get` (an in-memory store) and `scalars`. Each `scalars` call pops the next result from a
+`get` (an in-memory store), `scalars` and `scalar`. Each `scalars` call pops the next result from a
 FIFO queue, so the test controls every answer. `FakeWebhookQueue` collects the enqueued
 delivery ids.
 """
@@ -83,6 +83,11 @@ class FakeSession:
 
     async def scalars(self, _stmt: Any) -> FakeResult:
         return FakeResult(self._scalars.pop(0))
+
+    async def scalar(self, _stmt: Any) -> Any:
+        """Return the first item of the next queued result, or None."""
+        items = self._scalars.pop(0) if self._scalars else []
+        return items[0] if items else None
 
 
 class FakeWebhookQueue:

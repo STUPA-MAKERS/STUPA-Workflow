@@ -468,6 +468,18 @@ async def update_webhook(webhook_id: str, patch: S.WebhookUpdate) -> dict:
 
 
 @group.tool
+async def get_webhook_catalog() -> list:
+    """List the webhook events with their ID keys and fields (personal ones marked)."""
+    return await api().get("/admin/webhooks/catalog")
+
+
+@group.tool
+async def send_webhook_test(webhook_id: str) -> dict:
+    """Queue a test delivery with example values. Requires webhook.manage."""
+    return await api().post(f"/admin/webhooks/{webhook_id}/test")
+
+
+@group.tool
 async def delete_webhook(webhook_id: str) -> dict:
     """Delete a webhook and its delivery history. Requires webhook.manage."""
     return await api().delete(f"/admin/webhooks/{webhook_id}")

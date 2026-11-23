@@ -30,6 +30,7 @@ from app.modules.livevote.open_window import check_open, load_meeting_settings
 from app.modules.livevote.repeat import first_meeting_id
 from app.modules.livevote.schemas import MeetingCreate, MeetingOut, MeetingPatch
 from app.modules.livevote.service.handover import HandoverOps
+from app.modules.livevote.webhook_fields import emit_meeting_event
 from app.modules.meetings.agenda_service import AgendaService
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.meetings.present import fix_counts, present_count
@@ -166,6 +167,7 @@ class LifecycleOps(HandoverOps):
                 "guestsMode": meeting.guests_mode,
             },
         )
+        await emit_meeting_event(self.session, "meeting.created", meeting)
         await self.session.commit()
         return await self._emit(meeting, principal)
 
@@ -415,6 +417,10 @@ class LifecycleOps(HandoverOps):
                 target_id=str(meeting.id),
                 data={"gremiumId": str(meeting.gremium_id), "changes": changes},
             )
+        if going_live:
+            await emit_meeting_event(self.session, "meeting.started", meeting)
+        if closing:
+            await emit_meeting_event(self.session, "meeting.closed", meeting)
         await self.session.flush()
         cancelled_events = await self._cancelled_events(cancelled)
         await self.session.commit()

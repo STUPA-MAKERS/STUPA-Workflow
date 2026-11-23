@@ -83,6 +83,7 @@ from app.modules.tickets.schemas import (
     TicketRef,
     TicketReporter,
 )
+from app.modules.tickets.webhook_fields import emit_ticket_created
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 from app.shared.mentions import (
     check_mentions,
@@ -264,7 +265,9 @@ class TicketService:
                 pepper=pepper,
                 ticket_id=ticket.id,
             )
-        confirmation = await self.reporter_address(ticket) is not None
+        reporter = await self.reporter_address(ticket)
+        confirmation = reporter is not None
+        await emit_ticket_created(self.session, ticket, reporter_email=reporter)
         self.session.add(
             TicketEvent(
                 ticket_id=ticket.id,

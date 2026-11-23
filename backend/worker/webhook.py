@@ -7,11 +7,17 @@ live in `WebhookService`. A transient error (timeout, transport, non-2xx) raises
 `arq.Retry` with an exponential backoff up to `webhook_max_tries`. After the last try the
 delivery goes to the dead letter status `dead`. An SSRF block is permanent and never
 retries. Idempotency comes from the job key `webhook:<id>`. A second run on an already
-delivered row is harmless.
+delivered row sends nothing.
+
+`enqueue_pending_webhooks` is a cron every ten seconds. A domain event writes its
+deliveries in its own transaction (§F/integrations/webhooks/002417), and the cron hands
+each new one to `deliver_webhook`. The grace time of `_GRACE_SECONDS` keeps it away from a
+row whose transaction is still open.
 """
 
 from __future__ import annotations
 
+import datetime as dt
 import logging
 from typing import Any
 from uuid import UUID
@@ -21,10 +27,14 @@ from arq import Retry
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
+from app.modules.webhooks.queue import webhook_queue_from_pool
 from app.modules.webhooks.service import WebhookService
 from app.settings import Settings, load_settings
 
 logger = logging.getLogger("app.webhooks")
+
+#: Age of a pending delivery before the sweep enqueues it.
+_GRACE_SECONDS = 5
 
 
 async def on_startup(ctx: dict[str, Any]) -> None:
@@ -75,8 +85,23 @@ async def deliver_webhook(ctx: dict[str, Any], delivery_id: str) -> str:
     return outcome.kind
 
 
+async def enqueue_pending_webhooks(ctx: dict[str, Any]) -> int:
+    """Enqueue the new pending deliveries (cron).
+
+    Returns:
+        The number of enqueued deliveries.
+    """
+    queue = webhook_queue_from_pool(ctx.get("redis"))
+    older_than = dt.datetime.now(dt.UTC) - dt.timedelta(seconds=_GRACE_SECONDS)
+    async with _sessionmaker(ctx)() as session:
+        count = await WebhookService(session, ctx["settings"], queue=queue).enqueue_pending(
+            older_than=older_than
+        )
+    if count:
+        logger.info("enqueued %d webhook deliveries", count)
+    return count
+
+
 def _default_client_factory(settings: Settings) -> httpx.AsyncClient:  # pragma: no cover
     """Return an httpx client that never follows redirects and uses a fixed timeout."""
-    return httpx.AsyncClient(
-        follow_redirects=False, timeout=settings.webhook_timeout_seconds
-    )
+    return httpx.AsyncClient(follow_redirects=False, timeout=settings.webhook_timeout_seconds)

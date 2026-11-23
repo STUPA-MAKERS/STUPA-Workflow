@@ -34,6 +34,8 @@ from app.modules.site_config.branding import (
 )
 from app.modules.site_config.cd_logos import LogoSlot, RenderSlot, VendoredLogoName
 from app.modules.site_config.features import FeatureSwitches
+from app.modules.webhooks.catalog import EVENTS as WEBHOOK_EVENTS
+from app.modules.webhooks.catalog import WebhookEventName
 from app.shared.config_schemas import ComparisonOffers, FlowGraph
 from app.shared.i18n import I18nMap, Lang
 from app.shared.permissions import PERMISSION_CATALOGUE
@@ -813,13 +815,50 @@ class GroupMappingUpdate(_OidcGroupField, frozen=True):
     role_id: UUID | None = Field(default=None, alias="roleId")
 
 
+class WebhookSubscription(FrozenCamelModel, frozen=True):
+    """One subscribed event of a webhook and the fields of its ``data`` object.
+
+    The event comes from the catalog (§F/integrations/webhooks/002411). A field that the
+    event does not have gives 422 (§F/integrations/webhooks/002412).
+    """
+
+    event: WebhookEventName
+    fields: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _known_fields(self) -> WebhookSubscription:
+        unknown = sorted(set(self.fields) - WEBHOOK_EVENTS[self.event].field_keys)
+        if unknown:
+            raise ValueError(f"event {self.event} has no field(s) {', '.join(unknown)}")
+        if len(set(self.fields)) != len(self.fields):
+            raise ValueError("a field is listed twice")
+        return self
+
+
+def _one_per_event(subs: list[WebhookSubscription] | None) -> list[WebhookSubscription] | None:
+    """Refuse a second subscription of the same event."""
+    if subs is not None and len({s.event for s in subs}) != len(subs):
+        raise ValueError("an event is subscribed twice")
+    return subs
+
+
+def _http(v: str | None) -> str | None:
+    if v is not None and not v.lower().startswith(("http://", "https://")):
+        raise ValueError("webhook url must be http(s)")
+    return v
+
+
 class WebhookOut(FrozenCamelModel, frozen=True):
-    """A webhook."""
+    """A webhook with its event subscriptions and filters."""
 
     id: UUID
     name: str
     url: str
     active: bool
+    subscriptions: list[WebhookSubscription] = Field(default_factory=list)
+    gremium_ids: list[UUID] = Field(default_factory=list, alias="gremiumIds")
+    type_ids: list[UUID] = Field(default_factory=list, alias="typeIds")
+    state_keys: list[str] = Field(default_factory=list, alias="stateKeys")
 
 
 class WebhookCreate(FrozenCamelModel, frozen=True):
@@ -828,28 +867,69 @@ class WebhookCreate(FrozenCamelModel, frozen=True):
     name: str = Field(min_length=1)
     url: str = Field(min_length=1)
     active: bool = True
+    subscriptions: list[WebhookSubscription] = Field(default_factory=list)
+    gremium_ids: list[UUID] = Field(default_factory=list, alias="gremiumIds")
+    type_ids: list[UUID] = Field(default_factory=list, alias="typeIds")
+    state_keys: list[str] = Field(default_factory=list, alias="stateKeys")
 
     @field_validator("url")
     @classmethod
     def _http_url(cls, v: str) -> str:
-        if not v.lower().startswith(("http://", "https://")):
-            raise ValueError("webhook url must be http(s)")
+        _http(v)
+        return v
+
+    @field_validator("subscriptions")
+    @classmethod
+    def _subscriptions(cls, v: list[WebhookSubscription]) -> list[WebhookSubscription]:
+        _one_per_event(v)
         return v
 
 
 class WebhookUpdate(FrozenCamelModel, frozen=True):
-    """Partial update of a webhook."""
+    """Partial update of a webhook. A list that is given replaces the stored one."""
 
     name: str | None = None
     url: str | None = None
     active: bool | None = None
+    subscriptions: list[WebhookSubscription] | None = None
+    gremium_ids: list[UUID] | None = Field(default=None, alias="gremiumIds")
+    type_ids: list[UUID] | None = Field(default=None, alias="typeIds")
+    state_keys: list[str] | None = Field(default=None, alias="stateKeys")
 
     @field_validator("url")
     @classmethod
     def _http_url(cls, v: str | None) -> str | None:
-        if v is not None and not v.lower().startswith(("http://", "https://")):
-            raise ValueError("webhook url must be http(s)")
-        return v
+        return _http(v)
+
+    @field_validator("subscriptions")
+    @classmethod
+    def _subscriptions(
+        cls, v: list[WebhookSubscription] | None
+    ) -> list[WebhookSubscription] | None:
+        return _one_per_event(v)
+
+
+class WebhookCatalogField(FrozenCamelModel, frozen=True):
+    """One field of a catalog event, with its example value for the preview."""
+
+    key: str
+    personal: bool
+    example: Any = None
+
+
+class WebhookCatalogEvent(FrozenCamelModel, frozen=True):
+    """One event of the webhook catalog (§F/integrations/webhooks/002411)."""
+
+    name: str
+    group: str
+    id_keys: list[str] = Field(alias="idKeys")
+    fields: list[WebhookCatalogField]
+
+
+class WebhookTestOut(FrozenCamelModel, frozen=True):
+    """The test delivery that was queued (§F/integrations/webhooks/002416)."""
+
+    delivery_id: UUID = Field(alias="deliveryId")
 
 
 class WebhookDeliveryStatusOut(FrozenCamelModel, frozen=True):

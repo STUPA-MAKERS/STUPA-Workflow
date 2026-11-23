@@ -25,9 +25,7 @@ def test_canonical_body_is_deterministic() -> None:
 def test_sign_binds_timestamp_and_body() -> None:
     secret = b"s3cr3t-key-bytes"
     body = b'{"x":1}'
-    expected = "sha256=" + hmac.new(
-        secret, b"1700000000." + body, hashlib.sha256
-    ).hexdigest()
+    expected = "sha256=" + hmac.new(secret, b"1700000000." + body, hashlib.sha256).hexdigest()
     assert sign(secret, 1700000000, body) == expected
     assert signing_input(1700000000, body) == b"1700000000." + body
 
