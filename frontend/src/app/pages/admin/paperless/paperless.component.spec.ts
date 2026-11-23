@@ -352,7 +352,6 @@ describe('PaperlessComponent', () => {
     api.getPaperless.mockReturnValueOnce(new Subject<PaperlessConnection>());
     api.listPaperlessFailed.mockReturnValueOnce(new Subject<PaperlessFailedFiling[]>());
     await setup({ api });
-    expect(document.querySelectorAll('app-skeleton')).toHaveLength(2);
     expect(screen.queryByLabelText(/Adresse von Paperless/)).toBeNull();
     expect(document.querySelectorAll('.sts__skelSwitch')).toHaveLength(3);
   });

@@ -9,9 +9,6 @@
   (save)="save()"
   (discard)="discard()"
 >
-  <ng-template screenSkeleton="connection">
-    <app-skeleton variant="rows" [count]="1" />
-  </ng-template>
   <ng-template screenGroup="connection">
     <app-input
       type="url"
@@ -24,9 +21,6 @@
     />
   </ng-template>
 
-  <ng-template screenSkeleton="token">
-    <app-skeleton variant="rows" [count]="1" />
-  </ng-template>
   <ng-template screenGroup="token">
     <app-input
       type="password"
