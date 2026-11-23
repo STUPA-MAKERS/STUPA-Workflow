@@ -192,7 +192,7 @@ _CATALOG: tuple[EventSpec, ...] = (
         "tickets",
         ("ticketId",),
         (
-            FieldSpec("number", "T-0042"),
+            FieldSpec("number", "T-7K3QX9MD"),
             FieldSpec("kind", "problem"),
             FieldSpec("title", "Upload hängt"),
             FieldSpec("url", "https://example.org/tickets/" + _ID),

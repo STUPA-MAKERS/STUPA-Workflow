@@ -103,7 +103,7 @@ class TicketCreate(FrozenStrictCamelModel, frozen=True):
 
 
 class TicketCreated(FrozenCamelModel, frozen=True):
-    """The only answer to a report: the ticket number (``T-0042``)."""
+    """The only answer to a report: the ticket number (``T-7K3QX9MD``)."""
 
     number: str
 

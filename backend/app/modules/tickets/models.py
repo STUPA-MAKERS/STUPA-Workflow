@@ -1,7 +1,8 @@
 """Ticket tables: ``ticket``, ``ticket_note`` and ``ticket_event``.
 
-``ticket.number`` comes from the sequence ``ticket_number_seq`` and reads as
-``T-0001`` on the wire. A ticket has exactly one reporter: an account
+``ticket.number`` holds eight random characters (``numbers.draw_number``) and reads as
+``T-7K3QX9MD`` on the wire. The service draws again when a ticket has the number. A
+ticket has exactly one reporter: an account
 (``reporter_principal_id``) or a bare e-mail address (``reporter_email``). The
 anonymization clears both, so the check accepts no reporter once ``anonymized_at``
 is set.
@@ -17,7 +18,7 @@ the status, the assignee and the kind. Both cascade with the ticket.
 
 ``ticket_sender_block`` holds the blocked senders: an account (``principal_id``) or a
 normalized e-mail address (``email``, stripped and lowercase). A report of a blocked
-sender is swallowed: it consumes a number and stores nothing (``hit_count``).
+sender is swallowed: it answers a number and stores nothing (``hit_count``).
 """
 
 from __future__ import annotations
@@ -32,7 +33,6 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
-    Sequence,
     Text,
     func,
     text,
@@ -41,6 +41,7 @@ from sqlalchemy.dialects.postgresql import CITEXT, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, TimestampMixin, UUIDPkMixin
+from app.modules.tickets.numbers import draw_number
 
 #: The kinds of a ticket.
 TICKET_KINDS: tuple[str, ...] = ("bug", "question", "idea", "barrier")
@@ -53,8 +54,6 @@ TICKET_NOTE_VISIBILITIES: tuple[str, ...] = ("internal", "public")
 #: The kinds of a timeline event.
 TICKET_EVENT_KINDS: tuple[str, ...] = ("created", "status", "assignee", "kind", "todo_done")
 
-TICKET_NUMBER_SEQ = Sequence("ticket_number_seq")
-
 
 def _in(values: tuple[str, ...]) -> str:
     return ", ".join(f"'{v}'" for v in values)
@@ -64,7 +63,7 @@ class Ticket(UUIDPkMixin, TimestampMixin, Base):
     """One reported ticket.
 
     Attributes:
-        number: The running number from ``ticket_number_seq``.
+        number: The eight random characters of the number, unique on the platform.
         reporter_principal_id: The account of the reporter, else NULL.
         reporter_email: The e-mail of a reporter without a session, else NULL.
         duplicate_of_id: The ticket that this one duplicates (status ``rejected``).
@@ -75,12 +74,7 @@ class Ticket(UUIDPkMixin, TimestampMixin, Base):
 
     __tablename__ = "ticket"
 
-    number: Mapped[int] = mapped_column(
-        Integer,
-        TICKET_NUMBER_SEQ,
-        server_default=TICKET_NUMBER_SEQ.next_value(),
-        unique=True,
-    )
+    number: Mapped[str] = mapped_column(Text, default=draw_number, unique=True)
     kind: Mapped[str] = mapped_column(Text)
     title: Mapped[str] = mapped_column(Text)
     body: Mapped[str] = mapped_column(Text)

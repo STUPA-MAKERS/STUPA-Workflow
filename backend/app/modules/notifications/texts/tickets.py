@@ -32,7 +32,7 @@ TICKET_CREATED_BODY: dict[str, str] = {
 }
 TICKET_CREATED_PLACEHOLDERS: dict[str, str] = {
     "link": "Link zum Ticket (ohne den Platzhalter hängt die Mail ihn an)",
-    "number": "Ticketnummer (T-0042)",
+    "number": "Ticketnummer (T-7K3QX9MD)",
     "title": "Titel des Tickets",
     "kind": "Art (bug/question/idea/barrier)",
     "reporter": "Name oder E-Mail der meldenden Person",
@@ -57,7 +57,7 @@ TICKET_RECEIVED_BODY: dict[str, str] = {
 }
 TICKET_RECEIVED_PLACEHOLDERS: dict[str, str] = {
     "link": "Link zum Ticket (leer bei einer Meldung ohne Anmeldung)",
-    "number": "Ticketnummer (T-0042)",
+    "number": "Ticketnummer (T-7K3QX9MD)",
     "title": "Titel des Tickets (leer bei einer Meldung ohne Anmeldung)",
     "wikiUrl": "Link zum Handbuch",
 }
@@ -75,7 +75,7 @@ TICKET_ANSWER_BODY: dict[str, str] = {
 }
 TICKET_ANSWER_PLACEHOLDERS: dict[str, str] = {
     "link": "Link zum Ticket (ohne den Platzhalter hängt die Mail ihn an)",
-    "number": "Ticketnummer (T-0042)",
+    "number": "Ticketnummer (T-7K3QX9MD)",
     "title": "Titel des Tickets",
     "author": "Name des Teammitglieds (leer ohne Namen)",
     "message": "Text der Nachricht (ohne Text die Namen der Dateien)",
@@ -93,7 +93,7 @@ TICKET_MESSAGE_BODY: dict[str, str] = {
 }
 TICKET_MESSAGE_PLACEHOLDERS: dict[str, str] = {
     "link": "Link zum Ticket (ohne den Platzhalter hängt die Mail ihn an)",
-    "number": "Ticketnummer (T-0042)",
+    "number": "Ticketnummer (T-7K3QX9MD)",
     "title": "Titel des Tickets",
     "reporter": "Name oder E-Mail der meldenden Person",
     "message": "Text der Nachricht (ohne Text die Namen der Dateien)",
