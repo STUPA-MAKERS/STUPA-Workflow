@@ -344,6 +344,7 @@ describe('CalendarComponent (desktop)', () => {
     await press('a');
     expect(view.cmp.selectedDay()).toBe('2026-11-15');
     view.cmp.selectedDay.set('no day');
+    view.fixture.detectChanges();
     await press('ArrowLeft');
     expect(view.cmp.selectedDay()).toBe('no day');
     expect(view.http.match(() => true).length).toBe(0);
@@ -421,7 +422,7 @@ describe('CalendarComponent (desktop)', () => {
     expect(req.request.params.get('from')).toBe('2026-11-09');
     expect(req.request.params.get('to')).toBe('2026-11-15');
     expect(screen.getByRole('heading', { name: '09.11. – 15.11.2026' })).toBeInTheDocument();
-    const week = view.container.querySelector('app-calendar-week') as HTMLElement;
+    const week = view.container.querySelector('app-calendar-week-view') as HTMLElement;
     const columns = week.querySelectorAll<HTMLElement>('.cw__col');
     expect(within(columns[2]).getByRole('button', { name: '14:00 – 15:30 Jour fixe' })).toBeInTheDocument();
     const allDay = week.querySelectorAll<HTMLElement>('.cw__cell');

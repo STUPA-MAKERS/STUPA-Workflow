@@ -8,7 +8,7 @@ updated: 2026-11-16
 implementation:
   - backend/app/modules/calendar/public_router.py
   - frontend/src/app/features/calendar/calendar.component.ts
-  - frontend/src/app/features/calendar/public-entry/public-entry.component.ts
+  - frontend/vendor/ui-kit/views/calendar/src/public-entry-view.component.ts
   - frontend/src/app/pages/home.component.html
 scope:
   - backend/app/modules/calendar

@@ -195,7 +195,7 @@
 
     <div class="cal__gridWrap">
       @if (view() === 'week') {
-        <app-calendar-week
+        <app-calendar-week-view
           class="cal__grid"
           [days]="week()"
           [entries]="visible()"
@@ -205,97 +205,34 @@
           (openEntry)="openEntry($event)"
         />
       } @else {
-        <div
+        <app-calendar-month-view
           class="cal__grid"
-          role="grid"
-          tabindex="-1"
-          [attr.aria-label]="heading()"
-          [attr.aria-busy]="loading() ? 'true' : null"
-          (keydown)="onGridKey($event)"
-        >
-          <div class="cal__row cal__row--head" role="row">
-            @for (name of weekdays(); track $index) {
-              <span class="cal__wd cap" role="columnheader">{{ name }}</span>
-            }
-          </div>
-          @for (row of rows(); track row.key) {
-            <div class="cal__row" role="row" [style.--cal-lanes]="row.lanes">
-              @for (c of row.cells; track c.day.iso) {
-                <div
-                  class="cal__cell"
-                  role="gridcell"
-                  [class.cal__cell--out]="!c.day.inMonth"
-                  [class.cal__cell--sel]="c.day.iso === selectedDay()"
-                  [attr.aria-selected]="c.day.iso === selectedDay()"
-                >
-                  <button
-                    type="button"
-                    class="cal__day"
-                    [attr.tabindex]="c.day.iso === selectedDay() ? 0 : -1"
-                    [attr.aria-label]="dayLabel(c.day, c.count)"
-                    [attr.aria-current]="c.day.isToday ? 'date' : null"
-                    (click)="selectDay(c.day.iso)"
-                  ></button>
-                  <span class="cal__num" [class.cal__num--today]="c.day.isToday" aria-hidden="true">{{ c.day.day }}</span>
-                  <span class="cal__entries" aria-hidden="true">
-                    @for (e of c.shown; track e.kind + e.id) {
-                      <span class="cal__entry">
-                        <span class="cal__entryTime">
-                          <app-icon [name]="icon(e.kind)" [size]="12" />
-                          <span [class.mono]="!!e.startTime">{{ time(e) || (kindKey(e.kind) | t) }}</span>
-                        </span>
-                        <span class="cal__entryTitle">{{ e.title }}</span>
-                      </span>
-                    }
-                    @if (c.more > 0) {
-                      <span class="cal__more">{{ 'meetings.overview.more' | t: { n: c.more } }}</span>
-                    }
-                  </span>
-                </div>
-              }
-              <div class="cal__bars" aria-hidden="true">
-                @for (b of row.bars; track b.entry.kind + b.entry.id) {
-                  <span
-                    class="cal__bar"
-                    [class.cal__bar--openStart]="b.openStart"
-                    [class.cal__bar--openEnd]="b.openEnd"
-                    [style.grid-column]="b.from + ' / ' + b.to"
-                    [style.grid-row]="b.lane + 1"
-                  >
-                    <app-icon [name]="icon(b.entry.kind)" [size]="12" />
-                    <span class="cal__barTitle">{{ b.entry.title }}</span>
-                  </span>
-                }
-              </div>
-            </div>
-          }
-        </div>
+          [rows]="rows()"
+          [weekdays]="weekdays()"
+          [selectedDay]="selectedDay()"
+          [label]="heading()"
+          [loading]="loading()"
+          [wide]="wide()"
+          (selectDay)="selectDay($event)"
+        />
       }
     </div>
 
     <aside class="cal__panel" [attr.aria-label]="dayHeading()">
       <div class="cal__panelScroll" appScrollFade="y">
-        <section class="cal__dayList" aria-live="polite" [attr.aria-label]="dayHeading()">
-          @if (error()) {
-            <app-load-error face [message]="'calendar.error' | t" (retry)="reload()" />
-          } @else if (firstLoad()) {
-            <app-skeleton class="skel-in" variant="items" [count]="3" [lead]="true" [grouped]="true" [label]="'common.loading' | t" />
-          } @else if (!dayEntries().length && !loading()) {
-            <app-empty-state icon="cal" shape="date" rows="3" [heading]="'calendar.day.empty' | t" />
-          } @else {
-            <div class="rowgroup cal__rows" role="list">
-              @for (e of dayEntries(); track e.kind + e.id) {
-                <app-list-item class="cal__dayRow" role="listitem" [title]="e.title" [wrap]="true" [subWrap]="true" (activate)="openEntry(e)">
-                  <span lead class="cal__lead cal__rowIcon"><app-icon [name]="icon(e.kind)" /></span>
-                  <span sub class="cal__sub">
-                    <ng-container *ngTemplateOutlet="facts; context: { $implicit: e, place: true }" />
-                  </span>
-                  <app-row-chevron trail />
-                </app-list-item>
-              }
-            </div>
-          }
-        </section>
+        @if (error()) {
+          <app-load-error [message]="'calendar.error' | t" (retry)="reload()" />
+        }
+        <app-calendar-day-list-view
+          class="cal__dayList"
+          [entries]="dayEntries()"
+          [label]="dayHeading()"
+          [loading]="loading()"
+          [firstLoad]="firstLoad()"
+          [error]="error()"
+          [errorText]="'calendar.error' | t"
+          (openEntry)="openEntry($event)"
+        />
       </div>
     </aside>
   </div>
@@ -349,7 +286,7 @@
 </ng-template>
 
 @if (isPublic) {
-  <app-public-entry [open]="publicOpen()" [entry]="publicEntry()" (closed)="publicOpen.set(false)" />
+  <app-public-entry-view [open]="publicOpen()" [entry]="publicEntry()" (closed)="publicOpen.set(false)" (protocolOpen)="openProtocol($event)" />
 } @else {
 <app-appointment-detail
   [open]="detailOpen()"
@@ -359,7 +296,7 @@
   (answered)="onAnswered($event)"
   (removed)="onRemoved($event)"
 />
-<app-external-entry [open]="externalOpen()" [entry]="external()" (closed)="externalOpen.set(false)" />
+<app-external-entry-view [open]="externalOpen()" [entry]="external()" (closed)="externalOpen.set(false)" />
 <app-appointment-dialog
   [open]="formOpen()"
   [appointment]="editing()"
