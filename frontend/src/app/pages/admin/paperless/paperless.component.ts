@@ -31,14 +31,20 @@ export interface PaperlessDraft {
   readonly fileProtocols: boolean;
   readonly fileApplications: boolean;
   readonly filePlans: boolean;
+  readonly insertEnabled: boolean;
 }
 
-/** The switch of each part that files documents, with its label. */
+/** The switch of each part of the integration, with its label and its group. */
 const SWITCHES = [
-  { key: 'fileProtocols', label: 'admin.paperless.fileProtocols' },
-  { key: 'fileApplications', label: 'admin.paperless.fileApplications' },
-  { key: 'filePlans', label: 'admin.paperless.filePlans' },
-] as const satisfies readonly { readonly key: keyof PaperlessDraft; readonly label: TranslationKey }[];
+  { key: 'fileProtocols', label: 'admin.paperless.fileProtocols', group: 'filing' },
+  { key: 'fileApplications', label: 'admin.paperless.fileApplications', group: 'filing' },
+  { key: 'filePlans', label: 'admin.paperless.filePlans', group: 'filing' },
+  { key: 'insertEnabled', label: 'admin.paperless.insertEnabled', group: 'insert' },
+] as const satisfies readonly {
+  readonly key: keyof PaperlessDraft;
+  readonly label: TranslationKey;
+  readonly group: 'filing' | 'insert';
+}[];
 
 type SwitchKey = (typeof SWITCHES)[number]['key'];
 
@@ -137,6 +143,7 @@ export class PaperlessComponent {
       fileProtocols: s.fileProtocols,
       fileApplications: s.fileApplications,
       filePlans: s.filePlans,
+      insertEnabled: s.insertEnabled,
     }),
     initial: {
       baseUrl: '',
@@ -144,10 +151,10 @@ export class PaperlessComponent {
       fileProtocols: false,
       fileApplications: false,
       filePlans: false,
+      insertEnabled: false,
     },
     body: () => {
       const d = this.draft();
-      const saved = this.form.saved();
       if (this.urlError()) return null;
       return {
         baseUrl: d.baseUrl.trim() || null,
@@ -155,7 +162,7 @@ export class PaperlessComponent {
         fileProtocols: d.fileProtocols,
         fileApplications: d.fileApplications,
         filePlans: d.filePlans,
-        insertEnabled: saved?.insertEnabled ?? false,
+        insertEnabled: d.insertEnabled,
       };
     },
     dirty: (s) => {
@@ -224,12 +231,12 @@ export class PaperlessComponent {
       {
         key: 'filing',
         label: this.i18n.translate('admin.paperless.filing'),
-        rows: SWITCHES.map(({ key, label }) => ({
-          key,
-          label: this.i18n.translate(label),
-          control: 'switch' as const,
-          value: d[key],
-        })),
+        rows: this.switchRows('filing', d),
+      },
+      {
+        key: 'insert',
+        label: this.i18n.translate('admin.paperless.insert'),
+        rows: this.switchRows('insert', d),
       },
       {
         key: 'actions',
@@ -330,6 +337,16 @@ export class PaperlessComponent {
     ]
       .filter(Boolean)
       .join(' · ');
+  }
+
+  /** The switch rows of one group (§F/integrations/paperless/002512). */
+  private switchRows(group: 'filing' | 'insert', d: PaperlessDraft) {
+    return SWITCHES.filter((s) => s.group === group).map(({ key, label }) => ({
+      key,
+      label: this.i18n.translate(label),
+      control: 'switch' as const,
+      value: d[key],
+    }));
   }
 
   protected errorText(code: string | null): string {

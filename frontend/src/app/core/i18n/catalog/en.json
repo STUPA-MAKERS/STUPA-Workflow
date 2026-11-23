@@ -5046,5 +5046,16 @@
   "admin.paperless.error.unknown": "Unknown error.",
   "paperless.open": "Open in Paperless",
   "admin.audit.action.paperless_connection": "Paperless connection changed",
-  "admin.audit.action.paperless_filed": "Document filed in Paperless"
+  "admin.audit.action.paperless_filed": "Document filed in Paperless",
+  "admin.paperless.insert": "Insert",
+  "admin.paperless.insertEnabled": "Insert from Paperless",
+  "paperless.search.label": "Search in Paperless",
+  "paperless.search.none": "No documents found",
+  "paperless.search.unavailable": "Paperless is not reachable",
+  "paperless.insert.error.unavailable": "Paperless is not reachable.",
+  "paperless.insert.error.type": "This document has no readable PDF version.",
+  "paperless.insert.error.tooLarge": "The document is too large (at most 20 MB and 100 pages).",
+  "paperless.insert.error.forbidden": "You lack the right to insert.",
+  "paperless.insert.error.failed": "The document could not be inserted.",
+  "admin.audit.action.paperless_inserted": "Document inserted from Paperless"
 }

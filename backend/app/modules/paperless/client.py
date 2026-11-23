@@ -6,6 +6,9 @@ client checks the host of the address against the deploy setting
 (§NF/security/network/002514), so a changed list also stops a stored address. The client
 has no call with the method DELETE (§F/integrations/paperless/002522).
 
+`search` and `download` serve the insert from Paperless (§F/integrations/paperless/002527,
+002528). `search` has a time limit of 5 seconds (§F/integrations/paperless/002529).
+
 A failure is a `PaperlessError` with a short cause code and never the text of an
 exception or of an answer, because such a text can hold the token or an internal address
 (§NF/security/network/002515).
@@ -23,15 +26,29 @@ import httpx
 
 #: The causes of a failed call. `blocked`: the host is not in the allowlist.
 #: `unauthorized`: Paperless refuses the token. `status`: another error answer.
-#: `format`: an answer that is not the JSON of the API.
+#: `format`: an answer that is not the JSON of the API. `too_large`: a file over the
+#: size limit of the caller.
 ErrorCode = Literal[
-    "blocked", "timeout", "unreachable", "redirect", "unauthorized", "status", "format"
+    "blocked",
+    "timeout",
+    "unreachable",
+    "redirect",
+    "unauthorized",
+    "status",
+    "format",
+    "too_large",
 ]
 
 #: The lists of Paperless in which the platform looks a name up and creates it.
 NameList = Literal["document_types", "tags", "custom_fields"]
 
 TIMEOUT_SECONDS = 20.0
+
+#: The time limit of the search of the insert (§F/integrations/paperless/002529).
+SEARCH_TIMEOUT_SECONDS = 5.0
+
+#: The most hits of one search.
+SEARCH_LIMIT = 20
 
 
 class PaperlessError(Exception):
@@ -84,6 +101,26 @@ class TaskState:
     failed: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class DocumentHit:
+    """One document of a search: its number, title, type name and date."""
+
+    document_id: int
+    title: str
+    document_type: str | None = None
+    created: date | None = None
+
+
+def _date(value: object) -> date | None:
+    """Read the day of a date or of a timestamp that Paperless gives as text."""
+    if not isinstance(value, str):
+        return None
+    try:
+        return date.fromisoformat(value[:10])
+    except ValueError:
+        return None
+
+
 def _client(timeout_seconds: float) -> httpx.AsyncClient:  # pragma: no cover - real HTTP
     return httpx.AsyncClient(follow_redirects=False, timeout=httpx.Timeout(timeout_seconds))
 
@@ -110,6 +147,51 @@ class PaperlessClient:
     timeout_seconds: float = TIMEOUT_SECONDS
     client_factory: Callable[[float], httpx.AsyncClient] = _client
 
+    async def _request(
+        self,
+        method: Literal["GET", "POST", "PATCH"],
+        path: str,
+        *,
+        params: Mapping[str, str] | None = None,
+        json: Mapping[str, Any] | None = None,
+        data: Mapping[str, Any] | None = None,
+        files: Mapping[str, tuple[str, bytes, str]] | None = None,
+        timeout_seconds: float | None = None,
+        accept: str = "application/json",
+    ) -> httpx.Response:
+        """Send one request and return the answer with a success status.
+
+        Raises:
+            PaperlessError: The host is not allowed, Paperless does not answer in time,
+                or it answers with a redirect or an error.
+        """
+        if not host_allowed(self.base_url, self.allowlist):
+            raise PaperlessError("blocked")
+        limit = timeout_seconds or self.timeout_seconds
+        try:
+            async with self.client_factory(limit) as client:
+                response = await client.request(
+                    method,
+                    f"{self.base_url}{path}",
+                    params=params,
+                    json=json,
+                    data=data,
+                    files=files,
+                    headers={"Authorization": f"Token {self.token}", "Accept": accept},
+                    timeout=limit,
+                )
+        except httpx.TimeoutException as exc:
+            raise PaperlessError("timeout") from exc
+        except httpx.HTTPError as exc:
+            raise PaperlessError("unreachable") from exc
+        if 300 <= response.status_code < 400:
+            raise PaperlessError("redirect")
+        if response.status_code in (401, 403):
+            raise PaperlessError("unauthorized")
+        if not 200 <= response.status_code < 300:
+            raise PaperlessError("status")
+        return response
+
     async def _send(
         self,
         method: Literal["GET", "POST", "PATCH"],
@@ -124,37 +206,17 @@ class PaperlessClient:
         """Send one request and return the JSON of the answer.
 
         Raises:
-            PaperlessError: The host is not allowed, Paperless does not answer in time,
-                or it answers with a redirect, an error or no JSON.
+            PaperlessError: The request fails or the answer is no JSON.
         """
-        if not host_allowed(self.base_url, self.allowlist):
-            raise PaperlessError("blocked")
-        limit = timeout_seconds or self.timeout_seconds
-        try:
-            async with self.client_factory(limit) as client:
-                response = await client.request(
-                    method,
-                    f"{self.base_url}{path}",
-                    params=params,
-                    json=json,
-                    data=data,
-                    files=files,
-                    headers={
-                        "Authorization": f"Token {self.token}",
-                        "Accept": "application/json",
-                    },
-                    timeout=limit,
-                )
-        except httpx.TimeoutException as exc:
-            raise PaperlessError("timeout") from exc
-        except httpx.HTTPError as exc:
-            raise PaperlessError("unreachable") from exc
-        if 300 <= response.status_code < 400:
-            raise PaperlessError("redirect")
-        if response.status_code in (401, 403):
-            raise PaperlessError("unauthorized")
-        if not 200 <= response.status_code < 300:
-            raise PaperlessError("status")
+        response = await self._request(
+            method,
+            path,
+            params=params,
+            json=json,
+            data=data,
+            files=files,
+            timeout_seconds=timeout_seconds,
+        )
         try:
             return response.json()
         except ValueError as exc:
@@ -271,6 +333,88 @@ class PaperlessClient:
             await self._send(
                 "PATCH", f"/api/documents/{document_id}/", json={"tags": [*tags, tag_id]}
             )
+
+    async def _type_names(self, ids: Sequence[int], timeout_seconds: float) -> dict[int, str]:
+        """Read the names of the document types with these ids."""
+        if not ids:
+            return {}
+        body = await self._send(
+            "GET",
+            "/api/document_types/",
+            params={"id__in": ",".join(str(i) for i in ids), "page_size": str(len(ids))},
+            timeout_seconds=timeout_seconds,
+        )
+        rows = body.get("results") if isinstance(body, dict) else None
+        return {
+            type_id: name
+            for row in (rows if isinstance(rows, list) else [])
+            if isinstance(row, dict)
+            and (type_id := _int(row.get("id"))) is not None
+            and isinstance(name := row.get("name"), str)
+        }
+
+    async def search(
+        self, query: str, timeout_seconds: float = SEARCH_TIMEOUT_SECONDS
+    ) -> list[DocumentHit]:
+        """Search the documents by title and content, the best hits first.
+
+        An empty query answers the documents that Paperless added last. The answer
+        has at most `SEARCH_LIMIT` hits.
+
+        Raises:
+            PaperlessError: A call fails or the answer is not the list of the API.
+        """
+        text = query.strip()
+        params = {
+            "page_size": str(SEARCH_LIMIT),
+            "fields": "id,title,created,document_type",
+            **({"query": text} if text else {"ordering": "-added"}),
+        }
+        body = await self._send(
+            "GET", "/api/documents/", params=params, timeout_seconds=timeout_seconds
+        )
+        rows = body.get("results") if isinstance(body, dict) else None
+        if not isinstance(rows, list):
+            raise PaperlessError("format")
+        found = [
+            (document_id, row)
+            for row in rows[:SEARCH_LIMIT]
+            if isinstance(row, dict) and (document_id := _int(row.get("id"))) is not None
+        ]
+        type_ids = sorted({t for _, row in found if (t := _int(row.get("document_type")))})
+        names = await self._type_names(type_ids, timeout_seconds)
+        return [
+            DocumentHit(
+                document_id=document_id,
+                title=str(row.get("title") or document_id),
+                document_type=names.get(_int(row.get("document_type")) or 0),
+                created=_date(row.get("created")),
+            )
+            for document_id, row in found
+        ]
+
+    async def title(self, document_id: int) -> str:
+        """Read the title of one document.
+
+        Raises:
+            PaperlessError: A call fails.
+        """
+        document = await self._document(document_id)
+        return str(document.get("title") or document_id)
+
+    async def download(self, document_id: int, max_bytes: int) -> bytes:
+        """Read the PDF version of one document, the archive version of Paperless.
+
+        Raises:
+            PaperlessError: A call fails, or the file has more than ``max_bytes``
+                (`too_large`).
+        """
+        response = await self._request(
+            "GET", f"/api/documents/{document_id}/download/", accept="application/pdf"
+        )
+        if len(response.content) > max_bytes:
+            raise PaperlessError("too_large")
+        return response.content
 
 
 def document_url(base_url: str, document_id: int) -> str:

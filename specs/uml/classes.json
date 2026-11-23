@@ -4497,6 +4497,12 @@
           "type": "CHAR(32)"
         },
         {
+          "name": "paperless_document_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "BIGINT"
+        },
+        {
           "name": "created_at",
           "nullable": false,
           "primaryKey": false,

@@ -5,7 +5,12 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "frontend/src/app/features/meetings/paperless-insert/paperless-insert.component.spec.ts:PaperlessInsertComponent"
+  - "frontend/vendor/ui-kit/src/lib/search-window/search-window.component.spec.ts:SearchWindowComponent"
+implementation:
+  - frontend/src/app/features/meetings/paperless-insert/paperless-insert.component.ts
+  - frontend/vendor/ui-kit/src/lib/search-window/search-window.component.ts
 scope:
   - frontend/src/app/
 ---

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal, Self
 from uuid import UUID
 
@@ -95,3 +95,24 @@ class FiledDocumentOut(FrozenCamelModel, frozen=True):
     title: str
     url: str | None = None
     filed_at: datetime | None = Field(default=None, serialization_alias="filedAt")
+
+
+class InsertStateOut(FrozenCamelModel, frozen=True):
+    """Whether the part `Aus Paperless einfügen` is on (§F/integrations/paperless/002512)."""
+
+    enabled: bool
+
+
+class DocumentHitOut(FrozenCamelModel, frozen=True):
+    """One hit of the Paperless search (§F/integrations/paperless/002534)."""
+
+    document_id: int = Field(serialization_alias="documentId")
+    title: str
+    document_type: str | None = Field(default=None, serialization_alias="documentType")
+    created: date | None = None
+
+
+class InsertIn(FrozenStrictCamelModel, frozen=True):
+    """The pick of the Paperless search: the number of the document to copy."""
+
+    document_id: int = Field(alias="documentId", gt=0)

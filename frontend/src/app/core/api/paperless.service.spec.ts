@@ -79,4 +79,43 @@ describe('PaperlessService', () => {
     expect(open).toHaveBeenCalledWith('https://p.example.org/documents/1/details', '_blank', 'noopener');
     open.mockRestore();
   });
+
+  /** § F/integrations/paperless/002512, 002527: the state of the insert, read once. */
+  it('reads once whether the insert is on, and not at all without the right', () => {
+    const api = TestBed.inject(PaperlessService);
+    const seen: boolean[] = [];
+    api.insertOn().subscribe((v) => seen.push(v));
+    api.insertOn().subscribe((v) => seen.push(v));
+    http.expectOne('/api/paperless/insert').flush({ enabled: true });
+    expect(seen).toEqual([true, true]);
+
+    allowed = false;
+    api.insertOn().subscribe((v) => seen.push(v));
+    expect(seen).toEqual([true, true, false]);
+  });
+
+  it('counts the insert as off after an error', () => {
+    let on: boolean | undefined;
+    TestBed.inject(PaperlessService)
+      .insertOn()
+      .subscribe((v) => (on = v));
+    http.expectOne('/api/paperless/insert').flush(null, { status: 500, statusText: 'x' });
+    expect(on).toBe(false);
+  });
+
+  /** § 002534, 002528: the search and the copy. */
+  it('searches Paperless and copies a document into the protocol of a Sitzung', () => {
+    const api = TestBed.inject(PaperlessService);
+    api.search('beamer').subscribe();
+    const search = http.expectOne((r) => r.url === '/api/paperless/search');
+    expect(search.request.params.get('q')).toBe('beamer');
+    search.flush([]);
+
+    let name: string | undefined;
+    api.insert('m1', 418).subscribe((copy) => (name = copy.name));
+    const insert = http.expectOne({ method: 'POST', url: '/api/meetings/m1/documents/paperless' });
+    expect(insert.request.body).toEqual({ documentId: 418 });
+    insert.flush({ name: 'Angebot.pdf', url: '/api/media/documents/d1' });
+    expect(name).toBe('Angebot.pdf');
+  });
 });
