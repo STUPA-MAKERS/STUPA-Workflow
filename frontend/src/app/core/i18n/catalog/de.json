@@ -75,6 +75,7 @@
   "account.frame.navLabel": "Kontobereiche",
   "account.frame.none": "Keine Seite geöffnet",
   "account.nav.notificationsDesc": "E-Mails je Anlass ein- und ausschalten",
+  "account.nav.notificationsPushDesc": "Mail und Push je Anlass ein- und ausschalten",
   "account.nav.profileDesc": "Deine Angaben aus dem SSO",
   "account.nav.grantsDesc": "MCP-Server und Zugriffe von Agenten",
   "account.calendar.title": "Kalender-Abo",

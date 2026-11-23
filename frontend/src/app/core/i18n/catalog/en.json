@@ -78,6 +78,7 @@
   "account.frame.navLabel": "Account sections",
   "account.frame.none": "No page open",
   "account.nav.notificationsDesc": "Turn emails on or off per occasion",
+  "account.nav.notificationsPushDesc": "Turn email and push on or off per occasion",
   "account.nav.profileDesc": "Your details from the SSO",
   "account.nav.grantsDesc": "MCP server and agent access",
   "account.calendar.title": "Calendar subscription",
