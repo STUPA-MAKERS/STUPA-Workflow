@@ -2,7 +2,7 @@
 
 <section class="td__block" aria-labelledby="td-guard">
   <h3 class="cap ins__cap" id="td-guard">{{ 'admin.flow.guard' | t }}</h3>
-  <app-guard-editor
+  <app-guard-editor-view
     [guard]="transition().guard ?? null"
     [roleOptions]="roleOptions()"
     [gremiumOptions]="gremiumOptions()"

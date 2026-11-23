@@ -20,12 +20,16 @@ import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
   ButtonGroupComponent,
+  ContentLangState,
+  ContentLangSwitchComponent,
   EmptyStateComponent,
+  FabComponent,
   IconComponent,
   MEDIA,
   mediaQuery,
   NoteComponent,
   observeElementSize,
+  PageHeaderComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
@@ -34,8 +38,6 @@ import {
   SkeletonComponent,
   StatusTextComponent,
   ToastService,
-  FabComponent,
-  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
@@ -88,13 +90,14 @@ import {
   stateDisplayLabel,
   transitionGuardLabel,
 } from './flow-label.util';
-import { GroupInspectorComponent } from './group-inspector.component';
-import { StateInspectorComponent, type GuardPriorityRow } from './state-inspector.component';
 import { TransitionDetailComponent } from './transition-detail.component';
-import { TransitionInspectorComponent } from './transition-inspector.component';
-import { TransitionListsComponent } from './transition-lists.component';
-import { ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
-import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.state';
+import {
+  GroupInspectorViewComponent,
+  type GuardPriorityRow,
+  StateInspectorViewComponent,
+  TransitionInspectorViewComponent,
+  TransitionListsViewComponent,
+} from '@stupa-makers/ui-kit/views/flow-editor';
 import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 import { injectPanePage } from '../pane-page';
 
@@ -147,10 +150,10 @@ const MIN_FIT_SCALE = 0.75;
     ButtonComponent,
     ButtonGroupComponent,
     VersionHistoryComponent,
-    StateInspectorComponent,
-    TransitionInspectorComponent,
-    GroupInspectorComponent,
-    TransitionListsComponent,
+    StateInspectorViewComponent,
+    TransitionInspectorViewComponent,
+    GroupInspectorViewComponent,
+    TransitionListsViewComponent,
     TransitionDetailComponent,
     PageHeaderComponent,
     BreadcrumbsComponent,

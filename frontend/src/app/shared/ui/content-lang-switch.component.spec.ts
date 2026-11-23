@@ -3,9 +3,9 @@ import { TestBed } from '@angular/core/testing';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { I18nService } from '@core/i18n/i18n.service';
-import { runAxe } from '../../../../testing/a11y';
-import { type ContentLang, ContentLangSwitchComponent } from './content-lang-switch.component';
-import { ContentLangState } from './content-lang.state';
+import { runAxe } from '../../../testing/a11y';
+import { provideAppUiKit } from '@core/i18n/ui-kit-intl';
+import { type ContentLang, ContentLangState, ContentLangSwitchComponent } from '@stupa-makers/ui-kit';
 
 /** Give the service active extra languages, as the bundle of the server does. */
 function withExtras(): void {
@@ -24,7 +24,7 @@ describe('ContentLangSwitchComponent', () => {
     const lang = signal<ContentLang>('de');
     const { container, fixture } = await render(
       `<app-content-lang-switch [(value)]="lang" ariaLabel="Sprache der Texte" />`,
-      { imports: [ContentLangSwitchComponent], componentProperties: { lang } },
+      { imports: [ContentLangSwitchComponent], providers: [provideAppUiKit()], componentProperties: { lang } },
     );
     withExtras();
     fixture.detectChanges();
@@ -53,7 +53,7 @@ describe('ContentLangSwitchComponent', () => {
   });
 
   it('the state of an editor starts with the language of the page', () => {
-    TestBed.configureTestingModule({ providers: [ContentLangState] });
+    TestBed.configureTestingModule({ providers: [provideAppUiKit(), ContentLangState] });
     expect(TestBed.inject(ContentLangState).lang()).toBe('de');
   });
 });

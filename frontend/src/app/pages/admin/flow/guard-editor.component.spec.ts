@@ -1,7 +1,7 @@
 import { render } from '@testing-library/angular';
 import type { SelectOption } from '@stupa-makers/ui-kit';
 import type { Guard } from '../admin.models';
-import { GuardEditorComponent } from './guard-editor.component';
+import { GuardEditorViewComponent as GuardEditorComponent } from '@stupa-makers/ui-kit/views/flow-editor';
 
 const ROLES: SelectOption[] = [{ value: 'stupa', label: 'StuPa' }];
 const GREMIEN: SelectOption[] = [{ value: 'g1', label: 'Finanzausschuss' }];

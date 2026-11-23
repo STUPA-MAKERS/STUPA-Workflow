@@ -2,9 +2,9 @@ import { signal } from '@angular/core';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { I18nMap } from '@core/api/models';
-import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.state';
-import { runAxe } from '../../../../testing/a11y';
-import { I18nInputComponent } from './i18n-input.component';
+import { provideAppUiKit } from '@core/i18n/ui-kit-intl';
+import { ContentLangState, I18nInputComponent } from '@stupa-makers/ui-kit';
+import { runAxe } from '../../../testing/a11y';
 
 /** A content language state that the spec sets. */
 function stateFor(lang: string): ContentLangState {
@@ -19,6 +19,7 @@ describe('I18nInputComponent', () => {
     const value = signal<I18nMap>({ de: 'Sitzung', en: 'Meeting' });
     const { container, fixture } = await render(`<app-i18n-input [(value)]="value" placeholder="Frage" />`, {
       imports: [I18nInputComponent],
+      providers: [provideAppUiKit()],
       componentProperties: { value },
     });
     await fixture.whenStable();
@@ -35,7 +36,7 @@ describe('I18nInputComponent', () => {
     const { fixture } = await render(`<app-i18n-input [(value)]="value" label="Titel" />`, {
       imports: [I18nInputComponent],
       componentProperties: { value },
-      providers: [{ provide: ContentLangState, useValue: state }],
+      providers: [provideAppUiKit(), { provide: ContentLangState, useValue: state }],
     });
     const fr = screen.getByLabelText('Titel (FR)');
     expect(fr).toHaveValue('');
@@ -63,7 +64,7 @@ describe('I18nInputComponent', () => {
   it('labels a short field with its code', async () => {
     await render(`<app-i18n-input [short]="true" label="Text" />`, {
       imports: [I18nInputComponent],
-      providers: [{ provide: ContentLangState, useValue: stateFor('en') }],
+      providers: [provideAppUiKit(), { provide: ContentLangState, useValue: stateFor('en') }],
     });
     expect(screen.getByRole('textbox', { name: 'EN' })).toBeInTheDocument();
   });
@@ -71,6 +72,7 @@ describe('I18nInputComponent', () => {
   it('does not join a form of the page, so the field needs no name', async () => {
     await render(`<form><app-i18n-input [value]="{ de: 'a', en: 'b' }" /></form>`, {
       imports: [I18nInputComponent, (await import('@angular/forms')).FormsModule],
+      providers: [provideAppUiKit()],
     });
     expect(screen.getAllByRole('textbox')).toHaveLength(1);
   });
