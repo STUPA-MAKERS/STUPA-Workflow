@@ -2,12 +2,10 @@
 id: "000316"
 title: Closed tickets are anonymized after the retention time
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation:
-  - backend/worker/tickets.py
-  - backend/app/modules/tickets/service.py
+updated: 2026-11-23
+replaced_by: F/collaboration/tickets/002716
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets
