@@ -459,13 +459,13 @@ export interface TodoLinkedCard {
   readonly balance: string | null;
 }
 
-/** One end of a link: the kind and the id of an element (spec 001402). */
 /** The hits of the link picker and whether Paperless answered. */
 export interface LinkSearch {
-  readonly hits: TodoLinkTarget[];
+  readonly hits: readonly TodoLinkTarget[];
   readonly paperlessDown: boolean;
 }
 
+/** One end of a link: the kind and the id of an element (spec 001402). */
 export interface LinkEnd {
   readonly kind: TodoLinkKind;
   readonly id: Uuid;
@@ -882,7 +882,7 @@ export class TodosApiService {
    * The link picker: what the caller may read, at most five per kind (spec 001408).
    * `exclude` leaves out an element and the elements that it links already.
    */
-  linkTargets(q: string, kind: TodoLinkKind | 'all', exclude?: LinkEnd | null): Observable<TodoLinkTarget[]> {
+  linkTargets(q: string, kind: TodoLinkKind | 'all', exclude?: LinkEnd | null): Observable<readonly TodoLinkTarget[]> {
     return this.linkSearch(q, kind, exclude).pipe(map((found) => found.hits));
   }
 

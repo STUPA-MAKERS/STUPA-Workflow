@@ -148,7 +148,7 @@ export class TodoLinkPickerComponent {
     }),
   );
   readonly kind = signal<PickerKind>('all');
-  readonly hits = signal<TodoLinkTarget[]>([]);
+  readonly hits = signal<readonly TodoLinkTarget[]>([]);
   readonly failed = signal(false);
   /** Paperless did not answer the newest search (§F/integrations/paperless/002766). */
   readonly paperlessDown = signal(false);
