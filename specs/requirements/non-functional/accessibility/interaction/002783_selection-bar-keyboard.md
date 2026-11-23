@@ -2,9 +2,11 @@
 id: "002783"
 title: The format bar works with the keyboard
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
+tests:
+  - "frontend/vendor/ui-kit/markdown-editor/src/markdown-editor.selection-bar.spec.ts:MarkdownEditorSelectionBar"
 implementation:
   - frontend/vendor/ui-kit/markdown-editor/src/markdown-editor.component.ts
 scope:

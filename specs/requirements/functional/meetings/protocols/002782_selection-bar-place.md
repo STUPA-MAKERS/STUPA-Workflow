@@ -2,9 +2,12 @@
 id: "002782"
 title: The format bar shows below the selection
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
+tests:
+  - "frontend/vendor/ui-kit/markdown-editor/src/markdown-editor.selection-bar.spec.ts:MarkdownEditorSelectionBar"
+  - "frontend/vendor/ui-kit/markdown-editor/src/markdown-editor.selection-bar.spec.ts:measureSelectionBar"
 implementation:
   - frontend/vendor/ui-kit/markdown-editor/src/markdown-editor.component.ts
 scope:
