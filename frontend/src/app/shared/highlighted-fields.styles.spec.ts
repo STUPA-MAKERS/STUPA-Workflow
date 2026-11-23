@@ -13,7 +13,7 @@ const FIELDS: readonly (readonly [string, string])[] = [
   ['../../vendor/ui-kit/views/chat/src/chat-view.component.scss', '.chat__editInput'],
   ['features/todos/card-detail/todo-card-detail.component.scss', '.cd__itemInput'],
   ['features/todos/card-detail/todo-card-detail.component.scss', '.cd__evInput'],
-  ['features/meetings/top-sheet/top-sheet.component.scss', '.ts__titleInput'],
+  ['../../vendor/ui-kit/views/protocol/src/top-sheet-view.component.scss', '.ts__titleInput'],
   ['../../vendor/ui-kit/views/meeting/src/agenda-pane-view.component.scss', '.ap__input'],
   ['pages/admin/privacy/privacy.component.scss', '.pv__textarea'],
   ['pages/todos/board-settings/todo-board-settings.component.scss', '.bs__input'],
@@ -42,7 +42,7 @@ const SURFACES: readonly (readonly [string, string])[] = [
   ['features/meetings/live-cards/live-cards.component.scss', '.lc__join'],
   ['pages/todos/board-picker/todo-board-picker.component.scss', '.bp__chip'],
   ['features/help/help-menu/help-menu.component.scss', '.hm__head'],
-  ['features/meetings/top-sheet/top-sheet.component.scss', '.ts'],
+  ['../../vendor/ui-kit/views/protocol/src/top-sheet-view.component.scss', '.ts'],
   ['pages/home.component.scss', '.home__latestItem'],
   ['features/apply/altcha.component.scss', '.altcha__btn'],
 ];

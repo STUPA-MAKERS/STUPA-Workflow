@@ -5,7 +5,7 @@ import { of, throwError } from 'rxjs';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { ImageAltService } from '@shared/markdown/image-alt.service';
 import { MediaApiService } from '@shared/markdown/media-api.service';
-import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-upload.directive';
+import { ProtocolImageUploadDirective, TopSheetViewComponent } from '@stupa-makers/ui-kit/views/protocol';
 import { renderDeferred } from '../../../../testing/defer';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -13,7 +13,8 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { AgendaItem, Meeting, Protocol } from '@core/api/models';
 import { MarkdownEditorComponent } from '@stupa-makers/ui-kit/markdown-editor';
 import { AGENDA, meeting, protocol } from '../../../../testing/meeting-fixtures';
-import { type SaveState, TopSheetComponent, documentUploadErrorKey } from './top-sheet.component';
+import { type SaveState, TopSheetComponent } from './top-sheet.component';
+import { documentUploadErrorKey } from './protocol-api.provider';
 import { KnownNamesService } from './known-names.service';
 import { NO_LINKED_TODOS } from '../../../../testing/todo-fixtures';
 import { kindSpies } from '../../../../testing/toast';
@@ -200,7 +201,7 @@ describe('TopSheetComponent', () => {
     const ask = jest.fn().mockResolvedValueOnce(null).mockResolvedValue('Die Sitzung im Saal');
     const view = await setup({}, [
       { provide: MediaApiService, useValue: { uploadImage: upload } },
-      { provide: ImageAltService, useValue: { ask } },
+      { provide: ImageAltService, useValue: Object.assign(Object.create(ImageAltService.prototype) as ImageAltService, { ask }) },
     ]);
     const uploader = editorOf(view).imageUpload();
     expect(uploader).not.toBeNull();
@@ -372,7 +373,8 @@ describe('TopSheetComponent', () => {
 
     it('marks no name for a reader', async () => {
       const view = await setup({ editable: false, top: { ...AGENDA[0], body: '' } });
-      const cmp = view.fixture.componentInstance as unknown as { knownNames: () => readonly unknown[] };
+      const cmp = view.fixture.debugElement.query((d) => d.componentInstance instanceof TopSheetViewComponent)
+        .componentInstance as unknown as { knownNames: () => readonly unknown[] };
       expect(cmp.knownNames()).toEqual([]);
     });
 
@@ -396,8 +398,8 @@ describe('TopSheetComponent', () => {
       expect(area.value).toBe('Text\n\n|  |  |  |\n| --- | --- | --- |\n|  |  |  |\n|  |  |  |\n');
       expect(view.bodyChange).toHaveBeenLastCalledWith({ itemId: 't-1', body: area.value });
       const directive = view.fixture.debugElement
-        .query((d) => d.injector.get(MarkdownImageUploadDirective, null) !== null)
-        .injector.get(MarkdownImageUploadDirective);
+        .query((d) => d.injector.get(ProtocolImageUploadDirective, null) !== null)
+        .injector.get(ProtocolImageUploadDirective);
       const pick = jest.spyOn(directive, 'pick').mockImplementation(() => undefined);
       await userEvent.click(screen.getByRole('button', { name: 'Bild einfügen' }));
       expect(pick).toHaveBeenCalled();
