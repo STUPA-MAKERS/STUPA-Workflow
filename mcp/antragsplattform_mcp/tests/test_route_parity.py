@@ -46,6 +46,14 @@ EXCLUDED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/admin/privacy/erasures/{}/execute"),
         # The login lifetime: the server refuses every agent token.
         ("PUT", "/admin/login-settings"),
+        # Paperless: no OAuth scope carries `admin.paperless` or `paperless.use`.
+        ("GET", "/admin/paperless"),
+        ("PUT", "/admin/paperless"),
+        ("POST", "/admin/paperless/test"),
+        ("GET", "/admin/paperless/failed-filings"),
+        ("POST", "/admin/paperless/failed-filings/{}/retry"),
+        ("POST", "/admin/paperless/backfill"),
+        ("GET", "/paperless/documents/{}/{}"),
         # Login, logout, the OAuth flow and the MCP package: the MCP client does them.
         ("GET", "/auth/login"),
         ("GET", "/auth/callback"),

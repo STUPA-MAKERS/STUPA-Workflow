@@ -453,7 +453,7 @@ def test_flow_dispatcher_prefers_the_ctx_and_falls_back_to_the_full_chain() -> N
         {"settings": SETTINGS, "deadlines_sessionmaker": _maker([])}
     )
     assert isinstance(chain, ChainActionDispatcher)
-    assert len(chain.dispatchers) == 2
+    assert len(chain.dispatchers) == 3
 
 
 async def test_vote_scan_and_lock_read_the_session() -> None:

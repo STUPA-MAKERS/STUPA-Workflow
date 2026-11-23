@@ -5,7 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/paperless/test_paperless.py:test_a_protocol_that_is_final_again_replaces_its_documents"
+implementation:
+  - backend/app/modules/paperless/filings.py
+  - backend/app/modules/paperless_filing/runner.py
 scope:
   - backend/app/
   - frontend/src/app/

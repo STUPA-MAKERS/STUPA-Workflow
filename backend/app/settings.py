@@ -160,6 +160,12 @@ class Settings(BaseSettings):
         example ran with an empty allowlist. `WEBHOOK_HOST_ALLOWLIST` wins when both
         are set. The per-webhook `secret` never reaches the log.
 
+    Paperless:
+        `paperless_host_allowlist` names the hosts that the address of the Paperless
+        connection can have (§NF/security/network/002514). Paperless often runs in the
+        internal network, so the SSRF guard does not apply and this list is the whole
+        guard: an empty list allows no address.
+
     Delegation:
         The gremium flag `allow_vote_delegation` alone switches vote delegation; no
         server setting does. `local_timezone`
@@ -362,7 +368,11 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("webhook_host_allowlist", "webhook_allowlist"),
     )
 
-    @field_validator("cors_allow_origins", "webhook_host_allowlist", mode="before")
+    paperless_host_allowlist: CsvList = []
+
+    @field_validator(
+        "cors_allow_origins", "webhook_host_allowlist", "paperless_host_allowlist", mode="before"
+    )
     @classmethod
     def _accept_csv_lists(cls, value: object) -> object:
         """Accept a comma-separated list, as `deploy/.env.example` documents it."""

@@ -66,6 +66,7 @@ import { CostCentreSettingsComponent } from '../cost-centre/cost-centre-settings
 import { CostCentreSelectComponent } from '../cost-centre-select/cost-centre-select.component';
 import { costCentreError, createKey, findNode, levelKey, withDescendants } from '../cost-centre/cost-centre.util';
 import { defaultFiscalYearId } from '../fiscal-year.util';
+import { openInPaperless, paperlessLink } from '@core/api/paperless.service';
 import {
   BudgetPlanApi,
   type BudgetPlan,
@@ -137,6 +138,7 @@ const ACTIONS = [
   'setState',
   'exportPdf',
   'exportXlsx',
+  'paperless',
 ] as const;
 type ActionId = (typeof ACTIONS)[number];
 
@@ -333,6 +335,8 @@ export class BudgetPlanComponent {
     return load.kind === 'plan' ? load.plan : null;
   });
   readonly versions = computed(() => this.plan()?.versions ?? []);
+  /** The filed document of the plan in Paperless, for a holder of `paperless.use` (002525). */
+  private readonly paperlessUrl = paperlessLink('plan', computed(() => this.plan()?.id));
   readonly version = computed<PlanVersion | null>(
     () => this.versions().find((v) => v.id === this.versionId()) ?? currentVersion(this.versions()),
   );
@@ -672,6 +676,7 @@ export class BudgetPlanComponent {
     const files: RowMenuItem[] = [
       ...item('exportPdf', 'budget.plan.action.openPdf', 'file', !!this.version()),
       ...item('exportXlsx', 'budget.plan.action.exportXlsx', 'download', !!this.version()),
+      ...item('paperless', 'paperless.open', 'link', !!this.paperlessUrl()),
     ];
     const draft: RowMenuItem[] =
       this.editable() && this.versions().length > 0
@@ -1218,6 +1223,9 @@ export class BudgetPlanComponent {
         return;
       case 'exportXlsx':
         this.exportFile('xlsx');
+        return;
+      case 'paperless':
+        openInPaperless(this.paperlessUrl() ?? '');
         return;
     }
   }

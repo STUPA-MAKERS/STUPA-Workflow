@@ -166,7 +166,7 @@ def build_worker_dispatcher(
     sessionmaker: async_sessionmaker[AsyncSession],
     settings: Settings | None = None,
 ) -> ChainActionDispatcher:
-    """Build the full flow action dispatcher: notify and the extras.
+    """Build the full flow action dispatcher: notify, the extras and Paperless.
 
     The API (`app.main`) and the arq worker use the same chain. So a transition that
     a vote close or an automatic advance fires runs the same actions as a
@@ -177,6 +177,7 @@ def build_worker_dispatcher(
     """
     from app.modules.flow.extras_dispatcher import FlowExtrasActionDispatcher
     from app.modules.flow.mail_actions import NotificationActionDispatcher
+    from app.modules.flow.paperless_actions import PaperlessFilingDispatcher
     from app.modules.notifications.provider import mail_queue_from_pool
     from app.settings import get_settings
 
@@ -185,5 +186,6 @@ def build_worker_dispatcher(
         [
             NotificationActionDispatcher(sessionmaker, mail_queue_from_pool(redis), resolved),
             FlowExtrasActionDispatcher(sessionmaker),
+            PaperlessFilingDispatcher(redis),
         ]
     )

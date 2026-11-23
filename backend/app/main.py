@@ -89,6 +89,8 @@ from app.modules.notifications.router import router as notifications_router
 from app.modules.notifications.router import (
     templates_router as mail_templates_router,
 )
+from app.modules.paperless_filing.router import admin_router as paperless_admin_router
+from app.modules.paperless_filing.router import router as paperless_router
 from app.modules.privacy.request_router import router as erasure_request_router
 from app.modules.privacy.router import router as privacy_router
 from app.modules.protocol.documents_router import router as protocol_documents_router
@@ -150,6 +152,8 @@ api_router.include_router(budget_plan_router)
 api_router.include_router(calendar_router)
 api_router.include_router(calendar_admin_router)
 api_router.include_router(public_calendar_router)
+api_router.include_router(paperless_router)
+api_router.include_router(paperless_admin_router)
 api_router.include_router(avatars_router)
 api_router.include_router(antiabuse_router)
 api_router.include_router(files_router)

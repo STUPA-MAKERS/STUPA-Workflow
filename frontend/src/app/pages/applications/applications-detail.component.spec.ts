@@ -6,7 +6,7 @@ import {
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, of } from 'rxjs';
 import { ApplicationsDetailComponent } from './applications-detail.component';
 import { ApplicationsPageService } from './applications-page.service';
 import { DraftAttachmentsService } from '../../features/apply/draft-attachments.service';
@@ -14,6 +14,7 @@ import { RailStatusService } from '../../layout/rail-status.service';
 import { TestBed } from '@angular/core/testing';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
+import { PaperlessService } from '@core/api/paperless.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { provideFormly } from '@shared/formly/formly.providers';
 import type {
@@ -213,6 +214,35 @@ function flushTypes(http: HttpTestingController) {
 /** jsdom has no structuredClone, and startEdit relies on the browser global. */
 describe('ApplicationsDetailComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  /** No filed document by default, so the page asks Paperless nothing. */
+  let paperless: jest.SpyInstance;
+  beforeEach(() => {
+    paperless = jest.spyOn(PaperlessService.prototype, 'documentUrl').mockReturnValue(of(null));
+  });
+  afterEach(() => paperless.mockRestore());
+
+  /** § F/integrations/paperless/002525 */
+  it('offers "In Paperless öffnen" only for a filed Antrag', async () => {
+    const ids = (c: { menuSections(): readonly { items: readonly { id: string }[] }[] }) =>
+      c.menuSections().flatMap((sec) => sec.items.map((i) => i.id));
+    const none = await setup(['application.read']);
+    none.http.expectOne(url('')).flush(appWire());
+    none.detectChanges();
+    expect(ids(none.cmp)).not.toContain('paperless');
+
+    TestBed.resetTestingModule();
+    paperless.mockReturnValue(of('https://paperless.example.org/documents/7/details'));
+    const view = await setup(['application.read']);
+    view.http.expectOne(url('')).flush(appWire());
+    view.detectChanges();
+    await view.fixture.whenStable();
+    expect(paperless).toHaveBeenLastCalledWith('application', 'app-1');
+    expect(ids(view.cmp)).toContain('paperless');
+    const open = jest.spyOn(window, 'open').mockReturnValue(null);
+    view.cmp.onMenu({ id: 'paperless', label: '' });
+    expect(open).toHaveBeenCalledWith('https://paperless.example.org/documents/7/details', '_blank', 'noopener');
+    open.mockRestore();
+  });
 
   const g = globalThis as unknown as { structuredClone?: <T>(v: T) => T };
   const savedClone = g.structuredClone;
