@@ -404,13 +404,21 @@ async def test_without_a_connection_the_worker_does_nothing(
 
 
 async def _feature(maker: Maker, *, on: bool) -> None:
-    """Set the feature switch `paperless` in the active site configuration."""
+    """Set the feature switch `paperless` in the active site configuration.
+
+    A database without an active configuration gets one, because the tests before this
+    one can leave the table empty.
+    """
+    branding = {"features": {"paperless": on}}
     async with maker() as session:
-        await session.execute(
+        changed = await session.execute(
             update(SiteConfigVersion)
             .where(SiteConfigVersion.active.is_(True))
-            .values(branding={"features": {"paperless": on}})
+            .values(branding=branding)
+            .returning(SiteConfigVersion.id)
         )
+        if changed.first() is None:
+            session.add(SiteConfigVersion(version=1, active=True, branding=branding))
         await session.commit()
 
 
