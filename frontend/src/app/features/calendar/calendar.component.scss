@@ -234,9 +234,7 @@ app-calendar-week-view.cal__grid {
 }
 .cal__panelScroll {
   --cal-fade: var(--space-3);
-  display: flex;
   flex: 1 1 auto;
-  flex-direction: column;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
