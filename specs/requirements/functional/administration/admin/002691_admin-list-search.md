@@ -2,7 +2,7 @@
 id: "002691"
 title: The search of a Verwaltung list finds the text of a row
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 tests:
