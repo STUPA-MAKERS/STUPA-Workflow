@@ -260,8 +260,7 @@
   @include kinds.colors;
 }
 
-// The foot of the layer: "Schritte" and the state of the build-up. It leaves the corner of
-// the zoom buttons free.
+// The foot of the layer: "Schritte". It leaves the corner of the zoom buttons free.
 .gr__foot {
   display: flex;
   align-items: flex-end;
@@ -270,22 +269,26 @@
   margin-inline-end: calc(var(--control-height) + var(--space-5));
   min-width: 0;
 }
-.gr__pill {
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-1);
-  box-shadow: var(--shadow-sm);
+// The state of the build-up ("Wird aufgebaut", "Mehr laden", spec 002790) stands over the zoom
+// buttons of the drawing, at their end edge with a gap of 8px. It is out of the foot, so it does
+// not take the room of the zoom buttons on a phone. The zoom buttons sit 12px inside the
+// drawing, on every width.
+.gr__float > .gr__state {
+  position: absolute;
+  inset-inline-end: var(--space-3);
+  bottom: calc(var(--space-3) + var(--control-height) + var(--space-2));
+  margin: 0;
 }
 .gr__growing {
-  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-1);
+  box-shadow: var(--shadow-md);
   color: var(--color-text-muted);
   font-size: 0.8125rem;
-}
-.gr__more {
-  padding: 0 var(--space-1);
 }
 
 // A phone: the drawing fills the screen above the bar of the shell, and the filters are one
@@ -356,7 +359,7 @@
   .gr__bar,
   .gr__depth,
   .gr__panel,
-  .gr__pill {
+  .gr__growing {
     border: 2px solid var(--color-text);
     box-shadow: none;
   }
