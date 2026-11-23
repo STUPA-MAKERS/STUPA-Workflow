@@ -33,7 +33,7 @@ from app.modules.auth.people import PersonRef, person_refs
 from app.modules.files.drafts import bind_drafts, check_message_drafts
 from app.modules.files.schemas import MessageAttachmentOut
 from app.modules.files.service import FilesService
-from app.modules.webhooks.events import WebhookEvent, emit_event
+from app.modules.webhooks.events import WebhookEvent, emit_event, has_subscriber
 from app.shared.errors import ForbiddenError, NotFoundError, ValidationProblem
 from app.shared.mentions import (
     check_mentions,
@@ -192,7 +192,6 @@ class CommentOps(ApplicationsServiceBase):
                 pepper=pepper,
                 comment_id=comment.id,
             )
-        await self.session.flush()
         await self._emit_comment(app, comment)
         await self.session.commit()
         self.added_mentions = wanted
@@ -213,7 +212,13 @@ class CommentOps(ApplicationsServiceBase):
         )
 
     async def _emit_comment(self, app: Application, comment: Comment) -> None:
-        """Hand `comment.created` to the webhooks (§F/integrations/webhooks/002410)."""
+        """Hand `comment.created` to the webhooks (§F/integrations/webhooks/002410).
+
+        The flush gives the comment its id, and only a subscribed event needs it.
+        """
+        if not await has_subscriber(self.session, "comment.created"):
+            return
+        await self.session.flush()
 
         async def fields() -> dict[str, Any]:
             info = await self._comment_author_info(app, comment.author, comment.author_kind)

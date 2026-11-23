@@ -21,7 +21,7 @@ from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Applicant, Application
 from app.modules.flow.models import State
 from app.modules.gremien.models import Gremium
-from app.modules.webhooks.events import WebhookEvent, emit_event
+from app.modules.webhooks.events import WebhookEvent, emit_event, has_subscriber
 from app.settings import get_settings
 
 if TYPE_CHECKING:
@@ -96,6 +96,8 @@ async def emit_application_event(
     Returns:
         The number of new deliveries.
     """
+    if not await has_subscriber(session, name):
+        return 0
 
     async def fields() -> Mapping[str, Any]:
         return {**await application_fields(session, app), **(extra or {})}
@@ -132,6 +134,8 @@ async def emit_transition_event(
     Returns:
         The number of new deliveries.
     """
+    if not await has_subscriber(session, "application.transition"):
+        return 0
     to_ref = (
         None if to_state is None else ref(to_state.id, label_of(to_state.label_i18n, to_state.key))
     )

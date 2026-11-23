@@ -15,6 +15,7 @@ from app.modules.webhooks.events import (
     WebhookEvent,
     build_body,
     emit_event,
+    has_subscriber,
     subscribed_fields,
 )
 from app.modules.webhooks.models import Webhook, WebhookDelivery
@@ -86,6 +87,14 @@ def test_build_body_keeps_ids_and_drops_unknown_keys() -> None:
         "transitionId": None,
         "data": {"title": "T"},
     }
+
+
+async def test_has_subscriber(active_webhooks: ActiveWebhooks) -> None:
+    """An emit site asks first, so an event without a subscriber reads nothing."""
+    active_webhooks.hooks = [_hook([{"event": "vote.opened"}])]
+    session = FakeSession()
+    assert await has_subscriber(session, "vote.opened")  # type: ignore[arg-type]
+    assert not await has_subscriber(session, "vote.closed")  # type: ignore[arg-type]
 
 
 async def test_emit_without_subscriber_adds_nothing(active_webhooks: ActiveWebhooks) -> None:

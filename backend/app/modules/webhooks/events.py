@@ -99,6 +99,15 @@ async def active_webhooks(session: AsyncSession) -> Sequence[Webhook]:
     return (await session.scalars(select(Webhook).where(Webhook.active.is_(True)))).all()
 
 
+async def has_subscriber(session: AsyncSession, name: str) -> bool:
+    """Return True when an active webhook subscribes to the event `name`.
+
+    An emit site asks first, so an event without a subscriber reads no field and builds
+    no event.
+    """
+    return any(subscribed_fields(hook, name) is not None for hook in await active_webhooks(session))
+
+
 async def emit_event(session: AsyncSession, event: WebhookEvent) -> int:
     """Add one pending delivery per subscribed webhook that the filters let pass.
 
