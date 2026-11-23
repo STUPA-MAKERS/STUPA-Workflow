@@ -276,7 +276,8 @@ class TicketSettings(FrozenStrictCamelModel, frozen=True):
     """The ticket reports.
 
     ``publicEnabled`` lets a person without a session report (ALTCHA). ``notifyNew``
-    mails each new ticket to the holders of ``ticket.manage``. ``retentionMonths`` is
+    is the stored value from before the Bereiche: nothing reads it, because the switch
+    of the Bereich ``Plattform`` took its value. ``retentionMonths`` is
     the time after the close until the retention cron anonymizes a ticket; null means
     never.
     """

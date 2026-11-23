@@ -29,23 +29,14 @@
             [text]="statusChipLabel()"
             [active]="true"
           />
-          <app-filter-select
-            class="tk__chip"
-            [label]="'tickets.list.filter.kind' | t"
-            [options]="kindOptions()"
-            [value]="kindFilter()"
-            (valueChange)="setKind($event)"
-            [text]="kindChipLabel()"
-            filled
-          />
-          @if (manager) {
+          @for (chip of chips(); track chip.key) {
             <app-filter-select
               class="tk__chip"
-              [label]="'tickets.list.filter.assignee' | t"
-              [options]="assigneeOptions()"
-              [value]="assigneeFilter()"
-              (valueChange)="setAssignee($event)"
-              [text]="assigneeChipLabel()"
+              [label]="chip.label"
+              [options]="chip.options"
+              [value]="chip.value"
+              (valueChange)="setFilter(chip.key, $event)"
+              [text]="chip.text"
               filled
             />
           }

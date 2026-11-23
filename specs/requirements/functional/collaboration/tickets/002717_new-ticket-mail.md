@@ -5,7 +5,12 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/tickets/test_ticket_mails.py:test_created_goes_to_the_team_of_the_bereich_only"
+implementation:
+  - backend/app/modules/tickets/mails.py
+  - backend/app/modules/tickets/access.py
+  - frontend/src/app/pages/account/notifications.component.ts
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets

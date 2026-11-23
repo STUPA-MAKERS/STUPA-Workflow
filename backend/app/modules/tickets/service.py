@@ -1,8 +1,10 @@
 """Ticket service: report, list, detail, change, notes, anonymization.
 
-The service trusts its caller for the permission: the router lets only a holder of
-``ticket.manage`` reach every method except ``create`` and the ``reporter_*`` methods.
-The service still decides who may be the assignee (a holder of ``ticket.manage``) and
+The router resolves the Bereiche of the caller (``access.area_scope``) and passes
+them as ``areas`` to every method of the team; None stands for every Bereich. A ticket
+of a Bereich outside ``areas`` answers 404, and a list or a count leaves it out.
+``create`` and the ``reporter_*`` methods take no scope. The service still decides who
+may be the assignee (a person with the work right in the Bereich of the ticket) and
 who may edit a note (its author).
 
 The ``reporter_*`` methods are the view of the reporter account on its own tickets:
@@ -14,8 +16,8 @@ The to-do coupling (``openTodoCount`` and ``completeTodos``) runs through
 ``TicketTodoHooks``. Without hooks the count is 0 and ``completeTodos`` changes no
 card.
 
-A team note can mention holders of ``ticket.manage`` (``mentions``, the set of
-``assignees``); another id is 422 ``mention_not_member``. ``add_note`` and
+A team note can mention the persons with the work right in the Bereich of the ticket
+(``mentions``, the set of ``assignees``); another id is 422 ``mention_not_member``. ``add_note`` and
 ``edit_note`` put the mentions that they added into ``added_mentions``, and the router
 mails exactly those after the commit. A message of the reporter mentions nobody, its
 edit keeps the stored mentions, and the view of the reporter never shows them.
@@ -26,7 +28,7 @@ from __future__ import annotations
 import logging
 import re
 import uuid
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -46,7 +48,6 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.people import (
     DELETED_PERSON,
     PersonRef,
-    permission_holders,
     person_of,
 )
 from app.modules.auth.principal import Principal
@@ -54,11 +55,14 @@ from app.modules.files.drafts import bind_drafts, check_drafts, check_message_dr
 from app.modules.files.schemas import MessageAttachmentOut
 from app.modules.files.service import FilesService
 from app.modules.meetings.models import Meeting
-from app.modules.tickets.access import TICKET_MANAGE
+from app.modules.tickets.access import AreaScope, area_workers, works_in
 from app.modules.tickets.models import (
     CLOSED_STATUSES,
+    PLATFORM_AREA_ID,
     TICKET_STATUSES,
     Ticket,
+    TicketArea,
+    TicketCategory,
     TicketEvent,
     TicketNote,
     TicketSenderBlock,
@@ -168,18 +172,6 @@ class _Account:
     email: str | None
 
 
-async def ticket_managers(
-    session: AsyncSession, *, principal_id: uuid.UUID | None = None
-) -> list[tuple[uuid.UUID, str | None, str | None]]:
-    """Return ``(id, display_name, email)`` of the active holders of ``ticket.manage``.
-
-    See ``permission_holders``: role assignments plus OIDC group mappings, the admin
-    role always counts, merged or inactive accounts never. ``principal_id`` narrows
-    the result to one account.
-    """
-    return await permission_holders(session, TICKET_MANAGE, principal_id=principal_id)
-
-
 async def principal_id_of(session: AsyncSession, sub: str) -> uuid.UUID | None:
     """Return the row id of the account with this ``sub``."""
     return await session.scalar(select(PrincipalRow.id).where(PrincipalRow.sub == sub))
@@ -259,6 +251,7 @@ class TicketService:
         ticket = Ticket(
             id=uuid.uuid4(),
             number=await self.free_number(),
+            area_id=PLATFORM_AREA_ID,
             kind=payload.kind,
             title=payload.title.strip() or payload.title,
             body=payload.body,
@@ -407,7 +400,9 @@ class TicketService:
             raise ConflictError("The ticket has no sender any more.", code=SENDER_UNKNOWN)
         return target
 
-    async def block_sender(self, ticket_id: uuid.UUID, principal: Principal) -> TicketDetail:
+    async def block_sender(
+        self, ticket_id: uuid.UUID, principal: Principal, *, areas: AreaScope = None
+    ) -> TicketDetail:
         """Block the sender of a ticket; a second block changes nothing.
 
         Raises:
@@ -415,7 +410,7 @@ class TicketService:
             ConflictError: The ticket is anonymized (HTTP 409, ``ticket_sender_unknown``).
             ValidationProblem: The sender is the caller (HTTP 422, ``sender_is_self``).
         """
-        ticket = await self._get(ticket_id)
+        ticket = await self._get(ticket_id, areas=areas)
         target = self._sender_target(ticket)
         me = await principal_id_of(self.session, principal.sub)
         if await self._is_self(target, me):
@@ -434,7 +429,7 @@ class TicketService:
             insert(TicketSenderBlock).values(**values).on_conflict_do_nothing()
         )
         await self.session.commit()
-        return await self.detail(ticket.id, principal)
+        return await self.detail(ticket.id, principal, areas=areas)
 
     async def _is_self(self, target: BlockTarget, me: uuid.UUID | None) -> bool:
         """Tell if a block target is the caller: the own account or the own address."""
@@ -451,7 +446,9 @@ class TicketService:
                 )
                 return own is not None and normalize_email(own) == address
 
-    async def unblock_sender(self, ticket_id: uuid.UUID, principal: Principal) -> TicketDetail:
+    async def unblock_sender(
+        self, ticket_id: uuid.UUID, principal: Principal, *, areas: AreaScope = None
+    ) -> TicketDetail:
         """Lift every block that holds back a ticket's sender; without one nothing changes.
 
         That is the block of the account and of its e-mail, or the block of the e-mail
@@ -461,11 +458,11 @@ class TicketService:
             NotFoundError: No ticket has this id (HTTP 404).
             ConflictError: The ticket is anonymized (HTTP 409, ``ticket_sender_unknown``).
         """
-        ticket = await self._get(ticket_id)
+        ticket = await self._get(ticket_id, areas=areas)
         target = self._sender_target(ticket)
         await self.session.execute(delete(TicketSenderBlock).where(self._target_condition(target)))
         await self.session.commit()
-        return await self.detail(ticket.id, principal)
+        return await self.detail(ticket.id, principal, areas=areas)
 
     async def blocked_senders(self) -> list[TicketBlockedSender]:
         """List the blocked senders, newest first."""
@@ -524,11 +521,15 @@ class TicketService:
         q: str | None = None,
         limit: int = 50,
         offset: int = 0,
+        areas: AreaScope = None,
+        area_ids: Sequence[uuid.UUID] = (),
     ) -> Page[TicketListItem]:
         """List the tickets, newest first, with the filters of ``GET /tickets``.
 
         ``q`` matches the title, the body, the number (``T-7K3QX9MD``, ``7k3q``),
-        and the name and e-mail of the reporter.
+        and the name and e-mail of the reporter. ``areas`` is the scope of the caller
+        and ``area_ids`` the filter for the Bereich; a ticket shows only when both
+        hold its Bereich.
         """
         reporter = aliased(PrincipalRow)
         term = (q or "").strip()
@@ -540,6 +541,7 @@ class TicketService:
             cast(reporter.email, String),
         )
         conds = (
+            *_area_filter(areas, area_ids),
             *_status_kind_filter(statuses, kinds),
             *_assignee_filter(assignee, me),
             *_search_filter(term, texts),
@@ -569,10 +571,14 @@ class TicketService:
             offset=offset,
         )
 
-    async def counts(self) -> TicketCounts:
-        """Count the tickets per status."""
+    async def counts(self, *, areas: AreaScope = None) -> TicketCounts:
+        """Count the tickets of the Bereiche ``areas`` per status."""
         rows = (
-            await self.session.execute(select(Ticket.status, func.count()).group_by(Ticket.status))
+            await self.session.execute(
+                select(Ticket.status, func.count())
+                .where(*_area_filter(areas, ()))
+                .group_by(Ticket.status)
+            )
         ).all()
         by_status = {status: int(n) for status, n in rows}
         return TicketCounts(
@@ -582,40 +588,47 @@ class TicketService:
             rejected=by_status.get("rejected", 0),
         )
 
-    async def assignees(self) -> list[PersonRef]:
-        """List the possible assignees (the holders of ``ticket.manage``), by name."""
+    async def assignees(self, areas: Collection[uuid.UUID] | None = None) -> list[PersonRef]:
+        """List the persons with the work right in one of ``areas``, by name.
+
+        None stands for every Bereich. For one Bereich the list holds its possible
+        assignees.
+        """
         people = [
-            person_of(pid, name, email) for pid, name, email in await ticket_managers(self.session)
+            person_of(pid, name, email)
+            for pid, name, email in await area_workers(self.session, areas)
         ]
         named = [p for p in people if p.principal_id is not None]
         return sorted(named, key=lambda p: ((p.display_name or "").casefold(), str(p.principal_id)))
 
     async def _checked_mentions(
-        self, mentions: Sequence[uuid.UUID], before: Sequence[uuid.UUID] = ()
+        self, ticket: Ticket, mentions: Sequence[uuid.UUID], before: Sequence[uuid.UUID] = ()
     ) -> list[uuid.UUID]:
         """Return the mentions without duplicates, after the check against ``assignees``.
 
         Only the mentions that are not in ``before`` are checked, so an edit keeps a
-        mention of a person who lost ``ticket.manage`` since the create.
+        mention of a person who lost the work right since the create.
 
         Raises:
-            ValidationProblem: A new mention of a person who does not hold
-                ``ticket.manage`` (HTTP 422, ``mention_not_member``).
+            ValidationProblem: A new mention of a person without the work right in the
+                Bereich of the ticket (HTTP 422, ``mention_not_member``).
         """
         wanted = unique_mentions(mentions)
         added = new_mentions(wanted, before)
         if added:
-            allowed = {p.principal_id for p in await self.assignees()}
+            allowed = {p.principal_id for p in await self.assignees(_area_of(ticket))}
             check_mentions(added, {pid for pid in allowed if pid is not None})
         return wanted
 
-    async def detail(self, ticket_id: uuid.UUID, principal: Principal) -> TicketDetail:
+    async def detail(
+        self, ticket_id: uuid.UUID, principal: Principal, *, areas: AreaScope = None
+    ) -> TicketDetail:
         """Return the whole ticket: notes, events, attachments and the links.
 
         Raises:
-            NotFoundError: No ticket has this id (HTTP 404).
+            NotFoundError: No ticket has this id in the Bereiche ``areas`` (HTTP 404).
         """
-        ticket = await self._get(ticket_id)
+        ticket = await self._get(ticket_id, areas=areas)
         me = await principal_id_of(self.session, principal.sub)
         notes = list(
             (
@@ -685,20 +698,32 @@ class TicketService:
         return await self.todos.readable_cards(ids, principal)
 
     async def patch(
-        self, ticket_id: uuid.UUID, payload: TicketPatch, principal: Principal
+        self,
+        ticket_id: uuid.UUID,
+        payload: TicketPatch,
+        principal: Principal,
+        *,
+        areas: AreaScope = None,
     ) -> TicketDetail:
-        """Change the status, the assignee or the kind, and write one event per change.
+        """Change status, assignee, Kategorie or Bereich, and write one event per change.
 
         A status change into ``done`` or ``rejected`` sets ``closed_at``, a reopen
         clears it. ``duplicateOfId`` goes with ``status: rejected`` only and names
         another ticket. ``completeTodos`` goes with ``done`` or ``rejected`` only.
 
+        ``areaId`` moves the ticket to another Bereich, also to one outside ``areas``.
+        The move clears the Kategorie, and it clears the assignee who has no work right
+        in the new Bereich. The other fields of the same call apply to the new Bereich.
+        The answer is the ticket after the change, also when the caller cannot read it
+        any more.
+
         Raises:
-            NotFoundError: No ticket has this id (HTTP 404).
-            ValidationProblem: ``assignee_not_allowed``, ``duplicate_invalid``, or
-                ``completeTodos`` without a closing status (HTTP 422).
+            NotFoundError: No ticket has this id in the Bereiche ``areas`` (HTTP 404).
+            ValidationProblem: ``assignee_not_allowed``, ``duplicate_invalid``,
+                ``area_invalid``, ``category_invalid``, or ``completeTodos`` without a
+                closing status (HTTP 422).
         """
-        ticket = await self._get(ticket_id)
+        ticket = await self._get(ticket_id, areas=areas)
         fields = payload.model_fields_set
         actor = await principal_id_of(self.session, principal.sub)
         duplicate = await self._duplicate_target(ticket, payload)
@@ -707,24 +732,31 @@ class TicketService:
                 "completeTodos goes with the status done or rejected.",
                 errors=[{"field": "completeTodos", "msg": "needs status done or rejected"}],
             )
+        target = await self._move_target(ticket, payload)
+        area_id = target.id if target is not None else _area_of_id(ticket)
         if (
             "assignee_id" in fields
             and payload.assignee_id is not None
-            and not await ticket_managers(self.session, principal_id=payload.assignee_id)
+            and not await area_workers(
+                self.session, frozenset({area_id}), principal_id=payload.assignee_id
+            )
         ):
             raise ValidationProblem(
-                "The assignee must hold ticket.manage.",
+                "The assignee must have the work right in the Bereich of the ticket.",
                 code="assignee_not_allowed",
-                errors=[{"field": "assigneeId", "msg": "not a ticket manager"}],
+                errors=[{"field": "assigneeId", "msg": "no work right in the Bereich"}],
             )
+        category = await self._category_target(area_id, payload)
         status, kind = payload.status, payload.kind
         new_status = (
             status
             if status is not None and (status != ticket.status or duplicate is not None)
             else None
         )
+        moved = target is not None and await self._move(ticket, target, actor)
         assignee_changes = "assignee_id" in fields and payload.assignee_id != ticket.assignee_id
         new_kind = kind if kind is not None and kind != ticket.kind else None
+        category_changes = "category_id" in fields and payload.category_id != ticket.category_id
         if new_status is not None:
             self._set_status(ticket, new_status, duplicate, actor)
         if assignee_changes:
@@ -741,12 +773,112 @@ class TicketService:
         if new_kind is not None:
             self._event(ticket, "kind", actor, {"from": ticket.kind, "to": new_kind})
             ticket.kind = new_kind
-        if new_status is not None or assignee_changes or new_kind is not None:
+        if category_changes:
+            await self._set_category(ticket, category, actor)
+        changes = (new_status is not None, assignee_changes, new_kind is not None)
+        if any(changes) or category_changes or moved:
             ticket.updated_at = _now()
         await self.session.commit()
         if payload.complete_todos and self.todos is not None:
             await self.todos.complete(ticket.id, principal)
         return await self.detail(ticket.id, principal)
+
+    async def _move_target(self, ticket: Ticket, payload: TicketPatch) -> TicketArea | None:
+        """Return the Bereich that a patch moves the ticket to, else None.
+
+        Raises:
+            ValidationProblem: ``areaId`` names no Bereich (HTTP 422, ``area_invalid``).
+        """
+        if payload.area_id is None or payload.area_id == ticket.area_id:
+            return None
+        target = await self.session.get(TicketArea, payload.area_id)
+        if target is None:
+            raise ValidationProblem(
+                "areaId names no Bereich.",
+                code="area_invalid",
+                errors=[{"field": "areaId", "msg": "unknown Bereich"}],
+            )
+        return target
+
+    async def _category_target(
+        self, area_id: uuid.UUID, payload: TicketPatch
+    ) -> TicketCategory | None:
+        """Return the Kategorie that a patch sets, after the check against the Bereich.
+
+        ``kind`` is the Kategorie of ``Plattform`` only, and ``categoryId`` names a
+        Kategorie of the Bereich of the ticket.
+
+        Raises:
+            ValidationProblem: ``kind`` outside ``Plattform``, or a ``categoryId`` of
+                another Bereich (HTTP 422, ``category_invalid``).
+        """
+        category = (
+            await self.session.get(TicketCategory, payload.category_id)
+            if payload.category_id is not None
+            else None
+        )
+        foreign = payload.category_id is not None and (
+            category is None or category.area_id != area_id
+        )
+        if foreign or (payload.kind is not None and area_id != PLATFORM_AREA_ID):
+            raise ValidationProblem(
+                "The Kategorie does not belong to the Bereich of the ticket.",
+                code="category_invalid",
+                errors=[{"field": "categoryId", "msg": "not a Kategorie of the Bereich"}],
+            )
+        return category
+
+    async def _move(self, ticket: Ticket, target: TicketArea, actor: uuid.UUID | None) -> bool:
+        """Move a ticket to the Bereich ``target`` and write the ``area`` event.
+
+        The Kategorie goes. The assignee goes when the person has no work right in the
+        new Bereich. The event keeps both names, so the timeline reads after a rename
+        or a delete of a Bereich.
+        """
+        source = await self.session.get(TicketArea, ticket.area_id)
+        keeps = ticket.assignee_id is not None and await area_workers(
+            self.session, frozenset({target.id}), principal_id=ticket.assignee_id
+        )
+        self._event(
+            ticket,
+            "area",
+            actor,
+            {
+                "from": str(ticket.area_id),
+                "to": str(target.id),
+                "fromName": source.name if source is not None else None,
+                "toName": target.name,
+            },
+        )
+        values: dict[str, object] = {
+            "area_id": target.id,
+            "kind": None,
+            "category_id": None,
+            **({} if keeps else {"assignee_id": None}),
+        }
+        for name, value in values.items():
+            setattr(ticket, name, value)
+        return True
+
+    async def _set_category(
+        self, ticket: Ticket, category: TicketCategory | None, actor: uuid.UUID | None
+    ) -> None:
+        """Set or clear the Kategorie and write the ``category`` event with both names."""
+        before = (
+            await self.session.get(TicketCategory, ticket.category_id)
+            if ticket.category_id is not None
+            else None
+        )
+        self._event(
+            ticket,
+            "category",
+            actor,
+            {
+                "from": before.name if before is not None else None,
+                "to": category.name if category is not None else None,
+            },
+        )
+        ticket.category_id = category.id if category is not None else None
 
     async def _duplicate_target(self, ticket: Ticket, payload: TicketPatch) -> Ticket | None:
         if payload.duplicate_of_id is None:
@@ -805,7 +937,13 @@ class TicketService:
         )
 
     async def add_note(
-        self, ticket_id: uuid.UUID, payload: NoteCreate, principal: Principal, *, pepper: str
+        self,
+        ticket_id: uuid.UUID,
+        payload: NoteCreate,
+        principal: Principal,
+        *,
+        pepper: str,
+        areas: AreaScope = None,
     ) -> TicketNoteOut:
         """Add a note (``internal`` or ``public``) and bind its files.
 
@@ -814,16 +952,16 @@ class TicketService:
                 (HTTP 404).
             ValidationProblem: Files on an anonymized ticket (``ticket_anonymized``),
                 files without a draft token, or a draft that is missing, expired,
-                foreign or infected, or a mention of a person who does not hold
-                ``ticket.manage`` (``mention_not_member``) (HTTP 422).
+                foreign or infected, or a mention of a person without the work right
+                in the Bereich (``mention_not_member``) (HTTP 422).
 
         With files the ticket row is locked, so the retention cron (which locks it too)
         cannot anonymize the ticket between the check and the commit; the cron runs once
         and would not see the file again.
         """
-        ticket = await self._get(ticket_id, lock=bool(payload.attachment_ids))
+        ticket = await self._get(ticket_id, lock=bool(payload.attachment_ids), areas=areas)
         author = await self._require_account(principal)
-        wanted = await self._checked_mentions(payload.mentions)
+        wanted = await self._checked_mentions(ticket, payload.mentions)
         note = await self._insert_note(
             ticket,
             author,
@@ -894,6 +1032,7 @@ class TicketService:
         principal: Principal,
         *,
         mentions: Sequence[uuid.UUID] | None = None,
+        areas: AreaScope = None,
     ) -> TicketNoteOut:
         """Change the text of an own note and set ``edited_at``; the files stay.
 
@@ -903,23 +1042,33 @@ class TicketService:
         Raises:
             NotFoundError: No live note with this id on this ticket (HTTP 404).
             ForbiddenError: The note has another author (HTTP 403, ``not_note_author``).
-            ValidationProblem: A mention of a person who does not hold
-                ``ticket.manage`` (HTTP 422, ``mention_not_member``).
+            ValidationProblem: A mention of a person without the work right in the
+                Bereich (HTTP 422, ``mention_not_member``).
         """
+        if areas is not None:
+            await self._get(ticket_id, areas=areas)
         note, me = await self._own_note(ticket_id, note_id, principal)
+        ticket = await self._get(ticket_id)
         self.added_mentions = []
         before = mention_ids(note.mentions)
-        wanted = await self._checked_mentions(mentions, before) if mentions is not None else None
+        wanted = (
+            await self._checked_mentions(ticket, mentions, before) if mentions is not None else None
+        )
         if wanted is not None:
             self.added_mentions = new_mentions(wanted, before)
             note.mentions = stored_mentions(wanted)
         note.body = body
         note.edited_at = _now()
         await self.session.commit()
-        return await self._note_out(note, me, await self._get(ticket_id))
+        return await self._note_out(note, me, ticket)
 
     async def delete_note(
-        self, ticket_id: uuid.UUID, note_id: uuid.UUID, principal: Principal
+        self,
+        ticket_id: uuid.UUID,
+        note_id: uuid.UUID,
+        principal: Principal,
+        *,
+        areas: AreaScope = None,
     ) -> None:
         """Soft-delete an own note (``deleted_at``) and remove its files.
 
@@ -927,6 +1076,8 @@ class TicketService:
             NotFoundError: No live note with this id on this ticket (HTTP 404).
             ForbiddenError: The note has another author (HTTP 403, ``not_note_author``).
         """
+        if areas is not None:
+            await self._get(ticket_id, areas=areas)
         note, _me = await self._own_note(ticket_id, note_id, principal)
         note.deleted_at = _now()
         await self.files.delete_for_messages("ticket_note", [note.id], actor=principal.sub)
@@ -1189,13 +1340,21 @@ class TicketService:
         ticket.context = {}
         ticket.anonymized_at = _now()
 
-    async def _get(self, ticket_id: uuid.UUID, *, lock: bool = False) -> Ticket:
+    async def _get(
+        self, ticket_id: uuid.UUID, *, lock: bool = False, areas: AreaScope = None
+    ) -> Ticket:
+        """Return the ticket when ``areas`` holds its Bereich; None holds every Bereich.
+
+        Raises:
+            NotFoundError: No ticket has this id, or its Bereich is outside ``areas``
+                (HTTP 404).
+        """
         ticket = await (
             self.session.get(Ticket, ticket_id, with_for_update=True, populate_existing=True)
             if lock
             else self.session.get(Ticket, ticket_id)
         )
-        if ticket is None:
+        if ticket is None or not works_in(areas, _area_of_id(ticket)):
             raise NotFoundError(f"ticket {ticket_id} not found")
         return ticket
 
@@ -1232,7 +1391,9 @@ class TicketService:
         return TicketListItem(
             id=ticket.id,
             number=format_number(ticket.number),
+            area_id=_area_of_id(ticket),
             kind=ticket.kind,  # pyright: ignore[reportArgumentType]
+            category_id=ticket.category_id,
             title=ticket.title,
             status=ticket.status,  # pyright: ignore[reportArgumentType]
             reporter=_reporter(ticket, accounts),
@@ -1309,6 +1470,26 @@ def _blocked_sender(
         ),
         hit_count=row.hit_count,
         last_hit_at=row.last_hit_at,
+    )
+
+
+def _area_of_id(ticket: Ticket) -> uuid.UUID:
+    """Return the Bereich of a ticket; a row before its first flush is of ``Plattform``."""
+    return ticket.area_id or PLATFORM_AREA_ID
+
+
+def _area_of(ticket: Ticket) -> frozenset[uuid.UUID]:
+    """Return the Bereich of a ticket as the scope of ``area_workers``."""
+    return frozenset({_area_of_id(ticket)})
+
+
+def _area_filter(
+    areas: AreaScope, area_ids: Sequence[uuid.UUID]
+) -> tuple[ColumnElement[bool], ...]:
+    """Return the conditions of the scope of the caller and of the Bereich filter."""
+    return (
+        *((Ticket.area_id.in_(areas),) if areas is not None else ()),
+        *((Ticket.area_id.in_(list(area_ids)),) if area_ids else ()),
     )
 
 
@@ -1615,5 +1796,4 @@ __all__ = [
     "principal_id_of",
     "reporter_reads_file",
     "sender_blocks_of",
-    "ticket_managers",
 ]

@@ -5,7 +5,11 @@ import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { provideRouter } from '@angular/router';
 import { Subject, of, throwError, type Observable } from 'rxjs';
-import { TicketsApiService, type TicketBlockedSender } from '@core/api/tickets.service';
+import {
+  TicketsApiService,
+  type TicketArea,
+  type TicketBlockedSender,
+} from '@core/api/tickets.service';
 import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
@@ -16,7 +20,6 @@ import { loadErrorToast, toastWith } from '../../../../testing/load-error';
 const STORED: HelpTicketsSettings = {
   wikiUrl: 'https://wiki.example.org/books/stupa',
   publicEnabled: true,
-  notifyNew: true,
   retentionMonths: 12,
 };
 
@@ -24,6 +27,7 @@ function makeApi(initial: HelpTicketsSettings = STORED) {
   return {
     getHelpTickets: jest.fn(() => of({ ...initial })),
     putHelpTickets: jest.fn((b: HelpTicketsSettings) => of({ ...b })),
+    listGremienOptions: jest.fn(() => of([{ id: 'g1', name: 'AStA' }])),
   };
 }
 
@@ -63,8 +67,41 @@ const BLOCKS: TicketBlockedSender[] = [
   },
 ];
 
-function makeTickets(list: Observable<TicketBlockedSender[]> = of(BLOCKS)) {
+const AREAS: TicketArea[] = [
+  {
+    id: 'a-plat',
+    name: 'Plattform',
+    gremiumId: null,
+    platform: true,
+    notifyNew: true,
+    categories: [],
+    mine: true,
+  },
+  {
+    id: 'a-asta',
+    name: 'AStA-Büro',
+    gremiumId: 'g1',
+    platform: false,
+    notifyNew: false,
+    categories: [
+      { id: 'c1', name: 'Raumanfrage' },
+      { id: 'c2', name: 'Schlüssel' },
+    ],
+    mine: true,
+  },
+];
+
+function makeTickets(
+  list: Observable<TicketBlockedSender[]> = of(BLOCKS),
+  areas: Observable<TicketArea[]> = of(AREAS),
+) {
   return {
+    adminAreas: jest.fn(() => areas),
+    createArea: jest.fn((b: object) => of({ ...AREAS[1], id: 'a-new', categories: [], ...b } as TicketArea)),
+    updateArea: jest.fn((id: string, b: object) =>
+      of({ ...AREAS.find((a) => a.id === id)!, ...b } as TicketArea),
+    ),
+    deleteArea: jest.fn((): Observable<void> => of(undefined)),
     blockedSenders: jest.fn(() => list),
     deleteBlockedSender: jest.fn((): Observable<void> => of(undefined)),
   };
@@ -121,7 +158,6 @@ describe('HelpTicketsComponent', () => {
     expect(screen.getByRole('heading', { name: 'Hilfe & Tickets' })).toBeInTheDocument();
     expect(wikiField().value).toBe(STORED.wikiUrl);
     expect(sw('Tickets ohne Konto erlauben')).toHaveAttribute('aria-checked', 'true');
-    expect(sw('Neue Tickets per E-Mail')).toHaveAttribute('aria-checked', 'true');
     expect(sw('Erledigte Tickets anonymisieren')).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: /nach 12 Monaten/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
@@ -131,7 +167,6 @@ describe('HelpTicketsComponent', () => {
   it('saves the switches, the link and the months', async () => {
     const { api, toast, fixture } = await setup();
     await userEvent.click(sw('Tickets ohne Konto erlauben'));
-    await userEvent.click(sw('Neue Tickets per E-Mail'));
     await userEvent.clear(wikiField());
     await userEvent.type(wikiField(), '  https://wiki.example.org/neu  ');
     const c = fixture.componentInstance as unknown as { setMonths(v: string): void };
@@ -141,7 +176,6 @@ describe('HelpTicketsComponent', () => {
     expect(api.putHelpTickets).toHaveBeenCalledWith({
       wikiUrl: 'https://wiki.example.org/neu',
       publicEnabled: false,
-      notifyNew: false,
       retentionMonths: 24,
     });
     expect(toast.success).toHaveBeenCalledWith('Gespeichert.');
@@ -199,10 +233,10 @@ describe('HelpTicketsComponent', () => {
 
   it('puts the stored values back on Verwerfen', async () => {
     const { fixture } = await setup();
-    await userEvent.click(sw('Neue Tickets per E-Mail'));
+    await userEvent.click(sw('Tickets ohne Konto erlauben'));
     await userEvent.click(discard());
     fixture.detectChanges();
-    expect(sw('Neue Tickets per E-Mail')).toHaveAttribute('aria-checked', 'true');
+    expect(sw('Tickets ohne Konto erlauben')).toHaveAttribute('aria-checked', 'true');
     expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
   });
 
@@ -210,10 +244,10 @@ describe('HelpTicketsComponent', () => {
     const api = makeApi();
     api.putHelpTickets.mockReturnValueOnce(throwError(() => new Error('x')));
     const { toast } = await setup({ api });
-    await userEvent.click(sw('Neue Tickets per E-Mail'));
+    await userEvent.click(sw('Tickets ohne Konto erlauben'));
     await userEvent.click(save());
     expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
-    expect(sw('Neue Tickets per E-Mail')).toHaveAttribute('aria-checked', 'false');
+    expect(sw('Tickets ohne Konto erlauben')).toHaveAttribute('aria-checked', 'false');
     expect(save()).toBeEnabled();
   });
 
@@ -222,7 +256,7 @@ describe('HelpTicketsComponent', () => {
     const pending = new Subject<HelpTicketsSettings>();
     api.putHelpTickets.mockReturnValueOnce(pending);
     const { fixture } = await setup({ api });
-    await userEvent.click(sw('Neue Tickets per E-Mail'));
+    await userEvent.click(sw('Tickets ohne Konto erlauben'));
     const c = fixture.componentInstance as unknown as { save(): void; discard(): void };
     c.save();
     c.save();
@@ -237,20 +271,20 @@ describe('HelpTicketsComponent', () => {
   });
 
   it('shows no form after a 403', async () => {
-    await setup({ api: { getHelpTickets: jest.fn(() => throwError(() => ({ status: 403 }))), putHelpTickets: jest.fn() } });
+    await setup({ api: { getHelpTickets: jest.fn(() => throwError(() => ({ status: 403 }))), putHelpTickets: jest.fn(), listGremienOptions: jest.fn(() => of([])) } });
     expect(screen.getByRole('alert')).toHaveTextContent('Für diese Einstellungen fehlt das Recht');
   });
 
   it('names a failed read', async () => {
-    await setup({ api: { getHelpTickets: jest.fn(() => throwError(() => null)), putHelpTickets: jest.fn() } });
+    await setup({ api: { getHelpTickets: jest.fn(() => throwError(() => null)), putHelpTickets: jest.fn(), listGremienOptions: jest.fn(() => of([])) } });
     expect(loadErrorToast()).toContain('Die Einstellungen konnten nicht geladen werden.');
   });
 
   /** The form shows in its loaded shape: the field and the switch rows with their labels. */
   it('shows the skeleton while it loads', async () => {
-    const { fixture } = await setup({ api: { getHelpTickets: jest.fn(() => new Subject()), putHelpTickets: jest.fn() } });
+    const { fixture } = await setup({ api: { getHelpTickets: jest.fn(() => new Subject()), putHelpTickets: jest.fn(), listGremienOptions: jest.fn(() => of([])) } });
     expect(document.querySelector('.ht__skelField')).not.toBeNull();
-    expect(document.querySelectorAll('.sts__skelSwitch')).toHaveLength(3);
+    expect(document.querySelectorAll('.sts__skelSwitch')).toHaveLength(2);
     expect(screen.getByRole('status')).toHaveTextContent('Wird geladen');
     const c = fixture.componentInstance as unknown as { dirty(): boolean; discard(): void };
     expect(c.dirty()).toBe(false);
@@ -314,7 +348,7 @@ describe('HelpTicketsComponent', () => {
     it('shows no alert after a 403 when the blocks are there', async () => {
       await setup({
         perms: ['admin.site', 'ticket.manage'],
-        api: { getHelpTickets: jest.fn(() => throwError(() => ({ status: 403 }))), putHelpTickets: jest.fn() },
+        api: { getHelpTickets: jest.fn(() => throwError(() => ({ status: 403 }))), putHelpTickets: jest.fn(), listGremienOptions: jest.fn(() => of([])) },
       });
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       expect(rows()).toHaveLength(3);
@@ -401,6 +435,78 @@ describe('HelpTicketsComponent', () => {
         'Gelöschte Person',
       );
       expect(cmp.senderName({ ...BLOCKS[1], person: null, email: null })).toBe('');
+    });
+  });
+
+  describe('Bereiche', () => {
+    const areaRow = (name: RegExp) => screen.getByRole('button', { name });
+
+    it('lists the Bereiche with the team and the Kategorien, then the row to create one', async () => {
+      await setup();
+      expect(areaRow(/^Plattform/)).toHaveTextContent('Fest eingebaut');
+      expect(areaRow(/^AStA-Büro/)).toHaveTextContent('AStA · Raumanfrage · Schlüssel');
+      expect(areaRow(/^Bereich anlegen/)).toBeInTheDocument();
+    });
+
+    it('names a Bereich without a Gremium', async () => {
+      await setup({ tickets: makeTickets(of(BLOCKS), of([{ ...AREAS[1], gremiumId: null }])) });
+      expect(areaRow(/^AStA-Büro/)).toHaveTextContent('Kein Gremium');
+    });
+
+    it('reads no Bereich without the site right', async () => {
+      const { tickets } = await setup({ perms: ['ticket.manage'] });
+      expect(tickets.adminAreas).not.toHaveBeenCalled();
+    });
+
+    it('names a failed read and keeps the row to create one', async () => {
+      const { toast } = await setup({
+        tickets: makeTickets(of(BLOCKS), throwError(() => new Error('x'))),
+      });
+      expect(toast.error).toHaveBeenCalledWith('Die Bereiche konnten nicht geladen werden.');
+      expect(areaRow(/^Bereich anlegen/)).toBeInTheDocument();
+    });
+
+    it('works without the list of the Gremien', async () => {
+      const api = { ...makeApi(), listGremienOptions: jest.fn(() => throwError(() => new Error('x'))) };
+      await setup({ api });
+      expect(areaRow(/^AStA-Büro/)).toHaveTextContent('Kein Gremium');
+    });
+
+    it('opens the dialog of a row and of the last row', async () => {
+      const { fixture } = await setup();
+      const cmp = fixture.componentInstance as unknown as {
+        editing(): TicketArea | 'new' | null;
+        editingArea(): TicketArea | null;
+        onAreaAction(key: string): void;
+      };
+      await userEvent.click(areaRow(/^AStA-Büro/));
+      expect(cmp.editing()).toEqual(AREAS[1]);
+      expect(cmp.editingArea()).toEqual(AREAS[1]);
+      cmp.onAreaAction('area:unknown');
+      expect(cmp.editing()).toEqual(AREAS[1]);
+      await userEvent.click(areaRow(/^Bereich anlegen/));
+      expect(cmp.editing()).toBe('new');
+      expect(cmp.editingArea()).toBeNull();
+    });
+
+    it('adds the row of a new Bereich, replaces a saved one and drops a deleted one', async () => {
+      const { fixture, toast } = await setup();
+      const cmp = fixture.componentInstance as unknown as {
+        onAreaSaved(a: TicketArea): void;
+        onAreaDeleted(a: TicketArea): void;
+        editing(): unknown;
+      };
+      cmp.onAreaSaved({ ...AREAS[1], id: 'a-new', name: 'Fachschaft' });
+      cmp.onAreaSaved({ ...AREAS[1], name: 'Büro' });
+      fixture.detectChanges();
+      expect(toast.success).toHaveBeenCalledWith('Bereich gespeichert.');
+      expect(areaRow(/^Fachschaft/)).toBeInTheDocument();
+      expect(areaRow(/^Büro/)).toBeInTheDocument();
+      cmp.onAreaDeleted({ ...AREAS[1], id: 'a-new' });
+      fixture.detectChanges();
+      expect(toast.success).toHaveBeenLastCalledWith('Bereich gelöscht.');
+      expect(screen.queryByRole('button', { name: /^Fachschaft/ })).toBeNull();
+      expect(cmp.editing()).toBeNull();
     });
   });
 });

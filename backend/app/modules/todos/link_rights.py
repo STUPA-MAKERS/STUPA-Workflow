@@ -11,7 +11,7 @@ one of them. The change right of an end is the right that changes the element it
 * gremium — ``admin.gremien``;
 * invoice, expense — ``budget.book``;
 * budget — ``budget.structure``;
-* ticket — ``ticket.manage``;
+* ticket — the work right in the Bereich of the ticket;
 * todo — the write right on the board of the card (``BoardAccess.can_write``).
 
 A link with a cost centre end also needs ``budget.book`` or ``budget.structure``, whatever
@@ -32,7 +32,7 @@ from app.modules.calendar import rules as calendar_rules
 from app.modules.calendar.appointments import AppointmentService
 from app.modules.calendar.models import Appointment
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
-from app.modules.tickets.access import TICKET_MANAGE
+from app.modules.tickets.access import works_on_ticket
 from app.modules.todos.access import BoardAccess
 from app.modules.todos.models import TodoBoard, TodoCard
 from app.modules.voting.models import Vote
@@ -44,7 +44,6 @@ GLOBAL_RIGHT: dict[str, str] = {
     "invoice": "budget.book",
     "expense": "budget.book",
     "budget": "budget.structure",
-    "ticket": TICKET_MANAGE,
 }
 #: The rights of which one is needed for any link with an end of the kind (spec 001410).
 GATE_RIGHTS: dict[str, tuple[str, ...]] = {"budget": ("budget.book", "budget.structure")}
@@ -91,6 +90,8 @@ class LinkRights:
                 return await self._appointment(target_id, principal)
             case "todo":
                 return await self._card(target_id, principal)
+            case "ticket":
+                return await works_on_ticket(self.session, principal, target_id)
             case _:
                 return False
 

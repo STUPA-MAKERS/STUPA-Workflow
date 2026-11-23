@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { type Observable, map, tap } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { API_BASE_URL } from '@core/api/api.config';
@@ -90,14 +90,16 @@ import {
 } from '../../features/todos/new-dialog/todo-new-dialog.component';
 import { TicketsPageService } from './tickets-page.service';
 import {
-  KIND_ICON,
   KIND_LABEL,
   STATUS_KIND,
   STATUS_LABEL,
+  areaOf,
+  categoryName,
   eventText,
   isOpen,
   reporterEventText,
   reporterName,
+  ticketIcon,
 } from './tickets.util';
 import { clock, dayMonth } from '@shared/date-format';
 import { personName } from '@shared/person-label.util';
@@ -151,7 +153,9 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
   return {
     id: m.id,
     number: m.number,
+    areaId: '',
     kind: m.kind,
+    categoryId: null,
     title: m.title,
     status: m.status,
     reporter,
@@ -176,19 +180,27 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
  * The detail of a ticket in the geometry of the
  * application detail: a header with the state, the kind and the assignee and the main
  * actions ("Erledigt", "Ablehnen"), then side by side the thread "Verlauf" (`app-chat`:
- * the report, the internal notes and the events) and "Details" (reporter, assignee, kind,
- * the linked to-dos, the technical context). One pane at a time the two are tabs.
+ * the report, the internal notes and the events) and "Details" (reporter, assignee,
+ * Bereich, Kategorie, the linked to-dos, the technical context). One pane at a time the
+ * two are tabs.
+ *
+ * A ticket of the Bereich "Plattform" has one of the four kinds as its Kategorie; a
+ * ticket of another Bereich has a Kategorie of that Bereich or none. The select
+ * "Bereich" moves the ticket to any other Bereich. The server then clears the Kategorie,
+ * and the assignee when that person does not work there. After a move to a Bereich in
+ * which the viewer does not work the page goes back to the list, because the ticket
+ * then answers 404. The assignee select and the "@" list hold the team of the Bereich.
  *
  * A note of the team is internal or public; the composer offers the switch (internal
  * first) when an account reported the ticket, because only an account reads a public
  * note. A note takes up to 5 files (not on an anonymized ticket).
  *
- * Without `ticket.manage` the page is the view of the reporter on an own ticket (`/tickets/mine`):
+ * Without a Bereich to work in the page is the view of the reporter on an own ticket (`/tickets/mine`):
  * the report, the public notes and the status changes, the own messages, the kind and the report
  * time. No actions, no menu, no assignee, no to-dos, no technical context. A block of the sender
  * hides the composer. Closing a ticket with open to-dos asks "Offene To-Dos mit erledigen?"
- * (default yes). The ⋮ menu blocks or unblocks the sender at once, with a toast and no question;
- * the own report offers no block. While a file of the report or a note is in the scan, the chat
+ * (default yes). With `ticket.manage` the ⋮ menu blocks or unblocks the sender at once, with a
+ * toast and no question; the own report offers no block. While a file of the report or a note is in the scan, the chat
  * asks for the thread again (`refreshThread`), and only the scan states of that read change the
  * page.
  *
@@ -244,6 +256,7 @@ export class TicketDetailComponent {
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly page = inject(TicketsPageService, { optional: true });
   private readonly injector = inject(Injector);
   /** The status buttons: a close or a reopen swaps them, so the focus moves to the new one. */
@@ -251,7 +264,7 @@ export class TicketDetailComponent {
 
   readonly split = computed(() => this.page?.split() ?? false);
   /** The team view; else the view of the reporter on an own ticket. */
-  readonly manager = this.auth.can('ticket.manage');
+  readonly manager = this.auth.worksOnTickets();
   /** The reporter may write: false while a block holds back the sender. */
   readonly canReply = signal(true);
   readonly phone = mediaQuery(MEDIA.phone);
@@ -267,8 +280,10 @@ export class TicketDetailComponent {
   readonly notes = signal<readonly TicketNote[]>([]);
   readonly todos = signal<TodoLinkedCard[]>([]);
   readonly assignees = signal<PersonRef[]>([]);
-  /** A change in flight: the state, the assignee or the kind. */
-  readonly saving = signal<'status' | 'assignee' | 'kind' | null>(null);
+  /** The Bereich whose team `assignees` holds. */
+  private assigneesOf: Uuid | null = null;
+  /** A change in flight: the state, the assignee, the Kategorie or the Bereich. */
+  readonly saving = signal<'status' | 'assignee' | 'kind' | 'area' | null>(null);
   readonly tab = signal<DetailTab>('log');
 
   /** The done question: the state to set, and whether the to-dos go along. */
@@ -316,8 +331,36 @@ export class TicketDetailComponent {
 
   readonly statusKind = computed(() => STATUS_KIND[this.ticket()?.status ?? 'new']);
   readonly statusLabel = computed(() => this.t(STATUS_LABEL[this.ticket()?.status ?? 'new']));
-  readonly kindLabel = computed(() => this.t(KIND_LABEL[this.ticket()?.kind ?? 'bug']));
-  readonly kindIcon = computed(() => KIND_ICON[this.ticket()?.kind ?? 'bug']);
+  /** Every Bereich, from the list page; empty while they load and for the reporter. */
+  readonly areas = computed(() => this.page?.areas() ?? []);
+  readonly area = computed(() => {
+    const t = this.ticket();
+    return t ? areaOf(t.areaId, this.areas()) : null;
+  });
+  /** The ticket has a kind as its Kategorie: a ticket of "Plattform". */
+  readonly hasKind = computed(() => !!this.ticket()?.kind);
+  /** The Kategorie by name; the empty string without one. */
+  readonly categoryLabel = computed(() => {
+    const t = this.ticket();
+    return t ? categoryName(t, this.areas(), this.t) : '';
+  });
+  /** The parts of the header line after the number: the Bereich, the Kategorie, the assignee. */
+  readonly lineParts = computed(() => [
+    ...(this.canMove() && this.area() ? [this.area()!.name] : []),
+    ...(this.categoryLabel() ? [this.categoryLabel()] : []),
+    ...(this.manager ? [this.assigneeName()] : []),
+  ]);
+  readonly kindLabel = computed(() => this.categoryLabel() || this.t('tickets.detail.noCategory'));
+  readonly kindIcon = computed(() => ticketIcon(this.ticket()?.kind ?? null));
+  /** The select "Bereich" shows with a second Bereich to move to. */
+  readonly canMove = computed(() => this.manager && this.areas().length > 1);
+  readonly areaOptions = computed<FilterSelectOption[]>(() =>
+    this.areas().map((a) => ({ value: a.id, label: a.name })),
+  );
+  readonly categoryOptions = computed<FilterSelectOption[]>(() => [
+    { value: '', label: this.t('tickets.detail.noCategory') },
+    ...(this.area()?.categories ?? []).map((c) => ({ value: c.id, label: c.name })),
+  ]);
   readonly assigneeName = computed(() => {
     const a = this.ticket()?.assignee;
     return a ? personName(a, this.t) : this.t('tickets.detail.unassigned');
@@ -343,7 +386,8 @@ export class TicketDetailComponent {
     const blockItem: RowMenuItem = t.senderBlocked
       ? { id: 'unblock', label: this.t('tickets.detail.unblockSender'), icon: 'lock' }
       : { id: 'block', label: this.t('tickets.detail.blockSender'), icon: 'lock' };
-    const block = !t.anonymizedAt && !this.ownReport(t.reporter) ? [blockItem] : [];
+    const mayBlock = this.auth.can('ticket.manage') && !t.anonymizedAt && !this.ownReport(t.reporter);
+    const block = mayBlock ? [blockItem] : [];
     const apart = [...duplicate, ...block];
     return [...reset, ...(apart.length ? [{ items: apart }] : [])];
   });
@@ -400,7 +444,7 @@ export class TicketDetailComponent {
     draftDropper(this.files),
   );
 
-  /** The "@" list of the staff: the holders of `ticket.manage`. The reporter gets none. */
+  /** The "@" list of the staff: the team of the Bereich. The reporter gets none. */
   readonly mentionables = computed(() => (this.manager ? chatPeople(this.assignees()) : []));
 
   readonly messages = computed<ChatMessage[]>(() => {
@@ -484,10 +528,20 @@ export class TicketDetailComponent {
   constructor() {
     pageItemTitle(() => this.ticket()?.title);
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => this.load(pm.get('id')!));
-    if (!this.manager) return;
-    this.api.assignees().subscribe({
-      next: (list) => this.assignees.set(list),
-      error: () => this.assignees.set([]),
+  }
+
+  /** Read the team of the Bereich of the ticket, once per Bereich. */
+  private loadAssignees(areaId: Uuid): void {
+    if (!this.manager || !areaId || areaId === this.assigneesOf) return;
+    this.assigneesOf = areaId;
+    this.assignees.set([]);
+    this.api.assignees(areaId).subscribe({
+      next: (list) => {
+        if (areaId === this.assigneesOf) this.assignees.set(list);
+      },
+      error: () => {
+        if (areaId === this.assigneesOf) this.assigneesOf = null;
+      },
     });
   }
 
@@ -575,6 +629,7 @@ export class TicketDetailComponent {
   private show(t: TicketDetail): void {
     this.ticket.set(t);
     this.notes.set(t.notes);
+    this.loadAssignees(t.areaId);
     this.showLinkedNote();
   }
 
@@ -729,7 +784,30 @@ export class TicketDetailComponent {
     this.patch({ kind: value as TicketKind }, 'kind');
   }
 
-  private patch(body: TicketPatch, what: 'status' | 'assignee' | 'kind', todos = false): void {
+  setCategory(value: string): void {
+    if (value === (this.ticket()?.categoryId ?? '')) return;
+    this.patch({ categoryId: value || null }, 'kind');
+  }
+
+  /**
+   * Move the ticket to another Bereich. In a Bereich in which the viewer does not work
+   * the ticket answers 404 from then on, so the page goes back to the list.
+   */
+  setArea(value: string): void {
+    const target = areaOf(value, this.areas());
+    if (!target || value === this.ticket()?.areaId) return;
+    this.patch({ areaId: value }, 'area', false, () => {
+      this.toast.show(this.t('tickets.detail.moved', { name: target.name }), 'success');
+      if (!target.mine) void this.router.navigate(['/tickets'], { queryParamsHandling: 'preserve' });
+    });
+  }
+
+  private patch(
+    body: TicketPatch,
+    what: 'status' | 'assignee' | 'kind' | 'area',
+    todos = false,
+    done?: () => void,
+  ): void {
     if (this.saving()) return;
     const id = this.id;
     this.saving.set(what);
@@ -742,6 +820,7 @@ export class TicketDetailComponent {
         if (what === 'status' && wasOpen !== this.open()) this.focusActions();
         this.page?.notify(id);
         if (todos) this.loadTodos();
+        done?.();
       },
       error: (err: unknown) => {
         this.saving.set(null);

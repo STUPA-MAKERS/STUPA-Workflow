@@ -12,13 +12,21 @@ session cookie or a token with the scope ``tickets:write``. A ticket of somebody
 gives 404. These routes stand before ``/tickets/{ticket_id}``, so ``mine`` never parses
 as an id.
 
-Every other route needs ``ticket.manage`` (401/403 on a collection route). An
-unknown ticket or note gives 404.
+Every other route of ``/tickets`` is the work of the team. It needs the work right
+in at least one Bereich: the global permission ``ticket.manage``, or the gremium
+permission ``ticket.work`` in the Gremium of a Bereich (403 without one). A ticket of
+a Bereich in which the caller does not work gives 404, like an unknown ticket. The
+sender blocks hold back a person in every Bereich, so their routes need
+``ticket.manage``.
+
+``/admin/ticket-areas`` is the list of the Bereiche of the admin page "Hilfe &
+Tickets" behind ``admin.site``.
 """
 
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -29,7 +37,8 @@ from app.modules.auth.people import PersonRef
 from app.modules.files.service import FilesService
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.site_config.reads import active_branding
-from app.modules.tickets.access import TICKET_MANAGE
+from app.modules.tickets.access import TICKET_MANAGE, AreaScope, area_scope, works_anywhere
+from app.modules.tickets.areas import TicketAreaService
 from app.modules.tickets.mails import (
     notify_ticket_created,
     notify_ticket_note,
@@ -43,6 +52,9 @@ from app.modules.tickets.schemas import (
     ReporterNoteCreate,
     ReporterTicketDetail,
     ReporterTicketItem,
+    TicketAreaCreate,
+    TicketAreaOut,
+    TicketAreaPatch,
     TicketBlockedSender,
     TicketCounts,
     TicketCreate,
@@ -70,7 +82,7 @@ from app.shared.antiabuse import (
     rate_limit_tickets,
     verify_altcha_unless_authenticated,
 )
-from app.shared.errors import ForbiddenError, ProblemDetail, ValidationProblem
+from app.shared.errors import ForbiddenError, NotFoundError, ProblemDetail, ValidationProblem
 from app.shared.paging import Page, PageParams
 
 router = APIRouter(tags=["tickets"])
@@ -84,6 +96,34 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
 Manager = Annotated[Principal, Depends(require_principal(TICKET_MANAGE))]
 Reader = Annotated[Principal, Depends(require_principal())]
+SiteAdmin = Annotated[Principal, Depends(require_principal("admin.site"))]
+
+
+@dataclass(frozen=True, slots=True)
+class TicketWorker:
+    """A caller with the work right in at least one Bereich.
+
+    ``areas`` holds the Bereiche of the caller; None stands for every Bereich.
+    """
+
+    principal: Principal
+    areas: AreaScope
+
+
+async def require_worker(principal: Reader, db: DbSession) -> TicketWorker:
+    """Let a person with the work right in at least one Bereich pass.
+
+    Raises:
+        ForbiddenError: Neither ``ticket.manage`` nor ``ticket.work`` in the Gremium
+            of a Bereich (HTTP 403).
+    """
+    areas = await area_scope(db, principal)
+    if not works_anywhere(areas):
+        raise ForbiddenError("The work on tickets needs the work right in a Bereich.")
+    return TicketWorker(principal=principal, areas=areas)
+
+
+Worker = Annotated[TicketWorker, Depends(require_worker)]
 
 
 def require_reporter_write(principal: Reader) -> Principal:
@@ -98,6 +138,14 @@ def require_reporter_write(principal: Reader) -> Principal:
 
 
 ReporterWriter = Annotated[Principal, Depends(require_reporter_write)]
+
+
+def get_area_service(session: DbSession) -> TicketAreaService:
+    """Wire the service of the Bereiche."""
+    return TicketAreaService(session)
+
+
+AreaServiceDep = Annotated[TicketAreaService, Depends(get_area_service)]
 
 
 def get_ticket_service(session: DbSession, request: Request) -> TicketService:
@@ -377,21 +425,24 @@ def _assignee_filter(raw: str | None) -> AssigneeFilter | None:
 async def list_tickets(
     service: ServiceDep,
     db: DbSession,
-    principal: Manager,
+    worker: Worker,
     page: Annotated[PageParams, Depends()],
     statuses: Annotated[list[TicketStatus] | None, Query(alias="status")] = None,
     kinds: Annotated[list[TicketKind] | None, Query(alias="kind")] = None,
+    area_ids: Annotated[list[UUID] | None, Query(alias="area")] = None,
     assignee: Annotated[str | None, Query(max_length=64)] = None,
     q: Annotated[str | None, Query(max_length=200)] = None,
 ) -> Page[TicketListItem]:
-    """List the tickets, newest first.
+    """List the tickets of the Bereiche of the caller, newest first.
 
-    ``status`` and ``kind`` repeat. ``assignee`` is a principal id, ``me`` or
-    ``none``. ``q`` matches title, body, number, and the reporter name and e-mail.
+    ``status``, ``kind`` and ``area`` repeat. ``assignee`` is a principal id, ``me``
+    or ``none``. ``q`` matches title, body, number, and the reporter name and e-mail.
     """
     wanted = _assignee_filter(assignee)
-    me = await principal_id_of(db, principal.sub) if wanted == "me" else None
+    me = await principal_id_of(db, worker.principal.sub) if wanted == "me" else None
     return await service.list(
+        areas=worker.areas,
+        area_ids=area_ids or (),
         statuses=statuses or (),
         kinds=kinds or (),
         assignee=wanted,
@@ -403,15 +454,41 @@ async def list_tickets(
 
 
 @router.get("/tickets/counts", response_model=TicketCounts, responses=_errors(401, 403))
-async def ticket_counts(service: ServiceDep, _principal: Manager) -> TicketCounts:
-    """Count the tickets per status (``new`` feeds the badge of the rail)."""
-    return await service.counts()
+async def ticket_counts(service: ServiceDep, worker: Worker) -> TicketCounts:
+    """Count the tickets of the Bereiche of the caller per status.
+
+    ``new`` feeds the badge of the rail.
+    """
+    return await service.counts(areas=worker.areas)
 
 
-@router.get("/tickets/assignees", response_model=list[PersonRef], responses=_errors(401, 403))
-async def ticket_assignees(service: ServiceDep, _principal: Manager) -> list[PersonRef]:
-    """List the possible assignees: the active holders of ``ticket.manage``, by name."""
-    return await service.assignees()
+@router.get(
+    "/tickets/assignees", response_model=list[PersonRef], responses=_errors(401, 403, 404, 422)
+)
+async def ticket_assignees(
+    service: ServiceDep,
+    worker: Worker,
+    area: Annotated[UUID | None, Query()] = None,
+) -> list[PersonRef]:
+    """List the active persons with the work right, by name.
+
+    With ``area`` the list holds the possible assignees of that Bereich; a Bereich in
+    which the caller does not work gives 404. Without it the list holds the persons
+    of every Bereich of the caller, for the assignee filter.
+    """
+    if area is not None and worker.areas is not None and area not in worker.areas:
+        raise NotFoundError(f"ticket area {area} not found")
+    return await service.assignees(frozenset({area}) if area is not None else worker.areas)
+
+
+@router.get("/tickets/areas", response_model=list[TicketAreaOut], responses=_errors(401, 403))
+async def ticket_areas(areas: AreaServiceDep, worker: Worker) -> list[TicketAreaOut]:
+    """List every Bereich with its Kategorien, ``Plattform`` first, then by name.
+
+    ``mine`` marks the Bereiche in which the caller works. The other Bereiche are in
+    the list, because a ticket can move to each Bereich.
+    """
+    return await areas.listing(worker.areas)
 
 
 @router.get(
@@ -439,24 +516,31 @@ async def delete_blocked_sender(
 
 
 @router.get("/tickets/{ticket_id}", response_model=TicketDetail, responses=_errors(401, 403, 404))
-async def get_ticket(ticket_id: UUID, service: ServiceDep, principal: Manager) -> TicketDetail:
+async def get_ticket(ticket_id: UUID, service: ServiceDep, worker: Worker) -> TicketDetail:
     """The whole ticket: body, context, attachments, notes and events."""
-    return await service.detail(ticket_id, principal)
+    return await service.detail(ticket_id, worker.principal, areas=worker.areas)
 
 
 @router.patch(
     "/tickets/{ticket_id}", response_model=TicketDetail, responses=_errors(401, 403, 404, 422)
 )
 async def patch_ticket(
-    ticket_id: UUID, payload: TicketPatch, service: ServiceDep, principal: Manager
+    ticket_id: UUID, payload: TicketPatch, service: ServiceDep, worker: Worker
 ) -> TicketDetail:
-    """Change the status, the assignee (``null`` unassigns) or the kind.
+    """Change the status, the assignee (``null`` unassigns), the Kategorie or the Bereich.
 
     ``duplicateOfId`` goes with ``status: rejected``; ``completeTodos`` with ``done``
-    or ``rejected``. A foreign assignee gives 422 ``assignee_not_allowed``, a bad
-    duplicate 422 ``duplicate_invalid``.
+    or ``rejected``. An assignee without the work right in the Bereich gives 422
+    ``assignee_not_allowed``, a bad duplicate 422 ``duplicate_invalid``.
+
+    ``kind`` is the Kategorie of a ticket of ``Plattform``. ``categoryId`` is the
+    Kategorie of a ticket of another Bereich (``null`` clears it); a Kategorie of a
+    different Bereich gives 422 ``category_invalid``. ``areaId`` moves the ticket to
+    another Bereich (``GET /tickets/areas``), also to one in which the caller does not
+    work: the move clears the Kategorie, and the assignee without the work right
+    there. An unknown Bereich gives 422 ``area_invalid``.
     """
-    return await service.patch(ticket_id, payload, principal)
+    return await service.patch(ticket_id, payload, worker.principal, areas=worker.areas)
 
 
 @router.post(
@@ -493,7 +577,7 @@ async def add_ticket_note(
     ticket_id: UUID,
     payload: NoteCreate,
     service: ServiceDep,
-    principal: Manager,
+    worker: Worker,
     settings: SettingsDep,
     background: BackgroundTasks,
     request: Request,
@@ -505,15 +589,22 @@ async def add_ticket_note(
     ``visibility`` is ``internal`` (the default) or ``public``: the reporter account
     reads a public note in ``/tickets/mine`` and gets the mail ``ticket_answer``.
 
-    ``mentions`` names holders of ``ticket.manage`` (``GET /tickets/assignees``);
-    another id gives 422 ``mention_not_member``. Each mentioned person except the
+    ``mentions`` names persons with the work right in the Bereich of the ticket
+    (``GET /tickets/assignees?area=``); another id gives 422 ``mention_not_member``.
+    Each mentioned person except the
     author gets the mail ``ticket_mentioned``.
 
     A draft that is missing, expired, foreign or infected gives 422
     ``draft_attachments_missing``; files on an anonymized ticket 422
     ``ticket_anonymized``.
     """
-    note = await service.add_note(ticket_id, payload, principal, pepper=settings.magic_link_secret)
+    note = await service.add_note(
+        ticket_id,
+        payload,
+        worker.principal,
+        pepper=settings.magic_link_secret,
+        areas=worker.areas,
+    )
     if note.visibility == "public":
         pool = getattr(request.app.state, "arq_pool", None)
         background.add_task(send_mail, settings, note.id, pool)
@@ -533,7 +624,7 @@ async def edit_ticket_note(
     note_id: UUID,
     payload: NotePatch,
     service: ServiceDep,
-    principal: Manager,
+    worker: Worker,
     settings: SettingsDep,
     background: BackgroundTasks,
     request: Request,
@@ -546,7 +637,12 @@ async def edit_ticket_note(
     the mail ``ticket_mentioned``.
     """
     note = await service.edit_note(
-        ticket_id, note_id, payload.body, principal, mentions=payload.mentions
+        ticket_id,
+        note_id,
+        payload.body,
+        worker.principal,
+        mentions=payload.mentions,
+        areas=worker.areas,
     )
     _queue_mention_mails(
         background, send_mentions, settings, request, note.id, service.added_mentions
@@ -561,8 +657,74 @@ async def edit_ticket_note(
     responses=_errors(401, 403, 404),
 )
 async def delete_ticket_note(
-    ticket_id: UUID, note_id: UUID, service: ServiceDep, principal: Manager
+    ticket_id: UUID, note_id: UUID, service: ServiceDep, worker: Worker
 ) -> Response:
     """Delete an own note and its files. Another author gives 403 ``not_note_author``."""
-    await service.delete_note(ticket_id, note_id, principal)
+    await service.delete_note(ticket_id, note_id, worker.principal, areas=worker.areas)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/admin/ticket-areas", response_model=list[TicketAreaOut], responses=_errors(401, 403)
+)
+async def admin_ticket_areas(areas: AreaServiceDep, _principal: SiteAdmin) -> list[TicketAreaOut]:
+    """List the Bereiche with their settings and Kategorien, ``Plattform`` first."""
+    return await areas.listing()
+
+
+@router.post(
+    "/admin/ticket-areas",
+    response_model=TicketAreaOut,
+    status_code=status.HTTP_201_CREATED,
+    responses=_errors(401, 403, 409, 422),
+)
+async def create_ticket_area(
+    payload: TicketAreaCreate, areas: AreaServiceDep, principal: SiteAdmin
+) -> TicketAreaOut:
+    """Create a Bereich with at most one Gremium and its Kategorien.
+
+    A used name gives 409 ``ticket_area_name_taken``, an unknown Gremium 422, and a
+    blank or duplicate Kategorie 422 ``ticket_categories_invalid``.
+    """
+    area = await areas.create(payload, principal.sub)
+    await areas.session.commit()
+    return area
+
+
+@router.patch(
+    "/admin/ticket-areas/{area_id}",
+    response_model=TicketAreaOut,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def patch_ticket_area(
+    area_id: UUID, payload: TicketAreaPatch, areas: AreaServiceDep, principal: SiteAdmin
+) -> TicketAreaOut:
+    """Change the name, the Gremium, the switch ``notifyNew`` or the Kategorien.
+
+    ``categories`` is the whole ordered list: an entry with ``id`` keeps a stored
+    Kategorie, an entry without one adds a Kategorie, and a stored Kategorie that the
+    list leaves out is deleted. The Bereich ``Plattform`` takes ``notifyNew`` only;
+    another field gives 409 ``ticket_area_platform_fixed``.
+    """
+    area = await areas.patch(area_id, payload, principal.sub)
+    await areas.session.commit()
+    return area
+
+
+@router.delete(
+    "/admin/ticket-areas/{area_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses=_errors(401, 403, 404, 409),
+)
+async def delete_ticket_area(
+    area_id: UUID, areas: AreaServiceDep, principal: SiteAdmin
+) -> Response:
+    """Delete a Bereich without tickets.
+
+    A Bereich with a ticket gives 409 ``ticket_area_has_tickets``, the Bereich
+    ``Plattform`` 409 ``ticket_area_platform_fixed``.
+    """
+    await areas.delete(area_id, principal.sub)
+    await areas.session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

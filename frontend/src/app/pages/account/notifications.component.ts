@@ -25,12 +25,10 @@ const HIDDEN_KINDS: ReadonlySet<string> = new Set(['vote', 'role_change']);
 
 /**
  * Kinds that only reach the team that works on tickets. The page shows them only to a
- * holder of `ticket.manage`, because nobody else gets these mails.
+ * person who works in a Bereich (`ticket.manage`, or the Gremium permission
+ * `ticket.work`), because nobody else gets these mails.
  */
-const TEAM_KINDS: ReadonlyMap<string, string> = new Map([
-  ['ticket_created', 'ticket.manage'],
-  ['ticket_message', 'ticket.manage'],
-]);
+const TEAM_KINDS: ReadonlySet<string> = new Set(['ticket_created', 'ticket_message']);
 
 /** The feature whose mails a kind switches; a kind without an entry has no feature. */
 const KIND_FEATURE: ReadonlyMap<string, FeatureKey> = new Map<string, FeatureKey>([
@@ -385,8 +383,7 @@ export class AccountNotificationsComponent {
 
   /** A team kind shows only to the holders of its permission. */
   private mayGet(kind: string): boolean {
-    const permission = TEAM_KINDS.get(kind);
-    return permission === undefined || this.auth.can(permission);
+    return !TEAM_KINDS.has(kind) || this.auth.worksOnTickets();
   }
 
   protected kindLabel(kind: string): string {

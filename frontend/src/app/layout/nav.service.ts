@@ -201,7 +201,7 @@ export class NavService {
         (item.gremiumPermissions ?? []).some((p) => this.auth.canInAnyGremium(p)) ||
         (!!item.inAnyCommittee && inAnyCommittee) ||
         (!!item.scopedBudgetView && this.auth.hasScopedBudgetView()) ||
-        (!!item.reportedTickets && this.auth.hasReportedTickets()),
+        (!!item.reportedTickets && (this.auth.hasReportedTickets() || this.auth.worksOnTickets())),
     );
   });
 
