@@ -54,6 +54,8 @@ _WIRE: Mapping[str, str] = {
     "smtp_password": "smtpPassword",
     "done_folder": "doneFolder",
     "enabled": "enabled",
+    "signature": "signature",
+    "confirm": "confirm",
 }
 #: The columns whose change starts the fetch of the inbox from its first mail.
 _INBOX_FIELDS = frozenset({"imap_host", "imap_port", "imap_user"})
@@ -94,6 +96,8 @@ def mailbox_out(row: TicketMailbox) -> MailboxOut:
         smtp_user=row.smtp_user,
         done_folder=row.done_folder,
         enabled=bool(row.enabled),
+        signature=row.signature or "",
+        confirm=bool(row.confirm),
         error=row.last_error if (row.failures or 0) >= SHOWN_FAILURES else None,
         fetched_at=row.fetched_at,
     )

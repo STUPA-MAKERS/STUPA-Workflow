@@ -981,6 +981,27 @@
       "to": "Ticket"
     },
     {
+      "column": "ticket_id",
+      "from": "TicketMail",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Ticket"
+    },
+    {
+      "column": "mailbox_id",
+      "from": "TicketMail",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "TicketMailbox"
+    },
+    {
+      "column": "note_id",
+      "from": "TicketMail",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "TicketNote"
+    },
+    {
       "column": "area_id",
       "from": "TicketMailbox",
       "multiplicity": "1",
@@ -6618,6 +6639,12 @@
           "type": "CITEXT"
         },
         {
+          "name": "reporter_name",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
           "name": "assignee_id",
           "nullable": true,
           "primaryKey": false,
@@ -6805,7 +6832,8 @@
             "kind",
             "todo_done",
             "category",
-            "area"
+            "area",
+            "mail_auto"
           ]
         },
         {
@@ -6832,6 +6860,145 @@
       "name": "TicketEvent",
       "path": "backend/app/modules/tickets/models.py",
       "table": "ticket_event"
+    },
+    {
+      "attributes": [
+        {
+          "name": "mailbox_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "ticket_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "note_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "direction",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "in",
+            "out"
+          ]
+        },
+        {
+          "name": "message_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "from_address",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CITEXT"
+        },
+        {
+          "name": "from_name",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "cc",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "subject",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "source_key",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "source_size",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BIGINT"
+        },
+        {
+          "name": "source_scan",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "skipped",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "automatic",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "to_addresses",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "state",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "attempts",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "send_error",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "next_try_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "TicketMail",
+      "module": "tickets",
+      "name": "TicketMail",
+      "path": "backend/app/modules/tickets/models.py",
+      "table": "ticket_mail"
     },
     {
       "attributes": [
@@ -6936,6 +7103,18 @@
           "nullable": true,
           "primaryKey": false,
           "type": "DATETIME"
+        },
+        {
+          "name": "signature",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "confirm",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
         },
         {
           "name": "id",

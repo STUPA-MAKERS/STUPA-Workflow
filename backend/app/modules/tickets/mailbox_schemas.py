@@ -12,12 +12,19 @@ from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 #: The folder for done mails of a new Postfach.
 DEFAULT_DONE_FOLDER = "Erledigt"
 
+#: The longest signature of a Postfach.
+MAX_SIGNATURE = 2000
+
 _ADDRESS = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
 _HOST = r"^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$"
 
 
 class MailboxCreate(FrozenStrictCamelModel, frozen=True):
-    """A new Postfach. It starts with the switch off unless ``enabled`` says else."""
+    """A new Postfach. It starts with the switch off unless ``enabled`` says else.
+
+    ``signature`` ends each sent mail; ``{name}`` in it stands for the writer.
+    ``confirm`` is the switch "Eingang bestätigen".
+    """
 
     address: str = Field(max_length=254, pattern=_ADDRESS)
     imap_host: str = Field(alias="imapHost", max_length=253, pattern=_HOST)
@@ -32,6 +39,8 @@ class MailboxCreate(FrozenStrictCamelModel, frozen=True):
         default=DEFAULT_DONE_FOLDER, alias="doneFolder", min_length=1, max_length=120
     )
     enabled: bool = False
+    signature: str = Field(default="", max_length=MAX_SIGNATURE)
+    confirm: bool = False
 
 
 class MailboxPatch(FrozenStrictCamelModel, frozen=True):
@@ -52,6 +61,8 @@ class MailboxPatch(FrozenStrictCamelModel, frozen=True):
     )
     done_folder: str | None = Field(default=None, alias="doneFolder", min_length=1, max_length=120)
     enabled: bool | None = None
+    signature: str | None = Field(default=None, max_length=MAX_SIGNATURE)
+    confirm: bool | None = None
 
 
 class MailboxOut(FrozenCamelModel, frozen=True):
@@ -71,6 +82,8 @@ class MailboxOut(FrozenCamelModel, frozen=True):
     smtp_user: str = Field(serialization_alias="smtpUser")
     done_folder: str = Field(serialization_alias="doneFolder")
     enabled: bool
+    signature: str = ""
+    confirm: bool = False
     error: str | None = None
     fetched_at: datetime | None = Field(default=None, serialization_alias="fetchedAt")
 

@@ -5,7 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_fetch.py:test_a_new_mail_becomes_a_ticket_with_the_values_of_the_mail"
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_fetch.py:test_a_mail_without_a_subject_gets_the_title_ohne_betreff"
+implementation:
+  - backend/app/modules/tickets/mail_import.py
 scope:
   - backend/app/modules/tickets
   - backend/worker

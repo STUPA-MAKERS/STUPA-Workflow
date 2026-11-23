@@ -87,7 +87,7 @@ describe('TicketNewDialogComponent', () => {
   it('shows no Bereich field with one Bereich, and no Kategorie field without a Kategorie', async () => {
     const { cmp } = await setup({ areas: [{ ...ASTA, categories: [] }] });
     const keys = cmp.form().sections[0].fields.map((f: { key: string }) => f.key);
-    expect(keys).toEqual(['title', 'body', 'message']);
+    expect(keys).toEqual(['email', 'title', 'body', 'message']);
   });
 
   it('asks for a person, searches the accounts and creates the ticket', async () => {
@@ -96,7 +96,7 @@ describe('TicketNewDialogComponent', () => {
     cmp.save();
     fixture.detectChanges();
     expect(api.createManual).not.toHaveBeenCalled();
-    expect(screen.getByText('Bitte eine Person wählen.')).toBeInTheDocument();
+    expect(screen.getByText('Bitte eine Person wählen oder eine E-Mail-Adresse eintragen.')).toBeInTheDocument();
     cmp.findPeople('Lea').subscribe();
     expect(people).toHaveBeenCalledWith('Lea');
     cmp.onPicked({ kind: 'gremium', id: 'g1', name: 'AStA', logoUrl: null });
@@ -110,6 +110,23 @@ describe('TicketNewDialogComponent', () => {
       expect.objectContaining({ areaId: 'a-plat', title: 'Anruf wegen Raum', reporterId: 'p7', kind: 'question' }),
     );
     expect(created).toHaveBeenCalledWith({ id: 't99' });
+  });
+
+  it('creates a ticket for an e-mail address without an account', async () => {
+    const { cmp, api, toast, fill } = await setup();
+    await fill({ title: 'Anruf wegen Raum', email: 'keine adresse' });
+    cmp.save();
+    expect(api.createManual).not.toHaveBeenCalled();
+    await fill({ email: ' dora@example.org ' });
+    api.createManual.mockReturnValueOnce(throwError(() => ({ error: { code: 'mailbox_off' } })));
+    cmp.save();
+    expect(api.createManual).toHaveBeenLastCalledWith(
+      expect.objectContaining({ title: 'Anruf wegen Raum', email: 'dora@example.org' }),
+    );
+    expect(api.createManual).not.toHaveBeenCalledWith(expect.objectContaining({ reporterId: expect.anything() }));
+    expect(toast.error).toHaveBeenLastCalledWith(
+      'Das Postfach dieses Bereichs ist ausgeschaltet. Öffentliche Nachrichten sind gerade nicht möglich.',
+    );
   });
 
   it('saves nothing without a title, and closes on Abbrechen', async () => {

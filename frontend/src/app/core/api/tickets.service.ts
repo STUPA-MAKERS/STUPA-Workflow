@@ -156,6 +156,10 @@ export interface TicketMailbox {
   /** The IMAP folder that takes each imported mail. */
   readonly doneFolder: string;
   readonly enabled: boolean;
+  /** The text that ends each sent mail; `{name}` stands for the writer. */
+  readonly signature?: string;
+  /** "Eingang bestätigen": a new ticket from a mail gets a confirmation. */
+  readonly confirm?: boolean;
   /** The cause code of the fetch after eight failed runs in sequence, else null. */
   readonly error?: string | null;
   readonly fetchedAt?: string | null;
@@ -174,6 +178,8 @@ export interface TicketMailboxInput {
   readonly smtpPassword: string;
   readonly doneFolder: string;
   readonly enabled: boolean;
+  readonly signature: string;
+  readonly confirm: boolean;
 }
 
 /** Each Postfach and the hosts of the deploy setting `TICKET_MAIL_HOST_ALLOWLIST`. */
@@ -231,12 +237,15 @@ export type TicketEventKind =
   | 'kind'
   | 'category'
   | 'area'
-  | 'todo_done';
+  | 'todo_done'
+  | 'mail_auto';
 
 /** The payloads of the event kinds, all optional so one type reads every kind. */
 export interface TicketEventPayload {
   /** created */
   readonly confirmationSent?: boolean;
+  /** mail_auto: the subject of the automatic mail. */
+  readonly subject?: string | null;
   /** status, assignee, kind; category: the names; area: the ids */
   readonly from?: TicketStatus | TicketKind | PersonRef | string | null;
   readonly to?: TicketStatus | TicketKind | PersonRef | string | null;
@@ -280,6 +289,54 @@ export interface TicketNote {
   readonly mentions?: readonly PersonRef[];
 }
 
+/** A file of a mail that did not become a file of the message. */
+export interface TicketSkippedFile {
+  readonly name: string;
+  readonly size: number;
+  /** `size`: above the size limit; `type`: a type that an upload refuses. */
+  readonly reason: 'size' | 'type';
+}
+
+/**
+ * One mail of a ticket from a Postfach. `noteId` names the message that the mail became;
+ * null for the first mail of the ticket and for an automatic mail. `source` tells if the
+ * full source downloads: only a `clean` one does.
+ */
+export interface TicketMail {
+  readonly id: Uuid;
+  readonly noteId: Uuid | null;
+  readonly direction: 'in' | 'out';
+  readonly fromName: string | null;
+  readonly fromAddress: string | null;
+  readonly cc: readonly string[];
+  readonly subject: string | null;
+  readonly automatic: boolean;
+  readonly source: 'clean' | 'infected' | 'closed' | 'gone';
+  readonly sourceSize: number;
+  readonly skipped: readonly TicketSkippedFile[];
+  /** The `To` addresses of a sent mail. */
+  readonly to?: readonly string[];
+  /** The state of a sent mail; null for an imported mail. */
+  readonly state?: 'sending' | 'sent' | 'failed' | null;
+  /** The cause code of the newest failed send. */
+  readonly error?: string | null;
+  readonly at: IsoDateTime;
+}
+
+/** The addresses of a mail. */
+export interface TicketMailRecipients {
+  readonly to: readonly string[];
+  readonly cc: readonly string[];
+}
+
+/**
+ * The recipients of the next public message on a mail ticket. `enabled` is false while
+ * the Postfach of the Bereich is off: a public message then answers 409 `mailbox_off`.
+ */
+export interface TicketMailAnswer extends TicketMailRecipients {
+  readonly enabled: boolean;
+}
+
 export interface TicketDetail extends TicketListItem {
   readonly body: string;
   readonly context: TicketContext;
@@ -301,6 +358,10 @@ export interface TicketDetail extends TicketListItem {
   readonly anonymizedAt: IsoDateTime | null;
   /** The reporter is blocked; false for an anonymized ticket. */
   readonly senderBlocked: boolean;
+  /** The mails of a ticket from a Postfach, oldest first. Absent on an older server. */
+  readonly mails?: readonly TicketMail[];
+  /** The recipients of a public message on a mail ticket; null on another ticket. */
+  readonly mailAnswer?: TicketMailAnswer | null;
 }
 
 /**
@@ -547,9 +608,11 @@ export class TicketsApiService {
     files: MessageFiles = {},
     visibility?: TicketNoteVisibility,
     mentions?: Uuid[],
+    recipients?: TicketMailRecipients | null,
   ): Observable<TicketNote> {
     return this.http.post<TicketNote>(`${this.base}/tickets/${id}/notes`, {
       body,
+      ...(recipients ? { to: recipients.to, cc: recipients.cc } : {}),
       ...(mentions?.length ? { mentions } : {}),
       ...messageFiles(files),
       ...(visibility ? { visibility } : {}),
@@ -592,6 +655,16 @@ export class TicketsApiService {
   /** The download of a ticket attachment: streamed through the API, never presigned. */
   attachmentUrl(attachmentId: Uuid): string {
     return `${this.base}/attachments/${attachmentId}/download`;
+  }
+
+  /** The download of the full source of a mail of a ticket (`.eml`). */
+  /** "Erneut senden": start the send of a failed mail again. */
+  resendMail(ticketId: Uuid, mailId: Uuid): Observable<TicketMail> {
+    return this.http.post<TicketMail>(`${this.base}/tickets/${ticketId}/mails/${mailId}/resend`, {});
+  }
+
+  mailSourceUrl(ticketId: Uuid, mailId: Uuid): string {
+    return `${this.base}/tickets/${ticketId}/mails/${mailId}/source`;
   }
 }
 

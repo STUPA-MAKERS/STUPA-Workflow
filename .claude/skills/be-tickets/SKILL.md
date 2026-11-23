@@ -92,7 +92,86 @@ works on its tickets: status, assignee, Kategorie, move to another Bereich, note
   The certificate check is `ssl.create_default_context()`. A failed check answers a cause
   code (`tls_missing`, `tls_failed`, `timeout`, `login_failed`, `connect_failed`), never
   the text of the server.
-- The switch (002722) is stored. The fetch and 409 `mailbox_off` do not exist yet.
+- The switch (002722): the fetch opens no connection while it is off. The test of the
+  admin page runs also while it is off. A public message on a mail ticket answers 409
+  `mailbox_off` while it is off, and the send job sends nothing.
+
+**Answers by mail (specs 002712, 002733 to 002738):**
+- A mail ticket is a ticket without an account whose source is `mail` or `team`
+  (`mail_send.is_mail_ticket`). A report of the help menu without a session stays one-way.
+- `mail_send.py` — `queue_answer(session, ticket, note_id, to=, cc=)` stores the mail of a
+  public note as a `ticket_mail` row with `direction` `out` and `state` `sending`, in the
+  transaction of the note (409 `mailbox_off`, 422 `mail_without_recipient`).
+  `thread_recipients` gives the sender in `to` and each other address of the thread in
+  `cc`, without the address of the Postfach; `NoteCreate.to` and `.cc` replace them.
+  `build_message` is pure: `From` is the address of the Postfach with the name of the
+  Bereich, the subject is the title with `[T-…]` (`Re:` when the ticket has an imported
+  mail), `In-Reply-To` is the last mail and `References` each mail of the ticket. The text
+  ends with `ticket_mailbox.signature`; `{name}` is the writer.
+- `MailSender.send_next` sends one waiting mail without a commit (`FOR UPDATE SKIP
+  LOCKED`). A failure counts `attempts`, stores the cause code in `send_error` and doubles
+  the wait (`next_try_at`); the eighth failure sets `failed`. A file of the note without a
+  clean scan is the failure `files_not_scanned`. The worker cron `send_ticket_mails`
+  (seconds 5 and 35, `worker/ticket_mail.py`) commits after each mail. Tests inject
+  `ctx['ticket_mail_send']`.
+- `POST /tickets/{id}/mails/{mailId}/resend` starts a `failed` mail again (409
+  `mail_not_failed`). `TicketDetail.mailAnswer` (`to`, `cc`, `enabled`) feeds the form;
+  `TicketMailOut` has `to`, `state` and `error`.
+- The confirmation (002738): `queue_confirmation` in the import of a new ticket while
+  `ticket_mailbox.confirm` is on, at most one per address and hour. It is a sent mail
+  without a note and with `automatic`, and it carries `Auto-Submitted: auto-replied`.
+- `POST /tickets/manual` with `email` needs a Postfach of the Bereich (422
+  `ticket_area_without_mailbox`); its `message` goes out as a mail.
+- Tests: `tests/integration/modules/tickets/test_ticket_mail_send.py`; the shared stack is
+  in `mail_support.py` and the fixture `stack` in `conftest.py`.
+
+**Mails of a Postfach (specs 002722 to 002732, 002739 to 002741):**
+- `worker/ticket_mail.py` — the cron `fetch_ticket_mails` (every minute, second 15). For
+  each Postfach that is on it checks the host against the allowlist again, opens the inbox
+  (`mail_inbox.open_inbox`), reads at most `BATCH` mails above `last_uid` and takes each
+  mail in its own transaction: import, commit, then `MOVE` to `done_folder`, then scans and
+  team mails. It stores `uid_validity` and `last_uid` at the end, after the commits. A
+  failure stops the run of that Postfach before the failed mail, counts `failures` and
+  stores the cause code (`import_failed`, `mail_host_not_allowed`, or a code of the mail
+  client). A new `UIDVALIDITY` starts from UID 0. The position stops before a mail above
+  the rate limit. Tests inject `ctx['ticket_mail_inbox']` and
+  `ctx['ticket_mail_sessionmaker']`.
+- `mail_inbox.py` — `Inbox` (`uids_after`, `size`, `fetch` with `BODY.PEEK[]`, `move`,
+  `close`), `folder_name` (modified UTF-7). A server without `MOVE` gives
+  `move_unsupported`; the platform never copies and deletes (002731). A mail above
+  `MAX_SOURCE_BYTES` stays in the inbox.
+- `mail_parse.py` — `parse_mail(bytes) -> ParsedMail` (pure): identity (`Message-ID`, else
+  `sha256:<hex>` of the source), parents, sender, `cc`, text (plain part, else the HTML
+  without tags, `script` and `style` dropped), files, the number `[T-…]` of the subject,
+  `automatic`.
+- `mail_import.py` — `MailImporter.take(box, mail, source) -> Taken`, no commit. The order
+  of the decisions is in its docstring: own address and no sender (stay), known identity
+  (`duplicate`), sender block (`blocked`, counts the hit), thread by headers, automatic
+  mail (`event` `mail_auto` on its ticket, else stay), thread by number for the sender or a
+  `Cc` address, else a new ticket (`TICKETS_PER_HOUR` = 20 an hour for one address, else
+  `deferred`). A mail for an anonymized ticket opens a new ticket; a mail for a ticket
+  closed for more than `REOPEN_DAYS` days opens a follow-up ticket.
+- Table `ticket_mail` (model `TicketMail`): one row per imported mail (later also per sent
+  mail, `direction`), unique `(mailbox_id, message_id)`, `note_id` (NULL for the first
+  mail and for an automatic mail), `from_address`, `from_name`, `cc`, `subject`,
+  `source_key`, `source_size`, `source_scan`, `skipped`, `automatic`. `ticket.reporter_name`
+  holds the display name of `From`. Migration `f3a17c5e9b24`.
+- A ticket from a mail has `source = mail`, `reporter_email` = the `From` address and never
+  an account (002739). A message from a mail is a public `ticket_note` without an author;
+  the detail shows the name of `From` and sets `fromReporter`.
+- The source goes to the object storage (`ticket-mail/<ticket>/<mail>.eml`) and is scanned
+  in the import. `GET /tickets/{id}/mails/{mailId}/source` streams only a source with the
+  result `clean`; else 409 `mail_source_closed`. Without a scanner, and after a failure of
+  the scanner, the source stays closed. The anonymization removes the source and clears the
+  addresses and the subject; the identity stays (`TicketService._anonymize_mails`).
+- A file of a mail goes through `FilesService.validate` like an upload. A file above the
+  size limit or of a refused type is in `ticket_mail.skipped` (`reason` `size` or `type`)
+  and in `TicketDetail.mails[].skipped`.
+- Team mails: `notify_ticket_created` for a new ticket, `notify_ticket_note` for a message
+  from a mail (to the assignee, else to the team). A public note of the team on a ticket
+  without a reporter account sends nothing yet.
+- Tests: `tests/integration/modules/tickets/test_ticket_mail_fetch.py` (real Postgres, a
+  scripted inbox) and `tests/unit/modules/tickets/test_ticket_mail_parse.py`.
 - `GET /api/auth/me` carries `works_on_tickets`; the frontend `AuthService.worksOnTickets`
   opens the team view. Search, activity, to-do links (`works_on_ticket`) and the ticket
   attachments use the same scope.

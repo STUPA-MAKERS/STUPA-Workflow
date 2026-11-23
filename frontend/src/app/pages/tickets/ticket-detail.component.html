@@ -179,6 +179,18 @@
     @if (split()) {
       <h3 id="td-log" class="sr-only">{{ 'tickets.detail.log' | t }}</h3>
     }
+    @if (mailAnswer(); as answer) {
+      @if (answer.enabled) {
+        <app-note icon="mail">
+          {{ 'tickets.mail.goesTo' | t: { people: recipientsLine() } }}
+          <app-button variant="text" size="sm" data-testid="td-recipients" (click)="openRecipients()">{{
+            'tickets.mail.recipients.change' | t
+          }}</app-button>
+        </app-note>
+      } @else {
+        <app-note icon="mail" kind="warn">{{ 'tickets.mail.off' | t }}</app-note>
+      }
+    }
     <app-chat
       class="td__chat"
       [draftKey]="'ticket.' + (ticket()?.id ?? '')"
@@ -449,6 +461,40 @@
         <app-empty-state icon="searchOff" rows="1" [heading]="'tickets.duplicate.none' | t" />
       }
     </div>
+  </ng-template>
+</app-dialog>
+
+<app-dialog
+  [open]="recipientsOpen()"
+  [heading]="'tickets.mail.recipients.heading' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="recipientsOpen.set(false)"
+  [actions]="[
+    { key: 'cancel', label: ('action.cancel' | t) },
+    { key: 'save', label: ('tickets.mail.recipients.save' | t), kind: 'main' },
+  ]"
+  (action)="$event.key === 'save' ? saveRecipients() : recipientsOpen.set(false)"
+>
+  <ng-template dialogBody>
+    <app-section [heading]="'tickets.mail.recipients.heading' | t" [hideHeading]="true">
+      <app-input
+        name="mailTo"
+        autocomplete="off"
+        [label]="'tickets.mail.recipients.to' | t"
+        [required]="true"
+        [error]="recipientsTried() && recipientsError() ? (recipientsError()! | t) : ''"
+        [ngModel]="recipientsDraft().to"
+        (ngModelChange)="recipientsDraft.set({ to: $event, cc: recipientsDraft().cc })"
+      />
+      <app-input
+        name="mailCc"
+        autocomplete="off"
+        [label]="'tickets.mail.recipients.cc' | t"
+        [hint]="'tickets.mail.recipients.hint' | t"
+        [ngModel]="recipientsDraft().cc"
+        (ngModelChange)="recipientsDraft.set({ to: recipientsDraft().to, cc: $event })"
+      />
+    </app-section>
   </ng-template>
 </app-dialog>
 

@@ -46,17 +46,33 @@ const CREATE_ERROR: Readonly<Record<string, TranslationKey>> = {
   ticket_reporter_invalid: 'tickets.new.error.person',
   ticket_area_without_mailbox: 'tickets.new.error.mailbox',
   category_invalid: 'tickets.new.error.category',
+  mailbox_off: 'tickets.mail.off',
 };
 
-/** The body of the create from the form value and the chosen person. */
-export function manualBody(value: FormValue, area: TicketArea, personId: string): TicketManualCreate {
+const ADDRESS = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+/** The address of the form when it is an e-mail address, else an empty text. */
+export function manualAddress(value: FormValue): string {
+  const address = String(value['email'] ?? '').trim();
+  return ADDRESS.test(address) ? address : '';
+}
+
+/**
+ * The body of the create from the form value and the chosen person. Without a person the
+ * ticket is for the address of the form.
+ */
+export function manualBody(
+  value: FormValue,
+  area: TicketArea,
+  personId: string | null,
+): TicketManualCreate {
   const category = String(value['category'] ?? '');
   return {
     areaId: area.id,
     title: String(value['title'] ?? '').trim(),
     body: String(value['body'] ?? '').trim(),
     message: String(value['message'] ?? '').trim(),
-    reporterId: personId,
+    ...(personId ? { reporterId: personId } : { email: manualAddress(value) }),
     ...(area.platform
       ? { kind: (TICKET_KINDS.find((k) => k === category) ?? 'question') satisfies TicketKind }
       : category
@@ -71,8 +87,8 @@ export function manualBody(value: FormValue, area: TicketArea, personId: string)
  * title, the Kategorie, the note of the team and the first message to the person.
  *
  * The note stays with the team: the person reads only the title and the public messages
- * in the tab "Tickets". A ticket for an e-mail address needs the Postfach of a Bereich,
- * which the app does not have yet, so the dialog takes an account only.
+ * in the tab "Tickets". Without an account the ticket is for an e-mail address: the
+ * Bereich then needs a Postfach, and the first message goes out as a mail.
  */
 @Component({
   selector: 'app-ticket-new-dialog',
@@ -114,6 +130,8 @@ export class TicketNewDialogComponent {
   protected readonly area = computed(
     () => this.areas().find((a) => a.id === this.value()['areaId']) ?? this.areas()[0] ?? null,
   );
+  /** Neither an account nor an e-mail address names the person of the ticket. */
+  protected readonly personMissing = computed(() => !this.person() && !manualAddress(this.value()));
   protected readonly taken = computed(() => (this.person() ? [this.person()!.id] : []));
   protected readonly findPeople = (q: string): Observable<readonly PickerPerson[]> => this.calendar.people(q);
 
@@ -142,7 +160,11 @@ export class TicketNewDialogComponent {
       categories.length > 1
         ? [{ key: 'category', kind: 'select', label: t('tickets.detail.kind'), options: categories }]
         : [];
+    const emailField: readonly FieldDef[] = this.person()
+      ? []
+      : [{ key: 'email', kind: 'text', label: t('tickets.new.email'), maxLength: 254 }];
     const fields: readonly FieldDef[] = [
+      ...emailField,
       ...areaField,
       { key: 'title', kind: 'text', label: t('tickets.new.title'), required: true, maxLength: 200 },
       ...categoryField,
@@ -181,6 +203,7 @@ export class TicketNewDialogComponent {
           areaId: first?.id ?? '',
           title: '',
           category: first?.platform ? 'question' : '',
+          email: '',
           body: '',
           message: '',
         });
@@ -209,9 +232,9 @@ export class TicketNewDialogComponent {
     const area = this.area();
     const person = this.person();
     const formOk = this.formRef()?.showErrors() !== false;
-    if (this.saving() || !formOk || !area || !person) return;
+    if (this.saving() || !formOk || !area || this.personMissing()) return;
     this.saving.set(true);
-    this.api.createManual(manualBody(this.value(), area, person.id)).subscribe({
+    this.api.createManual(manualBody(this.value(), area, person?.id ?? null)).subscribe({
       next: (ticket) => {
         this.saving.set(false);
         this.created.emit(ticket);

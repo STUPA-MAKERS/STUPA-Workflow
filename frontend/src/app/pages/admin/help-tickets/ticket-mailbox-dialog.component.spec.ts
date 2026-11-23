@@ -95,6 +95,16 @@ const FULL = {
 };
 
 describe('the draft of a Postfach', () => {
+  it('keeps the signature and the switch "Eingang bestätigen"', () => {
+    expect(draftOf(null)).toMatchObject({ signature: '', confirm: false });
+    const draft = draftOf({ ...BOX, signature: 'Viele Grüße\n{name}', confirm: true });
+    expect(draft).toMatchObject({ signature: 'Viele Grüße\n{name}', confirm: true });
+    expect(mailboxBody({ ...draft, signature: ' Dein AStA \n' })).toMatchObject({
+      signature: 'Dein AStA',
+      confirm: true,
+    });
+  });
+
   it('starts a new Postfach with the TLS ports, the folder and the switch off', () => {
     expect(draftOf(null)).toMatchObject({
       imapPort: '993',
@@ -184,6 +194,8 @@ describe('TicketMailboxDialogComponent', () => {
       smtpPassword: 'geheim-2',
       doneFolder: 'Archiv',
       enabled: false,
+      signature: '',
+      confirm: false,
     });
     expect(saved).toHaveBeenCalledTimes(1);
   });

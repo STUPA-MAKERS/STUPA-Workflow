@@ -264,9 +264,7 @@ def test_logout_idp_without_end_session_returns_no_url(
     with respx.mock(assert_all_called=False) as mock:
         doc = _doc(end_session_endpoint=None)
         mock.get(DISCOVERY).mock(return_value=httpx.Response(200, json=doc))
-        resp = enabled_client.post(
-            "/api/auth/logout", headers=_csrf(enabled_client, ENABLED)
-        )
+        resp = enabled_client.post("/api/auth/logout", headers=_csrf(enabled_client, ENABLED))
     assert resp.status_code == 200
     assert resp.json() == {"logout_url": None}
 
@@ -285,9 +283,7 @@ def test_logout_discovery_failure_still_ends_session(
     enabled_client.cookies.set(ENABLED.session_cookie_name, "x")
     with respx.mock(assert_all_called=False) as mock:
         mock.get(DISCOVERY).mock(side_effect=httpx.ConnectError("down"))
-        resp = enabled_client.post(
-            "/api/auth/logout", headers=_csrf(enabled_client, ENABLED)
-        )
+        resp = enabled_client.post("/api/auth/logout", headers=_csrf(enabled_client, ENABLED))
     assert resp.status_code == 200
     assert resp.json() == {"logout_url": None}
     assert ended == ["x"]
@@ -320,9 +316,7 @@ def test_logout_disabled_oidc_no_url(
 
     monkeypatch.setattr(router_mod.sessions, "delete_principal_session", _del)
     disabled_client.cookies.set(DISABLED.session_cookie_name, "x")
-    resp = disabled_client.post(
-        "/api/auth/logout", headers=_csrf(disabled_client, DISABLED)
-    )
+    resp = disabled_client.post("/api/auth/logout", headers=_csrf(disabled_client, DISABLED))
     assert resp.status_code == 200
     assert resp.json() == {"logout_url": None}
 
@@ -340,7 +334,10 @@ def test_me_returns_principal() -> None:
     app.dependency_overrides[get_settings] = lambda: ENABLED
     app.dependency_overrides[get_session] = _fake_db
     app.dependency_overrides[get_current_principal] = lambda: Principal(
-        sub="u1", email="e@x.de", roles=["member"], permissions={"application.read"},
+        sub="u1",
+        email="e@x.de",
+        roles=["member"],
+        permissions={"application.read"},
         groups={"stupa"},
     )
     client = TestClient(app)
@@ -358,12 +355,11 @@ def test_me_returns_principal() -> None:
         "has_scoped_budget_view": False,
         "in_substitute_pool": False,
         "has_reported_tickets": False,
+        "works_on_tickets": False,
     }
 
 
-def test_magic_link_always_202(
-    enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_magic_link_always_202(enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     """Answer 202 for every magic-link request.
 
     The work runs as a background task, which keeps the response time constant. The test
@@ -371,9 +367,7 @@ def test_magic_link_always_202(
     """
     scheduled: list[tuple[object, ...]] = []
 
-    async def _capture(
-        settings: object, email: str, application_id: object, pool: object
-    ) -> None:
+    async def _capture(settings: object, email: str, application_id: object, pool: object) -> None:
         scheduled.append((email, application_id))
 
     monkeypatch.setattr(login_mod, "_deliver_magic_link", _capture)
@@ -412,9 +406,7 @@ def test_magic_link_well_formed_altcha_202(
 
     monkeypatch.setattr(login_mod, "_deliver_magic_link", _noop)
     solution = solve_challenge(create_challenge("altcha-test-secret-0123", max_number=50))
-    resp = enabled_client.post(
-        "/api/auth/magic-link", json={"email": "x@y.de", "altcha": solution}
-    )
+    resp = enabled_client.post("/api/auth/magic-link", json={"email": "x@y.de", "altcha": solution})
     assert resp.status_code == 202
 
 
@@ -463,13 +455,15 @@ async def _deliver_and_capture_lang(
         def __init__(self, session: object, *, queue: object, settings: object) -> None:
             self._s = session
 
-        async def send_magic_link(
-            self, *, email: str, link: str, lang: str | None = None
-        ) -> None:
+        async def send_magic_link(self, *, email: str, link: str, lang: str | None = None) -> None:
             langs.append(lang)
 
     async def _req(
-        session: object, settings: object, *, email: str, application_id: object,
+        session: object,
+        settings: object,
+        *,
+        email: str,
+        application_id: object,
         deliver: object,
     ) -> None:
         await deliver("r@x.de", "https://link")  # type: ignore[operator]
@@ -503,14 +497,10 @@ async def test_deliver_magic_link_without_application_keeps_default_language(
 ) -> None:
     """An address without an application keeps the default language."""
     db = fake_session()
-    assert await _deliver_and_capture_lang(monkeypatch, db) == [
-        ENABLED.mail_default_lang
-    ]
+    assert await _deliver_and_capture_lang(monkeypatch, db) == [ENABLED.mail_default_lang]
 
 
-def test_magic_link_verify_ok(
-    enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_magic_link_verify_ok(enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     app_uuid = "11111111-1111-1111-1111-111111111111"
 
     async def _verify(*a: object, **k: object) -> tuple[str, str]:

@@ -5,7 +5,14 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_send.py:test_eight_failed_sends_end_in_failed_and_resend_starts_again"
+  - "frontend/src/app/pages/tickets/ticket-detail.component.spec.ts:TicketDetailComponent"
+implementation:
+  - backend/app/modules/tickets/mail_send.py
+  - backend/worker/ticket_mail.py
+  - backend/app/modules/tickets/router.py
+  - frontend/src/app/pages/tickets/tickets.util.ts
 scope:
   - backend/app/modules/tickets
   - backend/worker

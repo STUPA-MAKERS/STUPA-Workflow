@@ -28,6 +28,12 @@ decides who works in it (``access.py``). A ticket of ``Plattform`` has a ``kind`
 fixed Kategorien of that Bereich. A ticket of a different Bereich has no kind and at most
 one Kategorie of its Bereich (``ticket_category``).
 
+``ticket_mail`` holds each mail of a ticket: its ``Message-ID``, which is the identity
+of a mail in its Postfach, the addresses of the thread and the storage key of its
+source. A ticket from a mail has the ``From`` address as ``reporter_email`` and the
+display name as ``reporter_name``; it never has an account
+(§F/integrations/ticket-mail/002739).
+
 ``ticket_sender_block`` holds the blocked senders: an account (``principal_id``) or a
 normalized e-mail address (``email``, stripped and lowercase). A report of a blocked
 sender is swallowed: it answers a number and stores nothing (``hit_count``).
@@ -79,7 +85,12 @@ TICKET_EVENT_KINDS: tuple[str, ...] = (
     "todo_done",
     "category",
     "area",
+    "mail_auto",
 )
+#: The directions of a stored mail: ``in`` came through the fetch, ``out`` was sent.
+TICKET_MAIL_DIRECTIONS: tuple[str, ...] = ("in", "out")
+#: The states of a sent mail.
+TICKET_MAIL_STATES: tuple[str, ...] = ("sending", "sent", "failed")
 #: The id of the built-in Bereich ``Plattform``. The migration creates the row.
 PLATFORM_AREA_ID = uuid.UUID("7a11e700-0000-4000-8000-000000000001")
 
@@ -141,6 +152,10 @@ class TicketMailbox(UUIDPkMixin, TimestampMixin, Base):
         last_error: The short cause code of the newest failure, never a text of an
             exception.
         fetched_at: The moment of the last fetch without a failure.
+        signature: The text that ends each sent mail. ``{name}`` stands for the writer
+            (§F/integrations/ticket-mail/002736).
+        confirm: The switch "Eingang bestätigen": a new ticket from a mail gets a
+            confirmation (§F/integrations/ticket-mail/002738).
     """
 
     __tablename__ = "ticket_mailbox"
@@ -164,6 +179,8 @@ class TicketMailbox(UUIDPkMixin, TimestampMixin, Base):
     failures: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    signature: Mapped[str] = mapped_column(Text, default="", server_default="")
+    confirm: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
 
 class TicketCategory(UUIDPkMixin, Base):
@@ -200,6 +217,7 @@ class Ticket(UUIDPkMixin, TimestampMixin, Base):
         number: The eight random characters of the number, unique on the platform.
         reporter_principal_id: The account of the reporter, else NULL.
         reporter_email: The e-mail of a reporter without a session, else NULL.
+        reporter_name: The display name of ``From`` of a ticket from a mail, else NULL.
         duplicate_of_id: The ticket that this one duplicates (status ``rejected``).
         follow_up_of_id: The closed ticket that this one follows, else NULL.
         source: ``help``, ``mail`` or ``team``.
@@ -225,6 +243,7 @@ class Ticket(UUIDPkMixin, TimestampMixin, Base):
         ForeignKey("principal.id"), nullable=True
     )
     reporter_email: Mapped[str | None] = mapped_column(CITEXT, nullable=True)
+    reporter_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     assignee_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("principal.id"), nullable=True)
     duplicate_of_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("ticket.id", ondelete="SET NULL"), nullable=True
@@ -293,6 +312,82 @@ class TicketEvent(UUIDPkMixin, Base):
     __table_args__ = (
         CheckConstraint(f"kind IN ({_in(TICKET_EVENT_KINDS)})", name="kind"),
         Index("ix_ticket_event_ticket_id", "ticket_id"),
+    )
+
+
+class TicketMail(UUIDPkMixin, Base):
+    """One mail of a ticket: an imported mail or a sent mail.
+
+    ``mailbox_id`` and ``message_id`` together are the identity of a mail
+    (§F/integrations/ticket-mail/002724), so a second fetch of the same mail meets the
+    unique index. The row stays when its Postfach goes, because the ticket keeps its
+    mails. The anonymization of the ticket clears the addresses and the subject and
+    removes the source; the identity stays, so the mail is never imported again.
+
+    Attributes:
+        note_id: The message that the mail became, else NULL: the first mail of a
+            ticket is the ticket body, and an automatic mail is an event.
+        direction: ``in`` or ``out``.
+        message_id: The ``Message-ID`` with its angle brackets, else ``sha256:<hex>``.
+        from_address: The address of ``From``.
+        cc: The addresses of ``Cc``.
+        source_key: The storage key of the full source, else NULL.
+        source_size: The size of the source in bytes.
+        source_scan: NULL before a scan, ``clean``, or the signature of the finding.
+        skipped: The files that did not become files of the message, each with
+            ``name``, ``size`` and ``reason`` (``size`` or ``type``).
+        automatic: The mail came from a machine. A sent mail with this mark is the
+            confirmation of a new ticket.
+        to_addresses: The addresses of ``To`` of a sent mail.
+        state: The state of a sent mail: ``sending``, ``sent`` or ``failed``; NULL for
+            an imported mail (§F/integrations/ticket-mail/002737).
+        attempts: The failed sends in sequence.
+        send_error: The short cause code of the newest failed send.
+        next_try_at: The moment from which the worker tries the send again.
+    """
+
+    __tablename__ = "ticket_mail"
+
+    mailbox_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ticket_mailbox.id", ondelete="SET NULL"), nullable=True
+    )
+    ticket_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ticket.id", ondelete="CASCADE"))
+    note_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ticket_note.id", ondelete="SET NULL"), nullable=True
+    )
+    direction: Mapped[str] = mapped_column(Text, default="in", server_default="in")
+    message_id: Mapped[str] = mapped_column(Text)
+    from_address: Mapped[str | None] = mapped_column(CITEXT, nullable=True)
+    from_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cc: Mapped[list[str]] = mapped_column(JSONB, default=list, server_default=text("'[]'::jsonb"))
+    subject: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_size: Mapped[int] = mapped_column(BigInteger, default=0, server_default=text("0"))
+    source_scan: Mapped[str | None] = mapped_column(Text, nullable=True)
+    skipped: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
+    automatic: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    to_addresses: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
+    state: Mapped[str | None] = mapped_column(Text, nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    send_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    next_try_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(f"direction IN ({_in(TICKET_MAIL_DIRECTIONS)})", name="direction"),
+        CheckConstraint(f"state IS NULL OR state IN ({_in(TICKET_MAIL_STATES)})", name="state"),
+        UniqueConstraint("mailbox_id", "message_id", name="uq_ticket_mail_mailbox_message"),
+        Index("ix_ticket_mail_ticket_id", "ticket_id"),
+        Index("ix_ticket_mail_message_id", "message_id"),
+        Index(
+            "ix_ticket_mail_sending",
+            "next_try_at",
+            postgresql_where=text("state = 'sending'"),
+        ),
     )
 
 

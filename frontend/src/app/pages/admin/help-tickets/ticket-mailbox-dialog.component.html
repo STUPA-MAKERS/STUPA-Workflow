@@ -81,6 +81,21 @@
         [ngModel]="draft().doneFolder"
         (ngModelChange)="patch({ doneFolder: $event })"
       />
+      <app-section [heading]="'admin.helpTickets.mailbox.answers' | t">
+        <app-note [surface]="3">{{ 'admin.helpTickets.mailbox.signatureHint' | t }}</app-note>
+        <app-textarea [label]="'admin.helpTickets.mailbox.signature' | t" [grow]="true">
+          <textarea
+            rows="3"
+            name="signature"
+            maxlength="2000"
+            [ngModel]="draft().signature"
+            (ngModelChange)="patch({ signature: $event })"
+          ></textarea>
+        </app-textarea>
+        <app-switch [checked]="draft().confirm" (checkedChange)="patch({ confirm: $event })">{{
+          'admin.helpTickets.mailbox.confirm' | t
+        }}</app-switch>
+      </app-section>
       @for (line of testLines(); track line.text) {
         <app-note role="status" [kind]="line.ok ? 'ok' : 'error'" [surface]="3">{{ line.text }}</app-note>
       }

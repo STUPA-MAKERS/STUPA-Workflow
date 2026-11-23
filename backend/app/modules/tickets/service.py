@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 import re
 import uuid
-from collections.abc import Collection, Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Collection, Iterable, Mapping, Sequence
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -66,17 +66,29 @@ from app.modules.auth.principal import Principal
 from app.modules.files.drafts import bind_drafts, check_drafts, check_message_drafts
 from app.modules.files.schemas import MessageAttachmentOut
 from app.modules.files.service import FilesService
+from app.modules.files.storage import StorageError
 from app.modules.meetings.models import Meeting
 from app.modules.tickets.access import AreaScope, area_workers, works_in
+from app.modules.tickets.mail_send import (
+    MAILBOX_OFF,
+    is_mail_ticket,
+    mailbox_of,
+    queue_answer,
+    send_again,
+    thread_recipients,
+)
 from app.modules.tickets.models import (
     CLOSED_STATUSES,
     PLATFORM_AREA_ID,
     REOPEN_DAYS,
+    TICKET_MAIL_STATES,
     TICKET_STATUSES,
     Ticket,
     TicketArea,
     TicketCategory,
     TicketEvent,
+    TicketMail,
+    TicketMailbox,
     TicketNote,
     TicketSenderBlock,
 )
@@ -95,14 +107,23 @@ from app.modules.tickets.schemas import (
     TicketDetail,
     TicketEventOut,
     TicketListItem,
+    TicketMailAnswer,
+    TicketMailOut,
     TicketManualCreate,
     TicketNoteOut,
     TicketPatch,
     TicketRef,
     TicketReporter,
+    TicketSkippedFile,
 )
 from app.modules.tickets.webhook_fields import emit_ticket_created
-from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
+from app.shared.errors import (
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    ServiceUnavailableError,
+    ValidationProblem,
+)
 from app.shared.mentions import (
     check_mentions,
     mention_ids,
@@ -143,6 +164,9 @@ AREA_NOT_REACHABLE = "ticket_area_not_reachable"
 AREA_WITHOUT_MAILBOX = "ticket_area_without_mailbox"
 #: The problem code of a ticket by hand that names no person, two, or an unknown account.
 REPORTER_INVALID = "ticket_reporter_invalid"
+
+#: The problem code of a download of a mail source without a clean scan result.
+MAIL_SOURCE_CLOSED = "mail_source_closed"
 
 #: What a block targets: an account id or a normalized e-mail address.
 BlockTarget = tuple[Literal["principal"], uuid.UUID] | tuple[Literal["email"], str]
@@ -384,8 +408,8 @@ class TicketService:
         the ticket and that note, else None.
 
         A ticket for an address needs a Postfach of the Bereich, because the first
-        public message goes out as a mail. No Bereich has a Postfach yet, so an address
-        always answers 422.
+        public message goes out as a mail (§F/collaboration/tickets/002712). The
+        message of such a ticket is stored with its mail.
 
         Raises:
             ForbiddenError: The caller has no work right in the Bereich (HTTP 403).
@@ -394,6 +418,8 @@ class TicketService:
                 Bereich without a Postfach (``ticket_area_without_mailbox``), no person
                 or two, or an unknown or inactive account
                 (``ticket_reporter_invalid``), a bad kind or Kategorie (HTTP 422).
+            ConflictError: A message for an address while the Postfach is off (HTTP
+                409, ``mailbox_off``).
         """
         if not works_in(areas, payload.area_id):
             raise ForbiddenError("No work right in the Bereich.")
@@ -410,20 +436,9 @@ class TicketService:
                 code=REPORTER_INVALID,
                 errors=[{"field": "reporterId", "msg": "exactly one of reporterId and email"}],
             )
-        if payload.reporter_id is None:
-            raise ValidationProblem(
-                "The Bereich has no Postfach, so it cannot write to an address.",
-                code=AREA_WITHOUT_MAILBOX,
-                errors=[{"field": "email", "msg": "the Bereich has no Postfach"}],
-            )
-        person = await self.session.get(PrincipalRow, payload.reporter_id)
-        if person is None or not person.active or person.merged_into is not None:
-            raise ValidationProblem(
-                "The account does not exist or is not active.",
-                code=REPORTER_INVALID,
-                errors=[{"field": "reporterId", "msg": "unknown or inactive account"}],
-            )
+        person = await self._manual_person(payload)
         await self._check_kind(payload.area_id, payload.kind, payload.category_id)
+        address = normalize_email(payload.email) if payload.email is not None else None
         ticket = Ticket(
             id=uuid.uuid4(),
             number=await self.free_number(),
@@ -434,12 +449,15 @@ class TicketService:
             title=payload.title.strip() or payload.title,
             body=payload.body,
             status="new",
-            reporter_principal_id=person.id,
+            reporter_principal_id=person.id if person is not None else None,
+            reporter_email=address,
             context={},
         )
         self.session.add(ticket)
         await self.session.flush()
-        await emit_ticket_created(self.session, ticket, reporter_email=person.email)
+        await emit_ticket_created(
+            self.session, ticket, reporter_email=person.email if person is not None else address
+        )
         self._event(ticket, "created", actor, {"confirmationSent": False})
         note = (
             TicketNote(
@@ -456,7 +474,37 @@ class TicketService:
         if note is not None:
             self.session.add(note)
         await self.session.flush()
+        if note is not None and person is None:
+            await queue_answer(self.session, ticket, note.id)
         return ticket, note
+
+    async def _manual_person(self, payload: TicketManualCreate) -> PrincipalRow | None:
+        """Return the account of a ticket by hand; None for a ticket for an address.
+
+        Raises:
+            ValidationProblem: The Bereich has no Postfach for the address
+                (``ticket_area_without_mailbox``), or the account is unknown or not
+                active (``ticket_reporter_invalid``) (HTTP 422).
+        """
+        if payload.reporter_id is None:
+            box = await self.session.scalar(
+                select(TicketMailbox.id).where(TicketMailbox.area_id == payload.area_id)
+            )
+            if box is None:
+                raise ValidationProblem(
+                    "The Bereich has no Postfach, so it cannot write to an address.",
+                    code=AREA_WITHOUT_MAILBOX,
+                    errors=[{"field": "email", "msg": "the Bereich has no Postfach"}],
+                )
+            return None
+        person = await self.session.get(PrincipalRow, payload.reporter_id)
+        if person is None or not person.active or person.merged_into is not None:
+            raise ValidationProblem(
+                "The account does not exist or is not active.",
+                code=REPORTER_INVALID,
+                errors=[{"field": "reporterId", "msg": "unknown or inactive account"}],
+            )
+        return person
 
     async def reporter_address(self, ticket: Ticket) -> str | None:
         """Return the address of the reporter: the account e-mail or the given e-mail."""
@@ -537,6 +585,29 @@ class TicketService:
         await self.session.commit()
         logger.info("report held back by sender block %s", block_id)
         return SwallowedReport(number=number)
+
+    async def count_block_hit(self, block_id: uuid.UUID) -> None:
+        """Count one held-back mail on a sender block, without a commit."""
+        await self.session.execute(
+            update(TicketSenderBlock)
+            .where(TicketSenderBlock.id == block_id)
+            .values(hit_count=TicketSenderBlock.hit_count + 1, last_hit_at=_now())
+        )
+        logger.info("mail held back by sender block %s", block_id)
+
+    def sender_answered(self, ticket: Ticket) -> None:
+        """Set ``in_progress`` after a message of the sender, without a commit.
+
+        Only a ticket with the status ``waiting``, ``done`` or ``rejected`` changes. The
+        status event has no person, so the team sees that the answer is there.
+        """
+        if ticket.status == "waiting" or ticket.status in CLOSED_STATUSES:
+            self._set_status(ticket, "in_progress", None, None)
+        ticket.updated_at = _now()
+
+    def add_event(self, ticket: Ticket, kind: str, payload: dict[str, JsonValue]) -> None:
+        """Add an event of the system to a ticket, without a commit."""
+        self._event(ticket, kind, None, payload)
 
     @staticmethod
     def block_target(ticket: Ticket) -> BlockTarget | None:
@@ -837,6 +908,8 @@ class TicketService:
         )
         item = self._list_item(ticket, accounts)
         files = await self.files.message_attachments("ticket_note", [n.id for n in notes])
+        mails = await self._mails(ticket.id)
+        senders = {m.note_id: m for m in mails if m.note_id is not None}
         return TicketDetail(
             **item.model_dump(),
             body=ticket.body,
@@ -844,7 +917,10 @@ class TicketService:
             attachments=tuple(
                 TicketAttachment.of(a) for a in await self.files.list_for_ticket(ticket.id)
             ),
-            notes=tuple(_note_row(n, ticket, accounts, me, files.get(n.id, [])) for n in notes),
+            notes=tuple(
+                _note_row(n, ticket, accounts, me, files.get(n.id, []), mail=senders.get(n.id))
+                for n in notes
+            ),
             events=tuple(_event_out(e, accounts, readable) for e in events),
             duplicate_of=(
                 TicketRef(id=duplicate.id, number=format_number(duplicate.number))
@@ -863,7 +939,80 @@ class TicketService:
             closed_at=ticket.closed_at,
             anonymized_at=ticket.anonymized_at,
             sender_blocked=await self._sender_blocked(ticket),
+            mails=tuple(_mail_out(m) for m in mails),
+            mail_answer=await self._mail_answer(ticket, mails),
         )
+
+    async def _mail_answer(
+        self, ticket: Ticket, mails: Sequence[TicketMail]
+    ) -> TicketMailAnswer | None:
+        """Return the recipients of the next answer; None when the ticket has no mails."""
+        if not is_mail_ticket(ticket):
+            return None
+        box = await mailbox_of(self.session, ticket)
+        people = thread_recipients(ticket, mails, str(box.address) if box is not None else "")
+        return TicketMailAnswer(
+            to=people.to, cc=people.cc, enabled=box is not None and bool(box.enabled)
+        )
+
+    async def resend_mail(
+        self, ticket_id: uuid.UUID, mail_id: uuid.UUID, *, areas: AreaScope = None
+    ) -> TicketMailOut:
+        """Start the send of a failed mail of a ticket again, without a commit.
+
+        Raises:
+            NotFoundError: No such ticket in the Bereiche ``areas``, or no such mail on
+                it (HTTP 404).
+            ConflictError: The mail did not fail (``mail_not_failed``), or the Postfach
+                is off (``mailbox_off``) (HTTP 409).
+        """
+        ticket = await self._get(ticket_id, areas=areas)
+        mail = await self.session.get(TicketMail, mail_id, with_for_update=True)
+        if mail is None or mail.ticket_id != ticket.id:
+            raise NotFoundError("Mail not found.")
+        box = await mailbox_of(self.session, ticket)
+        if box is None or not box.enabled:
+            raise ConflictError("The Postfach of the Bereich is off.", code=MAILBOX_OFF)
+        send_again(mail)
+        await self.session.flush()
+        return _mail_out(mail)
+
+    async def _mails(self, ticket_id: uuid.UUID) -> Sequence[TicketMail]:
+        return (
+            await self.session.scalars(
+                select(TicketMail)
+                .where(TicketMail.ticket_id == ticket_id)
+                .order_by(TicketMail.created_at, TicketMail.id)
+            )
+        ).all()
+
+    async def mail_source(
+        self, ticket_id: uuid.UUID, mail_id: uuid.UUID, *, areas: AreaScope = None
+    ) -> tuple[AsyncIterator[bytes], str, int]:
+        """Open the source of a mail of a ticket: the stream, the file name and the size.
+
+        Raises:
+            NotFoundError: No such ticket in the Bereiche ``areas``, no such mail on it,
+                or the source is gone (HTTP 404).
+            ConflictError: The source has no clean scan result
+                (``mail_source_closed``, HTTP 409).
+            ServiceUnavailableError: The object storage is off (HTTP 503).
+        """
+        ticket = await self._get(ticket_id, areas=areas)
+        mail = await self.session.get(TicketMail, mail_id)
+        if mail is None or mail.ticket_id != ticket.id or mail.source_key is None:
+            raise NotFoundError("Mail not found.")
+        if mail.source_scan != "clean":
+            raise ConflictError(
+                "The source of the mail has no clean scan result.", code=MAIL_SOURCE_CLOSED
+            )
+        if self.files.storage is None:
+            raise ServiceUnavailableError("Object storage unavailable.")
+        try:
+            stream = await self.files.storage.get_stream(mail.source_key)
+        except StorageError as exc:
+            raise ServiceUnavailableError("Mail source temporarily unavailable.") from exc
+        return stream, f"{format_number(ticket.number)}.eml", mail.source_size
 
     async def _readable_cards(
         self, events: Sequence[TicketEvent], principal: Principal
@@ -1139,7 +1288,13 @@ class TicketService:
             ValidationProblem: Files on an anonymized ticket (``ticket_anonymized``),
                 files without a draft token, or a draft that is missing, expired,
                 foreign or infected, or a mention of a person without the work right
-                in the Bereich (``mention_not_member``) (HTTP 422).
+                in the Bereich (``mention_not_member``), or a public message on a mail
+                ticket to nobody (``mail_without_recipient``) (HTTP 422).
+            ConflictError: A public message on a mail ticket while the Postfach of the
+                Bereich is off (``mailbox_off``, HTTP 409).
+
+        A public message on a mail ticket is stored with its mail to ``to`` and ``cc``
+        of the payload (§F/integrations/ticket-mail/002733, 002735).
 
         With files the ticket row is locked, so the retention cron (which locks it too)
         cannot anonymize the ticket between the check and the commit; the cron runs once
@@ -1157,6 +1312,11 @@ class TicketService:
             draft_token=payload.draft_token,
             pepper=pepper,
             mentions=wanted,
+            answer=(
+                (payload.to, payload.cc)
+                if payload.visibility == "public" and is_mail_ticket(ticket)
+                else None
+            ),
         )
         self.added_mentions = wanted
         return note
@@ -1173,8 +1333,12 @@ class TicketService:
         pepper: str,
         for_reporter: bool = False,
         mentions: Sequence[uuid.UUID] = (),
+        answer: tuple[Sequence[str] | None, Sequence[str] | None] | None = None,
     ) -> TicketNoteOut:
-        """Store a note, bind its files and commit. The caller read the ticket."""
+        """Store a note, bind its files and commit. The caller read the ticket.
+
+        ``answer`` holds ``to`` and ``cc`` of the mail of the note; None sends no mail.
+        """
         if attachment_ids and ticket.anonymized_at is not None:
             raise ValidationProblem(
                 "The ticket is anonymized and takes no files.",
@@ -1205,6 +1369,9 @@ class TicketService:
                 pepper=pepper,
                 ticket_note_id=note.id,
             )
+        if answer is not None:
+            await self.session.flush()
+            await queue_answer(self.session, ticket, note.id, to=answer[0], cc=answer[1])
         ticket.updated_at = _now()
         await self.session.commit()
         await self.session.refresh(note)
@@ -1600,10 +1767,40 @@ class TicketService:
             .where(TicketEvent.ticket_id == ticket.id, TicketEvent.kind == "created")
             .values(actor_id=None)
         )
-        ticket.reporter_principal_id = None
-        ticket.reporter_email = None
+        await self._anonymize_mails(ticket.id)
+        for column in ("reporter_principal_id", "reporter_email", "reporter_name"):
+            setattr(ticket, column, None)
         ticket.context = {}
         ticket.anonymized_at = _now()
+
+    async def _anonymize_mails(self, ticket_id: uuid.UUID) -> None:
+        """Remove the sources and the addresses of the mails of a ticket.
+
+        The row and its ``Message-ID`` stay, so the fetch never imports the mail again
+        (§F/integrations/ticket-mail/002724, 002729).
+        """
+        keys = (
+            await self.session.scalars(
+                select(TicketMail.source_key).where(
+                    TicketMail.ticket_id == ticket_id, TicketMail.source_key.is_not(None)
+                )
+            )
+        ).all()
+        await self.files.remove_objects([key for key in keys if key])
+        await self.session.execute(
+            update(TicketMail)
+            .where(TicketMail.ticket_id == ticket_id)
+            .values(
+                from_address=None,
+                from_name=None,
+                cc=[],
+                to_addresses=[],
+                subject=None,
+                source_key=None,
+                source_scan=None,
+                skipped=[],
+            )
+        )
 
     async def _get(
         self, ticket_id: uuid.UUID, *, lock: bool = False, areas: AreaScope = None
@@ -1841,6 +2038,7 @@ def _note_row(
     attachments: list[MessageAttachmentOut],
     *,
     for_reporter: bool = False,
+    mail: TicketMail | None = None,
 ) -> TicketNoteOut:
     """Build the wire note.
 
@@ -1852,6 +2050,8 @@ def _note_row(
     author = (
         _reporter_view_author(note.author_id, accounts, me)
         if for_reporter and note.author_id is not None
+        else _mail_author(mail)
+        if mail is not None and note.author_id is None
         else _person(accounts, note.author_id)
     )
     return TicketNoteOut(
@@ -1864,13 +2064,48 @@ def _note_row(
         attachments=attachments,
         visibility=note.visibility or "internal",  # pyright: ignore[reportArgumentType]
         from_reporter=(
-            note.author_id is not None and note.author_id == ticket.reporter_principal_id
+            (note.author_id is not None and note.author_id == ticket.reporter_principal_id)
+            or (note.author_id is None and mail is not None and mail.direction == "in")
         ),
         mentions=(
             ()
             if for_reporter
             else tuple(_person(accounts, pid) for pid in mention_ids(note.mentions))
         ),
+    )
+
+
+def _mail_author(mail: TicketMail) -> PersonRef:
+    """Return the writer of a message from a mail: the name of ``From``, else the address."""
+    name = mail.from_name or mail.from_address
+    return PersonRef(principal_id=None, display_name=name) if name else DELETED_PERSON
+
+
+def _mail_source_state(mail: TicketMail) -> Literal["clean", "infected", "closed", "gone"]:
+    if mail.source_key is None:
+        return "gone"
+    if mail.source_scan is None:
+        return "closed"
+    return "clean" if mail.source_scan == "clean" else "infected"
+
+
+def _mail_out(mail: TicketMail) -> TicketMailOut:
+    return TicketMailOut(
+        id=mail.id,
+        note_id=mail.note_id,
+        direction="out" if mail.direction == "out" else "in",
+        from_name=mail.from_name,
+        from_address=mail.from_address,
+        cc=tuple(str(entry) for entry in mail.cc or []),
+        subject=mail.subject,
+        automatic=mail.automatic,
+        source=_mail_source_state(mail),
+        source_size=mail.source_size,
+        skipped=tuple(TicketSkippedFile.model_validate(entry) for entry in mail.skipped or []),
+        to=tuple(str(entry) for entry in mail.to_addresses or []),
+        state=mail.state if mail.state in TICKET_MAIL_STATES else None,  # pyright: ignore[reportArgumentType]
+        error=mail.send_error if mail.state != "sent" else None,
+        at=mail.created_at,
     )
 
 
@@ -1884,6 +2119,11 @@ def _reporter_view_author(
         principal_id=author_id if own else None,
         display_name=account.display_name if account is not None else None,
     )
+
+
+def reply_is_late(ticket: Ticket) -> bool:
+    """Tell if a message of the sender comes more than ``REOPEN_DAYS`` days after the close."""
+    return _reply_is_late(ticket)
 
 
 def _reply_is_late(ticket: Ticket) -> bool:
@@ -1960,7 +2200,7 @@ def _reporter(ticket: Ticket, accounts: dict[uuid.UUID, _Account]) -> TicketRepo
     if ticket.anonymized_at is not None:
         return TicketReporter(anonymized=True)
     if ticket.reporter_principal_id is None:
-        return TicketReporter(email=ticket.reporter_email)
+        return TicketReporter(display_name=ticket.reporter_name, email=ticket.reporter_email)
     person = _person(accounts, ticket.reporter_principal_id)
     account = accounts.get(ticket.reporter_principal_id)
     return TicketReporter(

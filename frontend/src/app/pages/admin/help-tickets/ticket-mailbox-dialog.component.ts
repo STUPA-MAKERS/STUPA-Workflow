@@ -28,6 +28,7 @@ import {
   NoteComponent,
   SectionComponent,
   SwitchComponent,
+  TextareaComponent,
   ToastService,
   type Action,
 } from '@stupa-makers/ui-kit';
@@ -48,9 +49,11 @@ export interface MailboxDraft {
   readonly smtpPassword: string;
   readonly doneFolder: string;
   readonly enabled: boolean;
+  readonly signature: string;
+  readonly confirm: boolean;
 }
 
-type TextField = Exclude<keyof MailboxDraft, 'enabled'>;
+type TextField = Exclude<keyof MailboxDraft, 'enabled' | 'confirm'>;
 
 /** The four fields of one account. */
 interface Side {
@@ -106,6 +109,8 @@ export function draftOf(mailbox: TicketMailbox | null): MailboxDraft {
     smtpPassword: '',
     doneFolder: mailbox?.doneFolder ?? DEFAULT_DONE_FOLDER,
     enabled: mailbox?.enabled ?? false,
+    signature: mailbox?.signature ?? '',
+    confirm: mailbox?.confirm ?? false,
   };
 }
 
@@ -159,6 +164,8 @@ export function mailboxBody(draft: MailboxDraft): Partial<TicketMailboxInput> {
     ...(draft.smtpPassword ? { smtpPassword: draft.smtpPassword } : {}),
     doneFolder: draft.doneFolder.trim(),
     enabled: draft.enabled,
+    signature: draft.signature.trim(),
+    confirm: draft.confirm,
   };
 }
 
@@ -186,6 +193,7 @@ export function mailboxBody(draft: MailboxDraft): Partial<TicketMailboxInput> {
     NoteComponent,
     SectionComponent,
     SwitchComponent,
+    TextareaComponent,
   ],
   templateUrl: './ticket-mailbox-dialog.component.html',
 })
