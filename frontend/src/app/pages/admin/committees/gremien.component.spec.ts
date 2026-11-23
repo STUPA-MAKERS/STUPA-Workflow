@@ -495,8 +495,8 @@ describe('AdminGremienComponent ?open=', () => {
     expect(expanded('AStA')).toBe('true');
     expect(expanded('Studierendenparlament')).toBe('false');
     expect(scroll).toHaveBeenCalledTimes(1);
-    expect(scroll.mock.contexts[0]).toBe(item('AStA'));
-    expect(scroll).toHaveBeenCalledWith(expect.objectContaining({ block: 'start' }));
+    expect(scroll.mock.contexts[0]).toBe(screen.getByRole('button', { name: /^AStA/ }));
+    expect(scroll).toHaveBeenCalledWith(expect.objectContaining({ block: 'center' }));
   });
 
   it('opens the first row and does not scroll for an unknown id', async () => {

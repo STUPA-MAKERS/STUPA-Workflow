@@ -387,10 +387,12 @@ export class AdminGremienComponent {
     if (!target) return;
     afterNextRender(
       () => {
-        const row = this.host.nativeElement.querySelector<HTMLElement>(
-          `[data-gremium="${CSS.escape(target.id)}"]`,
+        // The head of the row, not the whole row: an open row is taller than the screen,
+        // and the centre keeps the head clear of a sticky page head.
+        const head = this.host.nativeElement.querySelector<HTMLElement>(
+          `[data-gremium="${CSS.escape(target.id)}"] [aria-expanded]`,
         );
-        row?.scrollIntoView?.({ block: 'start', behavior: scrollBehavior() });
+        head?.scrollIntoView?.({ block: 'center', behavior: scrollBehavior() });
       },
       { injector: this.injector },
     );
