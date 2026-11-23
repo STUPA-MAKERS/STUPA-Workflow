@@ -2,7 +2,7 @@
 id: "002768"
 title: The graph shows linked Paperless documents
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

@@ -2,7 +2,7 @@
 id: "002766"
 title: The link search finds Paperless documents
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

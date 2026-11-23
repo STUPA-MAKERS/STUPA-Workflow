@@ -2,7 +2,7 @@
 id: "002765"
 title: A Paperless link keeps the title from the moment of the link
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null
