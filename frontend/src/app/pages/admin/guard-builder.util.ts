@@ -149,11 +149,7 @@ export function validateAction(action: ActionDef | null | undefined): void {
   if (typeof type !== 'string' || !ACTION_SET.has(type)) {
     throw new GuardError('admin.flow.err.actionUnknownType', { type: String(type) });
   }
-  if (type === 'webhook') {
-    if (typeof action['webhookId'] !== 'string' || !action['webhookId']) {
-      throw new GuardError('admin.flow.err.actionWebhook');
-    }
-  } else if (type === 'notify') {
+  if (type === 'notify') {
     validateRecipients(action['recipients']);
   } else if (type === 'addToNextSession') {
     if ('gremiumId' in action && !isNonEmptyString(action['gremiumId'])) {

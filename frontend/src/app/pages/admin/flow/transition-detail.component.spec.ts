@@ -6,7 +6,6 @@ import { TransitionDetailComponent } from './transition-detail.component';
 
 const ROLES: SelectOption[] = [{ value: 'finance', label: 'Finanzen (finance)' }];
 const GREMIEN: SelectOption[] = [{ value: 'g1', label: 'StuPa' }];
-const WEBHOOKS: SelectOption[] = [{ value: 'w1', label: 'Buchhaltung' }];
 
 const TREE: BudgetTreeNode[] = [
   {
@@ -33,7 +32,6 @@ async function setup(transition: TransitionDef, extra: Record<string, unknown> =
       transition,
       roleOptions: ROLES,
       gremiumOptions: GREMIEN,
-      webhookOptions: WEBHOOKS,
       ...extra,
     },
   });
@@ -54,7 +52,6 @@ describe('TransitionDetailComponent', () => {
       from: 'a',
       to: 'b',
       actions: [
-        { type: 'webhook', webhookId: 'w1' },
         { type: 'addToNextSession', gremiumId: 'g1' },
         { type: 'assignBudget', budgetId: 'b1' },
         {
@@ -68,7 +65,6 @@ describe('TransitionDetailComponent', () => {
         },
       ],
     });
-    expect(screen.getAllByText('Webhook auslösen').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Zur nächsten Sitzung').length).toBeGreaterThanOrEqual(1);
     expect(c.actionParam({ type: 'assignBudget', budgetId: 'b1' }, 'budgetId')).toBe('b1');
     expect(c.actionParam({ type: 'assignBudget' }, 'budgetId')).toBe('');
@@ -94,16 +90,16 @@ describe('TransitionDetailComponent', () => {
     c.recipientAdd.subscribe((e: unknown) => events.push(['rcpt+', e]));
     c.recipientRemove.subscribe((e: unknown) => events.push(['rcpt-', e]));
     c.guardChange.subscribe((e: unknown) => events.push(['guard', e]));
-    c.actionAdd.emit('webhook');
+    c.actionAdd.emit('notify');
     c.actionRemove.emit(0);
-    c.actionParamChange.emit({ ai: 0, key: 'webhookId', value: 'w1' });
+    c.actionParamChange.emit({ ai: 0, key: 'gremiumId', value: 'g1' });
     c.recipientAdd.emit(0);
     c.recipientRemove.emit({ ai: 0, ri: 0 });
     c.guardChange.emit(null);
     expect(events).toEqual([
-      ['add', 'webhook'],
+      ['add', 'notify'],
       ['remove', 0],
-      ['param', { ai: 0, key: 'webhookId', value: 'w1' }],
+      ['param', { ai: 0, key: 'gremiumId', value: 'g1' }],
       ['rcpt+', 0],
       ['rcpt-', { ai: 0, ri: 0 }],
       ['guard', null],
@@ -119,11 +115,11 @@ describe('TransitionDetailComponent', () => {
     expect(add).toBeDisabled();
     c.addPending();
     expect(added).toEqual([]);
-    c.pendingAction.set('webhook');
+    c.pendingAction.set('notify');
     fixture.detectChanges();
     expect(add).toBeEnabled();
     add.click();
-    expect(added).toEqual(['webhook']);
+    expect(added).toEqual(['notify']);
     expect(c.pendingAction()).toBe('');
   });
 
@@ -165,7 +161,7 @@ describe('TransitionDetailComponent', () => {
     const { c } = await setup({ from: 'a', to: 'b', actions: [] });
     localStorage.removeItem('ap.features.off');
     const values = c.actionOptions().map((o: { value: string }) => o.value);
-    expect(values).toContain('webhook');
+    expect(values).toContain('notify');
     expect(values).not.toContain('addToNextSession');
     expect(values).not.toContain('assignBudget');
     expect(values).not.toContain('assignBudgetFromMap');

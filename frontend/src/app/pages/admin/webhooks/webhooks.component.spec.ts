@@ -2,10 +2,10 @@ import { Subject, of, throwError, type Observable } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
-import type { WebhookConfig, WebhookDeliveryStatus } from '../admin.models';
+import type { WebhookCatalogEvent, WebhookConfig, WebhookDeliveryStatus } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { ToastService } from '@stupa-makers/ui-kit';
-import { WebhooksComponent } from './webhooks.component';
+import { WebhooksComponent, previewBody, withSubscription } from './webhooks.component';
 import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
 
 const SENT: WebhookDeliveryStatus = {
@@ -25,6 +25,26 @@ const DEAD: WebhookDeliveryStatus = {
   lastAt: null,
 };
 
+const NO_FILTER = { subscriptions: [], gremiumIds: [], typeIds: [], stateKeys: [] };
+
+const CATALOG: WebhookCatalogEvent[] = [
+  {
+    name: 'application.transition',
+    group: 'applications',
+    idKeys: ['applicationId', 'transitionId', 'statusEventId'],
+    fields: [
+      { key: 'title', personal: false, example: 'Zuschuss Sommerfest' },
+      { key: 'applicantEmail', personal: true, example: 'erika@example.org' },
+    ],
+  },
+  {
+    name: 'vote.closed',
+    group: 'votes',
+    idKeys: ['voteId'],
+    fields: [{ key: 'result', personal: false, example: 'passed' }],
+  },
+];
+
 interface Opts {
   /** Make the initial list fail, so the loading state has to end anyway. */
   listError?: boolean;
@@ -34,6 +54,9 @@ interface Opts {
   status?: WebhookDeliveryStatus[];
   /** Front-end permission. `false` hides every mutating control. */
   can?: boolean;
+  /** Make the reads of the catalog and the filter choices fail. */
+  choicesError?: boolean;
+  testError?: boolean;
 }
 
 async function setup(seed: WebhookConfig[] = [], opts: Opts = {}) {
@@ -53,6 +76,25 @@ async function setup(seed: WebhookConfig[] = [], opts: Opts = {}) {
     saveWebhook,
     deleteWebhook,
     listWebhookDeliveryStatus,
+    getWebhookCatalog: jest.fn(() =>
+      opts.choicesError ? throwError(() => new Error('x')) : of(CATALOG),
+    ),
+    listGremienOptions: jest.fn(() =>
+      opts.choicesError ? throwError(() => new Error('x')) : of([{ id: 'g1', name: 'StuPa' }]),
+    ),
+    listApplicationTypes: jest.fn(() =>
+      opts.choicesError
+        ? throwError(() => new Error('x'))
+        : of([{ id: 't1', name: 'Finanzantrag' }]),
+    ),
+    getGlobalFlow: jest.fn(() =>
+      opts.choicesError
+        ? throwError(() => new Error('x'))
+        : of({ states: [{ key: 'approved', label: { de: 'Genehmigt' } }] }),
+    ),
+    sendWebhookTest: jest.fn(() =>
+      opts.testError ? throwError(() => new Error('x')) : of({ deliveryId: 'd1' }),
+    ),
   };
   const toast = { success: jest.fn(), error: jest.fn() };
   const auth = { can: jest.fn(() => opts.can !== false) };
@@ -69,8 +111,8 @@ async function setup(seed: WebhookConfig[] = [], opts: Opts = {}) {
 }
 
 const HOOKS: WebhookConfig[] = [
-  { id: 'wh-1', name: 'A', url: 'https://a', active: true },
-  { id: 'wh-2', name: 'B', url: 'https://b', active: true },
+  { id: 'wh-1', name: 'A', url: 'https://a', active: true, ...NO_FILTER },
+  { id: 'wh-2', name: 'B', url: 'https://b', active: true, ...NO_FILTER },
 ];
 
 describe('WebhooksComponent', () => {
@@ -82,10 +124,10 @@ describe('WebhooksComponent', () => {
   });
 
   /**
-   * An empty field is not yet wrong, but the save stays off. A valid URL is enough. The saved
-   * webhook has no event list, because only a flow action fires it.
+   * An empty field is not yet wrong, but the save stays off. A valid URL is enough. A new
+   * webhook subscribes to no event until one is checked.
    */
-  it('validates the URL and saves a webhook without an event list', async () => {
+  it('validates the URL and saves a webhook without a subscription', async () => {
     const { saveWebhook } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Webhook anlegen' }));
 
@@ -102,16 +144,14 @@ describe('WebhooksComponent', () => {
     expect(save).toBeEnabled();
     await userEvent.click(save);
     expect(saveWebhook).toHaveBeenCalledTimes(1);
-    expect(saveWebhook.mock.calls[0][0]).not.toHaveProperty('events');
+    expect(saveWebhook.mock.calls[0][0].subscriptions).toEqual([]);
   });
 
   /**
    * The edit leaves the original untouched until the save, and the dialog closes after the save.
    */
   it('edits an existing webhook via the dialog', async () => {
-    const seed = [
-      { id: 'wh-1', name: 'A', url: 'https://a', active: true },
-    ];
+    const seed = [{ id: 'wh-1', name: 'A', url: 'https://a', active: true, ...NO_FILTER }];
     const { c, saveWebhook } = await setup(seed);
     c.openEdit(0);
     expect(c.draft().url).toBe('https://a');
@@ -392,5 +432,109 @@ describe('WebhooksComponent', () => {
   it('offers no "Webhook anlegen" without webhook.manage', async () => {
     await setup(HOOKS, { can: false });
     expect(screen.queryByRole('button', { name: 'Webhook anlegen' })).toBeNull();
+  });
+  /** §F/integrations/webhooks/002410, 002412, 002413: a new subscription starts without personal fields. */
+  it('subscribes to an event with its fields that are not personal', async () => {
+    const { c } = await setup();
+    c.openAdd();
+    c.setEvent(CATALOG[0], true);
+    expect(c.subscriptionOf('application.transition')).toEqual({
+      event: 'application.transition',
+      fields: ['title'],
+    });
+    expect(c.hasTransition()).toBe(true);
+    c.setField(CATALOG[0], 'applicantEmail', true);
+    expect(c.subscriptionOf('application.transition').fields).toEqual(['title', 'applicantEmail']);
+    c.setField(CATALOG[0], 'title', false);
+    expect(c.subscriptionOf('application.transition').fields).toEqual(['applicantEmail']);
+    c.setEvent(CATALOG[0], false);
+    expect(c.subscriptionOf('application.transition')).toBeNull();
+    expect(c.hasTransition()).toBe(false);
+    c.setField(CATALOG[1], 'result', true);
+    expect(c.subscriptionOf('vote.closed')).toBeNull();
+  });
+
+  it('ignores event and field changes without a draft', async () => {
+    const { c } = await setup();
+    c.setEvent(CATALOG[0], true);
+    c.setField(CATALOG[0], 'title', true);
+    expect(c.draft()).toBeNull();
+    expect(c.subscriptionOf('application.transition')).toBeNull();
+    expect(c.previews()).toEqual([]);
+  });
+
+  /** §F/integrations/webhooks/002411, 002414: the dialog lists the catalog and the filter choices. */
+  it('renders the events by group, the personal mark and the filters', async () => {
+    const { c, fixture } = await setup();
+    c.openAdd();
+    c.setEvent(CATALOG[0], true);
+    fixture.detectChanges();
+    expect(c.groups().map((g: { group: string }) => g.group)).toEqual(['applications', 'votes']);
+    expect(c.gremiumOptions()).toEqual([{ value: 'g1', label: 'StuPa' }]);
+    expect(c.typeOptions()).toEqual([{ value: 't1', label: 'Finanzantrag' }]);
+    expect(c.stateOptions()).toEqual([{ value: 'approved', label: 'Genehmigt' }]);
+    expect(screen.getByRole('checkbox', { name: 'Statuswechsel' })).toBeChecked();
+    expect(screen.getAllByText('personenbezogen').length).toBeGreaterThan(0);
+  });
+
+  it('leaves the choices empty when their reads fail', async () => {
+    const { c } = await setup([], { choicesError: true });
+    expect(c.catalog()).toEqual([]);
+    expect(c.gremiumOptions()).toEqual([]);
+    expect(c.typeOptions()).toEqual([]);
+    expect(c.stateOptions()).toEqual([]);
+  });
+
+  /** §F/integrations/webhooks/002415: the preview shows the body of each subscribed event. */
+  it('previews the body of each subscribed event', async () => {
+    const { c } = await setup();
+    c.openAdd();
+    c.patch('subscriptions', [
+      { event: 'vote.closed', fields: ['result'] },
+      { event: 'gone.event', fields: [] },
+    ]);
+    const previews = c.previews();
+    expect(previews).toHaveLength(1);
+    expect(JSON.parse(previews[0].body)).toEqual({
+      event: 'vote.closed',
+      occurredAt: '2026-11-23T09:00:00+00:00',
+      voteId: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f',
+      data: { result: 'passed' },
+    });
+  });
+
+  it('builds the preview body and the subscription list', () => {
+    expect(JSON.parse(previewBody(CATALOG[0], [])).data).toEqual({});
+    const subs = withSubscription([], 'vote.closed', ['result']);
+    expect(subs).toEqual([{ event: 'vote.closed', fields: ['result'] }]);
+    expect(withSubscription(subs, 'vote.closed', null)).toEqual([]);
+  });
+
+  /** §F/integrations/webhooks/002416: the ⋮ menu sends a test delivery. */
+  it('sends a test delivery from the menu and reads the status again later', async () => {
+    jest.useFakeTimers();
+    try {
+      const { c, api, toast, listWebhookDeliveryStatus } = await setup(HOOKS);
+      c.onMenu(HOOKS[0], { id: 'test', label: 'Testzustellung senden' });
+      expect(api.sendWebhookTest).toHaveBeenCalledWith('wh-1');
+      expect(toast.success).toHaveBeenCalled();
+      const before = listWebhookDeliveryStatus.mock.calls.length;
+      jest.advanceTimersByTime(15_000);
+      expect(listWebhookDeliveryStatus.mock.calls.length).toBe(before + 1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('toasts a failed test delivery', async () => {
+    const { c, toast } = await setup(HOOKS, { testError: true });
+    c.sendTest(HOOKS[0]);
+    expect(toast.error).toHaveBeenCalled();
+  });
+
+  it('opens the delete confirm from the menu', async () => {
+    const { c } = await setup(HOOKS);
+    c.onMenu(HOOKS[1], { id: 'delete', label: 'Entfernen' });
+    expect(c.confirmDelete()).toEqual(HOOKS[1]);
   });
 });

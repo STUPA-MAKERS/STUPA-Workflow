@@ -154,7 +154,6 @@ export const GUARD_COMBINATORS: readonly GuardCombinator[] = ['and', 'or', 'not'
 
 
 export type ActionType =
-  | 'webhook'
   | 'notify'
   | 'addToNextSession'
   | 'assignBudget'
@@ -162,7 +161,6 @@ export type ActionType =
   | 'assignBudgetFromApplicantGremium'
   | 'assignBudgetFromMap';
 export const ACTION_TYPES: readonly ActionType[] = [
-  'webhook',
   'notify',
   'addToNextSession',
   'assignBudget',
@@ -835,11 +833,49 @@ export const EVENT_NAMES: readonly EventName[] = [
 
 export type RecipientKind = 'group' | 'role' | 'applicant';
 
+/** One subscribed event of a webhook and the fields of its `data` object (§F/integrations/webhooks/002412). */
+export interface WebhookSubscription {
+  readonly event: string;
+  readonly fields: readonly string[];
+}
+
 export interface WebhookConfig {
   readonly id: Uuid;
   readonly name: string;
   readonly url: string;
   readonly active: boolean;
+  /** The subscribed events (§F/integrations/webhooks/002410). */
+  readonly subscriptions: readonly WebhookSubscription[];
+  /** Filters; an empty list lets every value pass (§F/integrations/webhooks/002414). */
+  readonly gremiumIds: readonly Uuid[];
+  readonly typeIds: readonly Uuid[];
+  /** Target status keys of `application.transition`. */
+  readonly stateKeys: readonly string[];
+}
+
+/** The groups of the webhook event catalog, in the order of the dialog. */
+export type WebhookEventGroup =
+  | 'applications'
+  | 'votes'
+  | 'meetings'
+  | 'protocols'
+  | 'budget'
+  | 'tickets';
+
+/** One field of a catalog event (`GET /admin/webhooks/catalog`). */
+export interface WebhookCatalogField {
+  readonly key: string;
+  /** Personal data: marked and off by default (§F/integrations/webhooks/002413). */
+  readonly personal: boolean;
+  readonly example: unknown;
+}
+
+/** One event of the webhook catalog (§F/integrations/webhooks/002411). */
+export interface WebhookCatalogEvent {
+  readonly name: string;
+  readonly group: WebhookEventGroup;
+  readonly idKeys: readonly string[];
+  readonly fields: readonly WebhookCatalogField[];
 }
 
 /** Coarse state of the most recent delivery of one webhook. */

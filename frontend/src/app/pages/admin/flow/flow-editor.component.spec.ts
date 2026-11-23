@@ -23,8 +23,6 @@ interface Overrides {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   listRoles?: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  listWebhooks?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   listGremienOptions?: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tree?: any;
@@ -87,11 +85,6 @@ async function setup(over: Overrides = {}) {
   const listRoles =
     over.listRoles ??
     jest.fn(() => of([{ id: 'r1', key: 'finance', label: { de: 'Finanzen' }, permissions: [] }]));
-  const listWebhooks =
-    over.listWebhooks ??
-    jest.fn(() =>
-      of([{ id: 'w1', name: 'Buchhaltung', url: 'https://h.test', events: [], active: true }]),
-    );
   const listConfigRevisions = jest.fn(() => of([]));
   const api = {
     getGlobalFlow,
@@ -100,7 +93,6 @@ async function setup(over: Overrides = {}) {
     listGremienOptions,
     listGremiumRoles,
     listRoles,
-    listWebhooks,
     listConfigRevisions,
   };
   const budgetApi = { tree: over.tree ?? jest.fn(() => of([])) };
@@ -531,11 +523,10 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(getGlobalFlow).toHaveBeenCalledTimes(2);
   });
 
-  it('swallows errors from option/role/webhook/budget loads', async () => {
+  it('swallows errors from option/role/budget loads', async () => {
     const err = jest.fn(() => throwError(() => new Error('x')));
     const { fixture } = await setup({
       listRoles: err,
-      listWebhooks: err,
       listGremienOptions: err,
       tree: err,
     });
@@ -543,7 +534,6 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     const c = fixture.componentInstance as any;
     expect(c.gremiumOptions()).toEqual([]);
     expect(c.globalRoleOptions()).toEqual([]);
-    expect(c.webhookOptions()).toEqual([]);
   });
 
   /** The budget guard label resolves the nested id to its name. */
@@ -552,7 +542,6 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     expect(c.globalRoleOptions()).toEqual([{ value: 'finance', label: 'Finanzen (finance)' }]);
-    expect(c.webhookOptions()).toEqual([{ value: 'w1', label: 'Buchhaltung' }]);
     expect(
       c.guardGroupLabel({
         sig: 'x',
@@ -881,9 +870,9 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     buildValid(c);
-    c.addAction(0, 'webhook');
-    c.setActionParam(0, 0, 'webhookId', 'w1');
-    expect(c.actionParam(c.graph().transitions[0].actions[0], 'webhookId')).toBe('w1');
+    c.addAction(0, 'addToNextSession');
+    c.setActionParam(0, 0, 'gremiumId', 'g1');
+    expect(c.actionParam(c.graph().transitions[0].actions[0], 'gremiumId')).toBe('g1');
     expect(c.actionParam(c.graph().transitions[0].actions[0], 'missing')).toBe('');
 
     c.addAction(0, 'notify');
@@ -900,7 +889,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.recipientsOf(c.graph().transitions[0].actions[ai])[0].ref).toBeUndefined();
     c.removeRecipient(0, ai, 0);
     expect(c.recipientsOf(c.graph().transitions[0].actions[ai])).toHaveLength(0);
-    expect(c.recipientsOf({ type: 'webhook' })).toEqual([]);
+    expect(c.recipientsOf({ type: 'addToNextSession' })).toEqual([]);
   });
 
   it('sets transition color + requiresAction toggle', async () => {
@@ -1598,21 +1587,14 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(rightPids.some((p: string) => p.startsWith('group:'))).toBe(true);
   });
 
-  /**
-   * A role without a `de` label falls back to its key, and a webhook with an empty name falls back
-   * to its url.
-   */
-  it('falls back to keys/url when option labels are missing', async () => {
+  /** A role without a `de` label falls back to its key. */
+  it('falls back to keys when option labels are missing', async () => {
     const { fixture } = await setup({
       listRoles: jest.fn(() => of([{ id: 'r1', key: 'finance', label: {}, permissions: [] }])),
-      listWebhooks: jest.fn(() =>
-        of([{ id: 'w1', name: '', url: 'https://h.test', events: [], active: true }]),
-      ),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     expect(c.globalRoleOptions()).toEqual([{ value: 'finance', label: 'finance (finance)' }]);
-    expect(c.webhookOptions()).toEqual([{ value: 'w1', label: 'https://h.test' }]);
   });
 
   /**
@@ -1809,7 +1791,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     const c = fixture.componentInstance as any;
     buildValid(c);
     expect(c.recipientsOf({ type: 'notify', recipients: 'nope' })).toEqual([]);
-    expect(c.actionParam({ type: 'webhook', webhookId: 123 }, 'webhookId')).toBe('');
+    expect(c.actionParam({ type: 'addToNextSession', gremiumId: 123 }, 'gremiumId')).toBe('');
     const before = c.graph().transitions[0].actions.length;
     c.addAction(0, '');
     expect(c.graph().transitions[0].actions.length).toBe(before);
@@ -2286,7 +2268,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       ...g,
       transitions: [
         { from: 'a', to: 'b', actions: [{ type: 'notify', recipients: [] }] },
-        { from: 'b', to: 'c', actions: [{ type: 'webhook' }] },
+        { from: 'b', to: 'c', actions: [{ type: 'addToNextSession' }] },
       ],
     }));
     c.removeAction(0, 0);
@@ -2526,11 +2508,11 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       ...g,
       transitions: [{ from: 'a', to: 'b' }],
     }));
-    c.addAction(0, 'webhook');
+    c.addAction(0, 'addToNextSession');
     expect(c.graph().transitions[0].actions).toHaveLength(1);
 
     c.graph.update((g: FlowGraph) => ({ ...g, transitions: [{ from: 'a', to: 'b' }] }));
-    c.setActionParam(0, 0, 'webhookId', 'w1');
+    c.setActionParam(0, 0, 'gremiumId', 'g1');
     expect(c.graph().transitions[0].actions).toEqual([]);
 
     c.graph.update((g: FlowGraph) => ({ ...g, transitions: [{ from: 'a', to: 'b' }] }));
@@ -2547,11 +2529,11 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     buildValid(c);
-    c.addAction(0, 'webhook');
-    c.addAction(0, 'webhook');
-    c.setActionParam(0, 0, 'webhookId', 'w1');
-    expect(c.actionParam(c.graph().transitions[0].actions[0], 'webhookId')).toBe('w1');
-    expect(c.actionParam(c.graph().transitions[0].actions[1], 'webhookId')).toBe('');
+    c.addAction(0, 'addToNextSession');
+    c.addAction(0, 'addToNextSession');
+    c.setActionParam(0, 0, 'gremiumId', 'g1');
+    expect(c.actionParam(c.graph().transitions[0].actions[0], 'gremiumId')).toBe('g1');
+    expect(c.actionParam(c.graph().transitions[0].actions[1], 'gremiumId')).toBe('');
   });
 
   /** Without a stored position the drag starts from {x:0,y:0}. */
