@@ -142,21 +142,21 @@
           </div>
 
           <div class="gd__col">
-            <app-switch
-              class="gd__switch"
-              name="guestsMayVote"
-              [disabled]="form().quorumPercent !== null"
-              [ngModel]="form().guestsMayVote"
-              (ngModelChange)="patch('guestsMayVote', $event)"
-              >{{ 'admin.gremien.guestsMayVote' | t }}</app-switch
-            >
-            <app-switch
-              class="gd__switch"
-              name="allowVoteDelegation"
-              [ngModel]="form().allowVoteDelegation"
-              (ngModelChange)="patch('allowVoteDelegation', $event)"
-              >{{ 'admin.gremien.delegation' | t }}</app-switch
-            >
+            <div class="rowgroup rowgroup--settings">
+              <app-switch
+                name="guestsMayVote"
+                [disabled]="form().quorumPercent !== null"
+                [ngModel]="form().guestsMayVote"
+                (ngModelChange)="patch('guestsMayVote', $event)"
+                >{{ 'admin.gremien.guestsMayVote' | t }}</app-switch
+              >
+              <app-switch
+                name="allowVoteDelegation"
+                [ngModel]="form().allowVoteDelegation"
+                (ngModelChange)="patch('allowVoteDelegation', $event)"
+                >{{ 'admin.gremien.delegation' | t }}</app-switch
+              >
+            </div>
             @if (form().allowVoteDelegation) {
               <div class="gd__nested">
                 <app-input
@@ -166,13 +166,14 @@
                   [ngModel]="form().delegationLeadMinutes"
                   (ngModelChange)="patchLead($event)"
                 />
-                <app-switch
-                  class="gd__switch"
-                  name="delegationAllowExternal"
-                  [ngModel]="form().delegationAllowExternal"
-                  (ngModelChange)="patch('delegationAllowExternal', $event)"
-                  >{{ 'admin.gremien.delegationExternal' | t }}</app-switch
-                >
+                <div class="rowgroup rowgroup--settings">
+                  <app-switch
+                    name="delegationAllowExternal"
+                    [ngModel]="form().delegationAllowExternal"
+                    (ngModelChange)="patch('delegationAllowExternal', $event)"
+                    >{{ 'admin.gremien.delegationExternal' | t }}</app-switch
+                  >
+                </div>
                 <app-input
                   type="number"
                   [label]="'admin.gremien.delegationMax' | t"
@@ -180,13 +181,14 @@
                   [ngModel]="form().delegationMaxPerDelegate"
                   (ngModelChange)="patchMax($event)"
                 />
-                <app-switch
-                  class="gd__switch"
-                  name="delegationInElections"
-                  [ngModel]="form().delegationInElections"
-                  (ngModelChange)="patch('delegationInElections', $event)"
-                  >{{ 'admin.gremien.delegationInElections' | t }}</app-switch
-                >
+                <div class="rowgroup rowgroup--settings">
+                  <app-switch
+                    name="delegationInElections"
+                    [ngModel]="form().delegationInElections"
+                    (ngModelChange)="patch('delegationInElections', $event)"
+                    >{{ 'admin.gremien.delegationInElections' | t }}</app-switch
+                  >
+                </div>
               </div>
             }
           </div>
@@ -209,13 +211,14 @@
         </div>
 
         <div class="gd__public">
-          <app-switch
-            class="gd__switch"
-            name="protocolsPublic"
-            [ngModel]="form().protocolsPublic"
-            (ngModelChange)="patch('protocolsPublic', $event)"
-            >{{ 'admin.gremien.public' | t }}</app-switch
-          >
+          <div class="rowgroup rowgroup--settings">
+            <app-switch
+              name="protocolsPublic"
+              [ngModel]="form().protocolsPublic"
+              (ngModelChange)="patch('protocolsPublic', $event)"
+              >{{ 'admin.gremien.public' | t }}</app-switch
+            >
+          </div>
           @if (form().protocolsPublic) {
             <div class="gd__box">
               <span class="gd__boxLabel">{{ 'admin.gremien.publicImplies.title' | t }}</span>

@@ -188,12 +188,13 @@
             }
 
             @if (p.principal.active && !p.isSelf) {
-              <app-switch
-                class="ur__switch"
-                [checked]="deactivate()"
-                (checkedChange)="deactivate.set($event)"
-                >{{ 'admin.users.revoke.deactivate' | t }}</app-switch
-              >
+              <div class="rowgroup rowgroup--settings">
+                <app-switch
+                  [checked]="deactivate()"
+                  (checkedChange)="deactivate.set($event)"
+                  >{{ 'admin.users.revoke.deactivate' | t }}</app-switch
+                >
+              </div>
             }
           }
         </ng-template>
