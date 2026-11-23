@@ -4,7 +4,7 @@ title: The import contract has no exception
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-16
+updated: 2026-11-23
 tests:
   - "backend/tests/unit/modules/attachments/test_no_import_exception.py:test_import_contract_has_no_entry_in_ignore_imports"
   - "backend/tests/unit/scripts/test_check_ratchets.py:test_import_exceptions_are_counted_per_contract"
@@ -17,7 +17,7 @@ implementation:
   - backend/app/modules/protocol/public_images_router.py
   - backend/app/modules/admin/service/forms.py
   - backend/app/modules/admin/forms_router.py
-  - backend/app/modules/flow/webhook_actions.py
+  - backend/app/modules/webhooks/events.py
   - backend/app/modules/budget/form_options.py
   - scripts/check_ratchets.py
   - scripts/ratchet-baseline/import-exceptions.json
@@ -46,8 +46,8 @@ The code that reads a higher module is in the higher module:
 4. The route that serves an image of a public protocol is in `protocol`.
 5. The services that write a form version and its revision are in `admin`, like the services
    that write the flow and the site configuration.
-6. The flow action that sends a webhook is in `flow`, like the flow action that sends a mail
-   (000648).
+6. A webhook event gets its field values from the module that emits it. The module
+   `webhooks` reads no domain table (F/integrations/webhooks/002410).
 
 The module `forms` gets the cost-centre options of a form field through a dependency that the
 app wires in. It must not import `budget`.

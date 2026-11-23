@@ -25,6 +25,7 @@ from app.modules.applications.service.service_base import (
     _amount_currency,
     _whitelist,
 )
+from app.modules.applications.webhook_fields import emit_application_event
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.budget.form_options import budget_field_options
@@ -306,6 +307,8 @@ class CreateOps(ApplicationsServiceBase):
                     "matchedByEmail": capture.matched_by_email,
                 },
             )
+        await self.session.flush()
+        await emit_application_event(self.session, "application.created", app)
         await self.session.commit()
 
         if app.email_confirmed_at is not None:

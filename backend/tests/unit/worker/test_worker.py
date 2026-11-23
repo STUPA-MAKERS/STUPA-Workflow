@@ -38,7 +38,7 @@ def test_worker_settings_registers_tasks() -> None:
     assert process_retention in WorkerSettings.functions
     assert purge_draft_attachments in WorkerSettings.functions
     assert WorkerSettings.redis_settings is not None
-    assert len(WorkerSettings.cron_jobs) == 13
+    assert len(WorkerSettings.cron_jobs) == 14
     from worker.paperless import process_paperless_filings
 
     assert process_paperless_filings in WorkerSettings.functions

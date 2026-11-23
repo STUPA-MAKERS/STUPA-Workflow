@@ -26,7 +26,7 @@ describe('AdminApiService — mock mode', () => {
     const s = svc();
     s.listWebhooks().subscribe((hooks) => {
       expect(hooks.length).toBeGreaterThan(0);
-      const fresh: WebhookConfig = { id: '', name: 'X', url: 'https://x', active: true };
+      const fresh: WebhookConfig = { id: '', name: 'X', url: 'https://x', active: true, subscriptions: [], gremiumIds: [], typeIds: [], stateKeys: [] };
       s.saveWebhook(fresh).subscribe((saved) => {
         expect(saved.id).toBeTruthy();
         s.listWebhooks().subscribe((after) => {
@@ -58,6 +58,13 @@ describe('AdminApiService — mock mode', () => {
     expect(after.some((h) => h.id === before[0].id)).toBe(false);
     const status = await firstValueFrom(s.listWebhookDeliveryStatus());
     expect(status.map((x) => x.lastState)).toEqual(['sent', 'dead', 'pending', 'never']);
+  });
+
+  it('serves the webhook catalog and a test delivery in mock mode', async () => {
+    const s = svc();
+    const catalog = await firstValueFrom(s.getWebhookCatalog());
+    expect(catalog.map((e) => e.name)).toContain('application.transition');
+    expect(await firstValueFrom(s.sendWebhookTest('wh-1'))).toEqual({ deliveryId: 'test-wh-1' });
   });
 
   it('serves a public preview in mock mode', async () => {
@@ -187,11 +194,18 @@ describe('AdminApiService — real mode (contract)', () => {
     http.expectOne('/api/admin/config-schemas').flush({});
   });
 
+  it('GETs the webhook catalog and POSTs a test delivery', () => {
+    s.getWebhookCatalog().subscribe();
+    expect(http.expectOne('/api/admin/webhooks/catalog').request.method).toBe('GET');
+    s.sendWebhookTest('wh-9').subscribe();
+    expect(http.expectOne('/api/admin/webhooks/wh-9/test').request.method).toBe('POST');
+  });
+
   it('POSTs a new webhook and PATCHes an existing one', () => {
-    s.saveWebhook({ id: '', name: 'n', url: 'https://h', active: true }).subscribe();
+    s.saveWebhook({ id: '', name: 'n', url: 'https://h', active: true, subscriptions: [], gremiumIds: [], typeIds: [], stateKeys: [] }).subscribe();
     expect(http.expectOne('/api/admin/webhooks').request.method).toBe('POST');
 
-    s.saveWebhook({ id: 'wh-9', name: 'n', url: 'https://h', active: true }).subscribe();
+    s.saveWebhook({ id: 'wh-9', name: 'n', url: 'https://h', active: true, subscriptions: [], gremiumIds: [], typeIds: [], stateKeys: [] }).subscribe();
     expect(http.expectOne('/api/admin/webhooks/wh-9').request.method).toBe('PATCH');
   });
 

@@ -1,4 +1,4 @@
-"""WebhookService: dispatch_to_webhook dedup and deliver (ok/retry/dead/ssrf)."""
+"""WebhookService: the sweep of the pending deliveries and deliver (ok/retry/dead/ssrf)."""
 
 from __future__ import annotations
 
@@ -26,9 +26,7 @@ def _svc(session: FakeSession, queue: WebhookQueue | None = None) -> WebhookServ
 def _hook(
     *, url: str = "https://hook.test/h", active: bool = True, secret: bytes | None = b"k"
 ) -> Webhook:
-    hook = Webhook(
-        name="h", url=url, active=active, secret=secret
-    )
+    hook = Webhook(name="h", url=url, active=active, secret=secret)
     hook.id = uuid.uuid4()
     return hook
 
@@ -61,44 +59,38 @@ def _public_resolver(_host: str) -> list[str]:
     return [_IP]
 
 
-async def test_dispatch_to_webhook_dedup_skips_existing() -> None:
-    hook = _hook()
-    base = "app:evt:0:webhook"
-    session = FakeSession(scalars=[[f"{base}:{hook.id}"]])
-    session.store[hook.id] = hook
-    n = await _svc(session, FakeWebhookQueue()).dispatch_to_webhook(
-        hook.id, event="status_changed", idempotency_base=base
-    )
-    assert n == 0
-    assert session.committed == 0
+async def test_enqueue_pending_without_queue_is_zero() -> None:
+    """Without Redis the sweep enqueues nothing and reads nothing."""
+    import datetime as dt
+
+    session = FakeSession()
+    assert await _svc(session, None).enqueue_pending(older_than=dt.datetime.now(dt.UTC)) == 0
 
 
-async def test_dispatch_to_webhook_race_integrity_error_is_deduped() -> None:
-    """Dedupe a racing insert; the savepoint rollback discards the delivery."""
-    from sqlalchemy.exc import IntegrityError
+async def test_enqueue_pending_enqueues_each_row() -> None:
+    """The sweep hands each pending delivery to the queue. §F/integrations/webhooks/002417."""
+    import datetime as dt
 
-    hook = _hook()
-    base = "app:evt:0:webhook"
-    err = IntegrityError("INSERT", {}, Exception("duplicate key"))
-    session = FakeSession(scalars=[[]], flush_errors=[err])
-    session.store[hook.id] = hook
+    ids = [uuid.uuid4(), uuid.uuid4()]
+    session = FakeSession(scalars=[ids])
     queue = FakeWebhookQueue()
-    n = await _svc(session, queue).dispatch_to_webhook(
-        hook.id, event="status_changed", idempotency_base=base
-    )
-    assert n == 0
-    assert queue.enqueued == []
-    assert session.added == []
+    n = await _svc(session, queue).enqueue_pending(older_than=dt.datetime.now(dt.UTC))
+    assert n == 2
+    assert queue.enqueued == ids
 
 
-async def test_dispatch_to_webhook_without_queue_returns_one() -> None:
-    """Keep the delivery pending and return 1 when no queue exists."""
+@pytest.mark.parametrize("status", ["ok", "dead"])
+async def test_deliver_final_row_is_gone(status: str) -> None:
+    """A second job for a final delivery sends nothing. §F/integrations/webhooks/000299."""
     hook = _hook()
+    d = _delivery(hook.id)
+    d.status = status
     session = FakeSession()
     session.store[hook.id] = hook
-    n = await _svc(session, None).dispatch_to_webhook(hook.id, event="status_changed")
-    assert n == 1
-    assert session.committed == 1
+    session.store[d.id] = d
+    async with httpx.AsyncClient() as client:
+        outcome = await _svc(session).deliver(d.id, http_client=client)
+    assert outcome.kind == "gone"
 
 
 async def test_deliver_gone() -> None:
@@ -174,9 +166,7 @@ async def test_deliver_pins_validated_ip_no_rebind() -> None:
     delivery = _delivery(hook.id)
     session.store.update({delivery.id: delivery, hook.id: hook})
     async with httpx.AsyncClient() as client:
-        outcome = await _svc(session).deliver(
-            delivery.id, http_client=client, resolver=_rebinding
-        )
+        outcome = await _svc(session).deliver(delivery.id, http_client=client, resolver=_rebinding)
     assert outcome.kind == "ok"
     assert calls == ["hook.test"]
     assert route.called

@@ -49,7 +49,7 @@ from worker.task_reminders import process_task_reminders
 from worker.tickets import anonymize_tickets
 from worker.todos import archive_done_todos
 from worker.watchdog import watchdog_on_shutdown, watchdog_on_startup
-from worker.webhook import deliver_webhook
+from worker.webhook import deliver_webhook, enqueue_pending_webhooks
 from worker.webhook import on_startup as webhook_on_startup
 
 
@@ -151,8 +151,9 @@ class WorkerSettings:
     03:50 archives cards longer than ``archive_after_days`` in the done column. The
     deadline and vote scan runs every minute; it is idempotent and uses SKIP LOCKED.
     The fetch of the external calendars runs every minute at second 30 and fetches
-    only the calendars whose interval is over. The Paperless filing runs every minute at
-    second 45: it opens a job for each new final file and runs the due jobs.
+    only the calendars whose interval is over. The webhook sweep runs every ten seconds
+    and enqueues the new pending deliveries. The Paperless filing runs every minute
+    at second 45: it opens a job for each new final file and runs the due jobs.
     Task reminders run hourly (thresholds in days); ``task_reminder_log`` prevents
     duplicate sends. Draft reminders run hourly too; ``draft_reminder_at`` sends each
     draft one reminder at most. Expired wizard drafts go hourly with their objects. The public
@@ -173,6 +174,7 @@ class WorkerSettings:
         backfill_public_protocols,
         heal_public_protocols,
         func(deliver_webhook, timeout=_WEBHOOK_JOB_TIMEOUT_SECONDS),
+        enqueue_pending_webhooks,
         process_deadlines,
         process_task_reminders,
         process_draft_reminders,
@@ -194,6 +196,7 @@ class WorkerSettings:
         cron(anonymize_tickets, hour=3, minute=45),
         cron(archive_done_todos, hour=3, minute=50),
         cron(process_deadlines, second=0),
+        cron(enqueue_pending_webhooks, second={0, 10, 20, 30, 40, 50}),
         cron(fetch_external_calendars, second=30),
         cron(process_paperless_filings, second=45),
         cron(process_task_reminders, minute=10),

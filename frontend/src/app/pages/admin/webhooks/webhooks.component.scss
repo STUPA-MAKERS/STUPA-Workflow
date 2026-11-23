@@ -21,9 +21,6 @@
   flex-direction: column;
   gap: var(--space-3);
 }
-.wh__urlField ::ng-deep input {
-  font-family: var(--font-mono);
-}
 
 @include w.columns {
       .wh__grid {

@@ -87,6 +87,7 @@ import {
   type OAuthGrantQuery,
   type Role,
   type SiteConfig,
+  type WebhookCatalogEvent,
   type WebhookConfig,
   type WebhookDeliveryStatus,
 } from './admin.models';
@@ -135,6 +136,7 @@ import {
   mockMergePreview,
   MOCK_ROLES,
   MOCK_SITE_REVISIONS,
+  MOCK_WEBHOOK_CATALOG,
   MOCK_WEBHOOK_STATUS,
   MOCK_WEBHOOKS,
   type MockRow,
@@ -1123,6 +1125,18 @@ export class AdminApiService {
     return hook.id
       ? this.http.patch<WebhookConfig>(`${this.base}/admin/webhooks/${hook.id}`, hook)
       : this.http.post<WebhookConfig>(`${this.base}/admin/webhooks`, hook);
+  }
+
+  /** The webhook event catalog with the fields of each event. Needs P(`webhook.manage`). */
+  getWebhookCatalog(): Observable<WebhookCatalogEvent[]> {
+    if (this.mock) return of(mockTable(MOCK_WEBHOOK_CATALOG));
+    return this.http.get<WebhookCatalogEvent[]>(`${this.base}/admin/webhooks/catalog`);
+  }
+
+  /** Queue a test delivery with example values (§F/integrations/webhooks/002416). */
+  sendWebhookTest(id: Uuid): Observable<{ deliveryId: Uuid }> {
+    if (this.mock) return of({ deliveryId: `test-${id}` });
+    return this.http.post<{ deliveryId: Uuid }>(`${this.base}/admin/webhooks/${id}/test`, {});
   }
 
   /** Delete a webhook and its delivery history. Needs P(`webhook.manage`). */

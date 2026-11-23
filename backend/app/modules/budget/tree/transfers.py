@@ -25,6 +25,7 @@ from app.modules.budget.tree_schemas import (
     TransferRowOut,
     TransferUpdate,
 )
+from app.modules.budget.webhook_fields import emit_booking_created
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from app.shared.paging import Page
 from app.shared.search import dialect_of, trigram_rank
@@ -104,6 +105,7 @@ class TransferOps(ExpenseOps):
                 "amount": str(payload.amount),
             },
         )
+        await emit_booking_created(self.session, out_row, src, kind="transfer")
         await self.session.commit()
         return TransferOut(transferId=transfer_id, expenseId=out_row.id, incomeId=in_row.id)
 

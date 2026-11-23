@@ -26,6 +26,7 @@ from app.modules.budget.tree_schemas import (
     InvoiceSegmentCounts,
     InvoiceUpdate,
 )
+from app.modules.budget.webhook_fields import emit_invoice_created
 from app.modules.files.mime import MimeRejected, validate_upload
 from app.modules.files.scanner import scan_or_raise
 from app.modules.files.storage import StorageError
@@ -355,6 +356,7 @@ class InvoiceOps(BudgetTreeServiceBase):
             target_id=str(inv.id),
             data={"number": inv.number, "gross": str(inv.gross_amount)},
         )
+        await emit_invoice_created(self.session, inv)
         await self.session.commit()
         return self._invoice_out(inv)
 

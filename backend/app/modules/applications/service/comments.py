@@ -17,6 +17,7 @@ mails exactly those after the commit. The applicant view never sees the list.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -25,12 +26,14 @@ from app.modules.applications.mentions import mentionable_ids, mentionable_peopl
 from app.modules.applications.models import Applicant, Application, Comment
 from app.modules.applications.schemas import ActorOut, CommentOut
 from app.modules.applications.service.service_base import ApplicationsServiceBase
+from app.modules.applications.webhook_fields import link
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.people import PersonRef, person_refs
 from app.modules.files.drafts import bind_drafts, check_message_drafts
 from app.modules.files.schemas import MessageAttachmentOut
 from app.modules.files.service import FilesService
+from app.modules.webhooks.events import WebhookEvent, emit_event, has_subscriber
 from app.shared.errors import ForbiddenError, NotFoundError, ValidationProblem
 from app.shared.mentions import (
     check_mentions,
@@ -189,6 +192,7 @@ class CommentOps(ApplicationsServiceBase):
                 pepper=pepper,
                 comment_id=comment.id,
             )
+        await self._emit_comment(app, comment)
         await self.session.commit()
         self.added_mentions = wanted
         info = await self._comment_author_info(app, author, author_kind)
@@ -205,6 +209,37 @@ class CommentOps(ApplicationsServiceBase):
             isOwn=True,
             attachments=files.get(comment.id, []),
             mentions=refs.get(comment.id, []),
+        )
+
+    async def _emit_comment(self, app: Application, comment: Comment) -> None:
+        """Hand `comment.created` to the webhooks (§F/integrations/webhooks/002410).
+
+        The flush gives the comment its id, and only a subscribed event needs it.
+        """
+        if not await has_subscriber(self.session, "comment.created"):
+            return
+        await self.session.flush()
+
+        async def fields() -> dict[str, Any]:
+            info = await self._comment_author_info(app, comment.author, comment.author_kind)
+            title = (app.data or {}).get("title")
+            return {
+                "visibility": comment.visibility,
+                "applicationTitle": title.strip() if isinstance(title, str) else None,
+                "url": link(f"/applications/{app.id}"),
+                "body": comment.body,
+                "authorName": info.display_name,
+            }
+
+        await emit_event(
+            self.session,
+            WebhookEvent(
+                name="comment.created",
+                ids={"commentId": comment.id, "applicationId": app.id},
+                fields=fields,
+                gremium_id=app.gremium_id,
+                type_id=app.type_id,
+            ),
         )
 
     async def _is_anonymized(self, application_id: UUID) -> bool:

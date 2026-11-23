@@ -125,7 +125,7 @@ async def test_dispatch_skips_non_notify(monkeypatch: pytest.MonkeyPatch) -> Non
 
     monkeypatch.setattr(mod, "NotificationService", FakeService)
     disp = NotificationActionDispatcher(_sessionmaker(FakeSession()), None, SETTINGS)
-    await disp.dispatch([_action("webhook"), _action("budgetReserve")])
+    await disp.dispatch([_action("assignBudget"), _action("budgetReserve")])
     assert called == []
 
 

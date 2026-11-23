@@ -7802,6 +7802,30 @@
           "type": "BOOLEAN"
         },
         {
+          "name": "subscriptions",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "gremium_ids",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "type_ids",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "state_keys",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
           "name": "id",
           "nullable": false,
           "primaryKey": true,
@@ -7881,6 +7905,12 @@
           "nullable": false,
           "primaryKey": true,
           "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
         }
       ],
       "id": "WebhookDelivery",

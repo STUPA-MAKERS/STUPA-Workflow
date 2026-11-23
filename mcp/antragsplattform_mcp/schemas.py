@@ -132,7 +132,7 @@ class TransitionDef(WireModel, frozen=True):
         description="Actions: notify {recipients: [{kind, ref?}]} with kinds gremium/role/"
         "email (need ref), applicant, voteGremium (members of the Gremium that decides "
         "the vote) and budgetGremium (members of the deciding Gremium of the cost "
-        "center) — the last three without ref; webhook {webhookId}; "
+        "center) — the last three without ref; "
         "addToNextSession {gremiumId?} (target must be a vote state; without gremiumId "
         "the Gremium of the vote is used); assignBudget {budgetId}; "
         "assignBudgetFromField {field} (assigns the budget UUID stored in that form "
@@ -496,16 +496,35 @@ class UiLanguageUpdate(WireModel, frozen=True):
     active: bool | None = None
 
 
+class WebhookSubscription(WireModel, frozen=True):
+    event: str = Field(description="An event of get_webhook_catalog, e.g. application.transition")
+    fields: list[str] = Field(
+        default_factory=list,
+        description="The fields of the event for the data object; the IDs are always sent",
+    )
+
+
 class WebhookCreate(WireModel, frozen=True):
     name: str
     url: str
     active: bool = True
+    subscriptions: list[WebhookSubscription] = Field(default_factory=list)
+    gremiumIds: list[str] = Field(default_factory=list, description="Empty = every Gremium")
+    typeIds: list[str] = Field(default_factory=list, description="Empty = every Antragsart")
+    stateKeys: list[str] = Field(
+        default_factory=list,
+        description="Target status keys for application.transition; empty = every status",
+    )
 
 
 class WebhookUpdate(WireModel, frozen=True):
     name: str | None = None
     url: str | None = None
     active: bool | None = None
+    subscriptions: list[WebhookSubscription] | None = None
+    gremiumIds: list[str] | None = None
+    typeIds: list[str] | None = None
+    stateKeys: list[str] | None = None
 
 
 # Budget tree, bookings and transfers.

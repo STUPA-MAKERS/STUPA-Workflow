@@ -2,17 +2,12 @@
 id: "000402"
 title: A webhook fires only through a flow action
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-15
+updated: 2026-11-23
+replaced_by: F/integrations/webhooks/002410
 protocols:
   - "P/integrations/webhooks/000963"
-implementation:
-  - backend/app/modules/webhooks/models.py
-  - backend/app/modules/admin/schemas.py
-  - backend/app/modules/webhooks/service.py
-  - backend/migrations/versions/08dfb2c28b9a_drop_webhook_events.py
-  - frontend/src/app/pages/admin/webhooks/webhooks.component.html
 scope:
   - backend/app/modules/webhooks
   - backend/app/modules/admin

@@ -1,23 +1,36 @@
-"""Webhook admin CRUD plus coarse per-webhook delivery diagnostics."""
+"""Webhook admin CRUD, the event catalog, the test delivery and the delivery diagnostics.
+
+A webhook holds its event subscriptions with the chosen fields and its filters
+(§F/integrations/webhooks/002410, 002412, 002414). The schemas check the events and the
+fields against the catalog. The test delivery (§F/integrations/webhooks/002416) is a
+`pending` row with example values; the worker cron hands it to the delivery job like every
+other delivery.
+"""
 
 from __future__ import annotations
 
 import secrets
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
 
 from app.modules.admin.schemas import (
+    WebhookCatalogEvent,
+    WebhookCatalogField,
     WebhookCreate,
     WebhookDeliveryStatusOut,
     WebhookOut,
+    WebhookSubscription,
+    WebhookTestOut,
     WebhookUpdate,
 )
 from app.modules.admin.service.service_base import ConfigServiceBase, _iso
 from app.modules.audit.actions import AuditAction
+from app.modules.webhooks.catalog import EVENTS, TEST_EVENT, example_payload
 from app.modules.webhooks.models import Webhook, WebhookDelivery
 from app.settings import get_settings
-from app.shared.errors import BadRequestError, NotFoundError
+from app.shared.errors import BadRequestError, ConflictError, NotFoundError
 from app.shared.ssrf import SsrfError, assert_allowed_url
 
 
@@ -27,7 +40,51 @@ def _webhook_out(row: Webhook) -> WebhookOut:
         name=row.name,
         url=row.url,
         active=row.active,
+        subscriptions=[
+            WebhookSubscription.model_validate(sub)
+            for sub in row.subscriptions or []
+            if sub.get("event") in EVENTS
+        ],
+        gremiumIds=[UUID(x) for x in row.gremium_ids or []],
+        typeIds=[UUID(x) for x in row.type_ids or []],
+        stateKeys=list(row.state_keys or []),
     )
+
+
+def _subs_json(subs: list[WebhookSubscription]) -> list[dict[str, object]]:
+    return [{"event": sub.event, "fields": list(sub.fields)} for sub in subs]
+
+
+def _ids_json(ids: list[UUID]) -> list[str]:
+    return sorted({str(x) for x in ids})
+
+
+def catalog_out() -> list[WebhookCatalogEvent]:
+    """Return the event catalog with the fields and their example values."""
+    return [
+        WebhookCatalogEvent(
+            name=spec.name,
+            group=spec.group,
+            idKeys=list(spec.id_keys),
+            fields=[
+                WebhookCatalogField(key=f.key, personal=f.personal, example=f.example)
+                for f in spec.fields
+            ],
+        )
+        for spec in EVENTS.values()
+    ]
+
+
+def build_test_body(row: Webhook, moment: str) -> dict[str, object]:
+    """Return the body of a test delivery: the example `data` of each subscribed event."""
+    data = {
+        str(sub["event"]): example_payload(EVENTS[sub["event"]], list(sub.get("fields") or []))[
+            "data"
+        ]
+        for sub in row.subscriptions or []
+        if sub.get("event") in EVENTS
+    }
+    return {"event": TEST_EVENT, "occurredAt": moment, "webhookId": str(row.id), "data": data}
 
 
 def _delivery_reason_class(status: str, response_code: int | None) -> str:
@@ -138,6 +195,10 @@ class WebhookOps(ConfigServiceBase):
             url=payload.url,
             active=payload.active,
             secret=secrets.token_bytes(32),
+            subscriptions=_subs_json(payload.subscriptions),
+            gremium_ids=_ids_json(payload.gremium_ids),
+            type_ids=_ids_json(payload.type_ids),
+            state_keys=sorted(set(payload.state_keys)),
         )
         self.session.add(row)
         await self.session.flush()
@@ -156,13 +217,22 @@ class WebhookOps(ConfigServiceBase):
         row = await self.session.get(Webhook, webhook_id)
         if row is None:
             raise NotFoundError(f"webhook {webhook_id} not found")
-        if payload.name is not None:
-            row.name = payload.name
         if payload.url is not None:
             self._assert_webhook_url_advisory(payload.url)
-            row.url = payload.url
-        if payload.active is not None:
-            row.active = payload.active
+        changes = {
+            "name": payload.name,
+            "url": payload.url,
+            "active": payload.active,
+            "subscriptions": None
+            if payload.subscriptions is None
+            else _subs_json(payload.subscriptions),
+            "gremium_ids": None if payload.gremium_ids is None else _ids_json(payload.gremium_ids),
+            "type_ids": None if payload.type_ids is None else _ids_json(payload.type_ids),
+            "state_keys": None if payload.state_keys is None else sorted(set(payload.state_keys)),
+        }
+        for key, value in changes.items():
+            if value is not None:
+                setattr(row, key, value)
         await self._audit(actor, AuditAction.WEBHOOK_CONFIG, "webhook", row.id)
         await self.session.commit()
         return _webhook_out(row)
@@ -184,6 +254,32 @@ class WebhookOps(ConfigServiceBase):
         await self._audit(actor, AuditAction.WEBHOOK_CONFIG, "webhook", webhook_id)
         await self.session.delete(row)
         await self.session.commit()
+
+    async def send_test_delivery(self, webhook_id: UUID) -> WebhookTestOut:
+        """Queue a test delivery with example values (§F/integrations/webhooks/002416).
+
+        The row goes through the same worker path as every other delivery: SSRF guard,
+        signature and retry. An inactive webhook sends nothing, so it answers 409.
+
+        Raises:
+            NotFoundError: No webhook has this id (404).
+            ConflictError: The webhook is inactive (409, ``webhook_inactive``).
+        """
+        row = await self.session.get(Webhook, webhook_id)
+        if row is None:
+            raise NotFoundError(f"webhook {webhook_id} not found")
+        if not row.active:
+            raise ConflictError("The webhook is inactive.", code="webhook_inactive")
+        delivery = WebhookDelivery(
+            webhook_id=row.id,
+            event=TEST_EVENT,
+            payload=build_test_body(row, datetime.now(UTC).isoformat()),
+            status="pending",
+            attempts=0,
+        )
+        self.session.add(delivery)
+        await self.session.flush()
+        return WebhookTestOut(deliveryId=delivery.id)
 
     async def list_webhook_delivery_status(self) -> list[WebhookDeliveryStatusOut]:
         """Report the latest delivery state per webhook.
