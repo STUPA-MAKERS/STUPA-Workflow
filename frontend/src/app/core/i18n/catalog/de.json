@@ -5031,5 +5031,16 @@
   "admin.paperless.error.unknown": "Unbekannter Fehler.",
   "paperless.open": "In Paperless öffnen",
   "admin.audit.action.paperless_connection": "Paperless-Verbindung geändert",
-  "admin.audit.action.paperless_filed": "Dokument in Paperless abgelegt"
+  "admin.audit.action.paperless_filed": "Dokument in Paperless abgelegt",
+  "admin.paperless.insert": "Einfügen",
+  "admin.paperless.insertEnabled": "Aus Paperless einfügen",
+  "paperless.search.label": "In Paperless suchen",
+  "paperless.search.none": "Keine Dokumente gefunden",
+  "paperless.search.unavailable": "Paperless ist nicht erreichbar",
+  "paperless.insert.error.unavailable": "Paperless ist nicht erreichbar.",
+  "paperless.insert.error.type": "Dieses Dokument hat keine lesbare PDF-Fassung.",
+  "paperless.insert.error.tooLarge": "Das Dokument ist zu groß (höchstens 20 MB und 100 Seiten).",
+  "paperless.insert.error.forbidden": "Für das Einfügen fehlt das Recht.",
+  "paperless.insert.error.failed": "Das Dokument konnte nicht eingefügt werden.",
+  "admin.audit.action.paperless_inserted": "Dokument aus Paperless eingefügt"
 }

@@ -7,6 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-23
 tests:
   - "backend/tests/integration/modules/paperless/test_paperless.py:test_the_entry_opens_the_document_only_with_the_permission"
+  - "backend/tests/integration/modules/paperless/test_paperless.py:test_the_search_needs_the_permission_and_the_switch"
 implementation:
   - backend/app/shared/permissions.py
   - backend/app/modules/paperless_filing/router.py

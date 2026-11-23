@@ -122,6 +122,7 @@ describe('PaperlessComponent', () => {
     expect(sw('Protokolle ablegen')).toHaveAttribute('aria-checked', 'true');
     expect(sw('Anträge ablegen')).toHaveAttribute('aria-checked', 'false');
     expect(sw('Haushaltspläne ablegen')).toHaveAttribute('aria-checked', 'false');
+    expect(sw('Aus Paperless einfügen')).toHaveAttribute('aria-checked', 'false');
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
@@ -152,9 +153,10 @@ describe('PaperlessComponent', () => {
 
     await userEvent.type(tokenField(), 'new-token');
     await userEvent.click(sw('Haushaltspläne ablegen'));
+    await userEvent.click(sw('Aus Paperless einfügen'));
     await userEvent.click(save());
     expect(api.putPaperless).toHaveBeenLastCalledWith(
-      expect.objectContaining({ token: 'new-token', filePlans: true }),
+      expect.objectContaining({ token: 'new-token', filePlans: true, insertEnabled: true }),
     );
     fixture.detectChanges();
     expect(tokenField().value).toBe('');
@@ -353,6 +355,6 @@ describe('PaperlessComponent', () => {
     api.listPaperlessFailed.mockReturnValueOnce(new Subject<PaperlessFailedFiling[]>());
     await setup({ api });
     expect(screen.queryByLabelText(/Adresse von Paperless/)).toBeNull();
-    expect(document.querySelectorAll('.sts__skelSwitch')).toHaveLength(3);
+    expect(document.querySelectorAll('.sts__skelSwitch')).toHaveLength(4);
   });
 });

@@ -182,6 +182,7 @@ export const AUDIT_ACTIONS = [
   'gremium_notify',
   'paperless_connection',
   'paperless_filed',
+  'paperless_inserted',
 ] as const;
 
 /** Target type to router target: the detail page or the admin list that owns the target. */

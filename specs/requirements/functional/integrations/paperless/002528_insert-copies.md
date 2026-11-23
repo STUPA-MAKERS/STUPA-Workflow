@@ -5,7 +5,15 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/paperless/test_paperless.py:test_an_insert_copies_the_document_as_an_embedded_pdf"
+  - "backend/tests/unit/modules/paperless/test_client.py:test_download_answers_the_pdf_and_refuses_a_file_over_the_limit"
+  - "frontend/src/app/features/meetings/paperless-insert/paperless-insert.component.spec.ts:PaperlessInsertComponent"
+implementation:
+  - backend/app/modules/protocol/documents_router.py
+  - backend/app/modules/paperless/client.py
+  - backend/app/modules/media/models.py
+  - frontend/src/app/features/meetings/paperless-insert/paperless-insert.component.ts
 scope:
   - backend/app/
   - frontend/src/app/

@@ -23,7 +23,13 @@
   (renameTop)="renameTop.emit($event)"
   (doneChange)="doneChange.emit($event)"
   (documentOpen)="openDocument($event)"
+  [insertTrigger]="insertTrigger()"
+  (insertRequest)="paperlessOpen.set(true)"
 />
+
+@if (insertTrigger()) {
+  <app-paperless-insert [(open)]="paperlessOpen" [meetingId]="meeting().id" (inserted)="insertCopy($event)" />
+}
 
 @if (shownDocument()) {
   <app-document-viewer [(doc)]="shownDocument" />
