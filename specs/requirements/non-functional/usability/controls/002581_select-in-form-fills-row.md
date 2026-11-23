@@ -2,7 +2,7 @@
 id: "002581"
 title: A multiple choice in a form fills its row and names its values
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 tests:

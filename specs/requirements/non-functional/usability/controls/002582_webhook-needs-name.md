@@ -2,7 +2,7 @@
 id: "002582"
 title: The webhook dialog saves only with a name and a valid URL
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 tests:
