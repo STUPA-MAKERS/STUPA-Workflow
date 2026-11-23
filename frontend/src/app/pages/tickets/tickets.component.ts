@@ -20,6 +20,7 @@ import {
   TicketsApiService,
   type MyTicketItem,
   type TicketKind,
+  type TicketDetail,
   type TicketListItem,
   type TicketPage,
   type TicketQuery,
@@ -59,6 +60,7 @@ import { RailStatusService } from '../../layout/rail-status.service';
 import { TicketsPageService } from './tickets-page.service';
 import {
   KIND_LABEL,
+  OPEN_STATUSES,
   STATUS_LABEL,
   areaOf,
   categoryName,
@@ -66,6 +68,7 @@ import {
   ticketAge,
   ticketIcon,
 } from './tickets.util';
+import { TicketNewDialogComponent } from './ticket-new-dialog.component';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
@@ -74,7 +77,7 @@ import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 /** The state chip. `open` (the default) shows new and in progress, the closed ones folded. */
 export type TicketStatusFilter = 'open' | TicketStatus | 'all';
 
-const STATUS_FILTERS: readonly TicketStatusFilter[] = ['open', 'new', 'in_progress', 'done', 'rejected', 'all'];
+const STATUS_FILTERS: readonly TicketStatusFilter[] = ['open', 'new', 'in_progress', 'waiting', 'done', 'rejected', 'all'];
 
 /** Rows per request; "Weitere laden" asks for the next page. */
 export const TICKET_PAGE = 100;
@@ -110,9 +113,9 @@ export interface TicketGroup {
 function statusOrder(status: TicketStatusFilter): readonly TicketStatus[] {
   switch (status) {
     case 'open':
-      return ['new', 'in_progress'];
+      return OPEN_STATUSES;
     case 'all':
-      return ['new', 'in_progress', 'done', 'rejected'];
+      return [...OPEN_STATUSES, 'done', 'rejected'];
     default:
       return [status];
   }
@@ -140,6 +143,7 @@ function statusOrder(status: TicketStatusFilter): readonly TicketStatus[] {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TicketNewDialogComponent,
     RowMenuComponent,
     PullRefreshDirective,
     RowChevronComponent,
@@ -171,12 +175,26 @@ export class TicketsComponent {
   private readonly i18n = inject(I18nService);
   protected readonly phone = mediaQuery(MEDIA.phone);
   /** The ⋮ menu of the phone header: "Aktualisieren", the one-tap way to the pull (app spec 000514). */
+  /** "Ticket anlegen": the dialog of a ticket that the team writes by hand. */
+  protected readonly newOpen = signal(false);
+
   protected readonly phoneMenu = computed<RowMenuSection[]>(() => [
+    ...(this.manager
+      ? [{ items: [{ id: 'new', label: this.i18n.translate('tickets.new.heading'), icon: 'plus' as const }] }]
+      : []),
     refreshMenuSection((key) => this.i18n.translate(key)),
   ]);
 
   protected onPhoneMenu(item: RowMenuItem): void {
+    if (item.id === 'new') this.newOpen.set(true);
     if (isRefreshItem(item)) reloadLikePull(() => this.refreshList());
+  }
+
+  /** The new ticket opens, and the list loads again so its group shows it. */
+  protected onCreated(ticket: TicketDetail): void {
+    this.newOpen.set(false);
+    this.reload(true);
+    void this.router.navigate(['/tickets', ticket.id], { queryParamsHandling: 'preserve' });
   }
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -468,7 +486,7 @@ export class TicketsComponent {
 
   private statusQuery(): TicketStatus[] {
     const s = this.statusFilter();
-    if (s === 'open') return ['new', 'in_progress'];
+    if (s === 'open') return [...OPEN_STATUSES];
     if (s === 'all') return [];
     return [s];
   }

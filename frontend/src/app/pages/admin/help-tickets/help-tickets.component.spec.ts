@@ -74,6 +74,7 @@ const AREAS: TicketArea[] = [
     gremiumId: null,
     platform: true,
     notifyNew: true,
+    inApp: false,
     categories: [],
     mine: true,
   },
@@ -83,6 +84,7 @@ const AREAS: TicketArea[] = [
     gremiumId: 'g1',
     platform: false,
     notifyNew: false,
+    inApp: false,
     categories: [
       { id: 'c1', name: 'Raumanfrage' },
       { id: 'c2', name: 'Schlüssel' },
@@ -446,6 +448,12 @@ describe('HelpTicketsComponent', () => {
       expect(areaRow(/^Plattform/)).toHaveTextContent('Fest eingebaut');
       expect(areaRow(/^AStA-Büro/)).toHaveTextContent('AStA · Raumanfrage · Schlüssel');
       expect(areaRow(/^Bereich anlegen/)).toBeInTheDocument();
+    });
+
+    it('marks a Bereich that takes tickets from the app', async () => {
+      await setup({ tickets: makeTickets(of(BLOCKS), of([AREAS[0], { ...AREAS[1], inApp: true }])) });
+      expect(areaRow(/^AStA-Büro/)).toHaveTextContent('AStA · In der App · Raumanfrage · Schlüssel');
+      expect(areaRow(/^Plattform/)).not.toHaveTextContent('In der App');
     });
 
     it('names a Bereich without a Gremium', async () => {

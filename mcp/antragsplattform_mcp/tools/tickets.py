@@ -25,7 +25,7 @@ group = ToolGroup()
 
 @group.tool
 async def tickets_list(
-    status: list[Literal["new", "in_progress", "done", "rejected"]] | None = None,
+    status: list[Literal["new", "in_progress", "waiting", "done", "rejected"]] | None = None,
     kind: list[Literal["bug", "question", "idea", "barrier"]] | None = None,
     assignee: str | None = None,
     q: str | None = None,
@@ -112,6 +112,8 @@ async def tickets_update(ticket_id: str, patch: S.TicketPatch) -> dict:
     gives 422 `assignee_not_allowed`. `kind` is the Kategorie of a ticket of Plattform,
     `categoryId` of another Bereich (422 `category_invalid` for a foreign one).
     `areaId` moves the ticket, also to a Bereich the caller does not work in.
+    The status `waiting` (Wartet auf Antwort) is open; a message of the sender sets
+    `in_progress` again. A new assignee other than the caller gets a mail.
     `duplicateOfId` goes only with status `rejected`
     (422 `duplicate_invalid` otherwise). With status `done` or `rejected`,
     `completeTodos: true` also completes the open linked to-dos the caller can write.
@@ -225,9 +227,10 @@ async def ticket_areas_create(area: S.TicketAreaCreate) -> dict:
 
 @group.tool
 async def ticket_areas_update(area_id: str, patch: S.TicketAreaPatch) -> dict:
-    """Change the name, the Gremium, `notifyNew` or the Kategorien of a Bereich (`admin.site`).
+    """Change the name, the Gremium, the switches or the Kategorien of a Bereich (`admin.site`).
 
-    The Bereich Plattform takes `notifyNew` only (409 `ticket_area_platform_fixed`).
+    The switches are `notifyNew` and `inApp`. The Bereich Plattform takes the switches
+    only (409 `ticket_area_platform_fixed`).
     """
     return await api().patch(f"/admin/ticket-areas/{area_id}", json=dump_patch(patch))
 
@@ -240,10 +243,12 @@ async def ticket_areas_delete(area_id: str) -> dict:
 
 @group.tool
 async def tickets_report(
-    kind: Literal["bug", "question", "idea", "barrier"],
     title: str,
     body: str,
+    kind: Literal["bug", "question", "idea", "barrier"] | None = None,
     file_paths: list[str] | None = None,
+    area_id: str | None = None,
+    category_id: str | None = None,
 ) -> dict:
     """Report a problem, a question, an idea or an accessibility barrier as the caller.
 
@@ -254,17 +259,45 @@ async def tickets_report(
     Args:
         title: 1 to 200 characters.
         body: 1 to 10000 characters.
+        kind: Required without `area_id` (the Bereich Plattform).
+        area_id: A Bereich of `tickets_report_areas`; then leave out `kind`.
+        category_id: A Kategorie of that Bereich.
     """
     return await post_message(
         "/tickets",
-        {"kind": kind, "title": title, "body": body, "context": {"route": "mcp"}},
+        {
+            "title": title,
+            "body": body,
+            "context": {"route": "mcp"},
+            **({"kind": kind} if kind is not None else {}),
+            **({"areaId": area_id} if area_id is not None else {}),
+            **({"categoryId": category_id} if category_id is not None else {}),
+        },
         file_paths,
     )
 
 
 @group.tool
+async def tickets_report_areas() -> list:
+    """List the Bereiche that the caller can send a ticket to with `tickets_report`."""
+    return await api().get("/tickets/report-areas")
+
+
+@group.tool
+async def tickets_create_manual(ticket: S.TicketManualCreate) -> dict:
+    """Create a ticket by hand for an account or an address (work right in the Bereich).
+
+    Exactly one of `reporterId` and `email` names the person (422
+    `ticket_reporter_invalid`). `body` stays with the team; `message` is the first
+    public message. An address needs a Postfach of the Bereich (422
+    `ticket_area_without_mailbox`).
+    """
+    return await api().post("/tickets/manual", json=S.dump_create(ticket))
+
+
+@group.tool
 async def tickets_mine(
-    status: list[Literal["new", "in_progress", "done", "rejected"]] | None = None,
+    status: list[Literal["new", "in_progress", "waiting", "done", "rejected"]] | None = None,
     kind: list[Literal["bug", "question", "idea", "barrier"]] | None = None,
     q: str | None = None,
 ) -> dict:
@@ -283,6 +316,10 @@ async def tickets_mine_note(
     ticket_id: str, body: str = "", file_paths: list[str] | None = None
 ) -> dict:
     """Write a message on an own ticket; it is public and the team gets a mail.
+
+    A message on a waiting or closed ticket sets `in_progress`. On a ticket that is
+    closed for more than 14 days (`replyOpensNew`) the message becomes a new ticket and
+    the answer is `{ followUp: { id, number } }`.
 
     A blocked sender gets 403 `sender_blocked`. Files work as in `tickets_note`.
     """

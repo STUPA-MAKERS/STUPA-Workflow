@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/tickets/test_ticket_waiting.py:test_a_message_of_the_sender_sets_in_progress_without_an_actor"
+implementation:
+  - backend/app/modules/tickets/service.py
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets

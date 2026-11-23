@@ -950,7 +950,7 @@ TodoLinkKind = Literal[
     "todo",
 ]
 TicketKind = Literal["bug", "question", "idea", "barrier"]
-TicketStatus = Literal["new", "in_progress", "done", "rejected"]
+TicketStatus = Literal["new", "in_progress", "waiting", "done", "rejected"]
 
 
 class TodoLinkIn(WireModel, frozen=True):
@@ -1034,6 +1034,10 @@ class TicketAreaCreate(WireModel, frozen=True):
         default=None, description="The Gremium whose roles grant ticket.work in the Bereich"
     )
     notifyNew: bool = Field(default=True, description="Mail each new ticket to the team")
+    inApp: bool = Field(
+        default=False,
+        description="A signed-in person can choose the Bereich in the ticket dialog",
+    )
     categories: list[TicketCategoryIn] = Field(default_factory=list)
 
 
@@ -1043,10 +1047,34 @@ class TicketAreaPatch(WireModel, frozen=True):
         default=None, description="Explicit null leaves the Bereich without a Gremium"
     )
     notifyNew: bool | None = None
+    inApp: bool | None = Field(
+        default=None,
+        description="A signed-in person can choose the Bereich in the ticket dialog",
+    )
     categories: list[TicketCategoryIn] | None = Field(
         default=None,
         description="The whole ordered list; a stored Kategorie that is left out is deleted",
     )
+
+
+class TicketManualCreate(WireModel, frozen=True):
+    areaId: str = Field(description="A Bereich in which the caller works")
+    title: str = Field(description="1 to 200 characters")
+    body: str = Field(default="", description="The note of the team; the person does not read it")
+    kind: TicketKind | None = Field(
+        default=None, description="Required for the Bereich Plattform, not allowed elsewhere"
+    )
+    categoryId: str | None = Field(
+        default=None, description="A Kategorie of the Bereich; not for Plattform"
+    )
+    reporterId: str | None = Field(
+        default=None, description="The account of the person; or set email"
+    )
+    email: str | None = Field(
+        default=None,
+        description="The address of the person; the Bereich needs a Postfach (422 otherwise)",
+    )
+    message: str = Field(default="", description="The first public message to the person")
 
 
 class TicketPatch(WireModel, frozen=True):

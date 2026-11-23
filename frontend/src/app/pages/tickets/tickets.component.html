@@ -5,6 +5,14 @@
         <ng-container ngProjectAs="[actions]">
           @if (phone()) {
             <app-row-menu [label]="'action.more' | t" [sections]="phoneMenu()" (selected)="onPhoneMenu($event)" />
+          } @else if (manager) {
+            <app-button
+              variant="text"
+              [iconOnly]="true"
+              data-testid="tk-new"
+              [ariaLabel]="'tickets.new.heading' | t"
+              (click)="newOpen.set(true)"
+            ><app-icon name="plus" /></app-button>
           }
         </ng-container>
       </app-page-header>
@@ -141,3 +149,13 @@
     </div>
   </app-list-detail>
 </div>
+
+@if (manager) {
+  <app-ticket-new-dialog
+    [open]="newOpen()"
+    [areas]="myAreas()"
+    [preset]="areaFilter()"
+    (closed)="newOpen.set(false)"
+    (created)="onCreated($event)"
+  />
+}

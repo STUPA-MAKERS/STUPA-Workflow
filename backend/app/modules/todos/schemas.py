@@ -48,7 +48,7 @@ TodoEventKind = Literal[
     "archived",
     "restored",
 ]
-TicketStatus = Literal["new", "in_progress", "done", "rejected"]
+TicketStatus = Literal["new", "in_progress", "waiting", "done", "rejected"]
 VoteStatus = Literal["draft", "open", "closed", "cancelled"]
 VoteResult = Literal["passed", "rejected", "tie", "elected", "runoff"]
 InvoiceStatus = Literal["open", "paid"]

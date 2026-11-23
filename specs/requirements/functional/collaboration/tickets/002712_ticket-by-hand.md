@@ -5,7 +5,15 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/tickets/test_ticket_waiting.py:test_a_ticket_by_hand_names_one_known_account"
+  - "backend/tests/unit/modules/tickets/test_ticket_waiting.py:test_a_ticket_by_hand_outside_the_own_bereiche_is_403"
+  - "frontend/src/app/pages/tickets/ticket-new-dialog.component.spec.ts:TicketNewDialogComponent"
+implementation:
+  - backend/app/modules/tickets/service.py
+  - backend/app/modules/tickets/router.py
+  - frontend/src/app/pages/tickets/ticket-new-dialog.component.ts
+  - mcp/antragsplattform_mcp/tools/tickets.py
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets

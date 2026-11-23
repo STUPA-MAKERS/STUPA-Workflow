@@ -19,6 +19,10 @@ a Bereich in which the caller does not work gives 404, like an unknown ticket. T
 sender blocks hold back a person in every Bereich, so their routes need
 ``ticket.manage``.
 
+``GET /tickets/report-areas`` lists the Bereiche that a signed-in person can choose
+in the ticket dialog. ``POST /tickets/manual`` is the ticket that a person of the team
+writes by hand.
+
 ``/admin/ticket-areas`` is the list of the Bereiche of the admin page "Hilfe &
 Tickets" behind ``admin.site``.
 """
@@ -40,6 +44,7 @@ from app.modules.site_config.reads import active_branding
 from app.modules.tickets.access import TICKET_MANAGE, AreaScope, area_scope, works_anywhere
 from app.modules.tickets.areas import TicketAreaService
 from app.modules.tickets.mails import (
+    notify_ticket_assigned,
     notify_ticket_created,
     notify_ticket_note,
     notify_ticket_received,
@@ -52,6 +57,7 @@ from app.modules.tickets.schemas import (
     ReporterNoteCreate,
     ReporterTicketDetail,
     ReporterTicketItem,
+    TicketAreaChoice,
     TicketAreaCreate,
     TicketAreaOut,
     TicketAreaPatch,
@@ -60,10 +66,13 @@ from app.modules.tickets.schemas import (
     TicketCreate,
     TicketCreated,
     TicketDetail,
+    TicketFollowUp,
     TicketKind,
     TicketListItem,
+    TicketManualCreate,
     TicketNoteOut,
     TicketPatch,
+    TicketRef,
     TicketStatus,
 )
 from app.modules.tickets.service import (
@@ -195,6 +204,22 @@ def get_note_mail_sender() -> NoteMailSender:
 
 NoteMails = Annotated[NoteMailSender, Depends(get_note_mail_sender)]
 
+#: Sends ``ticket_assigned`` to the new assignee of a ticket (background task).
+AssignedMailSender = Callable[[Settings, UUID, object], Awaitable[None]]
+
+
+async def _deliver_assigned_mail(settings: Settings, ticket_id: UUID, pool: object) -> None:
+    queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
+    await notify_ticket_assigned(queue=queue, settings=settings, ticket_id=ticket_id)
+
+
+def get_assigned_mail_sender() -> AssignedMailSender:
+    """Return the injectable mail sender of an assignment that a test can override."""
+    return _deliver_assigned_mail
+
+
+AssignedMails = Annotated[AssignedMailSender, Depends(get_assigned_mail_sender)]
+
 #: Sends ``ticket_mentioned`` to the new mentions of a note (background task).
 MentionMailSender = Callable[[Settings, UUID, list[UUID], object], Awaitable[None]]
 
@@ -231,7 +256,7 @@ def _queue_mention_mails(
 
 
 async def require_public_or_session(
-    db: DbSession, principal: Principal | None, kind: TicketKind
+    db: DbSession, principal: Principal | None, kind: TicketKind | None
 ) -> None:
     """Refuse a report without a session while ``tickets.publicEnabled`` is off.
 
@@ -285,6 +310,11 @@ async def create_ticket(
 
     A report of a blocked sender gets the same answer with a fresh number, but
     nothing is stored and no mail goes out.
+
+    ``areaId`` sends the report to a Bereich of ``GET /tickets/report-areas``, with
+    ``categoryId`` in place of ``kind``. Without a session only ``Plattform`` takes a
+    report (403 ``ticket_area_needs_session``); a Bereich without the switch "In der
+    App erreichbar" gives 403 ``ticket_area_not_reachable``.
     """
     await require_public_or_session(db, principal, payload.kind)
     reporter_id = await principal_id_of(db, principal.sub) if principal is not None else None
@@ -349,7 +379,7 @@ async def get_my_ticket(
 
 @router.post(
     "/tickets/mine/{ticket_id}/notes",
-    response_model=TicketNoteOut,
+    response_model=TicketNoteOut | TicketFollowUp,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(rate_limit_ticket_messages)],
     responses=_errors(401, 403, 404, 422, 429),
@@ -358,20 +388,37 @@ async def add_my_ticket_note(
     ticket_id: UUID,
     payload: ReporterNoteCreate,
     service: ServiceDep,
+    db: DbSession,
     principal: ReporterWriter,
     settings: SettingsDep,
     background: BackgroundTasks,
     request: Request,
     send_mail: NoteMails,
-) -> TicketNoteOut:
+    send_ticket_mails: Annotated[TicketMailSender, Depends(get_ticket_mail_sender)],
+) -> TicketNoteOut | TicketFollowUp:
     """Write a message on an own ticket. It is public. A block gives 403 ``sender_blocked``.
 
-    After the commit the team gets the mail ``ticket_message``.
+    After the commit the team gets the mail ``ticket_message``. A message on a ticket
+    with the status ``waiting``, ``done`` or ``rejected`` sets ``in_progress``.
+
+    A message on a ticket that is closed for more than 14 days (``replyOpensNew`` of
+    the detail) becomes a new ticket in the same Bereich. The answer then is
+    ``{ followUp: { id, number } }`` and the mails are those of a new ticket.
     """
+    pool = getattr(request.app.state, "arq_pool", None)
+    follow_up = await service.reporter_follow_up(
+        ticket_id, payload, principal, pepper=settings.magic_link_secret
+    )
+    if follow_up is not None:
+        await db.commit()
+        background.add_task(send_ticket_mails, settings, follow_up.id, pool)
+        return TicketFollowUp(
+            follow_up=TicketRef(id=follow_up.id, number=format_number(follow_up.number))
+        )
     note = await service.reporter_add_note(
         ticket_id, payload, principal, pepper=settings.magic_link_secret
     )
-    background.add_task(send_mail, settings, note.id, getattr(request.app.state, "arq_pool", None))
+    background.add_task(send_mail, settings, note.id, pool)
     return note
 
 
@@ -491,6 +538,48 @@ async def ticket_areas(areas: AreaServiceDep, worker: Worker) -> list[TicketArea
     return await areas.listing(worker.areas)
 
 
+@router.get("/tickets/report-areas", response_model=list[TicketAreaChoice], responses=_errors(401))
+async def ticket_report_areas(areas: AreaServiceDep, _principal: Reader) -> list[TicketAreaChoice]:
+    """List the Bereiche that a signed-in person can choose in the ticket dialog.
+
+    These are ``Plattform`` and each Bereich with the switch "In der App erreichbar".
+    """
+    return await areas.choices()
+
+
+@router.post(
+    "/tickets/manual",
+    response_model=TicketDetail,
+    status_code=status.HTTP_201_CREATED,
+    responses=_errors(401, 403, 404, 422),
+)
+async def create_manual_ticket(
+    payload: TicketManualCreate,
+    service: ServiceDep,
+    db: DbSession,
+    worker: Worker,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    send_mail: NoteMails,
+) -> TicketDetail:
+    """Create a ticket by hand for an account or for an e-mail address.
+
+    The caller needs the work right in the Bereich ``areaId`` (403). Exactly one of
+    ``reporterId`` and ``email`` names the person (422 ``ticket_reporter_invalid``).
+    ``body`` is the note of the team; the person does not read it. ``message`` is the
+    first public message: the account reads it in the tab "Tickets" and gets the mail
+    ``ticket_answer``. A ticket for an address needs a Postfach of the Bereich, else
+    422 ``ticket_area_without_mailbox``.
+    """
+    ticket, note = await service.create_manual(payload, worker.principal, areas=worker.areas)
+    await db.commit()
+    if note is not None:
+        pool = getattr(request.app.state, "arq_pool", None)
+        background.add_task(send_mail, settings, note.id, pool)
+    return await service.detail(ticket.id, worker.principal, areas=worker.areas)
+
+
 @router.get(
     "/tickets/blocked-senders",
     response_model=list[TicketBlockedSender],
@@ -525,7 +614,14 @@ async def get_ticket(ticket_id: UUID, service: ServiceDep, worker: Worker) -> Ti
     "/tickets/{ticket_id}", response_model=TicketDetail, responses=_errors(401, 403, 404, 422)
 )
 async def patch_ticket(
-    ticket_id: UUID, payload: TicketPatch, service: ServiceDep, worker: Worker
+    ticket_id: UUID,
+    payload: TicketPatch,
+    service: ServiceDep,
+    worker: Worker,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    send_assigned: AssignedMails,
 ) -> TicketDetail:
     """Change the status, the assignee (``null`` unassigns), the Kategorie or the Bereich.
 
@@ -539,8 +635,15 @@ async def patch_ticket(
     another Bereich (``GET /tickets/areas``), also to one in which the caller does not
     work: the move clears the Kategorie, and the assignee without the work right
     there. An unknown Bereich gives 422 ``area_invalid``.
+
+    A new assignee who did not assign the ticket to the own account gets the mail
+    ``ticket_assigned``.
     """
-    return await service.patch(ticket_id, payload, worker.principal, areas=worker.areas)
+    detail = await service.patch(ticket_id, payload, worker.principal, areas=worker.areas)
+    if payload.assignee_id is not None:
+        pool = getattr(request.app.state, "arq_pool", None)
+        background.add_task(send_assigned, settings, ticket_id, pool)
+    return detail
 
 
 @router.post(
@@ -664,9 +767,7 @@ async def delete_ticket_note(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get(
-    "/admin/ticket-areas", response_model=list[TicketAreaOut], responses=_errors(401, 403)
-)
+@router.get("/admin/ticket-areas", response_model=list[TicketAreaOut], responses=_errors(401, 403))
 async def admin_ticket_areas(areas: AreaServiceDep, _principal: SiteAdmin) -> list[TicketAreaOut]:
     """List the Bereiche with their settings and Kategorien, ``Plattform`` first."""
     return await areas.listing()

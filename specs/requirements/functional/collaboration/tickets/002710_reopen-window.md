@@ -5,7 +5,15 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/tickets/test_ticket_waiting.py:test_a_late_answer_opens_a_follow_up_ticket_in_the_same_bereich"
+  - "backend/tests/unit/modules/tickets/test_ticket_waiting.py:test_an_answer_in_time_or_on_an_open_ticket_is_no_follow_up"
+  - "backend/tests/unit/modules/tickets/test_ticket_router.py:test_a_late_message_of_the_reporter_becomes_a_new_ticket"
+implementation:
+  - backend/app/modules/tickets/models.py
+  - backend/app/modules/tickets/service.py
+  - backend/app/modules/tickets/router.py
+  - frontend/src/app/pages/tickets/ticket-detail.component.ts
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets

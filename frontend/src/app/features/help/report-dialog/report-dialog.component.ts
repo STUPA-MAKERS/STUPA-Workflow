@@ -17,6 +17,7 @@ import type { ProblemDetail } from '@core/api/models';
 import {
   TICKET_KINDS,
   TicketsApiService,
+  type TicketAreaChoice,
   type TicketContext,
   type TicketKind,
 } from '@core/api/tickets.service';
@@ -39,6 +40,8 @@ import {
   mediaQuery,
   SegmentedComponent,
   type SegmentedOption,
+  SelectFieldComponent,
+  type SelectOption,
   TextareaComponent,
   ToastService,
   ErrorTextComponent,
@@ -115,6 +118,7 @@ const KIND_LABEL: Record<TicketKind, TranslationKey> = {
     IconComponent,
     InputComponent,
     SegmentedComponent,
+    SelectFieldComponent,
   ],
   providers: [
     DraftAttachmentsService,
@@ -139,6 +143,20 @@ export class ReportDialogComponent {
   protected readonly accept = UPLOAD_ACCEPT;
 
   readonly kind = signal<TicketKind>('bug');
+  /** The Bereiche that a signed-in person can choose; "Plattform" alone shows no select. */
+  readonly areas = signal<readonly TicketAreaChoice[]>([]);
+  /** The chosen Bereich; the empty string: "Plattform". */
+  readonly areaId = signal('');
+  readonly categoryId = signal('');
+  /** The chosen Bereich other than "Plattform", else null: then the report has a kind. */
+  readonly area = computed(() => this.areas().find((a) => !a.platform && a.id === this.areaId()) ?? null);
+  readonly areaOptions = computed<SelectOption[]>(() =>
+    this.areas().map((a) => ({ value: a.platform ? '' : a.id, label: a.name })),
+  );
+  readonly categoryOptions = computed<SelectOption[]>(() => [
+    { value: '', label: this.i18n.translate('tickets.detail.noCategory') },
+    ...(this.area()?.categories ?? []).map((c) => ({ value: c.id, label: c.name })),
+  ]);
   readonly title = signal('');
   readonly body = signal('');
   readonly email = signal('');
@@ -240,6 +258,7 @@ export class ReportDialogComponent {
   private prepare(): void {
     if (this.sentNumber() !== null) {
       this.kind.set('bug');
+      this.setArea('');
       this.title.set('');
       this.body.set('');
       this.email.set('');
@@ -247,6 +266,8 @@ export class ReportDialogComponent {
     }
     const preset = this.help.presetKind();
     if (preset) this.kind.set(preset);
+    if (preset || this.anonymous()) this.setArea('');
+    this.loadAreas();
     this.resetAltcha();
     this.sending.set(false);
     this.error.set(null);
@@ -255,6 +276,26 @@ export class ReportDialogComponent {
     this.context.set(
       reportContext(this.env(), this.i18n.uiLocale(), this.theme.resolved()),
     );
+  }
+
+  /** A signed-in person reads the Bereiche that take a ticket from the app; a failed read leaves "Plattform". */
+  private loadAreas(): void {
+    if (this.anonymous()) {
+      this.areas.set([]);
+      return;
+    }
+    this.api.reportAreas().subscribe({
+      next: (areas) => {
+        this.areas.set(areas);
+        if (!areas.some((a) => a.id === this.areaId())) this.setArea('');
+      },
+      error: () => this.areas.set([]),
+    });
+  }
+
+  setArea(id: string): void {
+    this.areaId.set(id);
+    this.categoryId.set('');
   }
 
   /** A solution is good for one send: the widget asks again. */
@@ -353,9 +394,12 @@ export class ReportDialogComponent {
     this.error.set(null);
     const ids = this.drafts.attachmentIds();
     const anonymous = this.anonymous();
+    const area = this.area();
     this.api
       .create({
-        kind: this.kind(),
+        ...(area
+          ? { areaId: area.id, ...(this.categoryId() ? { categoryId: this.categoryId() } : {}) }
+          : { kind: this.kind() }),
         title: this.title().trim(),
         body: this.body().trim(),
         email: anonymous ? this.email().trim() : null,

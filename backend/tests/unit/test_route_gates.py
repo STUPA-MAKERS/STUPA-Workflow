@@ -229,6 +229,12 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("GET", "/api/tickets/counts"): _TICKET_WORK,
     ("GET", "/api/tickets/assignees"): _TICKET_WORK,
     ("GET", "/api/tickets/areas"): _TICKET_WORK,
+    ("GET", "/api/tickets/report-areas"): (
+        "TicketAreaService.choices (any session: Plattform and the Bereiche with in_app)"
+    ),
+    ("POST", "/api/tickets/manual"): (
+        "tickets.router.require_worker + TicketService.create_manual (works_in the Bereich)"
+    ),
     ("GET", "/api/tickets/{ticket_id}"): _TICKET_WORK,
     ("PATCH", "/api/tickets/{ticket_id}"): _TICKET_WORK,
     ("POST", "/api/tickets/{ticket_id}/notes"): _TICKET_WORK,

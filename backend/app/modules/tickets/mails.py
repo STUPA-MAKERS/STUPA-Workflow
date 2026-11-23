@@ -1,7 +1,7 @@
 """Send the ticket mails to the team and to the reporter.
 
-``ticket_created`` and ``ticket_message`` go to the team, ``ticket_received`` and
-``ticket_answer`` to the reporter.
+``ticket_created``, ``ticket_message`` and ``ticket_assigned`` go to the team,
+``ticket_received`` and ``ticket_answer`` to the reporter.
 
 All run as background tasks after the commit of the report or the message, each
 with its own session, and all are best effort: a mail failure never fails the
@@ -26,6 +26,11 @@ internal note, an edit,
 a note on an anonymized ticket and an answer to a deactivated or merged reporter account
 send nothing. Each recipient can switch the kind
 off. A team author shows by name only, never by e-mail, as in the tab.
+
+``ticket_assigned`` goes to the new assignee when a different person assigned the
+ticket. A person who takes a ticket gets no mail. The mail reads the newest
+``assignee`` event of the ticket and is idempotent for that event, so a change that
+does not touch the assignee sends nothing new.
 """
 
 from __future__ import annotations
@@ -33,6 +38,7 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
@@ -45,6 +51,9 @@ from app.modules.notifications.texts.tickets import (
     TICKET_ANSWER_BODY,
     TICKET_ANSWER_KEY,
     TICKET_ANSWER_SUBJECT,
+    TICKET_ASSIGNED_BODY,
+    TICKET_ASSIGNED_KEY,
+    TICKET_ASSIGNED_SUBJECT,
     TICKET_CREATED_BODY,
     TICKET_CREATED_KEY,
     TICKET_CREATED_SUBJECT,
@@ -57,7 +66,13 @@ from app.modules.notifications.texts.tickets import (
 )
 from app.modules.site_config.reads import active_branding
 from app.modules.tickets.access import area_workers
-from app.modules.tickets.models import PLATFORM_AREA_ID, Ticket, TicketArea, TicketNote
+from app.modules.tickets.models import (
+    PLATFORM_AREA_ID,
+    Ticket,
+    TicketArea,
+    TicketEvent,
+    TicketNote,
+)
 from app.modules.tickets.service import TicketService, format_number
 from app.settings import Settings
 
@@ -124,7 +139,8 @@ async def notify_ticket_created(
                 context={
                     "number": format_number(ticket.number),
                     "title": ticket.title,
-                    "kind": ticket.kind,
+                    "kind": ticket.kind or "",
+                    "area": area.name,
                     "reporter": reporter,
                 },
                 idempotency_parts=(TICKET_CREATED_KEY, str(ticket.id)),
@@ -319,3 +335,63 @@ async def _mail_reporter(
         lang=language or "de",
         link=ticket_link(settings, ticket.id),
     )
+
+
+async def notify_ticket_assigned(
+    *,
+    queue: MailQueue | None,
+    settings: Settings,
+    ticket_id: UUID,
+    sessionmaker: async_sessionmaker[AsyncSession] | None = None,
+) -> bool:
+    """Mail the new assignee of a ticket when a different person assigned it (best effort).
+
+    Returns:
+        True when a mail was enqueued.
+    """
+    try:
+        async with _maker(sessionmaker)() as session:
+            ticket = await session.get(Ticket, ticket_id)
+            event = await session.scalar(
+                select(TicketEvent)
+                .where(TicketEvent.ticket_id == ticket_id, TicketEvent.kind == "assignee")
+                .order_by(TicketEvent.created_at.desc(), TicketEvent.id.desc())
+                .limit(1)
+            )
+            if ticket is None or event is None or ticket.assignee_id is None:
+                return False
+            target = str(ticket.assignee_id)
+            if (event.payload or {}).get("to") != target or str(event.actor_id) == target:
+                return False
+            workers = await area_workers(
+                session,
+                frozenset({ticket.area_id or PLATFORM_AREA_ID}),
+                principal_id=ticket.assignee_id,
+            )
+            recipients = sorted({email for _pid, _name, email in workers if email})
+            if not recipients:
+                return False
+            actor = (
+                await session.get(PrincipalRow, event.actor_id)
+                if event.actor_id is not None
+                else None
+            )
+            return await NotificationService(
+                session, queue=queue, settings=settings
+            ).send_kind_mail(
+                recipients,
+                kind=TICKET_ASSIGNED_KEY,
+                template_key=TICKET_ASSIGNED_KEY,
+                builtin_subject=TICKET_ASSIGNED_SUBJECT,
+                builtin_body=TICKET_ASSIGNED_BODY,
+                context={
+                    "number": format_number(ticket.number),
+                    "title": ticket.title,
+                    "actor": (actor.display_name or "") if actor is not None else "",
+                },
+                idempotency_parts=(TICKET_ASSIGNED_KEY, str(event.id)),
+                link=ticket_link(settings, ticket.id),
+            )
+    except Exception:
+        logger.exception("ticket_assigned mail failed")
+        return False

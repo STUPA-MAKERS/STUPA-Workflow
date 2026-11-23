@@ -25,6 +25,7 @@ The kinds:
 - ``ticket_message``: the reporter wrote on a ticket (the assignee, else every holder
   of ``ticket.manage``).
 - ``ticket_answer``: the team answered publicly on a ticket that the user reported.
+- ``ticket_assigned``: another person assigned a ticket to the user.
 - ``todo_assigned``, ``todo_mentioned``, ``todo_due``: a to-do was assigned, the user
   was mentioned in a to-do comment, or an assigned to-do is due the next day.
 - ``todo_board_added``: the user was added by name to a to-do board (spec 001071).
@@ -57,6 +58,7 @@ NOTIFICATION_KINDS: tuple[str, ...] = (
     "ticket_created",
     "ticket_message",
     "ticket_answer",
+    "ticket_assigned",
     "todo_assigned",
     "todo_mentioned",
     "todo_due",

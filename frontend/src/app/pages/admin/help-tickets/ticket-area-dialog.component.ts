@@ -74,8 +74,9 @@ export function idsAfter(
  * The dialog that creates or edits one Bereich of the tickets, with the form of the kit.
  *
  * The fields are the name, the Gremium whose roles give the work right `ticket.work`
- * (none: only the holders of `ticket.manage` work in the Bereich), the switch "Neue
- * Tickets per E-Mail" and the list of the Kategorien in their order. The Bereich
+ * (none: only the holders of `ticket.manage` work in the Bereich), the switches "Neue
+ * Tickets per E-Mail" and "In der App erreichbar" (a signed-in person can choose the
+ * Bereich in the ticket dialog of the help menu) and the list of the Kategorien in their order. The Bereich
  * "Plattform" keeps its name, has no Gremium and has the four kinds of a report as its
  * Kategorien, so its dialog shows only a note and the switch. "Bereich löschen" shows for
  * a stored Bereich other than "Plattform"; the server refuses it while the Bereich holds
@@ -147,6 +148,7 @@ export class TicketAreaDialogComponent {
         ],
       },
       notify,
+      { key: 'inApp', kind: 'switch', label: t('admin.helpTickets.areas.inApp') },
       {
         key: 'categories',
         kind: 'repeat',
@@ -193,6 +195,7 @@ export class TicketAreaDialogComponent {
           name: area?.name ?? '',
           gremiumId: area?.gremiumId ?? '',
           notifyNew: area?.notifyNew ?? true,
+          inApp: area?.inApp ?? false,
           categories: (area?.categories ?? []).map((c) => ({ name: c.name })),
         });
       });
@@ -221,6 +224,7 @@ export class TicketAreaDialogComponent {
       name: String(v['name'] ?? '').trim(),
       gremiumId: (v['gremiumId'] as string) || null,
       notifyNew: v['notifyNew'] === true,
+      inApp: v['inApp'] === true,
       categories: categoryNames(v).map((name, i) => ({
         ...(ids[i] ? { id: ids[i] } : {}),
         name: name.trim(),

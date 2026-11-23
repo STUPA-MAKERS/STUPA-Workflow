@@ -5,7 +5,13 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/tickets/test_ticket_waiting.py:test_no_assigned_mail_for_the_own_take_over_or_a_stale_event"
+  - "backend/tests/unit/modules/tickets/test_ticket_waiting.py:test_an_assignment_by_another_person_mails_the_new_assignee"
+implementation:
+  - backend/app/modules/tickets/mails.py
+  - backend/app/modules/tickets/router.py
+  - backend/app/modules/notifications/texts/tickets.py
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets

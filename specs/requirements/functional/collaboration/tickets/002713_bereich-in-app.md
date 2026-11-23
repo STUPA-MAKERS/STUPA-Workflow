@@ -5,7 +5,17 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/tickets/test_ticket_waiting.py:test_a_report_without_a_session_reaches_plattform_only"
+  - "backend/tests/unit/modules/tickets/test_ticket_waiting.py:test_a_report_reaches_a_bereich_with_the_switch_only"
+  - "backend/tests/unit/modules/tickets/test_ticket_waiting.py:test_the_choices_are_plattform_and_the_bereiche_with_the_switch"
+  - "frontend/src/app/features/help/report-dialog/report-dialog.component.spec.ts:ReportDialogComponent"
+implementation:
+  - backend/app/modules/tickets/service.py
+  - backend/app/modules/tickets/areas.py
+  - backend/app/modules/tickets/router.py
+  - frontend/src/app/features/help/report-dialog/report-dialog.component.ts
+  - frontend/src/app/pages/admin/help-tickets/ticket-area-dialog.component.ts
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets

@@ -78,6 +78,7 @@ export const VOTE_RESULT_LABEL: Record<TodoVoteResult, TranslationKey> = {
 export const TICKET_STATUS_LABEL: Record<string, TranslationKey> = {
   new: 'tickets.status.new',
   in_progress: 'tickets.status.in_progress',
+  waiting: 'tickets.status.waiting',
   done: 'tickets.status.done',
   rejected: 'tickets.status.rejected',
 };

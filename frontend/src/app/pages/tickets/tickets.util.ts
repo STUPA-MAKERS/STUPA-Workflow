@@ -5,6 +5,7 @@ import type {
   TicketEventPayload,
   TicketKind,
   TicketReporter,
+  TicketSource,
   TicketStatus,
 } from '@core/api/tickets.service';
 import type { Translate, TranslationKey } from '@core/i18n/translations';
@@ -56,21 +57,33 @@ export function categoryName(
 export const STATUS_LABEL: Record<TicketStatus, TranslationKey> = {
   new: 'tickets.status.new',
   in_progress: 'tickets.status.in_progress',
+  waiting: 'tickets.status.waiting',
   done: 'tickets.status.done',
   rejected: 'tickets.status.rejected',
+};
+
+/** The source of a ticket by name. */
+export const SOURCE_LABEL: Record<TicketSource, TranslationKey> = {
+  help: 'tickets.source.help',
+  mail: 'tickets.source.mail',
+  team: 'tickets.source.team',
 };
 
 /** The colour of a state: new is the accent, work in progress the warning colour. */
 export const STATUS_KIND: Record<TicketStatus, StatusKind> = {
   new: 'accent',
   in_progress: 'warn',
+  waiting: 'neutral',
   done: 'neutral',
   rejected: 'muted',
 };
 
-/** Done and rejected close a ticket; the other two are open. */
+/** The open states in the order of the list. "Wartet auf Antwort" is open. */
+export const OPEN_STATUSES: readonly TicketStatus[] = ['new', 'in_progress', 'waiting'];
+
+/** Done and rejected close a ticket; the other three are open. */
 export function isOpen(status: TicketStatus): boolean {
-  return status === 'new' || status === 'in_progress';
+  return OPEN_STATUSES.includes(status);
 }
 
 /** The reporter: the name, else the e-mail, else "Anonymisiert". */

@@ -14,7 +14,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { type Observable, map, tap } from 'rxjs';
+import { EMPTY, type Observable, map, mergeMap, of, tap } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { API_BASE_URL } from '@core/api/api.config';
 import { AuthService } from '@core/auth/auth.service';
@@ -27,6 +27,7 @@ import {
   type TicketDetail,
   type TicketKind,
   type TicketListItem,
+  type TicketFollowUp,
   type TicketNote,
   type TicketPatch,
   type TicketReporter,
@@ -81,6 +82,7 @@ import {
   ToastService,
   SectionComponent,
   DialogBodyDirective,
+  type IconName,
 } from '@stupa-makers/ui-kit';
 import { browserLabel, viewportLabel } from '../../features/help/report-context';
 import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
@@ -92,6 +94,7 @@ import { TicketsPageService } from './tickets-page.service';
 import {
   KIND_LABEL,
   STATUS_KIND,
+  SOURCE_LABEL,
   STATUS_LABEL,
   areaOf,
   categoryName,
@@ -139,6 +142,13 @@ export function blockErrorKey(err: unknown): TranslationKey {
   return (code && BLOCK_ERROR[code]) || 'tickets.detail.error.block';
 }
 
+/** A note under the header of the detail, with the ticket it names. */
+export interface TicketHint {
+  readonly icon: IconName;
+  readonly text: string;
+  readonly ref: { readonly id: Uuid; readonly number: string } | null;
+}
+
 /** The id of the ticket body in the thread: it never collides with a note id. */
 const BODY_ID = 'ticket-body';
 
@@ -158,6 +168,7 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
     categoryId: null,
     title: m.title,
     status: m.status,
+    source: 'help',
     reporter,
     assignee: null,
     createdAt: m.createdAt,
@@ -267,6 +278,8 @@ export class TicketDetailComponent {
   readonly manager = this.auth.worksOnTickets();
   /** The reporter may write: false while a block holds back the sender. */
   readonly canReply = signal(true);
+  /** The own ticket is closed for more than 14 days: a message becomes a new ticket. */
+  readonly replyOpensNew = signal(false);
   readonly phone = mediaQuery(MEDIA.phone);
 
   private id: Uuid = '';
@@ -350,6 +363,22 @@ export class TicketDetailComponent {
     ...(this.categoryLabel() ? [this.categoryLabel()] : []),
     ...(this.manager ? [this.assigneeName()] : []),
   ]);
+  readonly sourceLabel = computed(() => this.t(SOURCE_LABEL[this.ticket()?.source ?? 'help']));
+  /**
+   * The notes under the header: the ticket that this one duplicates or follows, and for
+   * the reporter that a message on a ticket closed long ago becomes a new ticket.
+   */
+  readonly hints = computed<readonly TicketHint[]>(() => {
+    const t = this.ticket();
+    if (!t) return [];
+    return [
+      ...(t.duplicateOf ? [{ icon: 'copy' as const, text: this.t('tickets.detail.duplicateOf'), ref: t.duplicateOf }] : []),
+      ...(t.followUpOf ? [{ icon: 'history' as const, text: this.t('tickets.detail.followUpOf'), ref: t.followUpOf }] : []),
+      ...(!this.manager && this.replyOpensNew() && this.canReply()
+        ? [{ icon: 'info' as const, text: this.t('tickets.detail.replyOpensNew'), ref: null }]
+        : []),
+    ];
+  });
   readonly kindLabel = computed(() => this.categoryLabel() || this.t('tickets.detail.noCategory'));
   readonly kindIcon = computed(() => ticketIcon(this.ticket()?.kind ?? null));
   /** The select "Bereich" shows with a second Bereich to move to. */
@@ -376,10 +405,14 @@ export class TicketDetailComponent {
   readonly menuSections = computed<RowMenuSection[]>(() => {
     const t = this.ticket();
     if (!t || !this.manager) return [];
-    const reset: RowMenuSection[] =
-      t.status !== 'new'
-        ? [{ items: [{ id: 'reset', label: this.t('tickets.detail.resetNew'), icon: 'history' }] }]
-        : [];
+    const reset: RowMenuItem[] =
+      t.status !== 'new' ? [{ id: 'reset', label: this.t('tickets.detail.resetNew'), icon: 'history' }] : [];
+    const wait: RowMenuItem[] =
+      t.status === 'waiting'
+        ? [{ id: 'progress', label: this.t('tickets.detail.setInProgress'), icon: 'play' }]
+        : isOpen(t.status)
+          ? [{ id: 'wait', label: this.t('tickets.detail.setWaiting'), icon: 'clock' }]
+          : [];
     const duplicate: RowMenuItem[] = isOpen(t.status)
       ? [{ id: 'duplicate', label: this.t('tickets.detail.duplicate'), icon: 'copy' }]
       : [];
@@ -389,7 +422,8 @@ export class TicketDetailComponent {
     const mayBlock = this.auth.can('ticket.manage') && !t.anonymizedAt && !this.ownReport(t.reporter);
     const block = mayBlock ? [blockItem] : [];
     const apart = [...duplicate, ...block];
-    return [...reset, ...(apart.length ? [{ items: apart }] : [])];
+    const states = [...wait, ...reset];
+    return [...(states.length ? [{ items: states }] : []), ...(apart.length ? [{ items: apart }] : [])];
   });
 
   readonly tabs = computed<TabItem[]>(() => [
@@ -434,7 +468,7 @@ export class TicketDetailComponent {
     (req) =>
       this.manager
         ? this.api.addNote(this.id, req.body, req, req.visibility, req.mentions)
-        : this.api.addMyNote(this.id, req.body, req),
+        : this.api.addMyNote(this.id, req.body, req).pipe(mergeMap((sent) => this.sentByReporter(sent))),
     (created) => this.notes.update((list) => appendOnce(list, created)),
     (err) =>
       this.toast.show(
@@ -591,7 +625,10 @@ export class TicketDetailComponent {
       anonymized: false,
     };
     return this.api.getMine(id, { detail }).pipe(
-      tap((m) => this.canReply.set(m.canReply)),
+      tap((m) => {
+        this.canReply.set(m.canReply);
+        this.replyOpensNew.set(!!m.replyOpensNew);
+      }),
       map((m) => fromMine(m, me)),
     );
   }
@@ -671,6 +708,8 @@ export class TicketDetailComponent {
 
   onMenu(item: RowMenuItem): void {
     if (item.id === 'reset') this.patch({ status: 'new' }, 'status');
+    if (item.id === 'wait') this.patch({ status: 'waiting' }, 'status');
+    if (item.id === 'progress') this.patch({ status: 'in_progress' }, 'status');
     if (item.id === 'duplicate') {
       this.duplicateSearch.clear();
       this.duplicateHits.set([]);
@@ -840,6 +879,19 @@ export class TicketDetailComponent {
         injector: this.injector,
       },
     );
+  }
+
+  /**
+   * The answer to a message of the reporter. A message on a ticket that is closed for
+   * more than 14 days became a new ticket: the page opens it, and the outbox of the old
+   * ticket clears with the change of the thread.
+   */
+  private sentByReporter(sent: TicketNote | TicketFollowUp): Observable<TicketNote> {
+    if (!('followUp' in sent)) return of(sent);
+    this.toast.show(this.t('tickets.detail.followUpCreated', { number: sent.followUp.number }), 'success');
+    this.page?.notify(sent.followUp.id);
+    void this.router.navigate(['/tickets', sent.followUp.id], { queryParamsHandling: 'preserve' });
+    return EMPTY;
   }
 
   /** A block that the team set while the reporter had the ticket open closes the composer. */

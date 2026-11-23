@@ -41,13 +41,34 @@
           <app-icon name="ext" [size]="15" />
         </a>
 
-        <app-segmented
-          width="fill"
-          [ariaLabel]="'tickets.kind.label' | t"
-          [options]="kindOptions()"
-          [value]="kind()"
-          (valueChange)="setKind($event)"
-        />
+        @if (areaOptions().length > 1) {
+          <app-select
+            [label]="'help.report.area' | t"
+            [options]="areaOptions()"
+            [ngModel]="areaId()"
+            [ngModelOptions]="{ standalone: true }"
+            (ngModelChange)="setArea($event)"
+          />
+        }
+        @if (area(); as chosen) {
+          @if (chosen.categories.length) {
+            <app-select
+              [label]="'tickets.detail.kind' | t"
+              [options]="categoryOptions()"
+              [ngModel]="categoryId()"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="categoryId.set($event)"
+            />
+          }
+        } @else {
+          <app-segmented
+            width="fill"
+            [ariaLabel]="'tickets.kind.label' | t"
+            [options]="kindOptions()"
+            [value]="kind()"
+            (valueChange)="setKind($event)"
+          />
+        }
 
         <app-input
           name="title"

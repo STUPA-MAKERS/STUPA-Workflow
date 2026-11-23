@@ -292,13 +292,14 @@ export class HelpTicketsComponent {
     if (area) this.editing.set(area);
   }
 
-  /** The line under the name: the team, then the Kategorien. */
+  /** The line under the name: the team, "In der App" with the switch, then the Kategorien. */
   protected areaParts(a: TicketArea): string[] {
     const gremium = this.gremien().find((g) => g.id === a.gremiumId)?.name;
     const team = a.platform
       ? this.i18n.translate('admin.helpTickets.areas.builtIn')
       : (gremium ?? this.i18n.translate('admin.helpTickets.areas.noGremium'));
-    return [team, ...a.categories.map((c) => c.name)];
+    const inApp = !a.platform && a.inApp ? [this.i18n.translate('admin.helpTickets.areas.inAppShort')] : [];
+    return [team, ...inApp, ...a.categories.map((c) => c.name)];
   }
 
   protected onAreaSaved(saved: TicketArea): void {
