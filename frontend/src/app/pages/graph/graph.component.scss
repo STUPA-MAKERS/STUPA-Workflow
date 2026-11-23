@@ -218,11 +218,11 @@
 .gr__panelHead,
 .gr__sheetHead {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-3);
 }
-.gr__sheetHead {
-  align-items: center;
+.gr__panelHead {
+  justify-content: space-between;
 }
 .gr__panelText {
   flex: 1 1 auto;
@@ -235,22 +235,14 @@
   line-height: 1.3;
   overflow-wrap: anywhere;
 }
-.gr__panelSub {
+.gr__panelSub,
+.gr__hint {
   margin: 0;
   color: var(--color-text-muted);
   font-size: 0.8125rem;
 }
 .gr__panelSub + .gr__panelSub {
   margin-top: var(--space-1);
-}
-.gr__hint {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-}
-.gr__panelHead {
-  align-items: center;
-  justify-content: space-between;
 }
 .gr__actions {
   align-self: flex-start;
