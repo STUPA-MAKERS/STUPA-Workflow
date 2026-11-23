@@ -49,7 +49,7 @@
 @if (loading()) {
   <app-skeleton variant="rows" [count]="5" [label]="'gremien.attendance.loading' | t" />
 } @else if (error() && !rows().length) {
-  <app-empty-state icon="alert" [heading]="'gremien.attendance.error' | t" />
+  <app-empty-state fill icon="alert" [heading]="'gremien.attendance.error' | t" />
 } @else if (noMeetings()) {
   <p class="sr-only">{{ 'gremien.attendance.noMeetings' | t }}</p>
   <div class="gat__ghost" aria-hidden="true">
@@ -63,7 +63,7 @@
     }
   </div>
 } @else if (!rows().length) {
-  <app-empty-state [icon]="role() ? 'searchOff' : 'users'" shape="table" rows="3" [heading]="(role() ? 'gremien.attendance.noMatch' : 'gremien.attendance.empty') | t" />
+  <app-empty-state fill [icon]="role() ? 'searchOff' : 'users'" shape="table" rows="3" [heading]="(role() ? 'gremien.attendance.noMatch' : 'gremien.attendance.empty') | t" />
 } @else if (phone()) {
   <div class="gat__phoneHead" aria-hidden="true">
     @for (h of heads(); track h.month) {

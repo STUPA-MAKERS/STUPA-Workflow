@@ -93,6 +93,8 @@ export class AttachmentsPanelComponent {
   readonly deleteAllowed = computed(() => this.canDelete() ?? this.canUpload());
   /** The panel is the drop target. False: the page around it takes the drop. */
   readonly dropTarget = input(true);
+  /** The panel is the whole content of a tab: the empty state centres in its free area (002650). */
+  readonly fill = input(false);
   /** The number of attachments, after the first load and after each change. */
   readonly countChange = output<number>();
 

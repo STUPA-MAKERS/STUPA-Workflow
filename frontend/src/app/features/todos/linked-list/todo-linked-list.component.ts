@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { booleanAttribute, ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { catchError, map, of, switchMap } from 'rxjs';
 import { NgTemplateOutlet } from '@angular/common';
@@ -146,6 +146,8 @@ export class TodoLinkedListComponent {
   readonly linkLabel = input('');
   /** Shown when nothing links the element; empty: the list shows nothing then. */
   readonly emptyHeading = input('');
+  /** The list is the whole content of a side pane: the empty state centres in its free area (002650). */
+  readonly fill = input(false, { transform: booleanAttribute });
   readonly size = input<'md' | 'lg'>('md');
 
   readonly newOpen = signal(false);

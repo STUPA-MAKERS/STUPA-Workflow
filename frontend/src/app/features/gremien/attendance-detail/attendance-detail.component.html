@@ -5,9 +5,9 @@
   @if (loading()) {
     <app-skeleton variant="lines" [count]="2" [label]="'gremien.attendance.detailLoading' | t" />
   } @else if (empty() && error()) {
-    <app-empty-state icon="alert" [heading]="'gremien.attendance.detailError' | t" />
+    <app-empty-state fill icon="alert" [heading]="'gremien.attendance.detailError' | t" />
   } @else if (empty()) {
-    <app-empty-state icon="users" rows="1" [heading]="'gremien.attendance.detailEmpty' | t" />
+    <app-empty-state fill icon="users" rows="1" [heading]="'gremien.attendance.detailEmpty' | t" />
   } @else {
     @for (g of groups(); track g.month) {
       @if (g.meetings.length) {

@@ -446,6 +446,7 @@
     [canUpload]="canUploadFiles()"
     [canDelete]="canDeleteFiles()"
     [dropTarget]="false"
+    [fill]="!split()"
   />
 </ng-template>
 
@@ -460,7 +461,7 @@
     @if (historyEntries().length) {
       <app-history [entries]="historyEntries()" />
     } @else {
-      <app-empty-state icon="history" rows="1" [heading]="'applications.history.empty' | t" />
+      <app-empty-state icon="history" rows="1" [fill]="!split()" [heading]="'applications.history.empty' | t" />
     }
   </app-section>
 </ng-template>
