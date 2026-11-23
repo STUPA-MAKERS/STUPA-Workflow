@@ -325,7 +325,7 @@
   "frontend/src/app/pages/admin/gremium-roles/gremium-role-dialog.component.scss": 80,
   "frontend/src/app/pages/admin/gremium-roles/gremium-role-dialog.component.ts": 1,
   "frontend/src/app/pages/admin/gremium-roles/gremium-role-matrix.component.html": 27,
-  "frontend/src/app/pages/admin/gremium-roles/gremium-role-matrix.component.scss": 202,
+  "frontend/src/app/pages/admin/gremium-roles/gremium-role-matrix.component.scss": 200,
   "frontend/src/app/pages/admin/gremium-roles/gremium-role-matrix.component.ts": 1,
   "frontend/src/app/pages/admin/gremium-roles/gremium-roles.component.html": 1,
   "frontend/src/app/pages/admin/gremium-roles/gremium-roles.component.scss": 3,
