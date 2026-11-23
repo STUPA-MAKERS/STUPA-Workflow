@@ -83,7 +83,7 @@ export const TICKET_PAGE = 100;
 export interface TicketChip {
   readonly key: 'area' | 'kind' | 'assignee';
   readonly label: string;
-  readonly options: FilterSelectOption[];
+  readonly options: readonly FilterSelectOption[];
   readonly value: string;
   readonly text: string;
 }
