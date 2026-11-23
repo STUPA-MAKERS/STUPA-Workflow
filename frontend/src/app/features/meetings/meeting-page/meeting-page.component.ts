@@ -45,10 +45,19 @@ import {
   type SegmentedOption,
   SideSheetComponent,
   SheetBodyDirective,
+  UI_KIT_INTL,
+  UiKitTranslatePipe,
 } from '@stupa-makers/ui-kit';
 import { meetingStatus, protocolStatus } from '@shared/status-kind.util';
-import { ProtocolBarComponent } from '../protocol-bar/protocol-bar.component';
-import { protocolActions, protocolMenuItems } from '../protocol-bar/protocol-actions.util';
+import {
+  ProtocolBarViewComponent,
+  type ProtocolPdfOpen,
+  protocolActions,
+  protocolMenuItems,
+} from '@stupa-makers/ui-kit/views/protocol';
+import { FileOpenService } from '@shared/viewer/file-open.service';
+import { MeetingSessionService } from '../meeting-session.service';
+import { ProtocolApprovalDialogComponent } from '../protocol-approval-dialog/protocol-approval-dialog.component';
 import { longDate } from '@shared/date-format';
 import {
   type AgendaMove,
@@ -149,7 +158,9 @@ type SessionAction =
     AttendanceSheetComponent,
     JoinQrComponent,
     AvatarComponent,
-    ProtocolBarComponent,
+    ProtocolBarViewComponent,
+    UiKitTranslatePipe,
+    ProtocolApprovalDialogComponent,
   ],
   templateUrl: './meeting-page.component.html',
   styleUrl: './meeting-page.component.scss',
@@ -294,7 +305,41 @@ export class MeetingPageComponent {
     return m.status === 'closed' && p ? protocolStatus(p) : meetingStatus(m.status);
   });
   /** The protocol part of the head: its action, its dialogs and its menu section. */
-  private readonly protocolBar = viewChild(ProtocolBarComponent);
+  private readonly protocolBar = viewChild(ProtocolBarViewComponent);
+  /** The page session: it saves the protocol actions of the head (spec 001304). */
+  private readonly session = inject(MeetingSessionService, { optional: true });
+  private readonly files = inject(FileOpenService);
+  private readonly kitIntl = inject(UI_KIT_INTL);
+  protected readonly hasSession = this.session !== null;
+  protected readonly approvalSaving = computed(() => this.session?.approvalSaving() ?? false);
+  /** The dialog "Als genehmigt markieren" is open (§ 000924). */
+  protected readonly approvalOpen = signal(false);
+  /** The dialog closes when the server stored the mark. */
+  private readonly approvalDone = effect(() => {
+    if (this.protocol()?.approvedAt) this.approvalOpen.set(false);
+  });
+
+  /** A PDF of the protocol: a link click keeps a new tab with a modifier, an item opens the viewer. */
+  protected openProtocolPdf({ file, event }: ProtocolPdfOpen): void {
+    if (event) this.files.click(event, file);
+    else this.files.open(file);
+  }
+
+  protected sendProtocolDraft(): void {
+    this.session?.sendProtocolDraft();
+  }
+
+  protected reopenProtocol(): void {
+    this.session?.reopenProtocol();
+  }
+
+  protected approveProtocol(meetingId: Uuid | null): void {
+    this.session?.setProtocolApproval(meetingId);
+  }
+
+  protected publishProtocol(publish: boolean): void {
+    this.session?.setPublicWithheld(!publish);
+  }
   protected readonly locked = computed(() => this.protocol()?.isLocked ?? false);
   /**
    * The text of the item can be written. A planned meeting has no protocol yet, but its
@@ -530,7 +575,7 @@ export class MeetingPageComponent {
     // after this menu is first read.
     const protocol =
       m.status === 'closed' && p
-        ? protocolMenuItems(protocolActions(m, p, true), p, this.phone(), t)
+        ? protocolMenuItems(protocolActions(m, p, true), p, this.phone(), (key) => this.kitIntl.translate(key))
         : [];
     return [
       ...(protocol.length ? [{ label: t('meetings.protocolMenu.caption'), items: protocol }] : []),

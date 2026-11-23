@@ -47,7 +47,6 @@ const CHROME_SLOTS = [
 ];
 /** The templates whose host is a segment of the group of the parent (`btn-grp__seg`). */
 const SEGMENT_HOSTS = [
-  'app/features/meetings/protocol-bar/protocol-bar.component.html',
   'app/features/meetings/public-join/join-qr.component.html',
 ];
 const VOID = new Set(['input', 'img', 'br', 'hr', 'meta', 'link', 'source', 'col', 'area', 'wbr']);

@@ -4,7 +4,7 @@ title: The graph shows the neighbours of the hits up to a count of steps
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-20
+updated: 2026-11-23
 tests:
   - "backend/tests/unit/modules/graph/test_graph_build.py:test_the_neighbours_of_a_hit_show_up_to_the_steps"
   - "backend/tests/unit/modules/graph/test_graph_build.py:test_a_hit_of_the_search_shows_without_a_line"
@@ -13,6 +13,7 @@ implementation:
   - backend/app/modules/graph/build.py
   - frontend/src/app/pages/graph/graph.util.ts
   - frontend/src/app/pages/graph/graph.component.html
+  - frontend/src/app/pages/graph/graph.component.scss
 scope:
   - backend/app/modules
   - frontend/src/app/pages
@@ -39,15 +40,21 @@ A fresh page must have 2 steps. The count must be in the query of the URL as `de
 without it means 2. The route `GET /api/graph` must take `depth`, and the server must apply
 it. "Zurücksetzen" must set 2 again.
 
-The field must be at the end side of the search and must stay there: it must not scroll with
-the filters. On a phone it must be in the line of the search. The person must be able to
-change the count with the keyboard (arrow up and down) and with a minus and a plus button.
+The field must not be in the bar of the filters. It must be a surface of its own over the
+drawing, at the bottom start corner, opposite the zoom buttons at the bottom end corner, also on
+a phone. Its name "Schritte" must be above the stepper: the minus button, the number and the
+plus button in one line. The field must show also while the page loads and when the graph is
+empty, so that the person can raise the count. The state of the build-up ("Wird aufgebaut",
+"Mehr laden") must be at the end side of the field. The person must be able to change the
+count with the keyboard (arrow up and down) and with the minus and the plus button.
 
 Reason: A hit alone does not answer the question of the person. The person searches an Antrag
 and wants to see its meeting, its vote and its Buchung, which the period or the search would
 hide. The count sets how far the view reaches: a small count for one element, a large count
 for a whole matter. A search that finds one element and shows an empty page at 0 steps looks
-like a search without a hit, and the count then seems to be wrong by one.
+like a search without a hit, and the count then seems to be wrong by one. The count is a
+setting of the view, as the zoom is, so it is in a corner of the drawing opposite the zoom,
+and the bar of the filters keeps its room for the search and the filters.
 
 Test: A backend unit test with a chain of nodes and the counts 0, 1 and 2; a backend unit test
 with a hit of the search that has no line to another hit, at 0 steps; a frontend unit test that

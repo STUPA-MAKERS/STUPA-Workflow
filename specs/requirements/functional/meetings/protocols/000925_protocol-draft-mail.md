@@ -8,7 +8,7 @@ updated: 2026-11-14
 implementation:
   - backend/app/modules/protocol/draft_mail.py
   - typst/typst_service/document.py
-  - frontend/src/app/features/meetings/protocol-bar/protocol-bar.component.ts
+  - frontend/vendor/ui-kit/views/protocol/src/protocol-bar-view.component.ts
 scope:
   - backend/app/modules/protocol
   - backend/app/modules/notifications

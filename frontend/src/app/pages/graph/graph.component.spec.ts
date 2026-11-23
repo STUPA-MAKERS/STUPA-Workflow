@@ -145,7 +145,10 @@ describe('GraphComponent', () => {
     expect(el.querySelector('#gr-title')).toHaveTextContent('Graph');
     expect(el.querySelector('#gr-title')).toHaveClass('sr-only');
     expect(el.querySelector('.gr__float .gr__bar [role="search"]')).not.toBeNull();
-    expect(el.querySelector('.gr__foot')).toBeNull();
+    // "Schritte" is in the foot, opposite the zoom buttons, not in the bar (spec 001434).
+    expect(el.querySelector('.gr__float .gr__foot .gr__depth')).not.toBeNull();
+    expect(el.querySelector('.gr__bar .gr__depth')).toBeNull();
+    expect(el.querySelector('.gr__foot .gr__pill')).toBeNull();
     expect(screen.queryByRole('group', { name: 'Legende' })).toBeNull();
     expect(
       screen.getByRole('group', {
