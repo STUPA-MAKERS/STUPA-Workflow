@@ -96,7 +96,7 @@
   (closed)="close()"
   [actions]="[
     { key: 'close', label: ('action.cancel' | t) },
-    { key: 'save', label: ('action.save' | t), kind: 'main', disabled: errors().length > 0 },
+    { key: 'save', label: ('action.save' | t), kind: 'main', disabled: !canSave() },
   ]"
   (action)="$event.key === 'close' ? close() : $event.key === 'save' ? save() : null"
 >
@@ -105,6 +105,7 @@
       <form class="wh__form" (submit)="$event.preventDefault(); save()">
         <app-input
           [label]="'admin.webhook.name' | t"
+          [required]="true"
           [ngModel]="d.name"
           (ngModelChange)="patch('name', $event)"
           name="name"
@@ -158,6 +159,7 @@
             [multiple]="true"
             [filled]="true"
             [label]="'admin.webhook.filter.gremien' | t"
+            [text]="filterText('admin.webhook.filter.gremien', gremiumOptions(), d.gremiumIds)"
             [options]="gremiumOptions()"
             [values]="d.gremiumIds"
             (valuesChange)="patch('gremiumIds', $event)"
@@ -168,6 +170,7 @@
             [multiple]="true"
             [filled]="true"
             [label]="'admin.webhook.filter.types' | t"
+            [text]="filterText('admin.webhook.filter.types', typeOptions(), d.typeIds)"
             [options]="typeOptions()"
             [values]="d.typeIds"
             (valuesChange)="patch('typeIds', $event)"
@@ -179,6 +182,7 @@
               [multiple]="true"
               [filled]="true"
               [label]="'admin.webhook.filter.states' | t"
+              [text]="filterText('admin.webhook.filter.states', stateOptions(), d.stateKeys)"
               [options]="stateOptions()"
               [values]="d.stateKeys"
               (valuesChange)="patch('stateKeys', $event)"
