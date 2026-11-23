@@ -5107,6 +5107,7 @@
   "admin.audit.action.paperless_filed": "Dokument in Paperless abgelegt",
   "admin.paperless.insert": "Einfügen",
   "admin.paperless.insertEnabled": "Aus Paperless einfügen",
+  "paperless.command": "Paperless",
   "paperless.search.label": "In Paperless suchen",
   "paperless.search.none": "Keine Dokumente gefunden",
   "paperless.search.unavailable": "Paperless ist nicht erreichbar",
