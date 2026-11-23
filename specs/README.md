@@ -864,6 +864,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/001480](requirements/non-functional/usability/layout/001480_admin-list-detail.md) | Verwaltung and Konto are ordinary list/detail pages | approved |
 | [NF/usability/layout/001482](requirements/non-functional/usability/layout/001482_admin-editors-full-width.md) | The form editor and the flow editor open without the list | approved |
 | [NF/usability/layout/002162](requirements/non-functional/usability/layout/002162_section-switch-at-once.md) | A switch between sections shows the new section at once | approved |
+| [NF/usability/layout/002610](requirements/non-functional/usability/layout/002610_settings-no-change-date.md) | A settings screen of Verwaltung shows no change date | approved |
 | [P/integrations/webhooks/000963](protocols/integrations/webhooks/000963_webhook-delivery.md) | A webhook delivery is a signed JSON POST | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |

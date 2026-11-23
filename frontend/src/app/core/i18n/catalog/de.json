@@ -1619,7 +1619,6 @@
   "admin.loginSettings.pwa": "Anmeldung in der installierten App gültig für",
   "admin.loginSettings.daysUnit": "Tage",
   "admin.loginSettings.range": "Eine ganze Zahl von 1 bis {max} Tagen.",
-  "admin.loginSettings.updatedAt": "Zuletzt geändert am {date}",
   "admin.loginSettings.loadError": "Die Einstellungen konnten nicht geladen werden.",
   "admin.loginSettings.forbidden": "Für diese Einstellungen fehlt das Recht, Personen zu verwalten.",
   "admin.forms.col.version": "Version",
