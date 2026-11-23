@@ -96,7 +96,7 @@ async function start(url: string, opts: StartOptions = {}) {
         { path: 'meetings/:id', component: TargetStub },
         { path: 'voting', component: TargetStub },
         { path: 'todos/:id', component: TargetStub },
-        { path: 'admin/committees/:id/members', component: TargetStub },
+        { path: 'admin/committees', component: TargetStub },
       ]),
       { provide: GremienApiService, useValue: api },
       { provide: AuthService, useValue: auth },
@@ -199,7 +199,7 @@ describe('GremiumDetailComponent', () => {
     expect(screen.getByRole('button', { name: 'Zur laufenden Sitzung' })).toBeTruthy();
   });
 
-  it('plans a meeting with session.manage and opens the administration with admin.gremien', async () => {
+  it('plans a meeting with session.manage and opens the Gremium in the administration with admin.gremien (002600)', async () => {
     const s = await start('/committees/g-1', { plan: true, admin: true });
     restore = s.restore;
     const d = s.detail();
@@ -215,7 +215,7 @@ describe('GremiumDetailComponent', () => {
 
     screen.getByRole('button', { name: 'Gremium verwalten' }).click();
     await s.settle();
-    expect(s.router.url).toBe('/admin/committees/g-1/members');
+    expect(s.router.url).toBe('/admin/committees?open=g-1');
   });
 
   it('runs every entry of the ⋮ menu', async () => {
@@ -234,7 +234,7 @@ describe('GremiumDetailComponent', () => {
     await s.settle();
     s.detail().onMenu({ id: 'admin', label: '' }, abo);
     await s.settle();
-    expect(s.router.url).toBe('/admin/committees/g-1/members');
+    expect(s.router.url).toBe('/admin/committees?open=g-1');
 
     await s.router.navigateByUrl('/committees/g-1');
     await s.settle();
@@ -332,7 +332,7 @@ describe('GremiumDetailComponent', () => {
     s.detail().openNext();
     s.detail().openAdmin();
     await s.settle();
-    expect(s.router.url).toBe('/admin/committees/g-x/members');
+    expect(s.router.url).toBe('/admin/committees?open=g-x');
   });
 
   it('shows the list error in the sheet', async () => {

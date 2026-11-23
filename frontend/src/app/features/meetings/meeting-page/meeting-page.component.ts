@@ -84,6 +84,10 @@ import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-lis
 import { clock, weekdayDate } from '@shared/date-format';
 import { pageItemTitle } from '../../../layout/page-title.service';
 import { provideVotingApi } from '../../voting/voting-api.provider';
+import { openInPaperless, paperlessLink } from '@core/api/paperless.service';
+
+/** The menu item `In Paperless öffnen` of the protocol. */
+const PAPERLESS_ITEM = 'paperless';
 
 /** The ids of the session menu. */
 type SessionAction =
@@ -186,6 +190,8 @@ export class MeetingPageComponent {
 
   readonly meeting = input.required<Meeting>();
   readonly protocol = input.required<Protocol | null>();
+  /** The filed protocol in Paperless, for a holder of `paperless.use` (002525). */
+  private readonly paperlessUrl = paperlessLink('protocol', computed(() => (this.protocol()?.status === 'final' ? this.protocol()?.id : null)));
   readonly agenda = input.required<AgendaItem[]>();
   /** The agenda item open in the sheet, plus its 0-based index. */
   readonly top = input.required<AgendaItem | null>();
@@ -573,9 +579,13 @@ export class MeetingPageComponent {
     const p = this.protocol();
     // The items come from the page inputs, not from the child: the child gets its inputs only
     // after this menu is first read.
-    const protocol =
+    const filed = this.paperlessUrl();
+    const protocol: readonly RowMenuItem[] =
       m.status === 'closed' && p
-        ? protocolMenuItems(protocolActions(m, p, true), p, this.phone(), (key) => this.kitIntl.translate(key))
+        ? [
+            ...protocolMenuItems(protocolActions(m, p, true), p, this.phone(), (key) => this.kitIntl.translate(key)),
+            ...when(!!filed, { id: PAPERLESS_ITEM, label: t('paperless.open'), icon: 'link' }),
+          ]
         : [];
     return [
       ...(protocol.length ? [{ label: t('meetings.protocolMenu.caption'), items: protocol }] : []),
@@ -788,6 +798,7 @@ export class MeetingPageComponent {
   }
 
   protected onMenu(item: RowMenuItem): void {
+    if (item.id === PAPERLESS_ITEM) return openInPaperless(this.paperlessUrl() ?? '');
     if (this.protocolBar()?.select(item.id)) return;
     switch (item.id as SessionAction) {
       case 'todos':

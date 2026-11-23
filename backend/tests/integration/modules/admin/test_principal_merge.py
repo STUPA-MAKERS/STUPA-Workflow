@@ -82,6 +82,7 @@ from app.modules.meetings.models import (
 )
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.notifications.models import NotificationPreference
+from app.modules.paperless.models import PaperlessFiling
 from app.modules.privacy.models import ErasureRequest
 from app.modules.site_config.models import PdfAsset, SiteConfigVersion
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
@@ -517,6 +518,13 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
                     handled_by=old.sub,
                 ),
                 Backup(created_by=old.sub),
+                PaperlessFiling(
+                    kind="plan",
+                    element_id=uuid.uuid4(),
+                    source_id=uuid.uuid4(),
+                    source_at=datetime.now(UTC),
+                    actor=old.sub,
+                ),
                 AuditVerification(
                     started_at=datetime.now(UTC),
                     valid=True,

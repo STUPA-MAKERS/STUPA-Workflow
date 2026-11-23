@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 
 from app.deps import Principal, SettingsDep, require_principal
 from app.modules.audit.actions import AuditAction
@@ -43,6 +43,7 @@ from app.modules.files.pdf_branding import (
     export_render_assets,
     export_render_config,
 )
+from app.modules.paperless.queue import request_filing
 from app.modules.pdf.typst_client import TypstError, build_typst_client
 from app.shared.antiabuse import rate_limit_pdf_render
 from app.shared.errors import (
@@ -341,10 +342,17 @@ async def delete_plan_line(version_id: UUID, budget_id: UUID, service: ServiceDe
     dependencies=_STRUCTURE,
     responses=_errors(401, 403, 404, 409, 422),
 )
-async def set_plan_state(version_id: UUID, payload: PlanStateSet, service: ServiceDep) -> PlanOut:
-    """Bring a version into force, or move a version in progress back to draft."""
+async def set_plan_state(
+    version_id: UUID, payload: PlanStateSet, service: ServiceDep, request: Request
+) -> PlanOut:
+    """Bring a version into force, or move a version in progress back to draft.
+
+    After the commit the route asks for a Paperless filing run
+    (§F/integrations/paperless/002523).
+    """
     out = await service.set_plan_state(version_id, payload)
     await service.session.commit()
+    await request_filing(getattr(request.app.state, "arq_pool", None))
     return out
 
 
@@ -355,11 +363,12 @@ async def set_plan_state(version_id: UUID, payload: PlanStateSet, service: Servi
     responses=_errors(401, 403, 404, 409, 422),
 )
 async def set_plan_state_by_hand(
-    version_id: UUID, payload: PlanStateByHand, service: ServiceDep
+    version_id: UUID, payload: PlanStateByHand, service: ServiceDep, request: Request
 ) -> PlanOut:
     """Set the state of the newest version of a plan by hand, with a reason."""
     out = await service.set_state_by_hand(version_id, payload)
     await service.session.commit()
+    await request_filing(getattr(request.app.state, "arq_pool", None))
     return out
 
 

@@ -5,7 +5,12 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/paperless/test_paperless.py:test_a_final_protocol_is_filed_once_in_both_variants"
+  - "backend/tests/unit/modules/paperless/test_client.py:test_set_link_keeps_the_other_custom_fields"
+implementation:
+  - backend/app/modules/paperless_filing/files.py
+  - backend/app/modules/paperless_filing/runner.py
 scope:
   - backend/app/
   - frontend/src/app/

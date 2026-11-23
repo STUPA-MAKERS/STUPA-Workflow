@@ -5,7 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/paperless/test_client.py:test_each_request_carries_the_token_and_none_deletes"
+  - "backend/tests/integration/modules/paperless/test_paperless.py:test_a_protocol_that_is_final_again_replaces_its_documents"
+implementation:
+  - backend/app/modules/paperless/client.py
 scope:
   - backend/app/
 ---
