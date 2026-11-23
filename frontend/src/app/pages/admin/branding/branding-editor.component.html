@@ -67,10 +67,9 @@
             </app-section>
             <app-section class="br__sec" [level]="2" [heading]="'admin.brand.avatars.group' | t">
               <div class="rowgroup rowgroup--settings">
-                <span class="br__skSwitch">
-                  <span class="br__skSwitchLabel">{{ 'admin.brand.avatars.gravatar' | t }}</span>
-                  <span class="skel-box br__skToggle"></span>
-                </span>
+                <span class="br__skSwitch"
+                  >{{ 'admin.brand.avatars.gravatar' | t }}<span class="skel-box br__skToggle"></span
+                ></span>
               </div>
             </app-section>
           </div>
@@ -274,7 +273,6 @@
               <app-section class="br__sec" [level]="2" [heading]="'admin.brand.avatars.group' | t">
                 <div class="rowgroup rowgroup--settings">
                   <app-switch
-                    class="br__row"
                     name="gravatarEnabled"
                     [ngModel]="d.gravatarEnabled !== false"
                     (ngModelChange)="setGravatar($event)"
