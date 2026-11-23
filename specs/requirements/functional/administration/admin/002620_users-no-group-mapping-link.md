@@ -1,24 +1,29 @@
 ---
 id: "002620"
-title: The Benutzer page has no link to the Gruppen-Zuordnung
+title: Benutzer and Gremien have no link to the Gruppen-Zuordnung
 kind: functional
 status: draft
 owner: frederikbeimgraben
 updated: 2026-11-23
 tests:
-  - "frontend/src/app/pages/admin/users/users.component.spec.ts:has no link to the group mappings"
+  - "frontend/src/app/pages/admin/users/users.component.spec.ts:has no link to the group mappings (spec 002620)"
+  - "frontend/src/app/pages/admin/committees/gremien.component.spec.ts:has no link to the group mappings (spec 002620)"
+  - "frontend/src/app/pages/admin/committees/gremium-members.component.spec.ts:names the gremium without a count (spec 000560) and has no mappings link (spec 002620)"
 implementation:
   - frontend/src/app/pages/admin/users/users.component.html
+  - frontend/src/app/pages/admin/committees/gremien.component.html
+  - frontend/src/app/pages/admin/committees/gremium-members.component.html
 scope:
   - frontend/src/app/pages/admin/users
+  - frontend/src/app/pages/admin/committees
 ---
 
-# The Benutzer page has no link to the Gruppen-Zuordnung
+# Benutzer and Gremien have no link to the Gruppen-Zuordnung
 
-The page Verwaltung › Benutzer must not show a note row with a link to the page
-Gruppen-Zuordnung. The list must start directly below the search.
+The pages Verwaltung › Benutzer, Verwaltung › Gremien and the members page of a Gremium must
+not show a note row with a link to the page Gruppen-Zuordnung.
 
 Reason: The Verwaltung menu already leads to the Gruppen-Zuordnung. A second way in on top of
-the list takes a row and adds nothing.
+the page takes a row and adds nothing.
 
-Test: The unit test of the users page finds no link to `/admin/group-mappings`.
+Test: The unit tests of the three pages find no link to the Gruppen-Zuordnung.

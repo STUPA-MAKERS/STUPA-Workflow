@@ -1,8 +1,7 @@
 import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import type { Uuid } from '@core/api/models';
-import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -13,7 +12,6 @@ import {
   ConfirmDialogComponent,
   EmptyStateComponent,
   IconComponent,
-  NoteComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
@@ -88,11 +86,9 @@ interface Setting {
     ExpandRowComponent,
     FabComponent,
     ConfirmDialogComponent,
-    RouterLink,
     TranslatePipe,
     IconComponent,
     EmptyStateComponent,
-    NoteComponent,
     PageHeaderComponent,
     BreadcrumbsComponent,
     RowMenuComponent,
@@ -106,7 +102,6 @@ interface Setting {
 })
 export class AdminGremienComponent {
   private readonly api = inject(AdminApiService);
-  private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
@@ -131,8 +126,6 @@ export class AdminGremienComponent {
   readonly confirmDelete = signal<Gremium | null>(null);
   readonly deleting = signal(false);
 
-  /** The note links to the group mappings only with that permission. */
-  protected readonly canMappings = computed(() => this.auth.can('admin.group_mappings'));
 
   constructor() {
     this.reload(true);

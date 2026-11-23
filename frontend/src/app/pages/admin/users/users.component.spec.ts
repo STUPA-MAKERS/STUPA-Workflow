@@ -171,7 +171,7 @@ describe('UsersComponent', () => {
     expect(inst.roleIds(PRINCIPALS[1])).toEqual([]);
   });
 
-  it('has no link to the group mappings', async () => {
+  it('has no link to the group mappings (spec 002620)', async () => {
     await setup();
     expect(screen.queryByRole('link', { name: 'Gruppen-Zuordnung' })).toBeNull();
   });

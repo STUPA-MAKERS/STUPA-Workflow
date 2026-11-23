@@ -2922,7 +2922,6 @@
   "admin.gremien.membersLoadFailed": "Die Mitglieder konnten nicht geladen werden.",
   "admin.users.col.groups": "SSO-Gruppen (letzte Anmeldung)",
   "admin.users.noGroups": "Keine Gruppen.",
-  "admin.users.manageGroupMappings": "Gruppen-Zuordnung",
   "admin.gremien.loading": "Gremien werden geladen …",
   "admin.gremien.error": "Gremien konnten nicht geladen werden.",
   "admin.gremien.empty": "Noch keine Gremien angelegt.",
