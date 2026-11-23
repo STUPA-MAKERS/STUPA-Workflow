@@ -47,7 +47,7 @@ import {
   SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { LINK_ICON, LINK_KIND_LABEL, linkSub, splitUrl } from '../../features/todos/todos.util';
-import { type CanvasNode, GraphCanvasComponent } from './graph-canvas.component';
+import { type CanvasNode, GraphCanvasViewComponent } from '@stupa-makers/ui-kit/views/graph';
 import {
   AUTO_NODES,
   EMPTY_GRAPH,
@@ -102,7 +102,7 @@ export interface GraphRow {
     ButtonLinkComponent,
     EmptyStateComponent,
     FilterSelectComponent,
-    GraphCanvasComponent,
+    GraphCanvasViewComponent,
     IconComponent,
     LoadErrorComponent,
     NgTemplateOutlet,

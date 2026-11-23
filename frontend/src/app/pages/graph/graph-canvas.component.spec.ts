@@ -2,8 +2,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { render, screen } from '@testing-library/angular';
-import { type CanvasNode, GraphCanvasComponent, LABEL_ZOOM, NUDGE } from './graph-canvas.component';
-import { type Body, SETTLE_STEPS } from './graph-layout';
+import { type CanvasNode, GraphCanvasViewComponent as GraphCanvasComponent, LABEL_ZOOM, NUDGE } from '@stupa-makers/ui-kit/views/graph';
+import { type Body, SETTLE_STEPS } from '@stupa-makers/ui-kit/views/graph';
 import type { GraphLine } from './graph.util';
 
 const node = (key: string, over: Partial<CanvasNode> = {}): CanvasNode => ({

@@ -473,6 +473,10 @@ export const UI_KIT_APP_KEYS: Partial<Record<UiKitTextKey, TranslationKey>> = {
   'calendar.public.tops': 'calendar.public.tops',
   'meetings.overview.more': 'meetings.overview.more',
   'meetings.overview.today': 'meetings.overview.today',
+  'graph.zoom.group': 'graph.zoom.group',
+  'graph.zoom.in': 'graph.zoom.in',
+  'graph.zoom.out': 'graph.zoom.out',
+  'graph.zoom.all': 'graph.zoom.all',
 };
 
 /**

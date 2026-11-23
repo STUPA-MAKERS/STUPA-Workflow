@@ -177,7 +177,7 @@
           <app-empty-state icon="shapes" [heading]="'graph.empty' | t" [body]="'graph.emptyBody' | t" />
         }
       } @else {
-        <app-graph-canvas
+        <app-graph-canvas-view
           class="gr__canvas"
           [nodes]="canvasNodes()"
           [lines]="graph().lines"
