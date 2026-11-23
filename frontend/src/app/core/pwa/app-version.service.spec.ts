@@ -6,13 +6,14 @@ import { SwUpdate } from '@angular/service-worker';
 import { PAGE_RELOAD } from '@stupa-makers/ui-kit/pwa';
 import { Subject, throwError } from 'rxjs';
 import { appVersionInterceptor } from './app-version.interceptor';
+import { PageResumeService } from '@core/browser/page-resume.service';
 import {
   APP_BUILD,
   AppVersionService,
   RELOAD_GUARD_MS,
   RELOAD_KEY,
+  SW_REMOVE_MS,
   SW_UNREGISTER,
-  SW_WAIT_MS,
 } from './app-version.service';
 
 interface Setup {
@@ -25,9 +26,9 @@ interface Setup {
     checkForUpdate: jest.Mock;
     activateUpdate: jest.Mock;
     unrecoverable: Subject<unknown>;
-    versionUpdates: Subject<unknown>;
   };
   events: Subject<unknown>;
+  resume: Subject<void>;
 }
 
 function setup(build = 'aaa', swEnabled = true): Setup {
@@ -38,9 +39,9 @@ function setup(build = 'aaa', swEnabled = true): Setup {
     checkForUpdate: jest.fn().mockResolvedValue(true),
     activateUpdate: jest.fn().mockResolvedValue(true),
     unrecoverable: new Subject<unknown>(),
-    versionUpdates: new Subject<unknown>(),
   };
   const events = new Subject<unknown>();
+  const resume = new Subject<void>();
   TestBed.configureTestingModule({
     providers: [
       provideHttpClient(withInterceptors([appVersionInterceptor])),
@@ -50,6 +51,7 @@ function setup(build = 'aaa', swEnabled = true): Setup {
       { provide: SW_UNREGISTER, useValue: unregister },
       { provide: SwUpdate, useValue: sw },
       { provide: Router, useValue: { events } },
+      { provide: PageResumeService, useValue: { resume$: resume } },
     ],
   });
   TestBed.inject(AppVersionService).init();
@@ -60,7 +62,13 @@ function setup(build = 'aaa', swEnabled = true): Setup {
     unregister,
     sw,
     events,
+    resume,
   };
+}
+
+/** A reload entry of the loop guard, as the service writes it. */
+function stored(version: string, tries: number, at = Date.now()): void {
+  sessionStorage.setItem(RELOAD_KEY, JSON.stringify({ version, at, tries }));
 }
 
 function answer(s: Setup, version: string | null, status = 200): void {
@@ -81,15 +89,19 @@ describe('AppVersionService', () => {
     document.body.innerHTML = '';
   });
 
-  /** §ui-kit:002151: another server version activates the update and reloads at once. */
-  it('reloads through the service worker when the header names another build', async () => {
+  /** §ui-kit:002151, §002340: another server version reloads at once, without a download. */
+  it('reloads at once when the header names another build', async () => {
     const s = setup();
     answer(s, 'bbb');
     await flush();
-    expect(s.sw.checkForUpdate).toHaveBeenCalled();
-    expect(s.sw.activateUpdate).toHaveBeenCalled();
+    expect(s.sw.checkForUpdate).not.toHaveBeenCalled();
+    expect(s.sw.activateUpdate).not.toHaveBeenCalled();
     expect(s.unregister).not.toHaveBeenCalled();
     expect(s.reload).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(sessionStorage.getItem(RELOAD_KEY) ?? '{}')).toMatchObject({
+      version: 'bbb',
+      tries: 1,
+    });
   });
 
   /** §ui-kit:002151: an error answer carries the header too. */
@@ -143,8 +155,8 @@ describe('AppVersionService', () => {
   });
 
   /** §ui-kit:002152: the same server version reloads only once within the guard time. */
-  it('does not reload a second time for the same server version', async () => {
-    sessionStorage.setItem(RELOAD_KEY, JSON.stringify({ version: 'bbb', at: Date.now() }));
+  it('does not reload a third time for the same server version', async () => {
+    stored('bbb', 2);
     const s = setup();
     answer(s, 'bbb');
     await flush();
@@ -156,141 +168,103 @@ describe('AppVersionService', () => {
   });
 
   it('reloads again for the same version after the guard time', async () => {
-    sessionStorage.setItem(
-      RELOAD_KEY,
-      JSON.stringify({ version: 'bbb', at: Date.now() - RELOAD_GUARD_MS - 1 }),
-    );
+    stored('bbb', 2, Date.now() - RELOAD_GUARD_MS - 1);
     const s = setup();
     answer(s, 'bbb');
     await flush();
+    expect(s.unregister).not.toHaveBeenCalled();
     expect(s.reload).toHaveBeenCalledTimes(1);
   });
 
-  it('reloads at once when the service worker cache is broken', () => {
+  /** §ui-kit:002152: an entry of the earlier guard without a count holds the reload. */
+  it('treats an entry without a count as two reloads', async () => {
+    sessionStorage.setItem(RELOAD_KEY, JSON.stringify({ version: 'bbb', at: Date.now() }));
     const s = setup();
-    s.sw.unrecoverable.next({});
-    expect(s.reload).toHaveBeenCalledTimes(1);
-  });
-
-  /** §002340: a failed update removes the service worker, so the reload uses the network. */
-  it('removes the service worker and reloads when the update fails', async () => {
-    const s = setup();
-    s.sw.checkForUpdate.mockRejectedValue(new Error('offline'));
     answer(s, 'bbb');
     await flush();
-    expect(s.sw.activateUpdate).not.toHaveBeenCalled();
-    expect(s.unregister).toHaveBeenCalledTimes(1);
-    expect(s.reload).toHaveBeenCalledTimes(1);
-  });
-
-  /** §002340: the reload waits until the service worker has downloaded the new version. */
-  it('reloads only after the service worker has the new version', async () => {
-    const s = setup();
-    let done: (v: boolean) => void = () => undefined;
-    s.sw.checkForUpdate.mockReturnValue(new Promise<boolean>((r) => (done = r)));
-    answer(s, 'bbb');
-    await flush();
-    expect(s.sw.activateUpdate).not.toHaveBeenCalled();
     expect(s.reload).not.toHaveBeenCalled();
-    done(true);
-    await flush();
-    expect(s.sw.activateUpdate).toHaveBeenCalled();
-    expect(s.unregister).not.toHaveBeenCalled();
-    expect(s.reload).toHaveBeenCalledTimes(1);
   });
 
-  /** §002340: a version that the service worker already holds is switched to, not removed. */
-  it('switches to a version that the service worker already holds', async () => {
+  /** §002340: the old version after one reload removes the service worker and reloads again. */
+  it('removes the service worker before the second reload for the same version', async () => {
+    stored('bbb', 1);
     const s = setup();
-    s.sw.checkForUpdate.mockResolvedValue(false);
-    answer(s, 'bbb');
-    await flush();
-    expect(s.unregister).not.toHaveBeenCalled();
-    expect(s.reload).toHaveBeenCalledTimes(1);
-  });
-
-  /** §002340: no newer version in the service worker: the reload goes to the network. */
-  it('removes the service worker when it has no newer version', async () => {
-    const s = setup();
-    s.sw.checkForUpdate.mockResolvedValue(false);
-    s.sw.activateUpdate.mockResolvedValue(false);
     answer(s, 'bbb');
     await flush();
     expect(s.unregister).toHaveBeenCalledTimes(1);
     expect(s.reload).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(sessionStorage.getItem(RELOAD_KEY) ?? '{}').tries).toBe(2);
   });
 
-  /** §002340: a download that takes too long removes the service worker and reloads. */
-  it('removes the service worker when the download takes too long', async () => {
+  /** §002340: a removal that does not end still reloads after a short wait. */
+  it('reloads when the removal of the service worker does not end', async () => {
     jest.useFakeTimers();
     try {
+      stored('bbb', 1);
       const s = setup();
-      s.sw.checkForUpdate.mockReturnValue(new Promise<boolean>(() => undefined));
+      s.unregister.mockReturnValue(new Promise(() => undefined));
       answer(s, 'bbb');
-      await jest.advanceTimersByTimeAsync(SW_WAIT_MS - 1);
+      await jest.advanceTimersByTimeAsync(SW_REMOVE_MS - 1);
       expect(s.reload).not.toHaveBeenCalled();
       await jest.advanceTimersByTimeAsync(1);
-      expect(s.sw.activateUpdate).not.toHaveBeenCalled();
-      expect(s.unregister).toHaveBeenCalledTimes(1);
       expect(s.reload).toHaveBeenCalledTimes(1);
     } finally {
       jest.useRealTimers();
     }
   });
 
-  /** §002340: typing that starts during the download holds the reload. */
-  it('holds the reload when typing starts during the download', async () => {
+  /** §002340: a failed removal still reloads. */
+  it('reloads when the removal of the service worker fails', async () => {
+    stored('bbb', 1);
     const s = setup();
-    let done: (v: boolean) => void = () => undefined;
-    s.sw.checkForUpdate.mockReturnValue(new Promise<boolean>((r) => (done = r)));
+    s.unregister.mockRejectedValue(new Error('denied'));
     answer(s, 'bbb');
     await flush();
+    expect(s.reload).toHaveBeenCalledTimes(1);
+  });
+
+  /** §002341: a return of the page reads the API once, and its header reloads. */
+  it('reads the API when the page comes back and reloads on another build', async () => {
+    const s = setup();
+    s.resume.next();
+    const req = s.ctrl.expectOne('/api/health');
+    expect(req.request.method).toBe('GET');
+    req.flush({ status: 'ok' }, { headers: { 'X-App-Version': 'bbb' } });
+    await flush();
+    expect(s.reload).toHaveBeenCalledTimes(1);
+  });
+
+  /** §002341: a failed read after a return does nothing. */
+  it('ignores a failed read after a return of the page', async () => {
+    const s = setup();
+    s.resume.next();
+    s.ctrl.expectOne('/api/health').error(new ProgressEvent('error'));
+    await flush();
+    expect(s.reload).not.toHaveBeenCalled();
+  });
+
+  it('does not read the API after a return in the dev build', () => {
+    const s = setup('dev');
+    s.resume.next();
+    s.ctrl.expectNone('/api/health');
+  });
+
+  /** §002340: a reload that waits for the end of typing still counts the earlier reloads. */
+  it('does not run a held reload after two reloads', async () => {
+    const s = setup();
     const input = document.createElement('input');
     document.body.appendChild(input);
     input.focus();
-    done(true);
-    await flush();
-    expect(s.sw.activateUpdate).not.toHaveBeenCalled();
-    expect(s.reload).not.toHaveBeenCalled();
-    input.blur();
-    s.sw.checkForUpdate.mockResolvedValue(false);
+    answer(s, 'bbb');
+    stored('bbb', 2);
     s.events.next(new NavigationEnd(1, '/a', '/a'));
     await flush();
-    expect(s.sw.activateUpdate).toHaveBeenCalled();
-    expect(s.reload).toHaveBeenCalledTimes(1);
+    expect(s.reload).not.toHaveBeenCalled();
   });
 
-  /** §002340: a ready version reloads after a reported server version, also within the guard. */
-  it('reloads when the service worker reports a ready version', async () => {
-    sessionStorage.setItem(RELOAD_KEY, JSON.stringify({ version: 'bbb', at: Date.now() }));
+  it('reloads at once when the service worker cache is broken', () => {
     const s = setup();
-    s.sw.versionUpdates.next({ type: 'VERSION_READY' });
-    await flush();
-    expect(s.reload).not.toHaveBeenCalled();
-    answer(s, 'bbb');
-    await flush();
-    expect(s.reload).not.toHaveBeenCalled();
-    s.sw.versionUpdates.next({ type: 'VERSION_DETECTED' });
-    await flush();
-    expect(s.reload).not.toHaveBeenCalled();
-    s.sw.versionUpdates.next({ type: 'VERSION_READY' });
-    await flush();
-    expect(s.reload).toHaveBeenCalledTimes(1);
-  });
-
-  it('holds a ready version while a text field has the focus', async () => {
-    sessionStorage.setItem(RELOAD_KEY, JSON.stringify({ version: 'bbb', at: Date.now() }));
-    const s = setup();
-    answer(s, 'bbb');
-    const area = document.createElement('textarea');
-    document.body.appendChild(area);
-    area.focus();
-    s.sw.versionUpdates.next({ type: 'VERSION_READY' });
-    await flush();
-    expect(s.reload).not.toHaveBeenCalled();
-    area.blur();
-    s.events.next(new NavigationEnd(1, '/a', '/a'));
-    await flush();
+    s.sw.unrecoverable.next({});
     expect(s.reload).toHaveBeenCalledTimes(1);
   });
 
