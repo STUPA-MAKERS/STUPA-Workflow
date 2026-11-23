@@ -114,6 +114,31 @@ async def test_a_card_shows_what_others_did(maker: async_sessionmaker[AsyncSessi
         assert only_tickets.entries == []
 
 
+async def test_the_archive_of_the_cron_is_no_activity(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    """Spec 001304: ``archived`` without an actor neither shows nor lights the dot."""
+    alice, alice_id = await add_person(maker, "Alice")
+    _, bob_id = await add_person(maker, "Bob")
+    gremium_id, board_id = await add_gremium(maker)
+    await add_member(maker, gremium_id, alice_id, "todo.write")
+    card_id = await _card(maker, board_id, alice_id)
+    async with maker() as session:
+        session.add(TodoEvent(card_id=card_id, actor_id=None, kind="archived", created_at=_at(1)))
+        await session.commit()
+    async with maker() as session:
+        service = ActivityService(session)
+        assert (await service.page(alice, own=True)).entries == []
+        assert await service.has_new(alice) is False
+    async with maker() as session:
+        session.add(TodoEvent(card_id=card_id, actor_id=bob_id, kind="archived", created_at=_at(2)))
+        await session.commit()
+    async with maker() as session:
+        service = ActivityService(session)
+        assert [e.change for e in (await service.page(alice)).entries] == ["todo.archived"]
+        assert await service.has_new(alice) is True
+
+
 async def test_a_card_on_an_unreadable_board_leaves_the_page(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
