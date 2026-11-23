@@ -5,7 +5,13 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/paperless/test_paperless.py:test_the_backfill_files_the_documents_from_before"
+  - "frontend/src/app/pages/admin/paperless/paperless.component.spec.ts:PaperlessComponent"
+implementation:
+  - backend/app/modules/paperless_filing/sources.py
+  - backend/app/modules/paperless_filing/router.py
+  - frontend/src/app/pages/admin/paperless
 scope:
   - backend/app/
   - frontend/src/app/

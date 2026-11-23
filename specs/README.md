@@ -20,7 +20,7 @@ specs/
       applications/    applications, dashboard, flow, forms
       collaboration/   activity, committees, graph, links, notifications, search, tickets, todos
       finance/         budget, invoices
-      integrations/    external, mcp, paperless, webhooks
+      integrations/    external, mcp, paperless, ticket-mail, webhooks
       meetings/        calendar, delegations, meetings, protocols, voting
       public/          public-pages
     non-functional/
@@ -102,6 +102,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/001093](requirements/functional/administration/admin/001093_branding-description.md) | The branding holds the description of the platform | approved |
 | [F/administration/admin/001230](requirements/functional/administration/admin/001230_platform-name-from-branding.md) | Every visible name of the platform comes from the branding | approved |
 | [F/administration/admin/001231](requirements/functional/administration/admin/001231_seeded-mail-subject-branding.md) | The seeded subject of the access link mail names the branding | approved |
+| [F/administration/admin/002601](requirements/functional/administration/admin/002601_gremien-page-opens-asked-row.md) | The Gremien page opens and shows the Gremium of the link | approved |
 | [F/administration/admin/002620](requirements/functional/administration/admin/002620_users-no-group-mapping-link.md) | Benutzer and Gremien have no link to the Gruppen-Zuordnung | approved |
 | [F/administration/audit/000291](requirements/functional/administration/audit/000291_record-in-tx.md) | An audit entry is written in the same transaction | approved |
 | [F/administration/audit/000292](requirements/functional/administration/audit/000292_chain-check.md) | The audit chain is checked every night | approved |
@@ -124,6 +125,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/privacy/000458](requirements/functional/administration/privacy/000458_data-export.md) | The data export is an audited XLSX | approved |
 | [F/administration/privacy/002532](requirements/functional/administration/privacy/002532_erasure-lists-paperless.md) | An erasure names the filed Paperless documents | approved |
 | [F/administration/privacy/002533](requirements/functional/administration/privacy/002533_export-names-paperless.md) | The data export names the filed Paperless documents | approved |
+| [F/administration/privacy/002747](requirements/functional/administration/privacy/002747_erasure-lists-ticket-mails.md) | An erasure names the mails that stay on the mail server | approved |
+| [F/administration/privacy/002748](requirements/functional/administration/privacy/002748_export-holds-mail-tickets.md) | The data export holds the mail tickets of the addresses of the person | approved |
 | [F/administration/translations/000136](requirements/functional/administration/translations/000136_all-languages-editable.md) | Every i18n text is editable in English too | approved |
 | [F/administration/translations/000336](requirements/functional/administration/translations/000336_catalog-source.md) | The frontend catalog is the source of UI texts | approved |
 | [F/administration/translations/000337](requirements/functional/administration/translations/000337_language-lifecycle.md) | A new language starts inactive | approved |
@@ -276,6 +279,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/committees/001852](requirements/functional/collaboration/committees/001852_notify-recipients.md) | The message goes to the members and the substitute pool | approved |
 | [F/collaboration/committees/001853](requirements/functional/collaboration/committees/001853_notify-template.md) | The members message is a mail template | approved |
 | [F/collaboration/committees/001854](requirements/functional/collaboration/committees/001854_notify-checks.md) | A members message is checked and audited | approved |
+| [F/collaboration/committees/002600](requirements/functional/collaboration/committees/002600_manage-opens-gremien-page.md) | Gremium verwalten opens the Gremium on the Gremien page | approved |
 | [F/collaboration/graph/001420](requirements/functional/collaboration/graph/001420_graph-page.md) | The page Graph shows the elements of a person and their relations | approved |
 | [F/collaboration/graph/001421](requirements/functional/collaboration/graph/001421_graph-permission.md) | The graph needs its own permission | approved |
 | [F/collaboration/graph/001422](requirements/functional/collaboration/graph/001422_graph-read-rules.md) | The graph shows only what the person reads | approved |
@@ -327,11 +331,31 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/search/000330](requirements/functional/collaboration/search/000330_per-kind-cap.md) | Search shows 5 hits per kind | approved |
 | [F/collaboration/tickets/000150](requirements/functional/collaboration/tickets/000150_public-report.md) | Anyone can report a help ticket | approved |
 | [F/collaboration/tickets/000313](requirements/functional/collaboration/tickets/000313_reporter-view.md) | A reporter account follows its tickets | approved |
-| [F/collaboration/tickets/000314](requirements/functional/collaboration/tickets/000314_team-work.md) | The team works on tickets | approved |
+| [F/collaboration/tickets/000314](requirements/functional/collaboration/tickets/000314_team-work.md) | The team works on tickets | replaced |
 | [F/collaboration/tickets/000315](requirements/functional/collaboration/tickets/000315_sender-block.md) | A sender can be blocked | approved |
 | [F/collaboration/tickets/000316](requirements/functional/collaboration/tickets/000316_ticket-retention.md) | Closed tickets are anonymized after the retention time | approved |
 | [F/collaboration/tickets/000317](requirements/functional/collaboration/tickets/000317_context-url.md) | A ticket context keeps only platform pages | approved |
 | [F/collaboration/tickets/001096](requirements/functional/collaboration/tickets/001096_system-entry-name.md) | A system entry names the short name | approved |
+| [F/collaboration/tickets/002700](requirements/functional/collaboration/tickets/002700_ticket-bereich.md) | Each ticket belongs to one Bereich | approved |
+| [F/collaboration/tickets/002701](requirements/functional/collaboration/tickets/002701_bereich-plattform.md) | The Bereich Plattform takes the reports of the help menu | approved |
+| [F/collaboration/tickets/002702](requirements/functional/collaboration/tickets/002702_bereich-gremium.md) | A Bereich belongs to one Gremium or to no Gremium | approved |
+| [F/collaboration/tickets/002703](requirements/functional/collaboration/tickets/002703_work-right.md) | The work right in a Bereich comes from the Gremium | approved |
+| [F/collaboration/tickets/002704](requirements/functional/collaboration/tickets/002704_assignee-in-bereich.md) | Only a person with the work right in the Bereich is assignee or mentioned | approved |
+| [F/collaboration/tickets/002705](requirements/functional/collaboration/tickets/002705_bereich-settings.md) | The admin page Hilfe & Tickets holds the Bereiche | approved |
+| [F/collaboration/tickets/002706](requirements/functional/collaboration/tickets/002706_kategorien.md) | Each Bereich has its own Kategorien | approved |
+| [F/collaboration/tickets/002707](requirements/functional/collaboration/tickets/002707_move-ticket.md) | A ticket can move to a different Bereich | approved |
+| [F/collaboration/tickets/002708](requirements/functional/collaboration/tickets/002708_status-waiting.md) | A ticket has the status Wartet auf Antwort | approved |
+| [F/collaboration/tickets/002709](requirements/functional/collaboration/tickets/002709_answer-ends-waiting.md) | An answer of the sender ends Wartet auf Antwort | approved |
+| [F/collaboration/tickets/002710](requirements/functional/collaboration/tickets/002710_reopen-window.md) | An answer on a closed ticket opens it again for 14 days | approved |
+| [F/collaboration/tickets/002711](requirements/functional/collaboration/tickets/002711_ticket-source.md) | A ticket names its source | approved |
+| [F/collaboration/tickets/002712](requirements/functional/collaboration/tickets/002712_ticket-by-hand.md) | The team creates a ticket by hand | approved |
+| [F/collaboration/tickets/002713](requirements/functional/collaboration/tickets/002713_bereich-in-app.md) | A Bereich can take tickets from signed-in persons | approved |
+| [F/collaboration/tickets/002714](requirements/functional/collaboration/tickets/002714_random-ticket-number.md) | A new ticket gets a random number of eight characters | approved |
+| [F/collaboration/tickets/002715](requirements/functional/collaboration/tickets/002715_bereich-filter.md) | The ticket list shows the Bereiche of the person | approved |
+| [F/collaboration/tickets/002716](requirements/functional/collaboration/tickets/002716_anonymization-removes-mail-data.md) | The anonymization of a ticket removes its mail data | approved |
+| [F/collaboration/tickets/002717](requirements/functional/collaboration/tickets/002717_new-ticket-mail.md) | A new ticket is mailed to the team of its Bereich | approved |
+| [F/collaboration/tickets/002718](requirements/functional/collaboration/tickets/002718_assigned-mail.md) | The new assignee gets a mail | approved |
+| [F/collaboration/tickets/002719](requirements/functional/collaboration/tickets/002719_existing-tickets.md) | The tickets from before the Bereiche belong to Plattform | approved |
 | [F/collaboration/todos/000147](requirements/functional/collaboration/todos/000147_board-kinds.md) | Boards per Gremium, per person and per team | approved |
 | [F/collaboration/todos/000149](requirements/functional/collaboration/todos/000149_no-status-sync.md) | No status sync between ticket and card | approved |
 | [F/collaboration/todos/000318](requirements/functional/collaboration/todos/000318_board-rights.md) | Board rights depend on the board kind | replaced |
@@ -548,6 +572,30 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/paperless/002531](requirements/functional/integrations/paperless/002531_audit.md) | Each filing and each insert has an audit entry | approved |
 | [F/integrations/paperless/002534](requirements/functional/integrations/paperless/002534_search-like-global-search.md) | The Paperless search looks like the global search | approved |
 | [F/integrations/paperless/002535](requirements/functional/integrations/paperless/002535_file-antrag-attachments.md) | The attachments of an Antrag are filed with its PDF | approved |
+| [F/integrations/ticket-mail/002720](requirements/functional/integrations/ticket-mail/002720_postfach-per-bereich.md) | A Bereich has at most one Postfach | approved |
+| [F/integrations/ticket-mail/002721](requirements/functional/integrations/ticket-mail/002721_postfach-page.md) | An admin sets the Postfach on the admin page | approved |
+| [F/integrations/ticket-mail/002722](requirements/functional/integrations/ticket-mail/002722_postfach-switch.md) | Each Postfach has a switch | approved |
+| [F/integrations/ticket-mail/002723](requirements/functional/integrations/ticket-mail/002723_fetch-in-worker.md) | The worker fetches the mails each minute | approved |
+| [F/integrations/ticket-mail/002724](requirements/functional/integrations/ticket-mail/002724_mail-imported-once.md) | A mail is imported one time | approved |
+| [F/integrations/ticket-mail/002725](requirements/functional/integrations/ticket-mail/002725_mail-becomes-ticket.md) | A new mail becomes a ticket | approved |
+| [F/integrations/ticket-mail/002726](requirements/functional/integrations/ticket-mail/002726_thread-by-headers.md) | An answer joins its ticket through the mail headers | approved |
+| [F/integrations/ticket-mail/002727](requirements/functional/integrations/ticket-mail/002727_thread-by-number.md) | The number in the subject joins only a mail of a participant | approved |
+| [F/integrations/ticket-mail/002728](requirements/functional/integrations/ticket-mail/002728_mail-as-text.md) | A mail shows as text only | approved |
+| [F/integrations/ticket-mail/002729](requirements/functional/integrations/ticket-mail/002729_mail-source-kept.md) | The platform keeps the source of each mail | approved |
+| [F/integrations/ticket-mail/002730](requirements/functional/integrations/ticket-mail/002730_mail-attachments.md) | The attachments of a mail become files of the message | approved |
+| [F/integrations/ticket-mail/002731](requirements/functional/integrations/ticket-mail/002731_mail-stays-in-postfach.md) | An imported mail moves to a folder and is never deleted | approved |
+| [F/integrations/ticket-mail/002732](requirements/functional/integrations/ticket-mail/002732_automatic-mails.md) | An automatic mail opens no ticket | approved |
+| [F/integrations/ticket-mail/002733](requirements/functional/integrations/ticket-mail/002733_answer-as-mail.md) | A public message on a mail ticket goes out as a mail | approved |
+| [F/integrations/ticket-mail/002734](requirements/functional/integrations/ticket-mail/002734_answer-headers.md) | A sent mail carries the thread headers and the number | approved |
+| [F/integrations/ticket-mail/002735](requirements/functional/integrations/ticket-mail/002735_answer-recipients.md) | An answer goes to the sender and to the Cc addresses of the thread | approved |
+| [F/integrations/ticket-mail/002736](requirements/functional/integrations/ticket-mail/002736_answer-sender.md) | A sent mail comes from the address of the Postfach | approved |
+| [F/integrations/ticket-mail/002737](requirements/functional/integrations/ticket-mail/002737_send-in-worker.md) | The worker sends a mail and shows a failure on the message | approved |
+| [F/integrations/ticket-mail/002738](requirements/functional/integrations/ticket-mail/002738_confirmation-mail.md) | A new mail ticket gets a confirmation | approved |
+| [F/integrations/ticket-mail/002739](requirements/functional/integrations/ticket-mail/002739_mail-sender-is-address.md) | The sender of a mail ticket is the address, not an account | approved |
+| [F/integrations/ticket-mail/002740](requirements/functional/integrations/ticket-mail/002740_blocked-mail-sender.md) | The mail of a blocked sender becomes no ticket | approved |
+| [F/integrations/ticket-mail/002741](requirements/functional/integrations/ticket-mail/002741_mail-rate-limit.md) | One address opens at most 20 tickets an hour by mail | approved |
+| [F/integrations/ticket-mail/002742](requirements/functional/integrations/ticket-mail/002742_file-to-paperless.md) | The team files an attachment of a ticket in Paperless | approved |
+| [F/integrations/ticket-mail/002743](requirements/functional/integrations/ticket-mail/002743_postfach-audit.md) | A change of a Postfach is in the audit log | approved |
 | [F/integrations/webhooks/000298](requirements/functional/integrations/webhooks/000298_retry.md) | A failed delivery is retried with backoff | approved |
 | [F/integrations/webhooks/000299](requirements/functional/integrations/webhooks/000299_idempotent-delivery.md) | A delivery runs once per key | approved |
 | [F/integrations/webhooks/000402](requirements/functional/integrations/webhooks/000402_flow-action-only.md) | A webhook fires only through a flow action | replaced |
@@ -560,6 +608,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/webhooks/002415](requirements/functional/integrations/webhooks/002415_payload-preview.md) | The webhook dialog shows a payload preview | approved |
 | [F/integrations/webhooks/002416](requirements/functional/integrations/webhooks/002416_test-delivery.md) | A webhook can send a test delivery | approved |
 | [F/integrations/webhooks/002417](requirements/functional/integrations/webhooks/002417_payload-at-event-time.md) | The payload is built when the event occurs | approved |
+| [F/integrations/webhooks/002749](requirements/functional/integrations/webhooks/002749_ticket-event-bereich.md) | The ticket event names the Bereich and follows the Gremium filter | approved |
+| [F/integrations/webhooks/002750](requirements/functional/integrations/webhooks/002750_ticket-message-event.md) | A message of the sender is a webhook event | approved |
+| [F/integrations/webhooks/002751](requirements/functional/integrations/webhooks/002751_ticket-status-event.md) | A status change of a ticket is a webhook event | approved |
 | [F/meetings/calendar/000331](requirements/functional/meetings/calendar/000331_feed.md) | Each person has a calendar feed | approved |
 | [F/meetings/calendar/000332](requirements/functional/meetings/calendar/000332_feed-404.md) | A wrong feed token is not found | approved |
 | [F/meetings/calendar/000333](requirements/functional/meetings/calendar/000333_event-defaults.md) | A calendar event has a reminder | approved |
@@ -852,12 +903,17 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/security/network/000466](requirements/non-functional/security/network/000466_webhook-host-allowlist.md) | Webhook targets can be limited to a host list | approved |
 | [NF/security/network/002514](requirements/non-functional/security/network/002514_paperless-host-allowlist.md) | The Paperless address needs a host from the deploy settings | approved |
 | [NF/security/network/002515](requirements/non-functional/security/network/002515_paperless-token-secret.md) | The Paperless token never leaves the server | approved |
+| [NF/security/network/002744](requirements/non-functional/security/network/002744_ticket-mail-host-allowlist.md) | The hosts of a Postfach need the deploy settings | approved |
+| [NF/security/network/002745](requirements/non-functional/security/network/002745_ticket-mail-tls.md) | The platform talks to a mail server only through TLS | approved |
+| [NF/security/network/002746](requirements/non-functional/security/network/002746_ticket-mail-password.md) | No read returns the password of a Postfach | approved |
 | [NF/usability/controls/000668](requirements/non-functional/usability/controls/000668_fiscal-year-chip.md) | The fiscal year is chosen with a chip | approved |
 | [NF/usability/controls/000676](requirements/non-functional/usability/controls/000676_tickets-word-in-admin.md) | Verwaltung says "Tickets" | approved |
 | [NF/usability/controls/000931](requirements/non-functional/usability/controls/000931_back-closes-budget-dialogs.md) | The dialogs of the Haushalt close on Back | approved |
 | [NF/usability/controls/002163](requirements/non-functional/usability/controls/002163_bar-pill-at-press.md) | The pill of the navigation bar moves at the press | approved |
 | [NF/usability/controls/002164](requirements/non-functional/usability/controls/002164_ripple-in-surface.md) | The ripple is the ripple of Angular Material inside the pressed surface | approved |
 | [NF/usability/controls/002570](requirements/non-functional/usability/controls/002570_one-icon-look-in-a-group.md) | Every icon of a button group has one size and one colour | approved |
+| [NF/usability/controls/002581](requirements/non-functional/usability/controls/002581_select-in-form-fills-row.md) | A multiple choice in a form fills its row and names its values | approved |
+| [NF/usability/controls/002582](requirements/non-functional/usability/controls/002582_webhook-needs-name.md) | The webhook dialog saves only with a name and a valid URL | approved |
 | [NF/usability/layout/000199](requirements/non-functional/usability/layout/000199_footer.md) | The footer shows only on start and public pages | approved |
 | [NF/usability/layout/000530](requirements/non-functional/usability/layout/000530_phone-start-search-pinned.md) | The search bar of the start page stays at the top on the phone | replaced |
 | [NF/usability/layout/000624](requirements/non-functional/usability/layout/000624_start-work-list-sticky-head.md) | The work list on Start keeps its column header and cuts at the window edge | replaced |
@@ -865,6 +921,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/001480](requirements/non-functional/usability/layout/001480_admin-list-detail.md) | Verwaltung and Konto are ordinary list/detail pages | approved |
 | [NF/usability/layout/001482](requirements/non-functional/usability/layout/001482_admin-editors-full-width.md) | The form editor and the flow editor open without the list | approved |
 | [NF/usability/layout/002162](requirements/non-functional/usability/layout/002162_section-switch-at-once.md) | A switch between sections shows the new section at once | approved |
+| [NF/usability/layout/002590](requirements/non-functional/usability/layout/002590_role-matrix-one-line-per-role.md) | Each role of the role matrix is one line | approved |
+| [NF/usability/layout/002610](requirements/non-functional/usability/layout/002610_settings-no-change-date.md) | A settings screen of Verwaltung shows no change date | approved |
 | [P/integrations/webhooks/000963](protocols/integrations/webhooks/000963_webhook-delivery.md) | A webhook delivery is a signed JSON POST | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |

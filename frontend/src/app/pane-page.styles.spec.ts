@@ -36,9 +36,9 @@ const panePages = sources(app).filter((ts) =>
   /'\[class\.pane-page\]'|injectPanePage\(/.test(readFileSync(ts, 'utf8')),
 );
 
-/** A scroll container of the page itself, or a kit layout that brings one. */
+/** A scroll container of the page itself, or a kit layout or kit view that brings one. */
 const scroller =
-  /overflow-y: auto|overflow: auto|lp\.split-scroll|<app-list-detail\b|<app-tab-pager\b/;
+  /overflow-y: auto|overflow: auto|lp\.split-scroll|<app-list-detail\b|<app-tab-pager\b|<app-form-editor-view\b/;
 
 describe('pane page styles (001930)', () => {
   it('finds the pane pages', () => {

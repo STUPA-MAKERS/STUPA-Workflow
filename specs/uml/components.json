@@ -158,6 +158,11 @@
     {
       "count": 1,
       "from": "admin",
+      "to": "paperless"
+    },
+    {
+      "count": 1,
+      "from": "admin",
       "to": "privacy"
     },
     {
@@ -473,6 +478,11 @@
     {
       "count": 1,
       "from": "budget",
+      "to": "paperless"
+    },
+    {
+      "count": 1,
+      "from": "budget",
       "to": "pdf"
     },
     {
@@ -744,6 +754,11 @@
       "count": 6,
       "from": "flow",
       "to": "notifications"
+    },
+    {
+      "count": 1,
+      "from": "flow",
+      "to": "paperless"
     },
     {
       "count": 26,
@@ -1049,6 +1064,76 @@
       "count": 5,
       "from": "notifications",
       "to": "site_config"
+    },
+    {
+      "count": 4,
+      "from": "paperless",
+      "to": "audit"
+    },
+    {
+      "count": 5,
+      "from": "paperless",
+      "to": "shared"
+    },
+    {
+      "count": 4,
+      "from": "paperless_filing",
+      "to": "applications"
+    },
+    {
+      "count": 1,
+      "from": "paperless_filing",
+      "to": "auth"
+    },
+    {
+      "count": 4,
+      "from": "paperless_filing",
+      "to": "budget"
+    },
+    {
+      "count": 2,
+      "from": "paperless_filing",
+      "to": "documents"
+    },
+    {
+      "count": 4,
+      "from": "paperless_filing",
+      "to": "files"
+    },
+    {
+      "count": 1,
+      "from": "paperless_filing",
+      "to": "flow"
+    },
+    {
+      "count": 1,
+      "from": "paperless_filing",
+      "to": "gremien"
+    },
+    {
+      "count": 4,
+      "from": "paperless_filing",
+      "to": "meetings"
+    },
+    {
+      "count": 11,
+      "from": "paperless_filing",
+      "to": "paperless"
+    },
+    {
+      "count": 1,
+      "from": "paperless_filing",
+      "to": "pdf"
+    },
+    {
+      "count": 2,
+      "from": "paperless_filing",
+      "to": "protocol"
+    },
+    {
+      "count": 3,
+      "from": "paperless_filing",
+      "to": "shared"
     },
     {
       "count": 1,
@@ -1653,6 +1738,18 @@
       "layer": 5,
       "name": "notifications",
       "path": "backend/app/modules/notifications"
+    },
+    {
+      "id": "paperless",
+      "layer": 5,
+      "name": "paperless",
+      "path": "backend/app/modules/paperless"
+    },
+    {
+      "id": "paperless_filing",
+      "layer": 1,
+      "name": "paperless_filing",
+      "path": "backend/app/modules/paperless_filing"
     },
     {
       "id": "pdf",
