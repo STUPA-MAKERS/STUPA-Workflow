@@ -4,7 +4,7 @@ import { CalendarApiService } from '@core/api/calendar.service';
 import { TicketsApiService, type TicketArea, type TicketDetail } from '@core/api/tickets.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { toastMock } from '../../../testing/toast';
-import { TicketNewDialogComponent, manualBody } from './ticket-new-dialog.component';
+import { TicketNewDialogComponent, manualAddress, manualBody } from './ticket-new-dialog.component';
 
 const PLAT: TicketArea = {
   id: 'a-plat',
@@ -71,6 +71,13 @@ describe('TicketNewDialogComponent', () => {
     expect(manualBody({ ...value, category: 'c1' }, ASTA, 'p7')).toMatchObject({ areaId: 'a-asta', categoryId: 'c1' });
     const bare = manualBody({ title: 'x' }, ASTA, 'p7');
     expect(bare).toEqual({ areaId: 'a-asta', title: 'x', body: '', message: '', reporterId: 'p7' });
+  });
+
+  it('takes the address of the form only when it is an e-mail address', () => {
+    expect(manualAddress({ email: ' anna@example.org ' })).toBe('anna@example.org');
+    expect(manualAddress({ email: 'anna' })).toBe('');
+    expect(manualAddress({})).toBe('');
+    expect(manualBody({}, ASTA, null)).toEqual({ areaId: 'a-asta', title: '', body: '', message: '', email: '' });
   });
 
   it('starts on the Bereich of the list filter and clears the Kategorie with a new Bereich', async () => {

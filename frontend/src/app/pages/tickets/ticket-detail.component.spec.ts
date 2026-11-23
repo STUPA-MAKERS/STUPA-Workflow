@@ -1706,6 +1706,34 @@ describe('TicketDetailComponent', () => {
           cmp.fileInPaperless(file);
           expect(toast.error).toHaveBeenLastCalledWith('Die Datei konnte nicht abgelegt werden.');
         });
+
+        it('keeps the other files, and drops an answer for a ticket that is gone', async () => {
+          const other = { ...file, id: 'f2', filename: 'angebot.pdf' };
+          const { cmp, api } = await open(mailTicket({ paperless: { files: [file, other] } }));
+          api.fileInPaperless.mockReturnValueOnce(of({ ...file, state: 'pending' }));
+          cmp.fileInPaperless(file);
+          expect(cmp.ticket()?.paperless?.files).toEqual([{ ...file, state: 'pending' }, other]);
+
+          const answer = new Subject<never>();
+          api.fileInPaperless.mockReturnValueOnce(answer);
+          cmp.fileInPaperless(other);
+          cmp.ticket.set(mailTicket({ paperless: null }));
+          answer.next({ ...other, state: 'pending' } as never);
+          expect(cmp.ticket()?.paperless).toBeNull();
+
+          cmp.ticket.set(null);
+          api.fileInPaperless.mockClear();
+          cmp.fileInPaperless(file);
+          expect(api.fileInPaperless).not.toHaveBeenCalled();
+        });
+
+        it('opens the recipients empty for a ticket without them, and keeps an unchanged Kategorie', async () => {
+          const { cmp, api } = await open(mailTicket({ mailAnswer: null, categoryId: null }));
+          cmp.openRecipients();
+          expect(cmp.recipientsDraft()).toEqual({ to: '', cc: '' });
+          cmp.setCategory('');
+          expect(api.patch).not.toHaveBeenCalled();
+        });
       });
     });
 
