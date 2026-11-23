@@ -2,6 +2,7 @@
   [head]="{ title: 'admin.paperless.title' | t }"
   [groups]="groups()"
   [state]="screenState()"
+  [notice]="notice()"
   [save]="{ dirty: dirty(), busy: saving(), disabled: !!urlError() }"
   (change)="set($event.key, $event.value)"
   (action)="act($event.key)"
@@ -9,94 +10,31 @@
   (discard)="discard()"
 >
   <ng-template screenSkeleton="connection">
-    <span class="pl__fields">
-      <span class="pl__skelField">
-        <span class="pl__skelFieldLabel">{{ 'admin.paperless.url' | t }}</span>
-        <span class="pl__skelFieldValue skel-in"><span class="skel-text"></span></span>
-      </span>
-      <span class="pl__skelField">
-        <span class="pl__skelFieldLabel">{{ 'admin.paperless.token' | t }}</span>
-        <span class="pl__skelFieldValue skel-in"><span class="skel-text"></span></span>
-      </span>
-    </span>
+    <app-skeleton variant="rows" [count]="1" />
   </ng-template>
   <ng-template screenGroup="connection">
-    <form class="pl__fields" (submit)="$event.preventDefault(); save()">
-      <app-input
-        type="url"
-        name="baseUrl"
-        autocomplete="off"
-        [label]="'admin.paperless.url' | t"
-        [error]="urlError()"
-        [ngModel]="draft().baseUrl"
-        (ngModelChange)="patch({ baseUrl: $event })"
-      />
-      <app-input
-        type="password"
-        name="token"
-        autocomplete="new-password"
-        [label]="tokenLabel()"
-        [ngModel]="draft().token"
-        (ngModelChange)="patch({ token: $event })"
-      />
-    </form>
+    <app-input
+      type="url"
+      name="baseUrl"
+      autocomplete="off"
+      [label]="'admin.paperless.url' | t"
+      [error]="urlError()"
+      [ngModel]="draft().baseUrl"
+      (ngModelChange)="patch({ baseUrl: $event })"
+    />
   </ng-template>
 
-  <ng-template screenGroup="failed">
-    <app-load-state
-      [state]="failedState()"
-      [errorText]="'admin.paperless.failedLoadError' | t"
-      (retry)="loadFailed()"
-    >
-      <ng-template #content>
-        @let list = failed() ?? [];
-        @if (list.length) {
-          <ul class="rowgroup rowgroup--records pl__list">
-            @for (f of list; track f.id) {
-              <li class="pl__row">
-                <span class="pl__item">
-                  <span class="pl__name rowgroup__title">{{ f.title }}</span>
-                  <span class="pl__meta">
-                    <app-meta-line>
-                      <span>{{ kindText(f.kind) }}</span>
-                      @if (f.failedAt) {
-                        <time [attr.datetime]="f.failedAt">{{ f.failedAt | ldate: 'medium' }}</time>
-                      }
-                      <span>{{ errorText(f.error) }}</span>
-                    </app-meta-line>
-                  </span>
-                </span>
-                <app-button-group>
-                  <app-button
-                    variant="tonal"
-                    size="sm"
-                    [loading]="retrying() === f.id"
-                    [disabled]="retrying() !== null"
-                    [ariaLabel]="'admin.paperless.retryNamed' | t: { name: f.title }"
-                    (click)="retry(f)"
-                  >
-                    {{ 'admin.paperless.retry' | t }}
-                  </app-button>
-                </app-button-group>
-              </li>
-            }
-          </ul>
-        } @else {
-          <app-empty-state icon="check" rows="3" [heading]="'admin.paperless.failedEmpty' | t" />
-        }
-      </ng-template>
-      <ng-template #loading>
-        <ul class="rowgroup rowgroup--records pl__list skel-in" aria-hidden="true">
-          <li class="pl__row">
-            <span class="pl__item">
-              <span class="pl__name rowgroup__title"><span class="skel-text pl__skelName"></span></span>
-              <span class="pl__meta"><span class="skel-text skel-text--muted pl__skelMeta"></span></span>
-            </span>
-            <span class="skel-box pl__skelButton"></span>
-          </li>
-        </ul>
-        <span class="sr-only" role="status">{{ 'common.loading' | t }}</span>
-      </ng-template>
-    </app-load-state>
+  <ng-template screenSkeleton="token">
+    <app-skeleton variant="rows" [count]="1" />
+  </ng-template>
+  <ng-template screenGroup="token">
+    <app-input
+      type="password"
+      name="token"
+      autocomplete="new-password"
+      [label]="tokenLabel()"
+      [ngModel]="draft().token"
+      (ngModelChange)="patch({ token: $event })"
+    />
   </ng-template>
 </app-settings-screen>

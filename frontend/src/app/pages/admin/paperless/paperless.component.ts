@@ -2,25 +2,17 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
-import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
+import { formatMoment } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { type SettingsForm, settingsForm } from '@shared/forms/settings-form';
-import type { LoadState } from '@shared/forms/settings-form';
-import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
-import {
-  ButtonComponent,
-  ButtonGroupComponent,
-  EmptyStateComponent,
-  InputComponent,
-  MetaLineComponent,
-  ToastService,
-} from '@stupa-makers/ui-kit';
+import { InputComponent, SkeletonComponent, ToastService } from '@stupa-makers/ui-kit';
 import {
   ScreenGroupDirective,
   ScreenSkeletonDirective,
   SettingsScreenComponent,
   type SettingsGroup,
+  type SettingsNotice,
   type SettingsState,
 } from '@stupa-makers/ui-kit/screens';
 import { type Observable, tap } from 'rxjs';
@@ -77,6 +69,9 @@ const KIND_TEXT: Readonly<Record<PaperlessFilingKind, TranslationKey>> = {
   plan: 'admin.paperless.kind.plan',
 };
 
+/** The prefix of the action key of "Erneut versuchen"; the id of the filing follows. */
+const RETRY = 'retry:';
+
 /** An absolute http(s) URL without a user part. */
 export function isPaperlessUrl(text: string): boolean {
   try {
@@ -101,8 +96,11 @@ export function isPaperlessUrl(text: string): boolean {
  * "Verbindung testen" calls Paperless with the stored connection and shows the result as a
  * toast. "Bestehende Dokumente ablegen" starts a job for each final document without one,
  * after a question (§F/integrations/paperless/002530). "Fehlgeschlagene Ablagen" lists each
- * filing whose job failed for the last time, with "Erneut versuchen"
- * (§F/integrations/paperless/002526).
+ * filing whose job failed for the last time; a press on its row asks and then starts the job
+ * again (§F/integrations/paperless/002526). The group shows only while a filing is failed.
+ *
+ * The page has no style of its own (§ui-kit:S/framework/architecture/002213): the settings
+ * screen of the kit draws every row.
  */
 @Component({
   selector: 'app-admin-paperless',
@@ -111,19 +109,13 @@ export function isPaperlessUrl(text: string): boolean {
   imports: [
     FormsModule,
     TranslatePipe,
-    LocalizedDatePipe,
     SettingsScreenComponent,
     ScreenGroupDirective,
     ScreenSkeletonDirective,
-    ButtonComponent,
-    ButtonGroupComponent,
-    EmptyStateComponent,
     InputComponent,
-    LoadStateComponent,
-    MetaLineComponent,
+    SkeletonComponent,
   ],
   templateUrl: './paperless.component.html',
-  styleUrl: './paperless.component.scss',
 })
 export class PaperlessComponent {
   private readonly api = inject(AdminApiService);
@@ -228,8 +220,10 @@ export class PaperlessComponent {
   protected readonly groups = computed<SettingsGroup[]>(() => {
     const d = this.draft();
     const idle = !this.connected() || this.dirty();
+    const failed = this.failed();
     return [
       { key: 'connection', label: this.i18n.translate('admin.paperless.connection'), rows: [] },
+      { key: 'token', rows: [] },
       {
         key: 'filing',
         label: this.i18n.translate('admin.paperless.filing'),
@@ -267,24 +261,42 @@ export class PaperlessComponent {
           },
         ],
       },
-      ...(this.form.state() === 'ok'
+      ...(failed.length
         ? [
             {
               key: 'failed',
               label: this.i18n.translate('admin.paperless.failed'),
-              rows: [],
-              always: true,
+              rows: failed.map((f) => ({
+                key: f.id,
+                label: f.title,
+                meta: this.metaText(f),
+                control: 'action' as const,
+                disabled: this.retrying() !== null,
+                action: {
+                  key: `${RETRY}${f.id}`,
+                  label: this.i18n.translate('admin.paperless.retry'),
+                  icon: 'reload' as const,
+                  confirm: {
+                    title: this.i18n.translate('admin.paperless.retryTitle'),
+                    text: f.title,
+                    confirmLabel: this.i18n.translate('admin.paperless.retry'),
+                  },
+                },
+              })),
             },
           ]
         : []),
     ];
   });
 
-  /** null while loading; the read failed: `failedError`. */
-  protected readonly failed = signal<PaperlessFailedFiling[] | null>(null);
-  protected readonly failedError = signal(false);
-  protected readonly failedState = computed<LoadState>(() =>
-    this.failedError() ? 'error' : this.failed() === null ? 'loading' : 'ok',
+  /** The failed filings; empty until the read answers. */
+  protected readonly failed = signal<readonly PaperlessFailedFiling[]>([]);
+  private readonly failedError = signal(false);
+  /** The read of the failed filings failed: a note under the head says so. */
+  protected readonly notice = computed<SettingsNotice | null>(() =>
+    this.failedError()
+      ? { kind: 'error', text: this.i18n.translate('admin.paperless.failedLoadError') }
+      : null,
   );
   /** The filing whose retry is in flight. */
   protected readonly retrying = signal<string | null>(null);
@@ -305,24 +317,26 @@ export class PaperlessComponent {
     );
   }
 
-  protected loadFailed(): void {
-    this.failed.set(null);
-    this.failedError.set(false);
+  private loadFailed(): void {
     this.api.listPaperlessFailed().subscribe({
       next: (list) => this.failed.set(list),
-      error: () => {
-        this.failed.set([]);
-        this.failedError.set(true);
-      },
+      error: () => this.failedError.set(true),
     });
+  }
+
+  /** The line under the title of a failed filing: its kind, the time and the cause. */
+  private metaText(f: PaperlessFailedFiling): string {
+    return [
+      this.i18n.translate(KIND_TEXT[f.kind]),
+      formatMoment(f.failedAt, this.i18n.formatLocale()),
+      this.errorText(f.error),
+    ]
+      .filter(Boolean)
+      .join(' · ');
   }
 
   protected errorText(code: string | null): string {
     return this.i18n.translate(ERROR_TEXT[code ?? ''] ?? 'admin.paperless.error.unknown');
-  }
-
-  protected kindText(kind: PaperlessFilingKind): string {
-    return this.i18n.translate(KIND_TEXT[kind]);
   }
 
   protected patch(change: Partial<PaperlessDraft>): void {
@@ -337,6 +351,8 @@ export class PaperlessComponent {
   protected act(key: string): void {
     if (key === 'test') this.test();
     if (key === 'backfill') this.backfill();
+    const filing = key.startsWith(RETRY) ? this.failed().find((f) => f.id === key.slice(RETRY.length)) : null;
+    if (filing) this.retry(filing);
   }
 
   private test(): void {
@@ -381,7 +397,7 @@ export class PaperlessComponent {
     this.retrying.set(filing.id);
     const drop = (): void => {
       this.retrying.set(null);
-      this.failed.update((list) => (list ?? []).filter((f) => f.id !== filing.id));
+      this.failed.update((list) => list.filter((f) => f.id !== filing.id));
       this.toast.show(this.i18n.translate('admin.paperless.retried'), 'success');
     };
     this.api.retryPaperlessFiling(filing.id).subscribe({

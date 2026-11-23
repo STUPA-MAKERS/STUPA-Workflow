@@ -12,7 +12,6 @@ const LISTS = [
   { name: 'committees/gremium-members.component', row: 'gmm__row', title: 'gmm__name' },
   { name: 'cd-variants/cd-variants.component', row: 'cdv__variant', title: 'cdv__name' },
   { name: 'help-tickets/help-tickets.component', row: 'ht__row', title: 'ht__name' },
-  { name: 'paperless/paperless.component', row: 'pl__row', title: 'pl__name' },
 ];
 
 const read = (rel: string): string => readFileSync(join(__dirname, rel), 'utf8');

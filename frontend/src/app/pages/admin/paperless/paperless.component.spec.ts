@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/angular';
+import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
@@ -61,7 +61,6 @@ interface Page {
   act(key: string): void;
   set(key: string, value: boolean): void;
   save(): void;
-  retry(f: PaperlessFailedFiling): void;
   errorText(code: string | null): string;
 }
 
@@ -88,8 +87,12 @@ const urlField = () => screen.getByLabelText(/Adresse von Paperless/) as HTMLInp
 const tokenField = (name: RegExp = /Neuer Token/) => screen.getByLabelText(name) as HTMLInputElement;
 const save = () => screen.getByRole('button', { name: 'Speichern' });
 const sw = (name: string) => screen.getByRole('switch', { name });
+/** The rows of "Fehlgeschlagene Ablagen": each is one button with the title and the line under it. */
 const rows = () =>
-  [...document.querySelectorAll('.pl__row')].map((li) => li.textContent?.replace(/\s+/g, ' ').trim());
+  screen
+    .queryAllByRole('button')
+    .map((b) => b.textContent?.replace(/\s+/g, ' ').trim() ?? '')
+    .filter((text) => /Sitzung|angebot/.test(text));
 
 describe('isPaperlessUrl', () => {
   it.each([
@@ -265,19 +268,23 @@ describe('PaperlessComponent', () => {
     expect(api.backfillPaperless).toHaveBeenCalledTimes(4);
   });
 
-  /** § 002526: the failed filings with "Erneut versuchen". */
-  it('lists the failed filings with their kind and their cause', async () => {
+  /** § 002526: the failed filings; a press on a row asks and starts the job again. */
+  it('lists the failed filings with their kind, the time and the cause', async () => {
     await setup();
     expect(screen.getByRole('heading', { name: 'Fehlgeschlagene Ablagen' })).toBeInTheDocument();
     expect(rows()).toEqual([
-      expect.stringMatching(/^3\. Sitzung.*Protokoll.*20\.11\.2026.*Paperless ist nicht erreichbar\..*Erneut versuchen$/),
-      expect.stringMatching(/^Plakate – angebot\.pdf.*Anhang.*Unbekannter Fehler\..*Erneut versuchen$/),
+      expect.stringMatching(/^3\. Sitzung ?Protokoll · 20\.11\.2026.* · Paperless ist nicht erreichbar\.$/),
+      expect.stringMatching(/^Plakate – angebot\.pdf ?Anhang · Unbekannter Fehler\.$/),
     ]);
   });
 
-  it('starts a failed filing again and takes its row out', async () => {
+  it('starts a failed filing again after the question and takes its row out', async () => {
     const { api, toast, fixture } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: '3. Sitzung erneut versuchen' }));
+    await userEvent.click(screen.getByRole('button', { name: /^3\. Sitzung/ }));
+    fixture.detectChanges();
+    expect(api.retryPaperlessFiling).not.toHaveBeenCalled();
+    const dialog = screen.getByRole('dialog', { name: 'Ablage erneut versuchen?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erneut versuchen' }));
     fixture.detectChanges();
     expect(api.retryPaperlessFiling).toHaveBeenCalledWith('f1');
     expect(toast.success).toHaveBeenCalledWith('Die Ablage startet erneut.');
@@ -290,35 +297,39 @@ describe('PaperlessComponent', () => {
       .mockReturnValueOnce(throwError(() => ({ status: 404 })))
       .mockReturnValueOnce(throwError(() => ({ status: 500 })));
     const { toast, page, fixture } = await setup({ api });
-    page.retry(FAILED[0]);
+    page.act('retry:f1');
     fixture.detectChanges();
     expect(rows()).toHaveLength(1);
-    page.retry(FAILED[1]);
+    page.act('retry:f2');
+    page.act('retry:gone');
     fixture.detectChanges();
     expect(toast.error).toHaveBeenCalledWith('Die Ablage konnte nicht erneut gestartet werden.');
     expect(rows()).toHaveLength(1);
+    expect(api.retryPaperlessFiling).toHaveBeenCalledTimes(2);
   });
 
   it('runs one retry at a time', async () => {
     const api = makeApi();
     api.retryPaperlessFiling.mockReturnValueOnce(new Subject<undefined>());
     const { page } = await setup({ api });
-    page.retry(FAILED[0]);
-    page.retry(FAILED[1]);
+    page.act('retry:f1');
+    page.act('retry:f2');
     expect(api.retryPaperlessFiling).toHaveBeenCalledTimes(1);
   });
 
-  it('shows the empty state without a failed filing', async () => {
+  it('shows no group without a failed filing', async () => {
     await setup({ api: makeApi(STORED, []) });
-    expect(screen.getByText('Keine fehlgeschlagenen Ablagen.')).toBeInTheDocument();
-    expect(rows()).toHaveLength(0);
+    expect(screen.queryByRole('heading', { name: 'Fehlgeschlagene Ablagen' })).toBeNull();
   });
 
   it('names a failed read of the failed filings', async () => {
     const api = makeApi();
     api.listPaperlessFailed.mockReturnValueOnce(throwError(() => null));
     await setup({ api });
-    expect(loadErrorToast()).toContain('Die fehlgeschlagenen Ablagen konnten nicht geladen werden.');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Die fehlgeschlagenen Ablagen konnten nicht geladen werden.',
+    );
+    expect(screen.queryByRole('heading', { name: 'Fehlgeschlagene Ablagen' })).toBeNull();
   });
 
   it('shows no form without the right', async () => {
@@ -341,7 +352,8 @@ describe('PaperlessComponent', () => {
     api.getPaperless.mockReturnValueOnce(new Subject<PaperlessConnection>());
     api.listPaperlessFailed.mockReturnValueOnce(new Subject<PaperlessFailedFiling[]>());
     await setup({ api });
-    expect(document.querySelectorAll('.pl__skelField')).toHaveLength(2);
+    expect(document.querySelectorAll('app-skeleton')).toHaveLength(2);
+    expect(screen.queryByLabelText(/Adresse von Paperless/)).toBeNull();
     expect(document.querySelectorAll('.sts__skelSwitch')).toHaveLength(3);
   });
 });
