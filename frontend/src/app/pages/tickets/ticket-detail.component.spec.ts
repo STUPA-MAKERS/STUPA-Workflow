@@ -1727,6 +1727,16 @@ describe('TicketDetailComponent', () => {
           expect(api.fileInPaperless).not.toHaveBeenCalled();
         });
 
+        it('shows nothing of a ticket that is gone', async () => {
+          const { cmp } = await open(mailTicket());
+          cmp.ticket.set(null);
+          expect(cmp.area()).toBeNull();
+          expect(cmp.hints()).toEqual([]);
+          expect(cmp.openTodoN()).toBe(0);
+          expect(cmp.recipientsLine()).toBe('');
+          expect(cmp.categoryOptions()).toHaveLength(1);
+        });
+
         it('opens the recipients empty for a ticket without them, and keeps an unchanged Kategorie', async () => {
           const { cmp, api } = await open(mailTicket({ mailAnswer: null, categoryId: null }));
           cmp.openRecipients();

@@ -40,7 +40,7 @@
         [clearable]="true"
         [placeholder]="'admin.audit.search' | t"
         [label]="'admin.audit.search' | t"
-        [busy]="loading() && entries().length > 0"
+        [busy]="loadingMore()"
         [results]="hits()"
         [value]="searchText()"
         (valueChange)="setSearch($event)"

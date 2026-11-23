@@ -91,6 +91,19 @@ describe('TicketNewDialogComponent', () => {
     expect(cmp.value().category).toBe('');
   });
 
+  it('opens without a Bereich', async () => {
+    const { cmp } = await setup({ areas: [] });
+    expect(cmp.area()).toBeNull();
+    expect(cmp.value().areaId).toBe('');
+  });
+
+  it('falls back to the first Bereich for an unknown one', async () => {
+    const { cmp, fill } = await setup({ preset: 'gone' });
+    expect(cmp.area().id).toBe('a-plat');
+    await fill({ areaId: 'gone' });
+    expect(cmp.area().id).toBe('a-plat');
+  });
+
   it('shows no Bereich field with one Bereich, and no Kategorie field without a Kategorie', async () => {
     const { cmp } = await setup({ areas: [{ ...ASTA, categories: [] }] });
     const keys = cmp.form().sections[0].fields.map((f: { key: string }) => f.key);
