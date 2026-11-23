@@ -335,7 +335,7 @@ describe('moveQuestionTo (drag and drop in the outline of the form editor)', () 
     { title: { de: 'A', en: '' }, fields: [q('a1'), q('a2'), q('a3')] },
     { title: { de: 'B', en: '' }, fields: [q('b1')] },
   ];
-  const keys = (gs: QuestionGroup[]): string[][] => gs.map((g) => g.fields.map((f) => f.key));
+  const keys = (gs: readonly QuestionGroup[]): string[][] => gs.map((g) => g.fields.map((f) => f.key));
 
   it('moves a question down inside its group (below the target row)', () => {
     const r = moveQuestionTo(groups(), { gi: 0, qi: 0 }, { gi: 0, qi: 2 });
