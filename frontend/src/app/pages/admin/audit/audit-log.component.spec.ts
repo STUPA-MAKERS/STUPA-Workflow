@@ -193,6 +193,7 @@ const BACKEND_AUDIT_ACTIONS = [
   'paperless_connection',
   'paperless_filed',
   'paperless_inserted',
+  'ticket_mailbox',
   'pii_export',
   'anonymization',
   'erasure_requested',

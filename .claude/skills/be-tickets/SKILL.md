@@ -39,6 +39,11 @@ works on its tickets: status, assignee, Kategorie, move to another Bereich, note
   has `ticket.work` in the Gremium of the Bereich), `works_on_ticket`, `works_on_tickets`.
 - `areas.py` — `TicketAreaService` (listing with `mine`, create, patch, delete; no commit,
   the router commits; audit `config_change` on `ticket_area`).
+- `mailbox.py` — `TicketMailboxService` (the Postfach of a Bereich: listing, create, patch,
+  delete, test; no commit; audit `ticket_mailbox` on `ticket_area` with the names of the
+  changed fields, never a password), `host_allowed`, `imap_account`, `smtp_account`.
+  `mailbox_schemas.py` — `MailboxCreate`, `MailboxPatch`, `MailboxOut` (no password field).
+  `mail_client.py` — `open_imap`, `open_smtp`, `check_imap`, `check_smtp`, `MailError`.
 - Mails: `mails.py` and `mention_mails.py` (the texts are in `notifications/texts/tickets.py` and `texts/mentions.py`). Outside the module: `worker/tickets.py`
   (retention cron), `auth/people.py` (`PersonRef`, `person_of`, `person_refs`),
   `files/{drafts,service,router}.py` (ticket attachments), `site_config/branding.py`
@@ -64,6 +69,30 @@ works on its tickets: status, assignee, Kategorie, move to another Bereich, note
 - `GET|POST /api/admin/ticket-areas`, `PATCH|DELETE /api/admin/ticket-areas/{id}`
   (`admin.site`): 409 `ticket_area_name_taken`, 409 `ticket_area_has_tickets`, 422
   `ticket_categories_invalid`. `categories` in a PATCH is the whole ordered list.
+
+**Postfach of a Bereich (specs 002720, 002721, 002743 to 002746):**
+- Table `ticket_mailbox` (model `TicketMailbox`): one row per Bereich (`area_id` unique),
+  address, IMAP and SMTP host, port, user and password, `done_folder` (default `Erledigt`),
+  `enabled` (default off), and the fetch state `uid_validity`, `last_uid`, `failures`,
+  `last_error`, `fetched_at`. The passwords are plain text in the row, like the token of
+  Paperless.
+- `GET /api/admin/ticket-mailboxes` (`items`, `allowedHosts`), `POST|PATCH|DELETE
+  /api/admin/ticket-areas/{id}/mailbox`, `POST /api/admin/ticket-areas/{id}/mailbox/test`,
+  all behind `admin.ticket_mail`. No OAuth scope carries this permission, so no agent
+  reaches the routes, and the MCP server has no tool for them.
+- 409 `ticket_mailbox_exists` for a second Postfach, 422 `mail_host_not_allowed` (fields
+  `imapHost`, `smtpHost`) for a host outside `TICKET_MAIL_HOST_ALLOWLIST` (entry = host or
+  host:port; empty = no host).
+- A PATCH holds only the changed fields; an empty password keeps the stored one. A change
+  of the IMAP host, port or user resets `uid_validity` and `last_uid`, because the UIDs of
+  another inbox mean other mails. Each change clears `failures` and `last_error`.
+- `MailboxOut.error` shows only after 8 failed runs (`SHOWN_FAILURES`).
+- TLS (002745): port 993 or 465 uses TLS from the start, each other port needs STARTTLS
+  before the login; without it the client ends with `tls_missing` and sends no password.
+  The certificate check is `ssl.create_default_context()`. A failed check answers a cause
+  code (`tls_missing`, `tls_failed`, `timeout`, `login_failed`, `connect_failed`), never
+  the text of the server.
+- The switch (002722) is stored. The fetch and 409 `mailbox_off` do not exist yet.
 - `GET /api/auth/me` carries `works_on_tickets`; the frontend `AuthService.worksOnTickets`
   opens the team view. Search, activity, to-do links (`works_on_ticket`) and the ticket
   attachments use the same scope.

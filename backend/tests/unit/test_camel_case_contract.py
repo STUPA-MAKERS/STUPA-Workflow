@@ -18,7 +18,7 @@ from app.main import app
 
 #: Properties that stay snake_case on purpose. The frontend reads these names as
 #: they are, so a change here is a breaking contract change on both sides.
-#: ``display_name`` to ``has_reported_tickets`` belong to ``MeOut``, a plain BaseModel
+#: ``display_name`` to ``works_on_tickets`` belong to ``MeOut``, a plain BaseModel
 #: that ``Principal`` in ``frontend/src/app/core/api/models.ts`` mirrors field for field;
 #: ``logout_url`` is mirrored the same way. RFC 6749 fixes the wire names of the token
 #: endpoint and of an OAuth error, so a camel name would break every standard client.
@@ -33,6 +33,7 @@ _ALLOWED: frozenset[str] = frozenset(
         "has_scoped_budget_view",
         "in_substitute_pool",
         "has_reported_tickets",
+        "works_on_tickets",
         "logout_url",
         "grant_type",
         "client_id",

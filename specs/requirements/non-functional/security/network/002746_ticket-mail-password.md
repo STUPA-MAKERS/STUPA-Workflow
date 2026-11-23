@@ -5,7 +5,13 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/tickets/test_ticket_mailbox.py:test_create_stores_the_postfach_and_returns_no_password"
+  - "backend/tests/unit/modules/tickets/test_ticket_mailbox.py:test_a_failure_is_a_short_cause_without_a_text_of_the_server"
+implementation:
+  - backend/app/modules/tickets/mailbox_schemas.py
+  - backend/app/modules/tickets/mailbox.py
+  - backend/app/modules/tickets/mail_client.py
 scope:
   - backend/app/
 ---

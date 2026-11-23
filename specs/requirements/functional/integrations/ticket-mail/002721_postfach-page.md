@@ -5,7 +5,15 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/tickets/test_ticket_router.py:test_the_postfach_routes_need_admin_ticket_mail"
+  - "backend/tests/unit/modules/tickets/test_ticket_mailbox.py:test_the_test_logs_in_to_both_accounts"
+  - "frontend/src/app/pages/admin/help-tickets/ticket-mailbox-dialog.component.spec.ts:TicketMailboxDialogComponent"
+implementation:
+  - backend/app/modules/tickets/router.py
+  - backend/app/modules/tickets/mailbox.py
+  - backend/app/shared/permissions.py
+  - frontend/src/app/pages/admin/help-tickets/ticket-mailbox-dialog.component.ts
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/admin/help-tickets

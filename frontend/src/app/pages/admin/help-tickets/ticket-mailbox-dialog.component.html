@@ -1,0 +1,97 @@
+<app-dialog
+  size="md"
+  [open]="open()"
+  [heading]="'admin.helpTickets.mailbox.heading' | t"
+  [subtitle]="area()?.name ?? ''"
+  [closeLabel]="'action.close' | t"
+  (closed)="closed.emit()"
+  [actions]="actions()"
+  (action)="onAction($event.key)"
+>
+  <ng-template dialogBody>
+    <app-section [heading]="'admin.helpTickets.mailbox.heading' | t" [hideHeading]="true">
+      @if (!allowedHosts().length) {
+        <app-note kind="warn" [surface]="3">{{ 'admin.helpTickets.mailbox.noHosts' | t }}</app-note>
+      }
+      @if (fetchError(); as cause) {
+        <app-note kind="error" [surface]="3">{{
+          'admin.helpTickets.mailbox.fetchFailed' | t: { cause }
+        }}</app-note>
+      }
+      <app-input
+        type="email"
+        name="address"
+        autocomplete="off"
+        [label]="'admin.helpTickets.mailbox.address' | t"
+        [required]="true"
+        [error]="errors()['address'] ?? ''"
+        [ngModel]="draft().address"
+        (ngModelChange)="patch({ address: $event })"
+      />
+      <app-switch [checked]="draft().enabled" (checkedChange)="patch({ enabled: $event })">{{
+        'admin.helpTickets.mailbox.enabled' | t
+      }}</app-switch>
+      @for (side of sides; track side.key) {
+        <app-section [heading]="side.heading | t">
+          <app-input
+            [name]="side.key + 'Host'"
+            autocomplete="off"
+            [label]="'admin.helpTickets.mailbox.host' | t"
+            [required]="true"
+            [error]="errors()[side.host] ?? ''"
+            [ngModel]="draft()[side.host]"
+            (ngModelChange)="patchField(side.host, $event)"
+          />
+          <app-input
+            type="number"
+            [name]="side.key + 'Port'"
+            [label]="'admin.helpTickets.mailbox.port' | t"
+            [required]="true"
+            [error]="errors()[side.port] ?? ''"
+            [ngModel]="draft()[side.port]"
+            (ngModelChange)="patchField(side.port, $event)"
+          />
+          <app-input
+            [name]="side.key + 'User'"
+            autocomplete="off"
+            [label]="'admin.helpTickets.mailbox.user' | t"
+            [required]="true"
+            [error]="errors()[side.user] ?? ''"
+            [ngModel]="draft()[side.user]"
+            (ngModelChange)="patchField(side.user, $event)"
+          />
+          <app-input
+            type="password"
+            [name]="side.key + 'Password'"
+            autocomplete="new-password"
+            [label]="passwordLabel() | t"
+            [required]="mailbox() === null"
+            [error]="errors()[side.password] ?? ''"
+            [ngModel]="draft()[side.password]"
+            (ngModelChange)="patchField(side.password, $event)"
+          />
+        </app-section>
+      }
+      <app-input
+        name="doneFolder"
+        autocomplete="off"
+        [label]="'admin.helpTickets.mailbox.doneFolder' | t"
+        [required]="true"
+        [error]="errors()['doneFolder'] ?? ''"
+        [ngModel]="draft().doneFolder"
+        (ngModelChange)="patch({ doneFolder: $event })"
+      />
+      @for (line of testLines(); track line.text) {
+        <app-note role="status" [kind]="line.ok ? 'ok' : 'error'" [surface]="3">{{ line.text }}</app-note>
+      }
+    </app-section>
+  </ng-template>
+</app-dialog>
+
+<app-confirm-dialog
+  [open]="confirmDelete()"
+  [title]="'admin.helpTickets.mailbox.deleteTitle' | t"
+  [body]="'admin.helpTickets.mailbox.deleteConfirm' | t: { name: area()?.name || '' }"
+  (confirm)="doDelete()"
+  (cancel)="confirmDelete.set(false)"
+/>

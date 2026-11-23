@@ -43,6 +43,14 @@ from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.site_config.reads import active_branding
 from app.modules.tickets.access import TICKET_MANAGE, AreaScope, area_scope, works_anywhere
 from app.modules.tickets.areas import TicketAreaService
+from app.modules.tickets.mailbox import TicketMailboxService
+from app.modules.tickets.mailbox_schemas import (
+    MailboxCreate,
+    MailboxList,
+    MailboxOut,
+    MailboxPatch,
+    MailboxTestOut,
+)
 from app.modules.tickets.mails import (
     notify_ticket_assigned,
     notify_ticket_created,
@@ -106,6 +114,7 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 Manager = Annotated[Principal, Depends(require_principal(TICKET_MANAGE))]
 Reader = Annotated[Principal, Depends(require_principal())]
 SiteAdmin = Annotated[Principal, Depends(require_principal("admin.site"))]
+MailAdmin = Annotated[Principal, Depends(require_principal("admin.ticket_mail"))]
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,6 +164,14 @@ def get_area_service(session: DbSession) -> TicketAreaService:
 
 
 AreaServiceDep = Annotated[TicketAreaService, Depends(get_area_service)]
+
+
+def get_mailbox_service(session: DbSession, settings: SettingsDep) -> TicketMailboxService:
+    """Wire the service of the Postfächer."""
+    return TicketMailboxService(session, settings)
+
+
+MailboxServiceDep = Annotated[TicketMailboxService, Depends(get_mailbox_service)]
 
 
 def get_ticket_service(session: DbSession, request: Request) -> TicketService:
@@ -829,3 +846,71 @@ async def delete_ticket_area(
     await areas.delete(area_id, principal.sub)
     await areas.session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/admin/ticket-mailboxes", response_model=MailboxList, responses=_errors(401, 403))
+async def admin_ticket_mailboxes(
+    mailboxes: MailboxServiceDep, _principal: MailAdmin
+) -> MailboxList:
+    """List each Postfach without its passwords, and the hosts that a Postfach can have."""
+    return await mailboxes.listing()
+
+
+@router.post(
+    "/admin/ticket-areas/{area_id}/mailbox",
+    response_model=MailboxOut,
+    status_code=status.HTTP_201_CREATED,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def create_ticket_mailbox(
+    area_id: UUID, payload: MailboxCreate, mailboxes: MailboxServiceDep, principal: MailAdmin
+) -> MailboxOut:
+    """Give a Bereich its Postfach.
+
+    A second Postfach gives 409 ``ticket_mailbox_exists``, a host outside
+    ``TICKET_MAIL_HOST_ALLOWLIST`` 422 ``mail_host_not_allowed``.
+    """
+    out = await mailboxes.create(area_id, payload, principal.sub)
+    await mailboxes.session.commit()
+    return out
+
+
+@router.patch(
+    "/admin/ticket-areas/{area_id}/mailbox",
+    response_model=MailboxOut,
+    responses=_errors(401, 403, 404, 422),
+)
+async def patch_ticket_mailbox(
+    area_id: UUID, payload: MailboxPatch, mailboxes: MailboxServiceDep, principal: MailAdmin
+) -> MailboxOut:
+    """Change the Postfach of a Bereich or its switch. A password that the body leaves out stays."""
+    out = await mailboxes.patch(area_id, payload, principal.sub)
+    await mailboxes.session.commit()
+    return out
+
+
+@router.delete(
+    "/admin/ticket-areas/{area_id}/mailbox",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses=_errors(401, 403, 404),
+)
+async def delete_ticket_mailbox(
+    area_id: UUID, mailboxes: MailboxServiceDep, principal: MailAdmin
+) -> Response:
+    """Remove the Postfach of a Bereich. The mails stay on the mail server."""
+    await mailboxes.delete(area_id, principal.sub)
+    await mailboxes.session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/admin/ticket-areas/{area_id}/mailbox/test",
+    response_model=MailboxTestOut,
+    responses=_errors(401, 403, 404),
+)
+async def test_ticket_mailbox(
+    area_id: UUID, mailboxes: MailboxServiceDep, _principal: MailAdmin
+) -> MailboxTestOut:
+    """Log in to the IMAP and the SMTP account of the stored Postfach and tell each result."""
+    return await mailboxes.test(area_id)

@@ -981,6 +981,13 @@
       "to": "Ticket"
     },
     {
+      "column": "area_id",
+      "from": "TicketMailbox",
+      "multiplicity": "1",
+      "onDelete": "CASCADE",
+      "to": "TicketArea"
+    },
+    {
       "column": "author_id",
       "from": "TicketNote",
       "multiplicity": "*",
@@ -6825,6 +6832,135 @@
       "name": "TicketEvent",
       "path": "backend/app/modules/tickets/models.py",
       "table": "ticket_event"
+    },
+    {
+      "attributes": [
+        {
+          "name": "area_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "address",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CITEXT"
+        },
+        {
+          "name": "imap_host",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "imap_port",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "imap_user",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "imap_password",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "smtp_host",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "smtp_port",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "smtp_user",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "smtp_password",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "done_folder",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "enabled",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "uid_validity",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "BIGINT"
+        },
+        {
+          "name": "last_uid",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BIGINT"
+        },
+        {
+          "name": "failures",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "last_error",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "fetched_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "TicketMailbox",
+      "module": "tickets",
+      "name": "TicketMailbox",
+      "path": "backend/app/modules/tickets/models.py",
+      "table": "ticket_mailbox"
     },
     {
       "attributes": [

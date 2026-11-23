@@ -5,7 +5,12 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/tickets/test_ticket_mailbox.py:test_a_server_without_starttls_ends_before_the_login"
+  - "backend/tests/unit/modules/tickets/test_ticket_mailbox.py:test_imap_uses_tls_from_the_start_or_starttls_before_the_login"
+  - "backend/tests/unit/modules/tickets/test_ticket_mailbox.py:test_smtp_uses_tls_from_the_start_or_starttls_before_the_login"
+implementation:
+  - backend/app/modules/tickets/mail_client.py
 scope:
   - backend/app/
 ---

@@ -5,7 +5,12 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/tickets/test_ticket_mailbox.py:test_a_host_outside_the_allowlist_is_422"
+  - "backend/tests/unit/modules/tickets/test_ticket_mailbox.py:test_an_empty_allowlist_refuses_each_host"
+implementation:
+  - backend/app/modules/tickets/mailbox.py
+  - backend/app/settings.py
 scope:
   - backend/app/
 ---

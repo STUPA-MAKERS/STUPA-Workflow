@@ -5,7 +5,15 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/tickets/test_ticket_mailbox.py:test_a_second_postfach_of_a_bereich_is_409"
+  - "backend/tests/unit/modules/tickets/test_ticket_mailbox.py:test_create_stores_the_postfach_and_returns_no_password"
+  - "frontend/src/app/pages/admin/help-tickets/help-tickets.component.spec.ts:HelpTicketsComponent"
+implementation:
+  - backend/app/modules/tickets/mailbox.py
+  - backend/app/modules/tickets/models.py
+  - backend/migrations/versions/d2f6b9a41c37_ticket_mailbox.py
+  - frontend/src/app/pages/admin/help-tickets/help-tickets.component.ts
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/admin/help-tickets

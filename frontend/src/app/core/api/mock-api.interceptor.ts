@@ -139,6 +139,7 @@ const MOCK_PRINCIPAL: Principal = {
     'admin.calendars',
     'admin.paperless',
     'admin.features',
+    'admin.ticket_mail',
     'paperless.use',
     'calendar.manage',
     'calendar.publish',

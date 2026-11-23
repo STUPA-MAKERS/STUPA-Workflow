@@ -143,6 +143,56 @@ export interface TicketAreaInput {
   readonly categories: readonly TicketCategoryInput[];
 }
 
+/** The Postfach of a Bereich, without its passwords (`admin.ticket_mail`). */
+export interface TicketMailbox {
+  readonly areaId: Uuid;
+  readonly address: string;
+  readonly imapHost: string;
+  readonly imapPort: number;
+  readonly imapUser: string;
+  readonly smtpHost: string;
+  readonly smtpPort: number;
+  readonly smtpUser: string;
+  /** The IMAP folder that takes each imported mail. */
+  readonly doneFolder: string;
+  readonly enabled: boolean;
+  /** The cause code of the fetch after eight failed runs in sequence, else null. */
+  readonly error?: string | null;
+  readonly fetchedAt?: string | null;
+}
+
+/** The body of a new Postfach. A change sends a part of it; a password it leaves out stays. */
+export interface TicketMailboxInput {
+  readonly address: string;
+  readonly imapHost: string;
+  readonly imapPort: number;
+  readonly imapUser: string;
+  readonly imapPassword: string;
+  readonly smtpHost: string;
+  readonly smtpPort: number;
+  readonly smtpUser: string;
+  readonly smtpPassword: string;
+  readonly doneFolder: string;
+  readonly enabled: boolean;
+}
+
+/** Each Postfach and the hosts of the deploy setting `TICKET_MAIL_HOST_ALLOWLIST`. */
+export interface TicketMailboxList {
+  readonly items: readonly TicketMailbox[];
+  readonly allowedHosts: readonly string[];
+}
+
+/** The result of one connection of the test. `error` is the cause code of a failure. */
+export interface TicketMailboxCheck {
+  readonly ok: boolean;
+  readonly error?: string | null;
+}
+
+export interface TicketMailboxTest {
+  readonly imap: TicketMailboxCheck;
+  readonly smtp: TicketMailboxCheck;
+}
+
 export interface TicketListItem {
   readonly id: Uuid;
   readonly number: string;
@@ -378,6 +428,34 @@ export class TicketsApiService {
   mine(query: TicketQuery = {}): Observable<MyTicketPage> {
     const params = queryParams({ ...query, assignee: null });
     return this.http.get<MyTicketPage>(`${this.base}/tickets/mine`, { params, context: skipLoading() });
+  }
+
+  /** Each Postfach of the page "Hilfe & Tickets" (`admin.ticket_mail`). */
+  adminMailboxes(): Observable<TicketMailboxList> {
+    return this.http.get<TicketMailboxList>(`${this.base}/admin/ticket-mailboxes`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** 409 `ticket_mailbox_exists`, 422 `mail_host_not_allowed`. */
+  createMailbox(areaId: Uuid, body: TicketMailboxInput): Observable<TicketMailbox> {
+    return this.http.post<TicketMailbox>(`${this.base}/admin/ticket-areas/${areaId}/mailbox`, body);
+  }
+
+  updateMailbox(areaId: Uuid, body: Partial<TicketMailboxInput>): Observable<TicketMailbox> {
+    return this.http.patch<TicketMailbox>(`${this.base}/admin/ticket-areas/${areaId}/mailbox`, body);
+  }
+
+  deleteMailbox(areaId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/admin/ticket-areas/${areaId}/mailbox`);
+  }
+
+  /** Log in to both accounts of the stored Postfach. */
+  testMailbox(areaId: Uuid): Observable<TicketMailboxTest> {
+    return this.http.post<TicketMailboxTest>(
+      `${this.base}/admin/ticket-areas/${areaId}/mailbox/test`,
+      {},
+    );
   }
 
   /** `detail` keeps the answer for the read ahead of the list (`prefetchDetails`). */
