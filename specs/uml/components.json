@@ -468,6 +468,11 @@
     {
       "count": 1,
       "from": "budget",
+      "to": "paperless"
+    },
+    {
+      "count": 1,
+      "from": "budget",
       "to": "pdf"
     },
     {
@@ -734,6 +739,11 @@
       "count": 6,
       "from": "flow",
       "to": "notifications"
+    },
+    {
+      "count": 1,
+      "from": "flow",
+      "to": "paperless"
     },
     {
       "count": 27,

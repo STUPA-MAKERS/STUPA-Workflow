@@ -18,7 +18,7 @@ description: The optional Paperless-ngx integration — one connection (address,
 - `paperless_filing/files.py` — `FileBuilder.build(filing)` → `Prepared` (file, title, date, document type, Gremium, link). `BuildError(code, final)`.
 - `paperless_filing/runner.py` — `FilingRunner.run` (two steps: upload, then read the consume task and set the custom field `Plattform`) and `tag_replaced` (tag `Ersetzt`).
 - `paperless_filing/router.py` — the routes.
-- `backend/worker/paperless.py` — cron `process_paperless_filings`, every minute at second 45.
+- `backend/worker/paperless.py` — job `process_paperless_filings`: asked for at each event (`paperless/queue.py`), and a cron every minute at second 45.
 
 **What is filed (kinds):**
 - `protocol`, `protocol_public` — both stored PDFs of a final protocol, one job per finalization (`source_at = finalized_at`). Document type `Protokoll`.
@@ -33,7 +33,7 @@ Each document gets the name of its Gremium as a tag and the address of its eleme
 - No MCP tool: no OAuth scope carries the two permissions (spec 001201).
 
 **Conventions & gotchas:**
-- **No hook in flow, budget or protocol.** The cron scans for events since `<part>_since` with `NOT EXISTS` on `paperless_filing`. A new source is a query in `sources.py`, not a call in another module.
+- **The events only ask for a run.** `paperless/queue.py: request_filing(pool)` enqueues one `process_paperless_filings` job. Three places call it after their commit: `flow/paperless_actions.py` (`PaperlessFilingDispatcher`, last in the chain of `build_worker_dispatcher`, so every committed transition), the two state routes of `budget/plan_router.py`, and `worker/protocol.py` after a finalization. The call passes no id and never fails (no pool: nothing; a queue error: a log line). The run itself scans for events since `<part>_since` with `NOT EXISTS` on `paperless_filing`, and the minute cron stays as the safety net. A new source is a query in `sources.py` plus one `request_filing` call at its event.
 - **The token is write-only** (002515): no response model has it, no log line and no audit entry names it. `PUT` without `token` keeps the stored one; `clearToken` removes it.
 - **The host allowlist is checked twice** (002514): at the save and in `PaperlessClient._send` before every call. `PAPERLESS_HOST_ALLOWLIST` empty allows no host. The client follows no redirect.
 - **A job never uploads twice for one document number:** after the upload the row keeps `task_id`; after the consume task it keeps `document_id`, and a failed link step tries only the link again. A failure before the document exists starts with a new upload.
@@ -43,6 +43,6 @@ Each document gets the name of its Gremium as a tag and the address of its eleme
 - The fourth switch `insert_enabled` is stored for the insert with `::` (specs 002527-002529, 002534). No code reads it yet.
 - Tests: `tests/_support/paperless_fakes.py` (`FakePaperless` behind `httpx.MockTransport`); the worker takes `ctx['paperless_sessionmaker']` and `ctx['paperless_client_factory']`.
 
-**Frontend:** `pages/admin/paperless` (kit settings screen: connection, switches, actions, failed list), `core/api/paperless.service.ts` (`paperlessLink(kind, idSignal)`, `openInPaperless`), the menu entry `paperless.open` in the Antrag detail, the plan page and the meeting page (final protocol).
+**Frontend:** `pages/admin/paperless` (kit settings screen with no own styles: connection, switches, actions, and the failed filings as action rows with the icon "Erneut versuchen", which asks first), `core/api/paperless.service.ts` (`paperlessLink(kind, idSignal)`, `openInPaperless`), the menu entry `paperless.open` in the Antrag detail, the plan page and the meeting page (final protocol).
 
 **Related:** be-protocol, be-applications, be-budget, be-files, be-pdf, be-webhooks (same SSRF concern), be-privacy, deploy
