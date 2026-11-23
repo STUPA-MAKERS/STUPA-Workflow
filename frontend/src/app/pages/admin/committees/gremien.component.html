@@ -38,7 +38,7 @@
   </ng-template>
   <ng-template screenRecord let-row>
     @let g = gremiumOf(row.id);
-    <li>
+    <li [attr.data-gremium]="g.id">
       <app-expand-row
         [title]="g.name"
         align="row"

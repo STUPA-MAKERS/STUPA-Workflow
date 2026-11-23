@@ -47,10 +47,7 @@ const saveButton = (): HTMLButtonElement => screen.getByRole('button', { name: '
 describe('LoginSettingsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  /**
-   * A setting that nobody changed has no change date. With nothing changed the page shows no
-   * "Speichern".
-   */
+  /** With nothing changed the page shows no "Speichern". */
   it('shows the stored lifetimes', async () => {
     const { api } = await setup();
     expect(api.getLoginSettings).toHaveBeenCalledTimes(1);
@@ -62,7 +59,7 @@ describe('LoginSettingsComponent', () => {
   });
 
   /** The saved values are the new baseline. */
-  it('saves both lifetimes and shows the change date', async () => {
+  it('saves both lifetimes', async () => {
     const { api, toast } = await setup();
     await userEvent.clear(webField());
     await userEvent.type(webField(), '30');
@@ -71,7 +68,7 @@ describe('LoginSettingsComponent', () => {
     await userEvent.click(saveButton());
     expect(api.putLoginSettings).toHaveBeenCalledWith({ webSessionDays: 30, pwaSessionDays: 400 });
     expect(toast.success).toHaveBeenCalled();
-    expect(screen.getByText(/Zuletzt geändert am/)).toBeInTheDocument();
+    expect(screen.queryByText(/Zuletzt geändert/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
@@ -133,9 +130,10 @@ describe('LoginSettingsComponent', () => {
     expect(api.putLoginSettings).not.toHaveBeenCalled();
   });
 
-  it('shows the date of the last change of a stored setting', async () => {
+  /** §002610: no settings screen shows a change date. */
+  it('shows no change date even with a stored one', async () => {
     await setup({ api: makeApi({ ...STORED, updatedAt: '2026-09-01T10:00:00Z', updatedBy: 'admin-sub' }) });
-    expect(screen.getByText(/Zuletzt geändert am/)).toBeInTheDocument();
+    expect(screen.queryByText(/Zuletzt geändert/)).not.toBeInTheDocument();
   });
 
   /** Without stored values there is nothing to save. */

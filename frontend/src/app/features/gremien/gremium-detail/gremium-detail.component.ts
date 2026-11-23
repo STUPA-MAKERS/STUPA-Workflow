@@ -349,9 +349,10 @@ export class GremiumDetailComponent {
     if (next) void this.router.navigate(['/meetings', next.id]);
   }
 
+  /** "Gremium verwalten": the Gremien page of the Verwaltung with this row open (002600). */
   openAdmin(): void {
     const id = this.id();
-    if (id) void this.router.navigate(['/admin/committees', id, 'members']);
+    if (id) void this.router.navigate(['/admin/committees'], { queryParams: { open: id } });
   }
 
   onMenu(item: RowMenuItem, abo: CalendarSubscribeComponent): void {

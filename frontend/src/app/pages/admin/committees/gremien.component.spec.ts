@@ -1,4 +1,6 @@
+import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
 import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
@@ -488,5 +490,51 @@ describe('AdminGremienComponent', () => {
     c.deleting.set(true);
     c.doDelete();
     expect(api.deleteGremium).not.toHaveBeenCalled();
+  });
+});
+
+/** The page behind a real route, so `?open=` reaches it through the ActivatedRoute (002601). */
+describe('AdminGremienComponent ?open=', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  async function open(url: string) {
+    const scroll = jest.fn();
+    const proto = HTMLElement.prototype as { scrollIntoView?: unknown };
+    const before = proto.scrollIntoView;
+    proto.scrollIntoView = scroll;
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([{ path: 'admin/committees', component: AdminGremienComponent }]),
+        { provide: AdminApiService, useValue: makeApi() },
+        { provide: ToastService, useFactory: () => toastWith({ success: jest.fn(), error: jest.fn() }) },
+        { provide: AuthService, useValue: { can: () => true } },
+      ],
+    });
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl(url);
+    harness.detectChanges();
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+    proto.scrollIntoView = before;
+    return { scroll };
+  }
+
+  const expanded = (name: string) =>
+    screen.getByRole('button', { name: new RegExp(`^${name}`) }).getAttribute('aria-expanded');
+
+  it('opens only the row of the link and scrolls it into view', async () => {
+    const { scroll } = await open('/admin/committees?open=g-2');
+    expect(expanded('AStA')).toBe('true');
+    expect(expanded('Studierendenparlament')).toBe('false');
+    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(scroll.mock.contexts[0]).toBe(screen.getByRole('button', { name: /^AStA/ }));
+    expect(scroll).toHaveBeenCalledWith(expect.objectContaining({ block: 'center' }));
+  });
+
+  it('opens the first row and does not scroll for an unknown id', async () => {
+    const { scroll } = await open('/admin/committees?open=g-x');
+    expect(expanded('Studierendenparlament')).toBe('true');
+    expect(expanded('AStA')).toBe('false');
+    expect(scroll).not.toHaveBeenCalled();
   });
 });
