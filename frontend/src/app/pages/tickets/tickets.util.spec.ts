@@ -1,11 +1,14 @@
-import type { TicketEvent } from '@core/api/tickets.service';
+import type { TicketArea, TicketEvent } from '@core/api/tickets.service';
 import { de, type Translate } from '@core/i18n/translations';
 import {
+  areaOf,
+  categoryName,
   eventText,
   isOpen,
   reporterName,
   reporterRowName,
   ticketAge,
+  ticketIcon,
 } from './tickets.util';
 import { personName } from '@shared/person-label.util';
 
@@ -118,9 +121,31 @@ describe('tickets.util', () => {
 
     it('writes a kind change and an unknown kind', () => {
       expect(eventText(ev({ kind: 'kind', payload: { from: 'bug', to: 'idea' } }), '', t)).toBe(
-        'Mara Keller: Art Fehler → Idee',
+        'Mara Keller: Kategorie Fehler → Idee',
       );
-      expect(eventText(ev({ kind: 'kind', payload: {} }), '', t)).toBe('Mara Keller: Art Fehler → Fehler');
+      expect(eventText(ev({ kind: 'kind', payload: {} }), '', t)).toBe('Mara Keller: Kategorie Fehler → Fehler');
+    });
+
+    it('writes a change of the Kategorie of a Bereich by the names', () => {
+      expect(
+        eventText(ev({ kind: 'category', payload: { from: 'Raumanfrage', to: 'Schlüssel' } }), '', t),
+      ).toBe('Mara Keller: Kategorie Raumanfrage → Schlüssel');
+      expect(eventText(ev({ kind: 'category', payload: { from: null, to: 'Schlüssel' } }), '', t)).toBe(
+        'Mara Keller: Kategorie Keine → Schlüssel',
+      );
+      expect(eventText(ev({ kind: 'category', payload: { from: 'Schlüssel' } }), '', t)).toBe(
+        'Mara Keller: Kategorie Schlüssel → Keine',
+      );
+    });
+
+    it('writes a move with both names, also after a Bereich is gone', () => {
+      const payload = { from: 'a1', to: 'a2', fromName: 'Plattform', toName: 'AStA-Büro' };
+      expect(eventText(ev({ kind: 'area', payload }), '', t)).toBe(
+        'Mara Keller hat das Ticket von Plattform nach AStA-Büro verschoben',
+      );
+      expect(eventText(ev({ kind: 'area', payload: { from: 'a1', to: 'a2' } }), '', t)).toBe(
+        'Mara Keller hat das Ticket von einem gelöschten Bereich nach einem gelöschten Bereich verschoben',
+      );
     });
 
     it('writes a done to-do, and one the viewer may not read', () => {
@@ -130,6 +155,35 @@ describe('tickets.util', () => {
       expect(eventText(ev({ kind: 'todo_done', payload: { cardTitle: null } }), '', t)).toBe(
         'Mara Keller hat ein To-Do erledigt',
       );
+    });
+  });
+
+  describe('Bereich and Kategorie', () => {
+    const ASTA: TicketArea = {
+      id: 'a-asta',
+      name: 'AStA-Büro',
+      gremiumId: 'g1',
+      platform: false,
+      notifyNew: true,
+      categories: [{ id: 'c1', name: 'Raumanfrage' }],
+      mine: true,
+    };
+
+    it('gives a ticket the icon of its kind, else the ticket', () => {
+      expect(ticketIcon('bug')).toBe('bug');
+      expect(ticketIcon(null)).toBe('ticket');
+    });
+
+    it('finds the Bereich of a ticket', () => {
+      expect(areaOf('a-asta', [ASTA])).toBe(ASTA);
+      expect(areaOf('x', [ASTA])).toBeNull();
+    });
+
+    it('names the kind, else the Kategorie of the Bereich, else nothing', () => {
+      expect(categoryName({ kind: 'idea', categoryId: null, areaId: 'x' }, [], t)).toBe('Idee');
+      expect(categoryName({ kind: null, categoryId: 'c1', areaId: 'a-asta' }, [ASTA], t)).toBe('Raumanfrage');
+      expect(categoryName({ kind: null, categoryId: null, areaId: 'a-asta' }, [ASTA], t)).toBe('');
+      expect(categoryName({ kind: null, categoryId: 'c1', areaId: 'gone' }, [ASTA], t)).toBe('');
     });
   });
 });

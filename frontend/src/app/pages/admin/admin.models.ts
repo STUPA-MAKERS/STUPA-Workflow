@@ -926,6 +926,7 @@ export const GREMIUM_PERMISSIONS = [
   'protocol.finalize',
   'info.write',
   'members.notify',
+  'ticket.work',
 ] as const;
 
 /**
@@ -1401,8 +1402,6 @@ export interface HelpTicketsSettings {
   readonly wikiUrl: string;
   /** Visitors without an account may send a ticket. */
   readonly publicEnabled: boolean;
-  /** A new ticket mails the holders of `ticket.manage`. */
-  readonly notifyNew: boolean;
   /** Months after the close until the reporter is anonymized (1 to 120); null = never. */
   readonly retentionMonths: number | null;
 }

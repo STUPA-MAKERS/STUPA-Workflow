@@ -9,6 +9,7 @@ import { AuthService } from '@core/auth/auth.service';
 import type { PersonRef } from '@core/api/models';
 import {
   TicketsApiService,
+  type TicketArea,
   type TicketListItem,
   type TicketPage,
   type TicketQuery,
@@ -36,7 +37,9 @@ function ticket(over: Partial<TicketListItem> = {}): TicketListItem {
   return {
     id: 't42',
     number: 'T-0042',
+    areaId: 'a-plat',
     kind: 'bug',
+    categoryId: null,
     title: 'Upload bricht bei PDF über 10 MB ab',
     status: 'new',
     reporter: { principalId: 'r1', displayName: 'Lea Hoffmann', email: null, anonymized: false },
@@ -80,8 +83,31 @@ const defaultAnswer: Answer = (q) => {
   return of(pageOf(OPEN));
 };
 
+function area(over: Partial<TicketArea> = {}): TicketArea {
+  return {
+    id: 'a-plat',
+    name: 'Plattform',
+    gremiumId: null,
+    platform: true,
+    notifyNew: true,
+    categories: [],
+    mine: true,
+    ...over,
+  };
+}
+const ASTA = area({
+  id: 'a-asta',
+  name: 'AStA-Büro',
+  gremiumId: 'g1',
+  platform: false,
+  categories: [{ id: 'c1', name: 'Raumanfrage' }],
+});
+
 interface Opts {
   answer?: Answer;
+  areas?: Observable<TicketArea[]>;
+  /** The viewer holds only `ticket.work` in a Gremium, not `ticket.manage`. */
+  workOnly?: boolean;
   assignees?: Observable<PersonRef[]>;
   /** The viewer holds `ticket.manage` (default); false: the own tickets of a reporter. */
   manager?: boolean;
@@ -99,6 +125,7 @@ async function start(url = '/tickets', opts: Opts = {}) {
       ),
     ),
     assignees: jest.fn(() => opts.assignees ?? of([MARA, { principalId: null, displayName: 'Weg' }, { principalId: 'p3', displayName: null }])),
+    areas: jest.fn(() => opts.areas ?? of([area()])),
   };
   const rail = { refresh: jest.fn() };
   TestBed.configureTestingModule({
@@ -115,7 +142,14 @@ async function start(url = '/tickets', opts: Opts = {}) {
       ]),
       { provide: TicketsApiService, useValue: api },
       { provide: RailStatusService, useValue: rail },
-      { provide: AuthService, useValue: { displayName: () => 'Mia', can: (p: string) => (opts.manager ?? true) && p === 'ticket.manage' } },
+      {
+        provide: AuthService,
+        useValue: {
+          displayName: () => 'Mia',
+          can: (p: string) => (opts.manager ?? true) && !opts.workOnly && p === 'ticket.manage',
+          worksOnTickets: () => opts.manager ?? true,
+        },
+      },
     ],
   });
   const harness = await RouterTestingHarness.create();
@@ -483,5 +517,52 @@ describe('TicketsComponent', () => {
     expect(row.sub).not.toContain('Lea');
     expect(row.assignee).toBeNull();
   });
-});
 
+  describe('Bereiche', () => {
+    it('shows no Bereich chip with one own Bereich, and reads the Bereiche once', async () => {
+      const { api, page } = await start();
+      expect(api.areas).toHaveBeenCalledTimes(1);
+      expect(page.areas()).toHaveLength(1);
+      expect(screen.queryByRole('button', { name: /Bereich/ })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Kategorie/ })).toBeInTheDocument();
+    });
+
+    it('filters by the Bereich with more than one own Bereich, and names it in the row', async () => {
+      const rows = [ticket(), ticket({ id: 't50', areaId: 'a-asta', kind: null, categoryId: 'c1', title: 'Raum 9-012' })];
+      const { cmp, api, go } = await start('/tickets', {
+        areas: of([area(), ASTA, area({ id: 'a-x', name: 'Fremd', platform: false, mine: false })]),
+        answer: (q) => of(pageOf(isClosedQuery(q) ? [] : rows)),
+      });
+      expect(cmp.areaOptions().map((o) => o.label)).toEqual(['Alle', 'Plattform', 'AStA-Büro']);
+      expect(screen.getByRole('button', { name: /Bereich/ })).toBeInTheDocument();
+      const row = cmp.groups()[0].rows[1];
+      expect(row.icon).toBe('ticket');
+      expect(row.kindLabel).toBe('Raumanfrage');
+      expect(row.sub).toContain('AStA-Büro');
+      expect(cmp.chips().map((c) => c.key)).toEqual(['area', 'kind', 'assignee']);
+      cmp.setFilter('area', 'a-asta');
+      cmp.setArea('a-asta');
+      await go('/tickets?area=a-asta');
+      expect(cmp.areaFilter()).toBe('a-asta');
+      expect(cmp.activeFilterCount()).toBe(1);
+      expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ area: ['a-asta'] }));
+      expect(cmp.areaChipLabel()).toContain('AStA-Büro');
+    });
+
+    it('shows no kind chip to a person who does not work in Plattform', async () => {
+      const row = ticket({ areaId: 'a-asta', kind: null, categoryId: null });
+      const { cmp } = await start('/tickets', {
+        workOnly: true,
+        areas: of([area({ mine: false }), ASTA]),
+        answer: (q) => of(pageOf(isClosedQuery(q) ? [] : [row])),
+      });
+      expect(screen.queryByRole('button', { name: /Kategorie/ })).not.toBeInTheDocument();
+      expect(cmp.groups()[0].rows[0].kindLabel).toBe('Keine');
+    });
+
+    it('works without the list of the Bereiche', async () => {
+      const { page } = await start('/tickets', { areas: throwError(() => new Error('x')) });
+      expect(page.areas()).toEqual([]);
+    });
+  });
+});

@@ -5,7 +5,16 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/tickets/test_ticket_areas.py:test_a_ticket_of_another_bereich_is_404"
+  - "backend/tests/unit/modules/tickets/test_ticket_areas.py:test_ticket_work_gives_the_bereiche_of_the_gremium"
+  - "backend/tests/integration/modules/tickets/test_ticket_areas_api.py:test_a_gremium_role_works_only_in_the_bereiche_of_its_gremium"
+implementation:
+  - backend/app/modules/tickets/access.py
+  - backend/app/modules/tickets/router.py
+  - backend/app/modules/tickets/service.py
+  - backend/app/modules/gremien/gremium_roles.py
+  - frontend/src/app/core/auth/auth.service.ts
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets

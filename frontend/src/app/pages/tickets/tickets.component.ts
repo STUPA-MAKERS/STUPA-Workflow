@@ -57,7 +57,15 @@ import {
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { TicketsPageService } from './tickets-page.service';
-import { KIND_ICON, KIND_LABEL, STATUS_LABEL, reporterRowName, ticketAge } from './tickets.util';
+import {
+  KIND_LABEL,
+  STATUS_LABEL,
+  areaOf,
+  categoryName,
+  reporterRowName,
+  ticketAge,
+  ticketIcon,
+} from './tickets.util';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
@@ -70,6 +78,15 @@ const STATUS_FILTERS: readonly TicketStatusFilter[] = ['open', 'new', 'in_progre
 
 /** Rows per request; "Weitere laden" asks for the next page. */
 export const TICKET_PAGE = 100;
+
+/** A filter chip after the state chip: the Bereich, the kind or the assignee. */
+export interface TicketChip {
+  readonly key: 'area' | 'kind' | 'assignee';
+  readonly label: string;
+  readonly options: FilterSelectOption[];
+  readonly value: string;
+  readonly text: string;
+}
 
 /** One row as the template shows it. */
 export interface TicketRow {
@@ -102,15 +119,19 @@ function statusOrder(status: TicketStatusFilter): readonly TicketStatus[] {
 }
 
 /**
- * "Tickets" (permission `ticket.manage`): the list of the tickets beside
- * the detail of the open one, in the geometry of the applications page.
+ * "Tickets": the list of the tickets beside the detail of the open one, in the
+ * geometry of the applications page. The team view shows the tickets of the Bereiche
+ * in which the person works (`ticket.manage`: every Bereich; the Gremium permission
+ * `ticket.work`: the Bereiche of that Gremium).
  *
- * The chips filter by state (default "Offen": new and in progress), kind and assignee;
+ * The chips filter by state (default "Offen": new and in progress), Bereich, kind and
+ * assignee. The Bereich chip shows only with more than one own Bereich, and the kind
+ * chip only when "Plattform" is among them, because only its tickets have a kind;
  * the search runs while the user types. All filters live in the query params, and a row
  * keeps them. In the default view the closed tickets stay folded under "Erledigt oder
  * abgelehnt" with their number; "n abgeschlossene Tickets zeigen" loads them.
  *
- * Without `ticket.manage` the page lists the own tickets of the reporter
+ * Without a Bereich to work in the page lists the own tickets of the reporter
  * (`/tickets/mine`): the same groups and filters, without the assignee chip and the
  * assignee of a row.
  */
@@ -163,7 +184,7 @@ export class TicketsComponent {
   private readonly rail = inject(RailStatusService);
   /** The team view; else the own tickets of the reporter. */
   private readonly auth = inject(AuthService);
-  readonly manager = this.auth.can('ticket.manage');
+  readonly manager = this.auth.worksOnTickets();
 
   /** The clock of the row ages; a spec sets it. */
   now: () => Date = () => new Date();
@@ -177,6 +198,7 @@ export class TicketsComponent {
   readonly q = signal('');
   readonly statusFilter = signal<TicketStatusFilter>('open');
   readonly kindFilter = signal<TicketKind | ''>('');
+  readonly areaFilter = signal('');
   readonly assigneeFilter = signal('');
   readonly search = liveSearch({
     run: (query) => {
@@ -188,6 +210,7 @@ export class TicketsComponent {
       (this.q() ? 1 : 0) +
       (this.statusFilter() !== 'open' ? 1 : 0) +
       (this.kindFilter() ? 1 : 0) +
+      (this.areaFilter() ? 1 : 0) +
       (this.assigneeFilter() ? 1 : 0),
   );
 
@@ -232,6 +255,24 @@ export class TicketsComponent {
     return filterChipText(this.i18n.translate('tickets.list.filter.kind'), k ? this.i18n.translate(KIND_LABEL[k]) : null);
   });
 
+  /** The Bereiche in which the person works; empty for the reporter and while they load. */
+  readonly myAreas = computed(() => (this.page.areas() ?? []).filter((a) => a.mine));
+  readonly showAreaChip = computed(() => this.myAreas().length > 1);
+  /** Only a ticket of "Plattform" has a kind. The reporter view always filters by it. */
+  readonly showKindChip = computed(
+    () => !this.manager || this.page.areas() === null || this.myAreas().some((a) => a.platform),
+  );
+  readonly areaOptions = computed<FilterSelectOption[]>(() => [
+    { value: '', label: this.i18n.translate('tickets.list.filter.all') },
+    ...this.myAreas().map((a) => ({ value: a.id, label: a.name })),
+  ]);
+  readonly areaChipLabel = computed(() =>
+    filterChipText(
+      this.i18n.translate('tickets.list.filter.area'),
+      this.myAreas().find((a) => a.id === this.areaFilter())?.name ?? null,
+    ),
+  );
+
   readonly assigneeOptions = computed<FilterSelectOption[]>(() => {
     const all = this.i18n.translate('tickets.list.filter.all');
     const none = this.i18n.translate('tickets.list.filter.none');
@@ -258,6 +299,42 @@ export class TicketsComponent {
       v ? this.assigneeOptions().find((o) => o.value === v)?.label : null,
     );
   });
+
+  /** The chips after the state chip, each only where it has a choice. */
+  readonly chips = computed<TicketChip[]>(() => {
+    const t = (key: TranslationKey): string => this.i18n.translate(key);
+    const area: TicketChip = {
+      key: 'area',
+      label: t('tickets.list.filter.area'),
+      options: this.areaOptions(),
+      value: this.areaFilter(),
+      text: this.areaChipLabel(),
+    };
+    const kind: TicketChip = {
+      key: 'kind',
+      label: t('tickets.list.filter.kind'),
+      options: this.kindOptions(),
+      value: this.kindFilter(),
+      text: this.kindChipLabel(),
+    };
+    const assignee: TicketChip = {
+      key: 'assignee',
+      label: t('tickets.list.filter.assignee'),
+      options: this.assigneeOptions(),
+      value: this.assigneeFilter(),
+      text: this.assigneeChipLabel(),
+    };
+    return [
+      ...(this.showAreaChip() ? [area] : []),
+      ...(this.showKindChip() ? [kind] : []),
+      ...(this.manager ? [assignee] : []),
+    ];
+  });
+
+  /** A chip set its filter: the query param of the chip changes. */
+  setFilter(key: TicketChip['key'], value: string): void {
+    this.navigate({ [key]: value || null });
+  }
 
   /** The groups of the list, in the order of the states. */
   readonly groups = computed<readonly TicketGroup[]>(() => {
@@ -303,6 +380,10 @@ export class TicketsComponent {
         next: (list) => this.assignees.set(list),
         error: () => this.assignees.set([]),
       });
+      this.api.areas().subscribe({
+        next: (list) => this.page.areas.set(list),
+        error: () => this.page.areas.set([]),
+      });
     }
 
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
@@ -326,13 +407,17 @@ export class TicketsComponent {
     this.navigate({ kind: value || null });
   }
 
+  setArea(value: string): void {
+    this.navigate({ area: value || null });
+  }
+
   setAssignee(value: string): void {
     this.navigate({ assignee: value || null });
   }
 
   reset(): void {
     this.search.sync('');
-    this.navigate({ q: null, status: null, kind: null, assignee: null });
+    this.navigate({ q: null, status: null, kind: null, area: null, assignee: null });
   }
 
   /** "Zur Liste" (one pane at a time): close the detail and keep the filters. */
@@ -353,6 +438,7 @@ export class TicketsComponent {
     this.statusFilter.set(STATUS_FILTERS.includes(status as TicketStatusFilter) ? (status as TicketStatusFilter) : 'open');
     const kind = pm.get('kind') ?? '';
     this.kindFilter.set(TICKET_KINDS.includes(kind as TicketKind) ? (kind as TicketKind) : '');
+    this.areaFilter.set(pm.get('area') ?? '');
     this.assigneeFilter.set(pm.get('assignee') ?? '');
   }
 
@@ -374,6 +460,7 @@ export class TicketsComponent {
   private baseQuery(): TicketQuery {
     return {
       kind: this.kindFilter() ? [this.kindFilter() as TicketKind] : [],
+      area: this.manager && this.areaFilter() ? [this.areaFilter()] : [],
       assignee: this.assigneeFilter() || null,
       q: this.q() || null,
     };
@@ -479,11 +566,13 @@ export class TicketsComponent {
       this.i18n.translate(key, params);
     const age = ticketAge(item.createdAt, this.now(), this.i18n.formatLocale(), t);
     const reporter = this.manager ? reporterRowName(item.reporter, t) : null;
+    const areas = this.page.areas() ?? [];
+    const area = this.showAreaChip() ? (areaOf(item.areaId, areas)?.name ?? null) : null;
     return {
       item,
-      icon: KIND_ICON[item.kind],
-      kindLabel: t(KIND_LABEL[item.kind]),
-      sub: [reporter, age].filter(Boolean).join(' · '),
+      icon: ticketIcon(item.kind),
+      kindLabel: categoryName(item, areas, t) || t('tickets.detail.noCategory'),
+      sub: [area, reporter, age].filter(Boolean).join(' · '),
       assignee: item.assignee,
     };
   }
@@ -493,6 +582,8 @@ export class TicketsComponent {
 function asListItem(item: MyTicketItem): TicketListItem {
   return {
     ...item,
+    areaId: '',
+    categoryId: null,
     reporter: { principalId: null, displayName: null, email: null, anonymized: false },
     assignee: null,
   };

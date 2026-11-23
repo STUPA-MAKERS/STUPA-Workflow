@@ -105,7 +105,8 @@ _DOWNGRADE: tuple[str, ...] = (
     "WHERE permissions ? 'ticket.work'",
     "DELETE FROM ticket_event WHERE kind IN ('category', 'area')",
     "ALTER TABLE ticket_event DROP CONSTRAINT IF EXISTS ck_ticket_event_kind",
-    f"ALTER TABLE ticket_event ADD CONSTRAINT ck_ticket_event_kind CHECK (kind IN ({_EVENT_KINDS}))",
+    "ALTER TABLE ticket_event ADD CONSTRAINT ck_ticket_event_kind "
+    f"CHECK (kind IN ({_EVENT_KINDS}))",
     f"DELETE FROM ticket WHERE area_id <> '{_PLATFORM}' OR kind IS NULL",
     "ALTER TABLE ticket ALTER COLUMN kind SET NOT NULL",
     "DROP INDEX IF EXISTS ix_ticket_area_id",

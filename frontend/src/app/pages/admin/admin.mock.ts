@@ -819,7 +819,6 @@ export const MOCK_MEETING_PERIODS: MeetingPeriods = {
 export const MOCK_HELP_TICKETS: HelpTicketsSettings = {
   wikiUrl: 'https://wiki.reutlingen.university/books/antragsplattform',
   publicEnabled: true,
-  notifyNew: true,
   retentionMonths: 12,
 };
 

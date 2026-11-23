@@ -92,9 +92,8 @@
       <p class="sheet-line td__line">
         <span class="td__part"><app-status-text chip [kind]="statusKind()">{{ statusLabel() }}</app-status-text></span>
         <span class="td__part mono">{{ ticket.number }}</span>
-        <span class="td__part">{{ kindLabel() }}</span>
-        @if (manager) {
-          <span class="td__part">{{ assigneeName() }}</span>
+        @for (part of lineParts(); track $index) {
+          <span class="td__part">{{ part }}</span>
         }
       </p>
 
@@ -204,7 +203,9 @@
       @if (!manager) {
         <div class="td__pair">
           <ng-container *ngTemplateOutlet="reportedRow" />
-          <app-field-row [label]="'tickets.detail.kind' | t">{{ kindLabel() }}</app-field-row>
+          @if (categoryLabel()) {
+            <app-field-row [label]="'tickets.detail.kind' | t">{{ categoryLabel() }}</app-field-row>
+          }
         </div>
       } @else if (split()) {
         <div class="td__pair">
@@ -216,12 +217,18 @@
           <ng-container *ngTemplateOutlet="assigneeRow" />
           <ng-container *ngTemplateOutlet="kindRow" />
         </div>
+        @if (canMove()) {
+          <ng-container *ngTemplateOutlet="areaRow" />
+        }
       } @else {
         <ng-container *ngTemplateOutlet="reporterRow" />
         <ng-container *ngTemplateOutlet="emailRow" />
         <ng-container *ngTemplateOutlet="reportedRow" />
         <ng-container *ngTemplateOutlet="assigneeRow" />
         <ng-container *ngTemplateOutlet="kindRow" />
+        @if (canMove()) {
+          <ng-container *ngTemplateOutlet="areaRow" />
+        }
       }
     </app-field-group>
     <ng-template #reporterRow>
@@ -253,16 +260,29 @@
         />
       </app-field-row>
     </ng-template>
+    <ng-template #areaRow>
+      <app-field-row [label]="'tickets.detail.area' | t">
+        <app-filter-select
+          class="td__select"
+          size="md"
+          [label]="'tickets.detail.area' | t"
+          [options]="areaOptions()"
+          [value]="ticket.areaId"
+          (valueChange)="setArea($event)"
+          [text]="area()?.name ?? ''"
+        />
+      </app-field-row>
+    </ng-template>
     <ng-template #kindRow>
       <app-field-row [label]="'tickets.detail.kind' | t">
         <app-filter-select
           class="td__select"
           size="md"
           [label]="'tickets.detail.kind' | t"
-          [options]="kindOptions()"
-          [value]="ticket.kind"
-          (valueChange)="setKind($event)"
-          [icon]="kindIcon()"
+          [options]="hasKind() ? kindOptions() : categoryOptions()"
+          [value]="ticket.kind ?? ticket.categoryId ?? ''"
+          (valueChange)="hasKind() ? setKind($event) : setCategory($event)"
+          [icon]="hasKind() ? kindIcon() : null"
           [text]="kindLabel()"
         />
       </app-field-row>

@@ -164,6 +164,8 @@ export interface Principal {
   readonly in_substitute_pool?: boolean;
   /** The principal reported a ticket that is not anonymized: the tab "Tickets" shows. */
   readonly has_reported_tickets?: boolean;
+  /** The principal works on tickets in at least one Bereich. */
+  readonly works_on_tickets?: boolean;
 }
 
 /** Response of POST /api/auth/logout. An RP-initiated OIDC logout URL, or null. */

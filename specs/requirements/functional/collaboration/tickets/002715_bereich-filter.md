@@ -5,7 +5,12 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/tickets/test_ticket_areas.py:test_the_list_and_the_counts_keep_to_the_bereiche"
+implementation:
+  - backend/app/modules/tickets/service.py
+  - backend/app/modules/tickets/router.py
+  - frontend/src/app/pages/tickets/tickets.component.ts
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets
