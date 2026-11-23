@@ -145,6 +145,10 @@
   justify-content: flex-start;
   width: 100%;
   max-width: none;
+}
+// The plain look, without the edge and the padding of a field. Very high contrast keeps the look
+// of the kit: there a select has a yellow edge (spec 000614), which needs the padding.
+:host-context(html:not([data-very-high-contrast='on'])) .td__select ::ng-deep .fs__chip {
   height: auto;
   padding: 0;
   border: 0;
@@ -159,14 +163,12 @@
 
 // The log adds only its minimum (`--chat-log-basis: 0`), so a long thread does not make the pane
 // scroll and the composer stays at the foot of the card.
-.td--split .td__cols {
-  flex: 1 0 auto;
-  align-items: stretch;
-}
 // Side by side the two columns never wrap: stacked, the log shrank to its minimum and the
 // sheet ran past the pane. The fields of a narrow details column stack instead.
 .td--split .td__cols {
+  flex: 1 0 auto;
   flex-wrap: nowrap;
+  align-items: stretch;
 }
 .td--split .td__col:first-child {
   min-width: 0;

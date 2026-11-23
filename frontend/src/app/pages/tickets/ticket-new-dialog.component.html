@@ -23,7 +23,7 @@
         [taken]="taken()"
         (picked)="onPicked($event)"
       />
-      @if (tried()) {
+      @if (tried() && personMissing()) {
         <app-error-text>{{ 'tickets.new.personMissing' | t }}</app-error-text>
       }
     }

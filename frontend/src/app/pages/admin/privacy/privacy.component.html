@@ -227,3 +227,19 @@
     </app-data-table>
   </ng-template>
 </app-dialog>
+
+<app-dialog
+  [open]="ticketMails() !== null && paperlessDocuments() === null"
+  [heading]="'admin.privacy.mails.title' | t"
+  [subtitle]="'admin.privacy.mails.text' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="ticketMails.set(null)"
+  [actions]="[{ key: 'close', label: ('action.close' | t), kind: 'main' }]"
+  (action)="ticketMails.set(null)"
+>
+  <ng-template dialogBody>
+    <app-data-table surface="rowgroup" [columns]="mailColumns()" [rows]="$any(ticketMails() ?? [])">
+      <ng-template appCell="mailbox" let-m>{{ $any(m).mailbox ?? ('admin.privacy.mails.removed' | t) }}</ng-template>
+    </app-data-table>
+  </ng-template>
+</app-dialog>

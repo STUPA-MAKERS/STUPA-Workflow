@@ -27,6 +27,8 @@ The MCP server must not have a tool for these functions:
 - the change of the login lifetime, because the server refuses it to every agent token
 - the Paperless connection, its actions and the address of a filed document, because no
   OAuth scope carries the permissions `admin.paperless` and `paperless.use`
+- the Postfach of a ticket Bereich and its connection test, because no OAuth scope carries
+  the permission `admin.ticket_mail`
 - the login, logout, OAuth and consent routes, the MCP package download and the ALTCHA
   challenge
 - the WebSocket channels with the tile read of a live ping, the ICS feeds with their token

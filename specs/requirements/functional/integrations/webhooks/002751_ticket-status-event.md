@@ -5,7 +5,13 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/tickets/test_ticket_paperless_webhooks.py:test_each_status_change_is_an_event"
+  - "backend/tests/unit/modules/tickets/test_ticket_webhooks.py:test_status_holds_both_statuses"
+implementation:
+  - backend/app/modules/tickets/webhook_fields.py
+  - backend/app/modules/tickets/service.py
+  - backend/app/modules/webhooks/catalog.py
 scope:
   - backend/app/modules/webhooks
   - backend/app/modules/tickets

@@ -25,12 +25,14 @@ description: The optional Paperless-ngx integration — one connection (address,
 - `application` — the PDF of an Antrag at each decision (a `status_event` into a state with `is_approved` or `is_denied`; `source_id` is the event). Rendered by a system reader with the admin role, so the archive copy hides no field. Document type `Antrag`.
 - `attachment` — each attachment of that Antrag with a clean virus scan, once per attachment. Document type `Antrag`, title `<Antrag> – <file name>`.
 - `plan` — the PDF of a plan version in force (`source_id` is the version). Document type `Haushaltsplan`.
+- `ticket_file` — one clean file of a ticket, only by the action "In Paperless ablegen" of a worker (spec 002742), never by an event or the backfill. `source_id` is the attachment. Document type `Ticket`, title `T-<number> – <file name>`, the Gremium of the Bereich as tag, link `/tickets/<id>`. It has no switch: `open_kinds` has it while the connection has an address and a token.
 Each document gets the name of its Gremium as a tag and the address of its element in the custom field `Plattform`.
 
 **API surface:**
 - `GET/PUT /api/admin/paperless`, `POST /api/admin/paperless/test`, `GET /api/admin/paperless/failed-filings`, `POST /api/admin/paperless/failed-filings/{id}/retry`, `POST /api/admin/paperless/backfill` — permission `admin.paperless`.
 - `GET /api/paperless/documents/{kind}/{element_id}` (`kind`: `protocol|application|plan`) — permission `paperless.use`; answers `{url, documentId}`, both null without a filed document or with the part off.
-- No MCP tool: no OAuth scope carries the two permissions (spec 001201).
+- `POST /api/tickets/{id}/files/{attachmentId}/paperless` (202) — a route of `tickets` (`tickets/paperless.py`, be-tickets): work right of the ticket and `paperless.use`; it opens the `ticket_file` job (a failed one runs again) and asks for a run. 409 `paperless_off` without a connection, 409 `file_not_clean` for a file without a clean scan. The ticket details answer `paperless.files` (`state`: `none|pending|filed|failed`, `url`) to a holder of `paperless.use`. MCP tool `tickets_file_in_paperless`.
+- No MCP tool for the admin routes and the entry: no OAuth scope carries the two permissions (spec 001201).
 
 **Conventions & gotchas:**
 - **The events only ask for a run.** `paperless/queue.py: request_filing(pool)` enqueues one `process_paperless_filings` job. Three places call it after their commit: `flow/paperless_actions.py` (`PaperlessFilingDispatcher`, last in the chain of `build_worker_dispatcher`, so every committed transition), the two state routes of `budget/plan_router.py`, and `worker/protocol.py` after a finalization. The call passes no id and never fails (no pool: nothing; a queue error: a log line). The run itself scans for events since `<part>_since` with `NOT EXISTS` on `paperless_filing`, and the minute cron stays as the safety net. A new source is a query in `sources.py` plus one `request_filing` call at its event.

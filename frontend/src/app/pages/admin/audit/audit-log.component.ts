@@ -188,6 +188,7 @@ export const AUDIT_ACTIONS = [
   'paperless_connection',
   'paperless_filed',
   'paperless_inserted',
+  'ticket_mailbox',
 ] as const;
 
 /** Target type to router target: the detail page or the admin list that owns the target. */

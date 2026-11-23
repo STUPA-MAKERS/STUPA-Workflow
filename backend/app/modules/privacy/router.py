@@ -36,6 +36,7 @@ from app.modules.privacy.schemas import (
     PrincipalErasureOut,
     PrivacySettingsOut,
     PrivacySettingsUpdate,
+    TicketMailCountOut,
 )
 from app.modules.privacy.service import (
     AuskunftService,
@@ -45,6 +46,7 @@ from app.modules.privacy.service import (
     build_auskunft_workbook,
     erase_email,
 )
+from app.modules.tickets.privacy import mail_counts_of, mail_counts_of_principal
 from app.shared.errors import ProblemDetail, ValidationProblem
 from app.shared.xlsx import XLSX_MEDIA_TYPE
 
@@ -143,6 +145,8 @@ async def execute_erasure(
 ) -> ErasureRequestOut:
     """Execute an erasure request and mail the confirmation in the background."""
     files = _files_with_storage(session, request)
+    before = await session.get(ErasureRequest, request_id)
+    mails = await mail_counts_of(session, before.email if before is not None else None)
     result = await service.execute(request_id, actor=principal.sub, files=files)
     pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(
@@ -154,7 +158,9 @@ async def execute_erasure(
         subject_type=result.subject_type,
     )
     documents = await documents_of_requests(session, [result])
-    return _out(result, documents.get(result.id, ()))
+    return _out(result, documents.get(result.id, ())).model_copy(
+        update={"ticket_mails": TypeAdapter(tuple[TicketMailCountOut, ...]).validate_python(mails)}
+    )
 
 
 @router.post(
@@ -204,12 +210,15 @@ async def erase_principal(
     address that finds them.
     """
     documents = await documents_of_principal(session, principal_id)
+    mails = await mail_counts_of_principal(session, principal_id)
     await PrincipalService(session).erase(
         principal_id,
         actor=principal.sub,
         files=_files_with_storage(session, request),
     )
-    return PrincipalErasureOut(paperlessDocuments=documents)
+    return PrincipalErasureOut.model_validate(
+        {"paperlessDocuments": documents, "ticketMails": mails}
+    )
 
 
 @router.post(
@@ -232,13 +241,14 @@ async def erase_by_email(
     """
     email = _canonical_email(body.email)
     documents = await documents_of_email(session, email)
+    mails = await mail_counts_of(session, email)
     result = await erase_email(
         session,
         email,
         actor=principal.sub,
         files=_files_with_storage(session, request),
     )
-    return EmailErasureOut.model_validate(result).model_copy(
+    return EmailErasureOut.model_validate({**result, "ticketMails": mails}).model_copy(
         update={"paperless_documents": documents}
     )
 

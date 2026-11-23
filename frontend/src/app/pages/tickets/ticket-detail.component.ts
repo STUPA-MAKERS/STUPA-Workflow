@@ -7,6 +7,7 @@ import {
   Injector,
   afterNextRender,
   computed,
+  effect,
   inject,
   signal,
   viewChild,
@@ -24,7 +25,10 @@ import {
   TicketsApiService,
   type MyTicketDetail,
   type TicketAttachment,
+  type TicketPaperlessFile,
   type TicketDetail,
+  type TicketMail,
+  type TicketMailRecipients,
   type TicketKind,
   type TicketListItem,
   type TicketFollowUp,
@@ -41,6 +45,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
 import type {
+  ChatAttachment,
   ChatEdit,
   ChatEvent,
   ChatMessage,
@@ -53,6 +58,7 @@ import { chatPeople } from '@shared/ui/chat/chat-mentions';
 import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
 import {
   ButtonComponent,
+  ButtonLinkComponent,
   ButtonGroupComponent,
   CheckboxComponent,
   DialogComponent,
@@ -94,11 +100,19 @@ import { TicketsPageService } from './tickets-page.service';
 import {
   KIND_LABEL,
   STATUS_KIND,
+  MAIL_SOURCE_NAME,
   SOURCE_LABEL,
   STATUS_LABEL,
   areaOf,
   categoryName,
   eventText,
+  addressesValid,
+  mailSourceScan,
+  parseAddresses,
+  recipientsText,
+  sentLine,
+  skippedLine,
+  withSkipped,
   isOpen,
   reporterEventText,
   reporterName,
@@ -116,6 +130,16 @@ interface ContextRow {
   readonly label: TranslationKey;
   readonly value: string;
   readonly href?: string;
+}
+
+/** The wait before the page reads a ticket with a waiting mail again. */
+export const MAIL_STATE_POLL_MS = 10_000;
+
+/** The chat state of a message from the state of its mail; none for a sent or no mail. */
+export function mailChatState(mail: TicketMail | undefined): { readonly state?: 'sending' | 'failed' } {
+  return mail?.direction === 'out' && (mail.state === 'sending' || mail.state === 'failed')
+    ? { state: mail.state }
+    : {};
 }
 
 /** The fragment of a link to one note: `#note-<id>`. */
@@ -147,6 +171,18 @@ export interface TicketHint {
   readonly icon: IconName;
   readonly text: string;
   readonly ref: { readonly id: Uuid; readonly number: string } | null;
+}
+
+/**
+ * The writer of the ticket body. A sender without an account (a mail, a report without a
+ * login) is a person with a name and no id, as in the later messages of the same sender, so
+ * each message of the sender has the avatar and the same indent. An anonymized ticket has
+ * no writer.
+ */
+export function bodyAuthor(reporter: TicketReporter): ChatMessage['author'] {
+  const displayName = reporter.displayName ?? reporter.email ?? null;
+  if (reporter.principalId) return { principalId: reporter.principalId, displayName };
+  return displayName ? { principalId: null, displayName } : null;
 }
 
 /** The id of the ticket body in the thread: it never collides with a note id. */
@@ -232,6 +268,7 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
+    ButtonLinkComponent,
     ButtonGroupComponent,
     ChatComponent,
     CheckboxComponent,
@@ -454,7 +491,31 @@ export class TicketDetailComponent {
   /** The visibility switch of the team composer: only an account reads a public note. */
   readonly visibilityOptions = computed<readonly ChatVisibility[]>(() => {
     const t = this.ticket();
-    return this.manager && t && t.reporter.principalId && !t.anonymizedAt ? TEAM_VISIBILITIES : [];
+    return this.manager && t && (t.reporter.principalId || t.mailAnswer) && !t.anonymizedAt
+      ? TEAM_VISIBILITIES
+      : [];
+  });
+
+  /** The recipients of a public message on a mail ticket; null on another ticket. */
+  readonly mailAnswer = computed(() => (this.manager ? (this.ticket()?.mailAnswer ?? null) : null));
+  /** The recipients that the writer chose for the next public message. */
+  private readonly chosenRecipients = signal<TicketMailRecipients | null>(null);
+  readonly recipients = computed<TicketMailRecipients | null>(
+    () => this.chosenRecipients() ?? this.mailAnswer(),
+  );
+  readonly recipientsLine = computed(() => {
+    const r = this.recipients();
+    return r ? recipientsText(r.to, r.cc, this.t) : '';
+  });
+  readonly recipientsOpen = signal(false);
+  readonly recipientsDraft = signal({ to: '', cc: '' });
+  /** The person tried to save the recipients: a wrong address shows its error. */
+  readonly recipientsTried = signal(false);
+  readonly recipientsError = computed<TranslationKey | null>(() => {
+    const draft = this.recipientsDraft();
+    const to = parseAddresses(draft.to);
+    if (!to.length) return 'tickets.mail.recipients.toMissing';
+    return addressesValid([...to, ...parseAddresses(draft.cc)]) ? null : 'tickets.mail.recipients.invalid';
   });
 
   readonly placeholder = computed<TranslationKey>(() =>
@@ -467,9 +528,19 @@ export class TicketDetailComponent {
   private readonly outbox = new ChatOutbox<TicketNote>(
     (req) =>
       this.manager
-        ? this.api.addNote(this.id, req.body, req, req.visibility, req.mentions)
+        ? this.api.addNote(
+            this.id,
+            req.body,
+            req,
+            req.visibility,
+            req.mentions,
+            req.visibility === 'public' ? this.chosenRecipients() : null,
+          )
         : this.api.addMyNote(this.id, req.body, req).pipe(mergeMap((sent) => this.sentByReporter(sent))),
-    (created) => this.notes.update((list) => appendOnce(list, created)),
+    (created) => {
+      this.notes.update((list) => appendOnce(list, created));
+      if (created.visibility === 'public' && this.mailAnswer()) this.reload();
+    },
     (err) =>
       this.toast.show(
         this.t(this.blockedKey(err) ?? sendErrorKey(err, 'tickets.detail.error.note')),
@@ -484,39 +555,68 @@ export class TicketDetailComponent {
   readonly messages = computed<ChatMessage[]>(() => {
     const t = this.ticket();
     if (!t) return [];
+    const locale = this.i18n.formatLocale();
+    const mails = (t.mails ?? []).filter((m) => !m.automatic);
+    const first = mails.find((m) => m.noteId === null && m.direction === 'in');
+    const byNote = new Map(mails.filter((m) => m.noteId).map((m) => [m.noteId, m]));
     const body: ChatMessage = {
       id: BODY_ID,
-      author: t.reporter.principalId
-        ? { principalId: t.reporter.principalId, displayName: t.reporter.displayName }
-        : null,
+      author: bodyAuthor(t.reporter),
       authorLabel: this.manager ? this.reporter() : null,
-      body: t.body,
+      body: withSkipped(t.body, skippedLine(first, locale, this.t)),
       at: t.createdAt,
       own: !this.manager,
       canEdit: false,
       visibility: this.visibilityOptions().length ? 'public' : null,
-      attachments: t.attachments.map((a) => ({
-        id: a.id,
-        filename: a.filename,
-        mime: a.mime,
-        size: a.size,
-        url: this.api.attachmentUrl(a.id),
-        scanState: reportScanState(a),
-      })),
+      attachments: [
+        ...t.attachments.map((a) => ({
+          id: a.id,
+          filename: a.filename,
+          mime: a.mime,
+          size: a.size,
+          url: this.api.attachmentUrl(a.id),
+          scanState: reportScanState(a),
+        })),
+        ...this.sourceFiles(first),
+      ],
     };
     const notes = this.notes().map<ChatMessage>((n) => ({
       id: n.id,
       author: n.author,
-      body: n.body,
+      body: withSkipped(
+        withSkipped(n.body, skippedLine(byNote.get(n.id), locale, this.t)),
+        sentLine(byNote.get(n.id), this.t),
+      ),
+      ...mailChatState(byNote.get(n.id)),
       at: n.at,
       editedAt: n.editedAt,
       own: n.isOwn,
-      attachments: toChatAttachments(this.apiBase, n.attachments),
+      attachments: [
+        ...toChatAttachments(this.apiBase, n.attachments),
+        ...this.sourceFiles(byNote.get(n.id)),
+      ],
       visibility: this.manager ? (n.visibility ?? 'internal') : null,
       mentions: n.mentions,
     }));
     return [body, ...notes, ...this.outbox.messages()];
   });
+
+  /** The source of a mail as a file of its message; none once the source is gone. */
+  private sourceFiles(mail: TicketMail | undefined): ChatAttachment[] {
+    const t = this.ticket();
+    const scanState = mail ? mailSourceScan(mail) : null;
+    if (!t || !mail || !scanState) return [];
+    return [
+      {
+        id: mail.id,
+        filename: MAIL_SOURCE_NAME,
+        mime: 'message/rfc822',
+        size: mail.sourceSize,
+        url: this.api.mailSourceUrl(t.id, mail.id),
+        scanState,
+      },
+    ];
+  }
 
   readonly events = computed<ChatEvent[]>(() => {
     const t = this.ticket();
@@ -559,9 +659,39 @@ export class TicketDetailComponent {
     };
   });
 
+  /**
+   * The clean files of the ticket for "In Paperless ablegen"; empty without `paperless.use`,
+   * while the connection is off and for a reporter (§F/integrations/ticket-mail/002742).
+   */
+  protected readonly paperlessFiles = computed<readonly TicketPaperlessFile[]>(() =>
+    this.manager ? (this.ticket()?.paperless?.files ?? []) : [],
+  );
+
+  /** "In Paperless ablegen": open the job of one file and show its new state at once. */
+  fileInPaperless(file: TicketPaperlessFile): void {
+    const t = this.ticket();
+    if (!t) return;
+    this.api.fileInPaperless(t.id, file.id).subscribe({
+      next: (filed) => {
+        const cur = this.ticket();
+        if (!cur?.paperless || cur.id !== t.id) return;
+        const files = cur.paperless.files.map((f) => (f.id === filed.id ? filed : f));
+        this.ticket.set({ ...cur, paperless: { files } });
+      },
+      error: () => this.toast.show(this.t('tickets.paperless.error'), 'error'),
+    });
+  }
+
   constructor() {
     pageItemTitle(() => this.ticket()?.title);
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => this.load(pm.get('id')!));
+    effect((onCleanup) => {
+      const sending = this.ticket()?.mails?.some((m) => m.state === 'sending') ?? false;
+      const filing = this.paperlessFiles().some((f) => f.state === 'pending');
+      if (!sending && !filing) return;
+      const timer = setTimeout(() => this.reload(), MAIL_STATE_POLL_MS);
+      onCleanup(() => clearTimeout(timer));
+    });
   }
 
   /** Read the team of the Bereich of the ticket, once per Bereich. */
@@ -591,6 +721,7 @@ export class TicketDetailComponent {
     if (opened) {
       this.id = id;
       this.outbox.clear();
+      this.chosenRecipients.set(null);
       this.ticket.set(null);
       this.todos.set([]);
       this.loading.set(true);
@@ -902,6 +1033,8 @@ export class TicketDetailComponent {
       this.canReply.set(false);
       return 'tickets.detail.error.blocked';
     }
+    if (code === 'mailbox_off') return 'tickets.mail.off';
+    if (code === 'mail_without_recipient') return 'tickets.mail.recipients.toMissing';
     return null;
   }
 
@@ -917,12 +1050,58 @@ export class TicketDetailComponent {
     this.outbox.send(req);
   }
 
+  /** "Erneut senden": a message of the outbox, or the failed mail of a stored message. */
   retryNote(ref: ChatRef): void {
-    this.outbox.retry(ref.id);
+    const mail = this.failedMail(ref.id);
+    if (!mail) {
+      this.outbox.retry(ref.id);
+      return;
+    }
+    this.api.resendMail(this.id, mail.id).subscribe({
+      next: () => this.reload(),
+      error: (err: unknown) =>
+        this.toast.show(this.t(sendErrorKey(err, 'tickets.mail.error.resend')), 'error'),
+    });
   }
 
+  /** "Verwerfen": a message of the outbox, or the stored message whose mail failed. */
   discardNote(ref: ChatRef): void {
-    this.outbox.discard(ref.id);
+    if (this.failedMail(ref.id)) this.deleteNote(ref);
+    else this.outbox.discard(ref.id);
+  }
+
+  private failedMail(noteId: string): TicketMail | undefined {
+    return this.ticket()?.mails?.find((m) => m.noteId === noteId && m.state === 'failed');
+  }
+
+  openRecipients(): void {
+    const r = this.recipients();
+    this.recipientsDraft.set({ to: (r?.to ?? []).join(', '), cc: (r?.cc ?? []).join(', ') });
+    this.recipientsTried.set(false);
+    this.recipientsOpen.set(true);
+  }
+
+  saveRecipients(): void {
+    this.recipientsTried.set(true);
+    if (this.recipientsError()) return;
+    const draft = this.recipientsDraft();
+    const to = parseAddresses(draft.to);
+    this.chosenRecipients.set({ to, cc: parseAddresses(draft.cc).filter((a) => !to.includes(a)) });
+    this.recipientsOpen.set(false);
+  }
+
+  /** Read the ticket again without the loading state, for the states of its mails. */
+  private reload(): void {
+    const id = this.id;
+    const seq = this.seq;
+    this.read(id).subscribe({
+      next: (t) => {
+        if (id !== this.id || seq !== this.seq) return;
+        this.ticket.set(t);
+        this.notes.set(t.notes);
+      },
+      error: () => undefined,
+    });
   }
 
   editNote(change: ChatEdit): void {

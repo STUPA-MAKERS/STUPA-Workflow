@@ -1141,6 +1141,11 @@
       "to": "shared"
     },
     {
+      "count": 2,
+      "from": "paperless_filing",
+      "to": "tickets"
+    },
+    {
       "count": 1,
       "from": "pdf",
       "to": "shared"
@@ -1211,7 +1216,7 @@
       "to": "shared"
     },
     {
-      "count": 2,
+      "count": 4,
       "from": "privacy",
       "to": "tickets"
     },
@@ -1401,17 +1406,17 @@
       "to": "applications"
     },
     {
-      "count": 2,
+      "count": 4,
       "from": "tickets",
       "to": "audit"
     },
     {
-      "count": 11,
+      "count": 13,
       "from": "tickets",
       "to": "auth"
     },
     {
-      "count": 7,
+      "count": 15,
       "from": "tickets",
       "to": "files"
     },
@@ -1436,12 +1441,17 @@
       "to": "notifications"
     },
     {
-      "count": 19,
+      "count": 3,
+      "from": "tickets",
+      "to": "paperless"
+    },
+    {
+      "count": 28,
       "from": "tickets",
       "to": "shared"
     },
     {
-      "count": 2,
+      "count": 3,
       "from": "tickets",
       "to": "site_config"
     },
@@ -1451,7 +1461,7 @@
       "to": "todos"
     },
     {
-      "count": 1,
+      "count": 2,
       "from": "tickets",
       "to": "webhooks"
     },

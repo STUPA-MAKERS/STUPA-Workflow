@@ -27,7 +27,9 @@ from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 TicketKind = Literal["bug", "question", "idea", "barrier"]
 TicketStatus = Literal["new", "in_progress", "waiting", "done", "rejected"]
 TicketSource = Literal["help", "mail", "team"]
-TicketEventKind = Literal["created", "status", "assignee", "kind", "todo_done", "category", "area"]
+TicketEventKind = Literal[
+    "created", "status", "assignee", "kind", "todo_done", "category", "area", "mail_auto"
+]
 NoteVisibility = Literal["internal", "public"]
 
 #: The most draft attachments one report binds.
@@ -164,6 +166,27 @@ class TicketAttachment(FrozenCamelModel, frozen=True):
         )
 
 
+class TicketPaperlessFile(FrozenCamelModel, frozen=True):
+    """One clean file of a ticket with the state of its filing in Paperless.
+
+    Attributes:
+        state: ``none`` before the action, ``pending`` while the job runs, ``filed``
+            with a document, ``failed`` after the last try.
+        url: The address of the document in Paperless; null before ``filed``.
+    """
+
+    id: UUID
+    filename: str
+    state: Literal["none", "pending", "filed", "failed"]
+    url: str | None = None
+
+
+class TicketPaperless(FrozenCamelModel, frozen=True):
+    """The files of a ticket that a person can file in Paperless."""
+
+    files: tuple[TicketPaperlessFile, ...] = ()
+
+
 class TicketEventOut(FrozenCamelModel, frozen=True):
     """An event of the ticket timeline."""
 
@@ -192,6 +215,67 @@ class TicketNoteOut(FrozenCamelModel, frozen=True):
     visibility: NoteVisibility = "internal"
     from_reporter: bool = Field(default=False, serialization_alias="fromReporter")
     mentions: tuple[PersonRef, ...] = Field(default_factory=tuple)
+
+
+#: The most addresses in ``to`` and in ``cc`` of one sent mail.
+MAX_MAIL_RECIPIENTS = 20
+
+
+class TicketSkippedFile(FrozenCamelModel, frozen=True):
+    """A file of a mail that did not become a file of the message.
+
+    Attributes:
+        reason: ``size`` for a file above the size limit, ``type`` for a file of a type
+            that an upload refuses.
+    """
+
+    name: str
+    size: int
+    reason: Literal["size", "type"]
+
+
+class TicketMailOut(FrozenCamelModel, frozen=True):
+    """One mail of a ticket, for the team.
+
+    Attributes:
+        note_id: The message that the mail became; null for the first mail of the
+            ticket and for an automatic mail.
+        source: ``clean`` when the source can be downloaded, ``infected`` after a
+            finding, ``closed`` without a scan result, ``gone`` after the anonymization.
+        to: The addresses of ``To`` of a sent mail.
+        state: The state of a sent mail: ``sending``, ``sent`` or ``failed``; null for
+            an imported mail. A mail with ``failed`` takes ``POST …/resend``.
+        error: The short cause code of the newest failed send.
+    """
+
+    id: UUID
+    note_id: UUID | None = Field(default=None, serialization_alias="noteId")
+    direction: Literal["in", "out"] = "in"
+    from_name: str | None = Field(default=None, serialization_alias="fromName")
+    from_address: str | None = Field(default=None, serialization_alias="fromAddress")
+    cc: tuple[str, ...] = Field(default_factory=tuple)
+    subject: str | None = None
+    automatic: bool = False
+    source: Literal["clean", "infected", "closed", "gone"] = "gone"
+    source_size: int = Field(default=0, serialization_alias="sourceSize")
+    skipped: tuple[TicketSkippedFile, ...] = Field(default_factory=tuple)
+    to: tuple[str, ...] = Field(default_factory=tuple)
+    state: Literal["sending", "sent", "failed"] | None = None
+    error: str | None = None
+    at: datetime
+
+
+class TicketMailAnswer(FrozenCamelModel, frozen=True):
+    """The recipients of the next public message on a mail ticket.
+
+    ``to`` holds the sender and ``cc`` each other address of the thread, without the
+    address of the Postfach. ``enabled`` is false while the Bereich has no Postfach or
+    its switch is off; a public message then answers 409 ``mailbox_off``.
+    """
+
+    to: tuple[str, ...] = Field(default_factory=tuple)
+    cc: tuple[str, ...] = Field(default_factory=tuple)
+    enabled: bool = False
 
 
 class TicketRef(FrozenCamelModel, frozen=True):
@@ -224,6 +308,9 @@ class TicketDetail(TicketListItem, frozen=True):
     closed_at: datetime | None = Field(default=None, serialization_alias="closedAt")
     anonymized_at: datetime | None = Field(default=None, serialization_alias="anonymizedAt")
     sender_blocked: bool = Field(default=False, serialization_alias="senderBlocked")
+    mails: tuple[TicketMailOut, ...] = Field(default_factory=tuple)
+    mail_answer: TicketMailAnswer | None = Field(default=None, serialization_alias="mailAnswer")
+    paperless: TicketPaperless | None = None
 
 
 class TicketPatch(FrozenStrictCamelModel, frozen=True):
@@ -290,6 +377,10 @@ class NoteCreate(MessageFilesIn):
     ``visibility`` defaults to ``internal``; ``public`` lets the reporter account read it.
     ``mentions`` holds the principal ids of mentioned holders of ``ticket.manage`` (at
     most 50, duplicates drop); another id gives 422 ``mention_not_member``.
+
+    ``to`` and ``cc`` are the recipients of a public message on a mail ticket. A list
+    that the body leaves out takes the addresses of the thread (``mailAnswer`` of the
+    ticket).
     """
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
@@ -297,6 +388,8 @@ class NoteCreate(MessageFilesIn):
     body: str = Field(max_length=10000)
     visibility: NoteVisibility = "internal"
     mentions: list[UUID] = Field(default_factory=list, max_length=MAX_MENTIONS)
+    to: list[EmailStr] | None = Field(default=None, max_length=MAX_MAIL_RECIPIENTS)
+    cc: list[EmailStr] | None = Field(default=None, max_length=MAX_MAIL_RECIPIENTS)
 
 
 class ReporterNoteCreate(MessageFilesIn):

@@ -17,7 +17,7 @@ The downgrade removes the links with a Paperless end, because the old kind check
 not accept them.
 
 Revision ID: b9e2c47f1a36
-Revises: a8c3f15d7e42
+Revises: c5d81f3a2e47
 Create Date: 2026-11-23 18:30:00.000000
 """
 
@@ -28,7 +28,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "b9e2c47f1a36"
-down_revision: str | None = "a8c3f15d7e42"
+down_revision: str | None = "c5d81f3a2e47"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

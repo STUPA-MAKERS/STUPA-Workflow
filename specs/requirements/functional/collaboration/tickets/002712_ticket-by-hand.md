@@ -8,6 +8,7 @@ updated: 2026-11-23
 tests:
   - "backend/tests/unit/modules/tickets/test_ticket_waiting.py:test_a_ticket_by_hand_names_one_known_account"
   - "backend/tests/unit/modules/tickets/test_ticket_waiting.py:test_a_ticket_by_hand_outside_the_own_bereiche_is_403"
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_send.py:test_a_ticket_by_hand_for_an_address_needs_a_postfach_and_sends_the_message"
   - "frontend/src/app/pages/tickets/ticket-new-dialog.component.spec.ts:TicketNewDialogComponent"
 implementation:
   - backend/app/modules/tickets/service.py

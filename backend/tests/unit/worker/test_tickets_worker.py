@@ -74,6 +74,9 @@ def audits(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
         def __init__(self, _session: object, **_kw: object) -> None:
             pass
 
+        async def remove_objects(self, _keys: object) -> None:
+            return None
+
         async def delete_for_ticket(self, *_a: object, **_kw: object) -> int:
             return 0
 

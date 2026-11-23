@@ -19,6 +19,7 @@ from .. import schemas as S
 from ..schemas import dump_patch
 from ._chat_files import post_message
 from ._common import ToolGroup, api, params
+from .meetings import download_to
 
 group = ToolGroup()
 
@@ -62,8 +63,72 @@ async def tickets_get(ticket_id: str) -> dict:
 
     Each note lists its `attachments` with `scanState`; download a clean one with
     `download_attachment`. `senderBlocked` tells whether the reporter is blocked.
+    `mails` lists the mails of a ticket from a Postfach: `noteId` names the message that
+    a mail became (null for the first mail), `skipped` the files that were left out, and
+    `source` tells if `tickets_download_mail_source` can read the source. A sent mail
+    has a `state` (`sending`, `sent` or `failed`) and its `to` addresses; send a failed
+    one again with `tickets_resend_mail`. `mailAnswer` names the recipients of the next
+    public note on a mail ticket (`to`, `cc`) and tells with `enabled` if the Postfach
+    of the Bereich is on. `paperless` lists the clean files for
+    `tickets_file_in_paperless`; it is null without `paperless.use` and while the
+    Paperless connection is off.
     """
     return await api().get(f"/tickets/{ticket_id}")
+
+
+@group.tool
+async def tickets_download_mail_source(
+    ticket_id: str, mail_id: str, target_path: str, overwrite: bool = False
+) -> dict:
+    """Download the full source of a mail of a ticket to a local file (`.eml`).
+
+    `GET /tickets/{id}/mails/{mailId}/source`, streamed to disk. `mails` of
+    `tickets_get` lists the mails; only one with `source: clean` can be downloaded.
+    `target_path` is a file path or an existing directory on the machine of the MCP
+    server. An existing file is kept unless `overwrite` is true. The content never
+    enters the chat.
+
+    409 `mail_source_closed` without a clean scan result, 404 for an unknown mail or
+    after the anonymization of the ticket.
+
+    Returns:
+        `path` (absolute), `filename`, `mime` and `size` in bytes.
+    """
+    return await download_to(
+        "GET",
+        f"/tickets/{ticket_id}/mails/{mail_id}/source",
+        target_path,
+        overwrite=overwrite,
+        fallback=f"mail-{mail_id}.eml",
+    )
+
+
+@group.tool
+async def tickets_resend_mail(ticket_id: str, mail_id: str) -> dict:
+    """Send a failed mail of a ticket again (`POST /tickets/{id}/mails/{mailId}/resend`).
+
+    The worker starts with the first of eight tries again. 409 `mail_not_failed` for a
+    mail whose `state` is not `failed`, 409 `mailbox_off` while the Postfach is off.
+    """
+    return await api().post(f"/tickets/{ticket_id}/mails/{mail_id}/resend")
+
+
+@group.tool
+async def tickets_file_in_paperless(ticket_id: str, attachment_id: str) -> dict:
+    """File one clean file of a ticket in Paperless ("In Paperless ablegen").
+
+    `POST /tickets/{id}/files/{attachmentId}/paperless`. Needs the work right in the
+    Bereich and `paperless.use`. `paperless.files` of `tickets_get` lists the files that
+    can be filed, with their `state` (`none`, `pending`, `filed`, `failed`) and, after
+    the filing, the `url` of the document. The call opens a job, and the worker files
+    the document with the number of the ticket in its title. A second call for the
+    same file adds no second document, and a call for a `failed` file starts its job
+    again.
+
+    409 `paperless_off` while the Paperless connection is off, 409 `file_not_clean`
+    for a file without a clean scan, 404 for a file that is not of the ticket.
+    """
+    return await api().post(f"/tickets/{ticket_id}/files/{attachment_id}/paperless")
 
 
 @group.tool
@@ -73,12 +138,18 @@ async def tickets_note(
     file_paths: list[str] | None = None,
     public: bool = False,
     mentions: list[str] | None = None,
+    to: list[str] | None = None,
+    cc: list[str] | None = None,
 ) -> dict:
     """Add a note to a ticket, optionally with files and mentions.
 
     A note is internal: the reporter never sees it. With `public` the reporter account
     reads it (and its files) in its own view of the ticket; a report without an account
     has nobody to read it.
+
+    A public note on a mail ticket (`mailAnswer` of `tickets_get` is not null) goes out
+    as a mail from the Postfach of the Bereich, with the text, the files and the
+    signature of the Postfach. It answers 409 `mailbox_off` while the Postfach is off.
 
     Each file in `file_paths` (a local path on the machine of the MCP server, at most 5
     per note) goes up as a draft through `POST /apply/attachments`; the note then binds
@@ -95,11 +166,17 @@ async def tickets_note(
         mentions: Principal ids of the mentioned holders of `ticket.manage` (`GET
             /tickets/assignees`); they get a mail. Another id gives 422
             `mention_not_member`. Write a mention as "@Display Name" in `body`.
+        to: The `To` addresses of the mail of a public note on a mail ticket. Leave it
+            out to take `mailAnswer.to`.
+        cc: The `Cc` addresses of that mail. Leave it out to take `mailAnswer.cc`; an
+            empty list sends to no `Cc` address.
     """
     payload: dict[str, object] = {
         "body": body,
         **({"visibility": "public"} if public else {}),
         **({"mentions": mentions} if mentions else {}),
+        **({"to": to} if to is not None else {}),
+        **({"cc": cc} if cc is not None else {}),
     }
     return await post_message(f"/tickets/{ticket_id}/notes", payload, file_paths)
 
@@ -290,7 +367,8 @@ async def tickets_create_manual(ticket: S.TicketManualCreate) -> dict:
     Exactly one of `reporterId` and `email` names the person (422
     `ticket_reporter_invalid`). `body` stays with the team; `message` is the first
     public message. An address needs a Postfach of the Bereich (422
-    `ticket_area_without_mailbox`).
+    `ticket_area_without_mailbox`); the message then goes out as a mail (409
+    `mailbox_off` while the Postfach is off).
     """
     return await api().post("/tickets/manual", json=S.dump_create(ticket))
 

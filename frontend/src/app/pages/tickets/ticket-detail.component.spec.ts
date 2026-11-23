@@ -23,7 +23,12 @@ import { TodosApiService, type TodoLinkedCard } from '@core/api/todos.service';
 import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { DraftAttachmentsService } from '../../features/apply/draft-attachments.service';
-import { TicketDetailComponent, reportScanState } from './ticket-detail.component';
+import {
+  MAIL_STATE_POLL_MS,
+  TicketDetailComponent,
+  bodyAuthor,
+  reportScanState,
+} from './ticket-detail.component';
 import { TicketsPageService } from './tickets-page.service';
 import { loadErrorToast, retryLoadError, toastWith } from '../../../testing/load-error';
 import { toastMock } from '../../../testing/toast';
@@ -235,6 +240,9 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
     ),
     deleteMyNote: jest.fn(() => of(undefined)),
     attachmentUrl: (id: string) => `/api/attachments/${id}/download`,
+    mailSourceUrl: (ticketId: string, mailId: string) => `/api/tickets/${ticketId}/mails/${mailId}/source`,
+    resendMail: jest.fn(() => of({})),
+    fileInPaperless: jest.fn(() => of({})),
   };
   const todosApi = {
     linked: jest.fn(() => todos),
@@ -298,6 +306,23 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
 }
 
 const notFound = () => new HttpErrorResponse({ status: 404 });
+
+describe('bodyAuthor', () => {
+  const sender = { principalId: null, displayName: null, email: null, anonymized: false };
+
+  it('gives a sender without an account a writer, so the first message has the avatar', () => {
+    expect(bodyAuthor({ ...sender, displayName: 'Anna Beispiel', email: 'a@b.test' })).toEqual({
+      principalId: null,
+      displayName: 'Anna Beispiel',
+    });
+    expect(bodyAuthor({ ...sender, email: 'a@b.test' })?.displayName).toBe('a@b.test');
+  });
+
+  it('keeps the account of a reporter and gives an anonymized ticket no writer', () => {
+    expect(bodyAuthor({ ...sender, principalId: 'p1', displayName: 'Max' })?.principalId).toBe('p1');
+    expect(bodyAuthor({ ...sender, anonymized: true })).toBeNull();
+  });
+});
 
 describe('TicketDetailComponent', () => {
   afterEach(() => localStorage.clear());
@@ -1058,6 +1083,7 @@ describe('TicketDetailComponent', () => {
       { body: 'Fix ist offen.' },
       undefined,
       undefined,
+      null,
     );
     cmp.sendNote({ body: '@Ada hilft', mentions: ['p-ada'] });
     expect(api.addNote).toHaveBeenLastCalledWith(
@@ -1066,6 +1092,7 @@ describe('TicketDetailComponent', () => {
       { body: '@Ada hilft', mentions: ['p-ada'] },
       undefined,
       ['p-ada'],
+      null,
     );
     expect(cmp.notes().map((n) => n.id)).toEqual(['n1', 'n9']);
 
@@ -1278,6 +1305,7 @@ describe('TicketDetailComponent', () => {
       expect.objectContaining({ attachmentIds: ['d1'], draftToken: 'tok' }),
       undefined,
       undefined,
+      null,
     );
     const failed = cmp.messages().at(-1)!;
     expect(failed.attachments).toEqual([file]);
@@ -1412,6 +1440,7 @@ describe('TicketDetailComponent', () => {
         { body: 'Antwort', visibility: 'public' },
         'public',
         undefined,
+        null,
       );
     });
 
@@ -1481,6 +1510,203 @@ describe('TicketDetailComponent', () => {
       expect(line).toHaveTextContent('Raumanfrage');
       expect(cmp.categoryOptions().map((o) => o.label)).toEqual(['Keine', 'Raumanfrage']);
       expect(cmp.areaOptions().map((o) => o.label)).toEqual(['Plattform', 'AStA-Büro']);
+    });
+
+    it('shows the source and the left-out files of a mail on its message', async () => {
+      const mail = {
+        id: 'm1',
+        noteId: null,
+        direction: 'in' as const,
+        fromName: 'Anna Beispiel',
+        fromAddress: 'anna@example.org',
+        cc: [],
+        subject: 'Raumanfrage',
+        automatic: false,
+        source: 'clean' as const,
+        sourceSize: 2048,
+        skipped: [{ name: 'plan.pdf', size: 12 * 1024 * 1024, reason: 'size' as const }],
+        at: '2026-10-14T19:14:00Z',
+      };
+      const ticket = inAsta({
+        source: 'mail',
+        reporter: { principalId: null, displayName: 'Anna Beispiel', email: 'anna@example.org', anonymized: false },
+        mails: [
+          mail,
+          { ...mail, id: 'm2', noteId: 'n1', source: 'closed', skipped: [] },
+          { ...mail, id: 'm3', automatic: true },
+          { ...mail, id: 'm4', noteId: 'gone', source: 'gone' },
+        ],
+      });
+      const { cmp } = await start('/tickets/t40', { areas: [PLAT, ASTA], get: () => of(ticket) });
+      const [first, answer] = cmp.messages();
+      expect(first.authorLabel).toBe('Anna Beispiel');
+      expect(first.body).toBe(`${ticket.body}\n\nNicht übernommen: plan.pdf (12 MB, zu groß)`);
+      expect(first.attachments?.at(-1)).toEqual({
+        id: 'm1',
+        filename: 'Original-Mail.eml',
+        mime: 'message/rfc822',
+        size: 2048,
+        url: '/api/tickets/t40/mails/m1/source',
+        scanState: 'clean',
+      });
+      expect(answer.body).toBe(ticket.notes[0].body);
+      expect(answer.attachments?.at(-1)).toMatchObject({ id: 'm2', scanState: 'scanning' });
+    });
+
+    describe('answers by mail', () => {
+      const out = {
+        id: 'o1',
+        noteId: 'n1',
+        direction: 'out' as const,
+        fromName: null,
+        fromAddress: 'buero@stupa.example',
+        cc: ['ben@example.org'],
+        to: ['anna@example.org'],
+        subject: 'Re: Raumanfrage [T-7K3QX9MD]',
+        automatic: false,
+        source: 'gone' as const,
+        sourceSize: 0,
+        skipped: [],
+        state: 'sent' as const,
+        at: '2026-10-14T19:20:00Z',
+      };
+      const mailTicket = (over: Partial<TicketDetail> = {}): TicketDetail =>
+        inAsta({
+          source: 'mail',
+          reporter: { principalId: null, displayName: 'Anna Beispiel', email: 'anna@example.org', anonymized: false },
+          mails: [out],
+          mailAnswer: { to: ['anna@example.org'], cc: ['ben@example.org'], enabled: true },
+          ...over,
+        });
+      const open = (ticket: TicketDetail) =>
+        start('/tickets/t40', { areas: [PLAT, ASTA], get: () => of(ticket) });
+
+      it('offers a public message, names the recipients and shows the state of a mail', async () => {
+        const { cmp } = await open(mailTicket());
+        expect(cmp.visibilityOptions()).toEqual(['internal', 'public']);
+        expect(
+          screen.getByText(/Öffentliche Nachrichten gehen als Mail an anna@example.org \(Cc: ben@example.org\)\./),
+        ).toBeInTheDocument();
+        const [, answer] = cmp.messages();
+        expect(answer.body).toBe(
+          `${mailTicket().notes[0].body}\n\nGesendet an anna@example.org (Cc: ben@example.org)`,
+        );
+        expect(answer.state).toBeUndefined();
+      });
+
+      it('says that the Postfach is off', async () => {
+        await open(mailTicket({ mailAnswer: { to: ['anna@example.org'], cc: [], enabled: false } }));
+        expect(screen.getByText(/Das Postfach dieses Bereichs ist ausgeschaltet/)).toBeInTheDocument();
+        expect(screen.queryByTestId('td-recipients')).toBeNull();
+      });
+
+      it('sends a public message to the chosen recipients and an internal one to nobody', async () => {
+        const { cmp, api } = await open(mailTicket());
+        cmp.sendNote({ body: 'Antwort', visibility: 'public' });
+        expect(api.addNote).toHaveBeenLastCalledWith(
+          't40',
+          'Antwort',
+          { body: 'Antwort', visibility: 'public' },
+          'public',
+          undefined,
+          null,
+        );
+        cmp.openRecipients();
+        expect(cmp.recipientsDraft()).toEqual({ to: 'anna@example.org', cc: 'ben@example.org' });
+        cmp.recipientsDraft.set({ to: '', cc: 'kein' });
+        cmp.saveRecipients();
+        expect(cmp.recipientsError()).toBe('tickets.mail.recipients.toMissing');
+        cmp.recipientsDraft.set({ to: 'Anna@Example.org', cc: 'kein' });
+        expect(cmp.recipientsError()).toBe('tickets.mail.recipients.invalid');
+        expect(cmp.recipientsOpen()).toBe(true);
+        cmp.recipientsDraft.set({ to: 'Anna@Example.org', cc: 'carla@example.org; anna@example.org' });
+        cmp.saveRecipients();
+        expect(cmp.recipientsOpen()).toBe(false);
+        expect(cmp.recipientsLine()).toBe('anna@example.org (Cc: carla@example.org)');
+        cmp.sendNote({ body: 'Noch etwas', visibility: 'public' });
+        expect(api.addNote).toHaveBeenLastCalledWith(
+          't40',
+          'Noch etwas',
+          { body: 'Noch etwas', visibility: 'public' },
+          'public',
+          undefined,
+          { to: ['anna@example.org'], cc: ['carla@example.org'] },
+        );
+        cmp.sendNote({ body: 'Intern', visibility: 'internal' });
+        expect(api.addNote).toHaveBeenLastCalledWith(
+          't40',
+          'Intern',
+          { body: 'Intern', visibility: 'internal' },
+          'internal',
+          undefined,
+          null,
+        );
+      });
+
+      it('names the refusal while the Postfach is off', async () => {
+        const { cmp, api, toast } = await open(mailTicket());
+        api.addNote.mockReturnValueOnce(
+          throwError(() => new HttpErrorResponse({ status: 409, error: { code: 'mailbox_off' } })),
+        );
+        cmp.sendNote({ body: 'Antwort', visibility: 'public' });
+        expect(toast.error).toHaveBeenLastCalledWith(
+          'Das Postfach dieses Bereichs ist ausgeschaltet. Öffentliche Nachrichten sind gerade nicht möglich.',
+        );
+      });
+
+      it('sends a failed mail again, discards its message and reads a waiting mail again', async () => {
+        jest.useFakeTimers();
+        try {
+          const failed = mailTicket({ mails: [{ ...out, state: 'failed', error: 'connect_failed' }] });
+          const { cmp, api, toast } = await open(failed);
+          const [, answer] = cmp.messages();
+          expect(answer.state).toBe('failed');
+          expect(answer.body).toContain('Mail an anna@example.org');
+          api.get.mockReturnValue(of(mailTicket({ mails: [{ ...out, state: 'sending' }] })));
+          cmp.retryNote({ id: 'n1' });
+          expect(api.resendMail).toHaveBeenCalledWith('t40', 'o1');
+          expect(cmp.messages()[1].state).toBe('sending');
+          api.get.mockReturnValue(of(mailTicket()));
+          TestBed.tick();
+          jest.advanceTimersByTime(MAIL_STATE_POLL_MS);
+          expect(cmp.messages()[1].state).toBeUndefined();
+          api.resendMail.mockReturnValueOnce(throwError(() => new Error('offline')));
+          cmp.ticket.set(failed);
+          cmp.retryNote({ id: 'n1' });
+          expect(toast.error).toHaveBeenLastCalledWith('Die Mail konnte nicht erneut gesendet werden.');
+          cmp.discardNote({ id: 'n1' });
+          expect(api.deleteNote).toHaveBeenCalledWith('t40', 'n1');
+        } finally {
+          jest.useRealTimers();
+        }
+      });
+
+      describe('In Paperless ablegen', () => {
+        const file = { id: 'f1', filename: 'rechnung.pdf', state: 'none' as const, url: null };
+
+        it('shows no section without files for Paperless', async () => {
+          await open(mailTicket());
+          expect(screen.queryByText('In Paperless ablegen')).toBeNull();
+        });
+
+        it('files a clean file and then links the document. §F/integrations/ticket-mail/002742', async () => {
+          const { cmp, api, toast } = await open(mailTicket({ paperless: { files: [file] } }));
+          api.fileInPaperless.mockReturnValueOnce(of({ ...file, state: 'pending' }));
+          cmp.fileInPaperless(file);
+          expect(api.fileInPaperless).toHaveBeenCalledWith('t40', 'f1');
+          expect(cmp.ticket()?.paperless?.files[0].state).toBe('pending');
+          cmp.ticket.set(
+            mailTicket({ paperless: { files: [{ ...file, state: 'filed', url: 'https://p.test/documents/7/details' }] } }),
+          );
+          TestBed.tick();
+          expect(screen.getByText('In Paperless öffnen').closest('a')?.getAttribute('href')).toBe(
+            'https://p.test/documents/7/details',
+          );
+          api.fileInPaperless.mockReturnValueOnce(throwError(() => new Error('offline')));
+          cmp.fileInPaperless(file);
+          expect(toast.error).toHaveBeenLastCalledWith('Die Datei konnte nicht abgelegt werden.');
+        });
+      });
     });
 
     it('sets and clears the Kategorie', async () => {

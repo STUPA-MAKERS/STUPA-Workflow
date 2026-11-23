@@ -35,8 +35,8 @@
         (checkedChange)="patch({ publicEnabled: $event })"
         >{{ 'admin.helpTickets.public' | t }}</app-switch
       >
-      <div class="ht__row ht__row--split">
-        <span id="ht-anon" class="ht__label">{{ 'admin.helpTickets.anonymize' | t }}</span>
+      <div class="rowgroup__setting">
+        <span id="ht-anon" class="rowgroup__label">{{ 'admin.helpTickets.anonymize' | t }}</span>
         @if (draft().retentionMonths; as months) {
           <app-filter-select
             [label]="'admin.helpTickets.retention' | t"
@@ -142,3 +142,15 @@
   (saved)="onAreaSaved($event)"
   (deleted)="onAreaDeleted($event)"
 />
+
+@if (canMail()) {
+  <app-ticket-mailbox-dialog
+    [open]="mailArea() !== null"
+    [area]="mailArea()"
+    [mailbox]="mailAreaBox()"
+    [allowedHosts]="allowedHosts()"
+    (closed)="mailArea.set(null)"
+    (saved)="onMailboxSaved($event)"
+    (deleted)="onMailboxDeleted($event)"
+  />
+}

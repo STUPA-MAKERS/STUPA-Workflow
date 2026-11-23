@@ -1,14 +1,21 @@
-import type { TicketArea, TicketEvent } from '@core/api/tickets.service';
+import type { TicketArea, TicketEvent, TicketMail } from '@core/api/tickets.service';
 import { de, type Translate } from '@core/i18n/translations';
 import {
   areaOf,
   categoryName,
   eventText,
   isOpen,
+  mailSourceScan,
   reporterName,
   reporterRowName,
   ticketAge,
   ticketIcon,
+  addressesValid,
+  parseAddresses,
+  recipientsText,
+  sentLine,
+  skippedLine,
+  withSkipped,
 } from './tickets.util';
 import { personName } from '@shared/person-label.util';
 
@@ -186,6 +193,78 @@ describe('tickets.util', () => {
       expect(categoryName({ kind: null, categoryId: 'c1', areaId: 'a-asta' }, [ASTA], t)).toBe('Raumanfrage');
       expect(categoryName({ kind: null, categoryId: null, areaId: 'a-asta' }, [ASTA], t)).toBe('');
       expect(categoryName({ kind: null, categoryId: 'c1', areaId: 'gone' }, [ASTA], t)).toBe('');
+    });
+  });
+
+  describe('the mails of a ticket', () => {
+    const mail = (over: Partial<TicketMail> = {}): TicketMail => ({
+      id: 'm1',
+      noteId: null,
+      direction: 'in',
+      fromName: 'Anna Beispiel',
+      fromAddress: 'anna@example.org',
+      cc: [],
+      subject: 'Raumanfrage',
+      automatic: false,
+      source: 'clean',
+      sourceSize: 2048,
+      skipped: [],
+      at: '2026-11-23T10:00:00Z',
+      ...over,
+    });
+
+    it('names an automatic mail with its sender and its subject', () => {
+      const event = ev({ kind: 'mail_auto', actor: null, payload: { from: 'Anna Beispiel', subject: 'Abwesend' } });
+      expect(eventText(event, 'Tobias', t)).toBe('Automatische Antwort von Anna Beispiel: Abwesend');
+      expect(eventText(ev({ kind: 'mail_auto', actor: null, payload: {} }), 'Tobias', t)).toBe(
+        'Automatische Antwort von Tobias: ',
+      );
+    });
+
+    it('maps the state of a source to the scan state of a file', () => {
+      expect(mailSourceScan(mail())).toBe('clean');
+      expect(mailSourceScan(mail({ source: 'infected' }))).toBe('quarantined');
+      expect(mailSourceScan(mail({ source: 'closed' }))).toBe('scanning');
+      expect(mailSourceScan(mail({ source: 'gone' }))).toBeNull();
+    });
+
+    it('names each left-out file with its size and the cause', () => {
+      const skipped = [
+        { name: 'plan.pdf', size: 12 * 1024 * 1024, reason: 'size' as const },
+        { name: 'daten.zip', size: 2048, reason: 'type' as const },
+      ];
+      expect(skippedLine(mail({ skipped }), 'de-DE', t)).toBe(
+        'Nicht übernommen: plan.pdf (12 MB, zu groß), daten.zip (2 KB, Dateityp nicht erlaubt)',
+      );
+      expect(skippedLine(mail(), 'de-DE', t)).toBe('');
+      expect(skippedLine(undefined, 'de-DE', t)).toBe('');
+    });
+
+    it('names the state and the recipients of a sent mail', () => {
+      const out = mail({ direction: 'out', to: ['anna@example.org'], cc: ['ben@example.org'], state: 'sent' });
+      expect(sentLine(out, t)).toBe('Gesendet an anna@example.org (Cc: ben@example.org)');
+      expect(sentLine({ ...out, cc: [], state: 'sending' }, t)).toBe('Mail an anna@example.org');
+      expect(sentLine({ ...out, cc: [], state: 'failed' }, t)).toBe('Mail an anna@example.org');
+      expect(sentLine(mail(), t)).toBe('');
+      expect(sentLine(undefined, t)).toBe('');
+      expect(recipientsText(['a@x.org', 'b@x.org'], [], t)).toBe('a@x.org, b@x.org');
+    });
+
+    it('reads the addresses that a person typed', () => {
+      expect(parseAddresses(' Anna@Example.org, ben@example.org;anna@example.org  carla@example.org ')).toEqual([
+        'anna@example.org',
+        'ben@example.org',
+        'carla@example.org',
+      ]);
+      expect(parseAddresses('  ')).toEqual([]);
+      expect(addressesValid(['anna@example.org'])).toBe(true);
+      expect(addressesValid(['anna@example.org', 'kein'])).toBe(false);
+    });
+
+    it('puts the line under the text of the message', () => {
+      expect(withSkipped('Hallo', 'Zeile')).toBe('Hallo\n\nZeile');
+      expect(withSkipped('', 'Zeile')).toBe('Zeile');
+      expect(withSkipped('Hallo', '')).toBe('Hallo');
     });
   });
 });

@@ -32,6 +32,8 @@ WebhookEventName = Literal[
     "booking.created",
     "invoice.created",
     "ticket.created",
+    "ticket.message",
+    "ticket.status",
 ]
 
 #: The event of a test delivery. It is not in the catalog, because no webhook
@@ -104,6 +106,13 @@ _MEETING_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("location", "Raum 9-012"),
     FieldSpec("status", "planned"),
     FieldSpec("url", "https://example.org/meetings/" + _ID),
+)
+
+_TICKET_FIELDS: tuple[FieldSpec, ...] = (
+    FieldSpec("number", "T-7K3QX9MD"),
+    FieldSpec("title", "Upload hängt"),
+    FieldSpec("area", _ref("Plattform")),
+    FieldSpec("url", "https://example.org/tickets/" + _ID),
 )
 
 _CATALOG: tuple[EventSpec, ...] = (
@@ -192,12 +201,30 @@ _CATALOG: tuple[EventSpec, ...] = (
         "tickets",
         ("ticketId",),
         (
-            FieldSpec("number", "T-7K3QX9MD"),
+            *_TICKET_FIELDS,
             FieldSpec("kind", "problem"),
-            FieldSpec("title", "Upload hängt"),
-            FieldSpec("url", "https://example.org/tickets/" + _ID),
+            FieldSpec("source", "mail"),
             FieldSpec("body", "Beim Hochladen passiert nichts.", personal=True),
             FieldSpec("reporterEmail", "erika@example.org", personal=True),
+        ),
+    ),
+    EventSpec(
+        "ticket.message",
+        "tickets",
+        ("ticketId",),
+        (
+            *_TICKET_FIELDS,
+            FieldSpec("body", "Es geht wieder nicht.", personal=True),
+        ),
+    ),
+    EventSpec(
+        "ticket.status",
+        "tickets",
+        ("ticketId",),
+        (
+            *_TICKET_FIELDS,
+            FieldSpec("fromStatus", "in_progress"),
+            FieldSpec("toStatus", "done"),
         ),
     ),
 )

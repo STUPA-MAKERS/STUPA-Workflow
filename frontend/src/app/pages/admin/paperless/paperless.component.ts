@@ -74,6 +74,7 @@ const KIND_TEXT: Readonly<Record<PaperlessFilingKind, TranslationKey>> = {
   application: 'admin.paperless.kind.application',
   attachment: 'admin.paperless.kind.attachment',
   plan: 'admin.paperless.kind.plan',
+  ticket_file: 'admin.paperless.kind.ticketFile',
 };
 
 /** The prefix of the action key of "Erneut versuchen"; the id of the filing follows. */

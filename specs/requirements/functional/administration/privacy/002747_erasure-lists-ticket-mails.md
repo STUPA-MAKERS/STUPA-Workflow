@@ -5,7 +5,12 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/privacy/test_privacy_ticket_mails.py:test_the_erasure_of_an_address_counts_the_mails_of_each_postfach"
+implementation:
+  - backend/app/modules/tickets/privacy.py
+  - backend/app/modules/privacy/router.py
+  - frontend/src/app/pages/admin/privacy/privacy.component.ts
 scope:
   - backend/app/modules/privacy
   - backend/app/modules/tickets

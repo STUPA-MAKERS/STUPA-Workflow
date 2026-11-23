@@ -148,7 +148,7 @@ describe('GraphComponent', () => {
     // "Schritte" is in the foot, opposite the zoom buttons, not in the bar (spec 001434).
     expect(el.querySelector('.gr__float .gr__foot .gr__depth')).not.toBeNull();
     expect(el.querySelector('.gr__bar .gr__depth')).toBeNull();
-    expect(el.querySelector('.gr__foot .gr__pill')).toBeNull();
+    expect(el.querySelector('.gr__foot .gr__state')).toBeNull();
     expect(screen.queryByRole('group', { name: 'Legende' })).toBeNull();
     expect(
       screen.getByRole('group', {
@@ -203,8 +203,14 @@ describe('GraphComponent', () => {
     expect(cmp.graph().nodes[59]).toBe(first.nodes[59]);
     expect(cmp.canvasNodes()).toHaveLength(300);
     expect(cmp.growing()).toBe(false);
+    // "Mehr laden" is a tonal button over the zoom buttons, out of the foot (spec 002790).
+    const more = screen.getByTestId('gr-more');
+    expect(more.closest('.gr__float > .gr__state')).not.toBeNull();
+    expect(more.closest('.gr__foot')).toBeNull();
+    expect(more.querySelector('.btn--tonal')).not.toBeNull();
+    expect(more.querySelector('app-icon')).toBeNull();
 
-    screen.getByTestId('gr-more').click();
+    more.click();
     await settle();
     expect(calls.map((c) => c.cursor)).toEqual([null, '60', '120', '180', '240', '300']);
     expect(cmp.limit()).toBe(2 * AUTO_NODES);
@@ -221,6 +227,7 @@ describe('GraphComponent', () => {
     expect(cmp.growing()).toBe(true);
     expect(el.querySelector('.gr__growing')).toHaveTextContent('Weitere Elemente werden geladen …');
     expect(el.querySelector('.gr__growing')).toHaveAttribute('role', 'status');
+    expect(el.querySelector('.gr__float > .gr__state.gr__growing')).not.toBeNull();
     expect(screen.queryByTestId('gr-more')).toBeNull();
     cmp.loadMore();
     expect(calls).toHaveLength(2);

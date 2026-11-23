@@ -136,7 +136,7 @@ async def test_the_erasure_of_an_account_lists_the_documents_of_its_antraege(
 
     erased = client.post(f"/api/admin/privacy/principals/{principal.id}/erase")
     assert erased.status_code == 200, erased.text
-    assert erased.json() == {"paperlessDocuments": _DOCUMENTS}
+    assert erased.json() == {"paperlessDocuments": _DOCUMENTS, "ticketMails": []}
     assert await _filings(session) == 3
 
 

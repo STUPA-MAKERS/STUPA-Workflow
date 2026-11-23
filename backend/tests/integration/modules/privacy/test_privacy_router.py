@@ -355,6 +355,7 @@ async def test_erase_email_anonymizes_the_applications_and_the_reports(
         "tickets": 1,
         "principalId": str(principal.id),
         "paperlessDocuments": [],
+        "ticketMails": [],
     }
 
     applicant = (
@@ -391,6 +392,7 @@ async def test_erase_email_anonymizes_the_applications_and_the_reports(
         "tickets": 0,
         "principalId": str(principal.id),
         "paperlessDocuments": [],
+        "ticketMails": [],
     }
 
 
@@ -405,6 +407,7 @@ async def test_erase_email_without_matches_reports_zero(
         "tickets": 0,
         "principalId": None,
         "paperlessDocuments": [],
+        "ticketMails": [],
     }
 
 
@@ -463,7 +466,7 @@ async def test_erase_principal_endpoint_nulls_pii(
     _as_dpo(app)
     r = client.post(f"/api/admin/privacy/principals/{pid}/erase")
     assert r.status_code == 200
-    assert r.json() == {"paperlessDocuments": []}
+    assert r.json() == {"paperlessDocuments": [], "ticketMails": []}
 
     await session.refresh(principal)
     assert principal.email is None

@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass, field
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
@@ -22,8 +23,16 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.tickets.router import get_ticket_mail_sender
 from app.settings import Settings
+from tests._support.files_fakes import FakeStorage
 from tests._support.guest_apps import build_api, guest_settings
 from tests.integration.conftest import clear_privacy_tables
+from tests.integration.modules.tickets.mail_support import (
+    HOST,
+    CleanScanner,
+    Scripted,
+    Stack,
+    make_box,
+)
 
 
 def _clear(eng: Engine) -> None:
@@ -138,3 +147,32 @@ async def add_group_role(
 MANAGER = Principal(sub="mgr-sub", email="mgr@example.org", permissions={"ticket.manage"})
 ADMIN = Principal(sub="admin-sub", email="admin@example.org", roles=["admin"])
 PLAIN = Principal(sub="plain-sub", email="plain@example.org")
+
+
+def _wipe_areas(eng: Engine) -> None:
+    with eng.begin() as conn:
+        conn.execute(text("DELETE FROM ticket"))
+        conn.execute(text("DELETE FROM ticket_sender_block"))
+        conn.execute(text("DELETE FROM ticket_area WHERE NOT platform"))
+
+
+@pytest.fixture
+async def stack(
+    maker: async_sessionmaker[AsyncSession], settings: Settings, clean: Engine
+) -> AsyncIterator[Stack]:
+    """One Bereich with a Postfach; the tickets and the Bereiche go before and after."""
+    _wipe_areas(clean)
+    area_id, box_id = await make_box(maker, "AStA-Büro")
+    inbox = Scripted()
+    storage = FakeStorage()
+    ctx: dict[str, Any] = {
+        "settings": settings.model_copy(update={"ticket_mail_host_allowlist": [HOST]}),
+        "ticket_mail_sessionmaker": maker,
+        "ticket_mail_inbox": inbox.open,
+        "object_storage": storage,
+        "scanner": CleanScanner(),
+    }
+    made = Stack(maker, area_id, box_id, inbox, storage, ctx)
+    ctx["ticket_mail_send"] = made.send
+    yield made
+    _wipe_areas(clean)

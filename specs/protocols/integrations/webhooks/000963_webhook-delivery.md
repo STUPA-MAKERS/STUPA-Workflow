@@ -54,8 +54,9 @@ The body must match `000963_webhook-delivery.schema.json`.
 
 A field marked P is personal (F/integrations/webhooks/002413). Names and labels are in the
 language of the platform default. An amount is a decimal string with two places, for example
-`"125.00"`. A reference to a Gremium, an Antragsart, a status or a cost centre is an object with
-`id` and `name`.
+`"125.00"`. A reference to a Gremium, an Antragsart, a status, a cost centre or a Bereich (`area`) is an
+object with `id` and `name`. `fromStatus` and `toStatus` of `ticket.status` are status keys, for
+example `"done"`. `source` is `help`, `mail` or `team`.
 
 | Event | ID keys | Fields |
 | --- | --- | --- |
@@ -68,7 +69,9 @@ language of the platform default. An amount is a decimal string with two places,
 | `protocol.finalized` | `protocolId`, `meetingId` | `meetingTitle`, `gremium`, `finalizedAt`, `publicUrl` |
 | `booking.created` | `bookingId` | `kind`, `amount`, `costCentre`, `fiscalYear`, `description`, `applicationId`, `url` |
 | `invoice.created` | `invoiceId` | `number`, `supplier`, `grossAmount`, `currency`, `issueDate`, `dueDate`, `costCentre`, `url` |
-| `ticket.created` | `ticketId` | `number`, `kind`, `title`, `url`, `body` P, `reporterEmail` P |
+| `ticket.created` | `ticketId` | `number`, `title`, `area`, `url`, `kind`, `source`, `body` P, `reporterEmail` P |
+| `ticket.message` | `ticketId` | `number`, `title`, `area`, `url`, `body` P |
+| `ticket.status` | `ticketId` | `number`, `title`, `area`, `url`, `fromStatus`, `toStatus` |
 | `webhook.test` | `webhookId` | the fields of each subscribed event, with example values, under the event name |
 
 `counts` holds only the totals of the options, never a single ballot. `url` is the link to the

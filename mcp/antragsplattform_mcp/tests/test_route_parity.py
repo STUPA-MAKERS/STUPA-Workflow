@@ -57,6 +57,12 @@ EXCLUDED: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/paperless/insert"),
         ("GET", "/paperless/search"),
         ("POST", "/meetings/{}/documents/paperless"),
+        # Ticket mail: no OAuth scope carries `admin.ticket_mail`.
+        ("GET", "/admin/ticket-mailboxes"),
+        ("POST", "/admin/ticket-areas/{}/mailbox"),
+        ("PATCH", "/admin/ticket-areas/{}/mailbox"),
+        ("DELETE", "/admin/ticket-areas/{}/mailbox"),
+        ("POST", "/admin/ticket-areas/{}/mailbox/test"),
         # Login, logout, the OAuth flow and the MCP package: the MCP client does them.
         ("GET", "/auth/login"),
         ("GET", "/auth/callback"),

@@ -9,6 +9,8 @@ import {
   TicketsApiService,
   type TicketArea,
   type TicketBlockedSender,
+  type TicketMailbox,
+  type TicketMailboxList,
 } from '@core/api/tickets.service';
 import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
@@ -93,6 +95,19 @@ const AREAS: TicketArea[] = [
   },
 ];
 
+const BOX: TicketMailbox = {
+  areaId: 'a-asta',
+  address: 'buero@example.org',
+  imapHost: 'mail.example.org',
+  imapPort: 993,
+  imapUser: 'buero',
+  smtpHost: 'mail.example.org',
+  smtpPort: 465,
+  smtpUser: 'buero',
+  doneFolder: 'Erledigt',
+  enabled: true,
+};
+
 function makeTickets(
   list: Observable<TicketBlockedSender[]> = of(BLOCKS),
   areas: Observable<TicketArea[]> = of(AREAS),
@@ -104,6 +119,9 @@ function makeTickets(
       of({ ...AREAS.find((a) => a.id === id)!, ...b } as TicketArea),
     ),
     deleteArea: jest.fn((): Observable<void> => of(undefined)),
+    adminMailboxes: jest.fn(
+      (): Observable<TicketMailboxList> => of({ items: [BOX], allowedHosts: ['mail.example.org'] }),
+    ),
     blockedSenders: jest.fn(() => list),
     deleteBlockedSender: jest.fn((): Observable<void> => of(undefined)),
   };
@@ -515,6 +533,69 @@ describe('HelpTicketsComponent', () => {
       expect(toast.success).toHaveBeenLastCalledWith('Bereich gelöscht.');
       expect(screen.queryByRole('button', { name: /^Fachschaft/ })).toBeNull();
       expect(cmp.editing()).toBeNull();
+    });
+  });
+
+  describe('Postfächer', () => {
+    const MAIL = ['admin.site', 'admin.ticket_mail'];
+    const rows = (name: RegExp) => screen.getAllByRole('button', { name });
+    interface Inner {
+      mailArea(): TicketArea | null;
+      mailAreaBox(): TicketMailbox | null;
+      onAreaAction(key: string): void;
+      onMailboxSaved(m: TicketMailbox): void;
+      onMailboxDeleted(a: TicketArea): void;
+    }
+
+    it('reads no Postfach without admin.ticket_mail', async () => {
+      const { tickets } = await setup();
+      expect(tickets.adminMailboxes).not.toHaveBeenCalled();
+      expect(screen.queryByText('Postfächer')).toBeNull();
+    });
+
+    it('lists each Bereich with its Postfach or "Kein Postfach"', async () => {
+      await setup({ perms: MAIL });
+      expect(rows(/^Plattform/)[1]).toHaveTextContent('Kein Postfach');
+      expect(rows(/^AStA-Büro/)[1]).toHaveTextContent('buero@example.org · Eingeschaltet');
+    });
+
+    it('marks a Postfach that is off and one whose fetch fails', async () => {
+      const tickets = makeTickets();
+      tickets.adminMailboxes.mockReturnValue(
+        of({ items: [{ ...BOX, enabled: false, error: 'timeout' }], allowedHosts: [] }),
+      );
+      await setup({ perms: MAIL, tickets });
+      expect(rows(/^AStA-Büro/)[1]).toHaveTextContent(
+        'buero@example.org · Ausgeschaltet · Abruf schlägt fehl',
+      );
+    });
+
+    it('names a failed read and keeps the rows', async () => {
+      const tickets = makeTickets();
+      tickets.adminMailboxes.mockReturnValue(throwError(() => new Error('x')));
+      const { toast } = await setup({ perms: MAIL, tickets });
+      expect(toast.error).toHaveBeenCalledWith('Die Postfächer konnten nicht geladen werden.');
+      expect(rows(/^AStA-Büro/)[1]).toHaveTextContent('Kein Postfach');
+    });
+
+    it('opens the dialog of a row, then takes a saved and a removed Postfach', async () => {
+      const { fixture, toast } = await setup({ perms: MAIL });
+      const cmp = fixture.componentInstance as unknown as Inner;
+      expect(cmp.mailAreaBox()).toBeNull();
+      await userEvent.click(rows(/^AStA-Büro/)[1]);
+      expect(cmp.mailArea()).toEqual(AREAS[1]);
+      expect(cmp.mailAreaBox()).toEqual(BOX);
+      cmp.onMailboxSaved({ ...BOX, enabled: false });
+      fixture.detectChanges();
+      expect(cmp.mailArea()).toBeNull();
+      expect(toast.success).toHaveBeenCalledWith('Postfach gespeichert.');
+      expect(rows(/^AStA-Büro/)[1]).toHaveTextContent('Ausgeschaltet');
+      cmp.onAreaAction('mailbox:a-plat');
+      expect(cmp.mailArea()).toEqual(AREAS[0]);
+      cmp.onMailboxDeleted(AREAS[1]);
+      fixture.detectChanges();
+      expect(toast.success).toHaveBeenLastCalledWith('Postfach entfernt.');
+      expect(rows(/^AStA-Büro/)[1]).toHaveTextContent('Kein Postfach');
     });
   });
 });

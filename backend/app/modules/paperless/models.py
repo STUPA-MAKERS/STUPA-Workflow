@@ -21,9 +21,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, UUIDPkMixin
 
-#: The kinds of a filing. `protocol_public` is the public PDF of a protocol, and
-#: `attachment` is one attachment of an Antrag.
-FILING_KINDS = ("protocol", "protocol_public", "application", "attachment", "plan")
+#: The kinds of a filing. `protocol_public` is the public PDF of a protocol,
+#: `attachment` is one attachment of an Antrag, and `ticket_file` is one file of a
+#: ticket that a person files (§F/integrations/ticket-mail/002742).
+FILING_KINDS = ("protocol", "protocol_public", "application", "attachment", "plan", "ticket_file")
 
 #: The states of a filing. `pending` waits for the upload, `uploaded` waits until
 #: Paperless has read the file, `filed` has a document number, and `failed` got no
@@ -79,8 +80,8 @@ class PaperlessFiling(UUIDPkMixin, CreatedAtMixin, Base):
 
     Attributes:
         kind: One of `FILING_KINDS`.
-        element_id: The protocol, the Antrag or the Haushaltsplan that the file belongs
-            to. The page of the element links to the document.
+        element_id: The protocol, the Antrag, the Haushaltsplan or the ticket that the
+            file belongs to. The page of the element links to the document.
         source_id: The record that names the file: the protocol, the status event of
             the decision, the attachment, or the plan version.
         source_at: The moment of the event that filed the file. A protocol that becomes
@@ -125,7 +126,8 @@ class PaperlessFiling(UUIDPkMixin, CreatedAtMixin, Base):
 
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('protocol','protocol_public','application','attachment','plan')",
+            "kind IN ('protocol','protocol_public','application','attachment','plan',"
+            "'ticket_file')",
             name="kind",
         ),
         CheckConstraint("state IN ('pending','uploaded','filed','failed')", name="state"),

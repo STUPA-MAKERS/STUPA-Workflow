@@ -110,6 +110,11 @@ Keys that need a note:
   the page /admin/paperless. The holder gives the server an address to call and a token,
   so the key is separate from `admin.site`. No OAuth scope carries it, so an agent token
   never changes the connection.
+- `admin.ticket_mail`: set the Postfach of a Bereich (/admin/help-tickets): its address,
+  the IMAP and the SMTP account, and its switch. The holder gives the server two hosts to
+  call and the password of a mail account, so the key is separate from `admin.site`
+  (§F/integrations/ticket-mail/002721). No OAuth scope carries it, so an agent token never
+  changes a Postfach.
 - `paperless.use`: open the filed document of an element in Paperless and insert a
   document from Paperless. The holder reads what the account of the platform reads in
   Paperless, so no seeded role but the admin holds it and no OAuth scope carries it.
@@ -173,5 +178,6 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "admin.features",
     "graph.view",
     "admin.paperless",
+    "admin.ticket_mail",
     "paperless.use",
 )
