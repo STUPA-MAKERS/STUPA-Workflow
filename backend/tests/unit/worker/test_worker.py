@@ -38,11 +38,13 @@ def test_worker_settings_registers_tasks() -> None:
     assert process_retention in WorkerSettings.functions
     assert purge_draft_attachments in WorkerSettings.functions
     assert WorkerSettings.redis_settings is not None
-    assert len(WorkerSettings.cron_jobs) == 15
-    from worker.ticket_mail import fetch_ticket_mails
+    assert len(WorkerSettings.cron_jobs) == 16
+    from worker.ticket_mail import fetch_ticket_mails, send_ticket_mails
 
     assert fetch_ticket_mails in WorkerSettings.functions
     assert any(job.coroutine is fetch_ticket_mails for job in WorkerSettings.cron_jobs)
+    assert send_ticket_mails in WorkerSettings.functions
+    assert any(job.coroutine is send_ticket_mails for job in WorkerSettings.cron_jobs)
     from worker.paperless import process_paperless_filings
 
     assert process_paperless_filings in WorkerSettings.functions

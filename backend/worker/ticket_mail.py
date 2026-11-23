@@ -1,4 +1,4 @@
-"""arq cron task: fetch the mails of each Postfach that is on.
+"""arq cron tasks: fetch the mails of each Postfach that is on, and send the answers.
 
 ``fetch_ticket_mails`` runs every minute (§F/integrations/ticket-mail/002723). It opens
 no connection for a Postfach whose switch is off (§F/integrations/ticket-mail/002722),
@@ -16,6 +16,10 @@ before it, so a later run takes it (§F/integrations/ticket-mail/002741).
 A failure of one Postfach counts on that Postfach and does not stop the others. The run
 that fails stores the short cause code. The admin page shows it after eight failed runs
 in sequence. A run without a failure clears the count.
+
+``send_ticket_mails`` runs twice a minute and sends each mail of a ticket that waits
+(§F/integrations/ticket-mail/002737). The wait and the count of the tries are on the
+mail row (``mail_send.py``), so an outage of the worker or of Redis loses no answer.
 """
 
 from __future__ import annotations
@@ -38,6 +42,7 @@ from app.modules.tickets.mail_client import MailAccount, MailError
 from app.modules.tickets.mail_import import MailImporter, Taken
 from app.modules.tickets.mail_inbox import MAX_SOURCE_BYTES, Inbox, open_inbox
 from app.modules.tickets.mail_parse import parse_mail
+from app.modules.tickets.mail_send import MailSender
 from app.modules.tickets.mailbox import host_allowed, imap_account
 from app.modules.tickets.mails import notify_ticket_created, notify_ticket_note
 from app.modules.tickets.models import TicketMailbox
@@ -270,3 +275,38 @@ async def _count_failure(maker: async_sessionmaker[AsyncSession], box_id: UUID, 
             .values(failures=TicketMailbox.failures + 1, last_error=code)
         )
         await session.commit()
+
+
+#: The mails that one run of the send job takes.
+SEND_BATCH = 20
+
+
+async def send_ticket_mails(ctx: dict[str, Any], now: datetime | None = None) -> int:
+    """Send each waiting mail of a ticket, one transaction per mail.
+
+    Tests inject the send function via ``ctx['ticket_mail_send']``.
+
+    Returns:
+        The number of sent mails.
+    """
+    results = await _send_some(ctx, now, SEND_BATCH)
+    return sum(results)
+
+
+async def _send_some(ctx: dict[str, Any], now: datetime | None, left: int) -> tuple[bool, ...]:
+    """Send the waiting mails in sequence until none waits or the batch is full."""
+    if left <= 0:
+        return ()
+    settings: Settings = ctx["settings"]
+    send = ctx.get("ticket_mail_send")
+    async with _sessionmaker(ctx)() as session:
+        sender = (
+            MailSender(session, ctx.get("object_storage"), settings, send)
+            if send is not None
+            else MailSender(session, ctx.get("object_storage"), settings)
+        )
+        sent = await sender.send_next(now)
+        await session.commit()
+    if sent is None:
+        return ()
+    return (sent, *await _send_some(ctx, now, left - 1))

@@ -78,6 +78,7 @@ from app.modules.tickets.schemas import (
     TicketFollowUp,
     TicketKind,
     TicketListItem,
+    TicketMailOut,
     TicketManualCreate,
     TicketNoteOut,
     TicketPatch,
@@ -570,7 +571,7 @@ async def ticket_report_areas(areas: AreaServiceDep, _principal: Reader) -> list
     "/tickets/manual",
     response_model=TicketDetail,
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(401, 403, 404, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def create_manual_ticket(
     payload: TicketManualCreate,
@@ -589,7 +590,8 @@ async def create_manual_ticket(
     ``body`` is the note of the team; the person does not read it. ``message`` is the
     first public message: the account reads it in the tab "Tickets" and gets the mail
     ``ticket_answer``. A ticket for an address needs a Postfach of the Bereich, else
-    422 ``ticket_area_without_mailbox``.
+    422 ``ticket_area_without_mailbox``; its first public message goes out as a mail,
+    and it answers 409 ``mailbox_off`` while the Postfach is off.
     """
     ticket, note = await service.create_manual(payload, worker.principal, areas=worker.areas)
     await db.commit()
@@ -627,6 +629,24 @@ async def delete_blocked_sender(
 async def get_ticket(ticket_id: UUID, service: ServiceDep, worker: Worker) -> TicketDetail:
     """The whole ticket: body, context, attachments, notes and events."""
     return await service.detail(ticket_id, worker.principal, areas=worker.areas)
+
+
+@router.post(
+    "/tickets/{ticket_id}/mails/{mail_id}/resend",
+    response_model=TicketMailOut,
+    responses=_errors(401, 403, 404, 409),
+)
+async def resend_ticket_mail(
+    ticket_id: UUID, mail_id: UUID, service: ServiceDep, db: DbSession, worker: Worker
+) -> TicketMailOut:
+    """Send a mail of the ticket again after the state ``failed`` ("Erneut senden").
+
+    The worker starts with the first of eight tries again. A mail in another state
+    gives 409 ``mail_not_failed``, and a Postfach that is off 409 ``mailbox_off``.
+    """
+    mail = await service.resend_mail(ticket_id, mail_id, areas=worker.areas)
+    await db.commit()
+    return mail
 
 
 @router.get(
@@ -715,7 +735,7 @@ async def unblock_sender(ticket_id: UUID, service: ServiceDep, principal: Manage
     "/tickets/{ticket_id}/notes",
     response_model=TicketNoteOut,
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(401, 403, 404, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def add_ticket_note(
     ticket_id: UUID,
@@ -732,6 +752,11 @@ async def add_ticket_note(
 
     ``visibility`` is ``internal`` (the default) or ``public``: the reporter account
     reads a public note in ``/tickets/mine`` and gets the mail ``ticket_answer``.
+
+    A public note on a mail ticket (a ticket from a mail or by hand for an address)
+    goes out as a mail through the Postfach of the Bereich to ``to`` and ``cc``; a list
+    that the body leaves out takes the addresses of ``mailAnswer`` of the ticket. While
+    the Postfach is off the route answers 409 ``mailbox_off``.
 
     ``mentions`` names persons with the work right in the Bereich of the ticket
     (``GET /tickets/assignees?area=``); another id gives 422 ``mention_not_member``.

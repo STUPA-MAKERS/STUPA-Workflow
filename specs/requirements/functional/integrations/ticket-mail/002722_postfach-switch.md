@@ -7,6 +7,8 @@ owner: frederikbeimgraben
 updated: 2026-11-23
 tests:
   - "backend/tests/integration/modules/tickets/test_ticket_mail_fetch.py:test_the_fetch_opens_no_connection_while_the_switch_is_off"
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_send.py:test_a_public_message_answers_409_while_the_postfach_is_off"
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_send.py:test_the_worker_sends_no_mail_after_the_switch_goes_off"
 implementation:
   - backend/worker/ticket_mail.py
   - backend/app/modules/tickets/mailbox.py

@@ -93,7 +93,37 @@ works on its tickets: status, assignee, Kategorie, move to another Bereich, note
   code (`tls_missing`, `tls_failed`, `timeout`, `login_failed`, `connect_failed`), never
   the text of the server.
 - The switch (002722): the fetch opens no connection while it is off. The test of the
-  admin page runs also while it is off. 409 `mailbox_off` does not exist yet.
+  admin page runs also while it is off. A public message on a mail ticket answers 409
+  `mailbox_off` while it is off, and the send job sends nothing.
+
+**Answers by mail (specs 002712, 002733 to 002738):**
+- A mail ticket is a ticket without an account whose source is `mail` or `team`
+  (`mail_send.is_mail_ticket`). A report of the help menu without a session stays one-way.
+- `mail_send.py` — `queue_answer(session, ticket, note_id, to=, cc=)` stores the mail of a
+  public note as a `ticket_mail` row with `direction` `out` and `state` `sending`, in the
+  transaction of the note (409 `mailbox_off`, 422 `mail_without_recipient`).
+  `thread_recipients` gives the sender in `to` and each other address of the thread in
+  `cc`, without the address of the Postfach; `NoteCreate.to` and `.cc` replace them.
+  `build_message` is pure: `From` is the address of the Postfach with the name of the
+  Bereich, the subject is the title with `[T-…]` (`Re:` when the ticket has an imported
+  mail), `In-Reply-To` is the last mail and `References` each mail of the ticket. The text
+  ends with `ticket_mailbox.signature`; `{name}` is the writer.
+- `MailSender.send_next` sends one waiting mail without a commit (`FOR UPDATE SKIP
+  LOCKED`). A failure counts `attempts`, stores the cause code in `send_error` and doubles
+  the wait (`next_try_at`); the eighth failure sets `failed`. A file of the note without a
+  clean scan is the failure `files_not_scanned`. The worker cron `send_ticket_mails`
+  (seconds 5 and 35, `worker/ticket_mail.py`) commits after each mail. Tests inject
+  `ctx['ticket_mail_send']`.
+- `POST /tickets/{id}/mails/{mailId}/resend` starts a `failed` mail again (409
+  `mail_not_failed`). `TicketDetail.mailAnswer` (`to`, `cc`, `enabled`) feeds the form;
+  `TicketMailOut` has `to`, `state` and `error`.
+- The confirmation (002738): `queue_confirmation` in the import of a new ticket while
+  `ticket_mailbox.confirm` is on, at most one per address and hour. It is a sent mail
+  without a note and with `automatic`, and it carries `Auto-Submitted: auto-replied`.
+- `POST /tickets/manual` with `email` needs a Postfach of the Bereich (422
+  `ticket_area_without_mailbox`); its `message` goes out as a mail.
+- Tests: `tests/integration/modules/tickets/test_ticket_mail_send.py`; the shared stack is
+  in `mail_support.py` and the fixture `stack` in `conftest.py`.
 
 **Mails of a Postfach (specs 002722 to 002732, 002739 to 002741):**
 - `worker/ticket_mail.py` — the cron `fetch_ticket_mails` (every minute, second 15). For

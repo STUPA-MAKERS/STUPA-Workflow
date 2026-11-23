@@ -5,7 +5,13 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_send.py:test_a_new_mail_ticket_gets_one_confirmation_an_hour"
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_send.py:test_no_confirmation_while_the_switch_is_off"
+implementation:
+  - backend/app/modules/tickets/mail_send.py
+  - backend/app/modules/tickets/mail_import.py
+  - backend/worker/ticket_mail.py
 scope:
   - backend/app/modules/tickets
   - backend/worker

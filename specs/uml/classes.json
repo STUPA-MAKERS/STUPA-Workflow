@@ -6952,6 +6952,36 @@
           "type": "BOOLEAN"
         },
         {
+          "name": "to_addresses",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "state",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "attempts",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "send_error",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "next_try_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
           "name": "created_at",
           "nullable": false,
           "primaryKey": false,
@@ -7073,6 +7103,18 @@
           "nullable": true,
           "primaryKey": false,
           "type": "DATETIME"
+        },
+        {
+          "name": "signature",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "confirm",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
         },
         {
           "name": "id",

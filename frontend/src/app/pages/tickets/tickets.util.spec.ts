@@ -10,6 +10,10 @@ import {
   reporterRowName,
   ticketAge,
   ticketIcon,
+  addressesValid,
+  parseAddresses,
+  recipientsText,
+  sentLine,
   skippedLine,
   withSkipped,
 } from './tickets.util';
@@ -234,6 +238,27 @@ describe('tickets.util', () => {
       );
       expect(skippedLine(mail(), 'de-DE', t)).toBe('');
       expect(skippedLine(undefined, 'de-DE', t)).toBe('');
+    });
+
+    it('names the state and the recipients of a sent mail', () => {
+      const out = mail({ direction: 'out', to: ['anna@example.org'], cc: ['ben@example.org'], state: 'sent' });
+      expect(sentLine(out, t)).toBe('Gesendet an anna@example.org (Cc: ben@example.org)');
+      expect(sentLine({ ...out, cc: [], state: 'sending' }, t)).toBe('Mail an anna@example.org');
+      expect(sentLine({ ...out, cc: [], state: 'failed' }, t)).toBe('Mail an anna@example.org');
+      expect(sentLine(mail(), t)).toBe('');
+      expect(sentLine(undefined, t)).toBe('');
+      expect(recipientsText(['a@x.org', 'b@x.org'], [], t)).toBe('a@x.org, b@x.org');
+    });
+
+    it('reads the addresses that a person typed', () => {
+      expect(parseAddresses(' Anna@Example.org, ben@example.org;anna@example.org  carla@example.org ')).toEqual([
+        'anna@example.org',
+        'ben@example.org',
+        'carla@example.org',
+      ]);
+      expect(parseAddresses('  ')).toEqual([]);
+      expect(addressesValid(['anna@example.org'])).toBe(true);
+      expect(addressesValid(['anna@example.org', 'kein'])).toBe(false);
     });
 
     it('puts the line under the text of the message', () => {

@@ -10,10 +10,8 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
-from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
-from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -22,30 +20,29 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.auth.principal import Principal
 from app.modules.files.models import Attachment
-from app.modules.files.scanner import ScanVerdict
 from app.modules.files.service import FilesService
-from app.modules.tickets.mail_client import MailAccount, MailError
+from app.modules.tickets.mail_client import MailAccount
 from app.modules.tickets.models import (
     Ticket,
     TicketArea,
     TicketEvent,
     TicketMail,
     TicketMailbox,
-    TicketNote,
     TicketSenderBlock,
 )
 from app.modules.tickets.service import TicketService
-from app.settings import Settings
-from tests._support.files_fakes import FakeStorage
 from tests._support.notifications_fakes import FakeQueue
 from tests.integration.modules.tickets.conftest import MANAGER, Api, add_principal
-from worker.ticket_mail import fetch_ticket_mails
+from tests.integration.modules.tickets.mail_support import (
+    ADDRESS,
+    PDF,
+    Scripted,
+    Stack,
+    make_box,
+    raw_mail,
+)
 
 pytestmark = pytest.mark.integration
-
-HOST = "mail.stupa.example"
-ADDRESS = "buero@stupa.example"
-PDF = b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n"
 
 
 @pytest.fixture(autouse=True)
@@ -61,153 +58,8 @@ def _areas(clean: Engine) -> Iterator[None]:
     _wipe()
 
 
-@dataclass
-class Scripted:
-    """A scripted inbox: the mails by UID, and the moves that the job asked for."""
-
-    mails: dict[int, bytes] = field(default_factory=dict)
-    moved: list[tuple[int, str]] = field(default_factory=list)
-    opened: list[MailAccount] = field(default_factory=list)
-    uid_validity: int = 1
-    fail: str | None = None
-
-    def open(self, account: MailAccount) -> Scripted:
-        self.opened.append(account)
-        if self.fail is not None:
-            raise MailError(self.fail)
-        return self
-
-    def put(self, source: bytes) -> int:
-        uid = max([0, *self.mails, *(uid for uid, _folder in self.moved)]) + 1
-        self.mails[uid] = source
-        return uid
-
-    def uids_after(self, last_uid: int) -> list[int]:
-        return sorted(uid for uid in self.mails if uid > last_uid)
-
-    def size(self, uid: int) -> int:
-        return len(self.mails[uid])
-
-    def fetch(self, uid: int) -> bytes:
-        return self.mails[uid]
-
-    def move(self, uid: int, folder: str) -> None:
-        del self.mails[uid]
-        self.moved.append((uid, folder))
-
-    def close(self) -> None:
-        return None
-
-
-class _Scanner:
-    async def scan(self, _data: bytes) -> ScanVerdict:
-        return ScanVerdict(clean=True)
-
-
-@dataclass
-class Stack:
-    """One Bereich with a Postfach, its scripted inbox and the context of the job."""
-
-    maker: async_sessionmaker[AsyncSession]
-    area_id: uuid.UUID
-    box_id: uuid.UUID
-    inbox: Scripted
-    storage: FakeStorage
-    ctx: dict[str, Any]
-
-    async def run(self) -> int:
-        return await fetch_ticket_mails(self.ctx)
-
-    async def box(self) -> TicketMailbox:
-        async with self.maker() as session:
-            row = await session.get(TicketMailbox, self.box_id)
-            assert row is not None
-            return row
-
-    async def tickets(self) -> list[Ticket]:
-        async with self.maker() as session:
-            return list(
-                (await session.scalars(select(Ticket).order_by(Ticket.created_at, Ticket.id))).all()
-            )
-
-    async def notes(self, ticket_id: uuid.UUID) -> list[TicketNote]:
-        async with self.maker() as session:
-            return list(
-                (
-                    await session.scalars(
-                        select(TicketNote)
-                        .where(TicketNote.ticket_id == ticket_id)
-                        .order_by(TicketNote.created_at, TicketNote.id)
-                    )
-                ).all()
-            )
-
-
-async def _box(
-    maker: async_sessionmaker[AsyncSession], name: str, *, enabled: bool = True
-) -> tuple[uuid.UUID, uuid.UUID]:
-    async with maker() as session:
-        area = TicketArea(id=uuid.uuid4(), name=name, notify_new=False)
-        session.add(area)
-        await session.flush()
-        box = TicketMailbox(
-            id=uuid.uuid4(),
-            area_id=area.id,
-            address=ADDRESS,
-            imap_host=HOST,
-            imap_port=993,
-            imap_user="buero",
-            imap_password="geheim-imap",
-            smtp_host=HOST,
-            smtp_port=465,
-            smtp_user="buero",
-            smtp_password="geheim-smtp",
-            done_folder="Erledigt",
-            enabled=enabled,
-        )
-        session.add(box)
-        await session.commit()
-        return area.id, box.id
-
-
-@pytest.fixture
-async def stack(maker: async_sessionmaker[AsyncSession], settings: Settings) -> Stack:
-    area_id, box_id = await _box(maker, "AStA-Büro")
-    inbox = Scripted()
-    storage = FakeStorage()
-    ctx: dict[str, Any] = {
-        "settings": settings.model_copy(update={"ticket_mail_host_allowlist": [HOST]}),
-        "ticket_mail_sessionmaker": maker,
-        "ticket_mail_inbox": inbox.open,
-        "object_storage": storage,
-        "scanner": _Scanner(),
-    }
-    return Stack(maker, area_id, box_id, inbox, storage, ctx)
-
-
-def _mail(
-    *,
-    sender: str = "Anna Beispiel <anna@example.org>",
-    subject: str | None = "Raumanfrage",
-    body: str = "Ich brauche einen Raum.",
-    message_id: str | None = None,
-    **headers: str,
-) -> bytes:
-    message = EmailMessage()
-    message["From"] = sender
-    message["To"] = ADDRESS
-    if subject is not None:
-        message["Subject"] = subject
-    if message_id is not None:
-        message["Message-ID"] = message_id
-    for name, value in headers.items():
-        message[name.replace("_", "-")] = value
-    message.set_content(body)
-    return bytes(message)
-
-
 async def test_a_new_mail_becomes_a_ticket_with_the_values_of_the_mail(stack: Stack) -> None:
-    stack.inbox.put(_mail(message_id="<m1@example.org>"))
+    stack.inbox.put(raw_mail(message_id="<m1@example.org>"))
     assert await stack.run() == 1
     (ticket,) = await stack.tickets()
     assert ticket.area_id == stack.area_id
@@ -222,7 +74,7 @@ async def test_a_new_mail_becomes_a_ticket_with_the_values_of_the_mail(stack: St
 
 
 async def test_a_mail_without_a_subject_gets_the_title_ohne_betreff(stack: Stack) -> None:
-    stack.inbox.put(_mail(subject=None))
+    stack.inbox.put(raw_mail(subject=None))
     await stack.run()
     (ticket,) = await stack.tickets()
     assert ticket.title == "Ohne Betreff"
@@ -236,7 +88,7 @@ async def test_the_fetch_opens_no_connection_while_the_switch_is_off(
         assert row is not None
         row.enabled = False
         await session.commit()
-    stack.inbox.put(_mail())
+    stack.inbox.put(raw_mail())
     assert await stack.run() == 0
     assert stack.inbox.opened == []
     assert await stack.tickets() == []
@@ -246,7 +98,7 @@ async def test_a_host_outside_the_allowlist_gets_no_connection(stack: Stack) -> 
     stack.ctx["settings"] = stack.ctx["settings"].model_copy(
         update={"ticket_mail_host_allowlist": []}
     )
-    stack.inbox.put(_mail())
+    stack.inbox.put(raw_mail())
     assert await stack.run() == 0
     assert stack.inbox.opened == []
     box = await stack.box()
@@ -266,7 +118,7 @@ async def test_a_failed_commit_leaves_the_mail_for_the_next_run(
         await real(self)
 
     monkeypatch.setattr(AsyncSession, "commit", _commit)
-    stack.inbox.put(_mail(message_id="<m1@example.org>"))
+    stack.inbox.put(raw_mail(message_id="<m1@example.org>"))
     assert await stack.run() == 0
     assert await stack.tickets() == []
     assert stack.inbox.moved == []
@@ -281,7 +133,7 @@ async def test_a_failed_commit_leaves_the_mail_for_the_next_run(
 async def test_a_failure_of_one_postfach_does_not_stop_the_others(
     stack: Stack, maker: async_sessionmaker[AsyncSession]
 ) -> None:
-    _area, broken = await _box(maker, "Kaputt")
+    _area, broken = await make_box(maker, "Kaputt")
     good = stack.inbox
     bad = Scripted(fail="login_failed")
 
@@ -296,7 +148,7 @@ async def test_a_failure_of_one_postfach_does_not_stop_the_others(
         first.created_at = datetime.now(UTC) - timedelta(days=1)
         await session.commit()
     stack.ctx["ticket_mail_inbox"] = _open
-    good.put(_mail())
+    good.put(raw_mail())
     assert await stack.run() == 1
     async with maker() as session:
         row = await session.get(TicketMailbox, broken)
@@ -306,7 +158,7 @@ async def test_a_failure_of_one_postfach_does_not_stop_the_others(
 
 
 async def test_the_same_mail_is_imported_one_time(stack: Stack) -> None:
-    source = _mail(message_id="<m1@example.org>")
+    source = raw_mail(message_id="<m1@example.org>")
     stack.inbox.put(source)
     await stack.run()
     stack.inbox.put(source)
@@ -317,7 +169,7 @@ async def test_the_same_mail_is_imported_one_time(stack: Stack) -> None:
 
 
 async def test_a_mail_without_a_message_id_is_imported_one_time(stack: Stack) -> None:
-    source = _mail()
+    source = raw_mail()
     stack.inbox.put(source)
     await stack.run()
     stack.inbox.put(source)
@@ -326,21 +178,21 @@ async def test_a_mail_without_a_message_id_is_imported_one_time(stack: Stack) ->
 
 
 async def test_a_new_uidvalidity_starts_from_the_first_mail(stack: Stack) -> None:
-    stack.inbox.put(_mail(message_id="<m1@example.org>"))
+    stack.inbox.put(raw_mail(message_id="<m1@example.org>"))
     await stack.run()
     stack.inbox.uid_validity = 2
     stack.inbox.moved.clear()
-    stack.inbox.mails[1] = _mail(message_id="<m2@example.org>", subject="Zweite")
+    stack.inbox.mails[1] = raw_mail(message_id="<m2@example.org>", subject="Zweite")
     assert await stack.run() == 1
     assert [t.title for t in await stack.tickets()] == ["Raumanfrage", "Zweite"]
     assert (await stack.box()).uid_validity == 2
 
 
 async def test_an_answer_joins_its_ticket_through_the_headers(stack: Stack) -> None:
-    stack.inbox.put(_mail(message_id="<m1@example.org>"))
+    stack.inbox.put(raw_mail(message_id="<m1@example.org>"))
     await stack.run()
     stack.inbox.put(
-        _mail(
+        raw_mail(
             message_id="<m2@example.org>",
             subject="Ganz anderer Betreff",
             body="Noch eine Frage.",
@@ -354,12 +206,12 @@ async def test_an_answer_joins_its_ticket_through_the_headers(stack: Stack) -> N
 
 
 async def test_the_newest_ticket_wins_with_more_than_one_hit(stack: Stack) -> None:
-    stack.inbox.put(_mail(message_id="<m1@example.org>", subject="Alt"))
+    stack.inbox.put(raw_mail(message_id="<m1@example.org>", subject="Alt"))
     await stack.run()
-    stack.inbox.put(_mail(message_id="<m2@example.org>", subject="Neu"))
+    stack.inbox.put(raw_mail(message_id="<m2@example.org>", subject="Neu"))
     await stack.run()
     stack.inbox.put(
-        _mail(message_id="<m3@example.org>", References="<m1@example.org> <m2@example.org>")
+        raw_mail(message_id="<m3@example.org>", References="<m1@example.org> <m2@example.org>")
     )
     await stack.run()
     old, new = await stack.tickets()
@@ -370,13 +222,13 @@ async def test_the_newest_ticket_wins_with_more_than_one_hit(stack: Stack) -> No
 async def test_an_answer_of_the_sender_sets_a_waiting_ticket_to_in_progress(
     stack: Stack, maker: async_sessionmaker[AsyncSession]
 ) -> None:
-    stack.inbox.put(_mail(message_id="<m1@example.org>"))
+    stack.inbox.put(raw_mail(message_id="<m1@example.org>"))
     await stack.run()
     async with maker() as session:
         ticket = (await session.scalars(select(Ticket))).one()
         ticket.status = "waiting"
         await session.commit()
-    stack.inbox.put(_mail(message_id="<m2@example.org>", In_Reply_To="<m1@example.org>"))
+    stack.inbox.put(raw_mail(message_id="<m2@example.org>", In_Reply_To="<m1@example.org>"))
     await stack.run()
     (ticket,) = await stack.tickets()
     assert ticket.status == "in_progress"
@@ -385,14 +237,14 @@ async def test_an_answer_of_the_sender_sets_a_waiting_ticket_to_in_progress(
 async def test_a_late_answer_opens_a_follow_up_ticket(
     stack: Stack, maker: async_sessionmaker[AsyncSession]
 ) -> None:
-    stack.inbox.put(_mail(message_id="<m1@example.org>"))
+    stack.inbox.put(raw_mail(message_id="<m1@example.org>"))
     await stack.run()
     async with maker() as session:
         ticket = (await session.scalars(select(Ticket))).one()
         ticket.status = "done"
         ticket.closed_at = datetime.now(UTC) - timedelta(days=15)
         await session.commit()
-    stack.inbox.put(_mail(message_id="<m2@example.org>", In_Reply_To="<m1@example.org>"))
+    stack.inbox.put(raw_mail(message_id="<m2@example.org>", In_Reply_To="<m1@example.org>"))
     assert await stack.run() == 1
     old, new = await stack.tickets()
     assert (old.status, new.status, new.follow_up_of_id) == ("done", "new", old.id)
@@ -401,13 +253,13 @@ async def test_a_late_answer_opens_a_follow_up_ticket(
 async def test_the_number_in_the_subject_joins_only_a_mail_of_a_participant(
     stack: Stack,
 ) -> None:
-    stack.inbox.put(_mail(message_id="<m1@example.org>", Cc="Bernd <bernd@example.org>"))
+    stack.inbox.put(raw_mail(message_id="<m1@example.org>", Cc="Bernd <bernd@example.org>"))
     await stack.run()
     (ticket,) = await stack.tickets()
     marker = f"Re: Raumanfrage [T-{ticket.number}]"
-    stack.inbox.put(_mail(sender="fremd@example.org", subject=marker, body="Fremd"))
-    stack.inbox.put(_mail(subject=marker, body="Absender"))
-    stack.inbox.put(_mail(sender="bernd@example.org", subject=marker, body="Cc"))
+    stack.inbox.put(raw_mail(sender="fremd@example.org", subject=marker, body="Fremd"))
+    stack.inbox.put(raw_mail(subject=marker, body="Absender"))
+    stack.inbox.put(raw_mail(sender="bernd@example.org", subject=marker, body="Cc"))
     assert await stack.run() == 3
     first, stranger = await stack.tickets()
     assert first.id == ticket.id
@@ -418,7 +270,7 @@ async def test_the_number_in_the_subject_joins_only_a_mail_of_a_participant(
 async def test_the_source_is_kept_and_the_anonymization_deletes_it(
     stack: Stack, api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
-    source = _mail(message_id="<m1@example.org>")
+    source = raw_mail(message_id="<m1@example.org>")
     stack.inbox.put(source)
     await stack.run()
     (ticket,) = await stack.tickets()
@@ -469,7 +321,7 @@ async def test_a_source_without_a_clean_scan_stays_closed(
     stack: Stack, api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
     stack.ctx["scanner"] = None
-    stack.inbox.put(_mail())
+    stack.inbox.put(raw_mail())
     await stack.run()
     (ticket,) = await stack.tickets()
     async with maker() as session:
@@ -525,10 +377,10 @@ async def test_a_small_file_is_a_file_and_a_too_large_file_is_named(
 async def test_an_automatic_answer_is_an_event_and_no_message(
     stack: Stack, maker: async_sessionmaker[AsyncSession]
 ) -> None:
-    stack.inbox.put(_mail(message_id="<m1@example.org>"))
+    stack.inbox.put(raw_mail(message_id="<m1@example.org>"))
     await stack.run()
     stack.inbox.put(
-        _mail(
+        raw_mail(
             message_id="<auto@example.org>",
             subject="Abwesend",
             In_Reply_To="<m1@example.org>",
@@ -547,7 +399,7 @@ async def test_an_automatic_answer_is_an_event_and_no_message(
 
 
 async def test_an_automatic_mail_without_a_ticket_stays_in_the_inbox(stack: Stack) -> None:
-    stack.inbox.put(_mail(subject="Newsletter", Precedence="bulk"))
+    stack.inbox.put(raw_mail(subject="Newsletter", Precedence="bulk"))
     assert await stack.run() == 0
     assert await stack.tickets() == []
     assert stack.inbox.moved == []
@@ -559,7 +411,7 @@ async def test_a_mail_with_the_address_of_an_account_is_no_ticket_of_the_account
     stack: Stack, api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
     await add_principal(maker, sub="anna-sub", email="anna@example.org", name="Anna")
-    stack.inbox.put(_mail())
+    stack.inbox.put(raw_mail())
     await stack.run()
     (ticket,) = await stack.tickets()
     assert ticket.reporter_principal_id is None
@@ -576,7 +428,7 @@ async def test_the_mail_of_a_blocked_sender_becomes_no_ticket(
     async with maker() as session:
         session.add(TicketSenderBlock(email="anna@example.org"))
         await session.commit()
-    stack.inbox.put(_mail())
+    stack.inbox.put(raw_mail())
     assert await stack.run() == 0
     assert await stack.tickets() == []
     async with maker() as session:
@@ -589,8 +441,8 @@ async def test_the_mail_of_a_blocked_sender_becomes_no_ticket(
 
 async def test_one_address_opens_at_most_20_tickets_an_hour(stack: Stack) -> None:
     for index in range(21):
-        stack.inbox.put(_mail(message_id=f"<m{index}@example.org>", subject=f"Nr {index}"))
-    stack.inbox.put(_mail(sender="bernd@example.org", message_id="<b@example.org>"))
+        stack.inbox.put(raw_mail(message_id=f"<m{index}@example.org>", subject=f"Nr {index}"))
+    stack.inbox.put(raw_mail(sender="bernd@example.org", message_id="<b@example.org>"))
     assert await stack.run() == 21
     tickets = await stack.tickets()
     assert sum(t.reporter_email == "anna@example.org" for t in tickets) == 20
@@ -601,7 +453,7 @@ async def test_one_address_opens_at_most_20_tickets_an_hour(stack: Stack) -> Non
 
 
 async def test_a_mail_from_the_address_of_the_postfach_stays_in_the_inbox(stack: Stack) -> None:
-    stack.inbox.put(_mail(sender=ADDRESS))
+    stack.inbox.put(raw_mail(sender=ADDRESS))
     assert await stack.run() == 0
     assert await stack.tickets() == []
     assert stack.inbox.moved == []
@@ -618,16 +470,16 @@ async def test_the_team_gets_a_mail_for_a_new_ticket_and_for_an_answer(
         assert area is not None
         area.notify_new = True
         await session.commit()
-    stack.inbox.put(_mail(message_id="<m1@example.org>"))
+    stack.inbox.put(raw_mail(message_id="<m1@example.org>"))
     await stack.run()
-    stack.inbox.put(_mail(message_id="<m2@example.org>", In_Reply_To="<m1@example.org>"))
+    stack.inbox.put(raw_mail(message_id="<m2@example.org>", In_Reply_To="<m1@example.org>"))
     await stack.run()
     assert [m.to for m in queue.messages] == [("team@example.org",), ("team@example.org",)]
     created, message = queue.messages
     assert "Anna Beispiel" in created.text
     assert "Ich brauche einen Raum." in message.text
     stack.inbox.put(
-        _mail(
+        raw_mail(
             message_id="<m3@example.org>",
             In_Reply_To="<m1@example.org>",
             Auto_Submitted="auto-replied",

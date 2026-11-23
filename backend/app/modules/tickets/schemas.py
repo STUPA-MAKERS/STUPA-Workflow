@@ -196,6 +196,10 @@ class TicketNoteOut(FrozenCamelModel, frozen=True):
     mentions: tuple[PersonRef, ...] = Field(default_factory=tuple)
 
 
+#: The most addresses in ``to`` and in ``cc`` of one sent mail.
+MAX_MAIL_RECIPIENTS = 20
+
+
 class TicketSkippedFile(FrozenCamelModel, frozen=True):
     """A file of a mail that did not become a file of the message.
 
@@ -217,6 +221,10 @@ class TicketMailOut(FrozenCamelModel, frozen=True):
             ticket and for an automatic mail.
         source: ``clean`` when the source can be downloaded, ``infected`` after a
             finding, ``closed`` without a scan result, ``gone`` after the anonymization.
+        to: The addresses of ``To`` of a sent mail.
+        state: The state of a sent mail: ``sending``, ``sent`` or ``failed``; null for
+            an imported mail. A mail with ``failed`` takes ``POST …/resend``.
+        error: The short cause code of the newest failed send.
     """
 
     id: UUID
@@ -230,7 +238,23 @@ class TicketMailOut(FrozenCamelModel, frozen=True):
     source: Literal["clean", "infected", "closed", "gone"] = "gone"
     source_size: int = Field(default=0, serialization_alias="sourceSize")
     skipped: tuple[TicketSkippedFile, ...] = Field(default_factory=tuple)
+    to: tuple[str, ...] = Field(default_factory=tuple)
+    state: Literal["sending", "sent", "failed"] | None = None
+    error: str | None = None
     at: datetime
+
+
+class TicketMailAnswer(FrozenCamelModel, frozen=True):
+    """The recipients of the next public message on a mail ticket.
+
+    ``to`` holds the sender and ``cc`` each other address of the thread, without the
+    address of the Postfach. ``enabled`` is false while the Bereich has no Postfach or
+    its switch is off; a public message then answers 409 ``mailbox_off``.
+    """
+
+    to: tuple[str, ...] = Field(default_factory=tuple)
+    cc: tuple[str, ...] = Field(default_factory=tuple)
+    enabled: bool = False
 
 
 class TicketRef(FrozenCamelModel, frozen=True):
@@ -264,6 +288,7 @@ class TicketDetail(TicketListItem, frozen=True):
     anonymized_at: datetime | None = Field(default=None, serialization_alias="anonymizedAt")
     sender_blocked: bool = Field(default=False, serialization_alias="senderBlocked")
     mails: tuple[TicketMailOut, ...] = Field(default_factory=tuple)
+    mail_answer: TicketMailAnswer | None = Field(default=None, serialization_alias="mailAnswer")
 
 
 class TicketPatch(FrozenStrictCamelModel, frozen=True):
@@ -330,6 +355,10 @@ class NoteCreate(MessageFilesIn):
     ``visibility`` defaults to ``internal``; ``public`` lets the reporter account read it.
     ``mentions`` holds the principal ids of mentioned holders of ``ticket.manage`` (at
     most 50, duplicates drop); another id gives 422 ``mention_not_member``.
+
+    ``to`` and ``cc`` are the recipients of a public message on a mail ticket. A list
+    that the body leaves out takes the addresses of the thread (``mailAnswer`` of the
+    ticket).
     """
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
@@ -337,6 +366,8 @@ class NoteCreate(MessageFilesIn):
     body: str = Field(max_length=10000)
     visibility: NoteVisibility = "internal"
     mentions: list[UUID] = Field(default_factory=list, max_length=MAX_MENTIONS)
+    to: list[EmailStr] | None = Field(default=None, max_length=MAX_MAIL_RECIPIENTS)
+    cc: list[EmailStr] | None = Field(default=None, max_length=MAX_MAIL_RECIPIENTS)
 
 
 class ReporterNoteCreate(MessageFilesIn):

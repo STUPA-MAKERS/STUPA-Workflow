@@ -215,3 +215,35 @@ export function skippedLine(mail: TicketMail | undefined, locale: string, t: Tra
 export function withSkipped(body: string, line: string): string {
   return line ? (body ? `${body}\n\n${line}` : line) : body;
 }
+
+/** The addresses of a sent mail as one text: "a@x.org (Cc: b@x.org)". */
+export function recipientsText(to: readonly string[], cc: readonly string[], t: Translate): string {
+  return cc.length ? t('tickets.mail.toCc', { to: to.join(', '), cc: cc.join(', ') }) : to.join(', ');
+}
+
+/**
+ * The line under a message that went out as a mail: its recipients ("Gesendet an
+ * anna@example.org (Cc: ben@example.org)"). A mail that waits or failed has "Mail an …",
+ * because the chat names that state under the message. Empty for another message.
+ */
+export function sentLine(mail: TicketMail | undefined, t: Translate): string {
+  if (mail?.direction !== 'out' || !mail.state) return '';
+  const people = recipientsText(mail.to ?? [], mail.cc, t);
+  return t(mail.state === 'sent' ? 'tickets.mail.sent' : 'tickets.mail.waiting', { people });
+}
+
+const MAIL_ADDRESS = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+/** The addresses that a person typed with commas, semicolons or spaces between them. */
+export function parseAddresses(text: string): readonly string[] {
+  const found = text
+    .split(/[\s,;]+/)
+    .map((a) => a.trim().toLowerCase())
+    .filter(Boolean);
+  return [...new Set(found)];
+}
+
+/** True when each entry is an e-mail address. */
+export function addressesValid(list: readonly string[]): boolean {
+  return list.every((a) => MAIL_ADDRESS.test(a));
+}

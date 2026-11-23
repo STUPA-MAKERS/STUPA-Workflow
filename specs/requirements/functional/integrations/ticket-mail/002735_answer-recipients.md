@@ -5,7 +5,14 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_send.py:test_an_answer_goes_to_the_sender_and_to_the_cc_addresses_of_the_thread"
+  - "frontend/src/app/pages/tickets/ticket-detail.component.spec.ts:TicketDetailComponent"
+implementation:
+  - backend/app/modules/tickets/mail_send.py
+  - backend/app/modules/tickets/schemas.py
+  - frontend/src/app/pages/tickets/ticket-detail.component.ts
+  - frontend/src/app/pages/tickets/ticket-detail.component.html
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets

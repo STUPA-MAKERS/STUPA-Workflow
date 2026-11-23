@@ -5,7 +5,14 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_send.py:test_a_public_message_goes_out_as_a_mail_and_an_internal_one_never"
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_send.py:test_a_file_of_the_message_goes_with_the_mail_after_a_clean_scan"
+  - "frontend/src/app/pages/tickets/ticket-detail.component.spec.ts:TicketDetailComponent"
+implementation:
+  - backend/app/modules/tickets/mail_send.py
+  - backend/app/modules/tickets/service.py
+  - frontend/src/app/pages/tickets/ticket-detail.component.ts
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets
