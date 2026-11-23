@@ -156,6 +156,15 @@
 .td__select ::ng-deep .fs__text {
   max-width: none;
 }
+// In very high contrast a select has a yellow edge (spec 000614). The plain look above has
+// no padding, so the edge would cut the text: the select gets the padding and the height of a
+// field again, and a gap to the label.
+:host-context([data-very-high-contrast='on']) .td__select ::ng-deep .fs__chip {
+  height: 2.75rem;
+  margin-top: var(--space-1);
+  padding: 0 14px;
+  color: inherit;
+}
 
 // The log adds only its minimum (`--chat-log-basis: 0`), so a long thread does not make the pane
 // scroll and the composer stays at the foot of the card.

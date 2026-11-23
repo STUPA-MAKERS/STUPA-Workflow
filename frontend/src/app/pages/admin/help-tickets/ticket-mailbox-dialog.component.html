@@ -28,9 +28,11 @@
         [ngModel]="draft().address"
         (ngModelChange)="patch({ address: $event })"
       />
-      <app-switch [checked]="draft().enabled" (checkedChange)="patch({ enabled: $event })">{{
-        'admin.helpTickets.mailbox.enabled' | t
-      }}</app-switch>
+      <div class="rowgroup rowgroup--settings">
+        <app-switch [checked]="draft().enabled" (checkedChange)="patch({ enabled: $event })">{{
+          'admin.helpTickets.mailbox.enabled' | t
+        }}</app-switch>
+      </div>
       @for (side of sides; track side.key) {
         <app-section [heading]="side.heading | t">
           <app-input
@@ -92,9 +94,11 @@
             (ngModelChange)="patch({ signature: $event })"
           ></textarea>
         </app-textarea>
-        <app-switch [checked]="draft().confirm" (checkedChange)="patch({ confirm: $event })">{{
-          'admin.helpTickets.mailbox.confirm' | t
-        }}</app-switch>
+        <div class="rowgroup rowgroup--settings">
+          <app-switch [checked]="draft().confirm" (checkedChange)="patch({ confirm: $event })">{{
+            'admin.helpTickets.mailbox.confirm' | t
+          }}</app-switch>
+        </div>
       </app-section>
       @for (line of testLines(); track line.text) {
         <app-note role="status" [kind]="line.ok ? 'ok' : 'error'" [surface]="3">{{ line.text }}</app-note>

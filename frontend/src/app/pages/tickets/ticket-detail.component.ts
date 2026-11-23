@@ -171,6 +171,18 @@ export interface TicketHint {
   readonly ref: { readonly id: Uuid; readonly number: string } | null;
 }
 
+/**
+ * The writer of the ticket body. A sender without an account (a mail, a report without a
+ * login) is a person with a name and no id, as in the later messages of the same sender, so
+ * each message of the sender has the avatar and the same indent. An anonymized ticket has
+ * no writer.
+ */
+export function bodyAuthor(reporter: TicketReporter): ChatMessage['author'] {
+  const displayName = reporter.displayName ?? reporter.email ?? null;
+  if (reporter.principalId) return { principalId: reporter.principalId, displayName };
+  return displayName ? { principalId: null, displayName } : null;
+}
+
 /** The id of the ticket body in the thread: it never collides with a note id. */
 const BODY_ID = 'ticket-body';
 
@@ -546,9 +558,7 @@ export class TicketDetailComponent {
     const byNote = new Map(mails.filter((m) => m.noteId).map((m) => [m.noteId, m]));
     const body: ChatMessage = {
       id: BODY_ID,
-      author: t.reporter.principalId
-        ? { principalId: t.reporter.principalId, displayName: t.reporter.displayName }
-        : null,
+      author: bodyAuthor(t.reporter),
       authorLabel: this.manager ? this.reporter() : null,
       body: withSkipped(t.body, skippedLine(first, locale, this.t)),
       at: t.createdAt,
