@@ -41,7 +41,7 @@ import { I18nService } from '@core/i18n/i18n.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [EmptyStateComponent],
   template: `@if (face()) {
-    <app-empty-state icon="alert" [heading]="message()" />
+    <app-empty-state icon="alert" fill [heading]="message()" />
   }`,
   styles: ':host { display: contents; }',
 })

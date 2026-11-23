@@ -46,7 +46,7 @@
     } @else if (error() && items().length === 0) {
       <app-note kind="error" icon="alert" role="alert">{{ 'publicProtocols.error' | t }}</app-note>
     } @else if (items().length === 0) {
-      <app-empty-state icon="searchOff" shape="date"
+      <app-empty-state fill icon="searchOff" shape="date"
         [heading]="'publicProtocols.empty.filtered' | t"
         [body]="'publicProtocols.empty.filteredBody' | t"
       />

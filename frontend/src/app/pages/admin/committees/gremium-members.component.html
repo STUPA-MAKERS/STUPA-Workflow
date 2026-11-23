@@ -18,7 +18,7 @@
       </ng-template>
       <ng-template #content>
         @if (!visible().length) {
-        <app-empty-state icon="users" shape="person" [heading]="'admin.gremien.membersEmpty' | t" />
+        <app-empty-state fill icon="users" shape="person" [heading]="'admin.gremien.membersEmpty' | t" />
       } @else {
         <ul class="rowgroup rowgroup--records gmm__list" [attr.aria-label]="'admin.gremien.members' | t">
           @for (m of visible(); track m.id) {

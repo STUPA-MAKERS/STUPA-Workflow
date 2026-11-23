@@ -16,7 +16,7 @@
     </ng-template>
     <ng-template #content>
   @if (!budgets().length) {
-    <app-empty-state icon="pie" shape="table" [heading]="'admin.budgets.empty' | t" />
+    <app-empty-state fill icon="pie" shape="table" [heading]="'admin.budgets.empty' | t" />
   } @else {
     <app-data-table
       surface="rowgroup"
