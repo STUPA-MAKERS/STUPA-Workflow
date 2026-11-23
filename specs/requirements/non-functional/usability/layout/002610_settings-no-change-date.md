@@ -6,7 +6,7 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-23
 tests:
-  - "frontend/src/app/pages/admin/login-settings/login-settings.component.spec.ts:shows no change date, also after a change"
+  - "frontend/src/app/pages/admin/login-settings/login-settings.component.spec.ts:LoginSettingsComponent"
 implementation:
   - frontend/src/app/pages/admin/login-settings/login-settings.component.ts
 scope:

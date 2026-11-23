@@ -131,7 +131,7 @@ describe('LoginSettingsComponent', () => {
   });
 
   /** §002610: no settings screen shows a change date. */
-  it('shows no change date, also after a change', async () => {
+  it('shows no change date even with a stored one', async () => {
     await setup({ api: makeApi({ ...STORED, updatedAt: '2026-09-01T10:00:00Z', updatedBy: 'admin-sub' }) });
     expect(screen.queryByText(/Zuletzt geändert/)).not.toBeInTheDocument();
   });
