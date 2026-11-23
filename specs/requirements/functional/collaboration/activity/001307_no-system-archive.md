@@ -1,5 +1,5 @@
 ---
-id: "001304"
+id: "001307"
 title: The automatic archive of a to-do card is not an activity
 kind: functional
 status: draft

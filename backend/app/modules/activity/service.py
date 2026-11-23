@@ -741,7 +741,7 @@ class ActivityService:
         stmt = _where(
             select(TodoEvent, key).where(
                 TodoEvent.card_id.in_(self._my_cards(me)),
-                # Spec 001304: the archive cron writes ``archived`` without an actor.
+                # Spec 001307: the archive cron writes ``archived`` without an actor.
                 or_(TodoEvent.kind != "archived", TodoEvent.actor_id.is_not(None)),
             ),
             _not_by(TodoEvent.actor_id, me.id, own),

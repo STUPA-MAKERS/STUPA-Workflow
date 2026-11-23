@@ -117,7 +117,7 @@ async def test_a_card_shows_what_others_did(maker: async_sessionmaker[AsyncSessi
 async def test_the_archive_of_the_cron_is_no_activity(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """Spec 001304: ``archived`` without an actor neither shows nor lights the dot."""
+    """Spec 001307: ``archived`` without an actor neither shows nor lights the dot."""
     alice, alice_id = await add_person(maker, "Alice")
     _, bob_id = await add_person(maker, "Bob")
     gremium_id, board_id = await add_gremium(maker)
