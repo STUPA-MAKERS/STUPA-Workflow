@@ -2,7 +2,7 @@
 id: "001434"
 title: The graph shows the neighbours of the hits up to a count of steps
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 tests:

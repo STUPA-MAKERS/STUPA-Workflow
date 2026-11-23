@@ -279,7 +279,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/graph/001424](requirements/functional/collaboration/graph/001424_graph-relations.md) | The graph shows links and the built-in relations | approved |
 | [F/collaboration/graph/001431](requirements/functional/collaboration/graph/001431_graph-api.md) | The graph has its own API | approved |
 | [F/collaboration/graph/001432](requirements/functional/collaboration/graph/001432_graph-features.md) | A kind of a feature that is off does not show in the graph | approved |
-| [F/collaboration/graph/001434](requirements/functional/collaboration/graph/001434_graph-neighbour-steps.md) | The graph shows the neighbours of the hits up to a count of steps | draft |
+| [F/collaboration/graph/001434](requirements/functional/collaboration/graph/001434_graph-neighbour-steps.md) | The graph shows the neighbours of the hits up to a count of steps | approved |
 | [F/collaboration/links/001400](requirements/functional/collaboration/links/001400_any-to-any.md) | Any two elements can link to each other | approved |
 | [F/collaboration/links/001401](requirements/functional/collaboration/links/001401_no-direction.md) | A link has no direction | approved |
 | [F/collaboration/links/001402](requirements/functional/collaboration/links/001402_one-row-two-ends.md) | A link is one row with two typed ends | approved |
