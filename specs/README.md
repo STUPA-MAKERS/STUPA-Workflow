@@ -774,6 +774,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/protocols/000970](requirements/functional/meetings/protocols/000970_known-names.md) | The known names are the persons of the platform | approved |
 | [F/meetings/protocols/000983](requirements/functional/meetings/protocols/000983_final-protocol-back-to-draft.md) | A final protocol goes back to draft until it is approved | approved |
 | [F/meetings/protocols/000997](requirements/functional/meetings/protocols/000997_sent-only-with-mail.md) | A protocol counts as sent only when its mail went out | approved |
+| [F/meetings/protocols/002780](requirements/functional/meetings/protocols/002780_selection-format-bar.md) | A text selection shows a format bar | approved |
+| [F/meetings/protocols/002781](requirements/functional/meetings/protocols/002781_selection-bar-formats.md) | The format bar holds the inline formats | approved |
+| [F/meetings/protocols/002782](requirements/functional/meetings/protocols/002782_selection-bar-place.md) | The format bar shows below the selection | approved |
 | [F/meetings/voting/000024](requirements/functional/meetings/voting/000024_every-vote-is-secret.md) | Every vote is secret | approved |
 | [F/meetings/voting/000025](requirements/functional/meetings/voting/000025_ballot-does-not-change.md) | A cast ballot does not change | approved |
 | [F/meetings/voting/000026](requirements/functional/meetings/voting/000026_tie-rejects-motion.md) | A tie rejects a motion | approved |
@@ -831,6 +834,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/accessibility/documents/000524](requirements/non-functional/accessibility/documents/000524_protocol-pdf-ua.md) | The protocol PDF is tagged as PDF/UA-1 | approved |
 | [NF/accessibility/documents/000525](requirements/non-functional/accessibility/documents/000525_mail-plain-text.md) | Each mail has a plain text part | approved |
 | [NF/accessibility/interaction/000521](requirements/non-functional/accessibility/interaction/000521_no-cognitive-test.md) | The login and the captcha need no cognitive test | approved |
+| [NF/accessibility/interaction/002783](requirements/non-functional/accessibility/interaction/002783_selection-bar-keyboard.md) | The format bar works with the keyboard | approved |
 | [NF/accessibility/language/000216](requirements/non-functional/accessibility/language/000216_i18n-parity.md) | German and English texts are complete | replaced |
 | [NF/accessibility/perception/000501](requirements/non-functional/accessibility/perception/000501_accent-contrast.md) | An admin accent colour keeps the contrast | approved |
 | [NF/accessibility/statement/000495](requirements/non-functional/accessibility/statement/000495_statement-page.md) | A public page holds the accessibility statement | approved |
