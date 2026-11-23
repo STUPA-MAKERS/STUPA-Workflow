@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/angular';
-import { FLOW_COLOR_PRESETS, FlowColorComponent } from './flow-color.component';
+import { FLOW_COLOR_PRESETS, FlowColorViewComponent as FlowColorComponent } from '@stupa-makers/ui-kit/views/flow-editor';
 
 async function setup(value: string | null) {
   const emitted: string[] = [];

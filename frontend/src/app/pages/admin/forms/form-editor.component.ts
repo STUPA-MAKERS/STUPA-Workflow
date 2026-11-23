@@ -29,8 +29,11 @@ import {
   ButtonComponent,
   ButtonGroupComponent,
   CheckboxComponent,
+  ContentLangState,
+  ContentLangSwitchComponent,
   EmptyStateComponent,
   FabComponent,
+  I18nInputComponent,
   IconComponent,
   InputComponent,
   MEDIA,
@@ -45,10 +48,10 @@ import {
   ScrollFadeDirective,
   SelectFieldComponent,
   type SelectOption,
+  SheetBodyDirective,
   SideSheetComponent,
   StatusTextComponent,
   ToastService,
-  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
@@ -70,9 +73,6 @@ import {
   validateFormField,
   validateJsonLogic,
 } from '../form-field.util';
-import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
-import { ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
-import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.state';
 import { withoutKey } from '@shared/util/immutable';
 import { injectPanePage } from '../pane-page';
 

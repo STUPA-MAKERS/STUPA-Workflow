@@ -21,19 +21,21 @@ import {
   normalizeHex,
 } from '@core/theme/accent';
 import {
-  ThemeService,
-  FabComponent,
   ButtonComponent,
   ButtonGroupComponent,
+  type ContentLang,
+  ContentLangSwitchComponent,
+  FabComponent,
   FilePickerComponent,
   formatBytes,
   IconComponent,
   InputComponent,
   NoteComponent,
-  SwitchComponent,
-  ToastService,
   PageHeaderComponent,
   SectionComponent,
+  SwitchComponent,
+  ThemeService,
+  ToastService,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import type { I18nMap } from '@core/api/models';
@@ -54,10 +56,6 @@ import {
   type LogoSlot,
 } from '../admin.models';
 import { brandingLinkErrors } from '../branding.util';
-import {
-  type ContentLang,
-  ContentLangSwitchComponent,
-} from '@shared/ui/content-lang-switch/content-lang-switch.component';
 
 /** The language of the texts in the editor. */
 type TextLang = ContentLang;

@@ -7,23 +7,26 @@ import type { I18nMap } from '@core/api/models';
 import { i18nLabel, sameI18n, trimI18n } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
+  type Action,
   ButtonGroupComponent,
   CapitalizePipe,
   CheckboxComponent,
   ConfirmDialogComponent,
+  ContentLangState,
+  ContentLangSwitchComponent,
+  DialogBodyDirective,
   DialogComponent,
+  I18nInputComponent,
   InputComponent,
-  type Action,
+  keyParts,
   type ListRow,
   type LoadState,
-  keyParts,
   NoteComponent,
   RowMenuComponent,
   type RowMenuSection,
+  SectionComponent,
   StatusTextComponent,
   ToastService,
-  SectionComponent,
-  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import {
   RecordsScreenComponent,
@@ -33,10 +36,7 @@ import {
 import { AdminApiService } from '../admin-api.service';
 import { ROLE_KEY_PATTERN, type Role } from '../admin.models';
 import { permissionSections } from './permission-sections';
-import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 import { expandSet } from '@shared/expand-set';
-import { ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
-import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.state';
 
 /** Draft for a new global role. */
 interface RoleDraft {
