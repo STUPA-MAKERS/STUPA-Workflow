@@ -347,7 +347,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/tickets/002711](requirements/functional/collaboration/tickets/002711_ticket-source.md) | A ticket names its source | draft |
 | [F/collaboration/tickets/002712](requirements/functional/collaboration/tickets/002712_ticket-by-hand.md) | The team creates a ticket by hand | draft |
 | [F/collaboration/tickets/002713](requirements/functional/collaboration/tickets/002713_bereich-in-app.md) | A Bereich can take tickets from signed-in persons | draft |
-| [F/collaboration/tickets/002714](requirements/functional/collaboration/tickets/002714_one-number-sequence.md) | All Bereiche share one sequence of ticket numbers | draft |
+| [F/collaboration/tickets/002714](requirements/functional/collaboration/tickets/002714_random-ticket-number.md) | A new ticket gets a random number of eight characters | draft |
 | [F/collaboration/tickets/002715](requirements/functional/collaboration/tickets/002715_bereich-filter.md) | The ticket list shows the Bereiche of the person | draft |
 | [F/collaboration/tickets/002716](requirements/functional/collaboration/tickets/002716_retention-per-bereich.md) | Closed tickets are anonymized after the retention time of the Bereich | draft |
 | [F/collaboration/tickets/002717](requirements/functional/collaboration/tickets/002717_new-ticket-mail.md) | A new ticket is mailed to the team of its Bereich | draft |
