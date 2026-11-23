@@ -20,7 +20,7 @@ specs/
       applications/    applications, dashboard, flow, forms
       collaboration/   activity, committees, graph, links, notifications, search, tickets, todos
       finance/         budget, invoices
-      integrations/    external, mcp, webhooks
+      integrations/    external, mcp, paperless, webhooks
       meetings/        calendar, delegations, meetings, protocols, voting
       public/          public-pages
     non-functional/
@@ -121,6 +121,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/files/000464](requirements/functional/administration/files/000464_draft-caps.md) | Wizard drafts are capped and expire | approved |
 | [F/administration/privacy/000457](requirements/functional/administration/privacy/000457_erasure-request.md) | An applicant can request the erasure of an Antrag | approved |
 | [F/administration/privacy/000458](requirements/functional/administration/privacy/000458_data-export.md) | The data export is an audited XLSX | approved |
+| [F/administration/privacy/002532](requirements/functional/administration/privacy/002532_erasure-lists-paperless.md) | An erasure names the filed Paperless documents | draft |
+| [F/administration/privacy/002533](requirements/functional/administration/privacy/002533_export-names-paperless.md) | The data export names the filed Paperless documents | draft |
 | [F/administration/translations/000136](requirements/functional/administration/translations/000136_all-languages-editable.md) | Every i18n text is editable in English too | approved |
 | [F/administration/translations/000336](requirements/functional/administration/translations/000336_catalog-source.md) | The frontend catalog is the source of UI texts | approved |
 | [F/administration/translations/000337](requirements/functional/administration/translations/000337_language-lifecycle.md) | A new language starts inactive | approved |
@@ -523,6 +525,25 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/mcp/001200](requirements/functional/integrations/mcp/001200_mcp-parity.md) | The MCP server has a tool for every app function | approved |
 | [F/integrations/mcp/001201](requirements/functional/integrations/mcp/001201_mcp-exclusions.md) | The MCP leaves out a closed list of functions | approved |
 | [F/integrations/mcp/001232](requirements/functional/integrations/mcp/001232_mcp-name.md) | The MCP server presents itself as workflow | approved |
+| [F/integrations/paperless/002511](requirements/functional/integrations/paperless/002511_connection-page.md) | An admin connects one Paperless instance | draft |
+| [F/integrations/paperless/002512](requirements/functional/integrations/paperless/002512_switch.md) | The Paperless integration has one switch | draft |
+| [F/integrations/paperless/002513](requirements/functional/integrations/paperless/002513_service-account.md) | Each call to Paperless uses the token of the connection | draft |
+| [F/integrations/paperless/002516](requirements/functional/integrations/paperless/002516_file-final-protocol.md) | A final protocol is filed in Paperless | draft |
+| [F/integrations/paperless/002517](requirements/functional/integrations/paperless/002517_file-decided-antrag.md) | The PDF of an Antrag is filed at each decision | draft |
+| [F/integrations/paperless/002518](requirements/functional/integrations/paperless/002518_file-plan-in-force.md) | A Haushaltsplan is filed when it comes into force | draft |
+| [F/integrations/paperless/002519](requirements/functional/integrations/paperless/002519_document-data.md) | A filed document carries type, date, Gremium and link | draft |
+| [F/integrations/paperless/002520](requirements/functional/integrations/paperless/002520_filed-once.md) | A file is filed only once | draft |
+| [F/integrations/paperless/002521](requirements/functional/integrations/paperless/002521_new-version.md) | A new version becomes a new document | draft |
+| [F/integrations/paperless/002522](requirements/functional/integrations/paperless/002522_no-delete.md) | The platform deletes no document in Paperless | draft |
+| [F/integrations/paperless/002523](requirements/functional/integrations/paperless/002523_filing-in-worker.md) | Filing runs in the worker and never blocks an action | draft |
+| [F/integrations/paperless/002524](requirements/functional/integrations/paperless/002524_permission-use.md) | One permission gives the use of Paperless | draft |
+| [F/integrations/paperless/002525](requirements/functional/integrations/paperless/002525_open-in-paperless.md) | An element with a filed document links to Paperless | draft |
+| [F/integrations/paperless/002526](requirements/functional/integrations/paperless/002526_failed-filings.md) | The admin page lists the filings that failed | draft |
+| [F/integrations/paperless/002527](requirements/functional/integrations/paperless/002527_insert-prefix.md) | Two colons open the Paperless search in a protocol text | draft |
+| [F/integrations/paperless/002528](requirements/functional/integrations/paperless/002528_insert-copies.md) | An insert from Paperless copies the document as an embedded PDF | draft |
+| [F/integrations/paperless/002529](requirements/functional/integrations/paperless/002529_search-outage.md) | The Paperless search tells an outage and keeps the editor | draft |
+| [F/integrations/paperless/002530](requirements/functional/integrations/paperless/002530_backfill.md) | An admin can file the final documents that exist | draft |
+| [F/integrations/paperless/002531](requirements/functional/integrations/paperless/002531_audit.md) | Each filing and each insert has an audit entry | draft |
 | [F/integrations/webhooks/000298](requirements/functional/integrations/webhooks/000298_retry.md) | A failed delivery is retried with backoff | approved |
 | [F/integrations/webhooks/000299](requirements/functional/integrations/webhooks/000299_idempotent-delivery.md) | A delivery runs once per key | approved |
 | [F/integrations/webhooks/000402](requirements/functional/integrations/webhooks/000402_flow-action-only.md) | A webhook fires only through a flow action | approved |
@@ -817,6 +838,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/security/network/000392](requirements/non-functional/security/network/000392_forwarded-ips.md) | Forwarded headers come only from the proxy | approved |
 | [NF/security/network/000454](requirements/non-functional/security/network/000454_api-security-headers.md) | The API sends strict security headers and no CORS | approved |
 | [NF/security/network/000466](requirements/non-functional/security/network/000466_webhook-host-allowlist.md) | Webhook targets can be limited to a host list | approved |
+| [NF/security/network/002514](requirements/non-functional/security/network/002514_paperless-host-allowlist.md) | The Paperless address needs a host from the deploy settings | draft |
+| [NF/security/network/002515](requirements/non-functional/security/network/002515_paperless-token-secret.md) | The Paperless token never leaves the server | draft |
 | [NF/usability/controls/000668](requirements/non-functional/usability/controls/000668_fiscal-year-chip.md) | The fiscal year is chosen with a chip | approved |
 | [NF/usability/controls/000676](requirements/non-functional/usability/controls/000676_tickets-word-in-admin.md) | Verwaltung says "Tickets" | approved |
 | [NF/usability/controls/000931](requirements/non-functional/usability/controls/000931_back-closes-budget-dialogs.md) | The dialogs of the Haushalt close on Back | approved |
