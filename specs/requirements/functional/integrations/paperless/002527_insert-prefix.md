@@ -5,7 +5,14 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "frontend/vendor/ui-kit/markdown-editor/src/markdown-editor.insert-trigger.spec.ts:MarkdownEditorInsertTrigger"
+  - "frontend/src/app/features/meetings/top-sheet/top-sheet.component.spec.ts:TopSheetComponent"
+implementation:
+  - frontend/vendor/ui-kit/markdown-editor/src/markdown-editor.component.ts
+  - frontend/src/app/features/meetings/top-sheet/top-sheet.component.ts
+  - frontend/src/app/core/api/paperless.service.ts
+  - backend/app/modules/paperless_filing/router.py
 scope:
   - frontend/src/app/
   - backend/app/

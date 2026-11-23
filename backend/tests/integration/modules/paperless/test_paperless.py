@@ -7,7 +7,8 @@ carries its data and the link. § 002520 a file is filed once. § 002521 a repla
 document gets the tag `Ersetzt`. § 002523, 002526 a job that fails eight times shows in
 the failed list and starts again. § 002524, 002525 the entry `In Paperless öffnen`.
 § 002530 the backfill. § 002531 the audit entries. § NF/security/network/002514 the
-host allowlist. § 002515 no read returns the token.
+host allowlist. § 002515 no read returns the token. § 002527-002529, 002534 the insert:
+the search and the copy.
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.deps import get_current_principal
+from app.deps import DbSession, get_current_principal
 from app.modules.applications.models import Application, StatusEvent
 from app.modules.audit.models import AuditEntry
 from app.modules.auth.principal import Principal
@@ -35,6 +36,9 @@ from app.modules.budget.tree_schemas import BudgetNodeCreate, FiscalYearCreate
 from app.modules.files.models import Attachment
 from app.modules.flow.models import State
 from app.modules.gremien.models import Gremium
+from app.modules.media.models import MarkdownDocument
+from app.modules.media.router import get_media_service
+from app.modules.media.service import MediaService
 from app.modules.meetings.models import Meeting
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.paperless.connection import ConnectionService
@@ -52,6 +56,7 @@ from tests._support.guest_apps import (
 from tests._support.memory_storage import MemoryStorage
 from tests._support.paperless_fakes import BASE_URL, HOST, TOKEN, FakePaperless
 from tests.integration.modules.documents.test_application_pdf import FakeTypst
+from tests.unit.modules.media.test_media_documents import make_pdf
 from worker.paperless import process_paperless_filings
 
 pytestmark = pytest.mark.integration
@@ -117,6 +122,7 @@ async def _connect(
     protocols: bool = False,
     applications: bool = False,
     plans: bool = False,
+    insert: bool = False,
     now: datetime = _SINCE,
 ) -> None:
     """Save the connection with the switches of a test."""
@@ -129,6 +135,7 @@ async def _connect(
                     "fileProtocols": protocols,
                     "fileApplications": applications,
                     "filePlans": plans,
+                    "insertEnabled": insert,
                 }
             ),
             actor=_ADMIN.sub,
@@ -685,3 +692,137 @@ async def test_the_entry_opens_the_document_only_with_the_permission(
     await _connect(maker, settings, protocols=False)
     with _client(migrated, settings, monkeypatch, fake, _USER) as client:
         assert client.get(path).json() == {"url": None, "documentId": None}
+
+
+def _archive(fake: FakePaperless, document_id: int, title: str, content: bytes) -> None:
+    """Put one document with its PDF version into the fake archive."""
+    fake.documents[document_id] = {
+        "id": document_id,
+        "title": title,
+        "created": "2026-10-30",
+        "document_type": None,
+        "tags": [],
+        "custom_fields": [],
+    }
+    fake.files[document_id] = content
+
+
+def test_the_search_needs_the_permission_and_the_switch(
+    migrated: tuple[str, str],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    fake: FakePaperless,
+) -> None:
+    """§ 002524 the search needs `paperless.use`; § 002512 it is off with its switch."""
+    _archive(fake, 41, "Angebot Beamer", b"")
+    _archive(fake, 42, "Bescheid", b"")
+    body = {**_BODY, "insertEnabled": False}
+    with _client(migrated, settings, monkeypatch, fake, _ADMIN) as client:
+        assert client.put("/api/admin/paperless", json=body).status_code == 200
+    with _client(migrated, settings, monkeypatch, fake, _MEMBER) as client:
+        assert client.get("/api/paperless/insert").status_code == 403
+        assert client.get("/api/paperless/search").status_code == 403
+    with _client(migrated, settings, monkeypatch, fake, _USER) as client:
+        assert client.get("/api/paperless/insert").json() == {"enabled": False}
+        assert client.get("/api/paperless/search").status_code == 404
+    assert [r for r in fake.requests if r.url.path == "/api/documents/"] == []
+
+    with _client(migrated, settings, monkeypatch, fake, _ADMIN) as client:
+        on = client.put("/api/admin/paperless", json={**body, "insertEnabled": True})
+        assert on.status_code == 200
+    with _client(migrated, settings, monkeypatch, fake, _USER) as client:
+        assert client.get("/api/paperless/insert").json() == {"enabled": True}
+        newest = client.get("/api/paperless/search")
+        assert [hit["documentId"] for hit in newest.json()] == [42, 41]
+        found = client.get("/api/paperless/search", params={"q": "beamer"})
+        assert found.json() == [
+            {
+                "documentId": 41,
+                "title": "Angebot Beamer",
+                "documentType": None,
+                "created": "2026-10-30",
+            }
+        ]
+
+
+def test_the_search_tells_an_outage(
+    migrated: tuple[str, str],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    fake: FakePaperless,
+) -> None:
+    """§ 002529: a Paperless that fails answers 503 `paperless_unavailable`."""
+    with _client(migrated, settings, monkeypatch, fake, _ADMIN) as client:
+        assert (
+            client.put("/api/admin/paperless", json={**_BODY, "insertEnabled": True}).status_code
+            == 200
+        )
+        fake.down = True
+        answer = client.get("/api/paperless/search", params={"q": "x"})
+    assert answer.status_code == 503
+    assert answer.json()["code"] == "paperless_unavailable"
+    assert TOKEN not in answer.text
+
+
+async def test_an_insert_copies_the_document_as_an_embedded_pdf(
+    migrated: tuple[str, str],
+    maker: Maker,
+    settings: Settings,
+    storage: MemoryStorage,
+    fake: FakePaperless,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """§ 002528 the copy is a stored PDF with the document number; § 002531 the audit entry."""
+    _protocol_id, meeting_id = await _protocol(maker, storage)
+    pdf = make_pdf(2)
+    _archive(fake, 41, "Angebot Beamer", pdf)
+    _archive(fake, 42, "Kein PDF", b"plain text")
+    path = f"/api/meetings/{meeting_id}/documents/paperless"
+
+    def _media(db: DbSession) -> MediaService:
+        return MediaService(db, storage=storage, settings=settings)
+
+    def _with_media(principal: Principal) -> TestClient:
+        client = _client(migrated, settings, monkeypatch, fake, principal)
+        api: Any = client.app
+        api.dependency_overrides[get_media_service] = _media
+        return client
+
+    # With the part off there is no copy (§ 002512).
+    await _connect(maker, settings, insert=False)
+    with _with_media(_ADMIN) as client:
+        assert client.post(path, json={"documentId": 41}).status_code == 404
+
+    await _connect(maker, settings, insert=True)
+    with _with_media(_MEMBER) as client:
+        assert client.post(path, json={"documentId": 41}).status_code == 403
+    with _with_media(_USER) as client:
+        # `paperless.use` alone does not write the protocol of the Sitzung.
+        assert client.post(path, json={"documentId": 41}).status_code == 403
+    with _with_media(_ADMIN) as client:
+        assert client.post(path, json={"documentId": 42}).status_code == 415
+        created = client.post(path, json={"documentId": 41})
+        assert created.status_code == 201
+        body = created.json()
+        assert body["name"] == "Angebot Beamer.pdf"
+        assert body["pages"] == 2
+        assert body["url"] == f"/api/media/documents/{body['id']}"
+        fake.down = True
+        down = client.post(path, json={"documentId": 41})
+        assert down.status_code == 503
+        assert down.json()["code"] == "paperless_unavailable"
+
+    async with maker() as session:
+        row = await session.get(MarkdownDocument, uuid.UUID(body["id"]))
+        assert row is not None
+        assert (row.meeting_id, row.paperless_document_id) == (meeting_id, 41)
+        assert storage.blobs[row.storage_key] == pdf
+        entries = (
+            await session.scalars(
+                select(AuditEntry).where(AuditEntry.action == "paperless_inserted")
+            )
+        ).all()
+    mine = [entry for entry in entries if entry.target_id == body["id"]]
+    assert len(mine) == 1
+    assert mine[0].actor == _ADMIN.sub
+    assert mine[0].data == {"meetingId": str(meeting_id), "documentId": 41}

@@ -54,6 +54,7 @@ GREMIUM_PERMISSIONS: tuple[str, ...] = (
     "todo.configure",
     "info.write",
     "members.notify",
+    "ticket.work",
 )
 _ALL_PERMS: list[str] = list(GREMIUM_PERMISSIONS)
 

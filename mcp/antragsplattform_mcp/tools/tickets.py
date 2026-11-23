@@ -1,7 +1,10 @@
 """Ticket tools: the reported problems, questions and ideas of the help menu.
 
-Every tool needs the global permission `ticket.manage` and the scope `tickets:write`.
-A reporter never reads a ticket, so there is no reporter tool. A note can carry files
+A ticket belongs to one Bereich. The work tools need the work right in a Bereich (the
+global permission `ticket.manage`, or the gremium permission `ticket.work` in the
+Gremium of the Bereich) and the scope `tickets:write`; a ticket of another Bereich
+answers 404. The sender blocks need `ticket.manage`, the Bereich settings `admin.site`.
+A note can carry files
 (`file_paths`, uploaded as drafts first, see `_chat_files`). "Absender sperren" blocks
 the reporter of a ticket: a later report of that sender gets a number and is dropped.
 """
@@ -28,19 +31,27 @@ async def tickets_list(
     q: str | None = None,
     limit: int = 50,
     offset: int = 0,
+    area: list[str] | None = None,
 ) -> dict:
-    """List the tickets, newest first, offset-paged.
+    """List the tickets of the Bereiche of the caller, newest first, offset-paged.
 
     Args:
         status: Keep only these statuses.
-        kind: Keep only these kinds.
+        kind: Keep only these kinds (tickets of the Bereich Plattform).
+        area: Keep only the tickets of these Bereiche (ids of `tickets_areas`).
         assignee: A principal id, `me` or `none`.
         q: Matches the title, the body, the number (`T-7K3QX9MD`, `7k3q`) and the reporter.
     """
     return await api().get(
         "/tickets",
         params=params(
-            status=status, kind=kind, assignee=assignee, q=q, limit=limit, offset=offset
+            status=status,
+            kind=kind,
+            area=area,
+            assignee=assignee,
+            q=q,
+            limit=limit,
+            offset=offset,
         ),
     )
 
@@ -95,10 +106,13 @@ async def tickets_note(
 
 @group.tool
 async def tickets_update(ticket_id: str, patch: S.TicketPatch) -> dict:
-    """Change the status, the assignee or the kind of a ticket.
+    """Change the status, the assignee, the Kategorie or the Bereich of a ticket.
 
-    Each change writes an event. An assignee without ticket.manage gives 422
-    `assignee_not_allowed`. `duplicateOfId` goes only with status `rejected`
+    Each change writes an event. An assignee without the work right in the Bereich
+    gives 422 `assignee_not_allowed`. `kind` is the Kategorie of a ticket of Plattform,
+    `categoryId` of another Bereich (422 `category_invalid` for a foreign one).
+    `areaId` moves the ticket, also to a Bereich the caller does not work in.
+    `duplicateOfId` goes only with status `rejected`
     (422 `duplicate_invalid` otherwise). With status `done` or `rejected`,
     `completeTodos: true` also completes the open linked to-dos the caller can write.
     """
@@ -173,14 +187,55 @@ async def tickets_note_delete(ticket_id: str, note_id: str) -> dict:
 
 @group.tool
 async def tickets_counts() -> dict:
-    """Count the tickets per status (`ticket.manage`)."""
+    """Count the tickets of the Bereiche of the caller per status."""
     return await api().get("/tickets/counts")
 
 
 @group.tool
-async def tickets_assignees() -> list:
-    """List the possible assignees: the active holders of `ticket.manage`, by name."""
-    return await api().get("/tickets/assignees")
+async def tickets_assignees(area: str | None = None) -> list:
+    """List the active persons with the work right, by name.
+
+    Args:
+        area: A Bereich id: the possible assignees of that Bereich. Without it the
+            persons of every Bereich of the caller.
+    """
+    return await api().get("/tickets/assignees", params=params(area=area))
+
+
+@group.tool
+async def tickets_areas() -> list:
+    """List every Bereich with its Kategorien; `mine` marks the Bereiche of the caller."""
+    return await api().get("/tickets/areas")
+
+
+@group.tool
+async def ticket_areas_admin_list() -> list:
+    """List the Bereiche with their settings and Kategorien (`admin.site`)."""
+    return await api().get("/admin/ticket-areas")
+
+
+@group.tool
+async def ticket_areas_create(area: S.TicketAreaCreate) -> dict:
+    """Create a Bereich with at most one Gremium and its Kategorien (`admin.site`).
+
+    A used name gives 409 `ticket_area_name_taken`.
+    """
+    return await api().post("/admin/ticket-areas", json=S.dump_create(area))
+
+
+@group.tool
+async def ticket_areas_update(area_id: str, patch: S.TicketAreaPatch) -> dict:
+    """Change the name, the Gremium, `notifyNew` or the Kategorien of a Bereich (`admin.site`).
+
+    The Bereich Plattform takes `notifyNew` only (409 `ticket_area_platform_fixed`).
+    """
+    return await api().patch(f"/admin/ticket-areas/{area_id}", json=dump_patch(patch))
+
+
+@group.tool
+async def ticket_areas_delete(area_id: str) -> dict:
+    """Delete a Bereich without tickets (`admin.site`); with tickets 409."""
+    return await api().delete(f"/admin/ticket-areas/{area_id}")
 
 
 @group.tool

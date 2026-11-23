@@ -14,12 +14,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
+from fastapi import Depends
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.deps import DbSession, SettingsDep
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.paperless.client import (
@@ -179,3 +181,20 @@ def part_since(row: PaperlessSettings, part: Part) -> datetime | None:
             return row.applications_since if row.file_applications else None
         case "plans":
             return row.plans_since if row.file_plans else None
+
+
+def insert_on(row: PaperlessSettings) -> bool:
+    """Tell whether the part `Aus Paperless einfügen` is on.
+
+    The part is off while its switch is off or the connection has no address
+    (§F/integrations/paperless/002512).
+    """
+    return bool(row.base_url and row.token and row.insert_enabled)
+
+
+def get_connection_service(db: DbSession, settings: SettingsDep) -> ConnectionService:
+    """Build the connection service of the request."""
+    return ConnectionService(db, settings)
+
+
+Connection = Annotated[ConnectionService, Depends(get_connection_service)]

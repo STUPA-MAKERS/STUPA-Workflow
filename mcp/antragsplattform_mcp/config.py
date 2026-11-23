@@ -30,7 +30,7 @@ except Exception:
 # caps the gremium rights: `meetings:write` lets session.manage, protocol.write and
 # protocol.finalize through, `votes:write` lets vote.manage through, `todos:write` lets
 # todo.write, todo.configure and todo.all through, `read` lets todo.read_all through,
-# `tickets:write` lets ticket.manage through, `committees:write` lets info.write and
+# `tickets:write` lets ticket.manage and ticket.work through, `committees:write` lets info.write and
 # members.notify through (the Info tab of a Gremium and the message to its members). The
 # set mirrors the platform's
 # `oauth.SCOPES`. Narrow it with ANTRAGSPLATTFORM_SCOPE.

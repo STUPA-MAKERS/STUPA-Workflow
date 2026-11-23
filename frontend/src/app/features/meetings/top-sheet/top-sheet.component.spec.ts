@@ -16,6 +16,7 @@ import { AGENDA, meeting, protocol } from '../../../../testing/meeting-fixtures'
 import { type SaveState, TopSheetComponent } from './top-sheet.component';
 import { documentUploadErrorKey } from './protocol-api.provider';
 import { KnownNamesService } from './known-names.service';
+import { PaperlessService } from '@core/api/paperless.service';
 import { NO_LINKED_TODOS } from '../../../../testing/todo-fixtures';
 import { kindSpies } from '../../../../testing/toast';
 
@@ -654,6 +655,58 @@ describe('TopSheetComponent', () => {
       await setup(over);
       expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /TOP umbenennen/ })).toBeNull();
+    });
+  });
+
+  /** § F/integrations/paperless/002527: `::` opens the Paperless search. */
+  describe('insert from Paperless', () => {
+    const copy = { name: 'Angebot.pdf', url: `/api/media/documents/${ID}` };
+    const paperless = (on: boolean): Provider => ({
+      provide: PaperlessService,
+      useValue: {
+        insertOn: () => of(on),
+        search: () => of([{ documentId: 418, title: 'Angebot', documentType: null, created: null }]),
+        insert: jest.fn(() => of(copy)),
+      },
+    });
+    afterEach(() => document.querySelectorAll('.sw-layer').forEach((n) => n.remove()));
+
+    it('gives the editor the prefix with the permission and the part on, and inserts the pick', async () => {
+      const view = await setup({}, [
+        paperless(true),
+        { provide: MediaApiService, useValue: { documentInfo: () => of({ pages: 3 }) } },
+      ]);
+      const editor = editorOf(view);
+      expect(editor.insertTrigger()).toBe('::');
+      expect(document.querySelector('.sw')).toBeNull();
+
+      editor.insertRequest.emit();
+      view.fixture.detectChanges();
+      await view.fixture.whenStable();
+      view.fixture.detectChanges();
+      expect(document.querySelector('.sw')?.getAttribute('aria-label')).toBe('In Paperless suchen');
+
+      (document.querySelector('.sw__row') as HTMLElement).click();
+      view.fixture.detectChanges();
+      expect(TestBed.inject(PaperlessService).insert).toHaveBeenCalledWith(
+        view.fixture.componentInstance.meeting().id,
+        418,
+      );
+      expect(document.querySelector('.sw')).toBeNull();
+      expect(view.bodyChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ body: expect.stringContaining(`[Angebot.pdf](${copy.url})`) }),
+      );
+    });
+
+    it('keeps `::` plain without the permission or with the part off', async () => {
+      const view = await setup({}, [paperless(false)]);
+      expect(editorOf(view).insertTrigger()).toBeNull();
+      expect(view.container.querySelector('app-paperless-insert')).toBeNull();
+    });
+
+    it('gives a reader no prefix', async () => {
+      const view = await setup({ editable: false }, [paperless(true)]);
+      expect(editorOf(view).insertTrigger()).toBeNull();
     });
   });
 });

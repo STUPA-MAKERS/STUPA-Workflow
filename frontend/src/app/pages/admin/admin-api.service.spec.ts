@@ -535,7 +535,7 @@ describe('AdminApiService — real mode (contract)', () => {
   it('reads and replaces the help and ticket settings', () => {
     let read: unknown;
     s.getHelpTickets().subscribe((v) => (read = v));
-    const settings = { wikiUrl: 'https://w.example', publicEnabled: true, notifyNew: false, retentionMonths: null };
+    const settings = { wikiUrl: 'https://w.example', publicEnabled: true, retentionMonths: null };
     http.expectOne({ method: 'GET', url: '/api/admin/help-tickets' }).flush(settings);
     expect(read).toEqual(settings);
     s.putHelpTickets({ ...settings, retentionMonths: 6 }).subscribe();
@@ -1344,12 +1344,11 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     const s = svc();
     expect(await firstValueFrom(s.getHelpTickets())).toMatchObject({ publicEnabled: true, retentionMonths: 12 });
     await firstValueFrom(
-      s.putHelpTickets({ wikiUrl: 'https://x.example', publicEnabled: false, notifyNew: false, retentionMonths: null }),
+      s.putHelpTickets({ wikiUrl: 'https://x.example', publicEnabled: false, retentionMonths: null }),
     );
     expect(await firstValueFrom(s.getHelpTickets())).toEqual({
       wikiUrl: 'https://x.example',
       publicEnabled: false,
-      notifyNew: false,
       retentionMonths: null,
     });
   });

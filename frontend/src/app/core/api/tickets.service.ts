@@ -1,10 +1,12 @@
 /**
  * API of the tickets (`/api/tickets`): the "Problem melden" dialog sends a ticket, and
- * the page `/tickets` (permission `ticket.manage`) reads and works them.
+ * the page `/tickets` reads and works them. A person works the tickets of a Bereich with
+ * `ticket.manage` (every Bereich) or with the Gremium permission `ticket.work` in the
+ * Gremium of the Bereich.
  *
  * A reporter account reads its own tickets under `/tickets/mine`: the report, the
  * public notes and the status changes, and it writes, edits and deletes its own
- * messages. Every other read and write below the create needs `ticket.manage`; an
+ * messages. Every other read and write below the create needs the work right; an
  * unknown ticket and a ticket the caller may not read both answer 404. The client only
  * binds the data; the server stays authoritative.
  */
@@ -61,10 +63,50 @@ export interface TicketReporter {
   readonly anonymized: boolean;
 }
 
+/** A Kategorie of a Bereich. The Bereich "Plattform" has none: its Kategorien are the kinds. */
+export interface TicketCategory {
+  readonly id: Uuid;
+  readonly name: string;
+}
+
+/** A Bereich: a group of tickets with its own team and its own Kategorien. */
+export interface TicketArea {
+  readonly id: Uuid;
+  readonly name: string;
+  /** The Gremium whose roles give `ticket.work`; null: only `ticket.manage` works here. */
+  readonly gremiumId: Uuid | null;
+  /** The built-in Bereich of the help menu reports. Nobody deletes it. */
+  readonly platform: boolean;
+  /** A new ticket sends a mail to the team of the Bereich. */
+  readonly notifyNew: boolean;
+  readonly categories: readonly TicketCategory[];
+  /** The caller works in the Bereich. */
+  readonly mine: boolean;
+}
+
+/** A Kategorie in the save of a Bereich: `id` keeps a stored one, without it a new one. */
+export interface TicketCategoryInput {
+  readonly id?: Uuid | null;
+  readonly name: string;
+}
+
+export interface TicketAreaInput {
+  readonly name: string;
+  readonly gremiumId: Uuid | null;
+  readonly notifyNew: boolean;
+  /** The whole ordered list; a stored Kategorie that it leaves out is deleted. */
+  readonly categories: readonly TicketCategoryInput[];
+}
+
 export interface TicketListItem {
   readonly id: Uuid;
   readonly number: string;
-  readonly kind: TicketKind;
+  /** The Bereich of the ticket. */
+  readonly areaId: Uuid;
+  /** The kind of a report; null outside the Bereich "Plattform". */
+  readonly kind: TicketKind | null;
+  /** The Kategorie of the Bereich; null in "Plattform" and without one. */
+  readonly categoryId: Uuid | null;
   readonly title: string;
   readonly status: TicketStatus;
   readonly reporter: TicketReporter;
@@ -85,15 +127,25 @@ export interface TicketAttachment {
   readonly scanState?: ScanState;
 }
 
-export type TicketEventKind = 'created' | 'status' | 'assignee' | 'kind' | 'todo_done';
+export type TicketEventKind =
+  | 'created'
+  | 'status'
+  | 'assignee'
+  | 'kind'
+  | 'category'
+  | 'area'
+  | 'todo_done';
 
 /** The payloads of the event kinds, all optional so one type reads every kind. */
 export interface TicketEventPayload {
   /** created */
   readonly confirmationSent?: boolean;
-  /** status, assignee, kind */
-  readonly from?: TicketStatus | TicketKind | PersonRef | null;
-  readonly to?: TicketStatus | TicketKind | PersonRef | null;
+  /** status, assignee, kind; category: the names; area: the ids */
+  readonly from?: TicketStatus | TicketKind | PersonRef | string | null;
+  readonly to?: TicketStatus | TicketKind | PersonRef | string | null;
+  /** area: the names of both Bereiche at the time of the move. */
+  readonly fromName?: string | null;
+  readonly toName?: string | null;
   /** status: the number of the ticket this one duplicates. */
   readonly duplicateOf?: string;
   /** todo_done */
@@ -177,7 +229,8 @@ export interface TicketBlockedSender {
 export interface MyTicketItem {
   readonly id: Uuid;
   readonly number: string;
-  readonly kind: TicketKind;
+  /** null after a move out of the Bereich "Plattform". */
+  readonly kind: TicketKind | null;
   readonly title: string;
   readonly status: TicketStatus;
   readonly createdAt: IsoDateTime;
@@ -213,6 +266,10 @@ export interface TicketPatch {
   /** Explicit null unassigns. */
   readonly assigneeId?: Uuid | null;
   readonly kind?: TicketKind;
+  /** A Kategorie of the Bereich of the ticket; explicit null clears it. */
+  readonly categoryId?: Uuid | null;
+  /** Move the ticket to this Bereich. The kind and the Kategorie go. */
+  readonly areaId?: Uuid;
   /** Only with status `rejected`. */
   readonly duplicateOfId?: Uuid;
   /** Only with status `done` or `rejected`. */
@@ -235,6 +292,8 @@ function readContext(opts: { readonly detail?: boolean }): HttpContext {
 export interface TicketQuery {
   readonly status?: readonly TicketStatus[];
   readonly kind?: readonly TicketKind[];
+  /** Only the tickets of these Bereiche. */
+  readonly area?: readonly Uuid[];
   /** A principal id, `me` or `none`. */
   readonly assignee?: string | null;
   readonly q?: string | null;
@@ -295,9 +354,35 @@ export class TicketsApiService {
     return this.http.get<TicketCounts>(`${this.base}/tickets/counts`, { context: skipLoading() });
   }
 
-  /** The people a ticket can go to, by name. */
-  assignees(): Observable<PersonRef[]> {
-    return this.http.get<PersonRef[]>(`${this.base}/tickets/assignees`, { context: skipLoading() });
+  /** The people a ticket of the Bereich can go to, by name; without `area`: of every own Bereich. */
+  assignees(area?: Uuid): Observable<PersonRef[]> {
+    return this.http.get<PersonRef[]>(`${this.base}/tickets/assignees`, {
+      params: httpParams({ area }),
+      context: skipLoading(),
+    });
+  }
+
+  /** Every Bereich by name, each with `mine`: a ticket can move to any of them. */
+  areas(): Observable<TicketArea[]> {
+    return this.http.get<TicketArea[]>(`${this.base}/tickets/areas`, { context: skipLoading() });
+  }
+
+  /** The Bereiche of the page "Hilfe & Tickets" (`admin.site`). */
+  adminAreas(): Observable<TicketArea[]> {
+    return this.http.get<TicketArea[]>(`${this.base}/admin/ticket-areas`, { context: skipLoading() });
+  }
+
+  createArea(body: TicketAreaInput): Observable<TicketArea> {
+    return this.http.post<TicketArea>(`${this.base}/admin/ticket-areas`, body);
+  }
+
+  updateArea(id: Uuid, body: Partial<TicketAreaInput>): Observable<TicketArea> {
+    return this.http.patch<TicketArea>(`${this.base}/admin/ticket-areas/${id}`, body);
+  }
+
+  /** 409 `ticket_area_has_tickets` while the Bereich holds a ticket. */
+  deleteArea(id: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/admin/ticket-areas/${id}`);
   }
 
   /** `detail` keeps the answer for the read ahead of the list (`prefetchDetails`). */
@@ -372,6 +457,7 @@ function queryParams(query: TicketQuery): HttpParams {
   return httpParams({
     status: query.status ?? [],
     kind: query.kind ?? [],
+    area: query.area ?? [],
     assignee: query.assignee || undefined,
     q: query.q?.trim() || undefined,
     limit: query.limit,

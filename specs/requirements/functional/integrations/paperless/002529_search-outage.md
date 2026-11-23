@@ -5,7 +5,14 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/paperless/test_paperless.py:test_the_search_tells_an_outage"
+  - "backend/tests/unit/modules/paperless/test_client.py:test_search_times_out_with_a_cause_code"
+  - "frontend/src/app/features/meetings/paperless-insert/paperless-insert.component.spec.ts:PaperlessInsertComponent"
+implementation:
+  - backend/app/modules/paperless/client.py
+  - backend/app/modules/paperless_filing/router.py
+  - frontend/src/app/features/meetings/paperless-insert/paperless-insert.component.ts
 scope:
   - backend/app/
   - frontend/src/app/

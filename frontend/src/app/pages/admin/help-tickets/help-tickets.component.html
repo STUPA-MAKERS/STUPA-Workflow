@@ -3,6 +3,7 @@
   [groups]="groups()"
   [state]="screenState()"
   [save]="{ dirty: dirty(), busy: saving(), disabled: !!wikiError() }"
+  (action)="onAreaAction($event.key)"
   (save)="save()"
   (discard)="discard()"
 >
@@ -33,12 +34,6 @@
         [checked]="draft().publicEnabled"
         (checkedChange)="patch({ publicEnabled: $event })"
         >{{ 'admin.helpTickets.public' | t }}</app-switch
-      >
-      <app-switch
-        class="ht__row"
-        [checked]="draft().notifyNew"
-        (checkedChange)="patch({ notifyNew: $event })"
-        >{{ 'admin.helpTickets.notify' | t }}</app-switch
       >
       <div class="ht__row ht__row--split">
         <span id="ht-anon" class="ht__label">{{ 'admin.helpTickets.anonymize' | t }}</span>
@@ -138,3 +133,12 @@
     </div>
   </ng-template>
 </app-settings-screen>
+
+<app-ticket-area-dialog
+  [open]="editing() !== null"
+  [area]="editingArea()"
+  [gremien]="gremien()"
+  (closed)="editing.set(null)"
+  (saved)="onAreaSaved($event)"
+  (deleted)="onAreaDeleted($event)"
+/>

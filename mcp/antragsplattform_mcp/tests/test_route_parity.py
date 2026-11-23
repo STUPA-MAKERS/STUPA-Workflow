@@ -54,6 +54,9 @@ EXCLUDED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/admin/paperless/failed-filings/{}/retry"),
         ("POST", "/admin/paperless/backfill"),
         ("GET", "/paperless/documents/{}/{}"),
+        ("GET", "/paperless/insert"),
+        ("GET", "/paperless/search"),
+        ("POST", "/meetings/{}/documents/paperless"),
         # Login, logout, the OAuth flow and the MCP package: the MCP client does them.
         ("GET", "/auth/login"),
         ("GET", "/auth/callback"),

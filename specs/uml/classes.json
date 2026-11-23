@@ -932,6 +932,34 @@
       "to": "Ticket"
     },
     {
+      "column": "area_id",
+      "from": "Ticket",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "TicketArea"
+    },
+    {
+      "column": "category_id",
+      "from": "Ticket",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "TicketCategory"
+    },
+    {
+      "column": "gremium_id",
+      "from": "TicketArea",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Gremium"
+    },
+    {
+      "column": "area_id",
+      "from": "TicketCategory",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "TicketArea"
+    },
+    {
       "column": "actor_id",
       "from": "TicketEvent",
       "multiplicity": "*",
@@ -4497,6 +4525,12 @@
           "type": "CHAR(32)"
         },
         {
+          "name": "paperless_document_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "BIGINT"
+        },
+        {
           "name": "created_at",
           "nullable": false,
           "primaryKey": false,
@@ -6509,8 +6543,20 @@
           "type": "TEXT"
         },
         {
-          "name": "kind",
+          "name": "area_id",
           "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "category_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "kind",
+          "nullable": true,
           "primaryKey": false,
           "type": "TEXT",
           "values": [
@@ -6614,6 +6660,90 @@
     {
       "attributes": [
         {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "gremium_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "platform",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "notify_new",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "TicketArea",
+      "module": "tickets",
+      "name": "TicketArea",
+      "path": "backend/app/modules/tickets/models.py",
+      "table": "ticket_area"
+    },
+    {
+      "attributes": [
+        {
+          "name": "area_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "position",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "TicketCategory",
+      "module": "tickets",
+      "name": "TicketCategory",
+      "path": "backend/app/modules/tickets/models.py",
+      "table": "ticket_category"
+    },
+    {
+      "attributes": [
+        {
           "name": "ticket_id",
           "nullable": false,
           "primaryKey": false,
@@ -6635,7 +6765,9 @@
             "status",
             "assignee",
             "kind",
-            "todo_done"
+            "todo_done",
+            "category",
+            "area"
           ]
         },
         {

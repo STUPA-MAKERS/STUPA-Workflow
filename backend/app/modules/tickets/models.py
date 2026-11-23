@@ -16,6 +16,13 @@ reporter account reads it too). Notes are soft-deleted (``deleted_at``). A note 
 reporter is ``public``; the anonymization clears its ``author_id``. Events are the timeline of
 the status, the assignee and the kind. Both cascade with the ticket.
 
+A ticket belongs to exactly one Bereich (``ticket_area``). The Bereich ``Plattform`` is
+built in and has the fixed id ``PLATFORM_AREA_ID``, so the reports of the help menu have
+a place on every installation. A Bereich belongs to one Gremium or to none; the Gremium
+decides who works in it (``access.py``). A ticket of ``Plattform`` has a ``kind``, the
+fixed Kategorien of that Bereich. A ticket of a different Bereich has no kind and at most
+one Kategorie of its Bereich (``ticket_category``).
+
 ``ticket_sender_block`` holds the blocked senders: an account (``principal_id``) or a
 normalized e-mail address (``email``, stripped and lowercase). A report of a blocked
 sender is swallowed: it answers a number and stores nothing (``hit_count``).
@@ -28,12 +35,14 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
     Integer,
     Text,
+    UniqueConstraint,
     func,
     text,
 )
@@ -52,17 +61,86 @@ CLOSED_STATUSES: frozenset[str] = frozenset({"done", "rejected"})
 #: The visibilities of a note.
 TICKET_NOTE_VISIBILITIES: tuple[str, ...] = ("internal", "public")
 #: The kinds of a timeline event.
-TICKET_EVENT_KINDS: tuple[str, ...] = ("created", "status", "assignee", "kind", "todo_done")
+TICKET_EVENT_KINDS: tuple[str, ...] = (
+    "created",
+    "status",
+    "assignee",
+    "kind",
+    "todo_done",
+    "category",
+    "area",
+)
+#: The id of the built-in Bereich ``Plattform``. The migration creates the row.
+PLATFORM_AREA_ID = uuid.UUID("7a11e700-0000-4000-8000-000000000001")
 
 
 def _in(values: tuple[str, ...]) -> str:
     return ", ".join(f"'{v}'" for v in values)
 
 
+class TicketArea(UUIDPkMixin, TimestampMixin, Base):
+    """A Bereich: the unit that separates the tickets, the rights and the settings of a team.
+
+    Attributes:
+        name: The name, unique on the platform.
+        gremium_id: The Gremium that owns the Bereich, else NULL. The Bereich stays
+            without a Gremium when the Gremium is deleted.
+        platform: True only for the built-in Bereich ``Plattform``.
+        notify_new: Mail each new ticket to the team of the Bereich.
+    """
+
+    __tablename__ = "ticket_area"
+
+    name: Mapped[str] = mapped_column(Text, unique=True)
+    gremium_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("gremium.id", ondelete="SET NULL"), nullable=True
+    )
+    platform: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    notify_new: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+
+    __table_args__ = (
+        CheckConstraint("NOT platform OR gremium_id IS NULL", name="platform_without_gremium"),
+        Index(
+            "uq_ticket_area_one_platform",
+            "platform",
+            unique=True,
+            postgresql_where=text("platform"),
+        ),
+        Index("ix_ticket_area_gremium_id", "gremium_id"),
+    )
+
+
+class TicketCategory(UUIDPkMixin, Base):
+    """A Kategorie of a Bereich. ``position`` orders the list of the Bereich.
+
+    The unique name of a Bereich is checked at the commit, so one save can swap the
+    names of two Kategorien.
+    """
+
+    __tablename__ = "ticket_category"
+
+    area_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ticket_area.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(Text)
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "area_id",
+            "name",
+            name="uq_ticket_category_area_name",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        Index("ix_ticket_category_area_id", "area_id"),
+    )
+
+
 class Ticket(UUIDPkMixin, TimestampMixin, Base):
     """One reported ticket.
 
     Attributes:
+        area_id: The Bereich of the ticket; a ticket without one cannot exist.
+        category_id: The Kategorie, of the same Bereich, else NULL.
         number: The eight random characters of the number, unique on the platform.
         reporter_principal_id: The account of the reporter, else NULL.
         reporter_email: The e-mail of a reporter without a session, else NULL.
@@ -75,7 +153,13 @@ class Ticket(UUIDPkMixin, TimestampMixin, Base):
     __tablename__ = "ticket"
 
     number: Mapped[str] = mapped_column(Text, default=draw_number, unique=True)
-    kind: Mapped[str] = mapped_column(Text)
+    area_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ticket_area.id"), default=PLATFORM_AREA_ID
+    )
+    category_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ticket_category.id", ondelete="SET NULL"), nullable=True
+    )
+    kind: Mapped[str | None] = mapped_column(Text, nullable=True)
     title: Mapped[str] = mapped_column(Text)
     body: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text, server_default="new")
@@ -101,6 +185,7 @@ class Ticket(UUIDPkMixin, TimestampMixin, Base):
         Index("ix_ticket_status", "status"),
         Index("ix_ticket_created_at", "created_at"),
         Index("ix_ticket_assignee", "assignee_id"),
+        Index("ix_ticket_area_id", "area_id"),
     )
 
 

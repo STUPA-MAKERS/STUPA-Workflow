@@ -574,6 +574,13 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/paperless/002531](requirements/functional/integrations/paperless/002531_audit.md) | Each filing and each insert has an audit entry | approved |
 | [F/integrations/paperless/002534](requirements/functional/integrations/paperless/002534_search-like-global-search.md) | The Paperless search looks like the global search | approved |
 | [F/integrations/paperless/002535](requirements/functional/integrations/paperless/002535_file-antrag-attachments.md) | The attachments of an Antrag are filed with its PDF | approved |
+| [F/integrations/paperless/002762](requirements/functional/integrations/paperless/002762_feature-switch.md) | Paperless has a feature switch | approved |
+| [F/integrations/paperless/002763](requirements/functional/integrations/paperless/002763_link-kind.md) | A Paperless document is a kind of link end | approved |
+| [F/integrations/paperless/002764](requirements/functional/integrations/paperless/002764_link-permission.md) | A Paperless link needs the Paperless permission | approved |
+| [F/integrations/paperless/002765](requirements/functional/integrations/paperless/002765_link-title-stored.md) | A Paperless link keeps the title from the moment of the link | approved |
+| [F/integrations/paperless/002766](requirements/functional/integrations/paperless/002766_link-search.md) | The link search finds Paperless documents | approved |
+| [F/integrations/paperless/002767](requirements/functional/integrations/paperless/002767_link-switch.md) | The links to Paperless have their own switch | approved |
+| [F/integrations/paperless/002768](requirements/functional/integrations/paperless/002768_link-graph.md) | The graph shows linked Paperless documents | approved |
 | [F/integrations/ticket-mail/002720](requirements/functional/integrations/ticket-mail/002720_postfach-per-bereich.md) | A Bereich has at most one Postfach | approved |
 | [F/integrations/ticket-mail/002721](requirements/functional/integrations/ticket-mail/002721_postfach-page.md) | An admin sets the Postfach on the admin page | approved |
 | [F/integrations/ticket-mail/002722](requirements/functional/integrations/ticket-mail/002722_postfach-switch.md) | Each Postfach has a switch | approved |

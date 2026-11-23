@@ -2,6 +2,7 @@
 
 §F/integrations/paperless/002513 each call carries the token of the connection.
 §F/integrations/paperless/002522 the client has no call with the method DELETE.
+§F/integrations/paperless/002527-002529 the search and the download of the insert.
 §NF/security/network/002514 the client calls only a host of the allowlist and follows no
 redirect. §NF/security/network/002515 an error carries a cause code and no text.
 """
@@ -14,6 +15,9 @@ import httpx
 import pytest
 
 from app.modules.paperless.client import (
+    SEARCH_LIMIT,
+    SEARCH_TIMEOUT_SECONDS,
+    DocumentHit,
     PaperlessClient,
     PaperlessError,
     TaskState,
@@ -211,3 +215,92 @@ async def test_add_tag_skips_a_tag_that_is_set() -> None:
     fake.documents[5] = {"id": 5, "tags": [9], "custom_fields": []}
     await fake.client().add_tag(5, 9)
     assert [r.method for r in fake.requests] == ["GET"]
+
+
+def _document(fake: FakePaperless, document_id: int, title: str, type_id: int | None) -> None:
+    fake.documents[document_id] = {
+        "id": document_id,
+        "title": title,
+        "created": "2031-05-02T00:00:00+02:00",
+        "document_type": type_id,
+        "tags": [],
+        "custom_fields": [],
+    }
+
+
+async def test_search_answers_the_hits_with_the_type_name_and_the_date() -> None:
+    """§002534: a hit has the title, the document type and the date."""
+    fake = FakePaperless()
+    fake.names["document_types"]["Angebot"] = 7
+    _document(fake, 100, "Angebot Beamer", 7)
+    _document(fake, 101, "Bescheid", None)
+
+    hits = await fake.client().search("  beamer ")
+
+    assert hits == [
+        DocumentHit(
+            document_id=100,
+            title="Angebot Beamer",
+            document_type="Angebot",
+            created=date(2031, 5, 2),
+        )
+    ]
+    search = fake.requests[0]
+    assert search.url.params["query"] == "beamer"
+    assert search.url.params["page_size"] == str(SEARCH_LIMIT)
+    assert "ordering" not in search.url.params
+    assert search.extensions["timeout"]["read"] == SEARCH_TIMEOUT_SECONDS
+
+
+async def test_search_without_a_query_answers_the_newest_documents() -> None:
+    fake = FakePaperless()
+    _document(fake, 100, "Alt", None)
+    _document(fake, 101, "Neu", None)
+
+    hits = await fake.client().search("")
+
+    assert [hit.title for hit in hits] == ["Neu", "Alt"]
+    assert [hit.document_type for hit in hits] == [None, None]
+    assert fake.requests[0].url.params["ordering"] == "-added"
+    assert "query" not in fake.requests[0].url.params
+    assert len(fake.requests) == 1
+
+
+async def test_search_refuses_an_answer_that_is_no_list() -> None:
+    client = _answering(httpx.Response(200, json={"detail": "x"}))
+    with pytest.raises(PaperlessError) as error:
+        await client.search("x")
+    assert error.value.code == "format"
+
+
+async def test_search_reads_a_date_only_from_a_date_text() -> None:
+    fake = FakePaperless()
+    _document(fake, 100, "Ohne Datum", None)
+    fake.documents[100]["created"] = "gestern"
+    _document(fake, 101, "Kein Text", None)
+    fake.documents[101]["created"] = None
+    assert [hit.created for hit in await fake.client().search("")] == [None, None]
+
+
+async def test_search_times_out_with_a_cause_code() -> None:
+    """§002529: a Paperless that does not answer in time is a failure of the search."""
+    client = _raising(httpx.ReadTimeout("slow"))
+    with pytest.raises(PaperlessError) as error:
+        await client.search("x")
+    assert error.value.code == "timeout"
+
+
+async def test_download_answers_the_pdf_and_refuses_a_file_over_the_limit() -> None:
+    """§002528: the copy is the PDF version of the document."""
+    fake = FakePaperless()
+    _document(fake, 100, "Angebot", None)
+    fake.files[100] = b"%PDF-1.7 angebot"
+    client = fake.client()
+
+    assert await client.title(100) == "Angebot"
+    assert await client.download(100, 100) == b"%PDF-1.7 angebot"
+    assert fake.requests[-1].url.path == "/api/documents/100/download/"
+    assert fake.requests[-1].headers["authorization"] == f"Token {TOKEN}"
+    with pytest.raises(PaperlessError) as error:
+        await client.download(100, 5)
+    assert error.value.code == "too_large"

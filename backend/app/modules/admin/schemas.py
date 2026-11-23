@@ -987,12 +987,12 @@ class HelpTicketsSettings(FrozenStrictCamelModel, frozen=True):
     """The admin page "Hilfe & Tickets" (``GET``/``PUT /admin/help-tickets``).
 
     ``wikiUrl`` takes http(s) only. ``retentionMonths`` is 1..120 or null (never
-    anonymize).
+    anonymize). The switch for the mail of a new ticket is a setting of each Bereich
+    (``/admin/ticket-areas``).
     """
 
     wiki_url: str = Field(default=DEFAULT_WIKI_URL, alias="wikiUrl", max_length=2048)
     public_enabled: bool = Field(default=True, alias="publicEnabled")
-    notify_new: bool = Field(default=True, alias="notifyNew")
     retention_months: int | None = Field(default=12, alias="retentionMonths", ge=1, le=120)
 
     @field_validator("wiki_url")

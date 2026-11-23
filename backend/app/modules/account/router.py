@@ -100,6 +100,7 @@ async def me(
         has_scoped_budget_view=await _has_scoped_budget_view(db, principal.sub),
         in_substitute_pool=await _in_substitute_pool(db, principal.sub),
         has_reported_tickets=await _has_reported_tickets(db, principal.sub),
+        works_on_tickets=await _works_on_tickets(db, principal),
     )
 
 
@@ -157,6 +158,13 @@ async def _own_session_id_token(
     if session_row is None or session_row.principal_id != principal_id:
         return None
     return session_row.id_token
+
+
+async def _works_on_tickets(db: DbSession, principal: Principal) -> bool:
+    """Tell if the principal works in at least one Bereich (the work list of "Tickets")."""
+    from app.modules.tickets.access import works_on_tickets
+
+    return await works_on_tickets(db, principal)
 
 
 async def _has_reported_tickets(db: DbSession, sub: str) -> bool:

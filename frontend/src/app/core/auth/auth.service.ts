@@ -92,6 +92,15 @@ export class AuthService {
     () => this._principal()?.has_reported_tickets === true,
   );
 
+  /**
+   * The principal works on tickets in at least one Bereich: with `ticket.manage`, or with
+   * the gremium permission `ticket.work` in the Gremium of a Bereich. The tab "Tickets"
+   * then shows the work list of the team.
+   */
+  readonly worksOnTickets = computed(
+    () => this.can('ticket.manage') || this._principal()?.works_on_tickets === true,
+  );
+
   /** A report went out with this session: the tab "Tickets" shows from now on. */
   markReportedTicket(): void {
     const p = this._principal();

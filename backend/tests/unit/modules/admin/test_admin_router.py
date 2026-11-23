@@ -975,7 +975,6 @@ def test_help_tickets_read_and_save_need_admin_site(app: FastAPI, client: TestCl
     body = {
         "wikiUrl": "https://w.example.org",
         "publicEnabled": False,
-        "notifyNew": True,
         "retentionMonths": None,
     }
     saved = client.put("/api/admin/help-tickets", json=body)

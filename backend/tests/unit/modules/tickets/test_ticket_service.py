@@ -19,6 +19,7 @@ from app.modules.auth.principal import Principal
 from app.modules.files.schemas import AttachmentOut, MessageAttachmentOut
 from app.modules.meetings.models import Meeting
 from app.modules.tickets import service as svc_mod
+from app.modules.tickets.access import PLATFORM_ONLY, area_workers
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote
 from app.modules.tickets.numbers import (
     NUMBER_ALPHABET,
@@ -28,12 +29,7 @@ from app.modules.tickets.numbers import (
     parse_number,
 )
 from app.modules.tickets.schemas import NoteCreate, TicketCreate, TicketPatch
-from app.modules.tickets.service import (
-    TicketService,
-    format_number,
-    principal_id_of,
-    ticket_managers,
-)
+from app.modules.tickets.service import TicketService, format_number, principal_id_of
 from app.shared.errors import ForbiddenError, NotFoundError, ValidationProblem
 from tests.unit.modules.tickets.fakes import FakeFiles, ScriptedSession
 
@@ -138,13 +134,14 @@ async def test_principal_id_of_reads_the_row_id() -> None:
     assert await principal_id_of(session, "s") == ME  # type: ignore[arg-type]
 
 
-async def test_ticket_managers_with_and_without_groups() -> None:
+async def test_the_workers_of_plattform_with_and_without_groups() -> None:
     session = ScriptedSession(scalars=[["grp"]], execute=[[(ME, "Ada", "a@x")]])
-    assert await ticket_managers(session, principal_id=ME) == [(ME, "Ada", "a@x")]  # type: ignore[arg-type]
+    found = await area_workers(session, PLATFORM_ONLY, principal_id=ME)  # type: ignore[arg-type]
+    assert found == [(ME, "Ada", "a@x")]
     sql = str(session.statements[-1])
     assert "oidc_groups" in sql
     session = ScriptedSession(scalars=[[]], execute=[[]])
-    assert await ticket_managers(session) == []  # type: ignore[arg-type]
+    assert await area_workers(session, PLATFORM_ONLY) == []  # type: ignore[arg-type]
     assert "oidc_groups" not in str(session.statements[-1])
 
 

@@ -11,6 +11,7 @@ import type { PersonRef } from '@core/api/models';
 import {
   TicketsApiService,
   type MyTicketDetail,
+  type TicketArea,
   type TicketDetail,
   type TicketListItem,
   type TicketNote,
@@ -70,7 +71,9 @@ function detail(over: Partial<TicketDetail> = {}): TicketDetail {
   return {
     id: 't40',
     number: 'T-0040',
+    areaId: 'a-plat',
     kind: 'bug',
+    categoryId: null,
     title: 'Protokoll-PDF zeigt im Kopf das falsche Datum',
     status: 'in_progress',
     reporter: {
@@ -158,6 +161,10 @@ interface Opts {
   me?: string | null;
   /** The viewer holds `ticket.manage` (default); false: the reporter view. */
   manager?: boolean;
+  /** The viewer holds only `ticket.work` in a Gremium, not `ticket.manage`. */
+  workOnly?: boolean;
+  /** The Bereiche of the list page. */
+  areas?: TicketArea[];
   /** The reporter view: the answer of `GET /tickets/mine/{id}`. */
   mine?: (id: string) => Observable<MyTicketDetail>;
 }
@@ -243,6 +250,7 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
   };
   const page = opts.split === null ? null : new TicketsPageService();
   page?.split.set(opts.split ?? false);
+  if (opts.areas) page?.areas.set(opts.areas);
   const notify = page ? jest.spyOn(page, 'notify') : null;
   TestBed.configureTestingModule({
     providers: [
@@ -258,7 +266,8 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
           principal: signal(opts.me == null ? null : { email: opts.me }),
           isAuthenticated: signal(true),
           displayName: signal('Lea Hoffmann'),
-          can: (p: string) => (opts.manager ?? true) && p === 'ticket.manage',
+          can: (p: string) => (opts.manager ?? true) && !opts.workOnly && p === 'ticket.manage',
+          worksOnTickets: () => opts.manager ?? true,
         },
       },
     ],
@@ -1368,6 +1377,97 @@ describe('TicketDetailComponent', () => {
       expect(cmp.visibilityOptions()).toEqual([]);
       expect(cmp.placeholder()).toBe('tickets.detail.notePlaceholder');
       expect(cmp.messages()[0].visibility).toBeNull();
+    });
+  });
+
+  describe('Bereiche', () => {
+    const PLAT: TicketArea = {
+      id: 'a-plat',
+      name: 'Plattform',
+      gremiumId: null,
+      platform: true,
+      notifyNew: true,
+      categories: [],
+      mine: true,
+    };
+    const ASTA: TicketArea = {
+      id: 'a-asta',
+      name: 'AStA-Büro',
+      gremiumId: 'g1',
+      platform: false,
+      notifyNew: true,
+      categories: [{ id: 'c1', name: 'Raumanfrage' }],
+      mine: true,
+    };
+    const FOREIGN: TicketArea = { ...ASTA, id: 'a-x', name: 'Fachschaft', categories: [], mine: false };
+    const inAsta = (over: Partial<TicketDetail> = {}) =>
+      detail({ areaId: 'a-asta', kind: null, categoryId: 'c1', ...over });
+
+    it('reads the team of the Bereich of the ticket', async () => {
+      const { api } = await start();
+      expect(api.assignees).toHaveBeenCalledTimes(1);
+      expect(api.assignees).toHaveBeenCalledWith('a-plat');
+    });
+
+    it('offers no move with one Bereich', async () => {
+      const { cmp } = await start('/tickets/t40', { areas: [PLAT] });
+      expect(cmp.canMove()).toBe(false);
+      expect(screen.queryByRole('button', { name: /Bereich/ })).not.toBeInTheDocument();
+    });
+
+    it('shows the Bereich and the Kategorie of a ticket outside Plattform', async () => {
+      const { cmp } = await start('/tickets/t40', { areas: [PLAT, ASTA], get: () => of(inAsta()) });
+      expect(cmp.hasKind()).toBe(false);
+      expect(cmp.kindIcon()).toBe('ticket');
+      const line = document.querySelector('.td__line')!;
+      expect(line).toHaveTextContent('AStA-Büro');
+      expect(line).toHaveTextContent('Raumanfrage');
+      expect(cmp.categoryOptions().map((o) => o.label)).toEqual(['Keine', 'Raumanfrage']);
+      expect(cmp.areaOptions().map((o) => o.label)).toEqual(['Plattform', 'AStA-Büro']);
+    });
+
+    it('sets and clears the Kategorie', async () => {
+      const { cmp, api } = await start('/tickets/t40', { areas: [PLAT, ASTA], get: () => of(inAsta()) });
+      cmp.setCategory('c1');
+      expect(api.patch).not.toHaveBeenCalled();
+      cmp.setCategory('');
+      expect(api.patch).toHaveBeenCalledWith('t40', { categoryId: null });
+      expect(cmp.kindLabel()).toBe('Keine');
+    });
+
+    it('moves the ticket, says so and reads the new team', async () => {
+      const { cmp, api, toast, router } = await start('/tickets/t40', { areas: [PLAT, ASTA] });
+      cmp.setArea('a-plat');
+      cmp.setArea('unknown');
+      expect(api.patch).not.toHaveBeenCalled();
+      api.patch.mockReturnValueOnce(of(inAsta({ categoryId: null })));
+      cmp.setArea('a-asta');
+      expect(api.patch).toHaveBeenCalledWith('t40', { areaId: 'a-asta' });
+      expect(toast.success).toHaveBeenCalledWith('Ticket nach AStA-Büro verschoben.');
+      expect(api.assignees).toHaveBeenLastCalledWith('a-asta');
+      expect(router.url).toBe('/tickets/t40');
+    });
+
+    it('goes back to the list after a move to a Bereich of another team', async () => {
+      const { cmp, api, router, settle } = await start('/tickets/t40', { areas: [PLAT, FOREIGN] });
+      const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+      api.patch.mockReturnValueOnce(of(detail({ areaId: 'a-x', kind: null })));
+      cmp.setArea('a-x');
+      await settle();
+      expect(navigate).toHaveBeenCalledWith(['/tickets'], { queryParamsHandling: 'preserve' });
+    });
+
+    it('offers the sender block only with ticket.manage', async () => {
+      const { cmp } = await start('/tickets/t40', { workOnly: true });
+      const ids = cmp.menuSections().flatMap((s) => s.items.map((i) => i.id));
+      expect(ids).not.toContain('block');
+      expect(ids).toContain('duplicate');
+    });
+
+    it('shows no Kategorie to the reporter of a ticket without a kind', async () => {
+      await start('/tickets/t40', { manager: false, mine: (id) => of(mine({ id, kind: null })) });
+      expect(document.querySelector('.td__line')).not.toHaveTextContent('Frage');
+      expect(screen.queryByText('Kategorie')).not.toBeInTheDocument();
     });
   });
 });

@@ -117,3 +117,7 @@ class MeOut(FrozenModel, frozen=True):
     #: True if the principal reported at least one ticket that is not anonymized. The
     #: frontend uses this to show the tab "Tickets" without `ticket.manage`.
     has_reported_tickets: bool = False
+    #: True if the principal works on tickets in at least one Bereich: `ticket.manage`,
+    #: or `ticket.work` in the Gremium of a Bereich. The frontend uses this to show the
+    #: work list of the tab "Tickets".
+    works_on_tickets: bool = False
