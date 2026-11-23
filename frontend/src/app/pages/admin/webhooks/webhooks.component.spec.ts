@@ -124,8 +124,8 @@ describe('WebhooksComponent', () => {
   });
 
   /**
-   * An empty field is not yet wrong, but the save stays off. A valid URL is enough. A new
-   * webhook subscribes to no event until one is checked.
+   * An empty field is not yet wrong, but the save stays off. A name and a valid URL are enough.
+   * A new webhook subscribes to no event until one is checked.
    */
   it('validates the URL and saves a webhook without a subscription', async () => {
     const { saveWebhook } = await setup();
@@ -140,6 +140,9 @@ describe('WebhooksComponent', () => {
 
     await userEvent.clear(url);
     await userEvent.type(url, 'https://hook.test');
+    // §NF/usability/controls/002582: the save also needs a name.
+    expect(save).toBeDisabled();
+    await userEvent.type(screen.getByRole('textbox', { name: /^Name/ }), 'Hook');
 
     expect(save).toBeEnabled();
     await userEvent.click(save);
@@ -476,6 +479,17 @@ describe('WebhooksComponent', () => {
     expect(screen.getByRole('checkbox', { name: 'Statuswechsel' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Statuswechsel' })).toBeInTheDocument();
     expect(screen.getAllByText('personenbezogen').length).toBeGreaterThan(0);
+  });
+
+  /** §NF/usability/controls/002581: a filter select names its chosen values. */
+  it('names the chosen values in the text of a filter', async () => {
+    const { c, fixture } = await setup();
+    c.openAdd();
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Gremien' })).toBeInTheDocument();
+    c.patch('gremiumIds', ['g1', 'gone']);
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Gremien: StuPa, gone' })).toBeInTheDocument();
   });
 
   it('leaves the choices empty when their reads fail', async () => {
