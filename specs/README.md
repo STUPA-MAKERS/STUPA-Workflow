@@ -330,7 +330,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/tickets/000313](requirements/functional/collaboration/tickets/000313_reporter-view.md) | A reporter account follows its tickets | approved |
 | [F/collaboration/tickets/000314](requirements/functional/collaboration/tickets/000314_team-work.md) | The team works on tickets | replaced |
 | [F/collaboration/tickets/000315](requirements/functional/collaboration/tickets/000315_sender-block.md) | A sender can be blocked | approved |
-| [F/collaboration/tickets/000316](requirements/functional/collaboration/tickets/000316_ticket-retention.md) | Closed tickets are anonymized after the retention time | replaced |
+| [F/collaboration/tickets/000316](requirements/functional/collaboration/tickets/000316_ticket-retention.md) | Closed tickets are anonymized after the retention time | approved |
 | [F/collaboration/tickets/000317](requirements/functional/collaboration/tickets/000317_context-url.md) | A ticket context keeps only platform pages | approved |
 | [F/collaboration/tickets/001096](requirements/functional/collaboration/tickets/001096_system-entry-name.md) | A system entry names the short name | approved |
 | [F/collaboration/tickets/002700](requirements/functional/collaboration/tickets/002700_ticket-bereich.md) | Each ticket belongs to one Bereich | draft |
@@ -349,7 +349,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/tickets/002713](requirements/functional/collaboration/tickets/002713_bereich-in-app.md) | A Bereich can take tickets from signed-in persons | draft |
 | [F/collaboration/tickets/002714](requirements/functional/collaboration/tickets/002714_random-ticket-number.md) | A new ticket gets a random number of eight characters | draft |
 | [F/collaboration/tickets/002715](requirements/functional/collaboration/tickets/002715_bereich-filter.md) | The ticket list shows the Bereiche of the person | draft |
-| [F/collaboration/tickets/002716](requirements/functional/collaboration/tickets/002716_retention-per-bereich.md) | Closed tickets are anonymized after the retention time of the Bereich | draft |
+| [F/collaboration/tickets/002716](requirements/functional/collaboration/tickets/002716_anonymization-removes-mail-data.md) | The anonymization of a ticket removes its mail data | draft |
 | [F/collaboration/tickets/002717](requirements/functional/collaboration/tickets/002717_new-ticket-mail.md) | A new ticket is mailed to the team of its Bereich | draft |
 | [F/collaboration/tickets/002718](requirements/functional/collaboration/tickets/002718_assigned-mail.md) | The new assignee gets a mail | draft |
 | [F/collaboration/tickets/002719](requirements/functional/collaboration/tickets/002719_existing-tickets.md) | The tickets from before the Bereiche belong to Plattform | draft |

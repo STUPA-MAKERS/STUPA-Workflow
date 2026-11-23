@@ -15,8 +15,7 @@ scope:
 
 The migration must put each existing ticket into the Bereich `Plattform` with the source help
 menu, and must keep its number of the form `T-0042`, its kind as the Kategorie, its status, its
-messages and its events. The settings `notifyNew` and `retentionMonths` must become the settings
-of `Plattform`.
+messages and its events. The setting `notifyNew` must become the setting of `Plattform`.
 
 Reason: The holders of `ticket.manage` must find each ticket and each rule after the update as
 before. The old numbers stand in mails and in to-do cards, so they must stay valid beside the
