@@ -137,7 +137,7 @@ describe('touch styles', () => {
 
   it('gives the app cards and the page header actions the press and the chrome text', () => {
     expect(read('pages/home.component.scss')).toContain('@include press.press;');
-    expect(read('features/todos/card-tile/todo-card-tile.component.scss')).toMatch(
+    expect(read('../../vendor/ui-kit/views/board/src/todo-card-tile-view.component.scss')).toMatch(
       /:host\(:active\),\s*:host\(\[data-press-key\]\) \{\s*@include press\.paint;/,
     );
     expect(read('../styles.scss')).toMatch(/\.sheet-back-link \{[^}]*@include press\.press;/);

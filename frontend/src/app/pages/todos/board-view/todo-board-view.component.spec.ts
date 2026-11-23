@@ -4,7 +4,7 @@ import { fireEvent, render, screen, within } from '@testing-library/angular';
 import type { TodoBoard } from '@core/api/todos.service';
 import { DROP_ENTER, cardsOf } from '../../../features/todos/todos.util';
 import { TODAY, board, tile } from '../../../../testing/todo-fixtures';
-import { DONE_PREVIEW, TodoBoardViewComponent } from './todo-board-view.component';
+import { DONE_PREVIEW, TodoBoardViewComponent } from '@stupa-makers/ui-kit/views/board';
 import { LONG_PRESS_MS } from '@stupa-makers/ui-kit';
 
 const OUTPUTS = ['openCard', 'menu', 'moveCard', 'dropIn', 'quickAdd', 'addIn', 'settings', 'archive'] as const;
@@ -188,7 +188,7 @@ describe('TodoBoardViewComponent', () => {
     await key('Raum buchen', ' ');
     expect(cmp.kb()).toMatchObject({ cardId: 'k-1', col: 0, index: 0 });
     expect(container.querySelector('[aria-live]')).toHaveTextContent('„Raum buchen“ aufgenommen, Spalte Offen, Position 1 von 2.');
-    expect(screen.getByRole('button', { name: 'Raum buchen' }).closest('app-todo-card-tile')).toHaveClass('tt--lifted');
+    expect(screen.getByRole('button', { name: 'Raum buchen' }).closest('app-todo-card-tile-view')).toHaveClass('tt--lifted');
     await key('Haushalt Kapitel 3', 'ArrowDown');
     expect(cmp.kb()?.index).toBe(0);
     await key('Raum buchen', 'ArrowDown');
