@@ -187,7 +187,8 @@ async def test_preview_counts_every_area() -> None:
     The fake count also answers the two open erasure requests. Five sub columns count,
     among them application_decision.decided_by, application_link.linked_by and
     application_observer.added_by. The
-    notifications have two duplicates of two rows, so nothing is left to rewrite. The
+    notifications have two duplicates of two rows in each of their two tables (mail and push
+    switches), so nothing is left to rewrite. The
     preview never locks, writes or commits.
     """
     session = _Session(_pair(calendar_token="tok"), count=2)
@@ -197,9 +198,9 @@ async def test_preview_counts_every_area() -> None:
     areas = {a.area: a for a in out.areas}
     assert list(areas) == list(AREAS)
     assert areas["applications"].rewritten == 2 * 5
-    assert areas["notifications"].combined == 2
+    assert areas["notifications"].combined == 4
     assert areas["notifications"].rewritten == 0
-    assert areas["sessions"].removed == 2 * 3
+    assert areas["sessions"].removed == 2 * 4
     assert areas["memberships"].removed == 2
     assert areas["calendar"].removed == 1
     assert session.dml == 0
@@ -233,7 +234,7 @@ async def test_merge_applies_audits_and_commits(recorded: list[dict[str, Any]]) 
     assert "FOR UPDATE" in str(session.statements[0])
     areas = {a.area: a for a in out.areas}
     assert areas["votes"].rewritten == 1
-    assert areas["sessions"].removed == 3
+    assert areas["sessions"].removed == 4
     assert areas["calendar"].removed == 0
     assert out.merged_at
     assert len(recorded) == 1

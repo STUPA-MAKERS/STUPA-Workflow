@@ -28,6 +28,7 @@ export const ACCOUNT_PAGES: readonly FramePage[] = [
     link: 'notifications',
     title: 'account.menu.notifications',
     desc: 'account.nav.notificationsDesc',
+    featureDesc: { feature: 'push', desc: 'account.nav.notificationsPushDesc' },
     icon: 'bell',
     group: 'account',
     permissions: [],

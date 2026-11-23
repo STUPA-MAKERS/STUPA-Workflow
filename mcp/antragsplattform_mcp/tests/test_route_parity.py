@@ -112,6 +112,11 @@ EXCLUDED: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/principals/me/avatar"),
         ("GET", "/principals/{}/avatar"),
         ("GET", "/api/health"),
+        # Web push of a browser: the key and the subscription come from the service worker,
+        # and a push button acts through its own signed token.
+        ("GET", "/push/key"),
+        ("POST", "/push/devices"),
+        ("GET", "/push/actions/{}"),
     }
 )
 

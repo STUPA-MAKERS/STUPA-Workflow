@@ -32,6 +32,7 @@ export const FEATURE_LABELS: Readonly<Record<FeatureKey, TranslationKey>> = {
   tickets: 'nav.tickets',
   graph: 'nav.graph',
   public: 'admin.features.public',
+  push: 'admin.features.push',
 };
 
 /** One place that still needs a feature, from the 409 `feature_in_use` of the save. */
@@ -60,6 +61,7 @@ const ALL_ON: FeatureSwitches = {
   tickets: true,
   graph: true,
   public: true,
+  push: true,
 };
 
 /** The features that are on: the own switch and each needed feature is on. */

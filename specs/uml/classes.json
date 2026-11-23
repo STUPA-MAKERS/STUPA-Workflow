@@ -786,6 +786,20 @@
     },
     {
       "column": "principal_id",
+      "from": "PushPreference",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "principal_id",
+      "from": "PushSubscription",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "principal_id",
       "from": "RoleAssignment",
       "multiplicity": "*",
       "onDelete": "CASCADE",
@@ -5736,6 +5750,123 @@
       "name": "ProtocolVoteRef",
       "path": "backend/app/modules/meetings/protocol_models.py",
       "table": "protocol_vote_ref"
+    },
+    {
+      "attributes": [
+        {
+          "name": "principal_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "kind",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "TEXT"
+        },
+        {
+          "name": "enabled",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        }
+      ],
+      "id": "PushPreference",
+      "module": "notifications",
+      "name": "PushPreference",
+      "path": "backend/app/modules/notifications/push_models.py",
+      "table": "push_preference"
+    },
+    {
+      "attributes": [
+        {
+          "name": "principal_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "endpoint",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "p256dh",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "auth",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "label",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "last_success_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "PushSubscription",
+      "module": "notifications",
+      "name": "PushSubscription",
+      "path": "backend/app/modules/notifications/push_models.py",
+      "table": "push_subscription"
+    },
+    {
+      "attributes": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "INTEGER"
+        },
+        {
+          "name": "private_pem",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "public_key",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "PushVapidKey",
+      "module": "notifications",
+      "name": "PushVapidKey",
+      "path": "backend/app/modules/notifications/push_models.py",
+      "table": "push_vapid_key"
     },
     {
       "attributes": [

@@ -307,6 +307,17 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/notifications/001002](requirements/functional/collaboration/notifications/001002_mail-footer-copyright.md) | The footer of a mail shows the copyright line | approved |
 | [F/collaboration/notifications/001003](requirements/functional/collaboration/notifications/001003_mail-footer-legal-links.md) | The footer of a mail shows the legal links | approved |
 | [F/collaboration/notifications/001004](requirements/functional/collaboration/notifications/001004_mail-dark-colours.md) | A mail has light and dark colours | approved |
+| [F/collaboration/notifications/002500](requirements/functional/collaboration/notifications/002500_push-per-device.md) | A person switches on push for one device | approved |
+| [F/collaboration/notifications/002501](requirements/functional/collaboration/notifications/002501_push-switch-per-kind.md) | Push has its own switch per kind | approved |
+| [F/collaboration/notifications/002502](requirements/functional/collaboration/notifications/002502_push-urgent-defaults.md) | Only urgent kinds push by default | approved |
+| [F/collaboration/notifications/002503](requirements/functional/collaboration/notifications/002503_push-content.md) | A push shows a title and one short line | approved |
+| [F/collaboration/notifications/002504](requirements/functional/collaboration/notifications/002504_push-feature-switch.md) | Push has a feature switch | approved |
+| [F/collaboration/notifications/002505](requirements/functional/collaboration/notifications/002505_push-vapid-key.md) | The platform makes its own push key | approved |
+| [F/collaboration/notifications/002506](requirements/functional/collaboration/notifications/002506_push-expired-devices.md) | An expired device subscription is removed | approved |
+| [F/collaboration/notifications/002507](requirements/functional/collaboration/notifications/002507_push-accounts-only.md) | Only accounts get push | approved |
+| [F/collaboration/notifications/002508](requirements/functional/collaboration/notifications/002508_push-jump-buttons.md) | A push can carry jump buttons | approved |
+| [F/collaboration/notifications/002509](requirements/functional/collaboration/notifications/002509_push-direct-actions.md) | A push can act without opening the app | approved |
+| [F/collaboration/notifications/002510](requirements/functional/collaboration/notifications/002510_push-endpoint-guard.md) | A push goes only to a known push service | approved |
 | [F/collaboration/search/000328](requirements/functional/collaboration/search/000328_reuse-gates.md) | Search reuses the gate of each module | approved |
 | [F/collaboration/search/000329](requirements/functional/collaboration/search/000329_query-length.md) | Search needs two characters | approved |
 | [F/collaboration/search/000330](requirements/functional/collaboration/search/000330_per-kind-cap.md) | Search shows 5 hits per kind | approved |

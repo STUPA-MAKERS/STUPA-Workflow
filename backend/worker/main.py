@@ -40,6 +40,7 @@ from worker.mail import on_startup as mail_on_startup
 from worker.mail import send_mail
 from worker.protocol import backfill_public_protocols, heal_public_protocols, render_protocol
 from worker.protocol import on_startup as protocol_on_startup
+from worker.push import send_push
 from worker.retention import process_retention
 from worker.scan import on_startup as scan_on_startup
 from worker.scan import scan_attachment
@@ -164,6 +165,7 @@ class WorkerSettings:
         ping,
         refresh_budget_stats,
         send_mail,
+        send_push,
         scan_attachment,
         render_protocol,
         backfill_public_protocols,

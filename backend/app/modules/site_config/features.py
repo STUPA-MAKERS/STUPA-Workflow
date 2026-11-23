@@ -34,6 +34,7 @@ class Feature(StrEnum):
     TICKETS = "tickets"
     GRAPH = "graph"
     PUBLIC = "public"
+    PUSH = "push"
 
 
 #: The features a feature needs (§F/administration/admin/000760). A feature is off while
@@ -63,6 +64,7 @@ class FeatureSwitches(FrozenStrictCamelModel, frozen=True):
     tickets: bool = Field(default=True)
     graph: bool = Field(default=True)
     public: bool = Field(default=True)
+    push: bool = Field(default=True)
 
     def is_set(self, feature: Feature) -> bool:
         """Return the stored switch of ``feature``."""

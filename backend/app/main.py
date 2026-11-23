@@ -81,6 +81,7 @@ from app.modules.livevote.service import BrokerPublisher
 from app.modules.livevote.vote_open_router import router as vote_open_router
 from app.modules.media.router import router as media_router
 from app.modules.notifications.provider import close_mail_pool, create_mail_pool
+from app.modules.notifications.push_router import router as push_router
 from app.modules.notifications.router import (
     admin_router as notification_settings_router,
 )
@@ -94,6 +95,7 @@ from app.modules.protocol.documents_router import router as protocol_documents_r
 from app.modules.protocol.public_images_router import router as public_media_router
 from app.modules.protocol.public_router import router as public_protocol_router
 from app.modules.protocol.router import router as protocol_router
+from app.modules.push_actions.router import router as push_actions_router
 from app.modules.search.router import router as search_router
 from app.modules.tickets.router import router as tickets_router
 from app.modules.todos.links_router import router as links_router
@@ -141,6 +143,8 @@ api_router.include_router(public_protocol_router)
 api_router.include_router(notifications_router)
 api_router.include_router(notification_settings_router)
 api_router.include_router(mail_templates_router)
+api_router.include_router(push_router)
+api_router.include_router(push_actions_router)
 api_router.include_router(budget_tree_router)
 api_router.include_router(budget_plan_router)
 api_router.include_router(calendar_router)

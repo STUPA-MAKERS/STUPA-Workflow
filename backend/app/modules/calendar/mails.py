@@ -24,6 +24,7 @@ from app.modules.calendar.models import Answer
 from app.modules.calendar.rules import Span
 from app.modules.notifications.links import appointment_link
 from app.modules.notifications.mail import MailAttachment
+from app.modules.notifications.push_service import PushButton
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.service import NotificationService
 from app.modules.notifications.texts.calendar import (
@@ -126,6 +127,10 @@ async def send_appointment_mail(
     key, subject, body = _TEXTS[mail.kind]
     cancelled = mail.kind == "cancelled"
     service = NotificationService(session, queue=queue, settings=settings)
+    answer_buttons = (
+        PushButton("appointment_accept", target_id=mail.facts.id),
+        PushButton("appointment_decline", target_id=mail.facts.id),
+    )
     domain = urlsplit(settings.public_base_url).hostname or "stupa.local"
     sent = [
         await service.send_kind_mail(
@@ -142,6 +147,7 @@ async def send_appointment_mail(
             },
             idempotency_parts=(key, str(mail.facts.id), str(person_id), str(mail.event_id)),
             link=None if cancelled else appointment_link(settings, mail.facts.id),
+            push_buttons=() if cancelled else answer_buttons,
             attachments=(
                 ics_file(
                     mail.facts,

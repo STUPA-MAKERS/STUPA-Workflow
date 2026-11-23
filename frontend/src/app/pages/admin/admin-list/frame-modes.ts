@@ -21,6 +21,8 @@ export interface FramePage {
   readonly permissions: readonly string[];
   /** The feature of the page. The entry does not show while the feature is off. */
   readonly feature?: FeatureKey;
+  /** The line under the title while `feature` is on, in place of `desc`. */
+  readonly featureDesc?: { readonly feature: FeatureKey; readonly desc: TranslationKey };
 }
 
 /** A group of a frame navigation. A group without a title shows its entries only. */

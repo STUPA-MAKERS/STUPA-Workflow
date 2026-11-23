@@ -35,6 +35,7 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.notifications.links import MailLink, circular_link, vote_link
 from app.modules.notifications.provider import mail_queue_from_pool
+from app.modules.notifications.push_service import PushButton
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.service import NotificationService
 from app.modules.notifications.texts.polls import (
@@ -166,6 +167,7 @@ async def send_poll_mail(
         "closesAt": _end_text(vote.closes_at, settings),
     }
     service = NotificationService(session, queue=queue, settings=settings)
+    link = _link(settings, vote)
 
     async def send_to(sub: str, email: str) -> bool:
         return await service.send_kind_mail(
@@ -176,7 +178,8 @@ async def send_poll_mail(
             builtin_body=body,
             context=context,
             idempotency_parts=(key, str(vote.id), sub),
-            link=_link(settings, vote),
+            link=link,
+            push_buttons=(PushButton("open_poll", url=link.url),),
         )
 
     sent = [await send_to(sub, email) for sub, email in members]

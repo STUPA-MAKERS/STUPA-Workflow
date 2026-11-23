@@ -22,6 +22,7 @@ const ALL_ON: FeatureSwitches = {
   tickets: true,
   graph: true,
   public: true,
+  push: true,
 };
 
 function makeApi(initial: FeatureSwitches = ALL_ON) {
@@ -52,7 +53,19 @@ async function setup(opts: { api?: Record<string, jest.Mock>; perms?: string[] }
 
 const sw = (name: string) => screen.getByRole('switch', { name: new RegExp(`^${name}`) });
 const save = () => screen.getByRole('button', { name: 'Speichern' });
-const NAMES = ['Aktivität', 'Boards', 'Kalender', 'Sitzungen', 'Abstimmungen', 'Haushalt', 'Rechnungen', 'Tickets', 'Graph', 'Öffentliche Seiten'];
+const NAMES = [
+  'Aktivität',
+  'Boards',
+  'Kalender',
+  'Sitzungen',
+  'Abstimmungen',
+  'Haushalt',
+  'Rechnungen',
+  'Tickets',
+  'Graph',
+  'Öffentliche Seiten',
+  'Push-Benachrichtigungen',
+];
 
 describe('enabledFeatures', () => {
   it('switches a feature off with the feature it needs', () => {

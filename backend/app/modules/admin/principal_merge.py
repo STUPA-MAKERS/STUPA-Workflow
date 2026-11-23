@@ -26,7 +26,8 @@ What the merge does with each reference:
   equal attendance or a to-do assignment that the target already has. The row
   of the target wins, the row of the source goes. A pool entry in which one account
   substitutes for the other goes too, because a person never substitutes for themselves.
-- It removes the sessions and the OAuth codes and tokens of the source, its feed token,
+- It removes the sessions and the OAuth codes and tokens of the source, its push
+  devices (a device subscribes again under the target at its next opt-in), its feed token,
   its role assignments and its gremium memberships. Rights never move: the roles come
   from the OIDC group mappings and the bootstrap, so the target gets its own at its
   next login. The memberships come from the OIDC groups only, so the
@@ -128,6 +129,7 @@ from app.modules.meetings.models import (
 )
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.notifications.models import NotificationPreference
+from app.modules.notifications.push_models import PushPreference, PushSubscription
 from app.modules.privacy.models import ErasureRequest
 from app.modules.site_config.models import PdfAsset, SiteConfigVersion
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
@@ -241,12 +243,14 @@ ID_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
 
 #: The rows of the source that the merge deletes, by area. Rights never move to the
 #: target, because that is a privilege escalation. The target gets its own roles from
-#: the OIDC group mappings and the bootstrap at its next login.
+#: the OIDC group mappings and the bootstrap at its next login. A push device of the
+#: source goes too, so it never pushes the target without its own opt-in.
 REMOVED_ROWS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("roles", RoleAssignment.principal_id),
     ("sessions", AuthSession.principal_id),
     ("sessions", OAuthAuthorizationCode.principal_id),
     ("sessions", OAuthToken.principal_id),
+    ("sessions", PushSubscription.principal_id),
 )
 
 
@@ -254,6 +258,7 @@ REMOVED_ROWS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
 #: duplicates of the source and rewrites the rest.
 COMBINED_COLUMNS: tuple[InstrumentedAttribute[Any], ...] = (
     NotificationPreference.principal_id,
+    PushPreference.principal_id,
     MeetingAttendance.principal_id,
     DelegationSubstitute.member_principal_id,
     DelegationSubstitute.substitute_principal_id,
@@ -726,6 +731,17 @@ class PrincipalMergeService:
             old,
             new,
             exists().where(np.principal_id == new, np.kind == NotificationPreference.kind),
+            tally,
+            apply=apply,
+        )
+
+        pp = aliased(PushPreference)
+        await self._combine(
+            "notifications",
+            PushPreference.principal_id,
+            old,
+            new,
+            exists().where(pp.principal_id == new, pp.kind == PushPreference.kind),
             tally,
             apply=apply,
         )
