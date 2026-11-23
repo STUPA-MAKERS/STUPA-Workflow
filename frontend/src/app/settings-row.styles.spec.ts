@@ -9,6 +9,7 @@ import { join } from 'node:path';
 const PAGES = [
   { name: 'pages/admin/notifications/notification-settings.component', row: 'ns__row' },
   { name: 'pages/admin/help-tickets/help-tickets.component', row: 'ht__row' },
+  { name: 'pages/admin/branding/branding-editor.component', row: 'br__row' },
 ];
 
 const read = (rel: string): string => readFileSync(join(__dirname, rel), 'utf8');
