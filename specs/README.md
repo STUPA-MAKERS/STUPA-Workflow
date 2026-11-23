@@ -606,6 +606,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/webhooks/002416](requirements/functional/integrations/webhooks/002416_test-delivery.md) | A webhook can send a test delivery | approved |
 | [F/integrations/webhooks/002417](requirements/functional/integrations/webhooks/002417_payload-at-event-time.md) | The payload is built when the event occurs | approved |
 | [F/integrations/webhooks/002749](requirements/functional/integrations/webhooks/002749_ticket-event-bereich.md) | The ticket event names the Bereich and follows the Gremium filter | draft |
+| [F/integrations/webhooks/002750](requirements/functional/integrations/webhooks/002750_ticket-message-event.md) | A message of the sender is a webhook event | draft |
+| [F/integrations/webhooks/002751](requirements/functional/integrations/webhooks/002751_ticket-status-event.md) | A status change of a ticket is a webhook event | draft |
 | [F/meetings/calendar/000331](requirements/functional/meetings/calendar/000331_feed.md) | Each person has a calendar feed | approved |
 | [F/meetings/calendar/000332](requirements/functional/meetings/calendar/000332_feed-404.md) | A wrong feed token is not found | approved |
 | [F/meetings/calendar/000333](requirements/functional/meetings/calendar/000333_event-defaults.md) | A calendar event has a reminder | approved |
