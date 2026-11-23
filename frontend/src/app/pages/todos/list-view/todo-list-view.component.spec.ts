@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/angular';
 import type { TodoBoard } from '@core/api/todos.service';
 import { cardsOf } from '../../../features/todos/todos.util';
 import { TODAY, board, link, tile } from '../../../../testing/todo-fixtures';
-import { TodoListViewComponent } from './todo-list-view.component';
+import { TodoListViewComponent } from '@stupa-makers/ui-kit/views/board';
 
 function mapOf(b: TodoBoard) {
   return new Map(b.columns.map((c) => [c.id, cardsOf(b, c.id)]));

@@ -44,7 +44,7 @@ describe('surfaceEdges (§ui-kit:000605)', () => {
 
   it('draws the white edge around a card and a column of a board', () => {
     expect(RULES).toMatch(
-      /\n {2}app-todo-card-tile,\s*\.bv__col \{\s*border: var\(--vh-edge\) !important;/,
+      /\n {2}app-todo-card-tile-view,\s*\.bv__col \{\s*border: var\(--vh-edge\) !important;/,
     );
   });
 

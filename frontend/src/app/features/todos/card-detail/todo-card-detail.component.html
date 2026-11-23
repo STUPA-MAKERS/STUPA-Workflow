@@ -185,7 +185,7 @@
     />
   }
 
-  <app-todo-move-sheet
+  <app-todo-move-sheet-view
     [(open)]="moveOpen"
     [columns]="moveColumns()"
     [current]="card.columnId"
@@ -275,7 +275,7 @@
       <div class="cd__field">
         <dt>{{ 'todos.card.due' | t }}</dt>
         <dd class="cd__chips">
-          <app-todo-due-chip [value]="card.dueDate" [disabled]="!canWrite()" (changed)="setDue($event)" />
+          <app-todo-due-chip-view [value]="card.dueDate" [disabled]="!canWrite()" (changed)="setDue($event)" />
           @if (dueRelative()) {
             <span class="cd__muted">{{ dueRelative() }}</span>
           }
@@ -318,7 +318,7 @@
       <div class="cd__field" data-testid="cd-event-start">
         <dt>{{ 'todos.eventCard.starts' | t }}</dt>
         <dd class="cd__chips">
-          <app-todo-due-chip [value]="event.startsOn" [disabled]="!canWrite()" (changed)="setEvent({ startsOn: $event })" />
+          <app-todo-due-chip-view [value]="event.startsOn" [disabled]="!canWrite()" (changed)="setEvent({ startsOn: $event })" />
           @if (event.startsOn) {
             @if (eventEdit() === 'startTime') {
               <app-time-input
@@ -351,7 +351,7 @@
       <div class="cd__field">
         <dt>{{ 'todos.eventCard.ends' | t }}</dt>
         <dd class="cd__chips">
-          <app-todo-due-chip [value]="event.endsOn" [disabled]="!canWrite()" (changed)="setEvent({ endsOn: $event })" />
+          <app-todo-due-chip-view [value]="event.endsOn" [disabled]="!canWrite()" (changed)="setEvent({ endsOn: $event })" />
           @if (event.endsOn) {
             @if (eventEdit() === 'endTime') {
               <app-time-input

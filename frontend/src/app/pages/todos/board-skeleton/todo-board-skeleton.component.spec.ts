@@ -1,12 +1,12 @@
 import { render } from '@testing-library/angular';
-import { TodoBoardSkeletonComponent } from './todo-board-skeleton.component';
+import { TodoBoardSkeletonViewComponent } from '@stupa-makers/ui-kit/views/board';
 
-describe('TodoBoardSkeletonComponent', () => {
+describe('TodoBoardSkeletonViewComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   /** The done column (the last) ends without it, as the board does. */
   it('draws four columns of tiles and the place of "+ To-Do" at the foot of each open column', async () => {
-    const { container, fixture } = await render(TodoBoardSkeletonComponent, { inputs: { canWrite: true } });
+    const { container, fixture } = await render(TodoBoardSkeletonViewComponent, { inputs: { canWrite: true } });
     const cols = container.querySelectorAll('.bv__col');
     expect(cols).toHaveLength(4);
     expect(container.querySelectorAll('.bv__col .bsk__tile').length).toBeGreaterThan(4);
@@ -16,7 +16,7 @@ describe('TodoBoardSkeletonComponent', () => {
   });
 
   it('draws the column count it is given and the natural height of a board with rows below', async () => {
-    const three = await render(TodoBoardSkeletonComponent, { inputs: { columnCount: 3, natural: true } });
+    const three = await render(TodoBoardSkeletonViewComponent, { inputs: { columnCount: 3, natural: true } });
     expect(three.container.querySelectorAll('.bv__col')).toHaveLength(3);
     expect(three.fixture.nativeElement as HTMLElement).toHaveClass('bv-host--natural');
     three.fixture.componentRef.setInput('columnCount', 6);
@@ -30,12 +30,12 @@ describe('TodoBoardSkeletonComponent', () => {
   });
 
   it('leaves out the place of "+ To-Do" for a person who may not add cards', async () => {
-    const { container } = await render(TodoBoardSkeletonComponent);
+    const { container } = await render(TodoBoardSkeletonViewComponent);
     expect(container.querySelector('.bsk__add')).toBeNull();
   });
 
   it('draws the tab row, one column and the dots on a phone', async () => {
-    const { container } = await render(TodoBoardSkeletonComponent, { inputs: { phone: true } });
+    const { container } = await render(TodoBoardSkeletonViewComponent, { inputs: { phone: true } });
     expect(container.querySelectorAll('.bsk__tab')).toHaveLength(4);
     expect(container.querySelectorAll('.bv__phoneCards .bsk__tile')).toHaveLength(5);
     expect(container.querySelectorAll('.bv__dot')).toHaveLength(4);
@@ -43,7 +43,7 @@ describe('TodoBoardSkeletonComponent', () => {
   });
 
   it('draws the table head and two groups of rows for the list', async () => {
-    const { container } = await render(TodoBoardSkeletonComponent, { inputs: { view: 'list' } });
+    const { container } = await render(TodoBoardSkeletonViewComponent, { inputs: { view: 'list' } });
     expect(container.querySelector('.lv__row--head')?.textContent).toContain('Titel');
     const groups = container.querySelectorAll('.lv__group');
     expect(groups).toHaveLength(2);
@@ -52,7 +52,7 @@ describe('TodoBoardSkeletonComponent', () => {
   });
 
   it('draws board sections of full-width tiles for the phone list', async () => {
-    const { container } = await render(TodoBoardSkeletonComponent, { inputs: { view: 'rows', phone: true } });
+    const { container } = await render(TodoBoardSkeletonViewComponent, { inputs: { view: 'rows', phone: true } });
     const sections = container.querySelectorAll('.bsk__section');
     expect(sections).toHaveLength(3);
     expect(sections[1].querySelectorAll('.bsk__list .bsk__tile')).toHaveLength(3);
