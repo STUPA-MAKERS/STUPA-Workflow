@@ -87,8 +87,8 @@ export interface GraphRow {
  * The server applies the read rules and every filter. The page loads 60 nodes per step and
  * adds each step to the drawing, by itself until 300 nodes show; then "Mehr laden" loads
  * the next 300. The filters are in the query of the URL. The drawing fills the page, and the
- * filters float over it. The field "Schritte" beside the search sets how far the neighbours of
- * the hits show (spec 001434). A press on a node chooses it: the panel shows its facts and
+ * filters float over it. The field "Schritte" at the start corner of the foot, opposite the
+ * zoom buttons, sets how far the neighbours of the hits show (spec 001434). A press on a node chooses it: the panel shows its facts and
  * "Öffnen", on a phone in a sheet. For a screen reader each node names its neighbours.
  */
 @Component({
