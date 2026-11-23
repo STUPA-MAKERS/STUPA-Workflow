@@ -13,7 +13,8 @@ scope:
 
 # Paperless has a feature switch
 
-Paperless must have a switch under /admin/features (`paperless`). While it is off, the platform
+Paperless must have a switch under /admin/features (`paperless`). The switch must be on until
+an admin switches it off, as each feature is. While it is off, the platform
 must not call Paperless: the worker must file nothing, the routes under `/api/paperless` and
 `/api/admin/paperless` and the copy route of the insert must answer 404 `feature_disabled`, and
 the platform must show no element of the integration (the admin page `Paperless`, the entry `In
