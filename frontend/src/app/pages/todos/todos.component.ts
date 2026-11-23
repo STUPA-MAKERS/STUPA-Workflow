@@ -69,11 +69,16 @@ import { TodoCardDetailComponent } from '../../features/todos/card-detail/todo-c
 import { TodoNewDialogComponent } from '../../features/todos/new-dialog/todo-new-dialog.component';
 import { TodoCacheService } from '../../features/todos/todo-cache.service';
 import {
-  TodoMoveSheetComponent,
+  TodoBoardSkeletonViewComponent,
+  TodoBoardViewComponent,
+  TodoListViewComponent,
+  TodoMoveSheetViewComponent,
+  boardDropId,
+  type BoardMove,
   type MoveChoice,
   type MoveColumn,
   type TileMenuRequest,
-} from '../../features/todos/move-sheet/todo-move-sheet.component';
+} from '@stupa-makers/ui-kit/views/board';
 import {
   TodoTransferDialogComponent,
   type TodoTransferTarget,
@@ -98,9 +103,6 @@ import { TodoArchivedBoardsComponent } from './archived-boards/todo-archived-boa
 import { TodoBoardPickerComponent } from './board-picker/todo-board-picker.component';
 import { TodoBoardRowsComponent, type RowDrop, type RowLead } from './board-rows/todo-board-rows.component';
 import { TodoBoardSettingsComponent } from './board-settings/todo-board-settings.component';
-import { TodoBoardSkeletonComponent } from './board-skeleton/todo-board-skeleton.component';
-import { TodoBoardViewComponent, boardDropId, type BoardMove } from './board-view/todo-board-view.component';
-import { TodoListViewComponent } from './list-view/todo-list-view.component';
 import { TodoNewBoardDialogComponent } from './new-board-dialog/todo-new-board-dialog.component';
 import { isoDay } from '@shared/date-format';
 import { pageItemTitle } from '../../layout/page-title.service';
@@ -143,7 +145,7 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
  * Phone: "Meine To-Dos" (board view) and "Alle" are one list of board sections
  * (`app-todo-board-rows`); the personal board is the first section (`lead`), not the tab
  * board. Nothing drags there. A long press on a tile of a writable board, on these lists
- * and on the tab board, opens the "Verschieben" sheet (`app-todo-move-sheet`, the sheet
+ * and on the tab board, opens the "Verschieben" sheet (`app-todo-move-sheet-view`, the sheet
  * of the card detail): a column and its top or end move the card, "In anderes Board
  * verschieben" opens the transfer dialog.
  *
@@ -195,14 +197,14 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
     TodoArchivedBoardsComponent,
     TodoBoardPickerComponent,
     TodoBoardRowsComponent,
-    TodoBoardSkeletonComponent,
+    TodoBoardSkeletonViewComponent,
     TodoBoardSettingsComponent,
     TodoBoardViewComponent,
     TodoCardDetailComponent,
     TodoListViewComponent,
     TodoNewBoardDialogComponent,
     TodoNewDialogComponent,
-    TodoMoveSheetComponent,
+    TodoMoveSheetViewComponent,
     TodoTransferDialogComponent,
   ],
   host: { '[class.pane-page]': "!phone() || view() === 'board'", class: 'todos-host' },

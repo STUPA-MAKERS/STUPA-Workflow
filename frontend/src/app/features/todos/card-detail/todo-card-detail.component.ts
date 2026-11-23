@@ -81,10 +81,14 @@ import {
   SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { TodoAgendaDialogComponent } from '../agenda-dialog/todo-agenda-dialog.component';
-import { TodoDueChipComponent } from '../due-chip/todo-due-chip.component';
 import { TodoLinkPickerComponent, linkKey } from '../link-picker/todo-link-picker.component';
 import { TodoLinkViewComponent } from '../link-view/todo-link-view.component';
-import { TodoMoveSheetComponent, type MoveChoice, type MoveColumn } from '../move-sheet/todo-move-sheet.component';
+import {
+  TodoDueChipViewComponent,
+  TodoMoveSheetViewComponent,
+  type MoveChoice,
+  type MoveColumn,
+} from '@stupa-makers/ui-kit/views/board';
 import { type NewTodoLink, type TodoCardCopy, TodoNewDialogComponent } from '../new-dialog/todo-new-dialog.component';
 import { TodoCacheService } from '../todo-cache.service';
 import { TodoTransferDialogComponent, type TodoTransferTarget } from '../transfer-dialog/todo-transfer-dialog.component';
@@ -190,9 +194,9 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     SideSheetComponent,
     SkeletonComponent,
     TimeInputComponent,
-    TodoDueChipComponent,
+    TodoDueChipViewComponent,
     TodoLinkPickerComponent,
-    TodoMoveSheetComponent,
+    TodoMoveSheetViewComponent,
     TodoNewDialogComponent,
     TodoAgendaDialogComponent,
     TodoTransferDialogComponent,
