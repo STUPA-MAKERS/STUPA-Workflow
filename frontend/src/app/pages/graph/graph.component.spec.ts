@@ -18,7 +18,7 @@ import {
 import { MEDIA } from '@stupa-makers/ui-kit';
 import { loadErrorToast, retryLoadError } from '../../../testing/load-error';
 import { matchMediaQueries } from '../../../testing/meeting-fixtures';
-import { type CanvasNode, GraphCanvasComponent } from './graph-canvas.component';
+import { type CanvasNode, GraphCanvasViewComponent as GraphCanvasComponent } from '@stupa-makers/ui-kit/views/graph';
 import { GraphComponent, SEARCH_PAUSE } from './graph.component';
 import { AUTO_NODES, defaultFilters, localDay } from './graph.util';
 
@@ -29,7 +29,7 @@ const FRESH = defaultFilters(localDay(new Date()));
 class TargetStub {}
 
 /** The drawing without its layout, for a test of the build-up with hundreds of nodes. */
-@Component({ selector: 'app-graph-canvas', standalone: true, template: '' })
+@Component({ selector: 'app-graph-canvas-view', standalone: true, template: '' })
 class CanvasStub {
   readonly nodes = input<readonly CanvasNode[]>([]);
   readonly lines = input<readonly unknown[]>([]);
@@ -242,7 +242,7 @@ describe('GraphComponent', () => {
     expect(el.querySelector('.gr__body')).toHaveAttribute('aria-busy', 'true');
     expect(el.querySelectorAll('.gr__skel .gr__skelNode')).toHaveLength(6);
     expect(el.querySelectorAll('.gr__skelTools .skel-btn')).toHaveLength(3);
-    expect(el.querySelector('app-graph-canvas')).toBeNull();
+    expect(el.querySelector('app-graph-canvas-view')).toBeNull();
     cmp.loadMore();
     expect(calls).toHaveLength(1);
   });
@@ -255,14 +255,14 @@ describe('GraphComponent', () => {
     await settle();
     expect(calls).toHaveLength(2);
     expect(cmp.error()).toBe(false);
-    expect(el.querySelector('app-graph-canvas')).not.toBeNull();
+    expect(el.querySelector('app-graph-canvas-view')).not.toBeNull();
   });
 
   it('shows an empty state, another one with filters', async () => {
     const plain = await start('/graph', [() => of(page([]))]);
     expect(screen.getByText('Noch keine Verknüpfungen')).toBeInTheDocument();
     expect(screen.getByText('Sobald Elemente miteinander verknüpft sind, erscheinen sie hier.')).toBeInTheDocument();
-    expect(plain.el.querySelector('app-graph-canvas')).toBeNull();
+    expect(plain.el.querySelector('app-graph-canvas-view')).toBeNull();
     expect(plain.cmp.empty()).toBe(true);
     expect(plain.cmp.filtered()).toBe(false);
   });
