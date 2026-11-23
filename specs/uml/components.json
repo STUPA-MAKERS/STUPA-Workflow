@@ -1206,6 +1206,11 @@
       "to": "voting"
     },
     {
+      "count": 1,
+      "from": "protocol",
+      "to": "webhooks"
+    },
+    {
       "count": 3,
       "from": "push_actions",
       "to": "auth"
@@ -1234,11 +1239,6 @@
       "count": 3,
       "from": "push_actions",
       "to": "todos"
-    },
-    {
-      "count": 1,
-      "from": "protocol",
-      "to": "webhooks"
     },
     {
       "count": 1,

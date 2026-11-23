@@ -9,6 +9,5 @@
   "backend/app/modules/admin/service/gremien.py": 6,
   "backend/app/modules/admin/service/rbac.py": 4,
   "backend/app/modules/admin/service/service_base.py": 1,
-  "backend/app/modules/admin/service/webhooks.py": 3,
   "backend/app/modules/admin/site_config_service.py": 1
 }

@@ -17,7 +17,7 @@ baseline (0001).
 ``webhook`` actions of the flow.
 
 Revision ID: 08e0c0134332
-Revises: b7d3e1f0a9c4
+Revises: 2e204b8ee6dd
 Create Date: 2026-11-23 09:00:00
 """
 
@@ -31,7 +31,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "08e0c0134332"
-down_revision: str | None = "b7d3e1f0a9c4"
+down_revision: str | None = "2e204b8ee6dd"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

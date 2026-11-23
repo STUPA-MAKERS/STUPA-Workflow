@@ -217,21 +217,22 @@ class WebhookOps(ConfigServiceBase):
         row = await self.session.get(Webhook, webhook_id)
         if row is None:
             raise NotFoundError(f"webhook {webhook_id} not found")
-        if payload.name is not None:
-            row.name = payload.name
         if payload.url is not None:
             self._assert_webhook_url_advisory(payload.url)
-            row.url = payload.url
-        if payload.active is not None:
-            row.active = payload.active
-        if payload.subscriptions is not None:
-            row.subscriptions = _subs_json(payload.subscriptions)
-        if payload.gremium_ids is not None:
-            row.gremium_ids = _ids_json(payload.gremium_ids)
-        if payload.type_ids is not None:
-            row.type_ids = _ids_json(payload.type_ids)
-        if payload.state_keys is not None:
-            row.state_keys = sorted(set(payload.state_keys))
+        changes = {
+            "name": payload.name,
+            "url": payload.url,
+            "active": payload.active,
+            "subscriptions": None
+            if payload.subscriptions is None
+            else _subs_json(payload.subscriptions),
+            "gremium_ids": None if payload.gremium_ids is None else _ids_json(payload.gremium_ids),
+            "type_ids": None if payload.type_ids is None else _ids_json(payload.type_ids),
+            "state_keys": None if payload.state_keys is None else sorted(set(payload.state_keys)),
+        }
+        for key, value in changes.items():
+            if value is not None:
+                setattr(row, key, value)
         await self._audit(actor, AuditAction.WEBHOOK_CONFIG, "webhook", row.id)
         await self.session.commit()
         return _webhook_out(row)

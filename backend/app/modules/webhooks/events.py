@@ -86,10 +86,12 @@ def subscribed_fields(hook: Webhook, event: str) -> list[str] | None:
 def build_body(event: WebhookEvent, chosen: list[str], values: Mapping[str, Any]) -> dict[str, Any]:
     """Return the body of one delivery: event, time, IDs and the chosen fields."""
     known = EVENTS[event.name].field_keys
-    body: dict[str, Any] = {"event": event.name, "occurredAt": event.occurred_at.isoformat()}
-    body.update({key: None if value is None else str(value) for key, value in event.ids.items()})
-    body["data"] = {key: values.get(key) for key in chosen if key in known}
-    return body
+    return {
+        "event": event.name,
+        "occurredAt": event.occurred_at.isoformat(),
+        **{key: None if value is None else str(value) for key, value in event.ids.items()},
+        "data": {key: values.get(key) for key in chosen if key in known},
+    }
 
 
 async def active_webhooks(session: AsyncSession) -> Sequence[Webhook]:

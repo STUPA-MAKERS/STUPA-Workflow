@@ -211,7 +211,9 @@ assert tuple(EVENTS) == get_args(WebhookEventName), "catalog and WebhookEventNam
 def example_payload(event: EventSpec, fields: tuple[str, ...] | list[str]) -> dict[str, Any]:
     """Return the example body of `event` with the chosen `fields` (preview and test)."""
     chosen = set(fields)
-    body: dict[str, Any] = {"event": event.name, "occurredAt": "2026-11-23T09:00:00+00:00"}
-    body.update(dict.fromkeys(event.id_keys, _ID))
-    body["data"] = {f.key: f.example for f in event.fields if f.key in chosen}
-    return body
+    return {
+        "event": event.name,
+        "occurredAt": "2026-11-23T09:00:00+00:00",
+        **dict.fromkeys(event.id_keys, _ID),
+        "data": {f.key: f.example for f in event.fields if f.key in chosen},
+    }
