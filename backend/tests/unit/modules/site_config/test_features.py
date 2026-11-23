@@ -206,7 +206,11 @@ def test_every_route_of_the_app_is_in_the_expected_feature() -> None:
     assert by_feature[Feature.PAPERLESS]
     assert all(
         p.startswith(("/api/paperless", "/api/admin/paperless"))
-        or p == "/api/meetings/{meeting_id}/documents/paperless"
+        or p
+        in (
+            "/api/meetings/{meeting_id}/documents/paperless",
+            "/api/tickets/{ticket_id}/files/{attachment_id}/paperless",
+        )
         for p in by_feature[Feature.PAPERLESS]
     )
     assert all(p.startswith("/api/public/") for p in by_feature[Feature.PUBLIC])
