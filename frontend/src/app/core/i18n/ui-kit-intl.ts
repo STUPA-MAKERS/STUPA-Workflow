@@ -1,5 +1,7 @@
-import { type EnvironmentProviders, inject } from '@angular/core';
+import { type EnvironmentProviders, inject, makeEnvironmentProviders } from '@angular/core';
 import {
+  CONTENT_LANGUAGES,
+  type ContentLanguages,
   provideUiKit,
   type UiKitIntl,
   type UiKitTextKey,
@@ -477,6 +479,79 @@ export const UI_KIT_APP_KEYS: Partial<Record<UiKitTextKey, TranslationKey>> = {
   'graph.zoom.in': 'graph.zoom.in',
   'graph.zoom.out': 'graph.zoom.out',
   'graph.zoom.all': 'graph.zoom.all',
+  'admin.common.key': 'admin.common.key',
+  'admin.flow.approved': 'admin.flow.approved',
+  'admin.flow.automatic': 'admin.flow.automatic',
+  'admin.flow.branch': 'admin.flow.branch',
+  'admin.flow.branchNone': 'admin.flow.branchNone',
+  'admin.flow.cfgGremium': 'admin.flow.cfgGremium',
+  'admin.flow.cfgGremiumPh': 'admin.flow.cfgGremiumPh',
+  'admin.flow.cfgGremiumSource': 'admin.flow.cfgGremiumSource',
+  'admin.flow.cfgGremiumSourceBudget': 'admin.flow.cfgGremiumSourceBudget',
+  'admin.flow.cfgGremiumSourceFixed': 'admin.flow.cfgGremiumSourceFixed',
+  'admin.flow.cfgRolePh': 'admin.flow.cfgRolePh',
+  'admin.flow.color': 'admin.flow.color',
+  'admin.flow.colorCustom': 'admin.flow.colorCustom',
+  'admin.flow.colorNone': 'admin.flow.colorNone',
+  'admin.flow.colorPreset': 'admin.flow.colorPreset',
+  'admin.flow.compareField': 'admin.flow.compareField',
+  'admin.flow.compareFieldPh': 'admin.flow.compareFieldPh',
+  'admin.flow.compareOp': 'admin.flow.compareOp',
+  'admin.flow.compareValue': 'admin.flow.compareValue',
+  'admin.flow.denied': 'admin.flow.denied',
+  'admin.flow.editAllowed': 'admin.flow.editAllowed',
+  'admin.flow.from': 'admin.flow.from',
+  'admin.flow.group.dissolve': 'admin.flow.group.dissolve',
+  'admin.flow.group.inspector': 'admin.flow.group.inspector',
+  'admin.flow.group.members': 'admin.flow.group.members',
+  'admin.flow.group.name': 'admin.flow.group.name',
+  'admin.flow.group.subgroups': 'admin.flow.group.subgroups',
+  'admin.flow.guardAddChild': 'admin.flow.guardAddChild',
+  'admin.flow.guardCombinator.and': 'admin.flow.guardCombinator.and',
+  'admin.flow.guardCombinator.not': 'admin.flow.guardCombinator.not',
+  'admin.flow.guardCombinator.or': 'admin.flow.guardCombinator.or',
+  'admin.flow.guardDesc.and': 'admin.flow.guardDesc.and',
+  'admin.flow.guardDesc.not': 'admin.flow.guardDesc.not',
+  'admin.flow.guardDesc.or': 'admin.flow.guardDesc.or',
+  'admin.flow.guardNone': 'admin.flow.guardNone',
+  'admin.flow.guardOp': 'admin.flow.guardOp',
+  'admin.flow.guardOp.actorIsApplicant': 'admin.flow.guardOp.actorIsApplicant',
+  'admin.flow.guardOp.applicantCommitteeIs': 'admin.flow.guardOp.applicantCommitteeIs',
+  'admin.flow.guardOp.applicantRoleIs': 'admin.flow.guardOp.applicantRoleIs',
+  'admin.flow.guardOp.applicationTypeIs': 'admin.flow.guardOp.applicationTypeIs',
+  'admin.flow.guardOp.attachmentPresent': 'admin.flow.guardOp.attachmentPresent',
+  'admin.flow.guardOp.budgetFitsApplication': 'admin.flow.guardOp.budgetFitsApplication',
+  'admin.flow.guardOp.budgetHasDecisionGremium': 'admin.flow.guardOp.budgetHasDecisionGremium',
+  'admin.flow.guardOp.budgetIs': 'admin.flow.guardOp.budgetIs',
+  'admin.flow.guardOp.compare': 'admin.flow.guardOp.compare',
+  'admin.flow.guardOp.fieldsComplete': 'admin.flow.guardOp.fieldsComplete',
+  'admin.flow.guardOp.hasField': 'admin.flow.guardOp.hasField',
+  'admin.flow.guardOp.isInCommittee': 'admin.flow.guardOp.isInCommittee',
+  'admin.flow.guardOp.isInVoteGremium': 'admin.flow.guardOp.isInVoteGremium',
+  'admin.flow.guardOp.manual': 'admin.flow.guardOp.manual',
+  'admin.flow.guardOp.permissionIs': 'admin.flow.guardOp.permissionIs',
+  'admin.flow.guardOp.roleIs': 'admin.flow.guardOp.roleIs',
+  'admin.flow.guardOp.voteResult': 'admin.flow.guardOp.voteResult',
+  'admin.flow.guardPriority': 'admin.flow.guardPriority',
+  'admin.flow.guardRemove': 'admin.flow.guardRemove',
+  'admin.flow.guardValue': 'admin.flow.guardValue',
+  'admin.flow.initial': 'admin.flow.initial',
+  'admin.flow.kindLabel': 'admin.flow.kindLabel',
+  'admin.flow.legendAutomatic': 'admin.flow.legendAutomatic',
+  'admin.flow.list.empty': 'admin.flow.list.empty',
+  'admin.flow.list.heading': 'admin.flow.list.heading',
+  'admin.flow.list.incoming': 'admin.flow.list.incoming',
+  'admin.flow.list.outgoing': 'admin.flow.list.outgoing',
+  'admin.flow.recipientKind.role': 'admin.flow.recipientKind.role',
+  'admin.flow.removeState': 'admin.flow.removeState',
+  'admin.flow.removeTransition': 'admin.flow.removeTransition',
+  'admin.flow.replacedTarget': 'admin.flow.replacedTarget',
+  'admin.flow.requiresAction': 'admin.flow.requiresAction',
+  'admin.flow.stateInspector': 'admin.flow.stateInspector',
+  'admin.flow.terminal': 'admin.flow.terminal',
+  'admin.flow.to': 'admin.flow.to',
+  'admin.flow.transitionInspector': 'admin.flow.transitionInspector',
+  'admin.common.label': 'admin.common.label',
 };
 
 /**
@@ -501,8 +576,19 @@ export function appUiKitIntl(i18n: I18nService): UiKitIntl {
  * into the kit. The manifest and the page background of each theme are the kit defaults.
  */
 export function provideAppUiKit(): EnvironmentProviders {
-  return provideUiKit({
-    intl: () => appUiKitIntl(inject(I18nService)),
-    theme: { storageKey: 'ap.theme' },
-  });
+  return makeEnvironmentProviders([
+    provideUiKit({
+      intl: () => appUiKitIntl(inject(I18nService)),
+      theme: { storageKey: 'ap.theme' },
+    }),
+    { provide: CONTENT_LANGUAGES, useFactory: () => appContentLanguages(inject(I18nService)) },
+  ]);
+}
+
+/**
+ * The content languages of the kit editors (`app-i18n-input`, `app-content-lang-switch`): DE,
+ * EN and the active extra languages of {@link I18nService}; a new editor starts in `uiLocale`.
+ */
+export function appContentLanguages(i18n: I18nService): ContentLanguages {
+  return { locales: i18n.locales, current: i18n.uiLocale, name: (code) => i18n.languageName(code) };
 }

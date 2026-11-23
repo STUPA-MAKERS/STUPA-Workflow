@@ -299,6 +299,27 @@ def test_state_by_hand_needs_its_own_permission(fake: _FakePlans) -> None:
     assert fake.session.commits == 1
 
 
+def test_a_state_change_asks_for_a_paperless_filing_run(
+    fake: _FakePlans, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """§F/integrations/paperless/002523: the route asks for the run after the commit."""
+    asked: list[tuple[object | None, int]] = []
+
+    async def _request(pool: object | None) -> None:
+        asked.append((pool, fake.session.commits))
+
+    monkeypatch.setattr(plan_router, "request_filing", _request)
+    client = _client(fake, "budget.structure", "budget.plan.set_state")
+    url = f"/api/budget-plan-versions/{_VERSION}/state"
+    assert client.post(url, json={"state": "in_force"}).status_code == 200
+    assert asked == [(None, 1)]
+    pool = object()
+    client.app.state.arq_pool = pool  # type: ignore[attr-defined]
+    by_hand = {"state": "in_force", "reason": "Beschluss"}
+    assert client.put(url, json=by_hand).status_code == 200
+    assert asked == [(None, 1), (pool, 2)]
+
+
 @pytest.mark.parametrize(
     "body",
     [

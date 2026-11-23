@@ -25,6 +25,8 @@ The MCP server must not have a tool for these functions:
 - the run of a privacy erasure: the erasure of an e-mail address, of a principal and the run
   of an erasure request, because it cannot be undone
 - the change of the login lifetime, because the server refuses it to every agent token
+- the Paperless connection, its actions and the address of a filed document, because no
+  OAuth scope carries the permissions `admin.paperless` and `paperless.use`
 - the login, logout, OAuth and consent routes, the MCP package download and the ALTCHA
   challenge
 - the WebSocket channels with the tile read of a live ping, the ICS feeds with their token

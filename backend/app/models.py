@@ -78,6 +78,7 @@ from app.modules.notifications.push_models import (
     PushSubscription,
     PushVapidKey,
 )
+from app.modules.paperless.models import PaperlessFiling, PaperlessSettings
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.site_config.models import SiteConfigVersion
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
@@ -152,6 +153,8 @@ __all__ = [
     "OAuthAuthorizationCode",
     "OAuthToken",
     "ErasureRequest",
+    "PaperlessFiling",
+    "PaperlessSettings",
     "Principal",
     "Backup",
     "CalendarAnswer",

@@ -29,6 +29,7 @@ from app.modules.livevote.service import meeting_channel
 from app.modules.meetings.models import Meeting
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
+from app.modules.paperless.queue import request_filing
 from app.modules.pdf.typst_client import build_typst_client
 from app.modules.protocol.service import ProtocolService
 from app.modules.site_config.features import Feature
@@ -153,6 +154,7 @@ async def render_protocol(ctx: dict[str, Any], protocol_id: str) -> str:
         await _broadcast_meeting_state(ctx, pid)
         return "failed"
     await _broadcast_meeting_state(ctx, pid)
+    await request_filing(ctx.get("redis"))
     return "final"
 
 

@@ -187,6 +187,8 @@ const BACKEND_AUDIT_ACTIONS = [
   'guest_admit_all',
   'gremium_info_update',
   'gremium_notify',
+  'paperless_connection',
+  'paperless_filed',
   'pii_export',
   'anonymization',
   'erasure_requested',

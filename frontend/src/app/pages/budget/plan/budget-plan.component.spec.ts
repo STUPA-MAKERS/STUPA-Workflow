@@ -7,6 +7,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/ang
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import { downloadBlob, ToastService } from '@stupa-makers/ui-kit';
+import { PaperlessService } from '@core/api/paperless.service';
 import { AuthService } from '@core/auth/auth.service';
 import { FeatureService } from '@core/features/feature.service';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
@@ -1339,6 +1340,24 @@ describe('BudgetPlanComponent', () => {
       await choose('Als XLSX exportieren');
       expect(view.api.exportVersion).toHaveBeenLastCalledWith('v0', 'xlsx');
       expect((downloadBlob as jest.Mock).mock.calls.map((call) => call[1])).toEqual(['Haushaltsplan_VS.xlsx']);
+    });
+
+    it('§F/integrations/paperless/002525: the menu opens the filed plan in Paperless', async () => {
+      const link = jest
+        .spyOn(PaperlessService.prototype, 'documentUrl')
+        .mockReturnValue(of('https://paperless.example.org/documents/9/details'));
+      const open = jest.spyOn(window, 'open').mockReturnValue(null);
+      await setup({ perms: ['budget.view'] });
+      await choose('In Paperless öffnen');
+      expect(link).toHaveBeenLastCalledWith('plan', plan().id);
+      expect(open).toHaveBeenCalledWith('https://paperless.example.org/documents/9/details', '_blank', 'noopener');
+      link.mockRestore();
+      open.mockRestore();
+    });
+
+    it('§F/integrations/paperless/002525: a plan without a filed document has no Paperless entry', async () => {
+      await setup({ perms: ['budget.view'] });
+      expect(await openMenu()).not.toContain('In Paperless öffnen');
     });
 
     it('§F/finance/budget/000875: a failed export shows a toast and frees the menu', async () => {

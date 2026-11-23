@@ -24,7 +24,7 @@ import {
   type TransitionDef,
 } from '../admin.models';
 import { CostCentreSelectComponent } from '../../budget/cost-centre-select/cost-centre-select.component';
-import { GuardEditorComponent } from './guard-editor.component';
+import { GuardEditorViewComponent } from '@stupa-makers/ui-kit/views/flow-editor';
 import { actionParamOf, recipientNeedsRef, recipientsOf } from './flow-guard.util';
 
 /**
@@ -45,7 +45,7 @@ import { actionParamOf, recipientNeedsRef, recipientsOf } from './flow-guard.uti
     IconComponent,
     InputComponent,
     SelectFieldComponent,
-    GuardEditorComponent,
+    GuardEditorViewComponent,
     CostCentreSelectComponent,
   ],
   templateUrl: './transition-detail.component.html',
