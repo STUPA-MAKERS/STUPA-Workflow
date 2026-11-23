@@ -2,7 +2,7 @@
 id: "002790"
 title: "Mehr laden" of the graph stands over the zoom buttons
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 tests:
