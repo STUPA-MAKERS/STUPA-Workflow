@@ -5,7 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/paperless/test_paperless.py:test_a_decided_antrag_is_filed_with_its_clean_attachments"
+implementation:
+  - backend/app/modules/paperless_filing/sources.py
+  - backend/app/modules/paperless_filing/files.py
 scope:
   - backend/app/
 ---

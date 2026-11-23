@@ -76,6 +76,9 @@ Backend domain modules (`backend/app/modules/<module>`):
   `ticket.manage` work routes, notes, events, retention cron
 - **be-graph** — the graph page: `GET /api/graph` (elements and relations as nodes and edges,
   paged), permission `graph.view`, read rules through the link resolver
+- **be-paperless** — optional Paperless-ngx integration: connection at `/admin/paperless`
+  (`admin.paperless`), the filing cron for protocols, Anträge, attachments and plans, the failed
+  list, the backfill, the entry "In Paperless öffnen" (`paperless.use`)
 - **be-todos** — to-do boards (gremium, personal, team): RBAC `todo.write`/`todo.configure`,
   lexorank moves, ETag, links with per-kind read checks, ticket and agenda coupling, mails
 

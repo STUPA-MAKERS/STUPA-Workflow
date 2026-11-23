@@ -25,7 +25,7 @@
       @if (gremien().length) {
       <ul class="rowgroup grem__list" [attr.aria-label]="'admin.gremien.title' | t">
         @for (g of gremien(); track g.id) {
-          <li class="grem__item">
+          <li class="grem__item" [attr.data-gremium]="g.id">
             <app-expand-row
               [title]="g.name"
               align="row"

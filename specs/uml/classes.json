@@ -5367,6 +5367,217 @@
     {
       "attributes": [
         {
+          "name": "kind",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "protocol",
+            "protocol_public",
+            "application",
+            "attachment",
+            "plan"
+          ]
+        },
+        {
+          "name": "element_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "source_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "source_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "application_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "title",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "link",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "actor",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "state",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "pending",
+            "uploaded",
+            "filed",
+            "failed"
+          ]
+        },
+        {
+          "name": "attempts",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "due_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "last_error",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "failed_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "task_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "uploaded_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "document_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "filed_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "replaced_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "PaperlessFiling",
+      "module": "paperless",
+      "name": "PaperlessFiling",
+      "path": "backend/app/modules/paperless/models.py",
+      "table": "paperless_filing"
+    },
+    {
+      "attributes": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "INTEGER"
+        },
+        {
+          "name": "base_url",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "token",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "file_protocols",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "protocols_since",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "file_applications",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "applications_since",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "file_plans",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "plans_since",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "insert_enabled",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        }
+      ],
+      "id": "PaperlessSettings",
+      "module": "paperless",
+      "name": "PaperlessSettings",
+      "path": "backend/app/modules/paperless/models.py",
+      "table": "paperless_settings"
+    },
+    {
+      "attributes": [
+        {
           "name": "slot",
           "nullable": false,
           "primaryKey": false,
