@@ -196,7 +196,7 @@
       "to": "voting"
     },
     {
-      "count": 1,
+      "count": 4,
       "from": "admin",
       "to": "webhooks"
     },
@@ -211,7 +211,7 @@
       "to": "shared"
     },
     {
-      "count": 4,
+      "count": 5,
       "from": "applications",
       "to": "application_types"
     },
@@ -236,7 +236,7 @@
       "to": "files"
     },
     {
-      "count": 32,
+      "count": 33,
       "from": "applications",
       "to": "flow"
     },
@@ -246,7 +246,7 @@
       "to": "forms"
     },
     {
-      "count": 12,
+      "count": 13,
       "from": "applications",
       "to": "gremien"
     },
@@ -261,7 +261,7 @@
       "to": "notifications"
     },
     {
-      "count": 65,
+      "count": 66,
       "from": "applications",
       "to": "shared"
     },
@@ -269,6 +269,11 @@
       "count": 7,
       "from": "applications",
       "to": "voting"
+    },
+    {
+      "count": 3,
+      "from": "applications",
+      "to": "webhooks"
     },
     {
       "count": 3,
@@ -431,7 +436,7 @@
       "to": "application_types"
     },
     {
-      "count": 8,
+      "count": 9,
       "from": "budget",
       "to": "applications"
     },
@@ -479,6 +484,11 @@
       "count": 2,
       "from": "budget",
       "to": "voting"
+    },
+    {
+      "count": 1,
+      "from": "budget",
+      "to": "webhooks"
     },
     {
       "count": 1,
@@ -691,7 +701,7 @@
       "to": "application_types"
     },
     {
-      "count": 22,
+      "count": 23,
       "from": "flow",
       "to": "applications"
     },
@@ -736,7 +746,7 @@
       "to": "notifications"
     },
     {
-      "count": 27,
+      "count": 26,
       "from": "flow",
       "to": "shared"
     },
@@ -744,11 +754,6 @@
       "count": 4,
       "from": "flow",
       "to": "voting"
-    },
-    {
-      "count": 3,
-      "from": "flow",
-      "to": "webhooks"
     },
     {
       "count": 1,
@@ -881,7 +886,7 @@
       "to": "voting"
     },
     {
-      "count": 7,
+      "count": 8,
       "from": "livevote",
       "to": "applications"
     },
@@ -911,12 +916,12 @@
       "to": "flow"
     },
     {
-      "count": 10,
+      "count": 11,
       "from": "livevote",
       "to": "gremien"
     },
     {
-      "count": 45,
+      "count": 46,
       "from": "livevote",
       "to": "meetings"
     },
@@ -949,6 +954,11 @@
       "count": 35,
       "from": "livevote",
       "to": "voting"
+    },
+    {
+      "count": 2,
+      "from": "livevote",
+      "to": "webhooks"
     },
     {
       "count": 2,
@@ -1121,7 +1131,7 @@
       "to": "voting"
     },
     {
-      "count": 3,
+      "count": 4,
       "from": "protocol",
       "to": "applications"
     },
@@ -1151,7 +1161,7 @@
       "to": "files"
     },
     {
-      "count": 4,
+      "count": 5,
       "from": "protocol",
       "to": "gremien"
     },
@@ -1166,7 +1176,7 @@
       "to": "media"
     },
     {
-      "count": 18,
+      "count": 20,
       "from": "protocol",
       "to": "meetings"
     },
@@ -1194,6 +1204,11 @@
       "count": 12,
       "from": "protocol",
       "to": "voting"
+    },
+    {
+      "count": 1,
+      "from": "protocol",
+      "to": "webhooks"
     },
     {
       "count": 1,
@@ -1251,7 +1266,7 @@
       "to": "shared"
     },
     {
-      "count": 3,
+      "count": 4,
       "from": "tickets",
       "to": "applications"
     },
@@ -1294,6 +1309,11 @@
       "count": 2,
       "from": "tickets",
       "to": "todos"
+    },
+    {
+      "count": 1,
+      "from": "tickets",
+      "to": "webhooks"
     },
     {
       "count": 9,
@@ -1381,7 +1401,7 @@
       "to": "shared"
     },
     {
-      "count": 11,
+      "count": 12,
       "from": "voting",
       "to": "applications"
     },
@@ -1411,7 +1431,7 @@
       "to": "flow"
     },
     {
-      "count": 4,
+      "count": 5,
       "from": "voting",
       "to": "gremien"
     },
@@ -1429,6 +1449,11 @@
       "count": 29,
       "from": "voting",
       "to": "shared"
+    },
+    {
+      "count": 2,
+      "from": "voting",
+      "to": "webhooks"
     },
     {
       "count": 3,

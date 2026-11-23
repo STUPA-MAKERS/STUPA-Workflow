@@ -27,7 +27,7 @@ def test_build_skips_set_edit_lock_and_strips_type() -> None:
     actions = [
         {"type": "notify", "group": "gremium", "template": "submitted"},
         {"type": "setEditLock", "locked": True},
-        {"type": "webhook", "url": "https://example.org/hook"},
+        {"type": "assignBudget", "budgetId": "b-1"},
     ]
     dispatched = build_dispatched_actions(
         actions,
@@ -35,11 +35,11 @@ def test_build_skips_set_edit_lock_and_strips_type() -> None:
         transition_id=transition_id,
         status_event_id=event_id,
     )
-    assert [a.type for a in dispatched] == ["notify", "webhook"]
+    assert [a.type for a in dispatched] == ["notify", "assignBudget"]
     notify = dispatched[0]
     assert notify.params == {"group": "gremium", "template": "submitted"}
     assert notify.idempotency_key == f"{app_id}:{event_id}:0:notify"
-    assert dispatched[1].idempotency_key == f"{app_id}:{event_id}:2:webhook"
+    assert dispatched[1].idempotency_key == f"{app_id}:{event_id}:2:assignBudget"
 
 
 def test_build_empty_actions() -> None:
@@ -104,7 +104,7 @@ def test_implicit_adds_applicant_notify_and_task() -> None:
     """Add the implicit applicant mail and task mail of a status change."""
     app_id, t_id, e_id = uuid4(), uuid4(), uuid4()
     implicit = build_implicit_notifications(
-        [{"type": "webhook", "url": "https://x"}],
+        [{"type": "assignBudget", "budgetId": "b-1"}],
         application_id=app_id,
         transition_id=t_id,
         status_event_id=e_id,

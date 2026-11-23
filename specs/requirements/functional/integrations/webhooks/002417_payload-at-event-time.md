@@ -2,12 +2,18 @@
 id: "002417"
 title: The payload is built when the event occurs
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
+tests:
+  - "backend/tests/unit/modules/webhooks/test_webhooks_service.py:test_enqueue_pending_enqueues_each_row"
+  - "backend/tests/unit/worker/test_webhooks_worker.py:test_enqueue_pending_hands_rows_to_the_queue"
 protocols:
   - "P/integrations/webhooks/000963"
-implementation: null
+implementation:
+  - backend/app/modules/webhooks/events.py
+  - backend/app/modules/webhooks/service.py
+  - backend/worker/webhook.py
 scope:
   - backend/app/modules/webhooks
 ---

@@ -100,3 +100,30 @@ async def test_on_startup_sets_settings() -> None:
 def test_sessionmaker_default() -> None:
     """Fall back to the global sessionmaker without an injected maker."""
     assert _sessionmaker({}) is not None
+
+
+class _Pool:
+    def __init__(self) -> None:
+        self.jobs: list[tuple[str, str]] = []
+
+    async def enqueue_job(self, name: str, arg: str, **_kw: Any) -> object:
+        self.jobs.append((name, arg))
+        return object()
+
+
+async def test_enqueue_pending_hands_rows_to_the_queue() -> None:
+    """The cron enqueues each new pending delivery. §F/integrations/webhooks/002417."""
+    from worker.webhook import enqueue_pending_webhooks
+
+    ids = [uuid.uuid4()]
+    session = FakeSession(scalars=[ids])
+    pool = _Pool()
+    ctx = {**_ctx(session), "redis": pool}
+    assert await enqueue_pending_webhooks(ctx) == 1
+    assert pool.jobs == [("deliver_webhook", str(ids[0]))]
+
+
+async def test_enqueue_pending_without_redis_does_nothing() -> None:
+    from worker.webhook import enqueue_pending_webhooks
+
+    assert await enqueue_pending_webhooks(_ctx(FakeSession())) == 0

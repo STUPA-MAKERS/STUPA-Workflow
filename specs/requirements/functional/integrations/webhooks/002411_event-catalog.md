@@ -2,12 +2,17 @@
 id: "002411"
 title: The webhook events come from a fixed catalog
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
+tests:
+  - "backend/tests/unit/modules/webhooks/test_webhook_events.py:test_catalog_matches_the_event_names"
 protocols:
   - "P/integrations/webhooks/000963"
-implementation: null
+implementation:
+  - backend/app/modules/webhooks/catalog.py
+  - backend/app/modules/admin/schemas.py
+  - backend/app/modules/admin/service/webhooks.py
 scope:
   - backend/app/modules/webhooks
   - backend/app/modules/admin

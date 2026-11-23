@@ -2,10 +2,15 @@
 id: "002414"
 title: A webhook filters by Gremium, Antragsart and target status
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/webhooks/test_webhook_events.py:test_filters"
+implementation:
+  - backend/app/modules/webhooks/events.py
+  - backend/app/modules/admin/service/webhooks.py
+  - frontend/src/app/pages/admin/webhooks/webhooks.component.html
 scope:
   - backend/app/modules/webhooks
   - backend/app/modules/admin

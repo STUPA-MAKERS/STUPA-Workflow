@@ -2,10 +2,11 @@
 id: "002415"
 title: The webhook dialog shows a payload preview
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+implementation:
+  - frontend/src/app/pages/admin/webhooks/webhooks.component.ts
 scope:
   - frontend/src/app/pages/admin/webhooks
 ---

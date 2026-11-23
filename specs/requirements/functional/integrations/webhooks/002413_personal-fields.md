@@ -2,12 +2,14 @@
 id: "002413"
 title: A personal payload field is marked and off by default
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 protocols:
   - "P/integrations/webhooks/000963"
-implementation: null
+implementation:
+  - backend/app/modules/webhooks/catalog.py
+  - frontend/src/app/pages/admin/webhooks/webhooks.component.html
 scope:
   - backend/app/modules/webhooks
   - frontend/src/app/pages/admin/webhooks

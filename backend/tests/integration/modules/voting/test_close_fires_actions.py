@@ -4,12 +4,12 @@ Before the fix the REST close `POST /votes/{id}/close` used a local dispatcher
 dependency that `app.main` did not override. The branch then fired without its
 actions. The worker had no `ctx['flow_dispatcher']` either and sent only the mails.
 
-The tests seed a vote state whose `pass` and `fail` exits carry a `webhook` and an
-`assignBudget` action. After the close:
+The tests seed a vote state whose `pass` and `fail` exits carry an `assignBudget`
+action, and a webhook that subscribes to `application.transition`. After the close:
 
 * the application has the cost center of `assignBudget` (extras dispatcher),
-* a `webhook_delivery` row is pending for the webhook (webhook dispatcher; without an
-  arq pool the delivery stays pending),
+* a `webhook_delivery` row is pending for the webhook (event in the transaction of the
+  transition, §F/integrations/webhooks/002410),
 * the notify dispatcher ran without an error (no pool: it only logs).
 
 Both the REST route through the real `app.main` wiring and the worker auto-close run
@@ -86,6 +86,7 @@ async def _seed(
         hook = Webhook(
             name=f"h-{tag}", url="https://hook.test/h", active=True,
             secret=b"k",
+            subscriptions=[{"event": "application.transition", "fields": ["toStatus"]}],
         )
         session.add_all([app_type, budget, hook])
         await session.commit()
@@ -119,7 +120,6 @@ async def _seed(
         session.add_all([voting, approved, rejected])
         await session.flush()
         actions: list[dict[str, Any]] = [
-            {"type": "webhook", "webhookId": str(hook.id)},
             {"type": "assignBudget", "budgetId": str(budget.id)},
         ]
         session.add_all([
@@ -164,6 +164,9 @@ async def _assert_actions_ran(
         ).all()
         assert len(deliveries) == 1
         assert deliveries[0].status == "pending"
+        assert deliveries[0].event == "application.transition"
+        assert deliveries[0].payload["applicationId"] == str(seed.app_id)
+        assert set(deliveries[0].payload["data"]) == {"toStatus"}
         vote = await session.get(Vote, seed.vote_id)
         assert vote is not None
         assert vote.status == "closed"

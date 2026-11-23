@@ -229,7 +229,6 @@ def test_validate_guard_rejects_bad_leaf_value_types() -> None:
 
 
 def test_validate_action_ok() -> None:
-    validate_action({"type": "webhook", "webhookId": "w-1"})
     validate_action(
         {"type": "notify", "recipients": [{"kind": "applicant"}, {"kind": "email", "ref": "a@b.c"}]}
     )
@@ -239,8 +238,6 @@ def test_validate_action_ok() -> None:
 
 
 def test_validate_action_required_fields() -> None:
-    with pytest.raises(GuardError, match="webhookId"):
-        validate_action({"type": "webhook"})
     with pytest.raises(GuardError, match="recipients"):
         validate_action({"type": "notify", "recipients": []})
     with pytest.raises(GuardError, match="unknown notify recipient kind"):
@@ -251,6 +248,12 @@ def test_validate_action_required_fields() -> None:
         validate_action({"type": "assignBudget"})
     with pytest.raises(GuardError, match="field"):
         validate_action({"type": "assignBudgetFromField"})
+
+
+def test_validate_action_rejects_webhook() -> None:
+    """The flow has no webhook action. §F/integrations/webhooks/002410."""
+    with pytest.raises(GuardError, match="unknown action type"):
+        validate_action({"type": "webhook", "webhookId": "w-1"})
 
 
 def test_validate_action_rejects_unknown_and_missing() -> None:
@@ -270,6 +273,6 @@ def test_whitelists_exact() -> None:
         "isInVoteGremium", "budgetHasDecisionGremium",
     } == GUARD_OPERATORS
     assert {
-        "webhook", "notify", "addToNextSession", "assignBudget", "assignBudgetFromField",
+        "notify", "addToNextSession", "assignBudget", "assignBudgetFromField",
         "assignBudgetFromApplicantGremium", "assignBudgetFromMap",
     } == ACTION_TYPES

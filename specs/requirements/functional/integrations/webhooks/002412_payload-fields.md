@@ -2,12 +2,18 @@
 id: "002412"
 title: A webhook chooses the payload fields per event
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
+tests:
+  - "backend/tests/unit/modules/webhooks/test_webhook_events.py:test_build_body_keeps_ids_and_drops_unknown_keys"
+  - "backend/tests/unit/modules/admin/test_admin_service_cov.py:test_webhook_subscription_validation"
 protocols:
   - "P/integrations/webhooks/000963"
-implementation: null
+implementation:
+  - backend/app/modules/webhooks/events.py
+  - backend/app/modules/admin/schemas.py
+  - frontend/src/app/pages/admin/webhooks/webhooks.component.ts
 scope:
   - backend/app/modules/webhooks
   - backend/app/modules/admin

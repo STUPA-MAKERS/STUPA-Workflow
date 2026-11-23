@@ -2,12 +2,26 @@
 id: "002410"
 title: A webhook subscribes to events
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
+tests:
+  - "backend/tests/unit/modules/webhooks/test_webhook_events.py:test_emit_one_delivery_per_subscriber"
 protocols:
   - "P/integrations/webhooks/000963"
-implementation: null
+implementation:
+  - backend/app/modules/webhooks/events.py
+  - backend/app/modules/webhooks/models.py
+  - backend/app/modules/applications/webhook_fields.py
+  - backend/app/modules/voting/webhook_fields.py
+  - backend/app/modules/livevote/webhook_fields.py
+  - backend/app/modules/protocol/webhook_fields.py
+  - backend/app/modules/budget/webhook_fields.py
+  - backend/app/modules/tickets/webhook_fields.py
+  - backend/app/modules/flow/service.py
+  - backend/app/shared/guards.py
+  - backend/migrations/versions/08e0c0134332_webhook_event_subscriptions.py
+  - frontend/src/app/pages/admin/webhooks/webhooks.component.ts
 scope:
   - backend/app/modules/webhooks
   - backend/app/modules/admin

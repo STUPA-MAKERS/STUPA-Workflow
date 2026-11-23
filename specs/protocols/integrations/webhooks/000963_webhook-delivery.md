@@ -8,14 +8,15 @@ updated: 2026-11-23
 version: 1
 media_type: application/json
 tests:
-  - "backend/tests/unit/protocols/test_webhook_delivery.py:test_transition_delivery_matches_schema"
+  - "backend/tests/unit/protocols/test_webhook_delivery.py:test_event_delivery_matches_schema"
+  - "backend/tests/unit/protocols/test_webhook_delivery.py:test_test_delivery_matches_schema"
 implementation:
   - backend/app/modules/webhooks/signing.py
   - backend/app/modules/webhooks/service.py
-  - backend/app/modules/flow/webhook_actions.py
+  - backend/app/modules/webhooks/events.py
+  - backend/app/modules/webhooks/catalog.py
 scope:
   - backend/app/modules/webhooks
-  - backend/app/modules/flow/webhook_actions.py
 ---
 
 # A webhook delivery is a signed JSON POST

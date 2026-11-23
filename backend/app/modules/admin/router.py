@@ -106,14 +106,17 @@ from app.modules.admin.schemas import (
     RoleOut,
     RoleUpdate,
     SiteConfigOut,
+    WebhookCatalogEvent,
     WebhookCreate,
     WebhookDeliveryStatusOut,
     WebhookOut,
+    WebhookTestOut,
     WebhookUpdate,
 )
 from app.modules.admin.service import CdVariantService, ConfigService
 from app.modules.admin.service.cd_variants import SquareLogoRef
 from app.modules.admin.service.pdf_branding import PdfBrandingService
+from app.modules.admin.service.webhooks import catalog_out
 from app.modules.admin.site_config_service import ManifestScheme, SiteConfigService
 from app.modules.applications.guest_settings import GuestSettingsService
 from app.modules.auth.login_settings import LoginSettingsService
@@ -1348,6 +1351,34 @@ async def delete_webhook(webhook_id: UUID, service: ServiceDep, principal: Webho
     audit log records the removal as ``webhook_config``.
     """
     await service.delete_webhook(webhook_id, principal.sub)
+
+
+@router.get(
+    "/webhooks/catalog",
+    response_model=list[WebhookCatalogEvent],
+    dependencies=[_WEBHOOK],
+    responses=_errors(401, 403),
+)
+async def webhook_catalog() -> list[WebhookCatalogEvent]:
+    """Return the event catalog with the fields of each event and their example values.
+
+    The dialog builds the event and field choice and the payload preview from it
+    (§F/integrations/webhooks/002411, 002415).
+    """
+    return catalog_out()
+
+
+@router.post(
+    "/webhooks/{webhook_id}/test",
+    response_model=WebhookTestOut,
+    status_code=202,
+    responses=_errors(401, 403, 404, 409),
+)
+async def send_webhook_test(
+    webhook_id: UUID, service: ServiceDep, _principal: WebhookAdmin
+) -> WebhookTestOut:
+    """Queue a test delivery with example values (§F/integrations/webhooks/002416)."""
+    return await service.send_test_delivery(webhook_id)
 
 
 @router.get(

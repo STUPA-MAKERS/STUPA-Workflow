@@ -110,6 +110,7 @@ from app.modules.protocol.public import (
     passed_conditions,
 )
 from app.modules.protocol.schemas import ProtocolOut
+from app.modules.protocol.webhook_fields import emit_protocol_finalized
 from app.modules.site_config.features import Feature, feature_on
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import ElectionResultOut, PollResultOut, VoteOut
@@ -758,6 +759,7 @@ class ProtocolService:
         )
         recipients = await self._mail_recipients(protocol)
         _mark_final(protocol, now, sent=bool(recipients))
+        await emit_protocol_finalized(self.session, protocol)
         await self.session.flush()
         await self.session.commit()
         await self._store(uploads)

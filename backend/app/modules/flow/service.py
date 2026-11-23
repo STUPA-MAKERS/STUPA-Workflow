@@ -62,6 +62,7 @@ from app.modules.applications.decision import (
 )
 from app.modules.applications.models import Application, StatusEvent
 from app.modules.applications.schemas import StateOut
+from app.modules.applications.webhook_fields import emit_transition_event
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import AuditService
 from app.modules.auth.principal import Principal
@@ -1003,6 +1004,15 @@ class FlowService:
             await self._add_to_agenda_in_tx(
                 app.id, meeting_id, non_public=non_public, actor=principal.sub
             )
+        await emit_transition_event(
+            self.session,
+            app,
+            transition_id=transition.id,
+            status_event_id=status_event_id,
+            from_state_id=from_state_id,
+            to_state=target,
+            note=note,
+        )
         return StagedFire(
             application=app,
             transition=transition,

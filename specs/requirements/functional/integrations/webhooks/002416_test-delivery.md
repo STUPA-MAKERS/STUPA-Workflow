@@ -2,12 +2,18 @@
 id: "002416"
 title: A webhook can send a test delivery
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
+tests:
+  - "backend/tests/unit/modules/admin/test_admin_service_cov.py:test_send_test_delivery"
+  - "backend/tests/unit/protocols/test_webhook_delivery.py:test_test_delivery_matches_schema"
 protocols:
   - "P/integrations/webhooks/000963"
-implementation: null
+implementation:
+  - backend/app/modules/admin/service/webhooks.py
+  - backend/app/modules/admin/router.py
+  - frontend/src/app/pages/admin/webhooks/webhooks.component.ts
 scope:
   - backend/app/modules/webhooks
   - backend/app/modules/admin
