@@ -1,68 +1,44 @@
-<section class="ab admin-page">
-  <app-page-header [flush]="true" [title]="'admin.budgets.title' | t">
-    <app-breadcrumbs crumbs />
-  </app-page-header>
-
-  <app-load-state [state]="loadState()" [keepContent]="true" [hasContent]="budgets().length > 0" [errorText]="'budget.tree.error' | t" (retry)="reload()">
-    <ng-template #loading>
-      <app-data-table
-        surface="rowgroup"
-        [loading]="true"
-        [columns]="columns()"
-        [rows]="[]"
-        [skeletonRowCount]="2"
-        [loadingText]="'budget.tree.loading' | t"
+<app-records-screen
+  class="ab"
+  [head]="{ title: 'admin.budgets.title' | t }"
+  [rows]="rows()"
+  [actions]="actions()"
+  [keepOnError]="budgets().length > 0"
+  [skeleton]="2"
+  (action)="$event.key === 'create' && openTop()"
+>
+  <ng-template screenSearch>
+    <div role="search">
+      <app-search-pill
+        size="md"
+        [clearable]="true"
+        [placeholder]="'admin.budgets.search' | t"
+        [label]="'admin.budgets.search' | t"
+        [results]="hits()"
+        [value]="search.text()"
+        (valueChange)="search.set($event)"
       />
-    </ng-template>
-    <ng-template #content>
-  @if (!budgets().length) {
-    <app-empty-state fill icon="pie" shape="table" [heading]="'admin.budgets.empty' | t" />
-  } @else {
-    <app-data-table
-      surface="rowgroup"
-      [loading]="false"
-      [columns]="columns()"
-      [rows]="budgets()"
-      [rowKey]="rowId"
-      [clickable]="true"
-      (rowClick)="openEdit(asBudget($event))"
-    >
-      <ng-template appCell="node" let-row>
-        @let b = asBudget(row);
-        <span class="ab__node">
-          <span class="ab__nameLine">
-            <span class="ab__name">{{ b.name }}</span>
-            @if (!b.active) {
-              <app-status-text kind="muted">{{ 'common.inactive' | t }}</app-status-text>
-            }
-          </span>
-          <span class="ab__key mono">{{ b.pathKey }}</span>
-        </span>
-      </ng-template>
-      <ng-template appCell="start" let-row><span class="mono">{{ start(asBudget(row)) }}</span></ng-template>
-      <ng-template appCell="plan" let-row>
-        <app-status-text [kind]="asBudget(row).planEnabled ? 'accent' : 'muted'">{{
-          (asBudget(row).planEnabled ? 'admin.budgets.withPlan' : 'admin.budgets.withoutPlan') | t
-        }}</app-status-text>
-      </ng-template>
-      <ng-template appCell="actions" let-row>
-        <span class="ab__actions" role="presentation" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
-          <app-button-group>
-            <app-row-menu
-              [label]="('budget.tree.rowActions' | t) + ': ' + asBudget(row).name"
-              [sections]="rowMenu()"
-              (selected)="onRowMenu(asBudget(row), $event)"
-            />
-          </app-button-group>
-        </span>
-      </ng-template>
-    </app-data-table>
-  }
-    </ng-template>
-  </app-load-state>
-
-  <app-fab [label]="'fab.budget' | t" (activate)="openTop()" />
-</section>
+    </div>
+  </ng-template>
+  <ng-template screenRecord let-row>
+    @let b = budgetOf(row.id);
+    <li>
+      <app-list-item [title]="b.name" [sub]="row.meta?.join(' · ') ?? null" subWrap (activate)="openEdit(b)">
+        @if (!b.active) {
+          <app-status-text status kind="muted">{{ 'common.inactive' | t }}</app-status-text>
+        }
+        <app-button-group ngProjectAs="[trail]">
+          <app-row-menu
+            trail
+            [label]="('budget.tree.rowActions' | t) + ': ' + b.name"
+            [sections]="rowMenu()"
+            (selected)="onRowMenu(b, $event)"
+          />
+        </app-button-group>
+      </app-list-item>
+    </li>
+  </ng-template>
+</app-records-screen>
 
 <app-dialog
   [open]="topOpen()"

@@ -14,8 +14,10 @@ import {
   type LoadState,
   RangeChipComponent,
   type RangeValue,
+  SearchPillComponent,
 } from '@stupa-makers/ui-kit';
-import { RecordsScreenComponent, ScreenFiltersDirective } from '@stupa-makers/ui-kit/screens';
+import { RecordsScreenComponent, ScreenFiltersDirective, ScreenSearchDirective } from '@stupa-makers/ui-kit/screens';
+import { hitCount, listSearch } from '../list-search';
 
 /** The default period: the last 90 days (spec 001651, as the server). */
 export const DEFAULT_DAYS = 90;
@@ -32,7 +34,7 @@ export function pathValue(fromKey: string | null, toKey: string): string {
 }
 
 /**
- * "Erzwungene Status" (specs 001651, 001652): one list of the forced status changes, the
+ * "Erzwungene Statusänderungen" (specs 001651, 001652): one list of the forced status changes, the
  * newest first, with filters for the reason, the path (from state, to state) and the
  * period (the last 90 days by default). A row opens the application. A forced change from
  * before the reason list reads "Ohne Grund". The page needs `audit.read`.
@@ -42,6 +44,8 @@ export function pathValue(fromKey: string | null, toKey: string): string {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SearchPillComponent,
+    ScreenSearchDirective,
     TranslatePipe,
     FilterSelectComponent,
     RangeChipComponent,
@@ -80,9 +84,17 @@ export class ForcedStatusComponent {
   );
   readonly filtered = computed(() => !!this.reason() || !!this.path());
   /** The first load shows skeleton rows; a reload keeps the list. */
+  /** The search of the list (§002690, §002691). */
+  protected readonly search = listSearch();
+  /** The hits of the search for the pill. */
+  protected readonly hits = computed(() => hitCount(this.rows(), this.search));
+
   /** The rows of the records screen (§ui-kit:002257): a reload keeps the rows that are there. */
   readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
-    const rows = this.events().map((e) => this.rowOf(e));
+    const rows = this.search.filter(
+      this.events().map((e) => this.rowOf(e)),
+      (r) => [r.title, ...(r.meta ?? [])],
+    );
     if (this.failed())
       return {
         state: 'error',
@@ -91,6 +103,8 @@ export class ForcedStatusComponent {
       };
     if (this.loading()) return { state: 'loading', previous: rows };
     if (rows.length) return { state: 'ready', data: rows };
+    if (this.search.words().length)
+      return { state: 'empty', icon: 'searchOff', heading: this.i18n.translate('admin.list.noHits') };
     return this.filtered()
       ? {
           state: 'empty',

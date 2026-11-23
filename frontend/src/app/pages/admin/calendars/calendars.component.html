@@ -8,6 +8,19 @@
   [skeleton]="3"
   (action)="$event.key === 'add' && openAdd()"
 >
+  <ng-template screenSearch>
+    <div role="search">
+      <app-search-pill
+        size="md"
+        [clearable]="true"
+        [placeholder]="'admin.calendars.search' | t"
+        [label]="'admin.calendars.search' | t"
+        [results]="hits()"
+        [value]="search.text()"
+        (valueChange)="search.set($event)"
+      />
+    </div>
+  </ng-template>
   <ng-template screenRecord let-row>
     @let c = calendarOf(row.id);
     @let st = state(c);

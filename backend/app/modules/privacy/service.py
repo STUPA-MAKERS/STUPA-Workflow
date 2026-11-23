@@ -854,18 +854,21 @@ def build_auskunft_workbook(
     sender_blocks: Sequence[Mapping[str, Any]] = (),
     appointments: Sequence[Mapping[str, Any]] = (),
     appointment_answers: Sequence[Mapping[str, Any]] = (),
+    paperless_documents: Sequence[Mapping[str, Any]] = (),
 ) -> bytes:
     """Build the GDPR access request (Art. 15) as `.xlsx` bytes.
 
     This function extends the shared `app.shared.xlsx.build_auskunft_workbook`. It adds
-    ten sheets: the comments that the subject can see (with the names of their
+    eleven sheets: the comments that the subject can see (with the names of their
     files), the attachment metadata of the applications and the reported tickets, the
     meeting attendance with the reason of an excuse, the reported tickets with their
     text and technical context, the own ticket messages (with the names of their
     files), the to-dos that the subject created or is assigned to
     (with the description of the own cards), the own to-do comments (with the names of
     their files), the sender blocks of the account or the address, the Termine that the
-    subject created and the answers of the subject to Termine.
+    subject created and the answers of the subject to Termine. An eleventh sheet names
+    the Paperless documents that the platform filed for the Anträge of the subject, with
+    the number and the date of the filing (§F/administration/privacy/002533).
     """
     from io import BytesIO
 
@@ -1043,6 +1046,19 @@ def build_auskunft_workbook(
                 _fmt_dt(a.get("answeredAt")),
             ]
             for a in appointment_answers
+        ],
+    )
+    _add_sheet(
+        "Paperless-Dokumente",
+        ["Antrag-ID", "Dokumentnummer", "Titel", "Abgelegt am"],
+        [
+            [
+                str(d.get("applicationId") or ""),
+                d.get("documentId"),
+                d.get("title") or "",
+                _fmt_dt(d.get("filedAt")),
+            ]
+            for d in paperless_documents
         ],
     )
 

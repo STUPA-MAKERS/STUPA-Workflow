@@ -6506,7 +6506,7 @@
           "name": "number",
           "nullable": false,
           "primaryKey": false,
-          "type": "INTEGER"
+          "type": "TEXT"
         },
         {
           "name": "kind",

@@ -83,6 +83,7 @@ export const AXE_ROUTES: readonly AxeRoute[] = [
   fixed('admin/committees'),
   { path: 'admin/committees/:id/members', url: (ids) => `/admin/committees/${ids.gremium}/members` },
   { path: 'admin/committees/:id/roles', url: (ids) => `/admin/committees/${ids.gremium}/roles` },
+  { path: 'admin/committees/:id/substitutes', url: (ids) => `/admin/committees/${ids.gremium}/substitutes` },
   fixed('admin/branding'),
   fixed('admin/texts'),
   fixed('admin/translations'),

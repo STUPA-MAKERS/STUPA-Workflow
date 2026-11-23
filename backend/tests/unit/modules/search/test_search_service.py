@@ -311,7 +311,7 @@ async def test_the_ticket_source_needs_ticket_manage(monkeypatch: pytest.MonkeyP
         at = datetime(2026, 1, 1, tzinfo=UTC)
         item = TicketListItem(
             id=tid,
-            number="T-0040",
+            number="T-AAAA0040",
             kind="bug",
             title="Drucker",
             status="in_progress",
@@ -330,7 +330,7 @@ async def test_the_ticket_source_needs_ticket_manage(monkeypatch: pytest.MonkeyP
     assert seen == {"q": "drucker", "limit": PER_KIND + 1}
     assert (hit.kind, hit.title, hit.subtitle, hit.url) == (
         "ticket",
-        "T-0040 · Drucker",
+        "T-AAAA0040 · Drucker",
         "In progress",
         f"/tickets/{tid}",
     )

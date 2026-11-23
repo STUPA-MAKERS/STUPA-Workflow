@@ -32,7 +32,7 @@ _AT = datetime(2026, 6, 16, 12, 0, tzinfo=UTC)
 def _ticket(**kw: Any) -> Ticket:
     base: dict[str, Any] = {
         "id": uuid.uuid4(),
-        "number": 3,
+        "number": "AAAA0003",
         "kind": "bug",
         "title": "Kaputt",
         "body": "b",
@@ -96,7 +96,7 @@ async def test_the_export_lists_the_tickets_of_the_address() -> None:
     data = await AuskunftService(db).collect("x@example.org")
     assert data["tickets"] == [
         {
-            "number": "T-0003",
+            "number": "T-AAAA0003",
             "title": "Kaputt",
             "status": "done",
             "createdAt": _AT,
@@ -109,7 +109,7 @@ async def test_the_export_lists_the_tickets_of_the_address() -> None:
 async def test_the_export_lists_the_attachments_of_the_reported_tickets() -> None:
     from app.modules.files.models import Attachment
 
-    mine = _ticket(reporter_email="x@example.org", number=7)
+    mine = _ticket(reporter_email="x@example.org", number="AAAA0007")
     shot = Attachment(
         id=uuid.uuid4(),
         ticket_id=mine.id,
@@ -122,7 +122,7 @@ async def test_the_export_lists_the_attachments_of_the_reported_tickets() -> Non
     data = await AuskunftService(db).collect("x@example.org")
     assert data["attachments"] == [
         {
-            "ticketNumber": "T-0007",
+            "ticketNumber": "T-AAAA0007",
             "filename": "screen.png",
             "mime": "image/png",
             "size": 12,
@@ -133,10 +133,10 @@ async def test_the_export_lists_the_attachments_of_the_reported_tickets() -> Non
 
 async def test_the_export_lists_the_tickets_of_the_account() -> None:
     principal = Principal(id=uuid.uuid4(), sub="kc", email="x@example.org", active=True)
-    ticket = _ticket(reporter_principal_id=principal.id, number=12)
+    ticket = _ticket(reporter_principal_id=principal.id, number="AAAA0012")
     db = fake_session(scalars=[result(), result(ticket)], scalar=[principal])
     data = await AuskunftService(db).collect("x@example.org")
-    assert [t["number"] for t in data["tickets"]] == ["T-0012"]
+    assert [t["number"] for t in data["tickets"]] == ["T-AAAA0012"]
 
 
 async def test_the_export_lists_the_own_ticket_messages() -> None:
@@ -145,7 +145,7 @@ async def test_the_export_lists_the_own_ticket_messages() -> None:
     from tests._support.privacy_fakes import FakeResult
 
     principal = Principal(id=uuid.uuid4(), sub="kc", email="x@example.org", active=True)
-    ticket = _ticket(reporter_principal_id=principal.id, number=12)
+    ticket = _ticket(reporter_principal_id=principal.id, number="AAAA0012")
     note = TicketNote(
         id=uuid.uuid4(),
         ticket_id=ticket.id,
@@ -167,7 +167,7 @@ async def test_the_export_lists_the_own_ticket_messages() -> None:
     data = await AuskunftService(db).collect("x@example.org")
     assert data["ticket_notes"] == [
         {
-            "ticketNumber": "T-0012",
+            "ticketNumber": "T-AAAA0012",
             "visibility": "public",
             "createdAt": _AT,
             "deletedAt": None,
@@ -191,7 +191,7 @@ def test_the_workbook_has_a_ticket_message_sheet() -> None:
         principal=None,
         ticket_notes=[
             {
-                "ticketNumber": "T-0012",
+                "ticketNumber": "T-AAAA0012",
                 "visibility": "public",
                 "createdAt": _AT,
                 "deletedAt": None,
@@ -204,7 +204,7 @@ def test_the_workbook_has_a_ticket_message_sheet() -> None:
     book = load_workbook(BytesIO(raw))
     rows = [[c.value for c in row] for row in book["Ticket-Nachrichten"].iter_rows()]
     assert rows[0] == ["Ticket", "Sichtbarkeit", "Zeitpunkt", "Gelöscht", "Text", "Anhänge"]
-    assert rows[1][:3] == ["T-0012", "public", "2026-06-16 12:00"]
+    assert rows[1][:3] == ["T-AAAA0012", "public", "2026-06-16 12:00"]
     assert not str(rows[1][4]).startswith("=")
     assert rows[1][5] == "a.pdf; b.png"
     assert rows[2] == [None] * 6
@@ -218,7 +218,7 @@ def test_the_workbook_has_a_ticket_sheet() -> None:
         principal=None,
         tickets=[
             {
-                "number": "T-0001",
+                "number": "T-AAAA0001",
                 "title": "=HYPERLINK()",
                 "status": "new",
                 "createdAt": _AT,
@@ -229,7 +229,7 @@ def test_the_workbook_has_a_ticket_sheet() -> None:
         ],
         attachments=[
             {
-                "ticketNumber": "T-0001",
+                "ticketNumber": "T-AAAA0001",
                 "filename": "screen.png",
                 "mime": "image/png",
                 "size": 12,
@@ -240,14 +240,14 @@ def test_the_workbook_has_a_ticket_sheet() -> None:
     book = load_workbook(BytesIO(raw))
     rows = [[c.value for c in row] for row in book["Tickets"].iter_rows()]
     assert rows[0] == ["Nummer", "Titel", "Status", "Gemeldet", "Text", "Technischer Kontext"]
-    assert rows[1][0] == "T-0001"
+    assert rows[1][0] == "T-AAAA0001"
     assert not str(rows[1][1]).startswith("=")
     assert rows[1][4] == "Der Knopf geht nicht."
     assert rows[1][5] == '{"url": "/x", "userAgent": "UA"}'
     assert rows[2] == [None] * 6
     files = [[c.value for c in row] for row in book["Anhänge"].iter_rows()]
     assert files[0][0] == "Antrag / Ticket"
-    assert files[1][:2] == ["T-0001", "screen.png"]
+    assert files[1][:2] == ["T-AAAA0001", "screen.png"]
 
 
 def test_the_erase_route_passes_the_object_storage(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -267,6 +267,11 @@ def test_the_erase_route_passes_the_object_storage(monkeypatch: pytest.MonkeyPat
         seen.update(kw, principal_id=principal_id)
 
     monkeypatch.setattr(PrincipalService, "erase", _erase)
+
+    async def _documents(_session: object, _principal_id: uuid.UUID) -> tuple[()]:
+        return ()
+
+    monkeypatch.setattr("app.modules.privacy.router.documents_of_principal", _documents)
     app = create_app()
     storage = object()
     app.state.object_storage = storage
@@ -282,7 +287,8 @@ def test_the_erase_route_passes_the_object_storage(monkeypatch: pytest.MonkeyPat
     with TestClient(app) as client:
         app.state.object_storage = storage
         resp = client.post(f"/api/admin/privacy/principals/{target}/erase")
-    assert resp.status_code == 204
+    assert resp.status_code == 200
+    assert resp.json() == {"paperlessDocuments": []}
     assert seen["principal_id"] == target
     assert seen["actor"] == "admin"
     assert seen["files"].storage is storage

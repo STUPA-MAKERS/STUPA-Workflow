@@ -16,6 +16,7 @@ import {
   type ListRow,
   type LoadState,
   NoteComponent,
+  SearchPillComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import {
@@ -23,10 +24,12 @@ import {
   ScreenFiltersDirective,
   ScreenListFootDirective,
   ScreenRecordDirective,
+  ScreenSearchDirective,
 } from '@stupa-makers/ui-kit/screens';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, OAuthGrantAdmin } from '../admin.models';
 import { personLabel } from '@shared/person-label.util';
+import { debounced } from '@shared/debounced';
 
 /**
  * The most scope tags per row. A token usually carries every scope, and all of them would
@@ -71,6 +74,8 @@ const PAGE_SIZE = 25;
     ScreenFiltersDirective,
     ScreenListFootDirective,
     ScreenRecordDirective,
+    ScreenSearchDirective,
+    SearchPillComponent,
   ],
   templateUrl: './oauth-grants.component.html',
   styleUrl: './oauth-grants.component.scss',
@@ -88,18 +93,44 @@ export class AdminOAuthGrantsComponent {
   readonly loadError = signal(false);
   /** The rows of the records screen (§ui-kit:002257); a load error keeps what showed before. */
   readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
-    if (this.loading()) return { state: 'loading' };
+    const rows = this.grants().map((g) => ({ id: g.id, title: g.clientId }));
+    if (this.loading()) return rows.length ? { state: 'loading', previous: rows } : { state: 'loading' };
     if (this.loadError())
       return {
         state: 'error',
         message: this.i18n.translate('admin.oauthGrants.error'),
         retry: () => this.load(),
       };
-    const rows = this.grants().map((g) => ({ id: g.id, title: g.clientId }));
-    return rows.length
-      ? { state: 'ready', data: rows }
+    if (rows.length) return { state: 'ready', data: rows };
+    return this.query()
+      ? { state: 'empty', icon: 'searchOff', heading: this.i18n.translate('admin.list.noHits') }
       : { state: 'empty', icon: 'key', heading: this.i18n.translate('admin.oauthGrants.empty') };
   });
+
+  /** The text in the search pill (§002690). The server searches it as `q` (§002691). */
+  readonly searchText = signal('');
+  /** The search of the last load. */
+  private readonly query = signal('');
+  /** The hits for the pill: the total of the server while a search is set. */
+  readonly hits = computed(() => (this.query() && !this.loading() ? this.total() : null));
+  /** A typed search loads page one after a short pause. */
+  private readonly searchLater = debounced(() => this.runSearch());
+
+  /** The pill changed: load again after the pause. */
+  setSearch(text: string): void {
+    this.searchText.set(text);
+    this.searchLater();
+  }
+
+  /** Enter in the pill: load now. */
+  runSearch(): void {
+    this.searchLater.cancel();
+    const q = this.searchText().trim();
+    if (q === this.query()) return;
+    this.query.set(q);
+    this.offset.set(0);
+    this.load();
+  }
 
   /** The grant of a row of the records screen. */
   protected grantOf(id: string): OAuthGrantAdmin {
@@ -169,6 +200,7 @@ export class AdminOAuthGrantsComponent {
         limit: PAGE_SIZE,
         offset: this.offset(),
         principalId: this.principalId() || null,
+        q: this.query() || null,
       })
       .subscribe({
         next: (page) => {

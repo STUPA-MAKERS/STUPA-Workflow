@@ -53,7 +53,7 @@ MANAGER = Principal(sub="mgr", permissions={"ticket.manage"})
 def _item() -> TicketListItem:
     return TicketListItem(
         id=TID,
-        number="T-0001",
+        number="T-AAAA0001",
         kind="bug",
         title="t",
         status="new",
@@ -78,7 +78,7 @@ def _note() -> TicketNoteOut:
 
 class _Created:
     id = TID
-    number = 42
+    number = "AAAA0042"
 
 
 class _FakeService:
@@ -89,7 +89,7 @@ class _FakeService:
 
     async def create(self, payload: Any, **kw: Any) -> _Created | SwallowedReport:
         self.calls.append(("create", kw))
-        return SwallowedReport(number=43) if self.swallow else _Created()
+        return SwallowedReport(number="AAAA0043") if self.swallow else _Created()
 
     async def block_sender(self, ticket_id: uuid.UUID, _p: Principal) -> TicketDetail:
         self.calls.append(("block", ticket_id))
@@ -138,7 +138,7 @@ class _FakeService:
         self.calls.append(("reporter_list", (me, kw)))
         item = ReporterTicketItem(
             id=TID,
-            number="T-0001",
+            number="T-AAAA0001",
             kind="bug",
             title="t",
             status="new",
@@ -151,7 +151,7 @@ class _FakeService:
         self.calls.append(("reporter_detail", ticket_id))
         return ReporterTicketDetail(
             id=TID,
-            number="T-0001",
+            number="T-AAAA0001",
             kind="bug",
             title="t",
             status="new",
@@ -224,7 +224,7 @@ _REPORT = {"kind": "bug", "title": "t", "body": "b"}
 def test_an_anonymous_report_answers_the_number_and_mails(env: _Env) -> None:
     resp = TestClient(env.app).post("/api/tickets", json={**_REPORT, "email": "a@example.org"})
     assert resp.status_code == 201
-    assert resp.json() == {"number": "T-0042"}
+    assert resp.json() == {"number": "T-AAAA0042"}
     kind, kw = env.service.calls[0]
     assert kind == "create"
     assert kw["reporter_id"] is None
@@ -236,7 +236,7 @@ def test_a_swallowed_report_answers_a_number_and_sends_no_mail(env: _Env) -> Non
     env.service.swallow = True
     resp = TestClient(env.app).post("/api/tickets", json={**_REPORT, "email": "a@example.org"})
     assert resp.status_code == 201
-    assert resp.json() == {"number": "T-0043"}
+    assert resp.json() == {"number": "T-AAAA0043"}
     assert env.mails.sent == []
 
 
@@ -318,7 +318,7 @@ def test_the_list_passes_the_filters(env: _Env) -> None:
         params=[("status", "new"), ("status", "done"), ("kind", "bug"), ("assignee", "me")],
     )
     assert resp.status_code == 200
-    assert resp.json()["items"][0]["number"] == "T-0001"
+    assert resp.json()["items"][0]["number"] == "T-AAAA0001"
     _kind, kw = env.service.calls[-1]
     assert kw["statuses"] == ["new", "done"]
     assert kw["kinds"] == ["bug"]
@@ -350,7 +350,7 @@ def test_the_work_routes_answer(env: _Env) -> None:
     }
     assert client.get("/api/tickets/assignees").json()[0]["displayName"] == "Ada"
     detail = client.get(f"/api/tickets/{TID}").json()
-    assert detail["number"] == "T-0001"
+    assert detail["number"] == "T-AAAA0001"
     assert detail["duplicateOf"] is None
     assert detail["openTodoCount"] == 0
     patched = client.patch(f"/api/tickets/{TID}", json={"assigneeId": None})
@@ -483,7 +483,7 @@ def test_the_reporter_list_passes_the_filters_and_the_account(env: _Env) -> None
         "/api/tickets/mine", params=[("status", "done"), ("kind", "idea"), ("q", "x")]
     )
     assert resp.status_code == 200
-    assert resp.json()["items"][0]["number"] == "T-0001"
+    assert resp.json()["items"][0]["number"] == "T-AAAA0001"
     assert "reporter" not in resp.json()["items"][0]
     me, kw = env.service.calls[-1][1]
     assert me == env.account

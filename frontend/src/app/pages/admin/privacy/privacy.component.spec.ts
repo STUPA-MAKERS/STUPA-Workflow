@@ -1,10 +1,10 @@
 import { toastWith } from '../../../../testing/load-error';
 import { of, throwError } from 'rxjs';
 import { provideRouter, Router } from '@angular/router';
-import { render, screen, waitFor } from '@testing-library/angular';
+import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ToastService } from '@stupa-makers/ui-kit';
-import type { AdminPrincipal, ErasureRequest, PrivacySettings } from '../admin.models';
+import type { AdminPrincipal, ErasureRequest, PaperlessDocument, PrivacySettings } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { PrivacyComponent } from './privacy.component';
 
@@ -22,6 +22,15 @@ const DONE: ErasureRequest = {
   email: null,
   status: 'executed',
 };
+const DOCUMENTS: PaperlessDocument[] = [
+  {
+    documentId: 41,
+    title: 'Erstsemesterfahrt',
+    url: 'https://paperless.test/documents/41/details',
+    filedAt: '2026-05-12T10:04:00Z',
+  },
+  { documentId: 42, title: 'Erstsemesterfahrt – Angebot.pdf', url: null, filedAt: '2026-05-12T10:05:00Z' },
+];
 
 const ANNA: AdminPrincipal = {
   id: 'p-7',
@@ -68,7 +77,7 @@ function makeApi(o: ApiOverrides = {}) {
     rejectErasure: o.rejectErasure ?? jest.fn(() => of(OPEN)),
     downloadAuskunft:
       o.downloadAuskunft ?? jest.fn(() => of(new Blob(['x'], { type: 'application/octet-stream' }))),
-    erasePrincipal: o.erasePrincipal ?? jest.fn(() => of(void 0)),
+    erasePrincipal: o.erasePrincipal ?? jest.fn(() => of({ paperlessDocuments: [] })),
     putPrivacySettings:
       o.putPrivacySettings ??
       jest.fn((s: PrivacySettings) => of<PrivacySettings>({ ...s })),
@@ -494,6 +503,68 @@ describe('PrivacyComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: /^Aktionen: / }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Ablehnen' }));
     expect(container.querySelector('textarea')).toBeInTheDocument();
+  });
+
+  /** §F/administration/privacy/002532: the admin sees the documents that stay in Paperless. */
+  it('lists the Paperless documents after an erasure with filed documents', async () => {
+    const api = makeApi({
+      executeErasure: jest.fn(() => of({ ...OPEN, status: 'executed', paperlessDocuments: DOCUMENTS })),
+    });
+    await setup(api);
+    expect(screen.queryByRole('dialog', { name: 'Dokumente in Paperless' })).toBeNull();
+    await userEvent.click(screen.getAllByRole('button', { name: /^Aktionen: / })[0]);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Ausführen' }));
+    const confirm = screen.getAllByRole('button', { name: 'Ausführen' });
+    await userEvent.click(confirm[confirm.length - 1]);
+    const dialog = await screen.findByRole('dialog', { name: 'Dokumente in Paperless' });
+    expect(dialog).toHaveTextContent('Diese Dokumente bleiben in Paperless.');
+    expect(dialog).toHaveTextContent('Erstsemesterfahrt – Angebot.pdf');
+    expect(dialog).toHaveTextContent('41');
+    const links = [...dialog.querySelectorAll('a[href]')];
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['https://paperless.test/documents/41/details']);
+    expect(links[0]).toHaveAttribute('target', '_blank');
+    expect(links[0]).toHaveAttribute('rel', 'noopener');
+  });
+
+  it('opens no Paperless dialog after an erasure without filed documents', async () => {
+    const { fixture } = await setup();
+    const cmp = fixture.componentInstance as unknown as {
+      pickPerson: (p: AdminPrincipal) => void;
+      doPrincipalErase: () => void;
+      paperlessDocuments: () => readonly PaperlessDocument[] | null;
+    };
+    cmp.pickPerson(ANNA);
+    cmp.doPrincipalErase();
+    expect(cmp.paperlessDocuments()).toBeNull();
+  });
+
+  it('lists the Paperless documents after the erasure of an account', async () => {
+    const api = makeApi({ erasePrincipal: jest.fn(() => of({ paperlessDocuments: DOCUMENTS })) });
+    const { fixture } = await setup(api);
+    const cmp = fixture.componentInstance as unknown as {
+      pickPerson: (p: AdminPrincipal) => void;
+      doPrincipalErase: () => void;
+      paperlessDocuments: { (): readonly PaperlessDocument[] | null; set: (v: null) => void };
+    };
+    cmp.pickPerson(ANNA);
+    cmp.doPrincipalErase();
+    expect(cmp.paperlessDocuments()).toEqual(DOCUMENTS);
+  });
+
+  it('an executed request with documents opens the list from its menu', async () => {
+    const api = makeApi({
+      listErasures: jest.fn(() => of([OPEN, { ...DONE, paperlessDocuments: DOCUMENTS }, DONE])),
+    });
+    const { container } = await setup(api);
+    const cells = [...container.querySelectorAll('td[data-label="Aktionen"]')];
+    expect(cells.map((cell) => cell.children.length)).toEqual([1, 1, 0]);
+    await userEvent.click(screen.getAllByRole('button', { name: /^Aktionen: / })[1]);
+    const items = await screen.findAllByRole('menuitem');
+    expect(items.map((item) => item.textContent?.trim())).toEqual(['Paperless-Dokumente']);
+    await userEvent.click(items[0]);
+    const dialog = await screen.findByRole('dialog', { name: 'Dokumente in Paperless' });
+    await userEvent.click(within(dialog).getAllByRole('button', { name: 'Schließen' }).at(-1)!);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Dokumente in Paperless' })).toBeNull());
   });
 
   it('stops loading when the list fails, rather than spinning forever', async () => {

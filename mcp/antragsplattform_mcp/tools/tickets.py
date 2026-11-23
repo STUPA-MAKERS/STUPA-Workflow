@@ -35,7 +35,7 @@ async def tickets_list(
         status: Keep only these statuses.
         kind: Keep only these kinds.
         assignee: A principal id, `me` or `none`.
-        q: Matches the title, the body, the number (`T-0040`, `40`) and the reporter.
+        q: Matches the title, the body, the number (`T-7K3QX9MD`, `7k3q`) and the reporter.
     """
     return await api().get(
         "/tickets",

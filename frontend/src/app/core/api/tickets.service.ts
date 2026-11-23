@@ -48,7 +48,7 @@ export interface TicketCreate {
   readonly altcha?: string | null;
 }
 
-/** The only answer to the reporter: the number, for example "T-0042". */
+/** The only answer to the reporter: the number, for example "T-7K3QX9MD". */
 export interface TicketCreated {
   readonly number: string;
 }

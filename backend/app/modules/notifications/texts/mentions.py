@@ -72,7 +72,7 @@ TICKET_MENTIONED_HTML: dict[str, str] = {
 TICKET_MENTIONED_PLACEHOLDERS: dict[str, str] = {
     "link": "Link zur Notiz (ohne den Platzhalter hängt die Mail ihn an)",
     "actor": "Name der Person, die erwähnt hat",
-    "number": "Ticketnummer (T-0042)",
+    "number": "Ticketnummer (T-7K3QX9MD)",
     "title": "Titel des Tickets",
     "message": "Text der Notiz (Auszug; ohne Text die Namen der Dateien)",
     "author": "Name der Autor:in der Notiz",

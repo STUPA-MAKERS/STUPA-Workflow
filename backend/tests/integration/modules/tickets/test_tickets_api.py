@@ -48,7 +48,7 @@ def _report(client: TestClient, **over: object) -> dict[str, str]:
 
 async def _ticket(maker: async_sessionmaker[AsyncSession], number: str) -> Ticket:
     async with maker() as session:
-        row = await session.scalar(select(Ticket).where(Ticket.number == int(number[2:])))
+        row = await session.scalar(select(Ticket).where(Ticket.number == number[2:]))
         assert row is not None
         return row
 
@@ -303,8 +303,8 @@ async def test_the_list_filters_and_pages(
         assert titles(assignee=str(me)) == ["Frage zum Budget"]
         assert titles(assignee="none") == ["Dunkles Design", "Login kaputt"]
         assert titles(q="login") == ["Login kaputt"]
-        assert titles(q=f"T-{numbers[0]:04d}") == ["Login kaputt"]
-        assert titles(q=str(numbers[1])) == ["Frage zum Budget"]
+        assert titles(q=f"T-{numbers[0]}") == ["Login kaputt"]
+        assert titles(q=numbers[1].lower()) == ["Frage zum Budget"]
         assert titles(q="rita") == ["Frage zum Budget"]
         assert titles(q="reporter@example") == ["Frage zum Budget"]
         assert titles(q="y@example.org") == ["Dunkles Design"]
@@ -503,7 +503,7 @@ async def test_status_changes_set_the_retention_clock_and_write_events(
             url, json={"status": "rejected", "duplicateOfId": str(first_id)}
         ).json()
         assert rejected["closedAt"] == closed_at
-        assert rejected["duplicateOf"] == {"id": str(first_id), "number": f"T-{first_number:04d}"}
+        assert rejected["duplicateOf"] == {"id": str(first_id), "number": f"T-{first_number}"}
         again = client.patch(url, json={"status": "rejected", "duplicateOfId": str(first_id)})
         assert again.status_code == 200
         reopened = client.patch(url, json={"status": "in_progress", "kind": "idea"}).json()
@@ -512,7 +512,7 @@ async def test_status_changes_set_the_retention_clock_and_write_events(
         assert reopened["kind"] == "idea"
         unchanged = client.patch(url, json={"status": "in_progress", "kind": "idea"}).json()
         payloads = [(e["kind"], e["payload"]) for e in unchanged["events"]]
-    dup = f"T-{first_number:04d}"
+    dup = f"T-{first_number}"
     assert payloads == [
         ("status", {"from": "new", "to": "done"}),
         ("status", {"from": "done", "to": "rejected", "duplicateOf": dup}),

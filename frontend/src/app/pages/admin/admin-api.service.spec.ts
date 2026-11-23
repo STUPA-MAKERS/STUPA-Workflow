@@ -1531,7 +1531,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     const rejNull = await firstValueFrom(s.rejectErasure('e-x'));
     expect(rejNull.id).toBe('e-x');
 
-    expect(await firstValueFrom(s.erasePrincipal('p-1'))).toBeUndefined();
+    expect(await firstValueFrom(s.erasePrincipal('p-1'))).toEqual({ paperlessDocuments: [] });
 
     const settings = await firstValueFrom(s.getPrivacySettings());
     expect(settings.defaultRetentionMonths).toBe(24);

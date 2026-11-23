@@ -982,6 +982,8 @@ export interface OAuthGrantQuery {
   readonly limit?: number;
   readonly offset?: number;
   readonly principalId?: Uuid | null;
+  /** The search over name, e-mail, client and scope (§002691). */
+  readonly q?: string | null;
 }
 
 /**
@@ -1282,6 +1284,22 @@ export interface ErasureRequest {
   readonly handledBy?: string | null;
   readonly handledAt?: string | null;
   readonly reason?: string | null;
+  /** The Paperless documents of the data of the request. They stay after the erasure. */
+  readonly paperlessDocuments?: readonly PaperlessDocument[];
+}
+
+/** A document that the platform filed in Paperless (§F/administration/privacy/002532). */
+export interface PaperlessDocument {
+  readonly documentId: number;
+  readonly title: string;
+  /** The address of the document in Paperless; `null` without a connection. */
+  readonly url?: string | null;
+  readonly filedAt?: string | null;
+}
+
+/** The answer of the erasure of an account: what stays in Paperless. */
+export interface PrincipalErasure {
+  readonly paperlessDocuments: readonly PaperlessDocument[];
 }
 
 /** Platform-wide DSGVO config (global retention default, P privacy.manage). */
