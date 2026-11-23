@@ -35,6 +35,7 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response, status
+from fastapi.responses import StreamingResponse
 
 from app.deps import DbSession, Principal, SettingsDep, get_current_principal, require_principal
 from app.modules.auth.people import PersonRef
@@ -100,6 +101,7 @@ from app.shared.antiabuse import (
     verify_altcha_unless_authenticated,
 )
 from app.shared.errors import ForbiddenError, NotFoundError, ProblemDetail, ValidationProblem
+from app.shared.filenames import content_disposition
 from app.shared.paging import Page, PageParams
 
 router = APIRouter(tags=["tickets"])
@@ -625,6 +627,28 @@ async def delete_blocked_sender(
 async def get_ticket(ticket_id: UUID, service: ServiceDep, worker: Worker) -> TicketDetail:
     """The whole ticket: body, context, attachments, notes and events."""
     return await service.detail(ticket_id, worker.principal, areas=worker.areas)
+
+
+@router.get(
+    "/tickets/{ticket_id}/mails/{mail_id}/source",
+    response_class=StreamingResponse,
+    responses=_errors(401, 403, 404, 409, 503),
+)
+async def get_mail_source(
+    ticket_id: UUID, mail_id: UUID, service: ServiceDep, worker: Worker
+) -> StreamingResponse:
+    """The full source of a mail of the ticket as a download (``message/rfc822``).
+
+    Only a source with a clean scan result leaves the platform; each other one answers
+    409 ``mail_source_closed`` (§F/integrations/ticket-mail/002729).
+    """
+    stream, filename, size = await service.mail_source(ticket_id, mail_id, areas=worker.areas)
+    headers = {
+        "Content-Disposition": content_disposition("attachment", filename),
+        "Content-Length": str(size),
+        "X-Content-Type-Options": "nosniff",
+    }
+    return StreamingResponse(stream, media_type="message/rfc822", headers=headers)
 
 
 @router.patch(

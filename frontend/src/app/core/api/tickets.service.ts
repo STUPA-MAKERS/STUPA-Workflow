@@ -231,12 +231,15 @@ export type TicketEventKind =
   | 'kind'
   | 'category'
   | 'area'
-  | 'todo_done';
+  | 'todo_done'
+  | 'mail_auto';
 
 /** The payloads of the event kinds, all optional so one type reads every kind. */
 export interface TicketEventPayload {
   /** created */
   readonly confirmationSent?: boolean;
+  /** mail_auto: the subject of the automatic mail. */
+  readonly subject?: string | null;
   /** status, assignee, kind; category: the names; area: the ids */
   readonly from?: TicketStatus | TicketKind | PersonRef | string | null;
   readonly to?: TicketStatus | TicketKind | PersonRef | string | null;
@@ -280,6 +283,34 @@ export interface TicketNote {
   readonly mentions?: readonly PersonRef[];
 }
 
+/** A file of a mail that did not become a file of the message. */
+export interface TicketSkippedFile {
+  readonly name: string;
+  readonly size: number;
+  /** `size`: above the size limit; `type`: a type that an upload refuses. */
+  readonly reason: 'size' | 'type';
+}
+
+/**
+ * One mail of a ticket from a Postfach. `noteId` names the message that the mail became;
+ * null for the first mail of the ticket and for an automatic mail. `source` tells if the
+ * full source downloads: only a `clean` one does.
+ */
+export interface TicketMail {
+  readonly id: Uuid;
+  readonly noteId: Uuid | null;
+  readonly direction: 'in' | 'out';
+  readonly fromName: string | null;
+  readonly fromAddress: string | null;
+  readonly cc: readonly string[];
+  readonly subject: string | null;
+  readonly automatic: boolean;
+  readonly source: 'clean' | 'infected' | 'closed' | 'gone';
+  readonly sourceSize: number;
+  readonly skipped: readonly TicketSkippedFile[];
+  readonly at: IsoDateTime;
+}
+
 export interface TicketDetail extends TicketListItem {
   readonly body: string;
   readonly context: TicketContext;
@@ -301,6 +332,8 @@ export interface TicketDetail extends TicketListItem {
   readonly anonymizedAt: IsoDateTime | null;
   /** The reporter is blocked; false for an anonymized ticket. */
   readonly senderBlocked: boolean;
+  /** The mails of a ticket from a Postfach, oldest first. Absent on an older server. */
+  readonly mails?: readonly TicketMail[];
 }
 
 /**
@@ -592,6 +625,11 @@ export class TicketsApiService {
   /** The download of a ticket attachment: streamed through the API, never presigned. */
   attachmentUrl(attachmentId: Uuid): string {
     return `${this.base}/attachments/${attachmentId}/download`;
+  }
+
+  /** The download of the full source of a mail of a ticket (`.eml`). */
+  mailSourceUrl(ticketId: Uuid, mailId: Uuid): string {
+    return `${this.base}/tickets/${ticketId}/mails/${mailId}/source`;
   }
 }
 

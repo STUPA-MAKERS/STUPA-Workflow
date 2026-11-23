@@ -25,6 +25,7 @@ import {
   type MyTicketDetail,
   type TicketAttachment,
   type TicketDetail,
+  type TicketMail,
   type TicketKind,
   type TicketListItem,
   type TicketFollowUp,
@@ -41,6 +42,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
 import type {
+  ChatAttachment,
   ChatEdit,
   ChatEvent,
   ChatMessage,
@@ -94,11 +96,15 @@ import { TicketsPageService } from './tickets-page.service';
 import {
   KIND_LABEL,
   STATUS_KIND,
+  MAIL_SOURCE_NAME,
   SOURCE_LABEL,
   STATUS_LABEL,
   areaOf,
   categoryName,
   eventText,
+  mailSourceScan,
+  skippedLine,
+  withSkipped,
   isOpen,
   reporterEventText,
   reporterName,
@@ -484,39 +490,66 @@ export class TicketDetailComponent {
   readonly messages = computed<ChatMessage[]>(() => {
     const t = this.ticket();
     if (!t) return [];
+    const locale = this.i18n.formatLocale();
+    const mails = (t.mails ?? []).filter((m) => !m.automatic);
+    const first = mails.find((m) => m.noteId === null && m.direction === 'in');
+    const byNote = new Map(mails.filter((m) => m.noteId).map((m) => [m.noteId, m]));
     const body: ChatMessage = {
       id: BODY_ID,
       author: t.reporter.principalId
         ? { principalId: t.reporter.principalId, displayName: t.reporter.displayName }
         : null,
       authorLabel: this.manager ? this.reporter() : null,
-      body: t.body,
+      body: withSkipped(t.body, skippedLine(first, locale, this.t)),
       at: t.createdAt,
       own: !this.manager,
       canEdit: false,
       visibility: this.visibilityOptions().length ? 'public' : null,
-      attachments: t.attachments.map((a) => ({
-        id: a.id,
-        filename: a.filename,
-        mime: a.mime,
-        size: a.size,
-        url: this.api.attachmentUrl(a.id),
-        scanState: reportScanState(a),
-      })),
+      attachments: [
+        ...t.attachments.map((a) => ({
+          id: a.id,
+          filename: a.filename,
+          mime: a.mime,
+          size: a.size,
+          url: this.api.attachmentUrl(a.id),
+          scanState: reportScanState(a),
+        })),
+        ...this.sourceFiles(first),
+      ],
     };
     const notes = this.notes().map<ChatMessage>((n) => ({
       id: n.id,
       author: n.author,
-      body: n.body,
+      body: withSkipped(n.body, skippedLine(byNote.get(n.id), locale, this.t)),
       at: n.at,
       editedAt: n.editedAt,
       own: n.isOwn,
-      attachments: toChatAttachments(this.apiBase, n.attachments),
+      attachments: [
+        ...toChatAttachments(this.apiBase, n.attachments),
+        ...this.sourceFiles(byNote.get(n.id)),
+      ],
       visibility: this.manager ? (n.visibility ?? 'internal') : null,
       mentions: n.mentions,
     }));
     return [body, ...notes, ...this.outbox.messages()];
   });
+
+  /** The source of a mail as a file of its message; none once the source is gone. */
+  private sourceFiles(mail: TicketMail | undefined): ChatAttachment[] {
+    const t = this.ticket();
+    const scanState = mail ? mailSourceScan(mail) : null;
+    if (!t || !mail || !scanState) return [];
+    return [
+      {
+        id: mail.id,
+        filename: MAIL_SOURCE_NAME,
+        mime: 'message/rfc822',
+        size: mail.sourceSize,
+        url: this.api.mailSourceUrl(t.id, mail.id),
+        scanState,
+      },
+    ];
+  }
 
   readonly events = computed<ChatEvent[]>(() => {
     const t = this.ticket();

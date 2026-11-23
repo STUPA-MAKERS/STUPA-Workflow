@@ -5,7 +5,14 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_fetch.py:test_the_same_mail_is_imported_one_time"
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_fetch.py:test_a_mail_without_a_message_id_is_imported_one_time"
+  - "backend/tests/unit/modules/tickets/test_ticket_mail_parse.py:test_a_mail_without_a_message_id_gets_the_hash_of_its_source"
+implementation:
+  - backend/app/modules/tickets/mail_import.py
+  - backend/app/modules/tickets/mail_parse.py
+  - backend/app/modules/tickets/models.py
 scope:
   - backend/app/modules/tickets
   - backend/worker

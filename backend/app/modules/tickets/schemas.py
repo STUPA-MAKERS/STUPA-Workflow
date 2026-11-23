@@ -27,7 +27,9 @@ from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 TicketKind = Literal["bug", "question", "idea", "barrier"]
 TicketStatus = Literal["new", "in_progress", "waiting", "done", "rejected"]
 TicketSource = Literal["help", "mail", "team"]
-TicketEventKind = Literal["created", "status", "assignee", "kind", "todo_done", "category", "area"]
+TicketEventKind = Literal[
+    "created", "status", "assignee", "kind", "todo_done", "category", "area", "mail_auto"
+]
 NoteVisibility = Literal["internal", "public"]
 
 #: The most draft attachments one report binds.
@@ -194,6 +196,43 @@ class TicketNoteOut(FrozenCamelModel, frozen=True):
     mentions: tuple[PersonRef, ...] = Field(default_factory=tuple)
 
 
+class TicketSkippedFile(FrozenCamelModel, frozen=True):
+    """A file of a mail that did not become a file of the message.
+
+    Attributes:
+        reason: ``size`` for a file above the size limit, ``type`` for a file of a type
+            that an upload refuses.
+    """
+
+    name: str
+    size: int
+    reason: Literal["size", "type"]
+
+
+class TicketMailOut(FrozenCamelModel, frozen=True):
+    """One mail of a ticket, for the team.
+
+    Attributes:
+        note_id: The message that the mail became; null for the first mail of the
+            ticket and for an automatic mail.
+        source: ``clean`` when the source can be downloaded, ``infected`` after a
+            finding, ``closed`` without a scan result, ``gone`` after the anonymization.
+    """
+
+    id: UUID
+    note_id: UUID | None = Field(default=None, serialization_alias="noteId")
+    direction: Literal["in", "out"] = "in"
+    from_name: str | None = Field(default=None, serialization_alias="fromName")
+    from_address: str | None = Field(default=None, serialization_alias="fromAddress")
+    cc: tuple[str, ...] = Field(default_factory=tuple)
+    subject: str | None = None
+    automatic: bool = False
+    source: Literal["clean", "infected", "closed", "gone"] = "gone"
+    source_size: int = Field(default=0, serialization_alias="sourceSize")
+    skipped: tuple[TicketSkippedFile, ...] = Field(default_factory=tuple)
+    at: datetime
+
+
 class TicketRef(FrozenCamelModel, frozen=True):
     """A reference to another ticket by id and number."""
 
@@ -224,6 +263,7 @@ class TicketDetail(TicketListItem, frozen=True):
     closed_at: datetime | None = Field(default=None, serialization_alias="closedAt")
     anonymized_at: datetime | None = Field(default=None, serialization_alias="anonymizedAt")
     sender_blocked: bool = Field(default=False, serialization_alias="senderBlocked")
+    mails: tuple[TicketMailOut, ...] = Field(default_factory=tuple)
 
 
 class TicketPatch(FrozenStrictCamelModel, frozen=True):

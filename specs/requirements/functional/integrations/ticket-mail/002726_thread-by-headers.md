@@ -5,7 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_fetch.py:test_an_answer_joins_its_ticket_through_the_headers"
+  - "backend/tests/integration/modules/tickets/test_ticket_mail_fetch.py:test_the_newest_ticket_wins_with_more_than_one_hit"
+implementation:
+  - backend/app/modules/tickets/mail_import.py
 scope:
   - backend/app/modules/tickets
   - backend/worker

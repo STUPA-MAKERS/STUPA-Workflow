@@ -5,7 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/tickets/test_ticket_mail_parse.py:test_an_html_mail_shows_as_text_without_tags_and_loads_nothing"
+  - "backend/tests/unit/modules/tickets/test_ticket_mail_parse.py:test_the_text_comes_from_the_plain_part"
+implementation:
+  - backend/app/modules/tickets/mail_parse.py
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets

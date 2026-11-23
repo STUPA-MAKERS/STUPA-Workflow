@@ -19,6 +19,7 @@ from .. import schemas as S
 from ..schemas import dump_patch
 from ._chat_files import post_message
 from ._common import ToolGroup, api, params
+from .meetings import download_to
 
 group = ToolGroup()
 
@@ -62,8 +63,38 @@ async def tickets_get(ticket_id: str) -> dict:
 
     Each note lists its `attachments` with `scanState`; download a clean one with
     `download_attachment`. `senderBlocked` tells whether the reporter is blocked.
+    `mails` lists the mails of a ticket from a Postfach: `noteId` names the message that
+    a mail became (null for the first mail), `skipped` the files that were left out, and
+    `source` tells if `tickets_download_mail_source` can read the source.
     """
     return await api().get(f"/tickets/{ticket_id}")
+
+
+@group.tool
+async def tickets_download_mail_source(
+    ticket_id: str, mail_id: str, target_path: str, overwrite: bool = False
+) -> dict:
+    """Download the full source of a mail of a ticket to a local file (`.eml`).
+
+    `GET /tickets/{id}/mails/{mailId}/source`, streamed to disk. `mails` of
+    `tickets_get` lists the mails; only one with `source: clean` can be downloaded.
+    `target_path` is a file path or an existing directory on the machine of the MCP
+    server. An existing file is kept unless `overwrite` is true. The content never
+    enters the chat.
+
+    409 `mail_source_closed` without a clean scan result, 404 for an unknown mail or
+    after the anonymization of the ticket.
+
+    Returns:
+        `path` (absolute), `filename`, `mime` and `size` in bytes.
+    """
+    return await download_to(
+        "GET",
+        f"/tickets/{ticket_id}/mails/{mail_id}/source",
+        target_path,
+        overwrite=overwrite,
+        fallback=f"mail-{mail_id}.eml",
+    )
 
 
 @group.tool

@@ -325,7 +325,7 @@ async def test_the_list_filters_and_pages(
         assert bad.status_code == 422
         assert client.get("/api/tickets", params={"status": "open"}).status_code == 422
         counts = client.get("/api/tickets/counts").json()
-        assert counts == {"new": 1, "inProgress": 1, "done": 1, "rejected": 0}
+        assert counts == {"new": 1, "inProgress": 1, "waiting": 0, "done": 1, "rejected": 0}
 
 
 async def test_the_assignees_are_the_active_holders_by_name(
