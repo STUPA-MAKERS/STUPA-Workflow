@@ -33,7 +33,13 @@
     </nav>
 
     <div detail class="adl__detail">
-      <div #body class="adl__body" [attr.tabindex]="split() ? 0 : null">
+      <div
+        #body
+        class="adl__body"
+        [class.adl__body--scrolled]="scrolled()"
+        [attr.tabindex]="split() ? 0 : null"
+        (scroll)="onBodyScroll()"
+      >
         <router-outlet />
       </div>
     </div>

@@ -18,7 +18,9 @@
 // Side by side the detail is the sheet, and its body is a round frame as wide as the fields,
 // 24px inside the sheet, which scrolls. A field that scrolls past an end keeps its round
 // corners, so the cut looks intended (spec 000193). The body is the scroll box, so a sticky bar
-// sticks at its top edge.
+// sticks at its top edge. The top corners are round only while the page is scrolled down: at
+// rest the page head starts at the top edge, and a round corner would cut a control at the right
+// end of the head (001483).
 .adl--split .adl__detail {
   padding: 0;
   overflow: hidden;
@@ -33,10 +35,14 @@
   min-height: 0;
   margin: var(--space-6);
   padding: 0 0 var(--space-2);
-  border-radius: var(--radius-field);
+  border-radius: 0 0 var(--radius-field) var(--radius-field);
   overflow-y: auto;
   overscroll-behavior: contain;
   --ld-sticky-top: 0px;
+}
+.adl--split .adl__body--scrolled {
+  border-top-left-radius: var(--radius-field);
+  border-top-right-radius: var(--radius-field);
 }
 .adl--split .adl__body > ::ng-deep * {
   flex-shrink: 0;

@@ -107,7 +107,7 @@ function links(container: Element): string[] {
   );
 }
 
-describe('AdminListComponent (spec 001480, 001481)', () => {
+describe('AdminListComponent (spec 001480, 001481, 001483)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('is an ordinary list/detail page: the list in the list slot, the page in the detail', async () => {
@@ -220,6 +220,20 @@ describe('AdminListComponent (spec 001480, 001481)', () => {
     expect(injector.get(PageFrameService).crumbRoot()).toBe('admin');
     expect(screen.queryByRole('button', { name: 'Zur Liste' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Verwaltung', level: 1 })).toBeNull();
+  });
+
+  it('rounds the top corners of the page body only while it is scrolled down (001483)', async () => {
+    const view = await setup(ALL);
+    const body = view.container.querySelector<HTMLElement>('.adl__body')!;
+    expect(body).not.toHaveClass('adl__body--scrolled');
+    Object.defineProperty(body, 'scrollTop', { configurable: true, value: 40 });
+    body.dispatchEvent(new Event('scroll'));
+    view.fixture.detectChanges();
+    expect(body).toHaveClass('adl__body--scrolled');
+    Object.defineProperty(body, 'scrollTop', { configurable: true, value: 0 });
+    body.dispatchEvent(new Event('scroll'));
+    view.fixture.detectChanges();
+    expect(body).not.toHaveClass('adl__body--scrolled');
   });
 
   it('one pane at a time: no fill and no crumb root', async () => {

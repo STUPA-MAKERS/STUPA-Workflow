@@ -126,6 +126,18 @@ export class AdminListComponent {
   private readonly layout = viewChild(ListDetailLayoutComponent);
   /** The scroll box of the open page while the panes sit side by side. */
   private readonly body = viewChild<ElementRef<HTMLElement>>('body');
+  /**
+   * The open page is scrolled down. Only then has the round frame round top corners, so a
+   * control at the top right of the page head is not cut at rest (001483).
+   */
+  readonly scrolled = signal(false);
+
+  /** The page body scrolled: keep {@link scrolled} current. */
+  onBodyScroll(): void {
+    const body = this.body()?.nativeElement;
+    this.scrolled.set(!!body && body.scrollTop > 0);
+  }
+
   /** The list and the open page sit side by side. */
   readonly split = injectListDetailPage(this.layout).split;
 
@@ -179,6 +191,7 @@ export class AdminListComponent {
         // page starts at the top.
         const body = this.body()?.nativeElement;
         if (body) body.scrollTop = 0;
+        this.scrolled.set(false);
       });
 
     effect(() =>
