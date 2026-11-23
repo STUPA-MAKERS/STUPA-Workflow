@@ -2,7 +2,7 @@
 id: "002730"
 title: The attachments of a mail become files of the message
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

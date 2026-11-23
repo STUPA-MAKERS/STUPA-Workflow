@@ -2,7 +2,7 @@
 id: "002737"
 title: The worker sends a mail and shows a failure on the message
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

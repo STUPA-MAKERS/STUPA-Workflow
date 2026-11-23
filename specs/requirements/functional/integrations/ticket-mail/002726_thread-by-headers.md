@@ -2,7 +2,7 @@
 id: "002726"
 title: An answer joins its ticket through the mail headers
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

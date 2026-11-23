@@ -2,7 +2,7 @@
 id: "002713"
 title: A Bereich can take tickets from signed-in persons
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

@@ -2,7 +2,7 @@
 id: "002714"
 title: A new ticket gets a random number of eight characters
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

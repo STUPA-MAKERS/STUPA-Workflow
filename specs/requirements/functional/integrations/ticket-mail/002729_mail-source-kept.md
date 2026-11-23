@@ -2,7 +2,7 @@
 id: "002729"
 title: The platform keeps the source of each mail
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

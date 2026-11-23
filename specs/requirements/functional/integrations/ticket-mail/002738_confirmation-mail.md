@@ -2,7 +2,7 @@
 id: "002738"
 title: A new mail ticket gets a confirmation
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

@@ -2,7 +2,7 @@
 id: "002744"
 title: The hosts of a Postfach need the deploy settings
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

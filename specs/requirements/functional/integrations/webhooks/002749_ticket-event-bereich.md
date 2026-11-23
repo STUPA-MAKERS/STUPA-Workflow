@@ -2,7 +2,7 @@
 id: "002749"
 title: The ticket event names the Bereich and follows the Gremium filter
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

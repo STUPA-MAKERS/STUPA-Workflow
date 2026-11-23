@@ -2,7 +2,7 @@
 id: "002746"
 title: No read returns the password of a Postfach
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

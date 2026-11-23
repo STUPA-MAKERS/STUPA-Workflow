@@ -2,7 +2,7 @@
 id: "002727"
 title: The number in the subject joins only a mail of a participant
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

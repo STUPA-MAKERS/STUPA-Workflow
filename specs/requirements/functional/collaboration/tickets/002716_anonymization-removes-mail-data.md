@@ -2,7 +2,7 @@
 id: "002716"
 title: The anonymization of a ticket removes its mail data
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

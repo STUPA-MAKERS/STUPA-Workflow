@@ -2,7 +2,7 @@
 id: "002731"
 title: An imported mail moves to a folder and is never deleted
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

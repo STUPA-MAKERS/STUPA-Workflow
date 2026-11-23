@@ -2,7 +2,7 @@
 id: "002739"
 title: The sender of a mail ticket is the address, not an account
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

@@ -2,7 +2,7 @@
 id: "002743"
 title: A change of a Postfach is in the audit log
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

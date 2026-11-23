@@ -2,7 +2,7 @@
 id: "002748"
 title: The data export holds the mail tickets of the addresses of the person
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

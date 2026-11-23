@@ -2,7 +2,7 @@
 id: "002709"
 title: An answer of the sender ends Wartet auf Antwort
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

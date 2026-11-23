@@ -2,7 +2,7 @@
 id: "002734"
 title: A sent mail carries the thread headers and the number
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

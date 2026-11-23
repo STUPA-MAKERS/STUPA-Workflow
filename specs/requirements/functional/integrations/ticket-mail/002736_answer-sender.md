@@ -2,7 +2,7 @@
 id: "002736"
 title: A sent mail comes from the address of the Postfach
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

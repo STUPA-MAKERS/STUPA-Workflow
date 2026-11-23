@@ -2,7 +2,7 @@
 id: "002735"
 title: An answer goes to the sender and to the Cc addresses of the thread
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

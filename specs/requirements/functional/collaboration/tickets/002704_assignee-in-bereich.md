@@ -2,7 +2,7 @@
 id: "002704"
 title: Only a person with the work right in the Bereich is assignee or mentioned
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

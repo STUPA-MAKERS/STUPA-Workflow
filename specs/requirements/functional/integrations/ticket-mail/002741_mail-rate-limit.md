@@ -2,7 +2,7 @@
 id: "002741"
 title: One address opens at most 20 tickets an hour by mail
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

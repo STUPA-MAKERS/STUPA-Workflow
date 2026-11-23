@@ -2,7 +2,7 @@
 id: "002747"
 title: An erasure names the mails that stay on the mail server
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

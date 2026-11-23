@@ -2,7 +2,7 @@
 id: "002703"
 title: The work right in a Bereich comes from the Gremium
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

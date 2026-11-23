@@ -2,7 +2,7 @@
 id: "002721"
 title: An admin sets the Postfach on the admin page
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

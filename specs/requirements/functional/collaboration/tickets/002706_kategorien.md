@@ -2,7 +2,7 @@
 id: "002706"
 title: Each Bereich has its own Kategorien
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

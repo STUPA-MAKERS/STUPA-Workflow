@@ -2,7 +2,7 @@
 id: "002700"
 title: Each ticket belongs to one Bereich
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

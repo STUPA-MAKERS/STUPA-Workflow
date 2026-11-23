@@ -2,7 +2,7 @@
 id: "002733"
 title: A public message on a mail ticket goes out as a mail
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

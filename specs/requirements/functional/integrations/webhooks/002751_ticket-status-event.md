@@ -2,7 +2,7 @@
 id: "002751"
 title: A status change of a ticket is a webhook event
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

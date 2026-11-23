@@ -2,7 +2,7 @@
 id: "002728"
 title: A mail shows as text only
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

@@ -2,7 +2,7 @@
 id: "002707"
 title: A ticket can move to a different Bereich
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

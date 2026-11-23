@@ -2,7 +2,7 @@
 id: "002705"
 title: The admin page Hilfe & Tickets holds the Bereiche
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

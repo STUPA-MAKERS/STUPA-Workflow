@@ -2,7 +2,7 @@
 id: "002701"
 title: The Bereich Plattform takes the reports of the help menu
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null

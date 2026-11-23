@@ -2,7 +2,7 @@
 id: "002711"
 title: A ticket names its source
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 implementation: null
