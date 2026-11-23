@@ -21,6 +21,10 @@
   padding: 0;
   list-style: none;
 }
+/* `?open=<id>` scrolls the row to the top; the margin keeps it clear of the sticky head. */
+.grem__item {
+  scroll-margin-top: calc(var(--app-top-safe-area, 0px) + 5rem);
+}
 .grem__icon {
   flex: none;
   color: var(--color-text-muted);

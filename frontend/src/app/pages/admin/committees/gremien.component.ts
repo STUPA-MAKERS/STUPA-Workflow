@@ -1,6 +1,15 @@
 import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import type { Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -17,6 +26,7 @@ import {
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
+  scrollBehavior,
   SkeletonComponent,
   StatusTextComponent,
   ToastService,
@@ -67,7 +77,8 @@ interface Setting {
  *
  * One row per gremium: name, slug, "n Mitglieder · n Rollen", the link to the members,
  * edit, delete and the toggle. An open row shows the settings (gaps N38) and the role
- * matrix of the gremium (`app-gremium-role-matrix`); the first row starts open. The
+ * matrix of the gremium (`app-gremium-role-matrix`); the first row starts open, or the row
+ * of `?open=<gremium id>`, which the page then scrolls into view (002601). The
  * memberships come from the OIDC groups, so this page has no member editing. The dialog
  * `app-gremium-dialog` creates and edits a gremium. The header button "Vorgaben" opens
  * the values that the form of a new gremium starts with (§ 000906).
@@ -110,6 +121,9 @@ export class AdminGremienComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
   readonly gremien = signal<Gremium[]>([]);
   readonly loading = signal(true);
@@ -348,7 +362,7 @@ export class AdminGremienComponent {
     });
   }
 
-  /** `first`: the first load opens the first row. */
+  /** `first`: the first load opens the row of `?open=<id>`, else the first row (002601). */
   protected reload(first: boolean): void {
     if (first) this.loading.set(true);
     this.loadError.set(false);
@@ -356,12 +370,29 @@ export class AdminGremienComponent {
       next: (g) => {
         this.gremien.set(g);
         this.loading.set(false);
-        if (first && g.length) this.toggle(g[0]);
+        if (first && g.length) this.openFirst(g);
       },
       error: () => {
         this.loadError.set(true);
         this.loading.set(false);
       },
     });
+  }
+
+  /** Opens the row that `?open=` names and scrolls it into view; else the first row. */
+  private openFirst(list: readonly Gremium[]): void {
+    const asked = this.route.snapshot.queryParamMap.get('open');
+    const target = list.find((g) => g.id === asked);
+    this.toggle(target ?? list[0]);
+    if (!target) return;
+    afterNextRender(
+      () => {
+        const row = this.host.nativeElement.querySelector<HTMLElement>(
+          `[data-gremium="${CSS.escape(target.id)}"]`,
+        );
+        row?.scrollIntoView?.({ block: 'start', behavior: scrollBehavior() });
+      },
+      { injector: this.injector },
+    );
   }
 }
