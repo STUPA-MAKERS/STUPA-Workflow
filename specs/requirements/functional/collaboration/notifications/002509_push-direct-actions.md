@@ -2,9 +2,9 @@
 id: "002509"
 title: A push can act without opening the app
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-22
+updated: 2026-11-23
 implementation:
   - backend/app/modules/notifications
   - backend/app/modules/push_actions/router.py

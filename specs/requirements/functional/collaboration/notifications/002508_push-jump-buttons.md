@@ -2,9 +2,9 @@
 id: "002508"
 title: A push can carry jump buttons
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-22
+updated: 2026-11-23
 implementation:
   - backend/app/modules/notifications
   - backend/app/modules/notifications/push_service.py

@@ -2,9 +2,9 @@
 id: "002510"
 title: A push goes only to a known push service
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-22
+updated: 2026-11-23
 implementation:
   - backend/app/modules/notifications/push_service.py
   - backend/worker/push.py

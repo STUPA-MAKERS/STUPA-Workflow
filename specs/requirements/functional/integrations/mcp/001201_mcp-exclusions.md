@@ -4,7 +4,7 @@ title: The MCP leaves out a closed list of functions
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-22
+updated: 2026-11-23
 tests:
   - "mcp/antragsplattform_mcp/tests/test_route_parity.py:test_exclusions_are_routes"
 implementation:

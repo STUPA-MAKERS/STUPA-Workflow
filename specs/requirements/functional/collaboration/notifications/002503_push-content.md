@@ -2,9 +2,9 @@
 id: "002503"
 title: A push shows a title and one short line
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
-updated: 2026-11-22
+updated: 2026-11-23
 implementation:
   - backend/app/modules/notifications
   - frontend/src/app/pages/account
