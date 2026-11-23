@@ -526,7 +526,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/mcp/001201](requirements/functional/integrations/mcp/001201_mcp-exclusions.md) | The MCP leaves out a closed list of functions | approved |
 | [F/integrations/mcp/001232](requirements/functional/integrations/mcp/001232_mcp-name.md) | The MCP server presents itself as workflow | approved |
 | [F/integrations/paperless/002511](requirements/functional/integrations/paperless/002511_connection-page.md) | An admin connects one Paperless instance | draft |
-| [F/integrations/paperless/002512](requirements/functional/integrations/paperless/002512_switch.md) | The Paperless integration has one switch | draft |
+| [F/integrations/paperless/002512](requirements/functional/integrations/paperless/002512_switch.md) | Each part of the Paperless integration has its own switch | draft |
 | [F/integrations/paperless/002513](requirements/functional/integrations/paperless/002513_service-account.md) | Each call to Paperless uses the token of the connection | draft |
 | [F/integrations/paperless/002516](requirements/functional/integrations/paperless/002516_file-final-protocol.md) | A final protocol is filed in Paperless | draft |
 | [F/integrations/paperless/002517](requirements/functional/integrations/paperless/002517_file-decided-antrag.md) | The PDF of an Antrag is filed at each decision | draft |
