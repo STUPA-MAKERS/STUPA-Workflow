@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  afterNextRender,
   type ElementRef,
   computed,
   effect,
@@ -189,20 +190,20 @@ export class AdminListComponent {
         // page starts at the top.
         const body = this.body()?.nativeElement;
         if (body) body.scrollTop = 0;
-        body?.removeAttribute('data-scrolled');
       });
 
-    effect((onCleanup) => {
-      const body = this.body()?.nativeElement;
-      if (!body) return;
+    // The body is in the template of this component, so it exists after the first render.
+    const destroyRef = inject(DestroyRef);
+    afterNextRender(() => {
+      const body = this.body()!.nativeElement;
       body.addEventListener('scroll', this.markScrolled, { passive: true });
-      onCleanup(() => body.removeEventListener('scroll', this.markScrolled));
+      destroyRef.onDestroy(() => body.removeEventListener('scroll', this.markScrolled));
     });
 
     effect(() =>
       this.pageFrame.crumbRoot.set(this.split() ? this.mode().home.replace(/^\//, '') : null),
     );
-    inject(DestroyRef).onDestroy(() => this.pageFrame.crumbRoot.set(null));
+    destroyRef.onDestroy(() => this.pageFrame.crumbRoot.set(null));
   }
 
   /** The full path of an entry. */
