@@ -545,6 +545,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/paperless/002530](requirements/functional/integrations/paperless/002530_backfill.md) | An admin can file the final documents that exist | draft |
 | [F/integrations/paperless/002531](requirements/functional/integrations/paperless/002531_audit.md) | Each filing and each insert has an audit entry | draft |
 | [F/integrations/paperless/002534](requirements/functional/integrations/paperless/002534_search-like-global-search.md) | The Paperless search looks like the global search | draft |
+| [F/integrations/paperless/002535](requirements/functional/integrations/paperless/002535_file-antrag-attachments.md) | The attachments of an Antrag are filed with its PDF | draft |
 | [F/integrations/webhooks/000298](requirements/functional/integrations/webhooks/000298_retry.md) | A failed delivery is retried with backoff | approved |
 | [F/integrations/webhooks/000299](requirements/functional/integrations/webhooks/000299_idempotent-delivery.md) | A delivery runs once per key | approved |
 | [F/integrations/webhooks/000402](requirements/functional/integrations/webhooks/000402_flow-action-only.md) | A webhook fires only through a flow action | approved |
