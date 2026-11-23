@@ -122,20 +122,20 @@ async def list_oauth_grants_admin(
         .join(PrincipalRow, PrincipalRow.id == OAuthToken.principal_id)
         .where(OAuthToken.revoked_at.is_(None))
     )
-    stmt = (
+    owned = (
         live
         if query.principal_id is None
         else live.where(OAuthToken.principal_id == query.principal_id)
     )
+    columns = (
+        PrincipalRow.display_name,
+        PrincipalRow.email,
+        OAuthToken.client_id,
+        OAuthToken.scope,
+    )
     words = (query.q or "").split()
-    if words:
-        columns = (
-            PrincipalRow.display_name,
-            PrincipalRow.email,
-            OAuthToken.client_id,
-            OAuthToken.scope,
-        )
-        stmt = stmt.where(
+    stmt = (
+        owned.where(
             and_(
                 *(
                     or_(*(col.ilike(f"%{escape_like(w)}%", escape="\\") for col in columns))
@@ -143,6 +143,9 @@ async def list_oauth_grants_admin(
                 )
             )
         )
+        if words
+        else owned
+    )
     total = await db.scalar(select(func.count()).select_from(stmt.subquery()))
     rows = (
         await db.execute(

@@ -2,7 +2,7 @@
 id: "002690"
 title: Every list page of Verwaltung looks like Benutzer
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 tests:
