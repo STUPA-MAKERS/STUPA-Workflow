@@ -11,6 +11,7 @@ implementation:
   - backend/app/modules/flow/service.py
   - frontend/src/app/features/apply/apply-wizard.component.ts
   - frontend/src/app/pages/admin/forms/form-editor.component.ts
+  - frontend/vendor/ui-kit/views/form-editor/src/form-editor-view.component.ts
 scope:
   - backend/app/modules/files
   - backend/app/modules/forms

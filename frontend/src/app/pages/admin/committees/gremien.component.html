@@ -9,14 +9,6 @@
     }}</app-button>
   </app-page-header>
 
-  @if (canMappings()) {
-    <app-note>
-      <a class="grem__noteLink" routerLink="/admin/group-mappings">{{
-        'admin.users.manageGroupMappings' | t
-      }}</a>
-    </app-note>
-  }
-
   <app-load-state [state]="loadState()" [keepContent]="true" [hasContent]="gremien().length > 0" [errorText]="'admin.gremien.error' | t" (retry)="reload(true)">
     <ng-template #loading>
       <app-skeleton variant="rows" [count]="4" [label]="'admin.gremien.loading' | t" />
@@ -25,7 +17,7 @@
       @if (gremien().length) {
       <ul class="rowgroup grem__list" [attr.aria-label]="'admin.gremien.title' | t">
         @for (g of gremien(); track g.id) {
-          <li class="grem__item">
+          <li class="grem__item" [attr.data-gremium]="g.id">
             <app-expand-row
               [title]="g.name"
               align="row"

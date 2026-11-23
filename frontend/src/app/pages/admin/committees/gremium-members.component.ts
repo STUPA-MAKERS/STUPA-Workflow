@@ -7,7 +7,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import type { Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -20,7 +20,6 @@ import {
   ButtonGroupComponent,
   CapitalizePipe,
   EmptyStateComponent,
-  NoteComponent,
   SkeletonComponent,
   PageHeaderComponent,
   SectionComponent,
@@ -56,8 +55,7 @@ export const MEMBER_PREVIEW = 7;
  * Members of a gremium on its own page (`/admin/committees/:id/members`).
  *
  * The members come only from the OIDC groups of the IdP, so the list is read-only: avatar,
- * name, e-mail and the gremium role. The note links to the group mappings, where the
- * memberships come from. The list shows the first rows; "Alle n anzeigen" shows the rest.
+ * name, e-mail and the gremium role. The list shows the first rows; "Alle n anzeigen" shows the rest.
  * The membership rows carry the name and the e-mail of the member, so the page loads no
  * principal list. With `admin.delegations` the substitute pool of the gremium follows
  * (`app-substitute-pool`). The last crumb shows the name of the gremium once it loads.
@@ -72,11 +70,9 @@ export const MEMBER_PREVIEW = 7;
     ButtonComponent,
     ButtonGroupComponent,
     EmptyStateComponent,
-    RouterLink,
     TranslatePipe,
     CapitalizePipe,
     AvatarComponent,
-    NoteComponent,
     PageHeaderComponent,
     BreadcrumbsComponent,
     SkeletonComponent,
@@ -100,8 +96,6 @@ export class GremiumMembersComponent {
   protected readonly showAll = signal(false);
   protected readonly preview = MEMBER_PREVIEW;
 
-  /** The note links to the mappings page only with its permission. */
-  protected readonly canManageMappings = computed(() => this.auth.can('admin.group_mappings'));
   /** The substitute pool needs `admin.delegations` (or `session.manage` in the gremium). */
   protected readonly canPool = computed(
     () =>

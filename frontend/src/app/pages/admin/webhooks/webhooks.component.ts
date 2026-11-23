@@ -28,6 +28,7 @@ import {
   type RowMenuSection,
   type FilterSelectOption,
   FilterSelectComponent,
+  filterChipText,
   CheckboxComponent,
   StatusTextComponent,
   SwitchComponent,
@@ -273,6 +274,19 @@ export class WebhooksComponent {
   protected readonly typeOptions = signal<readonly FilterSelectOption[]>([]);
   /** The choices of the target status filter: the states of the global flow. */
   protected readonly stateOptions = signal<readonly FilterSelectOption[]>([]);
+  /**
+   * The text of a filter select in the dialog: its name alone while no value is chosen, else
+   * the name and the chosen values ("Gremien: AStA, StuPa"), so the dialog shows what the
+   * webhook filters (spec 002581).
+   */
+  protected filterText(
+    label: TranslationKey,
+    options: readonly FilterSelectOption[],
+    values: readonly string[],
+  ): string {
+    const names = values.map((v) => options.find((o) => o.value === v)?.label ?? v);
+    return filterChipText(this.i18n.translate(label), names.join(', '));
+  }
   /** The subscribed events of the draft with their catalog entry, for the preview. */
   protected readonly previews = computed(() => {
     const d = this.draft();
@@ -313,6 +327,12 @@ export class WebhooksComponent {
   protected readonly errors = computed<readonly string[]>(() => {
     const d = this.draft();
     return d && !HTTP_URL.test(d.url) ? ['admin.webhook.badUrl'] : [];
+  });
+
+  /** The save needs a name and a valid URL, because the server refuses a webhook without them (spec 002582). */
+  protected readonly canSave = computed(() => {
+    const d = this.draft();
+    return !!d && d.name.trim().length > 0 && this.errors().length === 0;
   });
 
   /**
@@ -477,7 +497,7 @@ export class WebhooksComponent {
 
   protected save(): void {
     const d = this.draft();
-    if (!d || this.errors().length > 0) return;
+    if (!d || !this.canSave()) return;
     const idx = this.editingIndex();
     this.api.saveWebhook(d).subscribe({
       next: (saved) => {

@@ -5,15 +5,6 @@
   [filtersLabel]="'admin.users.filters' | t"
   [keepOnError]="principals().length > 0"
 >
-  <ng-template screenIntro>
-    @if (canManageMappings()) {
-      <app-note class="au__note">
-        <a class="au__noteLink" routerLink="/admin/group-mappings">{{
-          'admin.users.manageGroupMappings' | t
-        }}</a>
-      </app-note>
-    }
-  </ng-template>
   <ng-template screenSearch>
     <div class="au__search" role="search">
       <app-search-pill

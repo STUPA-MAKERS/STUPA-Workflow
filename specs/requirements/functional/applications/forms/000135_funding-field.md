@@ -8,6 +8,8 @@ updated: 2026-11-06
 implementation:
   - backend/app/modules/forms/validation.py
   - frontend/src/app/pages/admin/forms/form-editor.component.ts
+  - frontend/vendor/ui-kit/views/form-editor/src/form-editor-view.component.ts
+  - frontend/vendor/ui-kit/views/form-editor/src/form-field.util.ts
 scope:
   - backend/app/modules/forms
   - frontend/src/app/pages/admin

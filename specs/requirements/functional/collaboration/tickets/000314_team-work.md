@@ -2,13 +2,10 @@
 id: "000314"
 title: The team works on tickets
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation:
-  - backend/app/modules/tickets/access.py
-  - backend/app/modules/tickets/service.py
-  - backend/app/modules/tickets/router.py
+updated: 2026-11-23
+replaced_by: F/collaboration/tickets/002703
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets

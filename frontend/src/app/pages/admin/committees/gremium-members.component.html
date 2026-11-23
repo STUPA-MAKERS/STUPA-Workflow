@@ -6,14 +6,6 @@
     <app-breadcrumbs crumbs />
   </app-page-header>
 
-  @if (canManageMappings()) {
-    <app-note>
-      <a class="gmm__noteLink" routerLink="/admin/group-mappings">{{
-        'admin.users.manageGroupMappings' | t
-      }}</a>
-    </app-note>
-  }
-
   <app-section
     class="gmm__section"
     [level]="2"

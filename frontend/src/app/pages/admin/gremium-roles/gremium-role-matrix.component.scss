@@ -11,12 +11,11 @@
 }
 
 
-.rm__table {
-  min-width: 0;
-}
 .rm__row {
   display: grid;
-  grid-template-columns: minmax(10rem, 2fr) repeat(5, minmax(4.25rem, 1fr)) 3rem;
+  // One column per right of the catalogue: auto-fit makes as many columns as the row has cells and
+  // collapses the empty ones, so a new right gets its own column instead of a second grid line.
+  grid-template-columns: minmax(10rem, 2fr) repeat(auto-fit, minmax(min(100%, 4.25rem), 1fr)) 3rem;
   align-items: center;
   min-height: 3.75rem;
   padding: var(--space-1) var(--space-2) var(--space-1) var(--space-5);
@@ -40,6 +39,7 @@
 }
 .rm__colLabel {
   font-size: var(--fs-sm);
+  hyphens: auto;
   font-weight: var(--fw-semibold);
   line-height: 1.15rem;
 }
@@ -100,13 +100,11 @@
   }
 }
 .rm__chip--off {
-  background: none;
   cursor: default;
 }
 @media (hover: hover) {
   .rm__chip--off:hover {
     background: none;
-    cursor: default;
   }
 }
 .rm__chipText {
@@ -145,7 +143,10 @@
   cursor: progress;
 }
 
+// The last column of the template, after the collapsed auto-fit tracks.
+.rm__colAct,
 .rm__act {
+  grid-column: -2;
   display: flex;
   justify-content: flex-end;
   gap: var(--space-1);
