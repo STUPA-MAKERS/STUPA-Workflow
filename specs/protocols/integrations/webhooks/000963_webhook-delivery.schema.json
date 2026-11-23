@@ -3,13 +3,40 @@
   "title": "Webhook delivery",
   "description": "The body of one webhook delivery (P/integrations/webhooks/000963).",
   "type": "object",
-  "required": ["event", "applicationId", "transitionId", "statusEventId"],
+  "required": [
+    "event"
+  ],
   "additionalProperties": false,
   "properties": {
     "event": {
       "description": "The event name. It is the same as the header X-Webhook-Event.",
       "type": "string",
-      "enum": ["application.transition"]
+      "enum": [
+        "application.created",
+        "application.updated",
+        "application.transition",
+        "application.archived",
+        "comment.created",
+        "vote.opened",
+        "vote.closed",
+        "meeting.created",
+        "meeting.started",
+        "meeting.closed",
+        "protocol.finalized",
+        "booking.created",
+        "invoice.created",
+        "ticket.created",
+        "webhook.test"
+      ]
+    },
+    "occurredAt": {
+      "description": "The time of the event (F/integrations/webhooks/002417).",
+      "type": "string",
+      "format": "date-time"
+    },
+    "data": {
+      "description": "The fields that the webhook chose for the event (F/integrations/webhooks/002412). The field table of the spec lists the keys per event.",
+      "type": "object"
     },
     "applicationId": {
       "description": "The ID of the Antrag.",
@@ -25,6 +52,262 @@
       "description": "The ID of the status event that the transition wrote.",
       "type": "string",
       "format": "uuid"
+    },
+    "commentId": {
+      "description": "The ID of the comment.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "voteId": {
+      "description": "The ID of the vote.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "meetingId": {
+      "description": "The ID of the meeting.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "protocolId": {
+      "description": "The ID of the protocol.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "bookingId": {
+      "description": "The ID of the booking.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "invoiceId": {
+      "description": "The ID of the invoice.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "ticketId": {
+      "description": "The ID of the ticket.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "webhookId": {
+      "description": "The ID of the webhook (test delivery).",
+      "type": "string",
+      "format": "uuid"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "application.created"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "applicationId"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "application.updated"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "applicationId"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "application.archived"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "applicationId"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "application.transition"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "applicationId",
+          "transitionId",
+          "statusEventId"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "comment.created"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "commentId",
+          "applicationId"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "vote.opened"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "voteId"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "vote.closed"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "voteId"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "meeting.created"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "meetingId"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "meeting.started"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "meetingId"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "meeting.closed"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "meetingId"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "protocol.finalized"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "protocolId",
+          "meetingId"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "booking.created"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "bookingId"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "invoice.created"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "invoiceId"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "ticket.created"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "ticketId"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "webhook.test"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "webhookId"
+        ]
+      }
+    }
+  ]
 }

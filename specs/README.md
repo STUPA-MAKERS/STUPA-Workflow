@@ -514,8 +514,16 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/mcp/001232](requirements/functional/integrations/mcp/001232_mcp-name.md) | The MCP server presents itself as workflow | approved |
 | [F/integrations/webhooks/000298](requirements/functional/integrations/webhooks/000298_retry.md) | A failed delivery is retried with backoff | approved |
 | [F/integrations/webhooks/000299](requirements/functional/integrations/webhooks/000299_idempotent-delivery.md) | A delivery runs once per key | approved |
-| [F/integrations/webhooks/000402](requirements/functional/integrations/webhooks/000402_flow-action-only.md) | A webhook fires only through a flow action | approved |
+| [F/integrations/webhooks/000402](requirements/functional/integrations/webhooks/000402_flow-action-only.md) | A webhook fires only through a flow action | replaced |
 | [F/integrations/webhooks/000403](requirements/functional/integrations/webhooks/000403_delete-webhook.md) | A webhook can be deleted | approved |
+| [F/integrations/webhooks/002410](requirements/functional/integrations/webhooks/002410_event-subscriptions.md) | A webhook subscribes to events | draft |
+| [F/integrations/webhooks/002411](requirements/functional/integrations/webhooks/002411_event-catalog.md) | The webhook events come from a fixed catalog | draft |
+| [F/integrations/webhooks/002412](requirements/functional/integrations/webhooks/002412_payload-fields.md) | A webhook chooses the payload fields per event | draft |
+| [F/integrations/webhooks/002413](requirements/functional/integrations/webhooks/002413_personal-fields.md) | A personal payload field is marked and off by default | draft |
+| [F/integrations/webhooks/002414](requirements/functional/integrations/webhooks/002414_filters.md) | A webhook filters by Gremium, Antragsart and target status | draft |
+| [F/integrations/webhooks/002415](requirements/functional/integrations/webhooks/002415_payload-preview.md) | The webhook dialog shows a payload preview | draft |
+| [F/integrations/webhooks/002416](requirements/functional/integrations/webhooks/002416_test-delivery.md) | A webhook can send a test delivery | draft |
+| [F/integrations/webhooks/002417](requirements/functional/integrations/webhooks/002417_payload-at-event-time.md) | The payload is built when the event occurs | draft |
 | [F/meetings/calendar/000331](requirements/functional/meetings/calendar/000331_feed.md) | Each person has a calendar feed | approved |
 | [F/meetings/calendar/000332](requirements/functional/meetings/calendar/000332_feed-404.md) | A wrong feed token is not found | approved |
 | [F/meetings/calendar/000333](requirements/functional/meetings/calendar/000333_event-defaults.md) | A calendar event has a reminder | approved |
