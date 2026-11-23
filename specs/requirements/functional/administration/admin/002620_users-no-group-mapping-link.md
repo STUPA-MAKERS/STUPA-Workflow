@@ -2,7 +2,7 @@
 id: "002620"
 title: Benutzer and Gremien have no link to the Gruppen-Zuordnung
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 tests:
