@@ -5,7 +5,12 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
-implementation: null
+tests:
+  - "backend/tests/unit/modules/privacy/test_auskunft_completeness_unit.py:test_build_workbook_names_the_paperless_documents"
+  - "backend/tests/integration/modules/privacy/test_privacy_paperless.py:test_the_data_export_names_the_paperless_documents"
+implementation:
+  - backend/app/modules/privacy/paperless.py
+  - backend/app/modules/privacy/service.py
 scope:
   - backend/app/
 ---

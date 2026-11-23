@@ -33,11 +33,12 @@
           <span class="mono pv__date">{{ $any(r).createdAt | ldate: 'mediumDate' }}</span>
         </ng-template>
         <ng-template appCell="actions" let-r>
-          @if ($any(r).status === 'open') {
+          @let menu = rowMenu($any(r));
+          @if (menu.length) {
             <app-button-group>
               <app-row-menu
                 [label]="('admin.common.actions' | t) + ': ' + ($any(r).email || subjectLabel($any(r).subjectType))"
-                [sections]="rowMenu()"
+                [sections]="menu"
                 (selected)="onRowMenu($any(r), $event)"
               />
             </app-button-group>
@@ -201,3 +202,28 @@
     </p>
   }
 </app-confirm-dialog>
+
+<app-dialog
+  [open]="paperlessDocuments() !== null"
+  [heading]="'admin.privacy.paperless.title' | t"
+  [subtitle]="'admin.privacy.paperless.text' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="paperlessDocuments.set(null)"
+  [actions]="[{ key: 'close', label: ('action.close' | t), kind: 'main' }]"
+  (action)="paperlessDocuments.set(null)"
+>
+  <ng-template dialogBody>
+    <app-data-table surface="rowgroup" [columns]="paperlessColumns()" [rows]="$any(paperlessDocuments() ?? [])">
+      <ng-template appCell="filedAt" let-d>{{ $any(d).filedAt | ldate: 'mediumDate' }}</ng-template>
+      <ng-template appCell="open" let-d>
+        @if ($any(d).url) {
+          <app-button-group>
+            <a appButton="text" size="sm" target="_blank" rel="noopener" [href]="$any(d).url">{{
+              'admin.privacy.paperless.open' | t
+            }}</a>
+          </app-button-group>
+        }
+      </ng-template>
+    </app-data-table>
+  </ng-template>
+</app-dialog>
