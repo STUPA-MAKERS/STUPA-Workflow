@@ -186,9 +186,11 @@
               (valueChange)="patch({ colour: $event })"
               name="editColour"
             />
-            <app-switch [checked]="f.active" (checkedChange)="patch({ active: $event })">{{
-              'budget.tree.active' | t
-            }}</app-switch>
+            <div class="rowgroup rowgroup--settings">
+              <app-switch [checked]="f.active" (checkedChange)="patch({ active: $event })">{{
+                'budget.tree.active' | t
+              }}</app-switch>
+            </div>
           </div>
         </app-section>
         <ng-container
@@ -215,14 +217,16 @@
           </div>
         </app-section>
         <app-section [heading]="'admin.budgets.plan' | t">
-          <app-switch [checked]="f.plan" (checkedChange)="patch({ plan: $event })">{{
-            'admin.budgets.planSwitch' | t
-          }}</app-switch>
-          @if (f.plan) {
-            <app-switch [checked]="f.coverable" (checkedChange)="patch({ coverable: $event })">{{
-              'admin.budgets.coverableDefault' | t
+          <div class="rowgroup rowgroup--settings">
+            <app-switch [checked]="f.plan" (checkedChange)="patch({ plan: $event })">{{
+              'admin.budgets.planSwitch' | t
             }}</app-switch>
-          }
+            @if (f.plan) {
+              <app-switch [checked]="f.coverable" (checkedChange)="patch({ coverable: $event })">{{
+                'admin.budgets.coverableDefault' | t
+              }}</app-switch>
+            }
+          </div>
         </app-section>
         @if (f.plan) {
           <app-section [heading]="'admin.budgets.steps' | t">
@@ -431,9 +435,11 @@
           [disabled]="!!fy.closedAt"
           name="fyEditYear"
         />
-        <app-switch [checked]="fyEditActive()" (checkedChange)="fyEditActive.set($event)">{{
-          'budget.tree.fyActive' | t
-        }}</app-switch>
+        <div class="rowgroup rowgroup--settings">
+          <app-switch [checked]="fyEditActive()" (checkedChange)="fyEditActive.set($event)">{{
+            'budget.tree.fyActive' | t
+          }}</app-switch>
+        </div>
         <button type="submit" hidden></button>
       </form>
     }

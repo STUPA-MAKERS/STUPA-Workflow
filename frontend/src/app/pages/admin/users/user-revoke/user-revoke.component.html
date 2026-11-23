@@ -93,10 +93,10 @@
                     }}</app-button
                   >
                 </app-button-group>
-                <ul class="ur__items">
+                <ul class="rowgroup ur__items">
                   @for (g of p.gremien; track g.gremiumId) {
                     @let e = gEntry(g);
-                    <li class="ur__item" [class.ur__item--on]="isOn(e)">
+                    <li class="ur__item">
                       <div class="ur__body">
                         <app-checkbox
                           class="ur__title"
@@ -134,10 +134,10 @@
 
             @if (p.globalRoles.length) {
               <app-section class="ur__sec" [heading]="'admin.users.revoke.roles' | t">
-                <ul class="ur__items">
+                <ul class="rowgroup ur__items">
                   @for (r of p.globalRoles; track r.roleId) {
                     @let e = rEntry(r);
-                    <li class="ur__item" [class.ur__item--on]="isOn(e)">
+                    <li class="ur__item">
                       <div class="ur__body">
                         <app-checkbox
                           class="ur__title"
@@ -188,12 +188,13 @@
             }
 
             @if (p.principal.active && !p.isSelf) {
-              <app-switch
-                class="ur__switch"
-                [checked]="deactivate()"
-                (checkedChange)="deactivate.set($event)"
-                >{{ 'admin.users.revoke.deactivate' | t }}</app-switch
-              >
+              <div class="rowgroup rowgroup--settings">
+                <app-switch
+                  [checked]="deactivate()"
+                  (checkedChange)="deactivate.set($event)"
+                  >{{ 'admin.users.revoke.deactivate' | t }}</app-switch
+                >
+              </div>
             }
           }
         </ng-template>

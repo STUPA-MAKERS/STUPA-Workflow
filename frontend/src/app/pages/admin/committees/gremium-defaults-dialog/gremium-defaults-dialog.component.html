@@ -41,21 +41,21 @@
               [ngModel]="f.repeatQuorumPercent"
               (ngModelChange)="patchPercent('repeatQuorumPercent', $event)"
             />
-            <app-switch
-              class="gdd__switch"
-              name="guestsMayVote"
-              [disabled]="f.quorumPercent !== null"
-              [ngModel]="f.guestsMayVote"
-              (ngModelChange)="patch({ guestsMayVote: $event })"
-              >{{ 'admin.gremien.guestsMayVote' | t }}</app-switch
-            >
-            <app-switch
-              class="gdd__switch"
-              name="allowVoteDelegation"
-              [ngModel]="f.allowVoteDelegation"
-              (ngModelChange)="patch({ allowVoteDelegation: $event })"
-              >{{ 'admin.gremien.delegation' | t }}</app-switch
-            >
+            <div class="rowgroup rowgroup--settings">
+              <app-switch
+                name="guestsMayVote"
+                [disabled]="f.quorumPercent !== null"
+                [ngModel]="f.guestsMayVote"
+                (ngModelChange)="patch({ guestsMayVote: $event })"
+                >{{ 'admin.gremien.guestsMayVote' | t }}</app-switch
+              >
+              <app-switch
+                name="allowVoteDelegation"
+                [ngModel]="f.allowVoteDelegation"
+                (ngModelChange)="patch({ allowVoteDelegation: $event })"
+                >{{ 'admin.gremien.delegation' | t }}</app-switch
+              >
+            </div>
             @if (f.allowVoteDelegation) {
               <div class="gdd__nested">
                 <app-input
