@@ -21,7 +21,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, select, update
+from sqlalchemy import Engine, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.deps import get_current_principal
@@ -64,14 +64,19 @@ _USER = Principal(sub="user-sub", roles=["member"], permissions={"paperless.use"
 _SINCE = datetime.now(UTC) - timedelta(hours=1)
 #: The moment of the events of the tests, after the switches went on.
 _EVENT = _SINCE + timedelta(minutes=30)
-#: The first run of the worker. Each later run is one day after the run before it.
-_RUN = datetime.now(UTC) + timedelta(minutes=5)
+#: The first run of the worker, a day after the import: the suite runs for a long time, and
+#: a job that a test opens must be due at the first run. Each later run is one day after
+#: the run before it.
+_RUN = datetime.now(UTC) + timedelta(days=1)
 
 Maker = async_sessionmaker[AsyncSession]
 
 
 @pytest.fixture
 async def maker(migrated: tuple[str, str], engine: Engine) -> AsyncIterator[Maker]:
+    """Return the sessionmaker. The plan versions of other tests go, so they file nothing."""
+    with engine.begin() as conn:
+        conn.execute(text("TRUNCATE budget_plan RESTART IDENTITY CASCADE"))
     eng = create_async_engine(migrated[1])
     yield async_sessionmaker(eng, expire_on_commit=False)
     await eng.dispose()
@@ -160,7 +165,7 @@ async def _protocol(
 
 
 async def _decided(maker: Maker) -> uuid.UUID:
-    """Write an Antrag and move it to an approved state. Return its id."""
+    """Write a confirmed Antrag and move it to an approved state. Return its id."""
     seed = await seed_guest_flow(maker)
     app_id = await create_guest_application(maker, seed)
     async with maker() as session:
@@ -179,7 +184,7 @@ async def _decided(maker: Maker) -> uuid.UUID:
         await session.execute(
             update(Application)
             .where(Application.id == app_id)
-            .values(current_state_id=seed.locked_state_id)
+            .values(current_state_id=seed.locked_state_id, email_confirmed_at=_SINCE)
         )
         await session.commit()
     return app_id

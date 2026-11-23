@@ -121,7 +121,7 @@ async def due_filings(
                     PaperlessFiling.due_at <= now,
                     PaperlessFiling.kind.in_(kinds),
                 )
-                .order_by(PaperlessFiling.due_at, PaperlessFiling.id)
+                .order_by(PaperlessFiling.due_at, PaperlessFiling.kind, PaperlessFiling.id)
                 .limit(BATCH)
             )
         ).all()
