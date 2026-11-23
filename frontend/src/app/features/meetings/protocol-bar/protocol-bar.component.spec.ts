@@ -1,44 +1,27 @@
 import { render, screen, within } from '@testing-library/angular';
-import { of } from 'rxjs';
-import { ApiClient } from '@core/api/api-client.service';
 import userEvent from '@testing-library/user-event';
 import type { Meeting, Protocol } from '@core/api/models';
+import { ProtocolBarViewComponent } from '@stupa-makers/ui-kit/views/protocol';
 import { meeting, protocol } from '../../../../testing/meeting-fixtures';
-import { signal } from '@angular/core';
-import { MeetingSessionService } from '../meeting-session.service';
-import { FileOpenService } from '@shared/viewer/file-open.service';
-import { ProtocolBarComponent } from './protocol-bar.component';
 
 const closed = (over: Partial<Meeting> = {}) => meeting({ status: 'closed', ...over });
 const final = (over: Partial<Protocol> = {}) => protocol({ status: 'final', isFinal: true, isLocked: true, ...over });
 
-function fakeSession() {
-  return {
-    publicationSaving: signal(false),
-    draftSending: signal(false),
-    approvalSaving: signal(false),
-    reopenSaving: signal(false),
-    reopenProtocol: jest.fn(),
-    setPublicWithheld: jest.fn(),
-    sendProtocolDraft: jest.fn(),
-    setProtocolApproval: jest.fn(),
-  };
-}
-
-/** The bar on the meeting page (with its session), or elsewhere (`session: false`). */
-async function setup(m: Meeting, p: Protocol, opts: { session?: boolean; compact?: boolean; meetings?: Meeting[] } = {}) {
+/**
+ * The kit view of the bar (S/framework/views/002273) on the meeting page (`hasSession`), or
+ * elsewhere (`session: false`). The view emits the actions; the page runs them.
+ */
+async function setup(m: Meeting, p: Protocol, opts: { session?: boolean; compact?: boolean } = {}) {
   const finalize = jest.fn();
-  const session = fakeSession();
-  const api = { listMeetings: jest.fn(() => of(opts.meetings ?? [])) };
-  const files = { open: jest.fn(), click: jest.fn() };
-  const view = await render(ProtocolBarComponent, {
-    inputs: { meeting: m, protocol: p, compact: opts.compact ?? false },
-    on: { finalize },
-    providers: [
-      ...(opts.session === false ? [] : [{ provide: MeetingSessionService, useValue: session }]),
-      { provide: ApiClient, useValue: api },
-      { provide: FileOpenService, useValue: files },
-    ],
+  const sendDraft = jest.fn();
+  const reopen = jest.fn();
+  const approve = jest.fn();
+  const publish = jest.fn();
+  const approvalRequest = jest.fn();
+  const pdfOpen = jest.fn();
+  const view = await render(ProtocolBarViewComponent, {
+    inputs: { meeting: m, protocol: p, compact: opts.compact ?? false, hasSession: opts.session !== false },
+    on: { finalize, sendDraft, reopen, approve, publish, approvalRequest, pdfOpen },
   });
   const labels = () => view.fixture.componentInstance.menuItems().map((i) => i.label);
   const select = async (label: string) => {
@@ -49,11 +32,16 @@ async function setup(m: Meeting, p: Protocol, opts: { session?: boolean; compact
     await view.fixture.whenStable();
     view.fixture.detectChanges();
   };
-  return { ...view, finalize, session, api, files, labels, select };
+  /** The URLs of the PDFs that a menu item opened in the viewer. */
+  const opened = () =>
+    pdfOpen.mock.calls
+      .filter(([o]) => (o as { event: unknown }).event === null)
+      .map(([o]) => (o as { file: { url: string } }).file.url);
+  return { ...view, finalize, sendDraft, reopen, approve, publish, approvalRequest, pdfOpen, labels, select, opened };
 }
 
 /** §ui-kit:001304: the protocol part of the meeting head. */
-describe('ProtocolBarComponent', () => {
+describe('ProtocolBarViewComponent', () => {
   it('offers the finalize of a draft to a holder of the right as the one head action', async () => {
     const { finalize, labels } = await setup(closed(), protocol());
     await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & senden' }));
@@ -126,32 +114,32 @@ describe('ProtocolBarComponent', () => {
   describe('draft mail and approval', () => {
     /** § 000925 */
     it('sends the draft to the members after a confirmation', async () => {
-      const { session, select } = await setup(closed(), protocol());
+      const { sendDraft, select } = await setup(closed(), protocol());
       await select('Entwurf senden');
       const confirm = screen.getByRole('dialog', { name: 'Entwurf senden?' });
       expect(confirm).toHaveTextContent('Wasserzeichen „Entwurf“');
-      expect(session.sendProtocolDraft).not.toHaveBeenCalled();
+      expect(sendDraft).not.toHaveBeenCalled();
       await userEvent.click(within(confirm).getByRole('button', { name: 'Senden' }));
-      expect(session.sendProtocolDraft).toHaveBeenCalledTimes(1);
+      expect(sendDraft).toHaveBeenCalledTimes(1);
       expect(screen.queryByRole('dialog', { name: 'Entwurf senden?' })).toBeNull();
     });
 
     /** §F/meetings/protocols/000937 (draftSentAt) */
     it('names the date of the last send in the confirmation of a second send', async () => {
-      const { session, select } = await setup(closed(), protocol({ draftSentAt: '2026-11-03T18:30:00Z' }));
+      const { sendDraft, select } = await setup(closed(), protocol({ draftSentAt: '2026-11-03T18:30:00Z' }));
       await select('Entwurf senden');
       const confirm = screen.getByRole('dialog', { name: 'Entwurf senden?' });
       expect(confirm).toHaveTextContent('Der Entwurf ging zuletzt am 3. November 2026 an die Mitglieder des Gremiums.');
       expect(confirm).not.toHaveTextContent('Wasserzeichen');
       await userEvent.click(within(confirm).getByRole('button', { name: 'Senden' }));
-      expect(session.sendProtocolDraft).toHaveBeenCalledTimes(1);
+      expect(sendDraft).toHaveBeenCalledTimes(1);
     });
 
     it('keeps the draft on "Abbrechen", and offers no send to a reader or for a live meeting', async () => {
-      const { session, fixture, select, labels } = await setup(closed(), protocol());
+      const { sendDraft, fixture, select, labels } = await setup(closed(), protocol());
       await select('Entwurf senden');
       await userEvent.click(within(screen.getByRole('dialog', { name: 'Entwurf senden?' })).getByRole('button', { name: 'Abbrechen' }));
-      expect(session.sendProtocolDraft).not.toHaveBeenCalled();
+      expect(sendDraft).not.toHaveBeenCalled();
       fixture.componentRef.setInput('meeting', closed({ canWrite: false, canFinalize: false }));
       fixture.detectChanges();
       expect(labels()).not.toContain('Entwurf senden');
@@ -160,31 +148,19 @@ describe('ProtocolBarComponent', () => {
       expect(labels()).not.toContain('Entwurf senden');
     });
 
-    /** § 000924 */
-    it('marks a final protocol as approved by the next meeting of the Gremium', async () => {
-      const own = closed({ id: 'm-1', gremiumId: 'g-1', date: '2026-10-15' });
-      const meetings = [
-        meeting({ id: 'm-0', title: '32. Sitzung', date: '2026-10-01' }),
-        meeting({ id: 'm-3', title: '35. Sitzung', date: '2026-11-12' }),
-        meeting({ id: 'm-2', title: '34. Sitzung', date: '2026-10-29' }),
-        own,
-      ];
-      const { session, api, fixture, select, labels } = await setup(own, final(), { meetings });
+    /** § 000924: the page shows the dialog of the pick; the view asks before it removes the mark. */
+    it('asks the page for the approval pick, and removes the mark after a confirmation', async () => {
+      const { approve, approvalRequest, fixture, select, labels } = await setup(closed(), final());
       expect(labels()).not.toContain('Entwurf senden');
       await select('Als genehmigt markieren');
-      expect(api.listMeetings).toHaveBeenCalledWith('g-1');
-      const dialog = screen.getByRole('dialog', { name: 'Als genehmigt markieren' });
-      expect(within(dialog).getByLabelText(/Genehmigt in der Sitzung/)).toHaveTextContent('34. Sitzung · 29. Oktober 2026');
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Als genehmigt markieren' }));
-      expect(session.setProtocolApproval).toHaveBeenCalledWith('m-2');
+      expect(approvalRequest).toHaveBeenCalledTimes(1);
       fixture.componentRef.setInput('protocol', final({ approvedAt: '2026-10-29T18:00:00Z', approvedMeetingId: 'm-2' }));
       fixture.detectChanges();
-      expect(screen.queryByRole('dialog', { name: 'Als genehmigt markieren' })).toBeNull();
       await select('Genehmigung entfernen');
-      expect(session.setProtocolApproval).toHaveBeenCalledTimes(1);
+      expect(approve).not.toHaveBeenCalled();
       const ask = screen.getByRole('dialog', { name: 'Genehmigung entfernen?' });
       await userEvent.click(within(ask).getByRole('button', { name: 'Entfernen' }));
-      expect(session.setProtocolApproval).toHaveBeenLastCalledWith(null);
+      expect(approve).toHaveBeenLastCalledWith(null);
     });
 
     it('offers no mark without the right', async () => {
@@ -197,12 +173,12 @@ describe('ProtocolBarComponent', () => {
 
     /** § 000983 (reopenProtocol) */
     it('sets a final protocol back to draft after a confirmation, and not an approved one', async () => {
-      const { session, fixture, select, labels } = await setup(closed(), final());
+      const { reopen, fixture, select, labels } = await setup(closed(), final());
       await select('Zurück in Entwurf');
-      expect(session.reopenProtocol).not.toHaveBeenCalled();
+      expect(reopen).not.toHaveBeenCalled();
       const ask = screen.getByRole('dialog', { name: 'Protokoll zurück in den Entwurf setzen?' });
       await userEvent.click(within(ask).getByRole('button', { name: 'Zurück in Entwurf' }));
-      expect(session.reopenProtocol).toHaveBeenCalledTimes(1);
+      expect(reopen).toHaveBeenCalledTimes(1);
       fixture.componentRef.setInput('protocol', final({ approvedAt: '2026-10-29T18:00:00Z' }));
       fixture.detectChanges();
       expect(labels()).not.toContain('Zurück in Entwurf');
@@ -211,29 +187,21 @@ describe('ProtocolBarComponent', () => {
       fixture.detectChanges();
       expect(labels()).not.toContain('Zurück in Entwurf');
     });
-
-    it('closes the pick on "Abbrechen"', async () => {
-      const { session, select } = await setup(closed(), final());
-      await select('Als genehmigt markieren');
-      await userEvent.click(within(screen.getByRole('dialog', { name: 'Als genehmigt markieren' })).getByRole('button', { name: 'Abbrechen' }));
-      expect(screen.queryByRole('dialog', { name: 'Als genehmigt markieren' })).toBeNull();
-      expect(session.setProtocolApproval).not.toHaveBeenCalled();
-    });
   });
 
   describe('public gremium', () => {
     const pub = (over: Partial<Protocol> = {}) => final({ gremiumProtocolsPublic: true, ...over });
 
     it('offers to hold a public protocol back', async () => {
-      const { session, select } = await setup(closed(), pub());
+      const { publish, select } = await setup(closed(), pub());
       await select('Nicht veröffentlichen');
-      expect(session.setPublicWithheld).toHaveBeenCalledWith(true);
+      expect(publish).toHaveBeenCalledWith(false);
     });
 
     it('publishes a held-back protocol again', async () => {
-      const { session, select } = await setup(closed(), pub({ publicWithheld: true }));
+      const { publish, select } = await setup(closed(), pub({ publicWithheld: true }));
       await select('Veröffentlichen');
-      expect(session.setPublicWithheld).toHaveBeenCalledWith(false);
+      expect(publish).toHaveBeenCalledWith(true);
     });
 
     it('offers no switch without the right', async () => {
@@ -254,39 +222,37 @@ describe('ProtocolBarComponent', () => {
 
   /** §ui-kit:001304: the PDF items of the menu open the file viewer, with the title of the meeting. */
   describe('PDF items', () => {
-    const opened = (files: { open: jest.Mock }) => files.open.mock.calls.map(([f]) => (f as { url: string }).url);
-
     it('opens the final PDF and the public one', async () => {
-      const { fixture, files } = await setup(closed(), final({ pdfUrl: '/p.pdf', publicPdfUrl: '/pub.pdf' }), { compact: true });
+      const { fixture, pdfOpen, opened } = await setup(closed(), final({ pdfUrl: '/p.pdf', publicPdfUrl: '/pub.pdf' }), { compact: true });
       const bar = fixture.componentInstance;
       expect(bar.select('protocol.pdf')).toBe(true);
       expect(bar.select('protocol.pdfPublic')).toBe(true);
-      expect(opened(files)).toEqual(['/p.pdf', '/pub.pdf']);
-      expect(files.open.mock.calls[0][0]).toEqual(expect.objectContaining({ kind: 'pdf', name: expect.stringContaining('PDF intern') }));
+      expect(opened()).toEqual(['/p.pdf', '/pub.pdf']);
+      expect(pdfOpen.mock.calls[0][0].file).toEqual(expect.objectContaining({ kind: 'pdf', name: expect.stringContaining('PDF intern') }));
     });
 
     it('opens both variants of the draft PDF', async () => {
-      const { fixture, files } = await setup(closed(), protocol());
+      const { fixture, opened } = await setup(closed(), protocol());
       const bar = fixture.componentInstance;
       expect(bar.select('protocol.draftPdf')).toBe(true);
       expect(bar.select('protocol.draftPdfPublic')).toBe(true);
-      expect(opened(files)).toEqual([expect.stringMatching(/draft-pdf$/), expect.stringMatching(/draft-pdf\?variant=public$/)]);
+      expect(opened()).toEqual([expect.stringMatching(/draft-pdf$/), expect.stringMatching(/draft-pdf\?variant=public$/)]);
     });
 
     it('opens nothing for a PDF the protocol does not have, and leaves other ids to the page', async () => {
-      const { fixture, files } = await setup(meeting(), protocol());
+      const { fixture, pdfOpen } = await setup(meeting(), protocol());
       const bar = fixture.componentInstance;
       for (const id of ['protocol.pdf', 'protocol.pdfPublic', 'protocol.draftPdf', 'protocol.draftPdfPublic']) {
         expect(bar.select(id)).toBe(true);
       }
-      expect(files.open).not.toHaveBeenCalled();
+      expect(pdfOpen).not.toHaveBeenCalled();
       expect(bar.select('meeting.edit')).toBe(false);
     });
 
     it('opens the head link in the file viewer', async () => {
-      const { files } = await setup(closed(), final({ pdfUrl: '/p.pdf' }));
+      const { pdfOpen } = await setup(closed(), final({ pdfUrl: '/p.pdf' }));
       await userEvent.click(screen.getByRole('link', { name: 'PDF' }));
-      expect(files.click).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ url: '/p.pdf' }));
+      expect(pdfOpen).toHaveBeenCalledWith({ event: expect.anything(), file: expect.objectContaining({ url: '/p.pdf' }) });
     });
   });
 });

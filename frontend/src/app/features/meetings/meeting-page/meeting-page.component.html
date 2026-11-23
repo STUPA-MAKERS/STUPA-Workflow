@@ -47,12 +47,19 @@
   }
 
   @if (proto && m.status === 'closed') {
-    <app-protocol-bar
+    <app-protocol-bar-view
       [meeting]="m"
       [protocol]="proto"
       [finalizing]="finalizing()"
       [compact]="phone()"
+      [hasSession]="hasSession"
       (finalize)="finalize.emit()"
+      (sendDraft)="sendProtocolDraft()"
+      (reopen)="reopenProtocol()"
+      (approve)="approveProtocol($event)"
+      (publish)="publishProtocol($event)"
+      (approvalRequest)="approvalOpen.set(true)"
+      (pdfOpen)="openProtocolPdf($event)"
     />
   }
 
@@ -397,8 +404,8 @@
             variant="tonal"
             [iconOnly]="true"
             [ariaPressed]="ts.activeFormats().has(tool.format)"
-            [ariaLabel]="tool.label | t"
-            [title]="tool.label | t"
+            [ariaLabel]="tool.label | uiKitT"
+            [title]="tool.label | uiKitT"
             (pointerdown)="$event.preventDefault()"
             (mousedown)="$event.preventDefault()"
             (click)="ts.toggleFormat(tool.format)"
@@ -499,3 +506,13 @@
     }
   </ng-container>
 </ng-template>
+
+@if (approvalOpen()) {
+  <app-protocol-approval-dialog
+    [open]="true"
+    [meeting]="meeting()"
+    [saving]="approvalSaving()"
+    (closed)="approvalOpen.set(false)"
+    (picked)="approveProtocol($event)"
+  />
+}
