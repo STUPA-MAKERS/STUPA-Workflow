@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
   - frontend/src/app/features/calendar/calendar.component.ts
-  - frontend/src/app/features/calendar/external-entry/external-entry.component.ts
+  - frontend/vendor/ui-kit/views/calendar/src/external-entry-view.component.ts
 scope:
   - frontend/src/app/features
 ---

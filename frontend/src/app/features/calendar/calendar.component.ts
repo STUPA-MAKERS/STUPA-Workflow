@@ -4,11 +4,8 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
-  ElementRef,
-  Injector,
   NgZone,
   type OnDestroy,
-  afterNextRender,
   computed,
   effect,
   inject,
@@ -32,14 +29,11 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { dayMonth, dayMonthYear, isoDay, monthYear, parseDay, weekdayDate } from '@shared/date-format';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
-import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
 import { ButtonComponent, ButtonGroupComponent, EmptyStateComponent, FabComponent, FilterSelectComponent, IconComponent, ListGroupComponent, ListItemComponent, liveSearch, MEDIA, mediaQuery, MetaLineComponent, PageFrame, PageHeaderComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, ScrollFadeDirective, SearchPillComponent, SegmentedComponent, SkeletonComponent, StatusTextComponent, StickyBarComponent, ToastService } from '@stupa-makers/ui-kit';
 import { useNoindex } from '../public-protocols/public-protocols.util';
 import { CalendarSubscribeComponent } from '../meetings/calendar-subscribe/calendar-subscribe.component';
 import { AppointmentDetailComponent } from './appointment-detail/appointment-detail.component';
-import { ExternalEntryComponent } from './external-entry/external-entry.component';
-import { type PublicEntry, PublicEntryComponent } from './public-entry/public-entry.component';
 import { AppointmentDialogComponent } from './appointment-dialog/appointment-dialog.component';
 import {
   CALENDAR_NOW,
@@ -53,7 +47,14 @@ import {
   weekOf,
   weekdayNames,
 } from './calendar-grid.util';
-import { CalendarWeekComponent } from './calendar-week/calendar-week.component';
+import {
+  CalendarDayListViewComponent,
+  CalendarMonthViewComponent,
+  CalendarWeekViewComponent,
+  ExternalEntryViewComponent,
+  PublicEntryViewComponent,
+  type PublicEntry,
+} from '@stupa-makers/ui-kit/views/calendar';
 import {
   type CalendarView,
   type DayRange,
@@ -77,13 +78,6 @@ import {
 } from './calendar.util';
 
 /** The steps of the arrow keys in the month grid, in days. */
-const KEY_STEPS: Readonly<Record<string, number>> = {
-  ArrowLeft: -1,
-  ArrowRight: 1,
-  ArrowUp: -7,
-  ArrowDown: 7,
-};
-
 /**
  * The Kalender (`/calendar`, § 000710-000714, 000726-000728, 000737): the meetings, the
  * due cards, the Events and the Termine that the person reads, in one page.
@@ -117,9 +111,11 @@ const KEY_STEPS: Readonly<Record<string, number>> = {
     ButtonComponent,
     ButtonGroupComponent,
     CalendarSubscribeComponent,
-    CalendarWeekComponent,
+    CalendarDayListViewComponent,
+    CalendarMonthViewComponent,
+    CalendarWeekViewComponent,
     EmptyStateComponent,
-    ExternalEntryComponent,
+    ExternalEntryViewComponent,
     FabComponent,
     FilterSelectComponent,
     IconComponent,
@@ -127,8 +123,7 @@ const KEY_STEPS: Readonly<Record<string, number>> = {
     ListItemComponent,
     LoadErrorComponent,
     PageHeaderComponent,
-    PublicEntryComponent,
-    RowChevronComponent,
+    PublicEntryViewComponent,
     RowMenuComponent,
     ScrollFadeDirective,
     SearchPillComponent,
@@ -152,8 +147,6 @@ export class CalendarComponent implements OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
   private readonly frame = inject(PageFrame);
-  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-  private readonly injector = inject(Injector);
   private readonly zone = inject(NgZone);
   private readonly now = inject(CALENDAR_NOW);
 
@@ -355,39 +348,9 @@ export class CalendarComponent implements OnDestroy {
     this.month.set(monthOf(day));
   }
 
-  /**
-   * The arrow keys move the picked day (a day left or right, a week up or down), Home
-   * and End go to the start and the end of the week. The focus follows the day.
-   */
-  onGridKey(event: KeyboardEvent): void {
-    const day = parseDay(this.selectedDay());
-    if (!day) return;
-    const weekday = (day.getDay() + 6) % 7;
-    const delta: number | undefined =
-      event.key === 'Home' ? -weekday : event.key === 'End' ? 6 - weekday : KEY_STEPS[event.key];
-    if (delta === undefined) return;
-    event.preventDefault();
-    this.selectDay(shiftDay(this.selectedDay(), delta));
-    afterNextRender(
-      () => this.host.nativeElement.querySelector<HTMLElement>('.cal__day[tabindex="0"]')?.focus(),
-      { injector: this.injector },
-    );
-  }
-
-  /** The name of a day cell for a screen reader: "Mittwoch, 11. November 2026, Heute, 2 Einträge". */
-  dayLabel(day: CalendarDay, count: number): string {
-    const date = parseDay(day.iso);
-    const text = date
-      ? new Intl.DateTimeFormat(this.i18n.formatLocale(), { dateStyle: 'full' }).format(date)
-      : day.iso;
-    const today = day.isToday ? `, ${this.i18n.translate('meetings.overview.today')}` : '';
-    const entries =
-      count === 0
-        ? this.i18n.translate('calendar.day.none')
-        : count === 1
-          ? this.i18n.translate('calendar.day.one')
-          : this.i18n.translate('calendar.day.many', { n: count });
-    return `${text}${today}, ${entries}`;
+  /** Open the public protocol of a meeting of the public calendar. */
+  openProtocol(id: string): void {
+    void this.router.navigate(['/protocols', id]);
   }
 
   /** "14:00 – 15:30", or the days of an entry over several days. */
