@@ -2,7 +2,7 @@
 id: "002601"
 title: The Gremien page opens and shows the Gremium of the link
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-23
 tests:

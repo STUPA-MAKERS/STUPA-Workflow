@@ -102,7 +102,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/001093](requirements/functional/administration/admin/001093_branding-description.md) | The branding holds the description of the platform | approved |
 | [F/administration/admin/001230](requirements/functional/administration/admin/001230_platform-name-from-branding.md) | Every visible name of the platform comes from the branding | approved |
 | [F/administration/admin/001231](requirements/functional/administration/admin/001231_seeded-mail-subject-branding.md) | The seeded subject of the access link mail names the branding | approved |
-| [F/administration/admin/002601](requirements/functional/administration/admin/002601_gremien-page-opens-asked-row.md) | The Gremien page opens and shows the Gremium of the link | draft |
+| [F/administration/admin/002601](requirements/functional/administration/admin/002601_gremien-page-opens-asked-row.md) | The Gremien page opens and shows the Gremium of the link | approved |
 | [F/administration/audit/000291](requirements/functional/administration/audit/000291_record-in-tx.md) | An audit entry is written in the same transaction | approved |
 | [F/administration/audit/000292](requirements/functional/administration/audit/000292_chain-check.md) | The audit chain is checked every night | approved |
 | [F/administration/audit/000293](requirements/functional/administration/audit/000293_three-permissions.md) | Read, check and revert are separate permissions | approved |
@@ -276,7 +276,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/committees/001852](requirements/functional/collaboration/committees/001852_notify-recipients.md) | The message goes to the members and the substitute pool | approved |
 | [F/collaboration/committees/001853](requirements/functional/collaboration/committees/001853_notify-template.md) | The members message is a mail template | approved |
 | [F/collaboration/committees/001854](requirements/functional/collaboration/committees/001854_notify-checks.md) | A members message is checked and audited | approved |
-| [F/collaboration/committees/002600](requirements/functional/collaboration/committees/002600_manage-opens-gremien-page.md) | Gremium verwalten opens the Gremium on the Gremien page | draft |
+| [F/collaboration/committees/002600](requirements/functional/collaboration/committees/002600_manage-opens-gremien-page.md) | Gremium verwalten opens the Gremium on the Gremien page | approved |
 | [F/collaboration/graph/001420](requirements/functional/collaboration/graph/001420_graph-page.md) | The page Graph shows the elements of a person and their relations | approved |
 | [F/collaboration/graph/001421](requirements/functional/collaboration/graph/001421_graph-permission.md) | The graph needs its own permission | approved |
 | [F/collaboration/graph/001422](requirements/functional/collaboration/graph/001422_graph-read-rules.md) | The graph shows only what the person reads | approved |
