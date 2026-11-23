@@ -130,6 +130,7 @@ from app.modules.meetings.models import (
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.notifications.models import NotificationPreference
 from app.modules.notifications.push_models import PushPreference, PushSubscription
+from app.modules.paperless.models import PaperlessFiling
 from app.modules.privacy.models import ErasureRequest
 from app.modules.site_config.models import PdfAsset, SiteConfigVersion
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
@@ -210,6 +211,7 @@ SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("config", LoginSettings.updated_by),
     ("config", UiLanguage.updated_by),
     ("config", UiTranslation.updated_by),
+    ("config", PaperlessFiling.actor),
     ("roles", RoleAssignment.granted_by),
     ("privacy", ErasureRequest.requested_by),
     ("privacy", ErasureRequest.handled_by),

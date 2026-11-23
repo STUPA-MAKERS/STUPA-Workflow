@@ -12,6 +12,7 @@ import pytest
 
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.paperless_actions import PaperlessFilingDispatcher
+from app.modules.paperless import queue
 from app.modules.paperless.queue import FILING_TASK_NAME, request_filing
 
 
@@ -49,12 +50,14 @@ async def test_the_request_does_nothing_without_a_pool() -> None:
 
 
 async def test_a_broken_queue_does_not_fail_the_action(
-    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    logged: list[str] = []
+    monkeypatch.setattr(queue.logger, "exception", logged.append)
     pool = _Pool(broken=True)
     await request_filing(pool)
     assert pool.jobs == []
-    assert "paperless filing run was not enqueued" in caplog.text
+    assert logged == ["paperless filing run was not enqueued"]
 
 
 async def test_a_committed_transition_asks_for_a_filing_run() -> None:
