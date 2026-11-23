@@ -45,7 +45,7 @@ drawing, at the bottom start corner, opposite the zoom buttons at the bottom end
 a phone. Its name "Schritte" must be above the stepper: the minus button, the number and the
 plus button in one line. The field must show also while the page loads and when the graph is
 empty, so that the person can raise the count. The state of the build-up ("Wird aufgebaut",
-"Mehr laden") must be at the end side of the field. The person must be able to change the
+"Mehr laden") must stand over the zoom buttons (F/collaboration/graph/002790). The person must be able to change the
 count with the keyboard (arrow up and down) and with the minus and the plus button.
 
 Reason: A hit alone does not answer the question of the person. The person searches an Antrag

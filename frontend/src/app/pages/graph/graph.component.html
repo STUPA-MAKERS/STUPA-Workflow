@@ -128,19 +128,15 @@
             </app-button>
           </app-button-group>
         </div>
-        @if (drawing() && growing()) {
-          <p class="gr__growing gr__pill" role="status">{{ 'graph.growing' | t }}</p>
-        } @else if (drawing() && cursor()) {
-          <div class="gr__more gr__pill">
-            <app-button-group>
-              <app-button variant="text" size="sm" data-testid="gr-more" (click)="loadMore()">
-                <app-icon name="down" />
-                {{ 'graph.loadMore' | t }}
-              </app-button>
-            </app-button-group>
-          </div>
-        }
       </div>
+      <!-- The state of the build-up stands over the zoom buttons, at the end edge (spec 002790). -->
+      @if (drawing() && growing()) {
+        <p class="gr__state gr__growing" role="status">{{ 'graph.growing' | t }}</p>
+      } @else if (drawing() && cursor()) {
+        <app-button-group class="gr__state">
+          <app-button variant="tonal" data-testid="gr-more" (click)="loadMore()">{{ 'graph.loadMore' | t }}</app-button>
+        </app-button-group>
+      }
     </div>
 
     <div class="gr__body" [attr.aria-busy]="loading() || null">
