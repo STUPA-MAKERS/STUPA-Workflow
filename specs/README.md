@@ -567,7 +567,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/paperless/002524](requirements/functional/integrations/paperless/002524_permission-use.md) | One permission gives the use of Paperless | approved |
 | [F/integrations/paperless/002525](requirements/functional/integrations/paperless/002525_open-in-paperless.md) | An element with a filed document links to Paperless | approved |
 | [F/integrations/paperless/002526](requirements/functional/integrations/paperless/002526_failed-filings.md) | The admin page lists the filings that failed | approved |
-| [F/integrations/paperless/002527](requirements/functional/integrations/paperless/002527_insert-prefix.md) | Two colons open the Paperless search in a protocol text | approved |
+| [F/integrations/paperless/002527](requirements/functional/integrations/paperless/002527_insert-slash-command.md) | The command Paperless opens the Paperless search in a protocol text | approved |
 | [F/integrations/paperless/002528](requirements/functional/integrations/paperless/002528_insert-copies.md) | An insert from Paperless copies the document as an embedded PDF | approved |
 | [F/integrations/paperless/002529](requirements/functional/integrations/paperless/002529_search-outage.md) | The Paperless search tells an outage and keeps the editor | approved |
 | [F/integrations/paperless/002530](requirements/functional/integrations/paperless/002530_backfill.md) | An admin can file the final documents that exist | approved |

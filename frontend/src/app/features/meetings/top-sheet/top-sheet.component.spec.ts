@@ -658,8 +658,11 @@ describe('TopSheetComponent', () => {
     });
   });
 
-  /** § F/integrations/paperless/002527: `::` opens the Paperless search. */
-  describe('insert from Paperless', () => {
+  /**
+   * § ui-kit 002771: the inserts of the text as slash commands.
+   * § F/integrations/paperless/002527: the command `Paperless` opens the Paperless search.
+   */
+  describe('slash commands', () => {
     const copy = { name: 'Angebot.pdf', url: `/api/media/documents/${ID}` };
     const paperless = (on: boolean): Provider => ({
       provide: PaperlessService,
@@ -671,16 +674,34 @@ describe('TopSheetComponent', () => {
     });
     afterEach(() => document.querySelectorAll('.sw-layer').forEach((n) => n.remove()));
 
-    it('gives the editor the prefix with the permission and the part on, and inserts the pick', async () => {
+    const labels = (view: Awaited<ReturnType<typeof setup>>): string[] =>
+      editorOf(view)
+        .slashCommands()
+        .map((command) => command.label);
+
+    it('offers the inserts of the format bar and runs each of them', async () => {
+      const view = await setup({}, [paperless(false)]);
+      const editor = editorOf(view);
+      expect(labels(view)).toEqual(['Tabelle', 'Bild', 'PDF', 'Anmerkung']);
+      const table = jest.spyOn(editor, 'insertTable').mockReturnValue(true);
+      const image = jest.spyOn(editor, 'pickImage').mockImplementation(() => {});
+      const pdf = jest.spyOn(editor, 'pickDocument').mockImplementation(() => {});
+      const note = jest.spyOn(editor, 'insertTimeNote').mockReturnValue(true);
+      for (const id of ['table', 'image', 'document', 'timeNote']) editor.slashCommand.emit(id);
+      expect([table, image, pdf, note].map((spy) => spy.mock.calls.length)).toEqual([1, 1, 1, 1]);
+      expect(view.container.querySelector('app-paperless-insert')).toBeNull();
+    });
+
+    it('adds Paperless as the last command with the permission and the part on, and inserts the pick', async () => {
       const view = await setup({}, [
         paperless(true),
         { provide: MediaApiService, useValue: { documentInfo: () => of({ pages: 3 }) } },
       ]);
       const editor = editorOf(view);
-      expect(editor.insertTrigger()).toBe('::');
+      expect(labels(view)).toEqual(['Tabelle', 'Bild', 'PDF', 'Anmerkung', 'Paperless']);
       expect(document.querySelector('.sw')).toBeNull();
 
-      editor.insertRequest.emit();
+      editor.slashCommand.emit('paperless');
       view.fixture.detectChanges();
       await view.fixture.whenStable();
       view.fixture.detectChanges();
@@ -698,15 +719,41 @@ describe('TopSheetComponent', () => {
       );
     });
 
-    it('keeps `::` plain without the permission or with the part off', async () => {
-      const view = await setup({}, [paperless(false)]);
-      expect(editorOf(view).insertTrigger()).toBeNull();
-      expect(view.container.querySelector('app-paperless-insert')).toBeNull();
+    it('has the tool Paperless in the format bar after Anmerkung, and none with the part off', async () => {
+      const view = await setup({}, [paperless(true)]);
+      const bar = screen.getByRole('toolbar');
+      const names = Array.from(bar.querySelectorAll('button')).map((b) => b.getAttribute('aria-label'));
+      expect(names.slice(-2)).toEqual(['Anmerkung mit Uhrzeit einfügen', 'Paperless']);
+      await userEvent.click(screen.getByRole('button', { name: 'Paperless' }));
+      await view.fixture.whenStable();
+      view.fixture.detectChanges();
+      expect(document.querySelector('.sw')?.getAttribute('aria-label')).toBe('In Paperless suchen');
     });
 
-    it('gives a reader no prefix', async () => {
+    it('has no tool Paperless with the part off', async () => {
+      await setup({}, [paperless(false)]);
+      expect(screen.queryByRole('button', { name: 'Paperless' })).toBeNull();
+    });
+
+    it('puts the pick at the caret of the Markdown source', async () => {
+      const view = await setup({ top: { ...AGENDA[0], body: 'Text' } }, [paperless(true)]);
+      view.fixture.componentInstance.mode.set('raw');
+      view.fixture.detectChanges();
+      await view.fixture.whenStable();
+      view.fixture.componentInstance.insertFromPaperless();
+      view.fixture.detectChanges();
+      await view.fixture.whenStable();
+      view.fixture.detectChanges();
+      (document.querySelector('.sw__row') as HTMLElement).click();
+      view.fixture.detectChanges();
+      expect(view.bodyChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ body: expect.stringContaining(`[Angebot.pdf](${copy.url})`) }),
+      );
+    });
+
+    it('gives a reader no commands', async () => {
       const view = await setup({ editable: false }, [paperless(true)]);
-      expect(editorOf(view).insertTrigger()).toBeNull();
+      expect(labels(view)).toEqual([]);
     });
   });
 });

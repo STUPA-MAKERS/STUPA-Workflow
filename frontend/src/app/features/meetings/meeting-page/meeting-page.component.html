@@ -457,6 +457,18 @@
         (click)="ts.insertTimeNote()"
         ><app-icon name="clock"
       /></app-button>
+      @if (ts.paperlessOn()) {
+        <app-button
+          variant="text"
+          [iconOnly]="true"
+          [ariaLabel]="'paperless.command' | t"
+          [title]="'paperless.command' | t"
+          (pointerdown)="$event.preventDefault()"
+          (mousedown)="$event.preventDefault()"
+          (click)="ts.insertFromPaperless()"
+          ><app-icon name="archive"
+        /></app-button>
+      }
     </app-button-group>
   }
 </ng-template>

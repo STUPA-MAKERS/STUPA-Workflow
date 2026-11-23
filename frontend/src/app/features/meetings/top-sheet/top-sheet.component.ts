@@ -15,7 +15,11 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { I18nService } from '@core/i18n/i18n.service';
 import { PaperlessService, type PaperlessCopy } from '@core/api/paperless.service';
 import type { AgendaItem, Meeting, Protocol, Uuid } from '@core/api/models';
-import type { MarkdownDocumentRef, MarkdownFormat } from '@stupa-makers/ui-kit/markdown-editor';
+import type {
+  MarkdownDocumentRef,
+  MarkdownFormat,
+  SlashCommand,
+} from '@stupa-makers/ui-kit/markdown-editor';
 import {
   type EditorMode,
   type SaveState,
@@ -36,15 +40,15 @@ export type { EditorMode, SaveState } from '@stupa-makers/ui-kit/views/protocol'
 
 const NO_FORMATS: ReadonlySet<MarkdownFormat> = new Set();
 
-/** The typed text that opens the Paperless search (§F/integrations/paperless/002527). */
-export const PAPERLESS_PREFIX = '::';
+/** The ID of the slash command that opens the Paperless search (§F/integrations/paperless/002527). */
+export const PAPERLESS_COMMAND = 'paperless';
 
 /**
  * The sheet of the open agenda item: the kit view `app-top-sheet-view`
  * (S/framework/views/002273) with the parts of the app. This component gives the view the
  * vote cards of the meeting, the keeper line, the rows of the application and of the linked
- * to-dos, the media store (`PROTOCOL_API`), the PDF viewer and the Paperless search that `::`
- * opens (§F/integrations/paperless/002527).
+ * to-dos, the media store (`PROTOCOL_API`), the PDF viewer and the Paperless search that the
+ * slash command `Paperless` opens (§F/integrations/paperless/002527).
  *
  * The meeting page reaches the format tools of the view through it (`toolGroups`,
  * `activeFormats`, `toggleFormat`, the inserts), because on a phone the dock holds them.
@@ -122,14 +126,28 @@ export class TopSheetComponent {
   }
 
   /**
-   * `::` opens the Paperless search only for a person with `paperless.use` and while the
-   * part is on; else the text stays plain (§F/integrations/paperless/002527).
+   * The slash menu of the text has the command `Paperless` only for a person with
+   * `paperless.use` and while the part is on (§F/integrations/paperless/002527).
    */
-  private readonly paperlessOn = toSignal(inject(PaperlessService).insertOn(), { initialValue: false });
-  protected readonly insertTrigger = computed(() => (this.paperlessOn() ? PAPERLESS_PREFIX : null));
+  readonly paperlessOn = toSignal(inject(PaperlessService).insertOn(), { initialValue: false });
+  protected readonly extraCommands = computed<readonly SlashCommand[]>(() =>
+    this.paperlessOn()
+      ? [{ id: PAPERLESS_COMMAND, icon: 'archive', label: this.i18n.translate('paperless.command') }]
+      : [],
+  );
   protected readonly paperlessOpen = signal(false);
 
-  /** The copy of the picked document goes to the place of the `::`. */
+  /** The tool `Paperless` of the format bar and of the dock: open the search. */
+  insertFromPaperless(): void {
+    if (this.paperlessOn()) this.paperlessOpen.set(true);
+  }
+
+  /** A slash command of the app: `Paperless` opens the search. */
+  protected onCommand(id: string): void {
+    if (id === PAPERLESS_COMMAND) this.insertFromPaperless();
+  }
+
+  /** The copy of the picked document goes to the place of the cursor. */
   protected insertCopy(copy: PaperlessCopy): void {
     this.view()?.insertDocumentRef({ src: copy.url, name: copy.name });
   }
