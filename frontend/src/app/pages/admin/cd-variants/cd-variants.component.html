@@ -8,6 +8,19 @@
   [skeleton]="3"
   (action)="$event.key === 'add' && openCreate()"
 >
+  <ng-template screenSearch>
+    <div role="search">
+      <app-search-pill
+        size="md"
+        [clearable]="true"
+        [placeholder]="'admin.cdVariants.search' | t"
+        [label]="'admin.cdVariants.search' | t"
+        [results]="hits()"
+        [value]="search.text()"
+        (valueChange)="search.set($event)"
+      />
+    </div>
+  </ng-template>
   <ng-template screenRecord let-row>
     @let v = variantOf(row.id);
     <li class="cdv__variant">

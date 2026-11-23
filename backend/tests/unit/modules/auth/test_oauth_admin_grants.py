@@ -220,6 +220,28 @@ def test_list_filters_by_principal() -> None:
     assert "principal_id" in str(db.statements[-1])
 
 
+def test_list_grants_search() -> None:
+    """Search each word over name, e-mail, client and scope, with LIKE wildcards escaped."""
+    db = fake_session(result((_token_row(), _principal_row())))
+    db.scalar_results.append(1)
+    client = _build_client(db=db)
+    resp = client.get(GRANTS, params={"q": "claude 50%"})
+    assert resp.status_code == 200
+    sql = str(db.statements[-1]).lower()
+    for column in ("display_name", "email", "client_id", "scope"):
+        assert column in sql
+    assert sql.count(" like ") >= 8
+
+
+def test_list_without_search_has_no_like() -> None:
+    """A blank search adds no condition."""
+    db = fake_session(result((_token_row(), _principal_row())))
+    db.scalar_results.append(1)
+    client = _build_client(db=db)
+    assert client.get(GRANTS, params={"q": "  "}).status_code == 200
+    assert " like " not in str(db.statements[-1]).lower()
+
+
 def test_list_rejects_an_unknown_query_parameter() -> None:
     client = _build_client()
     resp = client.get(GRANTS, params={"bogus": "1"})

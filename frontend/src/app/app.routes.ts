@@ -598,6 +598,16 @@ export const routes: Routes = [
               ),
           },
           {
+            path: 'committees/:id/substitutes',
+            canMatch: [featureMatch('meetings')],
+            data: { title: 'admin.substitutes.title', permission: 'admin.delegations', parent: ['admin', 'admin/committees'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/delegations/substitute-pool.component').then(
+                (m) => m.SubstitutePoolComponent,
+              ),
+          },
+          {
             path: 'branding',
             data: { title: 'admin.brand.title', permission: 'admin.site', parent: ['admin'], section: 'branding' },
             canActivate: [authGuard],

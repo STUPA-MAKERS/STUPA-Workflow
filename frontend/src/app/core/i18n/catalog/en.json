@@ -4974,5 +4974,20 @@
   "invoices.bulk.failed": "Bulk action failed.",
   "applications.bulk.skippedHead": "Skipped",
   "applications.bulk.skipped": "Skipped: status not allowed",
-  "applications.list.more": "More actions"
+  "applications.list.more": "More actions",
+  "admin.list.noHits": "No matches.",
+  "admin.roles.search": "Search roles",
+  "admin.webhook.search": "Search webhooks",
+  "admin.calendars.search": "Search calendars",
+  "admin.cdVariants.search": "Search document variants",
+  "admin.forced.search": "Search status changes",
+  "admin.oauthGrants.search": "Search agent access",
+  "admin.gremien.search": "Search committees",
+  "admin.gremien.membersSearch": "Search members",
+  "admin.substitutes.listSearch": "Search substitutes",
+  "admin.deleg.search": "Search delegations",
+  "admin.deleg.filters": "Delegation filters",
+  "admin.deleg.filter.period": "Period",
+  "admin.deleg.nonePast": "No past delegations.",
+  "admin.budgets.search": "Search budgets"
 }

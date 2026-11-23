@@ -836,9 +836,15 @@ export class AdminApiService {
     const limit = query.limit ?? 50;
     const offset = query.offset ?? 0;
     if (this.mock) {
-      const all = this.store.oauthGrants.filter(
-        (g) => !query.principalId || g.principalId === query.principalId,
-      );
+      const words = (query.q ?? '').trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+      const all = this.store.oauthGrants.filter((g) => {
+        if (query.principalId && g.principalId !== query.principalId) return false;
+        const hay = [g.principalName, g.principalEmail, g.clientId, g.scope]
+          .filter(Boolean)
+          .join('\n')
+          .toLocaleLowerCase();
+        return words.every((w) => hay.includes(w));
+      });
       return of({
         items: structuredCopy(all.slice(offset, offset + limit)),
         total: all.length,
@@ -848,7 +854,10 @@ export class AdminApiService {
     }
     const params = withParams(
       new HttpParams().set('limit', String(limit)).set('offset', String(offset)),
-      [['principalId', query.principalId || null]],
+      [
+        ['principalId', query.principalId || null],
+        ['q', query.q?.trim() || null],
+      ],
     );
     return this.http.get<Page<OAuthGrantAdmin>>(`${this.base}/admin/oauth-grants`, {
       params,

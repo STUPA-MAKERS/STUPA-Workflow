@@ -27,16 +27,19 @@ import {
   SectionComponent,
   StatusTextComponent,
   ToastService,
+  SearchPillComponent,
 } from '@stupa-makers/ui-kit';
 import {
   RecordsScreenComponent,
   ScreenHeadToolsDirective,
   ScreenRecordDirective,
+  ScreenSearchDirective,
 } from '@stupa-makers/ui-kit/screens';
 import { AdminApiService } from '../admin-api.service';
 import { ROLE_KEY_PATTERN, type Role } from '../admin.models';
 import { permissionSections } from './permission-sections';
 import { expandSet } from '@shared/expand-set';
+import { hitCount, listSearch, searchedRows } from '../list-search';
 
 /** Draft for a new global role. */
 interface RoleDraft {
@@ -68,6 +71,8 @@ const FIXED_ROLES = new Set(['admin', 'member']);
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ContentLangState],
   imports: [
+    SearchPillComponent,
+    ScreenSearchDirective,
     DialogBodyDirective,
     SectionComponent,
     ContentLangSwitchComponent,
@@ -125,6 +130,11 @@ export class AdminRolesComponent {
 
   /** The read of the roles failed (§ui-kit:000576). */
   protected readonly loadError = signal(false);
+  /** The search of the list (§002690, §002691). */
+  protected readonly search = listSearch();
+  /** The hits of the search for the pill. */
+  protected readonly hits = computed(() => hitCount(this.rows(), this.search));
+
   /** The rows of the records screen (§ui-kit:002257). */
   protected readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
     if (this.loading()) return { state: 'loading' };
@@ -134,10 +144,16 @@ export class AdminRolesComponent {
         message: this.i18n.translate('admin.roles.error'),
         retry: () => this.load(),
       };
-    const rows = this.roles().map((r) => ({ id: r.id, title: r.key }));
-    return rows.length
-      ? { state: 'ready', data: rows }
-      : { state: 'empty', icon: 'shield', heading: this.i18n.translate('admin.roles.empty') };
+    const rows = this.search
+      .filter(this.roles(), (r) => [this.roleLabel(r), r.key])
+      .map((r) => ({ id: r.id, title: r.key }));
+    return searchedRows(
+      rows.length
+        ? { state: 'ready', data: rows }
+        : { state: 'empty', icon: 'shield', heading: this.i18n.translate('admin.roles.empty') },
+      this.search,
+      this.i18n.translate('admin.list.noHits'),
+    );
   });
   /**
    * With unsaved changes: "Verwerfen" in the head and "Speichern" as the FAB; else "Rolle

@@ -982,6 +982,8 @@ export interface OAuthGrantQuery {
   readonly limit?: number;
   readonly offset?: number;
   readonly principalId?: Uuid | null;
+  /** The search over name, e-mail, client and scope (§002691). */
+  readonly q?: string | null;
 }
 
 /**

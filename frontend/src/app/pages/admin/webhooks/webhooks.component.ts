@@ -37,9 +37,10 @@ import {
   FactsComponent,
   DialogBodyDirective,
   FieldGroupComponent,
+  SearchPillComponent,
 } from '@stupa-makers/ui-kit';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
-import { RecordsScreenComponent, ScreenRecordDirective } from '@stupa-makers/ui-kit/screens';
+import { RecordsScreenComponent, ScreenRecordDirective, ScreenSearchDirective } from '@stupa-makers/ui-kit/screens';
 import { type StatusView, webhookDeliveryStatus } from '@shared/status-kind.util';
 import { withEntry } from '@shared/util/immutable';
 import { AdminApiService } from '../admin-api.service';
@@ -52,6 +53,7 @@ import {
   type WebhookEventGroup,
   type WebhookSubscription,
 } from '../admin.models';
+import { hitCount, listSearch, searchedRows } from '../list-search';
 
 function emptyHook(): WebhookConfig {
   return {
@@ -179,6 +181,8 @@ function withMember(set: ReadonlySet<string>, id: string, on: boolean): Readonly
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SearchPillComponent,
+    ScreenSearchDirective,
     DialogBodyDirective,
     FactsComponent,
     ErrorTextComponent,
@@ -221,6 +225,11 @@ export class WebhooksComponent {
   protected readonly loadError = signal(false);
 
   protected readonly hooks = signal<readonly WebhookConfig[]>([]);
+  /** The search of the list (§002690, §002691). */
+  protected readonly search = listSearch();
+  /** The hits of the search for the pill. */
+  protected readonly hits = computed(() => hitCount(this.rows(), this.search));
+
   /** The rows of the records screen (§ui-kit:002257). */
   protected readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
     if (this.loading()) return { state: 'loading' };
@@ -230,10 +239,16 @@ export class WebhooksComponent {
         message: this.i18n.translate('admin.webhook.error'),
         retry: () => this.load(),
       };
-    const rows = this.hooks().map((h) => ({ id: h.id, title: h.name || h.url }));
-    return rows.length
-      ? { state: 'ready', data: rows }
-      : { state: 'empty', icon: 'webhook', heading: this.i18n.translate('admin.webhook.none') };
+    const rows = this.search
+      .filter(this.hooks(), (h) => [h.name, h.url])
+      .map((h) => ({ id: h.id, title: h.name || h.url }));
+    return searchedRows(
+      rows.length
+        ? { state: 'ready', data: rows }
+        : { state: 'empty', icon: 'webhook', heading: this.i18n.translate('admin.webhook.none') },
+      this.search,
+      this.i18n.translate('admin.list.noHits'),
+    );
   });
   protected readonly draft = signal<WebhookConfig | null>(null);
   protected readonly editingIndex = signal<number | null>(null);

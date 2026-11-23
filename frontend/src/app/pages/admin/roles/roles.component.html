@@ -6,6 +6,19 @@
   [keepOnError]="roles().length > 0"
   (action)="onAction($event.key)"
 >
+  <ng-template screenSearch>
+    <div role="search">
+      <app-search-pill
+        size="md"
+        [clearable]="true"
+        [placeholder]="'admin.roles.search' | t"
+        [label]="'admin.roles.search' | t"
+        [results]="hits()"
+        [value]="search.text()"
+        (valueChange)="search.set($event)"
+      />
+    </div>
+  </ng-template>
   <ng-template screenHeadTools>
     <app-content-lang-switch [(value)]="contentLang.lang" [ariaLabel]="'admin.common.contentLang' | t" />
   </ng-template>

@@ -16,16 +16,18 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import {
   AvatarComponent,
-  ButtonComponent,
-  ButtonGroupComponent,
   CapitalizePipe,
-  EmptyStateComponent,
+  type ListRow,
+  type LoadState,
   NoteComponent,
-  SkeletonComponent,
-  PageHeaderComponent,
-  SectionComponent,
+  SearchPillComponent,
 } from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import {
+  RecordsScreenComponent,
+  ScreenIntroDirective,
+  ScreenRecordDirective,
+  ScreenSearchDirective,
+} from '@stupa-makers/ui-kit/screens';
 import { AdminApiService } from '../admin-api.service';
 import {
   FORCED_GREMIUM_ROLE_KEYS,
@@ -35,9 +37,8 @@ import {
   isActiveMembership,
   MEMBER_GREMIUM_ROLE_KEY,
 } from '../admin.models';
-import { SubstitutePoolComponent } from '../delegations/substitute-pool.component';
 import { personLabel } from '@shared/person-label.util';
-import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
+import { hitCount, listSearch, searchedRows } from '../list-search';
 
 /** One row of the member list. */
 interface Member {
@@ -49,38 +50,31 @@ interface Member {
   readonly rank: number;
 }
 
-/** The rows the list shows before "Alle n anzeigen". */
-export const MEMBER_PREVIEW = 7;
-
 /**
  * Members of a gremium on its own page (`/admin/committees/:id/members`).
  *
- * The members come only from the OIDC groups of the IdP, so the list is read-only: avatar,
- * name, e-mail and the gremium role. The note links to the group mappings, where the
- * memberships come from. The list shows the first rows; "Alle n anzeigen" shows the rest.
- * The membership rows carry the name and the e-mail of the member, so the page loads no
- * principal list. With `admin.delegations` the substitute pool of the gremium follows
- * (`app-substitute-pool`). The last crumb shows the name of the gremium once it loads.
+ * A list page of Verwaltung (§002690) with the search of Benutzer (§002691). The members come
+ * only from the OIDC groups of the IdP, so the list is read-only: avatar, name, e-mail and the
+ * gremium role. The note links to the group mappings, where the memberships come from. The
+ * membership rows carry the name and the e-mail of the member, so the page loads no principal
+ * list. The substitute pool has its own page (§002692). The last crumb shows the name of the
+ * gremium once it loads.
  */
 @Component({
   selector: 'app-gremium-members',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    LoadStateComponent,
-    SectionComponent,
-    ButtonComponent,
-    ButtonGroupComponent,
-    EmptyStateComponent,
     RouterLink,
     TranslatePipe,
     CapitalizePipe,
     AvatarComponent,
     NoteComponent,
-    PageHeaderComponent,
-    BreadcrumbsComponent,
-    SkeletonComponent,
-    SubstitutePoolComponent,
+    RecordsScreenComponent,
+    ScreenIntroDirective,
+    ScreenRecordDirective,
+    ScreenSearchDirective,
+    SearchPillComponent,
   ],
   templateUrl: './gremium-members.component.html',
   styleUrl: './gremium-members.component.scss',
@@ -96,18 +90,9 @@ export class GremiumMembersComponent {
   /** True until the first answer, so the list does not claim there are no members. */
   protected readonly loading = signal(true);
   protected readonly failed = signal(false);
-  protected readonly loadState = loadStateOf(this.loading, this.failed);
-  protected readonly showAll = signal(false);
-  protected readonly preview = MEMBER_PREVIEW;
 
   /** The note links to the mappings page only with its permission. */
   protected readonly canManageMappings = computed(() => this.auth.can('admin.group_mappings'));
-  /** The substitute pool needs `admin.delegations` (or `session.manage` in the gremium). */
-  protected readonly canPool = computed(
-    () =>
-      this.auth.can('admin.delegations') ||
-      this.auth.canInGremium(this.gremiumId, 'session.manage'),
-  );
 
   readonly gremium = signal<Gremium | null>(null);
   private readonly gremiumRoles = signal<GremiumRole[]>([]);
@@ -136,14 +121,35 @@ export class GremiumMembersComponent {
     return rows.sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
   });
 
-  protected readonly visible = computed(() =>
-    this.showAll() ? this.members() : this.members().slice(0, MEMBER_PREVIEW),
-  );
+  /** The search of the list (§002690, §002691). */
+  protected readonly search = listSearch();
+  /** The rows of the records screen (§ui-kit:002257). */
+  protected readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
+    if (this.loading()) return { state: 'loading' };
+    if (this.failed())
+      return {
+        state: 'error',
+        message: this.i18n.translate('admin.gremien.membersLoadFailed'),
+        retry: () => this.loadMembers(),
+      };
+    const rows = this.search
+      .filter(this.members(), (m) => [m.name, m.email, m.role])
+      .map((m) => ({ id: m.id, title: m.name }));
+    return searchedRows(
+      rows.length
+        ? { state: 'ready', data: rows }
+        : { state: 'empty', icon: 'users', heading: this.i18n.translate('admin.gremien.membersEmpty') },
+      this.search,
+      this.i18n.translate('admin.list.noHits'),
+    );
+  });
+  /** The hits of the search for the pill. */
+  protected readonly hits = computed(() => hitCount(this.rows(), this.search));
 
-  /** The options of "Vertritt" in the substitute pool: every member. */
-  protected readonly poolMembers = computed(() =>
-    this.members().map((m) => ({ id: m.id, name: m.name })),
-  );
+  /** The member of a row of the records screen. */
+  protected memberOf(id: string): Member {
+    return this.members().find((m) => m.id === id)!;
+  }
 
   constructor() {
     const frame = inject(PageFrameService);

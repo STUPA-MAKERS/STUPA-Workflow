@@ -1,3 +1,4 @@
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { type DelegationSubstitute, DelegationsApiService } from '@core/api/delegations.service';
@@ -5,6 +6,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { of, throwError } from 'rxjs';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal } from '../admin.models';
+import { PageFrameService } from '../../../layout/page-frame.service';
 import { SubstitutePoolComponent } from './substitute-pool.component';
 import { optionLabels, pickOption } from '../../../../testing/select';
 import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
@@ -79,6 +81,7 @@ function makeDelegations(over: Partial<Record<string, jest.Mock>> = {}) {
 /** A deactivated member represents nobody, so it is no choice. */
 function makeAdmin(over: Partial<Record<string, jest.Mock>> = {}) {
   return {
+    listGremienOptions: jest.fn(() => of([{ id: 'g-1', name: 'Studierendenparlament' }])),
     listPrincipals: jest.fn(() => of(clone(PEOPLE))),
     listGremiumMemberships: jest.fn(() =>
       of([
@@ -134,7 +137,6 @@ async function setup(
   opts: {
     delegations?: ReturnType<typeof makeDelegations>;
     admin?: ReturnType<typeof makeAdmin>;
-    members?: unknown;
   } = {},
 ) {
   const delegations = opts.delegations ?? makeDelegations();
@@ -142,14 +144,24 @@ async function setup(
   const toast = { success: jest.fn(), error: jest.fn() };
   const view = await render(SubstitutePoolComponent, {
     providers: [
+      provideRouter([]),
       { provide: DelegationsApiService, useValue: delegations },
       { provide: AdminApiService, useValue: admin },
       { provide: ToastService, useFactory: () => toastWith(toast) },
+      {
+        provide: ActivatedRoute,
+        useValue: {
+          snapshot: {
+            paramMap: convertToParamMap({ id: 'g-1' }),
+            pathFromRoot: [
+              { url: [] },
+              { url: [{ path: 'admin' }] },
+              { url: [{ path: 'committees' }, { path: 'g-1' }, { path: 'substitutes' }] },
+            ],
+          },
+        },
+      },
     ],
-    componentInputs: {
-      gremiumId: 'g-1',
-      ...(opts.members !== undefined ? { members: opts.members } : {}),
-    },
   });
   await view.fixture.whenStable();
   view.fixture.detectChanges();
@@ -166,7 +178,10 @@ describe('SubstitutePoolComponent', () => {
    */
   it('lists the entries as "member → substitute" under one heading', async () => {
     await setup();
-    const rows = within(screen.getByRole('list', { name: 'Stellvertretungen' })).getAllByRole(
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'Stellvertretungen: Studierendenparlament',
+    );
+    const rows = within(screen.getByRole('list', { name: /^Stellvertretungen/ })).getAllByRole(
       'listitem',
     );
     expect(rows[0]).toHaveTextContent(/^Für alle Mitglieder\s*vertreten durch.*Fabi Fachschaft$/);
@@ -248,7 +263,7 @@ describe('SubstitutePoolComponent', () => {
     const { toast } = await setup({ delegations });
     await userEvent.click(screen.getByRole('button', { name: /Stellvertretung hinzufügen/ }));
     const dialog = screen.getByRole('dialog');
-    await userEvent.type(within(dialog).getByRole('searchbox'), 'kim');
+    await userEvent.type(within(dialog).getByRole('searchbox', { name: /Person suchen/ }), 'kim');
     await userEvent.click(await within(dialog).findByRole('button', { name: /Kim/ }));
     const add = within(dialog).getByText('Hinzufügen').closest('button')!;
     await userEvent.click(add);
@@ -275,7 +290,9 @@ describe('SubstitutePoolComponent', () => {
     });
     await setup({ admin });
     await userEvent.click(screen.getByRole('button', { name: /Stellvertretung hinzufügen/ }));
-    const search = screen.getByRole('searchbox');
+    const search = within(screen.getByRole('dialog')).getByRole('searchbox', {
+      name: /Person suchen/,
+    });
     await userEvent.type(search, 'zz');
     expect(await screen.findByText('Keine Person gefunden.')).toBeInTheDocument();
     await userEvent.type(search, 'z');
@@ -289,11 +306,21 @@ describe('SubstitutePoolComponent', () => {
     expect(await screen.findByRole('button', { name: /Kim/ })).toBeInTheDocument();
   });
 
-  it('takes the members from the input and loads no memberships', async () => {
-    const admin = makeAdmin();
-    await setup({ admin, members: [{ id: 'p-4', name: 'Toni T.' }] });
-    expect(admin.listGremiumMemberships).not.toHaveBeenCalled();
-    expect(screen.getAllByRole('listitem')[2]).toHaveTextContent('Toni T.');
+  /** §002690, §002691: the search of Benutzer filters by member and substitute. */
+  it('searches the entries by member and substitute', async () => {
+    const { fixture } = await setup();
+    const pill = screen.getByRole('searchbox', { name: 'Stellvertretungen durchsuchen' });
+    await userEvent.type(pill, 'robin');
+    fixture.detectChanges();
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    await userEvent.clear(pill);
+    await userEvent.type(pill, 'alle fabi');
+    fixture.detectChanges();
+    expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('Fabi Fachschaft');
+    await userEvent.clear(pill);
+    await userEvent.type(pill, 'nobody');
+    fixture.detectChanges();
+    expect(screen.getByText('Keine Treffer.')).toBeInTheDocument();
   });
 
   it('names a failed load and an empty pool', async () => {
@@ -315,11 +342,22 @@ describe('SubstitutePoolComponent', () => {
     expect(screen.getByText('Keine Stellvertretungen benannt.')).toBeInTheDocument();
   });
 
-  it('loads again for another gremium', async () => {
-    const { delegations, fixture } = await setup();
-    fixture.componentRef.setInput('gremiumId', 'g-2');
-    fixture.detectChanges();
-    expect(delegations.substitutes).toHaveBeenLastCalledWith('g-2');
+  it('names the gremium in the last crumb and clears it on leave', async () => {
+    const { fixture } = await setup();
+    const frame = fixture.debugElement.injector.get(PageFrameService);
+    expect(frame.crumbLabel()).toEqual({
+      url: '/admin/committees/g-1/substitutes',
+      label: 'Studierendenparlament',
+    });
+    fixture.destroy();
+    expect(frame.crumbLabel()).toBeNull();
+  });
+
+  it('shows an ellipsis for an unknown gremium', async () => {
+    await setup({
+      admin: makeAdmin({ listGremienOptions: jest.fn(() => throwError(() => ({ status: 500 }))) }),
+    });
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Stellvertretungen: …');
   });
 
   /** A nameless account reads "Ohne Namen", never its sub. */
