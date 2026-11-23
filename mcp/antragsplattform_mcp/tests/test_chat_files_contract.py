@@ -103,6 +103,7 @@ from antragsplattform_mcp.tools import (  # noqa: E402
 )
 
 TICKET_ID = uuid4()
+AREA_ID = uuid4()
 CARD_ID = uuid4()
 APP_ID = uuid4()
 BLOCK_ID = uuid4()
@@ -205,6 +206,7 @@ class _Drafts:
 def _detail(blocked: bool) -> TicketDetail:
     return TicketDetail(
         id=TICKET_ID,
+        area_id=AREA_ID,
         number="T-0040",
         kind="bug",
         title="Absturz",
