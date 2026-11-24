@@ -14,9 +14,12 @@ scope:
 
 The kind of a Bestellung must be `order` ("Bestellung") or `outlay` ("Auslage"). An Auslage is a
 purchase that a person paid and that the Studierendenschaft pays back. An Auslage must name its
-buyer, as an account or as a name. The kind must not change after the create.
+buyer, as an account or as a name. A person must be able to change the kind of a Bestellung. The
+server must answer 422 `order_buyer_required` for a change to Auslage without a buyer.
 
 Reason: An order and an Auslage hold the same data: what, the price, the invoice and the
-booking. A second element for the Auslage would copy all of it.
+booking. A second element for the Auslage would copy all of it. A wrong click at the create must
+not force a delete.
 
-Test: A backend unit test refuses an Auslage without a buyer and refuses a change of the kind.
+Test: A backend unit test refuses an Auslage without a buyer, changes an order with a buyer to
+an Auslage and refuses the change without a buyer.

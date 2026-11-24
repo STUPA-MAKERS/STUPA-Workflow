@@ -567,7 +567,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002868](requirements/functional/finance/orders/002868_order-sum-warning.md) | A sum above the approved amount warns and does not block | draft |
 | [F/finance/orders/002869](requirements/functional/finance/orders/002869_order-section.md) | The Antrag detail has the section Bestellungen | draft |
 | [F/finance/orders/002870](requirements/functional/finance/orders/002870_order-row-menu.md) | The row of a Bestellung has a menu with its actions | draft |
-| [F/finance/orders/002871](requirements/functional/finance/orders/002871_order-files.md) | A file of a Bestellung is an attachment of its Antrag | draft |
+| [F/finance/orders/002871](requirements/functional/finance/orders/002871_order-attachments.md) | A Bestellung has its own attachments | draft |
 | [F/finance/orders/002872](requirements/functional/finance/orders/002872_order-api.md) | The Bestellungen have their own API | draft |
 | [F/finance/orders/002873](requirements/functional/finance/orders/002873_order-invoice.md) | A Bestellung has at most one invoice | draft |
 | [F/finance/orders/002874](requirements/functional/finance/orders/002874_order-actual-amount-from-invoice.md) | The invoice fills an empty real price | draft |
