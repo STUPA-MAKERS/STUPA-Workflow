@@ -4,6 +4,8 @@ import { Component, input } from '@angular/core';
 import type { Provider } from '@angular/core';
 import { I18nService } from '@core/i18n/i18n.service';
 import { POSITION_FILES } from '@shared/forms/position-files';
+import type { FormFieldDef } from '@core/api/models';
+import { toFormlyFields } from '@shared/forms/formly-mapper';
 import { FormlyPositionsType } from './formly-positions.type';
 
 interface Offer {
@@ -867,6 +869,21 @@ describe('FormlyPositionsType — cost line (specs 001630, 001631)', () => {
   });
 });
 
+describe('FormlyPositionsType — cost line setting (spec 003000)', () => {
+  it('cost line: shows no Gesamtkosten line with costLine false, and keeps the head sum', async () => {
+    const fields: FormFieldDef[] = [
+      { key: 'kosten', type: 'positions', label: { de: 'K' }, validation: { costLine: false } },
+      { key: 'foerderung', type: 'funding', label: { de: 'F' } },
+    ];
+    const kosten = [{ label: 'Bus', offers: [{ label: 'Reisen AG', value: 1200, preferred: true }] }];
+    const props = (toFormlyFields(fields, 'de')[0].props ?? {}) as Record<string, unknown>;
+    const { host } = await setup({ key: 'kosten', value: kosten, model: { kosten }, props });
+    expect(host.querySelector('.pos__line')).toBeNull();
+    expect(host.textContent).not.toContain('Gesamtkosten');
+    expect(host.querySelector('.pos__sum')?.textContent).toContain('1.200,00');
+  });
+});
+
 describe('FormlyPositionsType — placeholder warnings (specs 001640, 001641)', () => {
   const offers = [
     { label: 'x', value: 1, preferred: true },
@@ -917,6 +934,20 @@ describe('FormlyPositionsType — placeholder warnings (specs 001640, 001641)', 
     expect(prot(cmp).switchHint({ ...p, noOffers: true })).toBe('');
   });
 
+  it('placeholder: shows no warning and no switch hint with placeholderWarning false (spec 003001)', async () => {
+    const { cmp, control, host, detect } = await setup({
+      value: [{ label: 'P', offers }],
+      props: { placeholderWarning: false },
+    });
+    prot(cmp).toggleOpen(0);
+    detect();
+    const p = (control.value as Position[])[0];
+    expect(prot(cmp).offerWarning(p, 0, 'value')).toBe('');
+    expect(prot(cmp).switchHint(p)).toBe('');
+    expect(host.querySelectorAll('.pf--warn')).toHaveLength(0);
+    expect(host.querySelectorAll('.pos__warn')).toHaveLength(0);
+  });
+
   it('keeps a complete position with a warning valid', async () => {
     const { control } = await setup({
       value: [{ label: 'P', offers }],
@@ -946,6 +977,17 @@ describe('FormlyPositionsType — files per position (spec 001730)', () => {
     expect(host.querySelector('.stub')?.textContent).toBe(`kosten/${id}/Dateien zur Position`);
     cmp.removePosition(0);
     expect(removed).toHaveBeenCalledWith('kosten', id);
+  });
+
+  it('position files: has no files block with positionFiles false (spec 003002)', async () => {
+    const removed = jest.fn();
+    const { host } = await setup({
+      key: 'kosten',
+      value: [{ id: 'p-1', label: '', offers: [] }],
+      props: { positionFiles: false },
+      providers: [{ provide: POSITION_FILES, useValue: { component: FilesStubComponent, removed } }],
+    });
+    expect(host.querySelector('.stub')).toBeNull();
   });
 
   it('has no files block without the page token', async () => {

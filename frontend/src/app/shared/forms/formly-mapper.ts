@@ -196,15 +196,14 @@ function totalText(key: TranslationKey, lang: Lang, total: number): string {
 }
 
 /**
- * The requested funding: the hint is the help of the field, an optional field without help says
- * that an empty value requests the full sum, and a value above the cost total is an error that
- * names the total (spec 002990). The server checks the same rule (`_check_funding_total`).
+ * The requested funding: the hint is the help of the field and nothing else (specs 002990,
+ * 003006). While the setting `capAtCost` is on, a value above the cost total is an error that
+ * names the total (spec 003004). The server checks the same rule (`_check_funding_total`).
  *
  * The cap is checked again when any answer changes, because the cost positions are other controls.
  */
 function withFunding(
   config: FormlyFieldConfig,
-  help: string | undefined,
   lang: Lang,
   costKeys: readonly string[],
 ): FormlyFieldConfig {
@@ -225,10 +224,6 @@ function withFunding(
         field.form?.valueChanges.pipe(
           tap(() => field.formControl?.updateValueAndValidity({ emitEvent: false })),
         ),
-    },
-    props: {
-      ...config.props,
-      description: help ?? (config.props?.required ? undefined : uiText('forms.funding.empty', lang)),
     },
     expressions: {
       ...config.expressions,
@@ -256,9 +251,11 @@ function choiceProps(f: FormFieldDef, lang: Lang): Readonly<Record<string, unkno
 }
 
 /**
- * The `positions` limits that the form sets. The last `positions` field of the form also
- * gets the fields of the form (`costFields`) and `costLine`: it shows the line with the
- * total cost, the requested amount and the amount per person (specs 001630, 001631).
+ * The `positions` limits and settings that the form sets. The last `positions` field of the
+ * form also gets the fields of the form (`costFields`) and `costLine`, unless its setting
+ * `costLine` is off: it shows the line with the total cost, the requested amount and the
+ * amount per person (specs 001630, 001631, 003000). `placeholderWarning` and
+ * `positionFiles` go to the field as they are (specs 003001, 003002).
  */
 function positionsProps(
   f: FormFieldDef,
@@ -267,7 +264,9 @@ function positionsProps(
   const v = f.validation;
   const last = all.filter((x) => x.type === 'positions').at(-1);
   return {
-    ...(last?.key === f.key ? { costLine: true, costFields: all } : {}),
+    ...(last?.key === f.key && v?.costLine !== false ? { costLine: true, costFields: all } : {}),
+    ...(v?.placeholderWarning === false ? { placeholderWarning: false } : {}),
+    ...(v?.positionFiles === false ? { positionFiles: false } : {}),
     ...(v?.minOffers !== undefined ? { minOffers: v.minOffers } : {}),
     ...(v?.minPositions !== undefined ? { minPositions: v.minPositions } : {}),
     ...(v?.allowNoOffers !== undefined ? { allowNoOffers: v.allowNoOffers } : {}),
@@ -334,7 +333,9 @@ function mapField(
     props,
     ...(expressions ? { expressions } : {}),
   };
-  return f.type === 'funding' ? withFunding(config, help, lang, costKeys) : config;
+  return f.type === 'funding' && f.validation?.capAtCost !== false
+    ? withFunding(config, lang, costKeys)
+    : config;
 }
 
 /** The Formly props of the `validation` limits of a field. */

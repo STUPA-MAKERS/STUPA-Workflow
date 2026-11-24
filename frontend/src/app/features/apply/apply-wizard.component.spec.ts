@@ -1214,5 +1214,33 @@ describe('ApplyWizardComponent', () => {
       expect(s.comp.confirmNoFile()).toBe(false);
       expect(s.create).toHaveBeenCalledTimes(2);
     });
+
+    it('file reminder: submits without the question when fileReminder is off (spec 003003)', async () => {
+      const kosten = COSTS.sections[0].fields[1];
+      const off: EffectiveForm = {
+        ...COSTS,
+        sections: [
+          {
+            ...COSTS.sections[0],
+            fields: [
+              COSTS.sections[0].fields[0],
+              { ...kosten, validation: { ...kosten.validation, fileReminder: false } },
+            ],
+          },
+        ],
+      };
+      const s = await setup({ form: off, loggedIn: true });
+      await toReviewSignedIn(s, async () => {
+        await userEvent.click(screen.getByRole('button', { name: /Position hinzufügen/ }));
+        s.fixture.detectChanges();
+        await userEvent.type(screen.getByLabelText('Position'), 'Bus');
+        await userEvent.type(screen.getByLabelText('Anbieter'), 'Reisen AG');
+        await userEvent.type(screen.getByLabelText(/^Betrag/), '120');
+        s.fixture.detectChanges();
+      });
+      s.comp.submit();
+      expect(s.comp.confirmNoFile()).toBe(false);
+      expect(s.create).toHaveBeenCalledTimes(1);
+    });
   });
 });

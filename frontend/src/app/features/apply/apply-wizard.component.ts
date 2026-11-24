@@ -318,6 +318,11 @@ export class ApplyWizardComponent {
   private readonly positionKeys = computed<ReadonlySet<string>>(
     () => new Set(this.allFields().filter((f) => f.type === 'positions').map((f) => f.key)),
   );
+  /** The form asks before a submit without a file: a `positions` field has the setting
+   *  `fileReminder` on (specs 001731, 003003). */
+  private readonly fileReminder = computed(() =>
+    this.allFields().some((f) => f.type === 'positions' && f.validation?.fileReminder !== false),
+  );
   /** Every field of the form, in form order. */
   private readonly allFields = computed<readonly FormFieldDef[]>(() =>
     (this.effForm()?.sections ?? []).flatMap((s) => s.fields),
@@ -751,7 +756,7 @@ export class ApplyWizardComponent {
     if (!this.canSubmit() || this.submitting()) return;
     const typeId = this.typeId();
     if (!typeId) return;
-    if (!withoutFile && this.positionKeys().size > 0 && this.drafts.count() === 0) {
+    if (!withoutFile && this.fileReminder() && this.drafts.count() === 0) {
       this.confirmNoFile.set(true);
       return;
     }

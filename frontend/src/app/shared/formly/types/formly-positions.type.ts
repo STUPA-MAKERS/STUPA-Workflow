@@ -23,7 +23,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { formatMoney } from '@shared/format-money';
 import { withEntry, withoutEntry } from '@shared/util/immutable';
 import { type CostLine, costLine, placeholderReasons } from '@shared/forms/form-rules';
-import { POSITION_FILES, newPositionId } from '@shared/forms/position-files';
+import { POSITION_FILES, type PositionFiles, newPositionId } from '@shared/forms/position-files';
 import { RowChevronComponent } from '../../ui/row-chevron/row-chevron.component';
 
 /** A comparison offer within a cost position. */
@@ -70,17 +70,19 @@ let nextUid = 0;
  *
  * The last `positions` field of a form (`props.costLine`) shows below the positions the
  * line "Gesamtkosten X €, davon beantragt Y €" and, with a number of participants above 0,
- * "Z € pro Person" (specs 001630, 001631). It reads the other answers from the model and
- * updates on every change of the form.
+ * "Z € pro Person" (specs 001630, 001631), unless the form switches it off (spec 003000).
+ * It reads the other answers from the model and updates on every change of the form.
  *
  * An offer that looks like a placeholder (0 € or 1 €, a supplier with fewer than 3
  * characters, the same supplier twice in a position) gets a warning below it (spec
  * 001640). The warning names the switch for "no comparison offers" when the field offers
- * it. It never makes the field invalid (spec 001641).
+ * it. It never makes the field invalid (spec 001641). `props.placeholderWarning: false`
+ * switches the warnings off (spec 003001).
  *
  * A page that provides `POSITION_FILES` gets a files block below each open position
- * (spec 001730). A new position gets a stable `id`; on such a page an older position
- * without one gets it when the field starts.
+ * (spec 001730), unless `props.positionFiles` is `false` (spec 003002). A new position
+ * gets a stable `id`; on such a page an older position without one gets it when the field
+ * starts.
  *
  * The legend must be the first child of the fieldset, so the legend and the sum float and the sum
  * sits at the end of the legend line.
@@ -105,8 +107,11 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   private readonly i18n = inject(I18nService);
   private readonly uid = `pos-${nextUid++}`;
   private readonly destroyRef = inject(DestroyRef);
-  /** The files of a position, when the page offers them. */
-  protected readonly positionFiles = inject(POSITION_FILES, { optional: true });
+  private readonly filesOfPage = inject(POSITION_FILES, { optional: true });
+  /** The files of a position, when the page offers them and the form does not switch them off. */
+  protected get positionFiles(): PositionFiles | null {
+    return this.props['positionFiles'] === false ? null : this.filesOfPage;
+  }
   /** Counts the changes of the form, so the cost line reads the other answers again. */
   private readonly formTick = signal(0);
 
@@ -218,6 +223,10 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   get allowNoOffers(): boolean {
     return this.props['allowNoOffers'] !== false;
   }
+  /** Whether the form warns at placeholder offers (spec 003001). Default yes. */
+  get placeholderWarning(): boolean {
+    return this.props['placeholderWarning'] !== false;
+  }
   /** Offers required for one position: 1 when the position opted out, else `minOffers`. */
   protected requiredOffers(p: Position): number {
     return this.allowNoOffers && p.noOffers ? 1 : this.minOffers;
@@ -295,6 +304,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
    * for the supplier (too short, or the same as another offer), `value` for the amount.
    */
   protected offerWarning(p: Position, oi: number, field: 'label' | 'value'): string {
+    if (!this.placeholderWarning) return '';
     const reasons = placeholderReasons(p.offers)[oi] ?? [];
     return reasons
       .filter((r) => (field === 'value' ? r === 'value' : r !== 'value'))
@@ -307,7 +317,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
    * offers the switch for no comparison offers and it is off (spec 001641), or ''.
    */
   protected switchHint(p: Position): string {
-    if (!this.allowNoOffers || p.noOffers) return '';
+    if (!this.placeholderWarning || !this.allowNoOffers || p.noOffers) return '';
     const any = placeholderReasons(p.offers).some((r) => r.length > 0);
     return any
       ? this.i18n.translate('forms.positions.placeholder.useSwitch', {

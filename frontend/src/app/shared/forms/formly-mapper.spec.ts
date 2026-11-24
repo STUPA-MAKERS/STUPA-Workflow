@@ -356,6 +356,22 @@ describe('toFormlyFields', () => {
     expect(last.props?.['costFields']).toBe(fields);
   });
 
+  it('drops the cost line and passes the display settings when they are off (specs 003000-003002)', () => {
+    const fields: FormFieldDef[] = [
+      {
+        key: 'a',
+        type: 'positions',
+        label: { de: 'A' },
+        validation: { costLine: false, placeholderWarning: false, positionFiles: false },
+      },
+    ];
+    const [cfg] = toFormlyFields(fields, 'de');
+    expect(cfg.props?.['costLine']).toBeUndefined();
+    expect(cfg.props?.['costFields']).toBeUndefined();
+    expect(cfg.props?.['placeholderWarning']).toBe(false);
+    expect(cfg.props?.['positionFiles']).toBe(false);
+  });
+
   it('omits positions min props when validation does not set them', () => {
     const fields: FormFieldDef[] = [
       { key: 'costs', type: 'positions', label: { de: 'Kosten' }, validation: {} },
@@ -458,13 +474,17 @@ describe('requested funding', () => {
     expect(cfg.props?.description).toBeUndefined();
   });
 
-  it('says without an amount that an empty optional field requests the full sum', () => {
-    expect(toFormlyFields([{ ...fields[1], help: undefined }], 'de')[0].props?.description).toBe(
-      'Leer lassen, um die volle Summe zu beantragen.',
-    );
-    expect(toFormlyFields([{ ...fields[1], help: undefined }], 'en')[0].props?.description).toBe(
-      'Leave empty to request the full amount.',
-    );
+  it('shows no hint at an optional field without help (spec 003006)', () => {
+    expect(toFormlyFields([{ ...fields[1], help: undefined }], 'de')[0].props?.description).toBeUndefined();
+  });
+
+  it('funding cap: no check and no error text with capAtCost off (spec 003004)', () => {
+    const off = toFormlyFields([fields[0], { ...fields[1], validation: { capAtCost: false } }], 'de')[1];
+    expect(off.validators?.['fundingMax']).toBeUndefined();
+    expect(off.expressions?.['props.errorText']).toBeUndefined();
+    expect(off.props?.description).toBe('Hilfe.');
+    const on = toFormlyFields([fields[0], { ...fields[1], validation: { capAtCost: true } }], 'de')[1];
+    expect(on.validators?.['fundingMax']).toBeDefined();
   });
 
   it('names the cost total in the error text', () => {

@@ -733,7 +733,6 @@
   "forms.positions.offers": "Offers",
   "forms.positions.preferred": "preferred",
   "forms.positions.total": "Total amount",
-  "forms.funding.empty": "Leave empty to request the full amount.",
   "forms.funding.max": "The funding must not exceed the costs ({total}).",
   "forms.positions.sum": "Total",
   "forms.costLine.total": "Total cost {total}, of which requested {requested}",

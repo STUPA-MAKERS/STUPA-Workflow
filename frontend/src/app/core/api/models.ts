@@ -1362,6 +1362,18 @@ export interface FieldValidation {
    *  user ticks a checkbox and must give a reason. Then one offer is enough. If
    *  unset, the opt-out is allowed. */
   readonly allowNoOffers?: boolean;
+  /** `positions`. The cost line below the field (specs 001630, 003000). Unset = on. */
+  readonly costLine?: boolean;
+  /** `positions`. The warnings at placeholder offers (specs 001640, 003001). Unset = on. */
+  readonly placeholderWarning?: boolean;
+  /** `positions`. The upload of files per position (specs 001730, 003002). Unset = on. */
+  readonly positionFiles?: boolean;
+  /** `positions`. The question before a submit without a file (specs 001731, 003003).
+   *  Unset = on. */
+  readonly fileReminder?: boolean;
+  /** `funding`. The value must not be above the cost total (specs 000135, 003004).
+   *  Unset = on. */
+  readonly capAtCost?: boolean;
   /** `number`. The field holds the number of participants (spec 001631); at most one
    *  field of a form. The cost line then shows the amount per person. */
   readonly participants?: boolean;
