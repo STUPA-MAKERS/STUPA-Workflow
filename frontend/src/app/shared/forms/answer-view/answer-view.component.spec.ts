@@ -222,6 +222,7 @@ describe('AnswerViewComponent', () => {
     );
     expect(valueOf('Förderquote · berechnet')).toMatch(/^83,3\s%$/);
     expect(valueOf('Eigenanteil · berechnet')).toMatch(/^200,00\s€$/);
+    expect(screen.getByText(/^83,3\s%$/).closest('.mono, [class*="mono"]')).not.toBeNull();
   });
 
   it('shows no cost line and the files of each position (specs 001632, 001730)', async () => {

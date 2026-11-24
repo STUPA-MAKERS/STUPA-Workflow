@@ -9,7 +9,7 @@ import {
   PositionsViewComponent,
   type PositionFile,
 } from '../positions-view/positions-view.component';
-import { computeValues } from '../form-rules';
+import { computedFormat, computeValues } from '../form-rules';
 import { runs } from '@shared/util/immutable';
 import { FieldGroupComponent, FieldRowComponent, SectionComponent } from '@stupa-makers/ui-kit';
 
@@ -67,7 +67,7 @@ type AnswerPiece =
 /** Field types that the detail never shows: display text, markers and files (the files
  *  have the block "Anhänge" with the scan state). */
 const NOT_SHOWN: ReadonlySet<FieldType> = new Set(['markdown', 'section', 'file']);
-/** Field types in the mono face. */
+/** Field types in the mono face. A computed `money` or `percent` value is mono too, as an amount. */
 const MONO: ReadonlySet<FieldType> = new Set(['iban', 'currency', 'funding']);
 /** Field types whose answer is the free text of the applicant, in the language of the application. */
 const FREE_TEXT: ReadonlySet<FieldType> = new Set(['text', 'textarea']);
@@ -223,7 +223,7 @@ export class AnswerViewComponent {
           ? `${label} · ${this.i18n.translate('forms.answers.computed')}`
           : label,
       value,
-      mono: MONO.has(f.type),
+      mono: MONO.has(f.type) || (f.type === 'computed' && computedFormat(f) !== 'number'),
       labelLang,
       valueLang: this.valueLang(f, raw, lang),
     };

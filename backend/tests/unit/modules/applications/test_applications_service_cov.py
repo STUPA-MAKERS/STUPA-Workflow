@@ -237,6 +237,7 @@ def test_field_from_row_maps_all_columns() -> None:
         is_pii=True,
         is_promoted=True,
         promote_target="amount",
+        display_format=None,
     )
     field = _field_from_row(row)
     assert field.key == "cost"
@@ -249,7 +250,7 @@ def test_field_from_row_validation_falsy_becomes_none() -> None:
     row = FormField(
         key="x", type="text", label_i18n={"de": "x"}, help_i18n=None,
         required=False, validation={}, visible_if=None, compute=None,
-        options=None, is_pii=False, is_promoted=False, promote_target=None,
+        options=None, is_pii=False, is_promoted=False, promote_target=None, display_format=None,
     )
     field = _field_from_row(row)
     assert field.validation is None
@@ -1081,7 +1082,7 @@ async def test_pinned_fields_returns_the_version_fields() -> None:
     row = _Obj(
         key="title", type="text", label_i18n={"de": "t"}, help_i18n=None,
         required=True, validation=None, visible_if=None, compute=None,
-        options=None, is_pii=False, is_promoted=False, promote_target=None,
+        options=None, is_pii=False, is_promoted=False, promote_target=None, display_format=None,
     )
     session = _Session(scalars_results=[[row]])
     svc = ApplicationsService(session)  # type: ignore[arg-type]

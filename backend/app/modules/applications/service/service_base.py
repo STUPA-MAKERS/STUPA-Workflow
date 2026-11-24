@@ -67,6 +67,7 @@ def _field_from_row(row: FormField) -> FormFieldDef:
             "isPII": row.is_pii,
             "isPromoted": row.is_promoted,
             "promoteTarget": row.promote_target,
+            "format": row.display_format,
         }
     )
 
