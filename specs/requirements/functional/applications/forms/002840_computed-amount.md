@@ -30,5 +30,5 @@ Reason: A fixed rate (for example 0.35 € per km) gives an amount that nobody t
 can change. Without the computed amount, `amount` is `null` and every flow guard that compares
 `amount` is false.
 
-Test: `backend/tests/unit/test_computed_amount.py`: `km = 84` gives `amount = 29.40` also when the
+Test: `backend/tests/unit/modules/forms/test_computed_amount.py`: `km = 84` gives `amount = 29.40` also when the
 client sends `summe = 999`, and an edit to `km = 100` gives `amount = 35.00`.

@@ -24,5 +24,5 @@ The save of a form must refuse these errors:
 - a JsonLogic operator outside the whitelist
 - a pattern that does not compile or can backtrack without limit
 
-Test: `backend/tests/unit/test_forms_validation.py` saves a form with a computed amount field
+Test: `backend/tests/unit/modules/forms/test_forms_validation.py` saves a form with a computed amount field
 and refuses a computed amount field beside a `positions` field.

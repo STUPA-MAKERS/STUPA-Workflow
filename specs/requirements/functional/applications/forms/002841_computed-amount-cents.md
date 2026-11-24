@@ -21,5 +21,5 @@ amount from an older value.
 Reason: The amount is money, and a booking holds whole cents. A broken expression must not give
 a stored amount that nobody can see is wrong.
 
-Test: `backend/tests/unit/test_computed_amount.py` rounds 29.405 to 29.41 and refuses a negative
+Test: `backend/tests/unit/modules/forms/test_computed_amount.py` rounds 29.405 to 29.41 and refuses a negative
 result and a missing input with 422.
