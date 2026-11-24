@@ -75,6 +75,10 @@ describe('FormlyDisplayType (rendered)', () => {
     expect(makeType({ computed: true, format: 'percent' }, 0.5).text).toMatch(/^50\s%$/);
   });
 
+  it('shows a value without a format as it is', () => {
+    expect(makeType({ computed: true }, 0.5).text).toBe('0.5');
+  });
+
   it('shows an own share as money (spec 002964)', () => {
     expect(makeType({ computed: true, format: 'money' }, 1234.5).text).toMatch(/^1\.234,50\s€$/);
   });

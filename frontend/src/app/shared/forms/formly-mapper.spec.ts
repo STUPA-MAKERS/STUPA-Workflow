@@ -154,6 +154,19 @@ describe('toFormlyFields', () => {
     expect(callExpr(quote, 'model.quote', { kosten })).toBeNull();
   });
 
+  it('reads a typed number in visibleIf and computes nothing without a model', () => {
+    const fields: FormFieldDef[] = [
+      { key: 'n', type: 'number', label: { de: 'n' } },
+      { key: 'note', type: 'text', label: { de: 'Notiz' }, visibleIf: { '>': [{ var: 'n' }, 5] } },
+      { key: 'twice', type: 'computed', label: { de: '2n' }, compute: { '*': [{ var: 'n' }, 2] } },
+    ];
+    const [, note, twice] = toFormlyFields(fields, 'de');
+    expect(callExpr(note, 'hide', { n: '7' })).toBe(false);
+    expect(callExpr(note, 'hide', { n: '3' })).toBe(true);
+    const expr = twice.expressions?.['model.twice'] as (field: FormlyFieldConfig) => unknown;
+    expect(expr({} as FormlyFieldConfig)).toBeNull();
+  });
+
   it('marks a computed amount field as money (spec 002842)', () => {
     const [summe] = toFormlyFields(
       [

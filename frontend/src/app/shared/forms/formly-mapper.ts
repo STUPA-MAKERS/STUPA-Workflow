@@ -301,7 +301,7 @@ function mapField(
   f: FormFieldDef,
   lang: Lang,
   extraContext: Readonly<Record<string, unknown>>,
-  all: readonly FormFieldDef[] = [],
+  all: readonly FormFieldDef[],
 ): FormlyFieldConfig {
   const costKeys = positionsKeys(all);
   const text = fieldLabel(f, lang);
@@ -352,7 +352,7 @@ function buildExpressions(
   f: FormFieldDef,
   extraContext: Readonly<Record<string, unknown>>,
   numbers: ReadonlySet<string> = new Set(),
-  all: readonly FormFieldDef[] = [f],
+  all: readonly FormFieldDef[],
 ): FormlyFieldConfig['expressions'] | undefined {
   const visibleIf = f.visibleIf;
   const compute = f.type === 'computed' ? f.compute : undefined;
@@ -362,7 +362,7 @@ function buildExpressions(
   const derived: Readonly<Record<string, FieldExpression>> = compute
     ? {
         [`model.${f.key}`]: (field: FormlyFieldConfig) =>
-          computeValues(all.length ? all : [f], (field.model ?? {}) as Record<string, unknown>, extraContext)[f.key] ??
+          computeValues(all, (field.model ?? {}) as Record<string, unknown>, extraContext)[f.key] ??
           null,
       }
     : {};

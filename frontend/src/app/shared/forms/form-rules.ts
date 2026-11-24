@@ -151,14 +151,14 @@ export function computedFormat(f: Pick<FormFieldDef, 'type' | 'isPromoted' | 'pr
 
 /** One step of `computeValues`: the value of one field, or none. */
 function computeStep(
-  f: ComputeField,
+  f: ComputeField & { readonly compute: Readonly<Record<string, unknown>> },
   fields: readonly RuleField[],
   base: Readonly<Record<string, unknown>>,
   values: Readonly<Record<string, unknown>>,
 ): unknown {
   const ctx = ruleContext(fields, { ...base, ...values });
   try {
-    const value = evalJsonLogic(f.compute ?? null, ctx);
+    const value = evalJsonLogic(f.compute, ctx);
     if (!isComputedAmount(f)) return formattedValue(f.format ?? 'number', value);
     return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? toCents(value) : null;
   } catch (err) {
@@ -182,7 +182,7 @@ export function computeValues(
   const answers = Object.fromEntries(Object.entries(data).filter(([k]) => !keys.has(k)));
   const base = { ...extra, ...answers };
   return fields
-    .filter((f) => f.type === 'computed' && f.compute)
+    .flatMap((f) => (f.type === 'computed' && f.compute ? [{ ...f, compute: f.compute }] : []))
     .reduce<Readonly<Record<string, unknown>>>((values, f) => {
       const value = computeStep(f, fields, base, values);
       return value === null || value === undefined ? values : { ...values, [f.key]: value };
