@@ -733,7 +733,7 @@
   "forms.positions.offers": "Angebote",
   "forms.positions.preferred": "bevorzugt",
   "forms.positions.total": "Gesamtbetrag",
-  "forms.funding.hint": "Kosten gesamt: {total}. Leer lassen, um die volle Summe zu beantragen.",
+  "forms.funding.empty": "Leer lassen, um die volle Summe zu beantragen.",
   "forms.funding.max": "Die Förderung darf die Kosten ({total}) nicht übersteigen.",
   "forms.positions.sum": "Gesamt",
   "forms.costLine.total": "Gesamtkosten {total}, davon beantragt {requested}",

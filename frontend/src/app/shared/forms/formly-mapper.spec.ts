@@ -446,24 +446,35 @@ describe('requested funding', () => {
     expect(valid({ foerderung: 1 })).toBe(false);
   });
 
-  it('shows the cost total in the hint and in the error text', () => {
+  it('shows only the help of the field', () => {
+    const cfg = toFormlyFields([{ ...fields[1], required: true, help: { de: 'X' } }], 'de')[0];
+    expect(cfg.props?.description).toBe('X');
+    expect(cfg.expressions?.['props.description']).toBeUndefined();
+    expect(toFormlyFields([fields[1]], 'de')[0].props?.description).toBe('Hilfe.');
+  });
+
+  it('shows no hint at a required field without help', () => {
+    const cfg = toFormlyFields([{ ...fields[1], required: true, help: undefined }], 'de')[0];
+    expect(cfg.props?.description).toBeUndefined();
+  });
+
+  it('says without an amount that an empty optional field requests the full sum', () => {
+    expect(toFormlyFields([{ ...fields[1], help: undefined }], 'de')[0].props?.description).toBe(
+      'Leer lassen, um die volle Summe zu beantragen.',
+    );
+    expect(toFormlyFields([{ ...fields[1], help: undefined }], 'en')[0].props?.description).toBe(
+      'Leave empty to request the full amount.',
+    );
+  });
+
+  it('names the cost total in the error text', () => {
     const { cfg, field, form } = build('en');
     field.model = { kosten: positions(300, 200) };
     form.controls.foerderung.setValue(600);
-    const desc = (cfg.expressions?.['props.description'] as (f: FormlyFieldConfig) => string)(field);
-    expect(desc).toBe('Hilfe. Total costs: €500.00. Leave empty to request the full amount.');
     const err = cfg.expressions?.['props.errorText'] as (f: FormlyFieldConfig) => string | undefined;
     expect(err(field)).toBe('The funding must not exceed the costs (€500.00).');
     form.controls.foerderung.setValue(100);
     expect(err(field)).toBeUndefined();
-  });
-
-  it('leaves out the help text when the field has none', () => {
-    const cfg = toFormlyFields([{ ...fields[1], help: undefined }], 'de')[0];
-    const desc = (cfg.expressions?.['props.description'] as (f: FormlyFieldConfig) => string)({
-      model: {},
-    } as FormlyFieldConfig);
-    expect(desc).toBe('Kosten gesamt: 0,00\u00a0€. Leer lassen, um die volle Summe zu beantragen.');
   });
 
   it('re-checks the cap when another answer changes', () => {

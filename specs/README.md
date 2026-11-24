@@ -269,6 +269,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/forms/002962](requirements/functional/applications/forms/002962_computed-format.md) | A computed field has a display format | approved |
 | [F/applications/forms/002963](requirements/functional/applications/forms/002963_computed-format-editor.md) | The form builder sets the format of a computed field | approved |
 | [F/applications/forms/002964](requirements/functional/applications/forms/002964_computed-format-display.md) | A computed value shows in its format | approved |
+| [F/applications/forms/002990](requirements/functional/applications/forms/002990_funding-hint-own-help.md) | The funding hint is the help of the field | approved |
 | [F/applications/forms/003000](requirements/functional/applications/forms/003000_cost-line-switch.md) | The cost line is a setting of the positions field | approved |
 | [F/applications/forms/003001](requirements/functional/applications/forms/003001_placeholder-warning-switch.md) | The placeholder warning is a setting of the positions field | approved |
 | [F/applications/forms/003002](requirements/functional/applications/forms/003002_position-files-switch.md) | The files per position are a setting of the positions field | approved |
