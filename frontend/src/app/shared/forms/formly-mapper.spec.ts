@@ -152,6 +152,19 @@ describe('toFormlyFields', () => {
     expect(summe.props?.['money']).toBe(true);
   });
 
+  it('reads a number that the input holds as a text in a computed expression', () => {
+    const fields: FormFieldDef[] = [
+      { key: 'km', type: 'number', label: { de: 'km' } },
+      { key: 'note', type: 'text', label: { de: 'Notiz' } },
+      { key: 'summe', type: 'computed', label: { de: 'Summe' }, compute: { '*': [{ var: 'km' }, 2] } },
+      { key: 'echo', type: 'computed', label: { de: 'Echo' }, compute: { var: 'note' } },
+    ];
+    const [, , summe, echo] = toFormlyFields(fields, 'de');
+    expect(callExpr(summe, 'model.summe', { km: '84' })).toBe(168);
+    expect(callExpr(summe, 'model.summe', { km: 'x' })).toBeNull();
+    expect(callExpr(echo, 'model.echo', { note: '5' })).toBe('5');
+  });
+
   /** A missing cofunding gives a null var, the arithmetic throws, and the catch gives null. */
   it('returns null from a computed expression when evaluation errors', () => {
     const fields: FormFieldDef[] = [
