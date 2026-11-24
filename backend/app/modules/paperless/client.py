@@ -26,6 +26,8 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from app.shared.ssrf import host_allowed
+
 #: The causes of a failed call. `blocked`: the host is not in the allowlist.
 #: `unauthorized`: Paperless refuses the token. `status`: another error answer.
 #: `format`: an answer that is not the JSON of the API. `too_large`: a file over the
@@ -67,18 +69,17 @@ def normalize_url(url: str) -> str:
     return url.strip().rstrip("/")
 
 
-def host_allowed(url: str, allowlist: Sequence[str]) -> bool:
+def address_allowed(url: str, allowlist: Sequence[str]) -> bool:
     """Tell whether the address is `http` or `https` and its host is in the allowlist.
 
-    An entry of the list is a host name, or a host name with a port. An empty list
-    allows no address.
+    An entry of the list is a host name, or a host name with a port
+    (`app.shared.ssrf.host_allowed`). An empty list allows no address.
     """
     parts = urlsplit(url)
-    host = (parts.hostname or "").lower()
+    host = parts.hostname or ""
     if parts.scheme.lower() not in ("http", "https") or not host or parts.username:
         return False
-    allowed = frozenset(entry.strip().lower() for entry in allowlist if entry.strip())
-    return host in allowed or parts.netloc.lower() in allowed
+    return host_allowed(host, parts.port, allowlist)
 
 
 @dataclass(frozen=True, slots=True)
@@ -167,7 +168,7 @@ class PaperlessClient:
             PaperlessError: The host is not allowed, Paperless does not answer in time,
                 or it answers with a redirect or an error.
         """
-        if not host_allowed(self.base_url, self.allowlist):
+        if not address_allowed(self.base_url, self.allowlist):
             raise PaperlessError("blocked")
         limit = timeout_seconds or self.timeout_seconds
         try:
