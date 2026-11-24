@@ -3,6 +3,7 @@
   [heading]="'meetings.leadSubstitute.title' | t"
   [subtitle]="subtitle()"
   [closeLabel]="'action.close' | t"
+  body="tight"
   (closed)="closed.emit()"
   [actions]="[
     { key: 'closed', label: ('action.cancel' | t) },

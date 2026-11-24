@@ -4,6 +4,7 @@
   [open]="open()"
   [heading]="'delegation.dialog.title' | t"
   [closeLabel]="'action.close' | t"
+  body="tight"
   (closed)="closed.emit()"
   [actions]="[
     { key: 'closed', label: ('action.cancel' | t) },

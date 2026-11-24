@@ -959,6 +959,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/002902](requirements/non-functional/usability/layout/002902_delegation-search-pinned.md) | The delegation dialogs pin the search | approved |
 | [NF/usability/layout/002903](requirements/non-functional/usability/layout/002903_delegation-pick-rows.md) | The delegation dialogs use the pick rows | approved |
 | [NF/usability/layout/002904](requirements/non-functional/usability/layout/002904_delegation-vote-line.md) | The delegation dialog says that the vote moves | removed |
+| [NF/usability/layout/002905](requirements/non-functional/usability/layout/002905_pick-dialog-tight-body.md) | A dialog with a search or a list has a tight body | approved |
 | [P/integrations/webhooks/000963](protocols/integrations/webhooks/000963_webhook-delivery.md) | A webhook delivery is a signed JSON POST | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |
