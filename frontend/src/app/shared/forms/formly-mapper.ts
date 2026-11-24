@@ -185,15 +185,20 @@ function costTotal(field: FormlyFieldConfig, costKeys: readonly string[]): numbe
   return costKeys.reduce((sum, key) => sum + positionsTotal(normalizePositions(model[key])), 0);
 }
 
+/** A UI text in the locale of the form. */
+function uiText(key: TranslationKey, lang: Lang): string {
+  return CATALOG[baseLocale(lang)]?.[key] ?? de[key];
+}
+
 /** A UI text with `{total}` filled in, in the locale of the form. */
 function totalText(key: TranslationKey, lang: Lang, total: number): string {
-  const text = CATALOG[baseLocale(lang)]?.[key] ?? de[key];
-  return text.replace('{total}', formatMoney(total, toFormatLocale(String(lang))) || String(total));
+  return uiText(key, lang).replace('{total}', formatMoney(total, toFormatLocale(String(lang))) || String(total));
 }
 
 /**
- * The requested funding: the hint shows the cost total, and a value above the total is
- * an error with its own text. The server checks the same rule (`_check_funding_total`).
+ * The requested funding: the hint is the help of the field, an optional field without help says
+ * that an empty value requests the full sum, and a value above the cost total is an error that
+ * names the total (spec 002990). The server checks the same rule (`_check_funding_total`).
  *
  * The cap is checked again when any answer changes, because the cost positions are other controls.
  */
@@ -221,12 +226,12 @@ function withFunding(
           tap(() => field.formControl?.updateValueAndValidity({ emitEvent: false })),
         ),
     },
+    props: {
+      ...config.props,
+      description: help ?? (config.props?.required ? undefined : uiText('forms.funding.empty', lang)),
+    },
     expressions: {
       ...config.expressions,
-      'props.description': (field: FormlyFieldConfig) => {
-        const hint = totalText('forms.funding.hint', lang, costTotal(field, costKeys));
-        return help ? `${help} ${hint}` : hint;
-      },
       'props.errorText': (field: FormlyFieldConfig) =>
         over(field) ? totalText('forms.funding.max', lang, costTotal(field, costKeys)) : undefined,
     },
