@@ -22,7 +22,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import DbSession, Principal, require_principal
+from app.deps import DbSession, Principal, refuse_agent_token, require_principal
 from app.modules.paperless import filings
 from app.modules.paperless.client import PaperlessError
 from app.modules.paperless.connection import (
@@ -167,8 +167,13 @@ async def read_paperless_document(
 
 
 @router.get("/insert", responses=_ERRORS)
-async def read_paperless_insert(_user: PaperlessUser, connection: Connection) -> InsertStateOut:
-    """Tell whether the insert from Paperless and the links to Paperless are on."""
+async def read_paperless_insert(user: PaperlessUser, connection: Connection) -> InsertStateOut:
+    """Tell whether the insert from Paperless and the links to Paperless are on.
+
+    An OAuth token gets 403 ``cookie_session_required``: a token does not insert
+    (§F/integrations/mcp/002921).
+    """
+    refuse_agent_token(user, "Agent tokens cannot insert from Paperless.")
     row = await connection.row()
     await connection.session.commit()
     return InsertStateOut(enabled=insert_on(row), link_enabled=links_on(row))
@@ -176,7 +181,7 @@ async def read_paperless_insert(_user: PaperlessUser, connection: Connection) ->
 
 @router.get("/search", responses={**_ERRORS, 404: _PROBLEM, 503: _PROBLEM})
 async def search_paperless(
-    _user: PaperlessUser,
+    user: PaperlessUser,
     connection: Connection,
     q: Annotated[str, Query(max_length=200)] = "",
 ) -> list[DocumentHitOut]:
@@ -185,8 +190,10 @@ async def search_paperless(
     An empty query answers the documents that Paperless added last. The answer is 404
     while the part is off, and 503 `paperless_unavailable` when Paperless does not
     answer within 5 seconds or answers with an error
-    (§F/integrations/paperless/002529).
+    (§F/integrations/paperless/002529). An OAuth token gets 403
+    ``cookie_session_required`` (§F/integrations/mcp/002921).
     """
+    refuse_agent_token(user, "Agent tokens cannot insert from Paperless.")
     row = await connection.row()
     client = await connection.client() if insert_on(row) else None
     await connection.session.commit()

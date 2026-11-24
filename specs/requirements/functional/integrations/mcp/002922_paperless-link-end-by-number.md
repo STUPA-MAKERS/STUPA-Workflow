@@ -2,7 +2,7 @@
 id: "002922"
 title: An MCP link tool names a Paperless end by its document number
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 tests:

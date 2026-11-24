@@ -306,7 +306,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/links/001408](requirements/functional/collaboration/links/001408_one-picker.md) | Verknüpfen searches every kind | approved |
 | [F/collaboration/links/001409](requirements/functional/collaboration/links/001409_links-api.md) | The links have their own API | approved |
 | [F/collaboration/links/001410](requirements/functional/collaboration/links/001410_cost-centre-needs-budget-write.md) | A cost centre link needs a budget write right | approved |
-| [F/collaboration/links/002923](requirements/functional/collaboration/links/002923_link-audit.md) | Each added or removed link has an audit entry | draft |
+| [F/collaboration/links/002923](requirements/functional/collaboration/links/002923_link-audit.md) | Each added or removed link has an audit entry | approved |
 | [F/collaboration/notifications/000151](requirements/functional/collaboration/notifications/000151_task-mail-recipients.md) | Task mails go only to who can act | approved |
 | [F/collaboration/notifications/000152](requirements/functional/collaboration/notifications/000152_team-mails-opt-in.md) | Team mails about Anträge are off by default | approved |
 | [F/collaboration/notifications/000153](requirements/functional/collaboration/notifications/000153_sandboxed-templates.md) | Mail placeholders use camelCase | approved |
@@ -558,11 +558,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/mcp/000387](requirements/functional/integrations/mcp/000387_idp-roles-read-only.md) | Memberships and roles are read-only in the MCP | replaced |
 | [F/integrations/mcp/000462](requirements/functional/integrations/mcp/000462_forbidden-permissions.md) | No agent token gets a human-only permission | approved |
 | [F/integrations/mcp/001200](requirements/functional/integrations/mcp/001200_mcp-parity.md) | The MCP server has a tool for every app function | approved |
-| [F/integrations/mcp/001201](requirements/functional/integrations/mcp/001201_mcp-exclusions.md) | The MCP leaves out a closed list of functions | draft |
+| [F/integrations/mcp/001201](requirements/functional/integrations/mcp/001201_mcp-exclusions.md) | The MCP leaves out a closed list of functions | approved |
 | [F/integrations/mcp/001232](requirements/functional/integrations/mcp/001232_mcp-name.md) | The MCP server presents itself as workflow | approved |
-| [F/integrations/mcp/002920](requirements/functional/integrations/mcp/002920_paperless-scope.md) | The scope paperless:use carries only paperless.use | draft |
-| [F/integrations/mcp/002921](requirements/functional/integrations/mcp/002921_no-paperless-copy-by-token.md) | A token does not copy documents into or out of Paperless | draft |
-| [F/integrations/mcp/002922](requirements/functional/integrations/mcp/002922_paperless-link-end-by-number.md) | An MCP link tool names a Paperless end by its document number | draft |
+| [F/integrations/mcp/002920](requirements/functional/integrations/mcp/002920_paperless-scope.md) | The scope paperless:use carries only paperless.use | approved |
+| [F/integrations/mcp/002921](requirements/functional/integrations/mcp/002921_no-paperless-copy-by-token.md) | A token does not copy documents into or out of Paperless | approved |
+| [F/integrations/mcp/002922](requirements/functional/integrations/mcp/002922_paperless-link-end-by-number.md) | An MCP link tool names a Paperless end by its document number | approved |
 | [F/integrations/paperless/002511](requirements/functional/integrations/paperless/002511_connection-page.md) | An admin connects one Paperless instance | approved |
 | [F/integrations/paperless/002512](requirements/functional/integrations/paperless/002512_switch.md) | Each part of the Paperless integration has its own switch | approved |
 | [F/integrations/paperless/002513](requirements/functional/integrations/paperless/002513_service-account.md) | Each call to Paperless uses the token of the connection | approved |
@@ -586,7 +586,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/paperless/002535](requirements/functional/integrations/paperless/002535_file-antrag-attachments.md) | The attachments of an Antrag are filed with its PDF | approved |
 | [F/integrations/paperless/002762](requirements/functional/integrations/paperless/002762_feature-switch.md) | Paperless has a feature switch | approved |
 | [F/integrations/paperless/002763](requirements/functional/integrations/paperless/002763_link-kind.md) | A Paperless document is a kind of link end | approved |
-| [F/integrations/paperless/002764](requirements/functional/integrations/paperless/002764_link-permission.md) | A Paperless link needs the Paperless permission | draft |
+| [F/integrations/paperless/002764](requirements/functional/integrations/paperless/002764_link-permission.md) | A Paperless link needs the Paperless permission | approved |
 | [F/integrations/paperless/002765](requirements/functional/integrations/paperless/002765_link-title-stored.md) | A Paperless link keeps the title from the moment of the link | approved |
 | [F/integrations/paperless/002766](requirements/functional/integrations/paperless/002766_link-search.md) | The link search finds Paperless documents | approved |
 | [F/integrations/paperless/002767](requirements/functional/integrations/paperless/002767_link-switch.md) | The links to Paperless have their own switch | approved |

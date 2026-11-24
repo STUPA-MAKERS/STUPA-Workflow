@@ -7,9 +7,11 @@ import uuid
 from pydantic import JsonValue
 from sqlalchemy import delete, func, select
 
+from app.modules.audit.actions import AuditAction
 from app.modules.auth.principal import Principal
 from app.modules.todos import events as todo_events
 from app.modules.todos import link_store
+from app.modules.todos.link_audit import audit_link
 from app.modules.todos.models import (
     Link,
     TodoAssignee,
@@ -101,7 +103,9 @@ class CardOps(DetailOps):
         for label_id in label_ids:
             self.session.add(TodoCardLabel(card_id=card.id, label_id=label_id))
         for kind, target_id in links:
-            self.session.add(Link.between(("todo", card.id), (kind, target_id), actor, now))
+            link = Link.between(("todo", card.id), (kind, target_id), actor, now)
+            self.session.add(link)
+            await audit_link(self.session, AuditAction.LINK_ADD, link, principal)
         for position, text in enumerate(payload.checklist):
             self.session.add(
                 TodoCheckItem(

@@ -2,12 +2,13 @@
 id: "002923"
 title: Each added or removed link has an audit entry
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 tests:
   - "backend/tests/integration/modules/todos/test_paperless_links.py:test_the_audit_names_the_grant"
 implementation:
+  - backend/app/modules/todos/link_audit.py
   - backend/app/modules/todos/link_service.py
   - backend/app/modules/audit/actions.py
   - backend/app/modules/auth/principal.py

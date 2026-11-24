@@ -2,7 +2,7 @@
 id: "002764"
 title: A Paperless link needs the Paperless permission
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 tests:

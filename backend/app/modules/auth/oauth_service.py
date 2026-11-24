@@ -302,10 +302,24 @@ async def revoke_all_grants(db: AsyncSession, *, principal_id: UUID, now: dateti
     return len(rows)
 
 
-async def resolve_access_token(
+@dataclass(frozen=True, slots=True)
+class AccessGrant:
+    """A valid access token: its principal, its scope and the grant behind it.
+
+    ``grant_id`` is the id of the token row, the id that the grants page shows and
+    revokes. The audit log names it with ``client_id`` (§F/collaboration/links/002923).
+    """
+
+    principal_id: UUID
+    scope: str
+    grant_id: UUID
+    client_id: str
+
+
+async def resolve_access_grant(
     db: AsyncSession, *, token: str, now: datetime
-) -> tuple[UUID, str] | None:
-    """Resolve a valid access token to `(principal_id, scope)`, or return `None`.
+) -> AccessGrant | None:
+    """Resolve a valid access token to its grant, or return `None`.
 
     A null ``access_expires_at`` means that the token never expires; only a revocation
     ends it.
@@ -319,4 +333,17 @@ async def resolve_access_token(
         return None
     if row.access_expires_at is not None and row.access_expires_at <= now:
         return None
-    return row.principal_id, row.scope
+    return AccessGrant(
+        principal_id=row.principal_id,
+        scope=row.scope,
+        grant_id=row.id,
+        client_id=row.client_id,
+    )
+
+
+async def resolve_access_token(
+    db: AsyncSession, *, token: str, now: datetime
+) -> tuple[UUID, str] | None:
+    """Resolve a valid access token to `(principal_id, scope)`, or return `None`."""
+    grant = await resolve_access_grant(db, token=token, now=now)
+    return None if grant is None else (grant.principal_id, grant.scope)

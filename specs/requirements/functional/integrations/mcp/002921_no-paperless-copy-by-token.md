@@ -2,11 +2,11 @@
 id: "002921"
 title: A token does not copy documents into or out of Paperless
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 tests:
-  - "backend/tests/integration/modules/paperless/test_paperless_token.py:test_a_token_does_not_insert_or_file"
+  - "backend/tests/unit/modules/paperless/test_paperless_token.py:test_a_token_does_not_insert_or_file"
 implementation:
   - backend/app/modules/paperless_filing/router.py
   - backend/app/modules/protocol/documents_router.py

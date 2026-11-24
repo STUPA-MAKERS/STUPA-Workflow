@@ -36,6 +36,10 @@ so a ``read`` token never opens the board "Plattform" (``ticket.manage``).
 through: the edit of the Info tab of a Gremium and the message to its members.
 ``tickets:write`` lets the gremium permission ``ticket.work`` through: the work on the
 tickets of the Bereiche of a Gremium.
+``paperless:use`` holds exactly ``paperless.use``: the links with a Paperless end, their
+search and the address of a filed document (§F/integrations/mcp/002920). It is not part of
+``DEFAULT_SCOPE``, so a client asks for it by name, and the consent page offers it only to
+a holder of ``paperless.use``. No scope holds ``admin.paperless``.
 """
 
 from __future__ import annotations
@@ -78,6 +82,7 @@ SCOPES: dict[str, frozenset[str]] = {
     "tickets:write": frozenset({"ticket.manage", "ticket.work"}),
     "todos:write": frozenset({"todo.write", "todo.configure", "todo.all", "todo.create_board"}),
     "committees:write": frozenset({"info.write", "members.notify"}),
+    "paperless:use": frozenset({"paperless.use"}),
     "forms:write": frozenset({"form.configure"}),
     "flows:write": frozenset({"flow.configure"}),
     "admin:write": frozenset(
@@ -99,9 +104,13 @@ SCOPES: dict[str, frozenset[str]] = {
     ),
 }
 
+#: The scopes that a client must ask for by name: the default scope leaves them out
+#: (§F/integrations/mcp/002920).
+OPT_IN_SCOPES: frozenset[str] = frozenset({"paperless:use"})
+
 #: The full curated range that MCP requests by default. The server caps it to the rights of
 #: the logged-in user. A non-admin gets only their own subset.
-DEFAULT_SCOPE = " ".join(SCOPES.keys())
+DEFAULT_SCOPE = " ".join(k for k in SCOPES if k not in OPT_IN_SCOPES)
 
 #: Hard cap in seconds for every finite token lifetime. This value bounds even the
 #: longest finite selectable lifetime.
@@ -144,10 +153,21 @@ SCOPE_ORDER: tuple[str, ...] = (
     "committees:write",
     "tickets:write",
     "budget:write",
+    "paperless:use",
     "forms:write",
     "flows:write",
     "admin:write",
 )
+
+
+def offered_scopes(requested: list[str], held: set[str]) -> list[str]:
+    """The requested scopes that the consent page shows, in display order.
+
+    The page shows every requested scope, held or not, except an opt-in scope that the
+    user does not hold (§F/integrations/mcp/002920).
+    """
+    return [s for s in SCOPE_ORDER if s in requested and (s not in OPT_IN_SCOPES or s in held)]
+
 
 #: Token prefixes: antragsplattform access token and refresh token.
 _ACCESS_PREFIX = "apat_"
