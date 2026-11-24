@@ -132,6 +132,11 @@
                 (choose)="s.pickApp($event)"
                 (cleared)="s.clearApp()"
               />
+              @if (s.newOrder(); as order) {
+                <app-locked-field filled data-testid="bf-order" [label]="'orders.booking.order' | t">{{
+                  order.label
+                }}</app-locked-field>
+              }
             }
             <app-select
               name="event"

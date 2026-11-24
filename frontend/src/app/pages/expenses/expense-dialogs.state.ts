@@ -1,5 +1,6 @@
 import { computed, inject, signal } from '@angular/core';
 import { ApiClient } from '@core/api/api-client.service';
+import { OrdersApiService } from '@core/api/orders.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { FileOpenService } from '@shared/viewer/file-open.service';
 import { liveSearch, type SelectOption, ToastService } from '@stupa-makers/ui-kit';
@@ -22,6 +23,7 @@ import type { ExpenseSubBookingsState } from './expense-sub-bookings.state';
 import type { ExpenseTransfersState } from './expense-transfers.state';
 import { formatMoney } from '@shared/format-money';
 import { EventLinkState } from '../../features/todos/event-link.state';
+import { bookingPayee, bookingRest } from '../applications/orders/orders.util';
 
 /** The fiscal year that holds today, else the only active one, else null. */
 export function currentFiscalYear(
@@ -44,6 +46,7 @@ export class ExpenseDialogsState {
   private readonly api = inject(BudgetTreeApi);
   private readonly files = inject(FileOpenService);
   private readonly apps = inject(ApiClient);
+  private readonly orders = inject(OrdersApiService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
@@ -58,6 +61,8 @@ export class ExpenseDialogsState {
   /** The budget of the pair of a new booking (spec 000879). */
   readonly newTopId = signal('');
   readonly newApplicationId = signal('');
+  /** The Bestellung that the new booking pays ("Buchung anlegen" at a Bestellung). */
+  readonly newOrder = signal<{ id: string; label: string } | null>(null);
   readonly appQuery = signal('');
   readonly appCandidates = signal<{ id: string; title: string }[]>([]);
   /**
@@ -256,9 +261,10 @@ export class ExpenseDialogsState {
 
   /**
    * Open the form for a new booking. `invoiceId` preselects an invoice and takes its data
-   * ("Buchung anlegen" on the invoices page).
+   * ("Buchung anlegen" on the invoices page). `orderId` takes the values of a Bestellung
+   * ("Buchung anlegen" at a Bestellung).
    */
-  openCreate(opts: { invoiceId?: string } = {}): void {
+  openCreate(opts: { invoiceId?: string; orderId?: string } = {}): void {
     this.closeForms();
     this.newKind.set('expense');
     this.newAmount.set('');
@@ -268,6 +274,7 @@ export class ExpenseDialogsState {
     this.newTopId.set('');
     this.newPair.set(null);
     this.newApplicationId.set('');
+    this.newOrder.set(null);
     this.newInvoiceId.set('');
     this.newInvoiceDate.set('');
     this.newPaymentDate.set('');
@@ -281,6 +288,31 @@ export class ExpenseDialogsState {
     this.event.load(null);
     this.createOpen.set(true);
     if (opts.invoiceId) this.preselectInvoice(opts.invoiceId);
+    if (opts.orderId) this.preselectOrder(opts.orderId);
+  }
+
+  /**
+   * Fill the new booking from a Bestellung: the Bestellung, its Antrag (which gives the
+   * cost centre and the fiscal year), its invoice, the Bezeichnung as the description, the
+   * payee, and the price minus the amounts already booked. Each value stays editable.
+   */
+  private preselectOrder(id: string): void {
+    this.orders.get(id).subscribe({
+      next: (order) => {
+        if (!this.createOpen() || !order.applicationId) return;
+        this.newBudgetId.set('');
+        this.pickApp({
+          id: order.applicationId,
+          title: order.applicationTitle || this.i18n.translate('expenses.col.application'),
+        });
+        this.newOrder.set({ id: order.id, label: `${order.number} · ${order.title}` });
+        this.newDescription.set(order.title);
+        this.newAmount.set(bookingRest(order).toFixed(2));
+        this.newCorrespondent.set(bookingPayee(order));
+        if (order.invoiceId) this.keepInvoice(order.invoiceId);
+      },
+      error: () => this.toast.show(this.i18n.translate('orders.error.load'), 'error'),
+    });
   }
 
   /**
@@ -351,6 +383,7 @@ export class ExpenseDialogsState {
   }
 
   pickApp(a: { id: string; title: string }): void {
+    if (a.id !== this.newApplicationId()) this.newOrder.set(null);
     this.newApplicationId.set(a.id);
     this.appQuery.set(a.title);
     this.appSearch.sync(a.title);
@@ -358,6 +391,7 @@ export class ExpenseDialogsState {
   }
 
   clearApp(): void {
+    this.newOrder.set(null);
     this.newApplicationId.set('');
     this.appQuery.set('');
     this.appSearch.sync('');
@@ -426,6 +460,7 @@ export class ExpenseDialogsState {
         description: this.newDescription().trim(),
         kind: this.newKind(),
         applicationId: linked ? this.newApplicationId() : null,
+        orderId: linked ? (this.newOrder()?.id ?? null) : null,
         budgetId: linked ? null : this.newBudgetId() || null,
         fiscalYearId: linked ? null : this.newFiscalYearId() || null,
         invoiceId: this.newInvoiceId() || null,

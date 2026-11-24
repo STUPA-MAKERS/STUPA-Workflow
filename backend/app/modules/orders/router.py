@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -27,10 +28,12 @@ from app.deps import (
     SettingsDep,
     get_current_applicant,
     get_current_principal,
+    require_any_permission,
     require_principal,
 )
 from app.modules.applications.access import Access, require_app_view, resolve_app_read
 from app.modules.auth.principal import Applicant, Principal
+from app.modules.budget.access import BUDGET_READ_PERMISSIONS, has_budget_read
 from app.modules.files.body import read_capped
 from app.modules.files.queue import scan_queue_from_pool
 from app.modules.files.schemas import AttachmentOut
@@ -39,14 +42,17 @@ from app.modules.orders.models import PurchaseOrder
 from app.modules.orders.numbers import format_number
 from app.modules.orders.rules import orders_sum, over_by
 from app.modules.orders.schemas import (
+    InvoiceOrderOut,
+    InvoiceOrdersOut,
     OrderApplicantOut,
     OrderCreate,
+    OrderInvoiceIn,
     OrderOut,
     OrdersOut,
     OrderStatusIn,
     OrderUpdate,
 )
-from app.modules.orders.service import MANAGE_PERMISSION, OrderService
+from app.modules.orders.service import MANAGE_PERMISSION, Marks, OrderService
 from app.shared.antiabuse import enforce_attachment_body_cap, rate_limit_attachments
 from app.shared.errors import ForbiddenError, NotFoundError
 
@@ -85,12 +91,23 @@ def get_order_files(db: DbSession, request: Request, settings: SettingsDep) -> F
 FilesDep = Annotated[FilesService, Depends(get_order_files)]
 
 
-def _out(row: PurchaseOrder, positions: tuple[str, ...], buyers: dict[UUID, str]) -> OrderOut:
+def _out(
+    row: PurchaseOrder,
+    positions: tuple[str, ...],
+    buyers: dict[UUID, str],
+    marks: Marks,
+    application_title: str | None,
+) -> OrderOut:
     """Build the member view of a Bestellung."""
     return OrderOut(
         id=row.id,
         number=format_number(row.number),
         applicationId=row.application_id,
+        applicationTitle=application_title,
+        invoiceId=row.invoice_id,
+        invoiceNumber=marks.invoice_number,
+        invoiceStatus=marks.invoice_status,  # pyright: ignore[reportArgumentType]
+        bookedAmount=marks.booked,
         title=row.title,
         kind=row.kind,  # pyright: ignore[reportArgumentType]
         status=row.status,  # pyright: ignore[reportArgumentType]
@@ -128,8 +145,21 @@ def _applicant_out(row: PurchaseOrder) -> OrderApplicantOut:
 async def _view(service: OrderService, row: PurchaseOrder) -> OrderOut:
     """Build the member view of one Bestellung with its positions."""
     return _out(
-        row, (await service.positions_of([row.id]))[row.id], await service.buyer_names([row])
+        row,
+        (await service.positions_of([row.id]))[row.id],
+        await service.buyer_names([row]),
+        (await service.marks([row]))[row.id],
+        (await service.application_titles([row.application_id])).get(row.application_id),
     )
+
+
+async def _reads(db: DbSession, application_id: UUID, principal: Principal) -> bool:
+    """Tell whether the caller reads the Antrag as a member."""
+    try:
+        access = await resolve_app_read(db, application_id, principal, None)
+    except (ForbiddenError, NotFoundError):
+        return False
+    return not access.is_applicant_view
 
 
 async def _readable(
@@ -171,11 +201,13 @@ async def list_orders(
         return OrdersOut(items=tuple(_applicant_out(row) for row in rows))
     positions = await service.positions_of([row.id for row in rows])
     buyers = await service.buyer_names(rows)
+    marks = await service.marks(rows)
+    title = (await service.application_titles([access.application_id])).get(access.application_id)
     total = orders_sum((row.status, row.actual_amount, row.planned_amount) for row in rows)
     approved = await service.approved_amount(access.application_id)
     manages = access.principal is not None and access.principal.has(MANAGE_PERMISSION)
     return OrdersOut(
-        items=tuple(_out(row, positions[row.id], buyers) for row in rows),
+        items=tuple(_out(row, positions[row.id], buyers, marks[row.id], title) for row in rows),
         total=total,
         approvedAmount=approved,
         overBy=over_by(total, approved),
@@ -259,12 +291,76 @@ async def post_order_status(
     return out
 
 
+@router.put("/orders/{order_id}/invoice", response_model=OrderOut, responses=_ERRORS)
+async def put_order_invoice(
+    order_id: UUID,
+    payload: OrderInvoiceIn,
+    db: DbSession,
+    service: ServiceDep,
+    principal: ManagerDep,
+) -> OrderOut:
+    """Set or remove the invoice of a Bestellung (F/finance/orders/002873).
+
+    The caller needs ``order.manage`` and the read of the invoices. The gross amount of
+    the invoice fills an empty real price when no other Bestellung names the invoice.
+    """
+    await _readable(db, service, order_id, principal, None, observers=False)
+    if not has_budget_read(principal):
+        raise ForbiddenError("The invoices are not readable.")
+    row = await service.set_invoice(
+        order_id, payload.invoice_id, payload.version, actor=principal.sub
+    )
+    out = await _view(service, row)
+    await db.commit()
+    return out
+
+
+@router.get(
+    "/invoices/{invoice_id}/orders",
+    response_model=InvoiceOrdersOut,
+    responses=_ERRORS,
+)
+async def list_invoice_orders(
+    invoice_id: UUID,
+    db: DbSession,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_any_permission(*BUDGET_READ_PERMISSIONS))],
+) -> InvoiceOrdersOut:
+    """List the Bestellungen that name an invoice (F/finance/orders/002877).
+
+    A Bestellung of an Antrag that the caller does not read is a row without values.
+    The sum covers every row, because it tells how much of the gross amount the
+    Bestellungen cover.
+    """
+    rows = await service.of_invoice(invoice_id)
+    titles = await service.application_titles([row.application_id for row in rows])
+    readable = [await _reads(db, row.application_id, principal) for row in rows]
+    return InvoiceOrdersOut(
+        items=tuple(
+            InvoiceOrderOut(
+                accessible=True,
+                id=row.id,
+                number=format_number(row.number),
+                title=row.title,
+                applicationId=row.application_id,
+                applicationTitle=titles.get(row.application_id),
+                actualAmount=row.actual_amount,
+            )
+            if reads
+            else InvoiceOrderOut(accessible=False)
+            for row, reads in zip(rows, readable, strict=True)
+        ),
+        total=sum((row.actual_amount or Decimal(0) for row in rows), Decimal(0)),
+    )
+
+
 @router.delete("/orders/{order_id}", status_code=status.HTTP_204_NO_CONTENT, responses=_ERRORS)
 async def delete_order(
     order_id: UUID, db: DbSession, service: ServiceDep, files: FilesDep, principal: ManagerDep
 ) -> Response:
-    """Delete a Bestellung with its files."""
+    """Delete a Bestellung with its files; 409 ``order_has_bookings`` when a booking names it."""
     await _readable(db, service, order_id, principal, None, observers=False)
+    await service.ensure_deletable(order_id)
     storage_keys = await files.drop_for_order(order_id, actor=principal.sub)
     await service.delete(order_id, actor=principal.sub)
     await db.commit()

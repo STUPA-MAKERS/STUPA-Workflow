@@ -9,6 +9,7 @@ from uuid import UUID
 
 from pydantic import Field, StringConstraints
 
+from app.modules.budget.tree_schemas import InvoiceStatus
 from app.modules.orders.rules import OrderKind, OrderStatus
 from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
@@ -75,16 +76,35 @@ class OrderStatusIn(FrozenStrictCamelModel, frozen=True):
     version: int
 
 
+class OrderInvoiceIn(FrozenStrictCamelModel, frozen=True):
+    """The body that sets or removes the invoice of a Bestellung.
+
+    Attributes:
+        invoice_id: The invoice, or null to remove the reference.
+        version: The version that the person read.
+    """
+
+    invoice_id: UUID | None = Field(alias="invoiceId")
+    version: int
+
+
 class OrderOut(FrozenCamelModel, frozen=True):
     """One Bestellung, as a person who reads the Antrag as a member sees it.
 
     Attributes:
+        application_title: The title of the Antrag.
         buyer_label: The name of the account of the buyer, else the typed name.
+        invoice_number: The number of the invoice of the Bestellung.
+        invoice_status: The status of that invoice, read at each read
+            (F/finance/orders/002880).
+        booked_amount: The sum of the bookings that name the Bestellung, read at each
+            read; 0 without a booking.
     """
 
     id: UUID
     number: str
     application_id: UUID = Field(alias="applicationId")
+    application_title: str | None = Field(default=None, alias="applicationTitle")
     title: str
     kind: OrderKind
     status: OrderStatus
@@ -100,6 +120,10 @@ class OrderOut(FrozenCamelModel, frozen=True):
     buyer_name: str | None = Field(default=None, alias="buyerName")
     buyer_label: str | None = Field(default=None, alias="buyerLabel")
     note: str | None = None
+    invoice_id: UUID | None = Field(default=None, alias="invoiceId")
+    invoice_number: str | None = Field(default=None, alias="invoiceNumber")
+    invoice_status: InvoiceStatus | None = Field(default=None, alias="invoiceStatus")
+    booked_amount: Decimal = Field(default=Decimal(0), alias="bookedAmount")
     version: int
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
@@ -136,3 +160,31 @@ class OrdersOut(FrozenCamelModel, frozen=True):
     over_by: Decimal | None = Field(default=None, alias="overBy")
     can_manage: bool = Field(default=False, alias="canManage")
     can_create: bool = Field(default=False, alias="canCreate")
+
+
+class InvoiceOrderOut(FrozenCamelModel, frozen=True):
+    """One Bestellung in the detail of its invoice (F/finance/orders/002877).
+
+    Attributes:
+        accessible: The reader reads the Antrag of the Bestellung. Else the row holds
+            no other value, and the page shows "Bestellung (kein Zugriff)".
+    """
+
+    accessible: bool
+    id: UUID | None = None
+    number: str | None = None
+    title: str | None = None
+    application_id: UUID | None = Field(default=None, alias="applicationId")
+    application_title: str | None = Field(default=None, alias="applicationTitle")
+    actual_amount: Decimal | None = Field(default=None, alias="actualAmount")
+
+
+class InvoiceOrdersOut(FrozenCamelModel, frozen=True):
+    """The Bestellungen that name one invoice.
+
+    Attributes:
+        total: The sum of the real prices of all these Bestellungen.
+    """
+
+    items: tuple[InvoiceOrderOut, ...]
+    total: Decimal

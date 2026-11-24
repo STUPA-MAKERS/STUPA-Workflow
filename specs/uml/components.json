@@ -1091,7 +1091,7 @@
       "to": "application_types"
     },
     {
-      "count": 3,
+      "count": 4,
       "from": "orders",
       "to": "applications"
     },
@@ -1104,6 +1104,11 @@
       "count": 2,
       "from": "orders",
       "to": "auth"
+    },
+    {
+      "count": 3,
+      "from": "orders",
+      "to": "budget"
     },
     {
       "count": 4,

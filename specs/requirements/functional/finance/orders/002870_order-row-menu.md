@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
-implementation: null
+implementation:
+  - frontend/src/app/pages/applications/orders/orders-section.component.ts
+  - frontend/src/app/pages/applications/orders/orders.util.ts
 scope:
   - frontend/src/app/pages/applications
 ---

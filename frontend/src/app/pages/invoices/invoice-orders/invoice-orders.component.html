@@ -1,0 +1,22 @@
+@if (rows().length) {
+  <app-section [level]="3" [heading]="'orders.ofInvoice.title' | t">
+    <app-field-group role="list">
+      @for (row of rows(); track row.key) {
+        <app-list-item
+          role="listitem"
+          data-testid="io-row"
+          [title]="row.title"
+          [sub]="row.sub || null"
+          [wrap]="true"
+          [link]="row.link"
+        >
+          <app-icon lead name="package" [size]="18" />
+          @if (row.price) {
+            <span trail>{{ row.price }}</span>
+          }
+        </app-list-item>
+      }
+      <app-field-row data-testid="io-sum" [label]="'orders.ofInvoice.sum' | t" [value]="sumLine()" />
+    </app-field-group>
+  </app-section>
+}

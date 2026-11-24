@@ -15,21 +15,28 @@ import type { Observable } from 'rxjs';
 import { CalendarApiService } from '@core/api/calendar.service';
 import type { Uuid } from '@core/api/models';
 import { type Order, OrdersApiService } from '@core/api/orders.service';
+import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   type Action,
+  ButtonComponent,
+  ButtonGroupComponent,
   ChipComponent,
   DialogBodyDirective,
   DialogComponent,
   ErrorTextComponent,
   FactsComponent,
+  FieldGroupComponent,
   type FormDef,
+  IconComponent,
+  ListItemComponent,
   SectionComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { FormComponent, type FormValue } from '@stupa-makers/ui-kit/screens';
+import { BUDGET_PERMISSIONS } from '../../../layout/nav.service';
 import {
   GremiumPersonPickerComponent,
   type PickerHit,
@@ -91,7 +98,12 @@ const sameIds = (a: unknown, b: unknown): boolean =>
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     TranslatePipe,
+    ButtonComponent,
+    ButtonGroupComponent,
     ChipComponent,
+    FieldGroupComponent,
+    IconComponent,
+    ListItemComponent,
     DialogBodyDirective,
     DialogComponent,
     ErrorTextComponent,
@@ -108,6 +120,7 @@ export class OrderDialogComponent {
   private readonly calendar = inject(CalendarApiService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
+  private readonly auth = inject(AuthService);
   private readonly formRef = viewChild(FormComponent);
 
   readonly open = model(false);
@@ -227,6 +240,48 @@ export class OrderDialogComponent {
         )
       : [];
   });
+
+  /** The invoice of the Bestellung as a row: its number and its mark. The row opens the
+   *  invoice for a person who reads the invoices. */
+  protected readonly invoice = computed(() => {
+    const order = this.order();
+    return order?.invoiceId
+      ? {
+          id: order.invoiceId,
+          link: this.auth.canAny(...BUDGET_PERMISSIONS) ? '/invoices' : null,
+          title: order.invoiceNumber || this.i18n.translate('orders.invoice.unnumbered'),
+          sub: this.i18n.translate(
+            order.invoiceStatus === 'paid' ? 'orders.mark.invoicePaid' : 'orders.mark.invoiceOpen',
+          ),
+        }
+      : null;
+  });
+
+  /** Take the invoice away from the Bestellung. The invoice itself stays. */
+  protected removeInvoice(): void {
+    const order = this.order();
+    if (!order || this.saving()) return;
+    this.saving.set(true);
+    this.api.setInvoice(order.id, null, order.version ?? 1).subscribe({
+      next: (saved) => {
+        this.saving.set(false);
+        this.open.set(false);
+        this.saved.emit(saved);
+      },
+      error: (err: { error?: { code?: string } | null }) => {
+        this.saving.set(false);
+        const stale = err.error?.code === 'order_version_conflict';
+        this.toast.show(
+          this.i18n.translate(stale ? 'orders.error.version' : 'orders.error.save'),
+          'error',
+        );
+        if (stale) {
+          this.open.set(false);
+          this.stale.emit();
+        }
+      },
+    });
+  }
 
   constructor() {
     effect(() => {

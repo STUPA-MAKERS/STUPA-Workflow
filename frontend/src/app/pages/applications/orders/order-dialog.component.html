@@ -48,6 +48,38 @@
           }
         </dl>
       }
+      @if (invoice(); as linked) {
+        <app-section [level]="4" [heading]="'orders.field.invoice' | t">
+          <app-field-group role="list">
+            <app-list-item
+              role="listitem"
+              data-testid="od-invoice"
+              [title]="linked.title"
+              [sub]="linked.sub"
+              [link]="linked.link"
+              [linkQueryParams]="{ id: linked.id }"
+            >
+              <app-icon lead name="receipt" [size]="18" />
+              @if (canManage()) {
+                <app-button-group trail>
+                  <app-button
+                    variant="text"
+                    size="sm"
+                    [iconOnly]="true"
+                    [ariaLabel]="'orders.invoice.unlink' | t"
+                    [title]="'orders.invoice.unlink' | t"
+                    [disabled]="saving()"
+                    data-testid="od-unlink"
+                    (click)="$event.stopPropagation(); $event.preventDefault(); removeInvoice()"
+                  >
+                    <app-icon name="x" />
+                  </app-button>
+                </app-button-group>
+              }
+            </app-list-item>
+          </app-field-group>
+        </app-section>
+      }
       @if (order(); as current) {
         <app-order-files [orderId]="current.id" [canManage]="canManage()" />
       }

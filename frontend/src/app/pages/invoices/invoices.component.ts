@@ -13,11 +13,12 @@ import {
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { type Observable, concatMap, from } from 'rxjs';
+import { type Observable, concatMap, from, switchMap } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, type ParamMap, Router } from '@angular/router';
 import { problemDetail } from '@core/api/problem';
 import { AuthService } from '@core/auth/auth.service';
+import { OrdersApiService } from '@core/api/orders.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { searchPlaceholder } from '@shared/util/search-placeholder';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -176,6 +177,7 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
 })
 export class InvoicesComponent implements InvoiceFormHost {
   private readonly api = inject(BudgetTreeApi);
+  private readonly orders = inject(OrdersApiService);
   private readonly files = inject(FileOpenService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -184,6 +186,8 @@ export class InvoicesComponent implements InvoiceFormHost {
   private readonly toast = inject(ToastService);
 
   readonly canManage = computed(() => this.auth.can('budget.book'));
+  /** The Bestellung that gets the new invoice ("Rechnung anlegen" at a Bestellung). */
+  readonly forOrder = signal<{ id: string; number: string; title: string } | null>(null);
 
   /** < 768px: one primary action in the title row, the rest in a menu; forms as a sheet. */
   readonly phone = mediaQuery(MEDIA.phone);
@@ -504,6 +508,7 @@ export class InvoicesComponent implements InvoiceFormHost {
 
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
       if (this.adoptUrl(qp)) this.reload();
+      this.adoptCreateLink(qp);
     });
 
     effect(() => {
@@ -713,6 +718,53 @@ export class InvoicesComponent implements InvoiceFormHost {
     else if (item.id === 'select') this.startSelecting();
   }
 
+  /**
+   * `?new=invoice&order=<id>` ("Rechnung anlegen" at a Bestellung) opens the form of a new
+   * invoice with the Händler of that Bestellung as the supplier. The page then takes the
+   * parameters away, so a reload does not open the form again.
+   */
+  private adoptCreateLink(qp: ParamMap): void {
+    if (qp.get('new') !== 'invoice') return;
+    const orderId = qp.get('order');
+    if (this.canManage()) {
+      this.openCreate();
+      if (orderId) this.takeOrder(orderId);
+    }
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { new: null, order: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  /** Read the Bestellung of the new invoice and take its Händler as the supplier. */
+  private takeOrder(id: string): void {
+    this.orders.get(id).subscribe({
+      next: (order) => {
+        if (!this.createOpen()) return;
+        this.forOrder.set({ id: order.id, number: order.number, title: order.title });
+        if (!this.newSupplier().trim()) this.newSupplier.set(order.supplier ?? '');
+      },
+      error: () => this.toast.show(this.i18n.translate('orders.error.load'), 'error'),
+    });
+  }
+
+  /** The new invoice becomes the invoice of the Bestellung that the form was opened for. */
+  private linkOrder(orderId: string, invoiceId: string): void {
+    this.orders
+      .get(orderId)
+      .pipe(switchMap((order) => this.orders.setInvoice(order.id, invoiceId, order.version ?? 1)))
+      .subscribe({
+        next: (order) =>
+          this.toast.show(
+            this.i18n.translate('orders.invoice.linked', { number: order.number }),
+            'success',
+          ),
+        error: () => this.toast.show(this.i18n.translate('orders.invoice.linkFailed'), 'error'),
+      });
+  }
+
   /** Parse a PDF. On success, prefill the form. Without ZUGFeRD data, open it empty. */
   private importFile(file: File): void {
     if (this.importing()) return;
@@ -726,7 +778,7 @@ export class InvoicesComponent implements InvoiceFormHost {
         this.importing.set(false);
         const code = (err as { error?: { code?: string } } | null)?.error?.code;
         if (code === 'invoice_not_zugferd') {
-          this.openCreate();
+          this.openCreate(this.createOpen());
           this.importNotice.set('manual');
           this.attachFile(file);
         } else {
@@ -737,6 +789,7 @@ export class InvoicesComponent implements InvoiceFormHost {
   }
 
   private prefillFromParse(p: InvoiceParseResult, size: number): void {
+    if (!this.createOpen()) this.forOrder.set(null);
     this.closeForms();
     this.newNumber.set(p.number ?? '');
     this.newSupplier.set(p.supplier ?? '');
@@ -803,7 +856,9 @@ export class InvoicesComponent implements InvoiceFormHost {
     this.reload();
   }
 
-  openCreate(): void {
+  /** Open the empty form. `keepOrder` keeps the Bestellung of an import into the open form. */
+  openCreate(keepOrder = false): void {
+    if (!keepOrder) this.forOrder.set(null);
     this.closeForms();
     this.newNumber.set('');
     this.newSupplier.set('');
@@ -848,6 +903,9 @@ export class InvoicesComponent implements InvoiceFormHost {
           this.createOpen.set(false);
           this.toast.show(this.i18n.translate('invoices.toast.created'), 'success');
           this.reload();
+          const order = this.forOrder();
+          this.forOrder.set(null);
+          if (created?.id && order) this.linkOrder(order.id, created.id);
           if (created?.id) this.openInvoice(created.id);
         },
         error: (err) => {

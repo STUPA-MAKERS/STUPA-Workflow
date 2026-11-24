@@ -126,6 +126,7 @@
             <dd class="mono">{{ money(i.grossAmount) }}</dd>
           </div>
         </dl>
+        <app-invoice-orders [invoiceId]="i.id" [gross]="i.grossAmount" />
       </app-section>
 
       @if (i.linkedBookings !== undefined) {

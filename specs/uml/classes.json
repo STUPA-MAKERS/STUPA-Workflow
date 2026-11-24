@@ -323,6 +323,13 @@
       "to": "Invoice"
     },
     {
+      "column": "order_id",
+      "from": "BudgetExpense",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "PurchaseOrder"
+    },
+    {
       "column": "fiscal_year_id",
       "from": "BudgetPlan",
       "multiplicity": "1",
@@ -2736,6 +2743,12 @@
         },
         {
           "name": "invoice_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "order_id",
           "nullable": true,
           "primaryKey": false,
           "type": "CHAR(32)"

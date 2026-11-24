@@ -370,7 +370,9 @@ class ExpenseCreate(FrozenCamelModel, frozen=True):
     replaces its binding pro rata. It is allowed for `kind='expense'` only.
     `fiscalYearId` is optional for a standalone expense. Without it the server
     picks the current fiscal year of the top budget (`tree_rules.pick_fiscal_year`).
-    An ambiguous or missing year gives a 422.
+    An ambiguous or missing year gives a 422. `orderId` names the Bestellung that the
+    expense paid. It needs the `applicationId` of that Bestellung, and an income cannot
+    name one (F/finance/orders/002878).
     """
 
     amount: Decimal = Field(gt=0, le=_MAX_AMOUNT, allow_inf_nan=False)
@@ -387,11 +389,14 @@ class ExpenseCreate(FrozenCamelModel, frozen=True):
     payment_method: PaymentMethod | None = Field(default=None, alias="paymentMethod")
     category: str | None = Field(default=None)
     invoice_id: UUID | None = Field(default=None, alias="invoiceId")
+    order_id: UUID | None = Field(default=None, alias="orderId")
 
     @model_validator(mode="after")
     def _income_not_linkable(self) -> ExpenseCreate:
         if self.kind == "income" and self.application_id is not None:
             raise ValueError("income cannot be linked to an application")
+        if self.kind == "income" and self.order_id is not None:
+            raise ValueError("income cannot name a Bestellung")
         return self
 
 
@@ -471,6 +476,8 @@ class ExpenseOut(FrozenCamelModel, frozen=True):
     category: str | None = None
     invoice_id: UUID | None = Field(default=None, alias="invoiceId")
     invoice_number: str | None = Field(default=None, alias="invoiceNumber")
+    #: The Bestellung that the expense paid, else null.
+    order_id: UUID | None = Field(default=None, alias="orderId")
     #: A set `parentExpenseId` means this booking IS a sub-booking. A
     #: `childCount` above 0 means the booking HAS sub-bookings. The UI can
     #: expand them. The `amount` is then the sum of the children and read-only.

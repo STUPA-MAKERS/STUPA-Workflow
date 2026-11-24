@@ -21,6 +21,12 @@ export function order(over: Partial<Order> = {}): Order {
     buyerName: null,
     buyerLabel: null,
     note: null,
+    applicationId: 'a-1',
+    applicationTitle: 'Technik für den Sitzungssaal',
+    invoiceId: null,
+    invoiceNumber: null,
+    invoiceStatus: null,
+    bookedAmount: '0',
     version: 1,
     ...over,
   };
@@ -37,10 +43,13 @@ export const NO_ORDER_LIST: OrderList = {
 };
 
 /**
- * A provider for a spec that renders the detail of an Antrag and does not test its
- * Bestellungen: the section reads an empty list and sends no request.
+ * A provider for a spec that renders the detail of an Antrag or of an invoice and does
+ * not test its Bestellungen: the page reads an empty list and sends no request.
  */
 export const NO_ORDERS = {
   provide: OrdersApiService,
-  useValue: { list: () => of(NO_ORDER_LIST) },
+  useValue: {
+    list: () => of(NO_ORDER_LIST),
+    ofInvoice: () => of({ items: [], total: '0' }),
+  },
 };

@@ -76,3 +76,14 @@ def orders_sum(rows: Iterable[tuple[str, Decimal | None, Decimal | None]]) -> De
 def over_by(total: Decimal, approved: Decimal | None) -> Decimal | None:
     """Return by how much the sum is above the approved amount, else None."""
     return total - approved if approved is not None and total > approved else None
+
+
+def price_from_invoice(actual: Decimal | None, gross: Decimal, others: int) -> Decimal | None:
+    """Return the real price of a Bestellung that gets an invoice.
+
+    The gross amount of the invoice fills an empty real price, and only when no other
+    Bestellung names the invoice (``others`` is 0). On an invoice for several purchases
+    each Bestellung has a part of the amount, so a person types it. A real price that is
+    set stays.
+    """
+    return gross if actual is None and others == 0 else actual

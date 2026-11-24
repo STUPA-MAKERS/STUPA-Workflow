@@ -118,7 +118,8 @@ TYPICAL FLOWS:
   (the other end of a card link). A link has no direction; the caller reads both ends
   and changes at least one (403 `link_forbidden`).
 - Bestellungen of an Antrag: `order_list(application_id)`, `order_get`, `order_create`,
-  `order_update` (needs `version`), `order_set_status`, `order_delete`, and the files of
+  `order_update` (needs `version`), `order_set_status`, `order_delete`,
+  `order_set_invoice` (the invoice of a Bestellung), `invoice_orders`, and the files of
   a Bestellung `order_attachments`, `order_attachment_upload`, `order_attachment_delete`.
   Only a person creates a Bestellung, for an approved Antrag of a type with money. A
   write needs `order.manage`.

@@ -143,13 +143,33 @@ export function orderFormValue(order: Order | null): Record<string, unknown> {
   };
 }
 
-export type OrderAction = 'ordered' | 'delivered' | 'edit' | 'cancelled' | 'delete';
+export type OrderAction =
+  | 'ordered'
+  | 'delivered'
+  | 'invoiceLink'
+  | 'invoiceNew'
+  | 'booking'
+  | 'edit'
+  | 'cancelled'
+  | 'delete';
+
+/** What the reader can do beside `order.manage`. */
+export interface OrderMenuRights {
+  /** The reader reads the invoices: "Rechnung verknüpfen". */
+  readonly invoices: boolean;
+  /** The reader holds `budget.book`: "Rechnung anlegen" and "Buchung anlegen". */
+  readonly book: boolean;
+}
 
 /**
  * The menu of a row for a person with `order.manage`: the status steps without the
- * current status, then the edit, then the cancel and the delete.
+ * current status, the invoice and the booking, the edit, then the cancel and the delete.
  */
-export function orderMenu(order: Order, t: (key: TranslationKey) => string): readonly RowMenuSection[] {
+export function orderMenu(
+  order: Order,
+  t: (key: TranslationKey) => string,
+  rights: OrderMenuRights = { invoices: false, book: false },
+): readonly RowMenuSection[] {
   const step = (id: OrderAction & OrderStatus, key: TranslationKey, icon: 'send' | 'check') =>
     order.status === id ? [] : [{ id, label: t(key), icon }];
   return [
@@ -157,6 +177,19 @@ export function orderMenu(order: Order, t: (key: TranslationKey) => string): rea
       items: [
         ...step('ordered', 'orders.menu.ordered', 'send'),
         ...step('delivered', 'orders.menu.delivered', 'check'),
+      ],
+    },
+    {
+      items: [
+        ...(rights.invoices
+          ? [{ id: 'invoiceLink', label: t('orders.menu.invoiceLink'), icon: 'link' as const }]
+          : []),
+        ...(rights.book
+          ? [
+              { id: 'invoiceNew', label: t('orders.menu.invoiceNew'), icon: 'receipt' as const },
+              { id: 'booking', label: t('orders.menu.booking'), icon: 'plus' as const },
+            ]
+          : []),
       ],
     },
     { items: [{ id: 'edit', label: t('action.edit'), icon: 'edit' as const }] },
@@ -169,6 +202,43 @@ export function orderMenu(order: Order, t: (key: TranslationKey) => string): rea
       ],
     },
   ].filter((section) => section.items.length > 0);
+}
+
+/**
+ * The marks of a Bestellung: "Rechnung offen" or "Rechnung bezahlt" from its invoice, and
+ * "Verbucht" with the booked amount when it has a booking.
+ */
+export function orderMarks(
+  order: Pick<Order, 'invoiceStatus' | 'bookedAmount'>,
+  locale: string,
+  currency: string | null,
+  t: (key: TranslationKey, params?: Record<string, string>) => string,
+): readonly string[] {
+  const booked = moneyNumber(order.bookedAmount);
+  return [
+    ...(order.invoiceStatus === 'open' ? [t('orders.mark.invoiceOpen')] : []),
+    ...(order.invoiceStatus === 'paid' ? [t('orders.mark.invoicePaid')] : []),
+    ...(booked
+      ? [t('orders.mark.booked', { amount: formatMoney(booked, locale, { currency }) })]
+      : []),
+  ];
+}
+
+/**
+ * The amount of a new booking for a Bestellung: the real price, else the planned one,
+ * minus the amounts already booked, and at least 0.
+ */
+export function bookingRest(
+  order: Pick<Order, 'actualAmount' | 'plannedAmount' | 'bookedAmount'>,
+): number {
+  const price = shownPrice(order).amount ?? 0;
+  const booked = moneyNumber(order.bookedAmount) ?? 0;
+  return Math.max(0, (Math.round(price * 100) - Math.round(booked * 100)) / 100);
+}
+
+/** The payee of a booking for a Bestellung: the buyer of an Auslage, else the Händler. */
+export function bookingPayee(order: Pick<Order, 'kind' | 'buyerLabel' | 'supplier'>): string {
+  return (order.kind === 'outlay' ? order.buyerLabel : order.supplier) ?? '';
 }
 
 /** One value of a Bestellung in the read view. `href` makes the value a link. */
@@ -209,6 +279,10 @@ export function orderFacts(
     { label: t('orders.field.deliveredOn'), value: dayMonthYear(order.deliveredOn, locale) },
     { label: t('orders.field.buyer'), value: order.buyerLabel ?? '' },
     { label: t('orders.field.note'), value: order.note ?? '' },
+    {
+      label: t('orders.field.booked'),
+      value: money(moneyNumber(order.bookedAmount) ? order.bookedAmount : null),
+    },
   ];
   return facts.filter((fact) => fact.value !== '');
 }

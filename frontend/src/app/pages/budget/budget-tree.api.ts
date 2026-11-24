@@ -59,6 +59,8 @@ export interface Expense {
   readonly referenceNumber: string | null;
   readonly paymentMethod: PaymentMethod | null;
   readonly category: string | null;
+  /** The Bestellung that the expense paid, else null. */
+  readonly orderId?: Uuid | null;
   /** The linked invoice. One invoice can back many bookings. */
   readonly invoiceId: Uuid | null;
   readonly invoiceNumber: string | null;
@@ -178,6 +180,8 @@ export interface ExpenseCreate extends ExpenseMetadata {
   readonly budgetId?: Uuid | null;
   readonly fiscalYearId?: Uuid | null;
   readonly applicationId?: Uuid | null;
+  /** The Bestellung that the expense paid. It needs the Antrag of that Bestellung. */
+  readonly orderId?: Uuid | null;
 }
 
 /** Update a booking: amount, description, cost center and extra metadata. */

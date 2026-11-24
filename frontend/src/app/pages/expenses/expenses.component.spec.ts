@@ -3097,7 +3097,7 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(dlg(cmp).newCorrespondent()).toBe('Acme GmbH');
     expect(nav).toHaveBeenCalledWith(
       [],
-      expect.objectContaining({ queryParams: { new: null, invoice: null }, replaceUrl: true }),
+      expect.objectContaining({ queryParams: { new: null, invoice: null, order: null }, replaceUrl: true }),
     );
     nav.mockRestore();
   });
@@ -3120,6 +3120,90 @@ describe('ExpensesComponent (list/detail)', () => {
     http.expectOne((r) => r.url.endsWith('/invoices')).flush({ items: [], total: 0, limit: 200, offset: 0 });
     flushList(http, page([]));
     expect(cmp.createOpen()).toBe(false);
+  });
+
+  /** §F/finance/orders/002879 */
+  it.each([
+    [
+      { kind: 'order', supplier: 'Technikhaus', buyerLabel: 'Lea Hoffmann', invoiceId: 'inv-1' },
+      { payee: 'Technikhaus', invoice: 'inv-1', app: 'Technik' },
+    ],
+    [
+      { kind: 'outlay', supplier: 'Technikhaus', buyerLabel: 'Lea Hoffmann', invoiceId: null, applicationTitle: null },
+      { payee: 'Lea Hoffmann', invoice: '', app: 'Antrag' },
+    ],
+  ])('fills the form of a new booking from a Bestellung %#', (over, want) => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: routeStub([['new', 'booking'], ['order', 'o-1']]) },
+        { provide: USE_MOCK_API, useValue: false },
+        { provide: TodosApiService, useValue: EVENTS_API },
+        { provide: AuthService, useValue: fakeAuth(['budget.view', 'budget.book']) },
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const cmp = TestBed.runInInjectionContext(() => new ExpensesComponent());
+    http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
+    http.expectOne((r) => r.url.endsWith('/invoices')).flush({ items: [INVOICE], total: 1, limit: 200, offset: 0 });
+    flushList(http, page([]));
+    expect(cmp.createOpen()).toBe(true);
+    http.expectOne((r) => r.url.endsWith('/orders/o-1')).flush({
+      id: 'o-1',
+      number: 'B-7K3QX9MD',
+      title: 'Beamer',
+      status: 'delivered',
+      applicationId: 'app-1',
+      applicationTitle: 'Technik',
+      plannedAmount: '100.00',
+      actualAmount: '112.50',
+      bookedAmount: '40.00',
+      ...over,
+    });
+    const d = dlg(cmp);
+    expect(d.newOrder()).toEqual({ id: 'o-1', label: 'B-7K3QX9MD · Beamer' });
+    expect(d.newApplicationId()).toBe('app-1');
+    expect(d.appQuery()).toBe(want.app);
+    expect(d.newDescription()).toBe('Beamer');
+    expect(d.newAmount()).toBe('72.50');
+    expect(d.newCorrespondent()).toBe(want.payee);
+    expect(d.newInvoiceId()).toBe(want.invoice);
+
+    d.create(new Event('submit'));
+    const post = http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'POST');
+    expect(post.request.body).toMatchObject({ applicationId: 'app-1', orderId: 'o-1', amount: '72.50' });
+    post.flush({ ...EXPENSE, orderId: 'o-1' });
+    http.match(() => true).forEach((req) => req.flush(req.request.url.endsWith('/budgets') ? [] : { items: [], total: 0, limit: 50, offset: 0 }));
+  });
+
+  /** §F/finance/orders/002879: the Bestellung goes with its Antrag. */
+  it('drops the Bestellung of a new booking with its Antrag and names a failed read', () => {
+    const { cmp, http } = build({});
+    const d = dlg(cmp);
+    const toast = TestBed.inject(ToastService);
+    const error = jest.spyOn(toast, 'show');
+    d.openCreate({ orderId: 'o-1' });
+    http.expectOne((r) => r.url.endsWith('/orders/o-1')).flush(null, { status: 404, statusText: 'x' });
+    expect(error).toHaveBeenCalledWith('Die Bestellung konnte nicht geladen werden.', 'error');
+    expect(d.newOrder()).toBeNull();
+
+    d.openCreate({ orderId: 'o-1' });
+    d.createOpen.set(false);
+    http.expectOne((r) => r.url.endsWith('/orders/o-1')).flush({ id: 'o-1', number: 'B-1', title: 'x', applicationId: 'app-1' });
+    expect(d.newOrder()).toBeNull();
+
+    d.openCreate();
+    d.pickApp({ id: 'app-1', title: 'Technik' });
+    d.newOrder.set({ id: 'o-1', label: 'B-1 · Beamer' });
+    d.pickApp({ id: 'app-1', title: 'Technik' });
+    expect(d.newOrder()).not.toBeNull();
+    d.pickApp({ id: 'app-2', title: 'Andere' });
+    expect(d.newOrder()).toBeNull();
+    d.newOrder.set({ id: 'o-1', label: 'B-1 · Beamer' });
+    d.clearApp();
+    expect(d.newOrder()).toBeNull();
   });
 
   /** A transfer that is not loaded leaves the detail empty. */

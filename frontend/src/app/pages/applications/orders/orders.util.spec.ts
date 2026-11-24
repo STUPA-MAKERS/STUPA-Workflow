@@ -6,6 +6,9 @@ import {
   orderBody,
   orderFacts,
   orderFormValue,
+  bookingPayee,
+  bookingRest,
+  orderMarks,
   orderMenu,
   orderPositions,
   positionPrefill,
@@ -150,6 +153,7 @@ describe('orders.util', () => {
       deliveredOn: '2026-11-22',
       buyerLabel: 'Anna B.',
       note: 'eilig',
+      bookedAmount: '40.00',
     });
     const facts = orderFacts(full, orderPositions(DATA), 'de-DE', 'EUR', t);
     expect(facts.map((f) => f.label)).toEqual([
@@ -166,12 +170,53 @@ describe('orders.util', () => {
       'orders.field.deliveredOn',
       'orders.field.buyer',
       'orders.field.note',
+      'orders.field.booked',
     ]);
+    expect(facts[13].value).toBe('40,00\u00a0€');
     expect(facts[4].value).toBe('Beamer, orders.position.removed');
     expect(facts[5]).toMatchObject({ href: 'https://shop.example.org' });
     expect(facts[7].value).toBe('112,50\u00a0€');
     expect(facts[9].value).toBe('20.11.2026');
     const bare = orderFacts({ ...order(), supplier: undefined, plannedAmount: undefined, positionIds: undefined }, [], 'de-DE', null, t);
     expect(bare.map((f) => f.label)).toEqual(['orders.field.number', 'orders.field.kind', 'orders.field.status']);
+  });
+
+  /** §F/finance/orders/002870 */
+  it('puts the invoice and the booking entries between the status steps and the edit', () => {
+    const ids = (rights: { invoices: boolean; book: boolean }) =>
+      orderMenu(order(), t, rights).flatMap((s) => s.items.map((i) => i.id));
+    expect(ids({ invoices: true, book: true })).toEqual([
+      'ordered',
+      'delivered',
+      'invoiceLink',
+      'invoiceNew',
+      'booking',
+      'edit',
+      'cancelled',
+      'delete',
+    ]);
+    expect(ids({ invoices: true, book: false })).toEqual(['ordered', 'delivered', 'invoiceLink', 'edit', 'cancelled', 'delete']);
+    expect(ids({ invoices: false, book: false })).toEqual(['ordered', 'delivered', 'edit', 'cancelled', 'delete']);
+  });
+
+  /** §F/finance/orders/002880 */
+  it('names the marks of the invoice and of the bookings', () => {
+    const tp = (key: string, params?: Record<string, string>) => `${key}${params ? `:${params['amount']}` : ''}`;
+    expect(orderMarks(order(), 'de-DE', 'EUR', tp)).toEqual([]);
+    expect(orderMarks(order({ invoiceStatus: 'open' }), 'de-DE', 'EUR', tp)).toEqual(['orders.mark.invoiceOpen']);
+    const marks = orderMarks(order({ invoiceStatus: 'paid', bookedAmount: '60.00' }), 'de-DE', null, tp);
+    expect(marks[0]).toBe('orders.mark.invoicePaid');
+    expect(marks[1]).toMatch(/^orders\.mark\.booked:60,00\s€$/);
+  });
+
+  /** §F/finance/orders/002879 */
+  it('gives the rest amount and the payee of a booking for a Bestellung', () => {
+    expect(bookingRest(order({ plannedAmount: '100.00', actualAmount: '112.50', bookedAmount: '40.00' }))).toBe(72.5);
+    expect(bookingRest(order({ plannedAmount: '100.00', bookedAmount: undefined }))).toBe(100);
+    expect(bookingRest(order({ plannedAmount: '20.00', bookedAmount: '30.00' }))).toBe(0);
+    expect(bookingRest(order({ plannedAmount: null }))).toBe(0);
+    expect(bookingPayee(order({ supplier: 'Technikhaus' }))).toBe('Technikhaus');
+    expect(bookingPayee(order({ kind: 'outlay', buyerLabel: 'Lea Hoffmann' }))).toBe('Lea Hoffmann');
+    expect(bookingPayee(order({ kind: 'outlay', buyerLabel: null }))).toBe('');
   });
 });

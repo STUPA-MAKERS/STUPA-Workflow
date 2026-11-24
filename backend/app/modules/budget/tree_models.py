@@ -198,6 +198,12 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
     invoice_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("invoice.id", ondelete="SET NULL"), nullable=True
     )
+    #: The Bestellung that this expense paid (F/finance/orders/002878). One Bestellung can
+    #: have many bookings. SET NULL keeps the booking when its Bestellung goes with the
+    #: Antrag.
+    order_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("purchase_order.id", ondelete="SET NULL"), nullable=True
+    )
     #: Links the two bookings of a transfer (source expense <-> target income).
     transfer_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     #: 'expense' | 'income'.
@@ -242,6 +248,7 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
         Index("ix_budget_expense_fiscal_year_id", "fiscal_year_id"),
         Index("ix_budget_expense_application_id", "application_id"),
         Index("ix_budget_expense_transfer_id", "transfer_id"),
+        Index("ix_budget_expense_order_id", "order_id"),
         Index("ix_budget_expense_invoice_date", "invoice_date"),
         Index("ix_budget_expense_invoice_id", "invoice_id"),
         Index("ix_budget_expense_parent_expense_id", "parent_expense_id"),

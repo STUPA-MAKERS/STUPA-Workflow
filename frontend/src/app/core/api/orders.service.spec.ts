@@ -73,4 +73,23 @@ describe('OrdersApiService', () => {
     expect(remove.request.method).toBe('DELETE');
     remove.flush(null);
   });
+
+  /** §F/finance/orders/002873 + §F/finance/orders/002877 */
+  it('reads one Bestellung, sets its invoice and reads the Bestellungen of an invoice', () => {
+    svc.get('o-1').subscribe();
+    const one = http.expectOne('/api/orders/o-1');
+    expect(one.request.method).toBe('GET');
+    one.flush(order());
+
+    svc.setInvoice('o-1', null, 2).subscribe();
+    const put = http.expectOne('/api/orders/o-1/invoice');
+    expect(put.request.method).toBe('PUT');
+    expect(put.request.body).toEqual({ invoiceId: null, version: 2 });
+    put.flush(order());
+
+    const got = jest.fn();
+    svc.ofInvoice('i-1').subscribe(got);
+    http.expectOne('/api/invoices/i-1/orders').flush({ items: [], total: '0' });
+    expect(got).toHaveBeenCalledWith({ items: [], total: '0' });
+  });
 });

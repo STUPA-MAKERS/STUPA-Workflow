@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
-implementation: null
+implementation:
+  - backend/app/modules/orders/router.py
+  - frontend/src/app/pages/invoices/invoice-orders/invoice-orders.component.ts
 scope:
   - frontend/src/app/pages/invoices
   - backend/app/modules/orders

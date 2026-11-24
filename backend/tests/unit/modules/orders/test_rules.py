@@ -2,7 +2,7 @@
 
 § F/finance/orders/002851 the fields, § 002853 the statuses and their dates, § 002855 the
 number, § 002856 the link, § 002852 the buyer of an Auslage, § 002860 the position ids and
-§ 002868 the sum.
+§ 002868 the sum. § 002874 the real price from the invoice.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from app.modules.orders.rules import (
     orders_sum,
     over_by,
     price,
+    price_from_invoice,
     status_dates,
     url_valid,
 )
@@ -135,3 +136,11 @@ def test_status_body_refuses_a_fifth_value() -> None:
     assert OrderStatusIn.model_validate({"status": "delivered", "version": 1}).status == "delivered"
     with pytest.raises(ValidationError):
         OrderStatusIn.model_validate({"status": "returned", "version": 1})
+
+
+def test_the_invoice_fills_only_an_empty_price_of_its_only_bestellung() -> None:
+    """§ 002874: the gross amount for the first Bestellung, no price for a second one."""
+    gross = Decimal("72.50")
+    assert price_from_invoice(None, gross, 0) == gross
+    assert price_from_invoice(None, gross, 1) is None
+    assert price_from_invoice(Decimal("70.00"), gross, 0) == Decimal("70.00")

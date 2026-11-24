@@ -6,6 +6,7 @@ import type { CostCentreLabel } from '../../budget/expense-display.util';
 import { InvoiceDetailComponent } from './invoice-detail.component';
 import { NO_LINKED_TODOS, linksOf } from '../../../../testing/todo-fixtures';
 import { of } from 'rxjs';
+import { NO_ORDERS } from '../../../../testing/order-fixtures';
 import { TodosApiService } from '@core/api/todos.service';
 
 const BOOKING: InvoiceBooking = {
@@ -66,7 +67,7 @@ async function setup(inputs: Record<string, unknown> = {}) {
       ...inputs,
     },
     on: handlers,
-    providers: [provideRouter([]), NO_LINKED_TODOS],
+    providers: [provideRouter([]), NO_LINKED_TODOS, NO_ORDERS],
   });
   return { view, ...handlers, user: userEvent.setup() };
 }

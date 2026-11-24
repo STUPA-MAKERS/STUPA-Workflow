@@ -114,6 +114,7 @@ class ExpenseOps(BudgetTreeServiceBase):
             category=e.category,
             invoiceId=e.invoice_id,
             invoiceNumber=invoice_number,
+            orderId=e.order_id,
             parentExpenseId=e.parent_expense_id,
             childCount=child_count,
             createdAt=e.created_at,
@@ -146,6 +147,8 @@ class ExpenseOps(BudgetTreeServiceBase):
         With ``commit=False`` the caller bundles the booking and its follow-up mutations
         in one transaction.
         """
+        if payload.order_id is not None:
+            await self._require_order(payload.order_id, payload.application_id)
         node, fy_id, app_title = (
             await self._bound_target(payload.application_id)
             if payload.application_id is not None
@@ -169,6 +172,7 @@ class ExpenseOps(BudgetTreeServiceBase):
             payment_method=payload.payment_method,
             category=payload.category,
             invoice_id=payload.invoice_id,
+            order_id=payload.order_id,
         )
         self.session.add(expense)
         paid_invoice = (
@@ -184,6 +188,7 @@ class ExpenseOps(BudgetTreeServiceBase):
                 "kind": payload.kind,
                 "amount": str(payload.amount),
                 "applicationId": (str(payload.application_id) if payload.application_id else None),
+                **({"orderId": str(payload.order_id)} if payload.order_id else {}),
                 **(
                     {"invoiceId": str(payload.invoice_id), "invoicePaid": True}
                     if paid_invoice
@@ -248,6 +253,33 @@ class ExpenseOps(BudgetTreeServiceBase):
         )
         await self._refuse_not_leaf(node, year)
         return node, year, None
+
+    async def _require_order(self, order_id: UUID, application_id: UUID | None) -> None:
+        """Check the Bestellung that a new expense names (F/finance/orders/002878).
+
+        The function reads the table ``purchase_order`` through the metadata, because the
+        module ``orders`` is in a layer above this one and its model cannot be imported
+        here.
+
+        Raises:
+            NotFoundError: No Bestellung has this id.
+            ValidationProblem: The booking does not name the Antrag of the Bestellung
+                (``order_application_mismatch``).
+        """
+        orders = BudgetExpense.metadata.tables["purchase_order"]
+        owner = (
+            await self.session.execute(
+                select(orders.c.application_id).where(orders.c.id == order_id)
+            )
+        ).first()
+        if owner is None:
+            raise NotFoundError(f"order {order_id} not found")
+        if owner[0] != application_id:
+            raise ValidationProblem(
+                "The booking must name the Antrag of the Bestellung.",
+                code="order_application_mismatch",
+                errors=[{"field": "orderId", "msg": "Antrag of the Bestellung differs"}],
+            )
 
     async def _pay_invoice(self, invoice_id: UUID) -> bool:
         """Set the invoice of a new booking to `paid` (spec 001290).

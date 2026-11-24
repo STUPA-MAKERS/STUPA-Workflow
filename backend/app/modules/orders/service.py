@@ -18,20 +18,22 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application, ApplicationOrderEvent
 from app.modules.applications.position_ids import position_ids
+from app.modules.applications.service.service_base import _title_of
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.models import AuditEntry
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.budget.tree_models import BudgetExpense, Invoice
 from app.modules.flow.models import State
 from app.modules.orders.models import PurchaseOrder, PurchaseOrderPosition
 from app.modules.orders.numbers import format_number
-from app.modules.orders.rules import buyer_missing, status_dates, url_valid
+from app.modules.orders.rules import buyer_missing, price_from_invoice, status_dates, url_valid
 from app.modules.orders.schemas import OrderCreate, OrderUpdate
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
@@ -53,7 +55,9 @@ _FIELDS: tuple[tuple[str, str], ...] = (
     ("buyerName", "buyer_name"),
     ("note", "note"),
 )
-_COLUMN: Mapping[str, str] = dict(_FIELDS)
+#: The column of each wire name of an audit entry. The invoice has its own route, so it is
+#: no field of a change.
+_COLUMN: Mapping[str, str] = dict(_FIELDS) | {"invoiceId": "invoice_id"}
 _STATUS_KEYS: tuple[str, ...] = ("status", "orderedOn", "deliveredOn")
 
 
@@ -72,7 +76,7 @@ def _parse(key: str, raw: object) -> object:
             return Decimal(text)
         case "orderedOn" | "deliveredOn":
             return date.fromisoformat(text)
-        case "buyerId":
+        case "buyerId" | "invoiceId":
             return UUID(text)
         case _:
             return text
@@ -83,6 +87,21 @@ def _refused(code: str, field: str, msg: str) -> ValidationProblem:
     return ValidationProblem(
         "The Bestellung cannot be saved.", code=code, errors=[{"field": field, "msg": msg}]
     )
+
+
+@dataclass(frozen=True, slots=True)
+class Marks:
+    """What a Bestellung shows of its invoice and its bookings (F/finance/orders/002880).
+
+    Attributes:
+        invoice_number: The number of the invoice, else None.
+        invoice_status: ``open`` or ``paid``, else None without an invoice.
+        booked: The sum of the bookings that name the Bestellung.
+    """
+
+    invoice_number: str | None = None
+    invoice_status: str | None = None
+    booked: Decimal = Decimal(0)
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +167,125 @@ class OrderService:
             else []
         )
         return {principal_id: name for principal_id, name in found if name}
+
+    async def marks(self, rows: Sequence[PurchaseOrder]) -> dict[UUID, Marks]:
+        """Return the marks of each of the rows.
+
+        The function reads the invoices and the bookings at each call. The Bestellung
+        stores no copy, because a copy goes wrong when a person reverts a booking or
+        sets an invoice to open.
+        """
+        invoice_ids = {row.invoice_id for row in rows if row.invoice_id is not None}
+        invoices: dict[UUID | None, tuple[str | None, str | None]] = (
+            {
+                invoice_id: (number, status)
+                for invoice_id, number, status in (
+                    await self.session.execute(
+                        select(Invoice.id, Invoice.number, Invoice.status).where(
+                            Invoice.id.in_(invoice_ids)
+                        )
+                    )
+                ).all()
+            }
+            if invoice_ids
+            else {}
+        )
+        booked = (
+            dict(
+                (
+                    await self.session.execute(
+                        select(BudgetExpense.order_id, func.sum(BudgetExpense.amount))
+                        .where(
+                            BudgetExpense.order_id.in_([row.id for row in rows]),
+                            BudgetExpense.parent_expense_id.is_(None),
+                        )
+                        .group_by(BudgetExpense.order_id)
+                    )
+                )
+                .tuples()
+                .all()
+            )
+            if rows
+            else {}
+        )
+        return {
+            row.id: Marks(
+                invoice_number=invoices.get(row.invoice_id, (None, None))[0],
+                invoice_status=invoices.get(row.invoice_id, (None, None))[1],
+                booked=Decimal(booked.get(row.id) or 0),
+            )
+            for row in rows
+        }
+
+    async def application_titles(self, application_ids: Sequence[UUID]) -> dict[UUID, str]:
+        """Return the title of each of the Anträge that has one."""
+        ids = set(application_ids)
+        found = (
+            (
+                await self.session.execute(
+                    select(Application.id, Application.data).where(Application.id.in_(ids))
+                )
+            ).all()
+            if ids
+            else []
+        )
+        return {
+            application_id: title
+            for application_id, data in found
+            if (title := _title_of(data)) is not None
+        }
+
+    async def of_invoice(self, invoice_id: UUID) -> list[PurchaseOrder]:
+        """Return the Bestellungen that name the invoice, the oldest first.
+
+        Raises:
+            NotFoundError: No invoice has this id.
+        """
+        if await self.session.get(Invoice, invoice_id) is None:
+            raise NotFoundError("Invoice not found.")
+        rows = await self.session.scalars(
+            select(PurchaseOrder)
+            .where(PurchaseOrder.invoice_id == invoice_id)
+            .order_by(PurchaseOrder.created_at, PurchaseOrder.id)
+        )
+        return list(rows)
+
+    async def set_invoice(
+        self, order_id: UUID, invoice_id: UUID | None, version: int, *, actor: str
+    ) -> PurchaseOrder:
+        """Set or remove the invoice of a Bestellung (F/finance/orders/002873).
+
+        The gross amount of the invoice fills an empty real price when no other
+        Bestellung names the invoice (F/finance/orders/002874).
+
+        Raises:
+            NotFoundError: No Bestellung or no invoice has the id.
+            ConflictError: A different version is current.
+        """
+        row = await self.get(order_id)
+        self._check_version(row, version)
+        invoice = await self.session.get(Invoice, invoice_id) if invoice_id is not None else None
+        if invoice_id is not None and invoice is None:
+            raise NotFoundError("Invoice not found.")
+        others = (
+            await self.session.scalar(
+                select(func.count())
+                .select_from(PurchaseOrder)
+                .where(PurchaseOrder.invoice_id == invoice_id, PurchaseOrder.id != row.id)
+            )
+            if invoice is not None
+            else 0
+        )
+        actual = (
+            price_from_invoice(row.actual_amount, invoice.gross_amount, others or 0)
+            if invoice is not None
+            else row.actual_amount
+        )
+        values = {
+            "invoiceId": invoice_id,
+            **({"actualAmount": actual} if actual != row.actual_amount else {}),
+        }
+        return await self._write(row, values, None, actor=actor, action=AuditAction.ORDER_UPDATE)
 
     async def approved_amount(self, application_id: UUID) -> Decimal | None:
         """Return the approved amount of the Antrag."""
@@ -428,13 +566,32 @@ class OrderService:
             await self._event(row, actor, "status", **{"from": previous, "to": status})
         return result
 
+    async def ensure_deletable(self, order_id: UUID) -> None:
+        """Refuse the delete of a Bestellung with a booking.
+
+        The router asks before it drops the files, so a refused delete keeps them.
+
+        Raises:
+            ConflictError: A booking names the Bestellung (``order_has_bookings``).
+        """
+        booked = await self.session.scalar(
+            select(BudgetExpense.id).where(BudgetExpense.order_id == order_id).limit(1)
+        )
+        if booked is not None:
+            raise ConflictError("A booking names the Bestellung.", code="order_has_bookings")
+
     async def delete(self, order_id: UUID, *, actor: str) -> None:
         """Delete a Bestellung with its positions.
 
+        A Bestellung with a booking is a record of the finances, so a person cancels it
+        and does not delete it (F/finance/orders/002878).
+
         Raises:
             NotFoundError: No Bestellung has this id.
+            ConflictError: A booking names the Bestellung (``order_has_bookings``).
         """
         row = await self.get(order_id)
+        await self.ensure_deletable(order_id)
         positions = (await self.positions_of([row.id]))[row.id]
         await self._event(row, actor, "deleted")
         await audit_record(
@@ -483,6 +640,9 @@ class OrderService:
         ) or ("positionIds" in before and current_positions != after.get("positionIds"))
         if stale:
             raise ConflictError("A later change touched the same fields.", code="stale_revert")
+        old_invoice = fields.get("invoiceId")
+        if old_invoice is not None and await self.session.get(Invoice, UUID(old_invoice)) is None:
+            raise ConflictError("The old invoice is gone.", code="not_revertable")
         positions = (
             tuple(str(pos) for pos in before["positionIds"]) if "positionIds" in before else None
         )

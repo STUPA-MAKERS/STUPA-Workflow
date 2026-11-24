@@ -91,8 +91,29 @@ the flag `is_approved` of the current state, "with money" is `has_budget` of the
 - A new route needs an MCP tool (route parity test) and, for an object check, an entry in
   `OBJECT_CHECK_ROUTES`.
 
-**Not built yet:** invoice and booking of a Bestellung, the marks, the list page with the
-export, the offered transition of the Antrag, link kind, search, graph, webhooks.
+**Invoice, bookings and marks:**
+- `PUT /api/orders/{id}/invoice` (`order.manage` and a budget read permission, body
+  `invoiceId` or null and `version`) sets or removes the one invoice of a Bestellung.
+  `rules.price_from_invoice` fills an empty real price with the gross amount when no other
+  Bestellung names the invoice. The delete of an invoice clears the reference (FK
+  `SET NULL`). `GET /api/invoices/{id}/orders` lists the Bestellungen of an invoice; a row
+  of an Antrag that the reader does not read has `accessible: false` and no value.
+- A booking names a Bestellung with `budget_expense.order_id` (`orderId` of
+  `POST /api/expenses`). `budget` is a layer below `orders`, so
+  `budget/tree/expenses.py` reads the table `purchase_order` through the metadata and
+  never imports the model. 422 `order_application_mismatch` when the booking does not name
+  the Antrag of the Bestellung. The delete of a Bestellung with a booking answers 409
+  `order_has_bookings` (`ensure_deletable`, asked before the files go).
+- `OrderService.marks` reads `invoiceNumber`, `invoiceStatus` and `bookedAmount` at each
+  read; the Bestellung stores no copy.
+- Frontend: the menu entries "Rechnung verknüpfen" (pick dialog in the section),
+  "Rechnung anlegen" (`/invoices?new=invoice&order=<id>`) and "Buchung anlegen"
+  (`/expenses?new=booking&order=<id>`); `bookingRest` and `bookingPayee` give the amount
+  and the payee of the booking; the cancel of a booked Bestellung asks first;
+  `pages/invoices/invoice-orders` lists the Bestellungen in the invoice detail.
+
+**Not built yet:** the list page with the export, the offered transition of the Antrag,
+link kind, search, graph, webhooks.
 
 **Related:** `be-applications`, `be-files`, `be-budget`, `be-audit`, `be-privacy`, `mcp`,
 `frontend`.

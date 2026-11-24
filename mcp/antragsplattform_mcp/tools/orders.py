@@ -34,7 +34,9 @@ async def order_list(application_id: str) -> dict:
     type with money). Each item has `id`, `number` (`B-` and eight characters), `title`,
     `kind`, `status`, `supplier`, `url`, `orderNumber`, `positionIds`, `plannedAmount`,
     `actualAmount`, `orderedOn`, `deliveredOn`, `buyerId`, `buyerName`, `buyerLabel`
-    (the name of the account of the buyer, else the typed name), `note` and `version`.
+    (the name of the account of the buyer, else the typed name), `note`, `invoiceId`,
+    `invoiceNumber`, `invoiceStatus` (`open` or `paid`, read from the invoice),
+    `bookedAmount` (the sum of the bookings that name the Bestellung) and `version`.
     The applicant view has no prices, no link and no note.
     """
     return await api().get(f"/applications/{application_id}/orders")
@@ -86,8 +88,38 @@ async def order_set_status(order_id: str, status: S.OrderStatus, version: int) -
 
 @group.tool
 async def order_delete(order_id: str) -> dict:
-    """Delete a Bestellung with its files. Requires `order.manage`. Audited."""
+    """Delete a Bestellung with its files. Requires `order.manage`. Audited.
+
+    409 `order_has_bookings` when a booking names the Bestellung: cancel it with
+    `order_set_status` and keep it.
+    """
     return await api().delete(f"/orders/{order_id}")
+
+
+@group.tool
+async def order_set_invoice(order_id: str, invoice_id: str | None, version: int) -> dict:
+    """Set the invoice of a Bestellung, or remove it with `invoice_id` null.
+
+    Requires `order.manage` and the read of the invoices. A Bestellung has at most one
+    invoice, and one invoice can belong to many Bestellungen. The gross amount of the
+    invoice fills an empty `actualAmount` when no other Bestellung names the invoice.
+    409 `order_version_conflict` on an old `version`. Audited.
+    """
+    return await api().put(
+        f"/orders/{order_id}/invoice", json={"invoiceId": invoice_id, "version": version}
+    )
+
+
+@group.tool
+async def invoice_orders(invoice_id: str) -> dict:
+    """List the Bestellungen that name an invoice. Requires the read of the invoices.
+
+    The answer has `items` and `total` (the sum of the real prices). An item has
+    `accessible`, `id`, `number`, `title`, `applicationId`, `applicationTitle` and
+    `actualAmount`. An item of an Antrag that the caller does not read has
+    `accessible` false and no other value.
+    """
+    return await api().get(f"/invoices/{invoice_id}/orders")
 
 
 @group.tool

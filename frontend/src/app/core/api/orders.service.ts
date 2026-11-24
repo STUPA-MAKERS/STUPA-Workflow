@@ -43,8 +43,34 @@ export interface Order {
   /** The name of the account of the buyer, else the typed name. */
   readonly buyerLabel?: string | null;
   readonly note?: string | null;
+  readonly applicationId?: Uuid;
+  readonly applicationTitle?: string | null;
+  /** The invoice of the purchase; one invoice can belong to many Bestellungen. */
+  readonly invoiceId?: Uuid | null;
+  readonly invoiceNumber?: string | null;
+  /** The status of the invoice, read from the invoice at each read. */
+  readonly invoiceStatus?: 'open' | 'paid' | null;
+  /** The sum of the bookings that name the Bestellung, as a decimal string. */
+  readonly bookedAmount?: string;
   readonly version?: number;
   readonly createdAt?: IsoDateTime;
+}
+
+/** One Bestellung in the detail of its invoice. Without `accessible` it has no values. */
+export interface InvoiceOrder {
+  readonly accessible: boolean;
+  readonly id: Uuid | null;
+  readonly number: string | null;
+  readonly title: string | null;
+  readonly applicationId: Uuid | null;
+  readonly applicationTitle: string | null;
+  readonly actualAmount: string | null;
+}
+
+/** The Bestellungen that name one invoice, with the sum of their real prices. */
+export interface InvoiceOrders {
+  readonly items: readonly InvoiceOrder[];
+  readonly total: string;
 }
 
 /** The Bestellungen of one Antrag. The sums are null in the applicant view. */
@@ -82,6 +108,26 @@ export class OrdersApiService {
 
   list(applicationId: Uuid): Observable<OrderList> {
     return this.http.get<OrderList>(`${this.base}/applications/${applicationId}/orders`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** One Bestellung; 404 without the read of its Antrag. */
+  get(id: Uuid): Observable<Order> {
+    return this.http.get<Order>(`${this.base}/orders/${id}`, { context: skipLoading() });
+  }
+
+  /**
+   * Set the invoice of a Bestellung, or remove it with `null`. The gross amount of the
+   * invoice fills an empty real price when no other Bestellung names the invoice.
+   */
+  setInvoice(id: Uuid, invoiceId: Uuid | null, version: number): Observable<Order> {
+    return this.http.put<Order>(`${this.base}/orders/${id}/invoice`, { invoiceId, version });
+  }
+
+  /** The Bestellungen that name an invoice. */
+  ofInvoice(invoiceId: Uuid): Observable<InvoiceOrders> {
+    return this.http.get<InvoiceOrders>(`${this.base}/invoices/${invoiceId}/orders`, {
       context: skipLoading(),
     });
   }

@@ -43,6 +43,18 @@ def test_order_tools_read_create_change_and_delete(fake_api: _FakeApi) -> None:
     ]
 
 
+def test_order_invoice_tools_set_remove_and_list(fake_api: _FakeApi) -> None:
+    """§F/finance/orders/002873 and 002877: the invoice of a Bestellung and its list."""
+    asyncio.run(orders.order_set_invoice("o1", "i1", 2))
+    asyncio.run(orders.order_set_invoice("o1", None, 3))
+    asyncio.run(orders.invoice_orders("i1"))
+    assert fake_api.calls == [
+        ("PUT", "/orders/o1/invoice", {"invoiceId": "i1", "version": 2}),
+        ("PUT", "/orders/o1/invoice", {"invoiceId": None, "version": 3}),
+        ("GET", "/invoices/i1/orders", None),
+    ]
+
+
 def test_order_file_tools_list_upload_and_delete(fake_api: _FakeApi, tmp_path: Path) -> None:
     """A Bestellung has files of its own: list, upload from a local file, delete."""
     pdf = tmp_path / "Rechnung.pdf"

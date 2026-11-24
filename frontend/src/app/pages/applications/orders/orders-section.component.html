@@ -72,6 +72,30 @@
     (stale)="load()"
   />
   <app-confirm-dialog
+    [open]="cancelling() !== null"
+    [title]="'orders.cancel.title' | t"
+    [body]="cancelBody()"
+    [confirmLabel]="'orders.menu.cancel' | t"
+    (confirm)="confirmCancel()"
+    (cancel)="cancelling.set(null)"
+  />
+  <app-todo-pick-dialog
+    [open]="linking() !== null"
+    (openChange)="$event ? null : linking.set(null)"
+    [heading]="'orders.menu.invoiceLink' | t"
+    [searchLabel]="'orders.invoice.search' | t"
+    [query]="invoiceSearch.text()"
+    (queryChange)="invoiceSearch.set($event)"
+    [listLabel]="'orders.invoice.list' | t"
+    [emptyHeading]="'orders.invoice.none' | t"
+    [submitLabel]="'orders.invoice.link' | t"
+    submitIcon="link"
+    [rows]="invoiceRows()"
+    [(pick)]="invoicePick"
+    [busy]="busy()"
+    (picked)="linkInvoice($event)"
+  />
+  <app-confirm-dialog
     [open]="deleting() !== null"
     [title]="'orders.delete.title' | t"
     [body]="'orders.delete.body' | t: { title: deleting()?.title ?? '' }"

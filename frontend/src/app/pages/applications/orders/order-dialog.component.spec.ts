@@ -3,6 +3,8 @@ import { Subject, of, throwError } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { CalendarApiService } from '@core/api/calendar.service';
 import { type Order, OrdersApiService } from '@core/api/orders.service';
+import { provideRouter } from '@angular/router';
+import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { toastMock } from '../../../../testing/toast';
 import { OrderDialogComponent } from './order-dialog.component';
@@ -17,9 +19,10 @@ const POSITIONS = orderPositions({
   ],
 });
 
-async function setup(inputs: Record<string, unknown> = {}) {
+async function setup(inputs: Record<string, unknown> = {}, readsInvoices = false) {
   localStorage.setItem('ap.locale', 'de');
   const api = {
+    setInvoice: jest.fn(() => of(order())),
     create: jest.fn(() => of(order({ id: 'o-new' }))),
     update: jest.fn(() => of(order())),
     files: jest.fn(() => of([])),
@@ -36,6 +39,8 @@ async function setup(inputs: Record<string, unknown> = {}) {
       { provide: ApiClient, useValue: {} },
       { provide: CalendarApiService, useValue: { people } },
       { provide: ToastService, useValue: toast },
+      { provide: AuthService, useValue: { canAny: () => readsInvoices } },
+      provideRouter([]),
     ],
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -177,5 +182,50 @@ describe('OrderDialogComponent', () => {
   it('has no values to show without a Bestellung', async () => {
     const { cmp } = await setup({ canManage: false });
     expect(cmp.facts()).toEqual([]);
+  });
+
+  /** §F/finance/orders/002873 */
+  it('shows the invoice of the Bestellung and takes it away', async () => {
+    const linked = order({ invoiceId: 'i-1', invoiceNumber: 'R-17', invoiceStatus: 'paid', version: 4 });
+    const { cmp, api, saved, stale, toast, fixture } = await setup({ order: linked }, true);
+    expect(cmp.invoice()).toEqual({ id: 'i-1', link: '/invoices', title: 'R-17', sub: 'Rechnung bezahlt' });
+    expect(screen.getByTestId('od-invoice')).toHaveTextContent('R-17');
+
+    api.setInvoice.mockReturnValueOnce(throwError(() => ({ error: null })));
+    screen.getByTestId('od-unlink').querySelector('button')?.click();
+    expect(api.setInvoice).toHaveBeenCalledWith('o-1', null, 4);
+    expect(toast.error).toHaveBeenCalledWith('Die Bestellung konnte nicht gespeichert werden.');
+    expect(stale).not.toHaveBeenCalled();
+    api.setInvoice.mockReturnValueOnce(throwError(() => ({ error: { code: 'order_version_conflict' } })));
+    cmp.removeInvoice();
+    expect(stale).toHaveBeenCalledTimes(1);
+    expect(cmp.open()).toBe(false);
+
+    fixture.componentRef.setInput('open', true);
+    fixture.detectChanges();
+    const pending = new Subject<Order>();
+    api.setInvoice.mockReturnValueOnce(pending);
+    cmp.removeInvoice();
+    cmp.removeInvoice();
+    expect(api.setInvoice).toHaveBeenCalledTimes(3);
+    pending.next(order());
+    expect(saved).toHaveBeenCalledTimes(1);
+    expect(cmp.open()).toBe(false);
+  });
+
+  it('names an invoice without a number and gives a reader without the invoices no link', async () => {
+    const { cmp, api } = await setup({
+      order: { ...order({ invoiceId: 'i-2', invoiceStatus: 'open' }), version: undefined },
+    });
+    expect(cmp.invoice()).toEqual({ id: 'i-2', link: null, title: 'Rechnung ohne Nummer', sub: 'Rechnung offen' });
+    cmp.removeInvoice();
+    expect(api.setInvoice).toHaveBeenCalledWith('o-1', null, 1);
+  });
+
+  it('has no invoice row and no removal without a Bestellung', async () => {
+    const { cmp, api } = await setup();
+    expect(cmp.invoice()).toBeNull();
+    cmp.removeInvoice();
+    expect(api.setInvoice).not.toHaveBeenCalled();
   });
 });

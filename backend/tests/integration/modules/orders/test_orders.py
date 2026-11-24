@@ -6,13 +6,18 @@ status, with the dates. § 002860 a position belongs to at most one Bestellung t
 cancelled. § 002862 only ``order.manage`` writes. § 002863 the read follows the Antrag.
 § 002864 the applicant view. § 002865 the audit entries and the revert. § 002866 the
 timeline. § 002867 the version. § 002868 the sum. § 002930 no migration creates a Bestellung.
+§ 002873 at most one invoice, § 002874 the real price from the invoice, § 002877 the
+Bestellungen of an invoice. § 002878 a booking names a Bestellung, § 002880 the marks,
+§ 002881 the cancel keeps the bookings.
 """
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
+from datetime import date
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -28,6 +33,7 @@ from app.modules.applications.service import ApplicationsService
 from app.modules.audit.models import AuditEntry
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Applicant, Principal
+from app.modules.budget.tree_models import Budget, BudgetExpense, FiscalYear, Invoice
 from app.modules.config_revision.revert import RevertService
 from app.modules.files.models import Attachment
 from app.modules.files.service import FilesService
@@ -51,6 +57,12 @@ _BOOKER = Principal(
     roles=["member"],
     permissions={*_READ, "application.manage", "budget.book"},
 )
+_FINANCE = Principal(
+    sub="finance-sub",
+    roles=["member"],
+    permissions={*_READ, "order.manage", "budget.book"},
+)
+_LEDGER = Principal(sub="ledger-sub", roles=["member"], permissions={"budget.view"})
 _BLIND = Principal(sub="blind-sub", roles=["member"], permissions={"order.manage"})
 _POSITIONS = [
     {"id": "p1", "label": "Regal", "offers": [{"label": "A", "value": 60}]},
@@ -584,3 +596,213 @@ async def test_the_buyer_follows_the_privacy_rules(
         ("Drucker", None, None),
     ]
     assert typed["buyerName"] == "Ben Typed"
+
+
+async def _invoice(maker: async_sessionmaker[AsyncSession], gross: str) -> uuid.UUID:
+    """Create an open invoice with the gross amount."""
+    async with maker() as session:
+        row = Invoice(number="R-2026-17", supplier="Möbelhaus", gross_amount=Decimal(gross))
+        session.add(row)
+        await session.commit()
+        return row.id
+
+
+async def _cost_centre(maker: async_sessionmaker[AsyncSession], app_id: uuid.UUID) -> uuid.UUID:
+    """Give the Antrag a Kostenstelle and an open Haushaltsjahr; return the Kostenstelle."""
+    key = f"KS{uuid.uuid4().hex[:8]}"
+    async with maker() as session:
+        budget = Budget(key=key, path_key=key, name="Ausstattung")
+        session.add(budget)
+        await session.flush()
+        year = FiscalYear(
+            budget_id=budget.id,
+            year=2026,
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 12, 31),
+        )
+        session.add(year)
+        await session.flush()
+        await session.execute(
+            update(Application)
+            .where(Application.id == app_id)
+            .values(budget_id=budget.id, fiscal_year_id=year.id)
+        )
+        await session.commit()
+        return budget.id
+
+
+async def test_the_invoice_of_a_bestellung(
+    migrated: tuple[str, str],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    maker: async_sessionmaker[AsyncSession],
+    seed: GuestSeed,
+) -> None:
+    """§ 002873 + § 002874 + § 002877: set, real price, list, revert, delete of the invoice."""
+    api = _client(migrated, settings, monkeypatch, _FINANCE)
+    app_id = await _antrag(maker, seed)
+    base = f"/api/applications/{app_id}/orders"
+    regal = api.post(base, json={"title": "Regal", "plannedAmount": "60.00"}).json()
+    stuhl = api.post(base, json={"title": "Stuhl", "plannedAmount": "20.00"}).json()
+    assert (regal["invoiceId"], regal["invoiceStatus"], regal["bookedAmount"]) == (None, None, "0")
+    assert regal["applicationTitle"] == "Büroausstattung"
+    invoice_id = str(await _invoice(maker, "72.50"))
+    put = f"/api/orders/{regal['id']}/invoice"
+
+    no_read = _client(migrated, settings, monkeypatch, _MANAGER)
+    assert no_read.put(put, json={"invoiceId": invoice_id, "version": 1}).status_code == 403
+    unknown = api.put(put, json={"invoiceId": str(uuid.uuid4()), "version": 1})
+    assert unknown.status_code == 404
+    old = api.put(put, json={"invoiceId": invoice_id, "version": 7})
+    assert (old.status_code, old.json()["code"]) == (409, "order_version_conflict")
+
+    first = api.put(put, json={"invoiceId": invoice_id, "version": 1}).json()
+    assert (
+        first["invoiceId"],
+        first["invoiceNumber"],
+        first["invoiceStatus"],
+        first["actualAmount"],
+        first["version"],
+    ) == (invoice_id, "R-2026-17", "open", "72.50", 2)
+    linked = (await _audit(maker, "order_update"))[-1]
+    assert linked.data["before"] == {"invoiceId": None, "actualAmount": None}
+    async with maker() as session:
+        await RevertService(session).revert(linked.id, "revert-sub", _FINANCE)
+        await session.commit()
+    undone = api.get(f"/api/orders/{regal['id']}").json()
+    assert (undone["invoiceId"], undone["actualAmount"], undone["version"]) == (None, None, 3)
+
+    api.put(put, json={"invoiceId": invoice_id, "version": 3})
+    second = api.put(
+        f"/api/orders/{stuhl['id']}/invoice", json={"invoiceId": invoice_id, "version": 1}
+    ).json()
+    assert (second["invoiceId"], second["actualAmount"]) == (invoice_id, None)
+
+    of_invoice = api.get(f"/api/invoices/{invoice_id}/orders").json()
+    assert of_invoice["total"] == "72.50"
+    assert [
+        (item["accessible"], item["number"], item["title"], item["actualAmount"])
+        for item in of_invoice["items"]
+    ] == [(True, regal["number"], "Regal", "72.50"), (True, stuhl["number"], "Stuhl", None)]
+    assert of_invoice["items"][0]["applicationTitle"] == "Büroausstattung"
+    ledger = _client(migrated, settings, monkeypatch, _LEDGER)
+    hidden = ledger.get(f"/api/invoices/{invoice_id}/orders").json()
+    assert hidden == {
+        "items": [
+            {
+                "accessible": False,
+                "id": None,
+                "number": None,
+                "title": None,
+                "applicationId": None,
+                "applicationTitle": None,
+                "actualAmount": None,
+            }
+        ]
+        * 2,
+        "total": "72.50",
+    }
+    assert no_read.get(f"/api/invoices/{invoice_id}/orders").status_code == 403
+    assert api.get(f"/api/invoices/{uuid.uuid4()}/orders").status_code == 404
+
+    removed = api.put(put, json={"invoiceId": None, "version": 4}).json()
+    assert (removed["invoiceId"], removed["invoiceStatus"], removed["actualAmount"]) == (
+        None,
+        None,
+        "72.50",
+    )
+    removal = (await _audit(maker, "order_update"))[-1]
+    again = api.put(put, json={"invoiceId": invoice_id, "version": 5}).json()
+    assert (again["invoiceId"], again["actualAmount"]) == (invoice_id, "72.50")
+    assert api.delete(f"/api/invoices/{invoice_id}").status_code == 204
+    assert [item["invoiceId"] for item in api.get(base).json()["items"]] == [None, None]
+    async with maker() as session:
+        with pytest.raises(ConflictError) as gone:
+            await RevertService(session).revert(removal.id, "revert-sub", _FINANCE)
+        assert gone.value.code == "not_revertable"
+
+
+async def test_a_booking_names_a_bestellung(
+    migrated: tuple[str, str],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    maker: async_sessionmaker[AsyncSession],
+    seed: GuestSeed,
+) -> None:
+    """§ 002878 + § 002880 + § 002881: bookings, the marks, the refused delete, the cancel."""
+    api = _client(migrated, settings, monkeypatch, _FINANCE)
+    app_id = await _antrag(maker, seed)
+    other_id = await _antrag(maker, seed)
+    budget_id = await _cost_centre(maker, app_id)
+    await _cost_centre(maker, other_id)
+    regal = api.post(
+        f"/api/applications/{app_id}/orders", json={"title": "Regal", "plannedAmount": "60.00"}
+    ).json()
+    url = f"/api/orders/{regal['id']}"
+    invoice_id = str(await _invoice(maker, "60.00"))
+    api.put(f"{url}/invoice", json={"invoiceId": invoice_id, "version": 1})
+
+    def book(amount: str, **extra: object) -> Any:
+        body = {"amount": amount, "description": "Regal", "orderId": regal["id"], **extra}
+        return api.post("/api/expenses", json=body)
+
+    deposit = book("20.00", applicationId=str(app_id))
+    assert (deposit.status_code, deposit.json()["orderId"]) == (201, regal["id"])
+    rest = book("40.00", applicationId=str(app_id), invoiceId=invoice_id)
+    assert rest.status_code == 201
+    marked = api.get(url).json()
+    assert (marked["bookedAmount"], marked["invoiceStatus"]) == ("60.00", "paid")
+
+    for refused in (
+        book("5.00", applicationId=str(other_id)),
+        book("5.00", budgetId=str(budget_id)),
+    ):
+        assert (refused.status_code, refused.json()["code"]) == (
+            422,
+            "order_application_mismatch",
+        )
+    assert book("5.00", kind="income", budgetId=str(budget_id)).status_code == 422
+    missing = api.post(
+        "/api/expenses",
+        json={
+            "amount": "5.00",
+            "description": "x",
+            "applicationId": str(app_id),
+            "orderId": str(uuid.uuid4()),
+        },
+    )
+    assert missing.status_code == 404
+
+    kept = api.delete(url)
+    assert (kept.status_code, kept.json()["code"]) == (409, "order_has_bookings")
+    cancelled = api.post(f"{url}/status", json={"status": "cancelled", "version": 2}).json()
+    assert (cancelled["status"], cancelled["bookedAmount"]) == ("cancelled", "60.00")
+
+    booked = (await _audit(maker, "budget_expense_create"))[-2]
+    assert booked.data["orderId"] == regal["id"]
+    async with maker() as session:
+        await RevertService(session).revert(booked.id, "revert-sub", _FINANCE)
+        await session.commit()
+    assert api.get(url).json()["bookedAmount"] == "40.00"
+    assert api.delete(f"/api/budget-expenses/{rest.json()['id']}").status_code == 204
+    assert Decimal(api.get(url).json()["bookedAmount"]) == 0
+    assert api.delete(url).status_code == 204
+
+    again = api.post(
+        f"/api/applications/{app_id}/orders", json={"title": "Drucker", "plannedAmount": "9.00"}
+    ).json()
+    paid = api.post(
+        "/api/expenses",
+        json={
+            "amount": "9.00",
+            "description": "Drucker",
+            "applicationId": str(app_id),
+            "orderId": again["id"],
+        },
+    ).json()
+    async with maker() as session:
+        await ApplicationsService(session).delete(app_id, actor="finance-sub")
+    async with maker() as session:
+        left = await session.get(BudgetExpense, uuid.UUID(paid["id"]))
+        assert left is not None
+        assert (left.order_id, left.application_id) == (None, None)
