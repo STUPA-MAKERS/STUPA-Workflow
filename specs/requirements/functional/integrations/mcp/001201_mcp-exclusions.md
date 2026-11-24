@@ -2,9 +2,9 @@
 id: "001201"
 title: The MCP leaves out a closed list of functions
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-23
+updated: 2026-11-24
 tests:
   - "mcp/antragsplattform_mcp/tests/test_route_parity.py:test_exclusions_are_routes"
 implementation:
@@ -25,8 +25,10 @@ The MCP server must not have a tool for these functions:
 - the run of a privacy erasure: the erasure of an e-mail address, of a principal and the run
   of an erasure request, because it cannot be undone
 - the change of the login lifetime, because the server refuses it to every agent token
-- the Paperless connection, its actions and the address of a filed document, because no
-  OAuth scope carries the permissions `admin.paperless` and `paperless.use`
+- the Paperless connection and its actions, because no OAuth scope carries the permission
+  `admin.paperless`
+- the insert from Paperless, its search, the copy of a document into a protocol text and the
+  filing of a ticket file, because a token does not copy documents (F/integrations/mcp/002921)
 - the Postfach of a ticket Bereich and its connection test, because no OAuth scope carries
   the permission `admin.ticket_mail`
 - the login, logout, OAuth and consent routes, the MCP package download and the ALTCHA
