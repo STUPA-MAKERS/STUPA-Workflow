@@ -27,7 +27,8 @@ space above and below the body instead of 16px. The search sits directly under t
 list ends directly above the footer. This applies to "Vertretung einrichten", "Vertretung
 eintragen", "TOP hinzufügen", "Auf Tagesordnung setzen" (to-do and Antrag), "Beobachter",
 "Archivierte Boards", "Stellvertretung hinzufügen" and the pick step of "Konten zusammenführen".
-A dialog that is a form (fields, text) must keep the normal body.
+A dialog that is a form (fields, text) must keep the normal body. A list in these dialogs has no
+scroll fade: it cuts hard at its rounded corners.
 
 Reason: Around a search or a list the normal space looked too large (Frederik, 2026-11-24:
 "überall so").
