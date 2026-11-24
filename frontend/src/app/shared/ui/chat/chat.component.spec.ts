@@ -699,7 +699,7 @@ describe('ChatComponent', () => {
         }
       });
 
-      it('frames a public draft and keeps an internal one plain', async () => {
+      it('keeps the field plain for a public and an internal draft', async () => {
         const { user, view } = await setup({
           visibilityOptions: ['internal', 'public'],
           visibilityGuard: GUARD,
@@ -708,7 +708,7 @@ describe('ChatComponent', () => {
         expect(view.container.querySelector('.chat__box--public')).toBeNull();
         await user.click(screen.getByRole('radio', { name: PUB }));
         expect(screen.getByRole('radio', { name: PUB })).toBeChecked();
-        expect(view.container.querySelector('.chat__box--public')).not.toBeNull();
+        expect(view.container.querySelector('.chat__box--public')).toBeNull();
       });
 
       it('starts the next message with the first choice again', async () => {
