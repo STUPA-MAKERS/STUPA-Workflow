@@ -22,8 +22,8 @@ from app.modules.paperless.client import (
     PaperlessError,
     TaskState,
     Upload,
+    address_allowed,
     document_url,
-    host_allowed,
     normalize_url,
 )
 from tests._support.paperless_fakes import BASE_URL, HOST, TOKEN, FakePaperless
@@ -76,8 +76,8 @@ def _raising(error: Exception) -> PaperlessClient:
         ("paperless.test", ["paperless.test"], False),
     ],
 )
-def test_host_allowed(url: str, allowlist: list[str], allowed: bool) -> None:
-    assert host_allowed(url, allowlist) is allowed
+def test_address_allowed(url: str, allowlist: list[str], allowed: bool) -> None:
+    assert address_allowed(url, allowlist) is allowed
 
 
 def test_normalize_url_and_document_url() -> None:
