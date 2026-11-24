@@ -2,7 +2,7 @@
 id: "002964"
 title: A computed value shows in its format
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:

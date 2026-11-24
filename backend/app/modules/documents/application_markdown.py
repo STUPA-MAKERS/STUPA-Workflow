@@ -38,9 +38,10 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Final
 
+from app.modules.forms.validation import is_computed_amount, with_computed
 from app.shared.config_schemas import FormFieldDef
 from app.shared.i18n import resolve_i18n
 from app.shared.jsonlogic import JsonLogicError, eval_jsonlogic
@@ -298,14 +299,40 @@ def format_answer(fdef: FormFieldDef, value: object, currency: str) -> str:
 
 
 def _computed(fdef: FormFieldDef, data: Mapping[str, object], ctx: dict[str, object]) -> object:
-    """Return the stored value of a computed field, else its computed value."""
+    """Return the stored value of a computed field, else its computed value.
+
+    ``ctx`` holds the values that `with_computed` makes, as the server stores them
+    (spec 002960).
+    """
     stored = data.get(fdef.key)
-    if not is_empty(stored) or fdef.compute is None:
-        return stored
-    try:
-        return eval_jsonlogic(fdef.compute, ctx)
-    except JsonLogicError:
+    return stored if not is_empty(stored) else ctx.get(fdef.key)
+
+
+def _computed_text(fdef: FormFieldDef, value: object, currency: str) -> str | None:
+    """Write a computed value in its format (spec 002964), or ``None`` for ``number``."""
+    shown = "money" if is_computed_amount(fdef) else fdef.display_format
+    match shown:
+        case "money":
+            return _money(value, currency)
+        case "percent":
+            return _percent(value)
+        case _:
+            return None
+
+
+def _percent(value: object) -> str | None:
+    """Write a fraction as a percent with at most one decimal place: 0.8333 is `83,3 %`."""
+    if isinstance(value, bool):
         return None
+    try:
+        num = Decimal(str(value)) * 100
+    except InvalidOperation:
+        return None
+    if not num.is_finite():
+        return None
+    rounded = num.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP).normalize()
+    text = f"{rounded:f}".replace(".", ",")
+    return f"{'0' if text == '-0' else text} %"
 
 
 def _visible(fdef: FormFieldDef, ctx: dict[str, object]) -> bool:
@@ -412,6 +439,8 @@ def _answer_value(doc: ApplicationDoc, fdef: FormFieldDef, value: object) -> lis
             return markdown_text(_plain(value)).splitlines()
         case "date" | "daterange" | "iban" | "currency" | "funding":
             return [code(format_answer(fdef, value, doc.currency))]
+        case "computed" if (text := _computed_text(fdef, value, doc.currency)) is not None:
+            return [code(text)]
         case _:
             return [escape(format_answer(fdef, value, doc.currency))]
 
@@ -536,7 +565,8 @@ def _frontmatter(doc: ApplicationDoc) -> list[str]:
 
 def build_application_document(doc: ApplicationDoc) -> str:
     """Build the Markdown of the Antrag PDF: the frontmatter and the body."""
-    ctx: dict[str, object] = {**doc.context, **doc.data}
+    fields = [f for section in doc.sections for f in section.fields]
+    ctx: dict[str, object] = {**doc.context, **with_computed(fields, doc.data, doc.context)}
     body = [
         *_head_lines(doc),
         *(line for section in doc.sections for line in _section_lines(doc, section, ctx)),

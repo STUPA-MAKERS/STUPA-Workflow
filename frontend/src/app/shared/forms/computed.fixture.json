@@ -1,0 +1,77 @@
+{
+  "comment": "Specs 002960-002962: the backend (tests/unit/modules/forms/test_computed_format.py) and the frontend (form-rules.spec.ts) compute these cases and must give the same values. A key that is missing in values has no value.",
+  "fields": [
+    { "key": "kosten", "type": "positions", "label": { "de": "Kosten" } },
+    { "key": "foerderhoehe", "type": "funding", "label": { "de": "Förderhöhe" } },
+    {
+      "key": "foerderquote",
+      "type": "computed",
+      "label": { "de": "Förderquote" },
+      "compute": { "/": [{ "var": "foerderhoehe" }, { "var": "costTotal" }] },
+      "format": "percent"
+    },
+    {
+      "key": "eigenanteil",
+      "type": "computed",
+      "label": { "de": "Eigenanteil" },
+      "compute": { "-": [{ "var": "costTotal" }, { "var": "foerderhoehe" }] },
+      "format": "money"
+    },
+    {
+      "key": "anteil_betrag",
+      "type": "computed",
+      "label": { "de": "Anteil am Betrag" },
+      "compute": { "/": [{ "var": "eigenanteil" }, { "var": "amount" }] }
+    }
+  ],
+  "cases": [
+    {
+      "name": "costs 1200 and funding 1000",
+      "data": {
+        "kosten": [{ "label": "Bus", "offers": [{ "label": "A", "value": 1200, "preferred": true }] }],
+        "foerderhoehe": 1000
+      },
+      "values": { "foerderquote": 0.8333, "eigenanteil": 200, "anteil_betrag": 0.2 }
+    },
+    {
+      "name": "a funding typed as text",
+      "data": {
+        "kosten": [{ "label": "Bus", "offers": [{ "label": "A", "value": 1200, "preferred": true }] }],
+        "foerderhoehe": "1000"
+      },
+      "values": { "foerderquote": 0.8333, "eigenanteil": 200, "anteil_betrag": 0.2 }
+    },
+    {
+      "name": "money rounds half up to cents",
+      "data": {
+        "kosten": [{ "label": "Bus", "offers": [{ "label": "A", "value": 100.006, "preferred": true }] }],
+        "foerderhoehe": 50
+      },
+      "values": { "foerderquote": 0.5, "eigenanteil": 50.01, "anteil_betrag": 1.0002 }
+    },
+    {
+      "name": "an empty funding",
+      "data": {
+        "kosten": [{ "label": "Bus", "offers": [{ "label": "A", "value": 1200, "preferred": true }] }]
+      },
+      "values": {}
+    },
+    {
+      "name": "costs of 0 and an empty funding",
+      "data": {
+        "kosten": [{ "label": "Bus", "offers": [{ "label": "A", "value": 0, "preferred": true }] }]
+      },
+      "values": {}
+    },
+    {
+      "name": "a value that the client sends does not count",
+      "data": {
+        "kosten": [{ "label": "Bus", "offers": [{ "label": "A", "value": 1200, "preferred": true }] }],
+        "foerderhoehe": 1000,
+        "foerderquote": 0.1,
+        "eigenanteil": 999
+      },
+      "values": { "foerderquote": 0.8333, "eigenanteil": 200, "anteil_betrag": 0.2 }
+    }
+  ]
+}

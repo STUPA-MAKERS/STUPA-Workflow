@@ -2,7 +2,7 @@
 id: "002963"
 title: The form builder sets the format of a computed field
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:

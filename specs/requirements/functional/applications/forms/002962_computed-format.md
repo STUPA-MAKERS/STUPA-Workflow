@@ -2,7 +2,7 @@
 id: "002962"
 title: A computed field has a display format
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:

@@ -2,7 +2,7 @@
 id: "002961"
 title: A computed field that cannot be computed stays empty
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:
@@ -16,8 +16,9 @@ scope:
 # A computed field that cannot be computed stays empty
 
 When the expression of a `computed` field that is not the amount cannot be evaluated, the field
-must have no value. Examples are an empty operand and a division by 0. A result that is not a
-finite number also gives no value. The server must not answer 422 for such a field, and the
+must have no value. Examples are an empty operand and a division by 0. A number that is not
+finite also gives no value, and so does a result that is no number at a `money` or `percent`
+field (002962). The server must not answer 422 for such a field, and the
 form must not stop the submit. For the computed amount, 002841 applies.
 
 Reason: An empty answer is a normal state of a form. A value that only shows information must
