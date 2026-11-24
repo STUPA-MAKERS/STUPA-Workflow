@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import base64
-import logging
 import os
 
 import pytest
@@ -100,12 +99,14 @@ def test_the_column_types_seal_and_open() -> None:
     assert binary.process_result_value(None, _DIALECT) is None
 
 
-def test_a_value_of_an_unknown_key_reads_as_empty(caplog: pytest.LogCaptureFixture) -> None:
+def test_a_value_of_an_unknown_key_reads_as_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    logged: list[str] = []
+    monkeypatch.setattr(sealed._log, "error", lambda msg, *args: logged.append(msg % args))
     foreign = Keyring(_key())
-    with caplog.at_level(logging.ERROR, logger="app.shared.sealed"):
-        assert Sealed("t.c").process_result_value(seal(b"x", "t.c", foreign), _DIALECT) == ""
-        assert SealedBytes("t.c").process_result_value(seal(b"x", "t.c", foreign), _DIALECT) == b""
-    assert "unknown key" in caplog.text
+    assert Sealed("t.c").process_result_value(seal(b"x", "t.c", foreign), _DIALECT) == ""
+    assert SealedBytes("t.c").process_result_value(seal(b"x", "t.c", foreign), _DIALECT) == b""
+    assert len(logged) == 2
+    assert all("unknown key" in line for line in logged)
 
 
 def test_the_keyring_follows_the_settings(monkeypatch: pytest.MonkeyPatch) -> None:
