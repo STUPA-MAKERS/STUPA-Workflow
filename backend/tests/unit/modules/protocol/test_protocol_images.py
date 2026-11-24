@@ -12,7 +12,6 @@ import pytest
 
 from app.modules.files.pdf_branding import PdfBranding, RenderGraphic
 from app.modules.meetings.protocol_models import Protocol
-from app.modules.protocol import service as protocol_service_mod
 from app.modules.protocol.markdown import sanitize_user_markdown
 from app.modules.protocol.public import PublicProtocolService, PublicSnapshot, PublicTop
 from app.modules.protocol.service import ProtocolService
@@ -70,7 +69,7 @@ def _pdf_branding(monkeypatch: pytest.MonkeyPatch) -> None:
     async def branding(_session: object, _storage: object) -> PdfBranding:
         return _BRANDING.pop(0) if _BRANDING else PdfBranding(footer=RenderGraphic("Skyline"))
 
-    monkeypatch.setattr(protocol_service_mod, "active_pdf_branding", branding)
+    monkeypatch.setattr("app.modules.protocol.service.render.active_pdf_branding", branding)
 
 
 async def test_render_sends_the_footer_graphic() -> None:
@@ -99,8 +98,10 @@ async def test_render_merges_the_images_with_the_logos(monkeypatch: pytest.Monke
     async def _cd(*_args: object) -> Any:
         return SimpleNamespace(assets={"a1-logo.png": b"LOGO"})
 
-    monkeypatch.setattr(protocol_service_mod, "resolve_cd_variant_by_key", _cd)
-    monkeypatch.setattr(protocol_service_mod, "cd_render_config", lambda _cd: {"logos": ["x"]})
+    monkeypatch.setattr("app.modules.protocol.service.render.resolve_cd_variant_by_key", _cd)
+    monkeypatch.setattr(
+        "app.modules.protocol.service.render.cd_render_config", lambda _cd: {"logos": ["x"]}
+    )
     session, storage, typst = _RenderSession(), MediaStorage(), FakeTypst()
     a = add_image(session, storage, b"A", "image/webp")
     await _service(session, storage, typst)._render_pdf(

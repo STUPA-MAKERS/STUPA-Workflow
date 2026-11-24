@@ -1,4 +1,10 @@
 {
   "backend/app/modules/protocol/public.py": 3,
-  "backend/app/modules/protocol/service.py": 16
+  "backend/app/modules/protocol/service/backfill.py": 2,
+  "backend/app/modules/protocol/service/base.py": 4,
+  "backend/app/modules/protocol/service/common.py": 2,
+  "backend/app/modules/protocol/service/document.py": 1,
+  "backend/app/modules/protocol/service/drafts.py": 4,
+  "backend/app/modules/protocol/service/finalize.py": 2,
+  "backend/app/modules/protocol/service/render.py": 1
 }

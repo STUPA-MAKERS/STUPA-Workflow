@@ -10,7 +10,8 @@ tests:
   - "backend/tests/integration/modules/livevote/test_public_meeting.py:test_guest_view_blacks_out_marked_names"
 implementation:
   - backend/app/shared/blackout.py
-  - backend/app/modules/protocol/service.py
+  - backend/app/modules/protocol/service/document.py
+  - backend/app/modules/protocol/service/render.py
   - backend/app/modules/livevote/guests.py
   - typst/template/protocol.typ
   - frontend/src/app/shared/markdown

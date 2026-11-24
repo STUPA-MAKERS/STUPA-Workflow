@@ -8,7 +8,7 @@ document gets the tag `Ersetzt`. § 002523, 002526 a job that fails eight times 
 the failed list and starts again. § 002524, 002525 the entry `In Paperless öffnen`.
 § 002530 the backfill. § 002531 the audit entries. § NF/security/network/002514 the
 host allowlist. § 002515 no read returns the token. § 002527-002529, 002534 the insert:
-the search and the copy.
+the search and the copy. § 002813 a new address needs the token again.
 """
 
 from __future__ import annotations
@@ -372,6 +372,30 @@ def test_the_connection_saves_and_no_read_returns_the_token(
     assert entries[0].actor == _ADMIN.sub
     assert entries[0].data["baseUrl"] == BASE_URL
     assert all(TOKEN not in str(entry.data) for entry in entries)
+
+
+def test_a_new_address_needs_the_token_again(
+    migrated: tuple[str, str],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    fake: FakePaperless,
+) -> None:
+    """§ F/integrations/paperless/002813: the stored token does not follow a new address."""
+    moved = f"{BASE_URL}/dms"
+    with _client(migrated, settings, monkeypatch, fake, _ADMIN) as client:
+        assert client.put("/api/admin/paperless", json=_BODY).status_code == 200
+        refused = client.put(
+            "/api/admin/paperless", json={**_BODY, "baseUrl": moved, "token": None}
+        )
+        assert refused.status_code == 422
+        assert refused.json()["code"] == "token_required"
+        assert client.get("/api/admin/paperless").json()["baseUrl"] == BASE_URL
+
+        same = client.put("/api/admin/paperless", json={**_BODY, "token": None})
+        assert same.status_code == 200
+        moved_ok = client.put("/api/admin/paperless", json={**_BODY, "baseUrl": moved})
+        assert moved_ok.status_code == 200
+        assert moved_ok.json()["baseUrl"] == moved
 
 
 def test_a_host_outside_the_allowlist_is_refused(

@@ -7,7 +7,8 @@ owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
   - backend/app/modules/protocol/public.py
-  - backend/app/modules/protocol/service.py
+  - backend/app/modules/protocol/service/render.py
+  - backend/app/modules/protocol/service/document.py
   - backend/worker/protocol.py
 scope:
   - backend/app/modules/protocol

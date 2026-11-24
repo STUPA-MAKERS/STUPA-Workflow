@@ -9,7 +9,7 @@ tests:
   - "typst/tests/test_markdown.py:test_empty_blackout_block_is_one_full_bar"
 implementation:
   - backend/app/shared/blackout.py
-  - backend/app/modules/protocol/service.py
+  - backend/app/modules/protocol/service/document.py
   - backend/app/modules/livevote/guests.py
   - typst/template/protocol.typ
   - frontend/src/app/shared/markdown

@@ -99,7 +99,8 @@ export function isPaperlessUrl(text: string): boolean {
  * `GET/PUT /admin/paperless` reads and saves the address, the token and the switches. The
  * server never returns the token: an empty token field keeps the stored one. The server
  * refuses an address whose host is not in the deploy setting `PAPERLESS_HOST_ALLOWLIST`
- * (422 `paperless_host_not_allowed`); the address field then shows the error.
+ * (422 `paperless_host_not_allowed`); the address field then shows the error. A new
+ * address needs the token again while a token is stored (§F/integrations/paperless/002813).
  *
  * "Verbindung testen" calls Paperless with the stored connection and shows the result as a
  * toast. "Bestehende Dokumente ablegen" starts a job for each final document without one,
@@ -160,7 +161,7 @@ export class PaperlessComponent {
     },
     body: () => {
       const d = this.draft();
-      if (this.urlError()) return null;
+      if (this.urlError() || this.tokenError()) return null;
       return {
         baseUrl: d.baseUrl.trim() || null,
         ...(d.token ? { token: d.token } : {}),
@@ -205,6 +206,20 @@ export class PaperlessComponent {
       });
     }
     return '';
+  });
+
+  /**
+   * A new address with a stored token needs the token again, because the stored token
+   * must not follow a new address (§F/integrations/paperless/002813).
+   */
+  protected readonly tokenError = computed(() => {
+    const saved = this.form.saved();
+    const d = this.draft();
+    const url = d.baseUrl.trim();
+    const moved = !!url && url.replace(/\/+$/, '') !== (saved?.baseUrl ?? '');
+    return saved?.tokenSet && moved && !d.token
+      ? this.i18n.translate('admin.paperless.tokenAgain')
+      : '';
   });
 
   protected readonly testing = signal(false);

@@ -10,7 +10,7 @@ tests:
   - backend/tests/unit/modules/protocol/test_header_excused.py:test_the_quorum_of_a_closed_meeting_uses_the_fixed_member_count
 implementation:
   - backend/app/modules/meetings/present.py
-  - backend/app/modules/protocol/service.py
+  - backend/app/modules/protocol/service/document.py
 scope:
   - backend/app/modules/protocol
   - backend/app/modules/livevote
