@@ -470,6 +470,7 @@ describe('AdminApiService — real mode (contract)', () => {
     read.flush({});
     const body = {
       baseUrl: 'https://paperless.example.org',
+      publicUrl: null,
       fileProtocols: true,
       fileApplications: false,
       filePlans: false,
