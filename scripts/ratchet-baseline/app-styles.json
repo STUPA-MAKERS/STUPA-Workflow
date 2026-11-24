@@ -129,7 +129,7 @@
   "frontend/src/app/features/meetings/meeting-delegation-card.component.scss": 83,
   "frontend/src/app/features/meetings/meeting-delegation-card.component.ts": 1,
   "frontend/src/app/features/meetings/meeting-follow-view.component.html": 51,
-  "frontend/src/app/features/meetings/meeting-follow-view.component.scss": 332,
+  "frontend/src/app/features/meetings/meeting-follow-view.component.scss": 327,
   "frontend/src/app/features/meetings/meeting-follow-view.component.ts": 1,
   "frontend/src/app/features/meetings/meeting-page-skeleton/meeting-page-skeleton.component.html": 61,
   "frontend/src/app/features/meetings/meeting-page-skeleton/meeting-page-skeleton.component.scss": 251,

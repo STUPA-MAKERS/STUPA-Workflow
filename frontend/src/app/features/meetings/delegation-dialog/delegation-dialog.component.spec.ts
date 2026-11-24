@@ -50,7 +50,7 @@ async function setup(context: MeetingDelegationContext = ctx()) {
   const closed = jest.fn();
   const created = jest.fn();
   const view = await render(DelegationDialogComponent, {
-    inputs: { open: true, context, subtitle: '35. Sitzung · Di., 13.10.2026' },
+    inputs: { open: true, context },
     on: { closed, created },
     providers: [
       provideHttpClient(),
@@ -69,7 +69,6 @@ describe('DelegationDialogComponent', () => {
   /** A member without a name has a placeholder, never an id. */
   it('lists the own substitutes apart from the other members', async () => {
     const { dialog, group } = await setup();
-    expect(within(dialog()).getByText('35. Sitzung · Di., 13.10.2026')).toBeInTheDocument();
     const subs = group('Deine Stellvertretung');
     expect(within(subs).getAllByRole('radio')).toHaveLength(2);
     expect(within(subs).getAllByText('Stellvertretung')).toHaveLength(2);

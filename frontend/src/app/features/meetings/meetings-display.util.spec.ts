@@ -10,7 +10,6 @@ import {
   meetingTimeText,
   countEntries,
   liveOpenedVote,
-  meetingLine,
   memberAttendanceKey,
   voteOptionLabel,
   voteOptionsFor,
@@ -94,13 +93,6 @@ describe('meetings-display.util', () => {
     expect(assembleProtocolMarkdown(agenda)).toBe(
       '# TOP A\n\n:::antrag{#app-1}\n:::\n\nText\n\n# Tagesordnungspunkt',
     );
-  });
-
-  it('names the meeting with its date and a short weekday', () => {
-    const m = { title: '35. Sitzung', date: '2026-10-13' } as Parameters<typeof meetingLine>[0];
-    expect(meetingLine(m, 'de-DE')).toBe('35. Sitzung · Di, 13.10.2026');
-    expect(meetingLine({ ...m, date: null }, 'de-DE')).toBe('35. Sitzung');
-    expect(meetingLine({ ...m, date: 'kein Datum' }, 'de-DE')).toBe('35. Sitzung');
   });
 
   it('builds a placeholder vote from a live vote_opened message', () => {

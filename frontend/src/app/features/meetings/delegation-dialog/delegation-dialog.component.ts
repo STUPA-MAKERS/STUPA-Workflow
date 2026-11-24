@@ -86,8 +86,6 @@ export class DelegationDialogComponent {
 
   readonly open = input.required<boolean>();
   readonly context = input.required<MeetingDelegationContext>();
-  /** "35. Sitzung des Studierendenparlaments · Di, 13.10.2026". */
-  readonly subtitle = input('');
 
   readonly closed = output<void>();
   readonly created = output<Delegation>();
