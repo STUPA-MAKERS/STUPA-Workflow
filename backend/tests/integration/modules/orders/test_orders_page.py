@@ -221,6 +221,7 @@ async def test_search_links_and_webhooks(
                 ],
             )
         )
+        session.add(PrincipalRow(sub=_MANAGER.sub, display_name="Mara", email="mara@example.org"))
         await session.commit()
     api = _client(migrated, settings, monkeypatch, _MANAGER)
     app_id = await _antrag(maker, seed)
