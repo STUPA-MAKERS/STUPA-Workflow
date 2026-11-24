@@ -6,7 +6,7 @@ database, calls these functions and writes the result.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from datetime import date
 from decimal import Decimal
 from typing import Literal
@@ -51,25 +51,6 @@ def status_dates(
             return (ordered_on, delivered_on or today)
         case _:
             return (ordered_on, delivered_on)
-
-
-def _positions(value: object) -> tuple[Mapping[str, object], ...]:
-    """Return the positions of one answer: the rows of a list whose rows hold offers."""
-    rows = (
-        tuple(row for row in value if isinstance(row, Mapping)) if isinstance(value, list) else ()
-    )
-    return rows if any("offers" in row for row in rows) else ()
-
-
-def position_ids(data: Mapping[str, object]) -> frozenset[str]:
-    """Return the ids of all positions of the Kostenaufstellung in the data of an Antrag.
-
-    The key of the positions field differs from form to form, so the function reads every
-    answer that is a list of rows with offers.
-    """
-    return frozenset(
-        str(row["id"]) for value in data.values() for row in _positions(value) if row.get("id")
-    )
 
 
 def price(actual: Decimal | None, planned: Decimal | None) -> Decimal | None:

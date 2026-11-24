@@ -13,12 +13,12 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
+from app.modules.applications.position_ids import position_ids
 from app.modules.orders.numbers import NUMBER_ALPHABET, draw_number, format_number
 from app.modules.orders.rules import (
     buyer_missing,
     orders_sum,
     over_by,
-    position_ids,
     price,
     status_dates,
     url_valid,

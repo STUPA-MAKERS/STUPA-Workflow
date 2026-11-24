@@ -38,7 +38,8 @@ def upgrade() -> None:
         "FOREIGN KEY (meeting_id) REFERENCES meeting (id) ON DELETE SET NULL"
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_markdown_document_meeting ON markdown_document (meeting_id)"
+        "CREATE INDEX IF NOT EXISTS ix_markdown_document_meeting "
+        "ON markdown_document (meeting_id)"
     )
     op.execute(
         "UPDATE markdown_document d SET meeting_id = i.meeting_id "

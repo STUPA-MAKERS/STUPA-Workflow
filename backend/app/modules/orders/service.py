@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application, ApplicationOrderEvent
+from app.modules.applications.position_ids import position_ids
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.models import AuditEntry
 from app.modules.audit.service import record as audit_record
@@ -30,7 +31,7 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.flow.models import State
 from app.modules.orders.models import PurchaseOrder, PurchaseOrderPosition
 from app.modules.orders.numbers import format_number
-from app.modules.orders.rules import buyer_missing, position_ids, status_dates, url_valid
+from app.modules.orders.rules import buyer_missing, status_dates, url_valid
 from app.modules.orders.schemas import OrderCreate, OrderUpdate
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 

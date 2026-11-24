@@ -17,6 +17,7 @@ from app.modules.applications.models import (
     StatusEvent,
     SubmissionVersion,
 )
+from app.modules.applications.position_ids import with_position_ids
 from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service.form_checks import check_form_rules
 from app.modules.applications.service.links import check_predecessor, write_link
@@ -210,7 +211,7 @@ class CreateOps(ApplicationsServiceBase):
 
         confirmed = actor != "applicant" if email_confirmed is None else email_confirmed
         initial = await self._initial_state(flow_version_id)
-        clean = _whitelist(fields, answers)
+        clean = with_position_ids(_whitelist(fields, answers), {})
         amount, currency = _amount_currency(fields, clean)
         pepper = await self._check_drafts(payload, fields, clean, draft_pepper)
 
