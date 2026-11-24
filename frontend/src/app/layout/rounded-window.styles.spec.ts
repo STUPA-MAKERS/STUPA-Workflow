@@ -16,7 +16,6 @@ const listDetail = read('../../vendor/ui-kit/src/lib/list-detail/list-detail-lay
 const budget = read('pages/budget/budget-dashboard.component.scss');
 const globalStyles = readFileSync(join(app, '../styles.scss'), 'utf8');
 const meetingPage = read('features/meetings/meeting-page/meeting-page.component.scss');
-const followView = read('features/meetings/meeting-follow-view.component.scss');
 
 /** The declarations of the first rule with exactly this selector. */
 function rule(css: string, selector: string): string {
@@ -42,20 +41,15 @@ describe('rounded sheet styles', () => {
    * and the content cuts at them without a fade (the rule is nested in the below-wide media query). The side column shares its
    * scroll rule with the agenda; the radius is a rule of its own.
    */
-  it('makes the session page and the participant view pane pages with round card columns', () => {
-    for (const css of [meetingPage, followView]) {
-      expect(rule(css, ':host')).toMatch(/flex: 1 1 0;/);
-      expect(rule(css, ':host')).not.toMatch(/height: 100dvh/);
-    }
+  it('makes the session page a pane page with round card columns', () => {
+    expect(rule(meetingPage, ':host')).toMatch(/flex: 1 1 0;/);
+    expect(rule(meetingPage, ':host')).not.toMatch(/height: 100dvh/);
     // The vote cards are a side sheet, not a column (spec 001460).
     expect(meetingPage).not.toMatch(/\.mp__body--wide \.mp__votes/);
     expect(meetingPage).toMatch(
       /\.mp__body:not\(\.mp__body--wide\) \{[^}]*margin-inline: var\(--space-3\);[^}]*padding-inline: 0;[^}]*border-radius: var\(--radius-xl\);/,
     );
     expect(meetingPage).not.toContain('fade.fade-y');
-    expect(followView).toMatch(
-      /\n\.fv__body--wide \.fv__side \{[^}]*border-radius: var\(--radius-xl\);/,
-    );
   });
 
   /** The top inset of an installed iOS app comes on top (0 in a browser tab). */

@@ -145,21 +145,6 @@ export class MeetingSessionService implements OnDestroy {
   /** The server resolves this. The FE only knows `principal.sub`, not the principal id. */
   readonly isProtokollant = computed(() => this.meeting()?.isProtokollant ?? false);
   /**
-   * Live follow view (read the protocol and cast on open votes) instead of the
-   * edit/manager view. Only the rights the server sends decide this. A named
-   * protokollant does NOT push everybody else into the follow view: the
-   * exclusivity covers the protocol text alone (see `canEditProtocol`), never
-   * the meeting control, the agenda or the votes. Coupling the two once stranded
-   * a meeting whose protokollant was away, because the switch that reassigns
-   * them sits in the settings dialog behind the hidden toolbar.
-   */
-  readonly isFollower = computed(() => {
-    const m = this.meeting();
-    if (!m) return false;
-    if (this.canViewAll()) return false;
-    return !m.canWrite && !m.canManage;
-  });
-  /**
    * Write the minutes. Two people must not type into one protocol, so in a live
    * meeting with a named protokollant only that person edits it. Everybody else with
    * `canWrite` reads the pane. The server grants `canWrite` to the protokollant,

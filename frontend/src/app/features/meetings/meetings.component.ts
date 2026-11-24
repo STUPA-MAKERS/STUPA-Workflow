@@ -37,7 +37,6 @@ import { DeleteMeetingDialogComponent } from './delete-meeting-dialog/delete-mee
 import { HandoverDialogComponent } from './handover-dialog/handover-dialog.component';
 import { MeetingAgendaService } from './meeting-agenda.service';
 import { MeetingDialogsService } from './meeting-dialogs.service';
-import { MeetingFollowViewComponent } from './meeting-follow-view.component';
 import { MeetingPageComponent } from './meeting-page/meeting-page.component';
 import { MeetingSessionService } from './meeting-session.service';
 import { MeetingGuestsService } from './meeting-guests.service';
@@ -91,7 +90,6 @@ import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
     PageHeaderComponent,
     BreadcrumbsComponent,
     MeetingPageComponent,
-    MeetingFollowViewComponent,
     MeetingsOverviewComponent,
     MeetingSettingsDialogComponent,
     DeleteMeetingDialogComponent,
@@ -139,7 +137,6 @@ export class MeetingsComponent {
   readonly canVote = this.session.canVote;
   readonly canViewAll = this.session.canViewAll;
   readonly isProtokollant = this.session.isProtokollant;
-  readonly isFollower = this.session.isFollower;
   readonly canEditProtocol = this.session.canEditProtocol;
   /** May see the (server-side filtered) list. Same predicate as `loadList()`. */
   readonly showOverview = this.timeline.canReadTimeline;
