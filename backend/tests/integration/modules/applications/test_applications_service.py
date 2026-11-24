@@ -82,7 +82,8 @@ async def _seed_type(
 
     forms = FormVersionWriter(session)
     await forms.create_form_version(
-        app_type.id, FormVersionCreate(fields=fields or _fields(), activate=True), "tester")
+        app_type.id, FormVersionCreate(fields=fields or _fields(), activate=True), "tester"
+    )
 
     flow = FlowVersion(version=1, active=True, editor_layout={})
     session.add(flow)
@@ -211,9 +212,7 @@ async def test_patch_preserves_system_title_field(session: AsyncSession) -> None
                 "promoteTarget": "amount",
             }
         ),
-        FormFieldDef.model_validate(
-            {"key": "note", "type": "text", "label": {"de": "Notiz"}}
-        ),
+        FormFieldDef.model_validate({"key": "note", "type": "text", "label": {"de": "Notiz"}}),
     ]
     app_type, _, _ = await _seed_type(session, fields=no_title_fields)
     svc = ApplicationsService(session)
@@ -335,9 +334,7 @@ async def test_unconfirmed_guest_app_hidden_from_principal_item_reads(
     with pytest.raises(NotFoundError):
         await svc.list_comments(app.id, include_internal=True, allow_unconfirmed=False)
     with pytest.raises(NotFoundError):
-        await svc.patch(
-            app.id, {"title": "neu"}, changed_by="admin", allow_unconfirmed=False
-        )
+        await svc.patch(app.id, {"title": "neu"}, changed_by="admin", allow_unconfirmed=False)
 
     out = await svc.get(app.id, include_pii=False)
     assert out.id == app.id
@@ -593,7 +590,8 @@ async def test_anonymize_scrubs_field_marked_pii_in_later_version(
         ),
     ]
     await FormVersionWriter(session).create_form_version(
-        app_type.id, FormVersionCreate(fields=later_fields, activate=True), "tester")
+        app_type.id, FormVersionCreate(fields=later_fields, activate=True), "tester"
+    )
 
     await svc.anonymize(app.id)
 
@@ -639,3 +637,47 @@ async def test_delete_writes_audit_entry_without_pii(session: AsyncSession) -> N
     assert "geheim" not in serialized
     assert "Erika" not in serialized
     assert "Antrag@Example.ORG".lower() not in serialized.lower()
+
+
+def _rate_fields() -> list[FormFieldDef]:
+    return [
+        FormFieldDef(key="title", type="text", label={"de": "Titel"}, required=True),
+        FormFieldDef(key="km", type="number", label={"de": "Kilometer"}, required=True),
+        FormFieldDef.model_validate(
+            {
+                "key": "summe",
+                "type": "computed",
+                "label": {"de": "Summe"},
+                "compute": {"/": [{"*": [{"var": "km"}, 35]}, 100]},
+                "isPromoted": True,
+                "promoteTarget": "amount",
+            }
+        ),
+    ]
+
+
+async def test_computed_amount_comes_from_the_server(session: AsyncSession) -> None:
+    """The server computes the amount and stores it; the client value does not count.
+
+    Specs 002840 and 002841.
+    """
+    app_type, _, _ = await _seed_type(session, fields=_rate_fields())
+    svc = ApplicationsService(session)
+    payload = ApplicationCreate.model_validate(
+        {
+            "typeId": str(app_type.id),
+            "data": {"title": "Fahrt", "km": 84, "summe": 999},
+            "applicantEmail": "x@example.org",
+        }
+    )
+    app, _ = await svc.create(payload)
+    assert app.amount == Decimal("29.40")
+    assert app.data["summe"] == 29.4
+
+    out = await svc.patch(app.id, {"title": "Fahrt", "km": 100, "summe": 1}, changed_by="applicant")
+    assert out.amount == Decimal("35.00")
+
+    with pytest.raises(ValidationProblem) as ei:
+        await svc.patch(app.id, {"title": "Fahrt", "summe": 1}, changed_by="applicant")
+    assert ei.value.errors is not None
+    assert {e.field for e in ei.value.errors} >= {"km", "summe"}

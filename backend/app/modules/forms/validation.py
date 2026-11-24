@@ -46,7 +46,7 @@ from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass, replace
 from datetime import date
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from functools import reduce
 from typing import Any
 from uuid import UUID
@@ -57,6 +57,9 @@ from app.shared.jsonlogic import JsonLogicError, eval_jsonlogic, validate_jsonlo
 #: Field types with a numeric value, used by the promoted extraction and by min and max.
 _NUMERIC_TYPES = frozenset({"number", "currency"})
 _RULE_NUMBER_TYPES = _NUMERIC_TYPES | {"funding"}
+#: The promote target of the amount of the Antrag.
+_AMOUNT = "amount"
+_CENT = Decimal("0.01")
 
 _PATTERN_MAX_INPUT_LEN = 4096
 _PATTERN_MATCH_TIMEOUT_SECONDS = 1.0
@@ -180,9 +183,10 @@ def validate_definition(fields: Sequence[FormFieldDef]) -> None:
         )
 
     _check_field_settings(fields)
+    _check_amount_source(fields)
 
     for f in fields:
-        if f.is_promoted and f.type not in _NUMERIC_TYPES:
+        if f.is_promoted and f.type not in _NUMERIC_TYPES and not is_computed_amount(f):
             raise FormDefinitionError(
                 f"promoted field {f.key!r} must be numeric (number/currency), got {f.type!r}"
             )
@@ -201,6 +205,34 @@ def validate_definition(fields: Sequence[FormFieldDef]) -> None:
                 raise FormDefinitionError(
                     f"field {f.key!r} has an invalid validation pattern: {exc}"
                 ) from exc
+
+
+def is_computed_amount(field: FormFieldDef) -> bool:
+    """Tell whether ``field`` is a ``computed`` field that is the amount (spec 002840)."""
+    return field.type == "computed" and field.is_promoted and field.promote_target == _AMOUNT
+
+
+def _check_amount_source(fields: Sequence[FormFieldDef]) -> None:
+    """Refuse a computed amount field beside another source of ``amount`` (spec 000284).
+
+    Raises:
+        FormDefinitionError: A computed amount field shares the form with a ``positions``
+            field, a ``funding`` field or another field with ``promoteTarget: "amount"``.
+    """
+    computed = [f.key for f in fields if is_computed_amount(f)]
+    if not computed:
+        return
+    others = [
+        f.key
+        for f in fields
+        if f.type in ("positions", "funding")
+        or (f.is_promoted and f.promote_target == _AMOUNT and f.key != computed[0])
+    ]
+    if others:
+        raise FormDefinitionError(
+            f"the computed amount field {computed[0]!r} must be the only source of the amount, "
+            f"got also {others}"
+        )
 
 
 def _check_field_settings(fields: Sequence[FormFieldDef]) -> None:
@@ -307,16 +339,86 @@ class _Computed:
     errors: tuple[FieldError, ...]
 
 
-def _compute_step(
-    state: _Computed, key: str, expr: Mapping[str, Any], ctx: Mapping[str, Any]
-) -> _Computed:
-    """Evaluate one ``compute`` expression against ``ctx`` and the values computed so far."""
+def _compute_step(state: _Computed, field: FormFieldDef, ctx: Mapping[str, Any]) -> _Computed:
+    """Evaluate one ``compute`` expression against ``ctx`` and the values computed so far.
+
+    The value of a computed amount field must be a finite number from 0 and becomes whole
+    cents (spec 002841); a bad one is an error and gets no value.
+    """
     try:
-        value = eval_jsonlogic(expr, {**ctx, **state.values})
+        value = eval_jsonlogic(field.compute, {**ctx, **state.values})
     except JsonLogicError as exc:
-        error = FieldError(field=key, msg=f"compute failed: {exc}")
+        error = FieldError(field=field.key, msg=f"compute failed: {exc}")
         return replace(state, errors=(*state.errors, error))
-    return replace(state, values={**state.values, key: value})
+    if not is_computed_amount(field):
+        return replace(state, values={**state.values, field.key: value})
+    cents = _cents(value)
+    if cents is None:
+        error = FieldError(field=field.key, msg="the amount must be a finite number from 0")
+        return replace(state, errors=(*state.errors, error))
+    return replace(state, values={**state.values, field.key: float(cents)})
+
+
+def _cents(value: object) -> Decimal | None:
+    """Return ``value`` rounded half up to whole cents, or ``None`` when it is no amount.
+
+    An amount is a finite number from 0. A bool, a text and ``None`` are no amount.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
+        return None
+    num = _finite_decimal(value)
+    if num is None or num < 0:
+        return None
+    return num.quantize(_CENT, rounding=ROUND_HALF_UP)
+
+
+def _number_answers(fields: Sequence[FormFieldDef], data: Mapping[str, Any]) -> dict[str, float]:
+    """Read a numeric answer that the form sends as a text (``"5"``) as its number.
+
+    Without this, an expression over such an answer could never be evaluated.
+    """
+    return {
+        f.key: float(num)
+        for f in fields
+        if f.type in _RULE_NUMBER_TYPES
+        and isinstance(data.get(f.key), str)
+        and (num := _finite_decimal(data.get(f.key))) is not None
+    }
+
+
+def _computed(
+    fields: Sequence[FormFieldDef], data: Mapping[str, Any], context: Mapping[str, Any] | None
+) -> _Computed:
+    """Evaluate every ``compute`` expression in field order against the answers.
+
+    ``data`` holds no value of a ``computed`` field, so an expression reads only the answers
+    and the values computed before it.
+    """
+    ctx = {**(context or {}), **data, **_number_answers(fields, data)}
+    return reduce(
+        lambda state, f: _compute_step(state, f, ctx),
+        (f for f in fields if f.type == "computed" and f.compute is not None),
+        _Computed(values={}, errors=()),
+    )
+
+
+def _computed_keys(fields: Sequence[FormFieldDef]) -> frozenset[str]:
+    return frozenset(f.key for f in fields if f.type == "computed")
+
+
+def with_computed(
+    fields: Sequence[FormFieldDef],
+    data: Mapping[str, Any],
+    context: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Return ``data`` with the values of the ``computed`` fields that the server computes.
+
+    A value that the client sends for a ``computed`` field never stays (spec 002840). A field
+    whose expression fails has no value, so no older value remains for it.
+    """
+    computed_keys = _computed_keys(fields)
+    answers = {k: v for k, v in data.items() if k not in computed_keys}
+    return {**answers, **_computed(fields, answers, context).values}
 
 
 def _answer_errors(field: FormFieldDef, value: object) -> tuple[FieldError, ...]:
@@ -344,19 +446,17 @@ def validate_answers(
     requested funding must not exceed the cost total of the visible positions.
 
     Returns:
-        ``data`` plus the values of the ``computed`` fields.
+        ``data`` with the values of the ``computed`` fields that the server computes, as
+        `with_computed` makes them.
 
     Raises:
         AnswerValidationError: At least one field is invalid. The error carries every
             collected field error.
     """
-    base_ctx = {**(context or {}), **data}
-    computed = reduce(
-        lambda state, pair: _compute_step(state, pair[0], pair[1], base_ctx),
-        ((f.key, f.compute) for f in fields if f.type == "computed" and f.compute is not None),
-        _Computed(values={}, errors=()),
-    )
-    result = {**data, **computed.values}
+    computed_keys = _computed_keys(fields)
+    answers = {k: v for k, v in data.items() if k not in computed_keys}
+    computed = _computed(fields, answers, context)
+    result = {**answers, **computed.values}
     eval_ctx = {**(context or {}), **result}
     checked = tuple(
         f for f in fields if f.type not in ("computed", "section") and _is_visible(f, eval_ctx)
@@ -938,7 +1038,12 @@ def _promote_flagged(out: dict[str, Any], field: FormFieldDef, value: object) ->
     target = field.promote_target
     if not (field.is_promoted and target) or value is None:
         return out
-    promoted = _finite_decimal(value) if field.type in _NUMERIC_TYPES else value
+    if is_computed_amount(field):
+        promoted: object = _cents(value)
+    elif field.type in _NUMERIC_TYPES:
+        promoted = _finite_decimal(value)
+    else:
+        promoted = value
     return out if promoted is None else {**out, target: promoted}
 
 
@@ -992,13 +1097,7 @@ def rule_context(fields: Sequence[FormFieldDef], data: Mapping[str, Any]) -> dic
     """
     amount = _finite_decimal(extract_promoted(fields, data).get("amount"))
     total = cost_total(fields, data)
-    numbers = {
-        f.key: float(num)
-        for f in fields
-        if f.type in _RULE_NUMBER_TYPES
-        and isinstance(data.get(f.key), str)
-        and (num := _finite_decimal(data.get(f.key))) is not None
-    }
+    numbers = _number_answers(fields, data)
     return {
         **data,
         **numbers,
