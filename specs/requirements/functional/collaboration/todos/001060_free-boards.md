@@ -9,7 +9,7 @@ tests:
   - "backend/tests/integration/modules/todos/test_todos_free_boards.py:test_only_the_permission_creates_a_free_board"
 implementation:
   - backend/app/modules/todos/models.py
-  - backend/app/modules/todos/service.py
+  - backend/app/modules/todos/service/boards.py
   - backend/migrations/versions/c6010961aa02_todo_free_boards.py
 scope:
   - backend/app/modules/todos
