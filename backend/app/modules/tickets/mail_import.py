@@ -19,6 +19,10 @@
    ``TICKETS_PER_HOUR`` an hour for one address; a mail above the limit stays in the
    inbox (§F/integrations/ticket-mail/002741).
 
+Each imported mail stores whether its sender is checked: it answers a mail that the
+Postfach sent to its ``From`` address (§F/integrations/ticket-mail/002816). The team
+sees the hint ``Absender nicht geprüft`` on every other one.
+
 A mail for an anonymized ticket becomes a new ticket, because an anonymized ticket takes
 no person and no file. A mail for a ticket that is closed for more than ``REOPEN_DAYS``
 days becomes a follow-up ticket, like a late message in the app.
@@ -40,7 +44,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Literal
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.files.models import Attachment
@@ -298,9 +302,34 @@ class MailImporter:
                 source_scan=await self._scan(source),
                 skipped=list(stored.skipped),
                 automatic=mail.automatic,
+                sender_checked=await self._sender_checked(box, mail),
             )
         )
         await self.session.flush()
+
+    async def _sender_checked(self, box: TicketMailbox, mail: ParsedMail) -> bool:
+        """Tell if the mail answers a mail that the Postfach sent to its ``From`` address.
+
+        Only a recipient of a sent mail knows its ``Message-ID``, while ``From`` and a
+        header ``Authentication-Results`` can be written by any sender
+        (§F/integrations/ticket-mail/002816).
+        """
+        if not mail.parents or not mail.sender:
+            return False
+        found = await self.session.scalar(
+            select(TicketMail.id)
+            .where(
+                TicketMail.mailbox_id == box.id,
+                TicketMail.direction == "out",
+                TicketMail.message_id.in_(mail.parents),
+                or_(
+                    TicketMail.to_addresses.contains([mail.sender]),
+                    TicketMail.cc.contains([mail.sender]),
+                ),
+            )
+            .limit(1)
+        )
+        return found is not None
 
     async def _scan(self, source: bytes) -> str | None:
         """Return the scan result of a source; None without a scanner or after a failure.

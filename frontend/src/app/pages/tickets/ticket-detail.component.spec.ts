@@ -1512,6 +1512,34 @@ describe('TicketDetailComponent', () => {
       expect(cmp.areaOptions().map((o) => o.label)).toEqual(['Plattform', 'AStA-Büro']);
     });
 
+    /** § F/integrations/ticket-mail/002816: the team sees an unchecked sender. */
+    it('names an unchecked sender under a mail message, and none for a sent mail', async () => {
+      const mail = {
+        id: 'm1',
+        noteId: null,
+        direction: 'in' as const,
+        fromName: 'Anna Beispiel',
+        fromAddress: 'anna@example.org',
+        cc: [],
+        subject: 'Raumanfrage',
+        automatic: false,
+        senderChecked: false,
+        source: 'gone' as const,
+        sourceSize: 0,
+        skipped: [],
+        at: '2026-10-14T19:14:00Z',
+      };
+      const ticket = inAsta({
+        source: 'mail',
+        reporter: { principalId: null, displayName: 'Anna Beispiel', email: 'anna@example.org', anonymized: false },
+        mails: [mail, { ...mail, id: 'm2', noteId: 'n1', senderChecked: true }],
+      });
+      const { cmp } = await start('/tickets/t40', { areas: [PLAT, ASTA], get: () => of(ticket) });
+      const [first, answer] = cmp.messages();
+      expect(first.body).toBe(`${ticket.body}\n\nAbsender nicht geprüft`);
+      expect(answer.body).not.toContain('Absender nicht geprüft');
+    });
+
     it('shows the source and the left-out files of a mail on its message', async () => {
       const mail = {
         id: 'm1',
@@ -1522,6 +1550,7 @@ describe('TicketDetailComponent', () => {
         cc: [],
         subject: 'Raumanfrage',
         automatic: false,
+        senderChecked: true,
         source: 'clean' as const,
         sourceSize: 2048,
         skipped: [{ name: 'plan.pdf', size: 12 * 1024 * 1024, reason: 'size' as const }],
@@ -1564,6 +1593,7 @@ describe('TicketDetailComponent', () => {
         to: ['anna@example.org'],
         subject: 'Re: Raumanfrage [T-7K3QX9MD]',
         automatic: false,
+        senderChecked: false,
         source: 'gone' as const,
         sourceSize: 0,
         skipped: [],
