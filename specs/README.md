@@ -583,6 +583,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/paperless/002766](requirements/functional/integrations/paperless/002766_link-search.md) | The link search finds Paperless documents | approved |
 | [F/integrations/paperless/002767](requirements/functional/integrations/paperless/002767_link-switch.md) | The links to Paperless have their own switch | approved |
 | [F/integrations/paperless/002768](requirements/functional/integrations/paperless/002768_link-graph.md) | The graph shows linked Paperless documents | approved |
+| [F/integrations/paperless/002813](requirements/functional/integrations/paperless/002813_address-change-needs-token.md) | A change of the Paperless address needs the token again | approved |
 | [F/integrations/ticket-mail/002720](requirements/functional/integrations/ticket-mail/002720_postfach-per-bereich.md) | A Bereich has at most one Postfach | approved |
 | [F/integrations/ticket-mail/002721](requirements/functional/integrations/ticket-mail/002721_postfach-page.md) | An admin sets the Postfach on the admin page | approved |
 | [F/integrations/ticket-mail/002722](requirements/functional/integrations/ticket-mail/002722_postfach-switch.md) | Each Postfach has a switch | approved |
@@ -607,6 +608,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/ticket-mail/002741](requirements/functional/integrations/ticket-mail/002741_mail-rate-limit.md) | One address opens at most 20 tickets an hour by mail | approved |
 | [F/integrations/ticket-mail/002742](requirements/functional/integrations/ticket-mail/002742_file-to-paperless.md) | The team files an attachment of a ticket in Paperless | approved |
 | [F/integrations/ticket-mail/002743](requirements/functional/integrations/ticket-mail/002743_postfach-audit.md) | A change of a Postfach is in the audit log | approved |
+| [F/integrations/ticket-mail/002812](requirements/functional/integrations/ticket-mail/002812_account-change-needs-password.md) | A change of a mail account needs its password again | approved |
+| [F/integrations/ticket-mail/002814](requirements/functional/integrations/ticket-mail/002814_confirmation-names-number.md) | The confirmation names only the number of the ticket | approved |
+| [F/integrations/ticket-mail/002815](requirements/functional/integrations/ticket-mail/002815_confirmation-cap.md) | A Postfach sends at most 30 confirmations an hour | approved |
+| [F/integrations/ticket-mail/002816](requirements/functional/integrations/ticket-mail/002816_unchecked-sender-marked.md) | A mail message of an unchecked sender is marked | approved |
 | [F/integrations/webhooks/000298](requirements/functional/integrations/webhooks/000298_retry.md) | A failed delivery is retried with backoff | approved |
 | [F/integrations/webhooks/000299](requirements/functional/integrations/webhooks/000299_idempotent-delivery.md) | A delivery runs once per key | approved |
 | [F/integrations/webhooks/000402](requirements/functional/integrations/webhooks/000402_flow-action-only.md) | A webhook fires only through a flow action | replaced |
@@ -910,6 +915,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/security/integrity/000296](requirements/non-functional/security/integrity/000296_secret-hidden.md) | A webhook secret is never shown | approved |
 | [NF/security/integrity/000297](requirements/non-functional/security/integrity/000297_signature.md) | A webhook request is signed with a timestamp | approved |
 | [NF/security/integrity/000393](requirements/non-functional/security/integrity/000393_db-roles.md) | Database roles are separated | approved |
+| [NF/security/integrity/002810](requirements/non-functional/security/integrity/002810_secrets-sealed.md) | A secret of an integration is sealed in the database | approved |
+| [NF/security/integrity/002811](requirements/non-functional/security/integrity/002811_secrets-key.md) | The key of the sealed secrets comes from the deploy | approved |
 | [NF/security/network/000182](requirements/non-functional/security/network/000182_webhook-ssrf.md) | The webhook SSRF guard runs at send time | approved |
 | [NF/security/network/000335](requirements/non-functional/security/network/000335_avatar-fetch.md) | The avatar fetch is fixed and limited | approved |
 | [NF/security/network/000389](requirements/non-functional/security/network/000389_typst-isolated.md) | The render service has no network egress | approved |
@@ -922,6 +929,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/security/network/002744](requirements/non-functional/security/network/002744_ticket-mail-host-allowlist.md) | The hosts of a Postfach need the deploy settings | approved |
 | [NF/security/network/002745](requirements/non-functional/security/network/002745_ticket-mail-tls.md) | The platform talks to a mail server only through TLS | approved |
 | [NF/security/network/002746](requirements/non-functional/security/network/002746_ticket-mail-password.md) | No read returns the password of a Postfach | approved |
+| [NF/security/network/002817](requirements/non-functional/security/network/002817_push-token-not-logged.md) | An access log holds no token of a path | approved |
 | [NF/usability/controls/000668](requirements/non-functional/usability/controls/000668_fiscal-year-chip.md) | The fiscal year is chosen with a chip | approved |
 | [NF/usability/controls/000676](requirements/non-functional/usability/controls/000676_tickets-word-in-admin.md) | Verwaltung says "Tickets" | approved |
 | [NF/usability/controls/000931](requirements/non-functional/usability/controls/000931_back-closes-budget-dialogs.md) | The dialogs of the Haushalt close on Back | approved |
@@ -970,6 +978,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/backend/python/000649](style/backend/python/000649_auth-audit-no-upward-import.md) | The modules auth and audit import no higher module | approved |
 | [S/backend/python/000651](style/backend/python/000651_no-import-exception.md) | The import contract has no exception | approved |
 | [S/backend/python/000652](style/backend/python/000652_meeting-core-module.md) | The meeting core is in the module meetings | approved |
+| [S/backend/python/002818](style/backend/python/002818_one-host-allowlist.md) | A host allowlist has one check | approved |
 | [S/frontend/angular/000073](style/frontend/angular/000073_i18n-parity.md) | Every UI text is in both catalogs | approved |
 | [S/frontend/angular/000074](style/frontend/angular/000074_production-build.md) | Run the production build after style changes | approved |
 | [S/frontend/angular/000075](style/frontend/angular/000075_narrow-with-as.md) | A template narrows a signal with as | approved |
