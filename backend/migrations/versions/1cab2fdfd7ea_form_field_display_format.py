@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-import sqlalchemy as sa
 from alembic import op
 
 revision: str = "1cab2fdfd7ea"
@@ -22,10 +21,14 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    """Add the display format of a form field."""
-    op.add_column("form_field", sa.Column("display_format", sa.Text(), nullable=True))
+    """Add the display format of a form field.
+
+    ``IF NOT EXISTS``, because the baseline builds a fresh database from the models, which
+    already have the column.
+    """
+    op.execute("ALTER TABLE form_field ADD COLUMN IF NOT EXISTS display_format text")
 
 
 def downgrade() -> None:
     """Drop the display format. A computed field then shows as a number."""
-    op.drop_column("form_field", "display_format")
+    op.execute("ALTER TABLE form_field DROP COLUMN IF EXISTS display_format")
