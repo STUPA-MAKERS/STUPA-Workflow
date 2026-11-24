@@ -28,6 +28,7 @@ import type {
   VersionOutWire,
 } from '@core/api/models';
 import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
+import { NO_ORDERS } from '../../../testing/order-fixtures';
 import { loadErrorToast, retryLoadError } from '../../../testing/load-error';
 import { kindSpies } from '../../../testing/toast';
 
@@ -107,6 +108,7 @@ async function setup(
   const view = await render(ApplicationsDetailComponent, {
     providers: [
       NO_LINKED_TODOS,
+      NO_ORDERS,
       provideRouter([]),
       provideHttpClient(),
       provideHttpClientTesting(),
@@ -510,6 +512,7 @@ describe('ApplicationsDetailComponent', () => {
     const view = await render(ApplicationsDetailComponent, {
       providers: [
         NO_LINKED_TODOS,
+        NO_ORDERS,
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -1336,6 +1339,39 @@ describe('ApplicationsDetailComponent', () => {
     expect(conditions.body).toBe('Mit Abweichungen: 1 Auflage');
     expect(plain.body).toBeNull();
     flushAttachments(http);
+    http.verify();
+  });
+
+  /** §F/finance/orders/002866, 002869: the events of the Bestellungen, and the timeline after a change. */
+  it('shows the events of the Bestellungen in the history and reads the timeline again after a change', async () => {
+    const { http, detectChanges, cmp } = await setup();
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush([]);
+    http.expectOne(url('/comments')).flush([]);
+    http.expectOne(url('/timeline')).flush([
+      { toStateId: 's1', toState: SUBMITTED, at: '2026-06-05T10:00:00Z' },
+      {
+        toStateId: 's1',
+        toState: SUBMITTED,
+        at: '2026-06-06T10:00:00Z',
+        kind: 'order',
+        order: { orderId: 'o-1', number: 'B-1', title: 'Beamer', change: 'created' },
+      },
+      { toStateId: 's1', toState: SUBMITTED, at: '2026-06-07T10:00:00Z', kind: 'order' },
+    ]);
+    flushForm(http);
+    detectChanges();
+    expect(cmp.historyEntries().map((e) => e.title)).toEqual(['Eingereicht', 'Bestellung angelegt']);
+    expect(cmp.historyEntries()[1]).toMatchObject({ icon: 'package', body: 'Beamer · B-1' });
+    expect(screen.getByRole('heading', { name: 'Bestellungen' })).toHaveAttribute('id', 'ad-orders');
+    flushAttachments(http);
+
+    (cmp as unknown as { reloadTimeline(): void }).reloadTimeline();
+    http.expectOne(url('/timeline')).flush([{ toStateId: 's1', toState: SUBMITTED, at: '2026-06-05T10:00:00Z' }]);
+    expect(cmp.historyEntries()).toHaveLength(1);
+    (cmp as unknown as { reloadTimeline(): void }).reloadTimeline();
+    http.expectOne(url('/timeline')).error(new ProgressEvent('error'));
+    expect(cmp.historyEntries()).toHaveLength(1);
     http.verify();
   });
 
@@ -2349,6 +2385,7 @@ describe('ApplicationsDetailComponent', () => {
     const view = await render(ApplicationsDetailComponent, {
       providers: [
         NO_LINKED_TODOS,
+        NO_ORDERS,
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),

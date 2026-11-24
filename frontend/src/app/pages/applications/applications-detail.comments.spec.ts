@@ -24,6 +24,7 @@ import type {
   VersionOutWire,
 } from '@core/api/models';
 import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
+import { NO_ORDERS } from '../../../testing/order-fixtures';
 import { kindSpies } from '../../../testing/toast';
 
 const SUBMITTED: StateOutWire = {
@@ -94,6 +95,7 @@ async function setup(
   const view = await render(ApplicationsDetailComponent, {
     providers: [
       NO_LINKED_TODOS,
+      NO_ORDERS,
       provideRouter([]),
       provideHttpClient(),
       provideHttpClientTesting(),

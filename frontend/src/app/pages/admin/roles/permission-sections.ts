@@ -15,7 +15,7 @@ const SECTIONS: readonly {
   readonly prefixes: readonly string[];
 }[] = [
   { key: 'applications', title: 'admin.roles.section.applications', prefixes: ['application.'] },
-  { key: 'budget', title: 'admin.roles.section.budget', prefixes: ['budget.'] },
+  { key: 'budget', title: 'admin.roles.section.budget', prefixes: ['budget.', 'order.'] },
   {
     key: 'meetings',
     title: 'admin.roles.section.meetings',

@@ -1,0 +1,55 @@
+<app-dialog
+  size="md"
+  [open]="open()"
+  [heading]="heading()"
+  [subtitle]="order()?.number ?? ''"
+  [closeLabel]="'action.close' | t"
+  [actions]="actions()"
+  (closed)="open.set(false)"
+  (action)="onAction($event.key)"
+>
+  <ng-template dialogBody>
+    @if (canManage()) {
+    <app-form [form]="form()" [value]="value()" [errors]="errors()" (valueChange)="onValue($event)" />
+    <div class="od__buyer">
+      @if (buyer(); as chosen) {
+        <span class="od__label">{{ 'orders.field.buyer' | t }}</span>
+        <app-chip
+          [removable]="true"
+          [removeLabel]="'orders.buyer.remove' | t: { name: chosen.name }"
+          (remove)="buyer.set(null)"
+        >
+          {{ chosen.name }}
+        </app-chip>
+      } @else {
+        <app-gremium-person-picker
+          [placeholder]="'orders.buyer.search' | t"
+          [persons]="findPeople"
+          (picked)="onPicked($event)"
+        />
+      }
+      @if (buyerError()) {
+        <app-error-text>{{ buyerError() }}</app-error-text>
+      }
+    </div>
+    } @else {
+      <dl appFacts layout="rows">
+        @for (fact of facts(); track fact.label) {
+          <div>
+            <dt>{{ fact.label }}</dt>
+            <dd>
+              @if (fact.href) {
+                <a [href]="fact.href" target="_blank" rel="noopener noreferrer">{{ fact.value }}</a>
+              } @else {
+                {{ fact.value }}
+              }
+            </dd>
+          </div>
+        }
+      </dl>
+    }
+    @if (order(); as current) {
+      <app-order-files [orderId]="current.id" [canManage]="canManage()" />
+    }
+  </ng-template>
+</app-dialog>

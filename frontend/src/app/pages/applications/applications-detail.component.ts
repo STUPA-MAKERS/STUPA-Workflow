@@ -129,8 +129,10 @@ import { decisionHistoryLine } from '@shared/decision/decision.util';
 import {
   amountChangeLines,
   forcedLine,
+  orderEventText,
   outsideDecisionLines,
 } from '@shared/decision/timeline-lines';
+import { OrdersSectionComponent } from './orders/orders-section.component';
 import { ApplicationsPageService } from './applications-page.service';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
 import { OutsideDecisionDialogComponent } from './outside-decision-dialog/outside-decision-dialog.component';
@@ -259,6 +261,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
     DecisionDialogComponent,
     DecisionSectionComponent,
     TodoLinkedListComponent,
+    OrdersSectionComponent,
     PredecessorFieldComponent,
     SideSheetComponent,
   ],
@@ -844,7 +847,7 @@ export class ApplicationsDetailComponent {
         : [],
     );
     const statusEntries: HistoryEntry[] = events
-      .filter((e) => e.kind !== 'amountChange')
+      .filter((e) => (e.kind ?? 'status') === 'status')
       .map((e, i) => {
         const first = i === 0;
         const intake = capture?.intake
@@ -933,7 +936,19 @@ export class ApplicationsDetailComponent {
         ? { label: t('applications.predecessor.open'), route: ['/applications', e.predecessor.id] }
         : null,
     }));
-    return [...statusEntries, ...amountEntries, ...versionEntries, ...linkEntries];
+    const orderEntries: HistoryEntry[] = events.flatMap((e) =>
+      e.kind === 'order' && e.order
+        ? [
+            {
+              at: e.at,
+              icon: 'package' as const,
+              ...orderEventText(e.order, t),
+              actor: this.actor(e.actorInfo, e.actor),
+            },
+          ]
+        : [],
+    );
+    return [...statusEntries, ...amountEntries, ...orderEntries, ...versionEntries, ...linkEntries];
   });
 
   private id: Uuid = '';
@@ -1380,6 +1395,17 @@ export class ApplicationsDetailComponent {
    * centre also for a reader without `application.manage`; only the "Ändern" button needs that
    * right.
    */
+  /** A Bestellung changed: its event is in the timeline of the Antrag. */
+  protected reloadTimeline(): void {
+    const seq = this.loadSeq;
+    this.api.timeline(this.id, { quiet: true }).subscribe({
+      next: (events) => {
+        if (seq === this.loadSeq) this.timeline.set(events);
+      },
+      error: () => {},
+    });
+  }
+
   private loadAux(detail = false): void {
     const seq = this.loadSeq;
     this.api.versions(this.id, { detail }).subscribe({

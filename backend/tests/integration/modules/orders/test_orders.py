@@ -564,7 +564,9 @@ async def test_the_buyer_follows_the_privacy_rules(
 
     async with maker() as session:
         await PrincipalMergeService(session).merge(old.id, new.id, actor="merge-admin")
-    assert api.get(f"/api/orders/{bought['id']}").json()["buyerId"] == str(new.id)
+    moved = api.get(f"/api/orders/{bought['id']}").json()
+    assert (moved["buyerId"], moved["buyerLabel"]) == (str(new.id), "Anna B.")
+    assert typed["buyerLabel"] == "Ben Typed"
     async with maker() as session:
         assert len((await AuskunftService(session).collect("anna.b@example.org"))["orders"]) == 1
 

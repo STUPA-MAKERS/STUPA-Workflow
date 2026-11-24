@@ -33,8 +33,9 @@ async def order_list(application_id: str) -> dict:
     `canCreate` (the caller holds `order.manage`, and the Antrag is approved and of a
     type with money). Each item has `id`, `number` (`B-` and eight characters), `title`,
     `kind`, `status`, `supplier`, `url`, `orderNumber`, `positionIds`, `plannedAmount`,
-    `actualAmount`, `orderedOn`, `deliveredOn`, `buyerId`, `buyerName`, `note` and
-    `version`. The applicant view has no prices, no link and no note.
+    `actualAmount`, `orderedOn`, `deliveredOn`, `buyerId`, `buyerName`, `buyerLabel`
+    (the name of the account of the buyer, else the typed name), `note` and `version`.
+    The applicant view has no prices, no link and no note.
     """
     return await api().get(f"/applications/{application_id}/orders")
 

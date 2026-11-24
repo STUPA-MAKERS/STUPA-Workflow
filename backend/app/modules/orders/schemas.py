@@ -76,7 +76,11 @@ class OrderStatusIn(FrozenStrictCamelModel, frozen=True):
 
 
 class OrderOut(FrozenCamelModel, frozen=True):
-    """One Bestellung, as a person who reads the Antrag as a member sees it."""
+    """One Bestellung, as a person who reads the Antrag as a member sees it.
+
+    Attributes:
+        buyer_label: The name of the account of the buyer, else the typed name.
+    """
 
     id: UUID
     number: str
@@ -94,6 +98,7 @@ class OrderOut(FrozenCamelModel, frozen=True):
     delivered_on: date | None = Field(default=None, alias="deliveredOn")
     buyer_id: UUID | None = Field(default=None, alias="buyerId")
     buyer_name: str | None = Field(default=None, alias="buyerName")
+    buyer_label: str | None = Field(default=None, alias="buyerLabel")
     note: str | None = None
     version: int
     created_at: datetime = Field(alias="createdAt")

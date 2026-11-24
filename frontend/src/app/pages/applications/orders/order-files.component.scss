@@ -1,0 +1,52 @@
+:host {
+  display: block;
+  min-width: 0;
+  margin-top: var(--space-5);
+}
+.of {
+  --section-gap: var(--space-2);
+}
+.of__upload {
+  display: inline-flex;
+  margin-inline-end: calc(-1 * var(--space-2));
+}
+.of__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.of__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.of__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 58px;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+}
+.of__icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.of__meta {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.of__name {
+  font-weight: var(--fw-medium);
+}
+.of__sub {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.of__sub app-status-text {
+  display: inline;
+}

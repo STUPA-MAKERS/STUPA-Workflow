@@ -573,9 +573,22 @@ export interface TimelineEventOutWire {
   readonly outsideDecision?: OutsideDecision | null;
   /** The change of the approved amount of an `amountChange` entry. */
   readonly amountChange?: AmountChange | null;
+  /** The event of a Bestellung of an `order` entry. */
+  readonly order?: TimelineOrderEvent | null;
 }
 
-export type TimelineKind = 'status' | 'amountChange';
+/** `order`: an event of a Bestellung of the Antrag; the state stays. */
+export type TimelineKind = 'status' | 'amountChange' | 'order';
+
+/** An event of a Bestellung, for the timeline. It holds no price. */
+export interface TimelineOrderEvent {
+  readonly orderId: Uuid;
+  readonly number: string;
+  readonly title: string;
+  readonly change: 'created' | 'status' | 'deleted';
+  readonly fromStatus?: string | null;
+  readonly toStatus?: string | null;
+}
 
 /** A decision of a Gremium made in a meeting without a vote on the platform. */
 export interface OutsideDecision {
@@ -1111,6 +1124,7 @@ export interface TimelineEntry {
   readonly forceReason?: string | null;
   readonly outsideDecision?: OutsideDecision | null;
   readonly amountChange?: AmountChange | null;
+  readonly order?: TimelineOrderEvent | null;
 }
 
 /** Comment, frontend view. `isPublic` comes from `visibility`. */

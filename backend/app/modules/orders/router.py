@@ -85,7 +85,7 @@ def get_order_files(db: DbSession, request: Request, settings: SettingsDep) -> F
 FilesDep = Annotated[FilesService, Depends(get_order_files)]
 
 
-def _out(row: PurchaseOrder, positions: tuple[str, ...]) -> OrderOut:
+def _out(row: PurchaseOrder, positions: tuple[str, ...], buyers: dict[UUID, str]) -> OrderOut:
     """Build the member view of a Bestellung."""
     return OrderOut(
         id=row.id,
@@ -104,6 +104,7 @@ def _out(row: PurchaseOrder, positions: tuple[str, ...]) -> OrderOut:
         deliveredOn=row.delivered_on,
         buyerId=row.buyer_id,
         buyerName=row.buyer_name,
+        buyerLabel=buyers.get(row.buyer_id) if row.buyer_id else row.buyer_name,
         note=row.note,
         version=row.version,
         createdAt=row.created_at,
@@ -126,7 +127,9 @@ def _applicant_out(row: PurchaseOrder) -> OrderApplicantOut:
 
 async def _view(service: OrderService, row: PurchaseOrder) -> OrderOut:
     """Build the member view of one Bestellung with its positions."""
-    return _out(row, (await service.positions_of([row.id]))[row.id])
+    return _out(
+        row, (await service.positions_of([row.id]))[row.id], await service.buyer_names([row])
+    )
 
 
 async def _readable(
@@ -167,11 +170,12 @@ async def list_orders(
     if access.is_applicant_view:
         return OrdersOut(items=tuple(_applicant_out(row) for row in rows))
     positions = await service.positions_of([row.id for row in rows])
+    buyers = await service.buyer_names(rows)
     total = orders_sum((row.status, row.actual_amount, row.planned_amount) for row in rows)
     approved = await service.approved_amount(access.application_id)
     manages = access.principal is not None and access.principal.has(MANAGE_PERMISSION)
     return OrdersOut(
-        items=tuple(_out(row, positions[row.id]) for row in rows),
+        items=tuple(_out(row, positions[row.id], buyers) for row in rows),
         total=total,
         approvedAmount=approved,
         overBy=over_by(total, approved),

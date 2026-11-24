@@ -1,0 +1,88 @@
+@if (shown()) {
+  @let rights = list();
+  <app-section class="os" [headingId]="headingId()" [heading]="'orders.section.title' | t">
+    @if (rights?.canCreate) {
+      <span sectionAction class="os__actions">
+        <app-button-group>
+          <app-button
+            variant="text"
+            size="sm"
+            [iconOnly]="true"
+            [ariaLabel]="'orders.dialog.create' | t"
+            [title]="'orders.dialog.create' | t"
+            data-testid="os-new"
+            (click)="open(null)"
+          >
+            <app-icon name="plus" />
+          </app-button>
+        </app-button-group>
+      </span>
+    }
+    @if (warning()) {
+      <app-note class="os__note" kind="warn" icon="alert" role="status">{{ warning() }}</app-note>
+    }
+    @if (rows().length) {
+      <ul class="rowgroup os__list">
+        @for (row of rows(); track row.order.id) {
+          <li class="os__row" [class.os__row--off]="row.order.status === 'cancelled'" data-testid="os-row">
+            <app-icon class="os__icon" name="package" [size]="18" />
+            <span class="os__text">
+              <button type="button" class="os__link" (click)="open(row.order)">{{ row.order.title }}</button>
+              <span class="os__sub"
+                ><app-meta-line>
+                  @for (part of row.sub; track $index) {
+                    <span>{{ part }}</span>
+                  }
+                  <app-status-text [kind]="row.statusKind">{{ row.status }}</app-status-text>
+                </app-meta-line></span
+              >
+            </span>
+            @if (row.price) {
+              <span class="os__money">
+                <span class="os__price num">{{ row.price }}</span>
+                @if (row.planned) {
+                  <span class="os__sub">{{ 'orders.section.planned' | t }}</span>
+                } @else if (row.difference) {
+                  <span class="os__sub num">{{ row.difference }}</span>
+                }
+              </span>
+            }
+            @if (row.menu.length) {
+              <app-row-menu
+                class="os__menu"
+                [sections]="row.menu"
+                [label]="'orders.menu.label' | t: { title: row.order.title }"
+                (selected)="onMenu(row.order, $event.id)"
+              />
+            }
+          </li>
+        }
+      </ul>
+      @if (sumLine()) {
+        <p class="os__sum num" data-testid="os-sum">{{ sumLine() }}</p>
+      }
+    } @else {
+      <app-empty-state icon="package" shape="row" rows="1" [heading]="'orders.section.empty' | t" />
+    }
+  </app-section>
+
+  <app-order-dialog
+    [(open)]="dialogOpen"
+    [applicationId]="applicationId()"
+    [order]="editing()"
+    [orders]="items()"
+    [positions]="positions()"
+    [canManage]="rights?.canManage === true"
+    [currency]="currency()"
+    (saved)="onChanged()"
+    (stale)="load()"
+  />
+  <app-confirm-dialog
+    [open]="deleting() !== null"
+    [title]="'orders.delete.title' | t"
+    [body]="'orders.delete.body' | t: { title: deleting()?.title ?? '' }"
+    [busy]="busy()"
+    (confirm)="confirmDelete()"
+    (cancel)="deleting.set(null)"
+  />
+}

@@ -1,0 +1,105 @@
+// Before the list arrived, and for a type without money and without a Bestellung, the host
+// holds no section, so it takes no space and no gap.
+:host {
+  display: block;
+  min-width: 0;
+}
+:host(:not(:has(> .os))) {
+  display: none;
+}
+.os {
+  --section-gap: var(--space-2);
+}
+.os__actions {
+  display: inline-flex;
+}
+.os__note {
+  display: block;
+  margin-bottom: var(--space-2);
+}
+.os__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.os__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-2) var(--space-3) var(--space-4);
+}
+.os__row:focus-within {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.os__icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.os__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+.os__link {
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: var(--fw-medium);
+  text-align: start;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+// The whole row opens the Bestellung.
+.os__link::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+}
+.os__link:focus-visible {
+  outline: none;
+}
+@media (hover: hover) {
+  .os__link:hover {
+    text-decoration: underline;
+  }
+}
+.os__row--off .os__link,
+.os__row--off .os__price {
+  color: var(--color-text-muted);
+}
+.os__sub {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.os__sub app-status-text {
+  display: inline;
+}
+.os__money {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.os__price {
+  font-weight: var(--fw-medium);
+}
+// The menu stands above the button of the row, whose ::after covers the whole row.
+.os__menu {
+  position: relative;
+  z-index: 1;
+  flex: none;
+}
+.os__sum {
+  margin: var(--space-2) 0 0;
+  padding-inline: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  text-align: end;
+}

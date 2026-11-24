@@ -1,0 +1,77 @@
+<app-section class="of" [heading]="'orders.files.title' | t">
+  @if (canManage()) {
+    <span sectionAction class="of__upload">
+      <input
+        #fileInput
+        type="file"
+        multiple
+        class="sr-only"
+        tabindex="-1"
+        (change)="upload(picked(fileInput)); fileInput.value = ''"
+        [attr.aria-label]="'applications.attachments.upload' | t"
+      />
+      <app-button-group>
+        <app-button variant="text" size="sm" [loading]="uploading()" (click)="fileInput.click()">
+          <span class="of__btn">
+            <app-icon name="upload" />
+            {{ 'applications.attachments.upload' | t }}
+          </span>
+        </app-button>
+      </app-button-group>
+    </span>
+  }
+  @if (files().length) {
+    <ul class="rowgroup of__list">
+      @for (file of files(); track file.id) {
+        @let st = scan(file.scanState);
+        <li class="of__row">
+          <app-icon class="of__icon" name="clip" [size]="19" />
+          <div class="of__meta">
+            <span class="of__name ell" [title]="file.filename">{{ file.filename }}</span>
+            <span class="of__sub"
+              ><app-meta-line>
+                <span class="num">{{ size(file) }}</span>
+                <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
+              </app-meta-line></span
+            >
+          </div>
+          <app-button-group>
+            <app-button
+              variant="text"
+              size="sm"
+              [iconOnly]="true"
+              [ariaLabel]="('applications.attachments.download' | t) + ': ' + file.filename"
+              [disabled]="file.scanState !== 'clean' || busyId() !== null"
+              (click)="download(file)"
+            >
+              <app-icon name="download" />
+            </app-button>
+            @if (canManage()) {
+              <app-button
+                variant="text"
+                size="sm"
+                [iconOnly]="true"
+                [ariaLabel]="('applications.attachments.delete' | t) + ': ' + file.filename"
+                [disabled]="busyId() !== null"
+                (click)="confirming.set(file)"
+              >
+                <app-icon name="trash" />
+              </app-button>
+            }
+          </app-button-group>
+        </li>
+      }
+    </ul>
+  } @else {
+    <app-empty-state icon="clip" shape="file" rows="1" [heading]="'orders.files.empty' | t" />
+  }
+</app-section>
+
+<app-confirm-dialog
+  [open]="confirming() !== null"
+  [title]="'applications.attachments.deleteTitle' | t"
+  [body]="'applications.attachments.deleteConfirm' | t: { name: confirming()?.filename ?? '' }"
+  [busy]="busyId() !== null"
+  (confirm)="remove()"
+  (cancel)="confirming.set(null)"
+/>

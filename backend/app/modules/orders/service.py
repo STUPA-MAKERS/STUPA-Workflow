@@ -133,6 +133,22 @@ class OrderService:
             order_id: tuple(pos for oid, pos in rows if oid == order_id) for order_id in order_ids
         }
 
+    async def buyer_names(self, rows: Sequence[PurchaseOrder]) -> dict[UUID, str]:
+        """Return the display name of each account that is the buyer of one of the rows."""
+        ids = {row.buyer_id for row in rows if row.buyer_id is not None}
+        found = (
+            (
+                await self.session.execute(
+                    select(PrincipalRow.id, PrincipalRow.display_name).where(
+                        PrincipalRow.id.in_(ids)
+                    )
+                )
+            ).all()
+            if ids
+            else []
+        )
+        return {principal_id: name for principal_id, name in found if name}
+
     async def approved_amount(self, application_id: UUID) -> Decimal | None:
         """Return the approved amount of the Antrag."""
         return await self.session.scalar(
