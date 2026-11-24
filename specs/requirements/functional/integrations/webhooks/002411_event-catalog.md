@@ -4,7 +4,7 @@ title: The webhook events come from a fixed catalog
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-23
+updated: 2026-11-24
 tests:
   - "backend/tests/unit/modules/webhooks/test_webhook_events.py:test_catalog_matches_the_event_names"
 protocols:
@@ -39,6 +39,8 @@ name with `422`.
 | `protocol.finalized` | Protokolle | A protocol is final. |
 | `booking.created` | Haushalt | A booking is made: an expense, an income or a transfer. |
 | `invoice.created` | Haushalt | An invoice is created or imported. |
+| `order.created` | Haushalt | A person creates a Bestellung. |
+| `order.status_changed` | Haushalt | The status of a Bestellung changes. |
 | `ticket.created` | Tickets | A ticket is new: from the help menu, a mail or the team. |
 | `ticket.message` | Tickets | The sender of a ticket writes one more message. |
 | `ticket.status` | Tickets | The status of a ticket changes. |

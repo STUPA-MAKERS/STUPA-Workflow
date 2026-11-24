@@ -35,6 +35,7 @@ from app.modules.orders.models import PurchaseOrder, PurchaseOrderPosition
 from app.modules.orders.numbers import format_number
 from app.modules.orders.rules import buyer_missing, price_from_invoice, status_dates, url_valid
 from app.modules.orders.schemas import OrderCreate, OrderUpdate
+from app.modules.orders.webhook_fields import emit_order_event
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 #: The permission that every write of a Bestellung needs (F/finance/orders/002862).
@@ -217,6 +218,18 @@ class OrderService:
             for row in rows
         }
 
+    async def bookings(self, order_id: UUID) -> list[BudgetExpense]:
+        """Return the bookings that name the Bestellung, the oldest first."""
+        rows = await self.session.scalars(
+            select(BudgetExpense)
+            .where(
+                BudgetExpense.order_id == order_id,
+                BudgetExpense.parent_expense_id.is_(None),
+            )
+            .order_by(BudgetExpense.created_at, BudgetExpense.id)
+        )
+        return list(rows)
+
     async def application_titles(self, application_ids: Sequence[UUID]) -> dict[UUID, str]:
         """Return the title of each of the Anträge that has one."""
         ids = set(application_ids)
@@ -376,7 +389,10 @@ class OrderService:
         await self.session.flush()
 
     async def _event(self, row: PurchaseOrder, actor: str, kind: str, **extra: str) -> None:
-        """Write one timeline event of the Antrag."""
+        """Write one timeline event of the Antrag and emit the webhook event of it.
+
+        The create and a status change are webhook events (F/finance/orders/002891).
+        """
         self.session.add(
             ApplicationOrderEvent(
                 application_id=row.application_id,
@@ -386,6 +402,13 @@ class OrderService:
                 payload={"number": format_number(row.number), "title": row.title, **extra},
             )
         )
+        match kind:
+            case "created":
+                await emit_order_event(self.session, row)
+            case "status":
+                await emit_order_event(self.session, row, previous=extra["from"])
+            case _:
+                pass
 
     async def create(
         self, application_id: UUID, payload: OrderCreate, *, actor: str

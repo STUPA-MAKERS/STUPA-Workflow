@@ -9,6 +9,8 @@
   its Antrag. ``POST /orders/{id}/attachments`` and
   ``DELETE /orders/{id}/attachments/{attachment_id}`` need ``order.manage``
   (F/finance/orders/002871). The download is ``GET /attachments/{id}/download``.
+- ``GET /orders/{id}/bookings`` lists the bookings that name a Bestellung, for a member who
+  reads its Antrag and holds a budget read permission (F/finance/orders/002889).
 - A Bestellung of an Antrag that the caller does not read answers 404
   (F/finance/orders/002863), so the answer does not tell that the Bestellung exists.
 """
@@ -45,6 +47,7 @@ from app.modules.orders.schemas import (
     InvoiceOrderOut,
     InvoiceOrdersOut,
     OrderApplicantOut,
+    OrderBookingOut,
     OrderCreate,
     OrderInvoiceIn,
     OrderOut,
@@ -91,7 +94,7 @@ def get_order_files(db: DbSession, request: Request, settings: SettingsDep) -> F
 FilesDep = Annotated[FilesService, Depends(get_order_files)]
 
 
-def _out(
+def order_out(
     row: PurchaseOrder,
     positions: tuple[str, ...],
     buyers: dict[UUID, str],
@@ -144,7 +147,7 @@ def _applicant_out(row: PurchaseOrder) -> OrderApplicantOut:
 
 async def _view(service: OrderService, row: PurchaseOrder) -> OrderOut:
     """Build the member view of one Bestellung with its positions."""
-    return _out(
+    return order_out(
         row,
         (await service.positions_of([row.id]))[row.id],
         await service.buyer_names([row]),
@@ -207,7 +210,9 @@ async def list_orders(
     approved = await service.approved_amount(access.application_id)
     manages = access.principal is not None and access.principal.has(MANAGE_PERMISSION)
     return OrdersOut(
-        items=tuple(_out(row, positions[row.id], buyers, marks[row.id], title) for row in rows),
+        items=tuple(
+            order_out(row, positions[row.id], buyers, marks[row.id], title) for row in rows
+        ),
         total=total,
         approvedAmount=approved,
         overBy=over_by(total, approved),
@@ -352,6 +357,31 @@ async def list_invoice_orders(
         ),
         total=sum((row.actual_amount or Decimal(0) for row in rows), Decimal(0)),
     )
+
+
+@router.get(
+    "/orders/{order_id}/bookings",
+    response_model=list[OrderBookingOut],
+    responses=_ERRORS,
+)
+async def list_order_bookings(
+    order_id: UUID,
+    db: DbSession,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_any_permission(*BUDGET_READ_PERMISSIONS))],
+) -> list[OrderBookingOut]:
+    """List the bookings that name a Bestellung, for the list "Verknüpft".
+
+    The caller needs a budget read permission, like the list of the bookings, and the
+    member read of the Antrag.
+    """
+    _, access = await _readable(db, service, order_id, principal, None, observers=False)
+    if access.is_applicant_view:
+        raise NotFoundError("Bestellung not found.")
+    return [
+        OrderBookingOut(id=row.id, description=row.description, amount=row.amount)
+        for row in await service.bookings(order_id)
+    ]
 
 
 @router.delete("/orders/{order_id}", status_code=status.HTTP_204_NO_CONTENT, responses=_ERRORS)

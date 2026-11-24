@@ -188,3 +188,26 @@ class InvoiceOrdersOut(FrozenCamelModel, frozen=True):
 
     items: tuple[InvoiceOrderOut, ...]
     total: Decimal
+
+
+class OrderBookingOut(FrozenCamelModel, frozen=True):
+    """One booking that names a Bestellung (F/finance/orders/002889)."""
+
+    id: UUID
+    description: str | None = None
+    amount: Decimal
+
+
+class PendingApplicationOut(FrozenCamelModel, frozen=True):
+    """One approved Antrag without a Bestellung (F/finance/orders/002934).
+
+    Attributes:
+        approved_amount: The approved amount of the Antrag, else null.
+        gremium_name: The name of the Gremium of the Antrag, else null.
+    """
+
+    id: UUID
+    title: str | None = None
+    gremium_id: UUID | None = Field(default=None, alias="gremiumId")
+    gremium_name: str | None = Field(default=None, alias="gremiumName")
+    approved_amount: Decimal | None = Field(default=None, alias="approvedAmount")

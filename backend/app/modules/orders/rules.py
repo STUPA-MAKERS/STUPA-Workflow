@@ -13,6 +13,8 @@ from typing import Literal
 
 OrderStatus = Literal["planned", "ordered", "delivered", "cancelled"]
 OrderKind = Literal["order", "outlay"]
+#: The segments of the page "Bestellungen" that hold a Bestellung (F/finance/orders/002884).
+Segment = Literal["open", "delivered", "done"]
 
 #: The schemes that the link of a Bestellung can have. A different scheme, for example
 #: ``javascript:``, runs code in the page.
@@ -87,3 +89,21 @@ def price_from_invoice(actual: Decimal | None, gross: Decimal, others: int) -> D
     set stays.
     """
     return gross if actual is None and others == 0 else actual
+
+
+def segment_of(status: str, cost: Decimal | None, booked: Decimal) -> Segment:
+    """Return the segment of a Bestellung on the page "Bestellungen" (F/finance/orders/002884).
+
+    ``cost`` is the price of the Bestellung (`price`) and ``booked`` the sum of its
+    bookings. A delivered Bestellung waits in "Geliefert" until its price is booked in
+    full. Without a price it usually waits for its invoice, so it stays there until a
+    person books it. `OrderListing` holds the same rule as SQL.
+    """
+    match status:
+        case "planned" | "ordered":
+            return "open"
+        case "cancelled":
+            return "done"
+        case _:
+            waits = booked < cost if cost is not None else booked == 0
+            return "delivered" if waits else "done"

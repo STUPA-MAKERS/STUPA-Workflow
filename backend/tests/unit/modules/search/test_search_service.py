@@ -31,6 +31,7 @@ def _svc(**sources: Any) -> SearchService:
         "_meetings",
         "_invoices",
         "_expenses",
+        "_orders",
         "_budgets",
         "_gremien",
         "_principals",
@@ -159,7 +160,9 @@ def test_every_kind_has_a_url_that_names_the_record() -> None:
 
     for kind, template in HIT_URL.items():
         assert "{id}" in template, kind
-        assert template.format(id="X") != template.format(id="Y"), kind
+        assert template.format(id="X", application="A") != template.format(
+            id="Y", application="A"
+        ), kind
 
 
 async def test_applications_source_includes_archived_and_marks_them(

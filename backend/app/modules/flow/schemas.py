@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from decimal import Decimal
 from typing import Literal, get_args
 from uuid import UUID
@@ -11,6 +12,21 @@ from pydantic import Field, model_validator
 from app.modules.applications.decision import DecisionIn
 from app.shared.i18n import I18nMap
 from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
+
+#: The statuses of a Bestellung that can offer a transition (F/finance/orders/002931).
+OrderOfferStatus = Literal["ordered", "delivered"]
+
+
+def offered_on(
+    transitions: Sequence[TransitionOut], status: OrderOfferStatus
+) -> list[TransitionOut]:
+    """Keep the transitions that a Bestellung with the new ``status`` offers.
+
+    ``transitions`` are the ones that the person can fire from the current state of the
+    Antrag. The setting sits on the transition, so no code names a state or a
+    transition of a flow. The page shows the offer; no code fires a transition of it.
+    """
+    return [t for t in transitions if t.offer_on_order_status == status]
 
 
 class TransitionOut(FrozenCamelModel, frozen=True):
@@ -34,6 +50,8 @@ class TransitionOut(FrozenCamelModel, frozen=True):
             target is an approved state, the current state is not, and the
             application has an amount. The dialog then shows the amount without the
             switch.
+        offer_on_order_status: The status of a Bestellung at which the page offers the
+            transition (F/finance/orders/002931), else null.
     """
 
     id: UUID
@@ -47,6 +65,7 @@ class TransitionOut(FrozenCamelModel, frozen=True):
     allows_decision: bool = Field(default=False, alias="allowsDecision")
     to_terminal: bool = Field(default=False, alias="toTerminal")
     requires_amount: bool = Field(default=False, alias="requiresAmount")
+    offer_on_order_status: OrderOfferStatus | None = Field(default=None, alias="offerOnOrderStatus")
 
 
 class TransitionRequest(FrozenCamelModel, frozen=True):

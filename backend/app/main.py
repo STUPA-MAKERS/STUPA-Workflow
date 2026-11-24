@@ -89,6 +89,7 @@ from app.modules.notifications.router import router as notifications_router
 from app.modules.notifications.router import (
     templates_router as mail_templates_router,
 )
+from app.modules.orders.list_router import router as orders_list_router
 from app.modules.orders.router import router as orders_router
 from app.modules.paperless_filing.router import admin_router as paperless_admin_router
 from app.modules.paperless_filing.router import router as paperless_router
@@ -171,6 +172,7 @@ api_router.include_router(search_router)
 api_router.include_router(activity_router)
 api_router.include_router(graph_router)
 api_router.include_router(tickets_router)
+api_router.include_router(orders_list_router)
 api_router.include_router(orders_router)
 api_router.include_router(todos_router)
 api_router.include_router(links_router)

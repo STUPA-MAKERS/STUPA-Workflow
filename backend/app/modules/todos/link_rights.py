@@ -10,6 +10,7 @@ one of them. The change right of an end is the right that changes the element it
 * appointment — the creator of the Termin or ``calendar.manage`` (``rules.can_edit``);
 * gremium — ``admin.gremien``;
 * invoice, expense — ``budget.book``;
+* order (a Bestellung) — ``order.manage`` (F/finance/orders/002887);
 * budget — ``budget.structure``;
 * ticket — the work right in the Bereich of the ticket;
 * todo — the write right on the board of the card (``BoardAccess.can_write``);
@@ -45,6 +46,7 @@ GLOBAL_RIGHT: dict[str, str] = {
     "gremium": "admin.gremien",
     "invoice": "budget.book",
     "expense": "budget.book",
+    "order": "order.manage",
     "budget": "budget.structure",
 }
 #: The rights of which one is needed for any link with an end of the kind (spec 001410).

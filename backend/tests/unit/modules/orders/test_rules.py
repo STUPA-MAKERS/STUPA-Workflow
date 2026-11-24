@@ -2,7 +2,8 @@
 
 § F/finance/orders/002851 the fields, § 002853 the statuses and their dates, § 002855 the
 number, § 002856 the link, § 002852 the buyer of an Auslage, § 002860 the position ids and
-§ 002868 the sum. § 002874 the real price from the invoice.
+§ 002868 the sum. § 002874 the real price from the invoice. § 002884 the segments of the
+page.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from app.modules.orders.rules import (
     over_by,
     price,
     price_from_invoice,
+    segment_of,
     status_dates,
     url_valid,
 )
@@ -144,3 +146,25 @@ def test_the_invoice_fills_only_an_empty_price_of_its_only_bestellung() -> None:
     assert price_from_invoice(None, gross, 0) == gross
     assert price_from_invoice(None, gross, 1) is None
     assert price_from_invoice(Decimal("70.00"), gross, 0) == Decimal("70.00")
+
+
+@pytest.mark.parametrize(
+    ("status", "cost", "booked", "segment"),
+    [
+        ("planned", "60.00", "0", "open"),
+        ("ordered", None, "0", "open"),
+        ("delivered", "60.00", "0", "delivered"),
+        ("delivered", "60.00", "20.00", "delivered"),
+        ("delivered", None, "0", "delivered"),
+        ("delivered", "60.00", "60.00", "done"),
+        ("delivered", "60.00", "75.00", "done"),
+        ("delivered", None, "20.00", "done"),
+        ("cancelled", "60.00", "0", "done"),
+    ],
+)
+def test_the_segment_of_a_bestellung(
+    status: str, cost: str | None, booked: str, segment: str
+) -> None:
+    """§ 002884: a delivered Bestellung waits until its price is booked in full."""
+    price_of = Decimal(cost) if cost is not None else None
+    assert segment_of(status, price_of, Decimal(booked)) == segment

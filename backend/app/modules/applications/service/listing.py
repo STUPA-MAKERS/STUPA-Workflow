@@ -276,6 +276,25 @@ class ListingOps(ApplicationsServiceBase):
             owner_sub=principal.sub, committee_sub=principal.sub, observer_email=principal.email
         )
 
+    async def member_scope_for(self, principal: Principal) -> ColumnElement[bool] | None:
+        """Build the scope of the Anträge that `principal` reads as a member, or None for all.
+
+        This is `read_scope_for` without the own applications and without the observed
+        ones, because the creator and an observer read an Antrag in the applicant view
+        (`Access.is_applicant_view`). A list of the internal values of many Anträge
+        uses this scope.
+        """
+        from app.modules.applications.access import principal_reads_all
+
+        if principal_reads_all(principal):
+            return None
+        clauses = await self._committee_read_clauses(principal.sub)
+        return or_(*clauses) if clauses else false()
+
+    async def subtree_scope(self, budget_id: UUID) -> ColumnElement[bool]:
+        """Keep the applications in the subtree of a cost center, or none for an unknown one."""
+        return await self._budget_scope(budget_id)
+
     async def _all_pii_keys(self) -> set[str]:
         """Collect the ``isPII`` field keys of every form version of every type.
 
