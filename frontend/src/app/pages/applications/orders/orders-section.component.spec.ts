@@ -52,8 +52,9 @@ describe('OrdersSectionComponent', () => {
 
   /** §F/finance/orders/002869 */
   it('shows the rows with the price, the difference, the sum line and a heading without a count', async () => {
-    const { api } = await setup();
+    const { api, fixture } = await setup();
     expect(api.list).toHaveBeenCalledWith('a-1');
+    expect(fixture.nativeElement).not.toHaveAttribute('hidden');
     expect(screen.getByRole('heading', { name: 'Bestellungen' })).toHaveTextContent(/^\s*Bestellungen\s*$/);
     const rows = [...document.querySelectorAll('[data-testid="os-row"]')].map((r) =>
       (r.textContent ?? '').replace(/\s+/g, ' ').trim(),
@@ -65,8 +66,9 @@ describe('OrdersSectionComponent', () => {
     expect(rows[0]).toMatch(/\+12,50\s€/);
     expect(rows[0]).not.toContain('geplant');
     expect(rows[1]).toContain('Auslage');
-    expect(rows[1]).toMatch(/20,00\s€\s*geplant/);
-    expect(screen.getByTestId('os-sum')).toHaveTextContent('Summe 132,50 € von 150,00 € genehmigt');
+    expect(rows[1]).toContain('Preis geplant');
+    expect(rows[1]).toMatch(/20,00\s€/);
+    expect(screen.getByTestId('os-sum')).toHaveTextContent(/Summe\s*132,50\s€ von 150,00\s€ genehmigt/);
   });
 
   /** §F/finance/orders/002868 */
@@ -89,8 +91,9 @@ describe('OrdersSectionComponent', () => {
   });
 
   it('does not show for a type without money and without a Bestellung', async () => {
-    await setup(list({ items: [] }), { hasBudget: false });
+    const { fixture } = await setup(list({ items: [] }), { hasBudget: false });
     expect(screen.queryByRole('heading', { name: 'Bestellungen' })).not.toBeInTheDocument();
+    expect(fixture.nativeElement).toHaveAttribute('hidden');
   });
 
   it('stays away while the list is not there', async () => {
@@ -111,14 +114,14 @@ describe('OrdersSectionComponent', () => {
       { hasBudget: false },
     );
     expect(screen.getByText('Bestellt')).toBeInTheDocument();
-    expect(cmp.rows()[0]).toMatchObject({ price: '', planned: false, difference: '', menu: [] });
+    expect(cmp.rows()[0]).toMatchObject({ price: '', sub: [], menu: [] });
     expect(document.querySelector('app-row-menu')).toBeNull();
     expect(screen.queryByTestId('os-sum')).not.toBeInTheDocument();
   });
 
   it('gives the sum alone without an approved amount', async () => {
     await setup(list({ approvedAmount: null }));
-    expect(screen.getByTestId('os-sum')).toHaveTextContent(/^\s*Summe 132,50 €\s*$/);
+    expect(screen.getByTestId('os-sum')).toHaveTextContent(/^\s*Summe\s*132,50\s€\s*$/);
   });
 
   it('opens the form for a new Bestellung and for a row, and reads again after a save', async () => {

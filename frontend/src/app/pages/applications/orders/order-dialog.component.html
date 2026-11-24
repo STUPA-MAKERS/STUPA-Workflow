@@ -9,47 +9,48 @@
   (action)="onAction($event.key)"
 >
   <ng-template dialogBody>
-    @if (canManage()) {
-    <app-form [form]="form()" [value]="value()" [errors]="errors()" (valueChange)="onValue($event)" />
-    <div class="od__buyer">
-      <span class="od__label">{{ 'orders.field.buyerAccount' | t }}</span>
-      @if (buyer(); as chosen) {
-        <app-chip
-          [removable]="true"
-          [removeLabel]="'orders.buyer.remove' | t: { name: chosen.name }"
-          (remove)="buyer.set(null)"
-        >
-          {{ chosen.name }}
-        </app-chip>
+    <app-section [level]="3" [heading]="'orders.dialog.details' | t" [hideHeading]="true">
+      @if (canManage()) {
+        <app-form [form]="form()" [value]="value()" [errors]="errors()" (valueChange)="onValue($event)" />
+        <app-section [level]="4" [heading]="'orders.field.buyerAccount' | t">
+          @if (buyer(); as chosen) {
+            <app-chip
+              [removable]="true"
+              [removeLabel]="'orders.buyer.remove' | t: { name: chosen.name }"
+              (remove)="buyer.set(null)"
+            >
+              {{ chosen.name }}
+            </app-chip>
+          } @else {
+            <app-gremium-person-picker
+              [placeholder]="'orders.buyer.search' | t"
+              [persons]="findPeople"
+              (picked)="onPicked($event)"
+            />
+          }
+          @if (buyerError()) {
+            <app-error-text>{{ buyerError() }}</app-error-text>
+          }
+        </app-section>
       } @else {
-        <app-gremium-person-picker
-          [placeholder]="'orders.buyer.search' | t"
-          [persons]="findPeople"
-          (picked)="onPicked($event)"
-        />
+        <dl appFacts layout="rows">
+          @for (fact of facts(); track fact.label) {
+            <div>
+              <dt>{{ fact.label }}</dt>
+              <dd>
+                @if (fact.href) {
+                  <a [href]="fact.href" target="_blank" rel="noopener noreferrer">{{ fact.value }}</a>
+                } @else {
+                  {{ fact.value }}
+                }
+              </dd>
+            </div>
+          }
+        </dl>
       }
-      @if (buyerError()) {
-        <app-error-text>{{ buyerError() }}</app-error-text>
+      @if (order(); as current) {
+        <app-order-files [orderId]="current.id" [canManage]="canManage()" />
       }
-    </div>
-    } @else {
-      <dl appFacts layout="rows">
-        @for (fact of facts(); track fact.label) {
-          <div>
-            <dt>{{ fact.label }}</dt>
-            <dd>
-              @if (fact.href) {
-                <a [href]="fact.href" target="_blank" rel="noopener noreferrer">{{ fact.value }}</a>
-              } @else {
-                {{ fact.value }}
-              }
-            </dd>
-          </div>
-        }
-      </dl>
-    }
-    @if (order(); as current) {
-      <app-order-files [orderId]="current.id" [canManage]="canManage()" />
-    }
+    </app-section>
   </ng-template>
 </app-dialog>

@@ -26,6 +26,7 @@ import {
   ErrorTextComponent,
   FactsComponent,
   type FormDef,
+  SectionComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { FormComponent, type FormValue } from '@stupa-makers/ui-kit/screens';
@@ -96,11 +97,11 @@ const sameIds = (a: unknown, b: unknown): boolean =>
     ErrorTextComponent,
     FactsComponent,
     FormComponent,
+    SectionComponent,
     GremiumPersonPickerComponent,
     OrderFilesComponent,
   ],
   templateUrl: './order-dialog.component.html',
-  styleUrl: './order-dialog.component.scss',
 })
 export class OrderDialogComponent {
   private readonly api = inject(OrdersApiService);

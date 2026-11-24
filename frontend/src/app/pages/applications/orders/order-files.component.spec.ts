@@ -52,8 +52,9 @@ describe('OrderFilesComponent', () => {
     expect(orders.files).toHaveBeenCalledWith('o-1');
     expect(screen.getByRole('heading', { name: 'Dateien' })).toBeInTheDocument();
     expect(screen.getByText('bestaetigung.pdf')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Herunterladen: neu.pdf' })).toBeDisabled();
-    await userEvent.click(screen.getByRole('button', { name: 'Herunterladen: bestaetigung.pdf' }));
+    await userEvent.click(screen.getByRole('button', { name: 'neu.pdf' }));
+    expect(api.attachmentUrl).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'bestaetigung.pdf' }));
     expect(api.attachmentUrl).toHaveBeenCalledWith('f-1');
     expect(opened).toHaveBeenCalledWith('/api/attachments/f-1/download');
   });
@@ -73,7 +74,6 @@ describe('OrderFilesComponent', () => {
 
   it('uploads the picked files one after the other and names a refused upload', async () => {
     const { cmp, orders, toast, fixture } = await setup({ files: [] });
-    expect(cmp.picked({ files: null })).toEqual([]);
     cmp.upload([]);
     cmp.upload([new File(['x'], 'a.pdf'), new File(['y'], 'b.pdf')]);
     fixture.detectChanges();

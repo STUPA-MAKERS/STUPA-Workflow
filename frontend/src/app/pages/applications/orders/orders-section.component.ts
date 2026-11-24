@@ -24,7 +24,10 @@ import {
   ButtonGroupComponent,
   ConfirmDialogComponent,
   EmptyStateComponent,
+  FieldGroupComponent,
+  FieldRowComponent,
   IconComponent,
+  ListItemComponent,
   MetaLineComponent,
   NoteComponent,
   RowMenuComponent,
@@ -49,15 +52,13 @@ import {
 /** One row of the section, ready for the template. */
 interface Row {
   readonly order: Order;
-  /** The Händler and, for an Auslage, the kind. */
+  /** After the status: the kind of an Auslage, the Händler, then "Preis geplant" for a
+   *  planned price or the signed difference of the real price to the planned one. */
   readonly sub: readonly string[];
   readonly status: string;
   readonly statusKind: StatusKind;
   /** The real price, else the planned one; empty in the applicant view. */
   readonly price: string;
-  readonly planned: boolean;
-  /** The real price minus the planned one with its sign; empty when they are equal. */
-  readonly difference: string;
   readonly menu: readonly RowMenuSection[];
 }
 
@@ -71,11 +72,13 @@ interface Row {
  * amount shows a warning and blocks nothing. The heading has no count.
  *
  * A person with `order.manage` gets the ⋮ menu of a row and, on an approved Antrag, the
- * button for a new Bestellung. Only a person creates a Bestellung. The server decides
+ * button for a new Bestellung. Before the list arrived, and for a type without money and
+ * without a Bestellung, the host is hidden, so it takes no space and no gap. Only a person creates a Bestellung. The server decides
  * both rights (`canManage`, `canCreate`).
  */
 @Component({
   selector: 'app-orders-section',
+  host: { '[attr.hidden]': "shown() ? null : ''" },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
@@ -84,7 +87,10 @@ interface Row {
     ButtonGroupComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
+    FieldGroupComponent,
+    FieldRowComponent,
     IconComponent,
+    ListItemComponent,
     MetaLineComponent,
     NoteComponent,
     OrderDialogComponent,
@@ -93,7 +99,6 @@ interface Row {
     StatusTextComponent,
   ],
   templateUrl: './orders-section.component.html',
-  styleUrl: './orders-section.component.scss',
 })
 export class OrdersSectionComponent {
   private readonly api = inject(OrdersApiService);
@@ -129,20 +134,21 @@ export class OrdersSectionComponent {
     const canManage = this.list()?.canManage === true;
     return this.items().map((order) => {
       const price = shownPrice(order);
+      const difference = formatMoney(priceDifference(order), this.i18n.formatLocale(), {
+        currency: this.currency(),
+        signed: true,
+      });
       return {
         order,
         sub: [
-          ...(order.supplier ? [order.supplier] : []),
           ...(order.kind === 'outlay' ? [t(ORDER_KIND_LABEL.outlay)] : []),
+          ...(order.supplier ? [order.supplier] : []),
+          ...(price.planned && price.amount !== null ? [t('orders.section.planned')] : []),
+          ...(difference ? [difference] : []),
         ],
         status: t(ORDER_STATUS_LABEL[order.status]),
         statusKind: ORDER_STATUS_KIND[order.status],
         price: this.money(price.amount),
-        planned: price.planned && price.amount !== null,
-        difference: formatMoney(priceDifference(order), this.i18n.formatLocale(), {
-          currency: this.currency(),
-          signed: true,
-        }),
         menu: canManage ? orderMenu(order, t) : [],
       };
     });
@@ -156,7 +162,7 @@ export class OrdersSectionComponent {
     const approved = this.money(list.approvedAmount);
     return approved
       ? this.i18n.translate('orders.section.sumOfApproved', { total, approved })
-      : this.i18n.translate('orders.section.sum', { total });
+      : total;
   });
 
   protected readonly warning = computed(() => {

@@ -1,52 +1,25 @@
-<app-section class="of" [heading]="'orders.files.title' | t">
+<app-section [heading]="'orders.files.title' | t">
   @if (canManage()) {
-    <span sectionAction class="of__upload">
-      <input
-        #fileInput
-        type="file"
-        multiple
-        class="sr-only"
-        tabindex="-1"
-        (change)="upload(picked(fileInput)); fileInput.value = ''"
-        [attr.aria-label]="'applications.attachments.upload' | t"
-      />
-      <app-button-group>
-        <app-button variant="text" size="sm" [loading]="uploading()" (click)="fileInput.click()">
-          <span class="of__btn">
-            <app-icon name="upload" />
-            {{ 'applications.attachments.upload' | t }}
-          </span>
-        </app-button>
-      </app-button-group>
-    </span>
+    <app-button-group sectionAction>
+      <app-button variant="text" size="sm" [loading]="uploading()" (click)="picker.open()">
+        <app-icon name="upload" />
+        {{ 'applications.attachments.upload' | t }}
+      </app-button>
+    </app-button-group>
   }
+  <app-file-picker #picker [multiple]="true" [disabled]="!canManage()" (picked)="upload($event)" />
   @if (files().length) {
-    <ul class="rowgroup of__list">
+    <app-field-group role="list">
       @for (file of files(); track file.id) {
         @let st = scan(file.scanState);
-        <li class="of__row">
-          <app-icon class="of__icon" name="clip" [size]="19" />
-          <div class="of__meta">
-            <span class="of__name ell" [title]="file.filename">{{ file.filename }}</span>
-            <span class="of__sub"
-              ><app-meta-line>
-                <span class="num">{{ size(file) }}</span>
-                <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
-              </app-meta-line></span
-            >
-          </div>
-          <app-button-group>
-            <app-button
-              variant="text"
-              size="sm"
-              [iconOnly]="true"
-              [ariaLabel]="('applications.attachments.download' | t) + ': ' + file.filename"
-              [disabled]="file.scanState !== 'clean' || busyId() !== null"
-              (click)="download(file)"
-            >
-              <app-icon name="download" />
-            </app-button>
-            @if (canManage()) {
+        <app-list-item role="listitem" [title]="file.filename" (activate)="download(file)">
+          <app-icon lead name="clip" [size]="19" />
+          <app-meta-line sub>
+            <span>{{ size(file) }}</span>
+            <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
+          </app-meta-line>
+          @if (canManage()) {
+            <app-button-group trail>
               <app-button
                 variant="text"
                 size="sm"
@@ -57,11 +30,11 @@
               >
                 <app-icon name="trash" />
               </app-button>
-            }
-          </app-button-group>
-        </li>
+            </app-button-group>
+          }
+        </app-list-item>
       }
-    </ul>
+    </app-field-group>
   } @else {
     <app-empty-state icon="clip" shape="file" rows="1" [heading]="'orders.files.empty' | t" />
   }

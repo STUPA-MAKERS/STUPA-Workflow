@@ -20,7 +20,10 @@ import {
   ButtonGroupComponent,
   ConfirmDialogComponent,
   EmptyStateComponent,
+  FieldGroupComponent,
+  FilePickerComponent,
   IconComponent,
+  ListItemComponent,
   MetaLineComponent,
   SectionComponent,
   StatusTextComponent,
@@ -41,7 +44,7 @@ const UPLOAD_ERROR: Readonly<Record<number, TranslationKey>> = {
  *
  * They are files of the Bestellung and no attachments of the Antrag, so the attachments
  * list of the Antrag does not show them. A person who reads the Bestellung reads and
- * downloads them; the upload and the delete need `order.manage` (`canManage`). A file
+ * downloads them with a click on the row; the upload and the delete need `order.manage` (`canManage`). A file
  * downloads only after a clean scan. Several files upload one after the other, because
  * parallel requests trip the rate limit.
  */
@@ -55,13 +58,15 @@ const UPLOAD_ERROR: Readonly<Record<number, TranslationKey>> = {
     ButtonGroupComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
+    FieldGroupComponent,
+    FilePickerComponent,
     IconComponent,
+    ListItemComponent,
     MetaLineComponent,
     SectionComponent,
     StatusTextComponent,
   ],
   templateUrl: './order-files.component.html',
-  styleUrl: './order-files.component.scss',
 })
 export class OrderFilesComponent {
   private readonly orders = inject(OrdersApiService);
@@ -94,12 +99,6 @@ export class OrderFilesComponent {
     return formatBytes(file.size, this.i18n.locale());
   }
 
-  /** The picked files of the input. The template empties the input after the read, so the
-   *  same file can be picked again. */
-  protected picked(input: HTMLInputElement): readonly File[] {
-    return Array.from(input.files ?? []);
-  }
-
   /** Several files upload one after the other; the first refusal ends the row of uploads. */
   protected upload(picked: readonly File[]): void {
     if (!this.canManage() || this.uploading() || !picked.length) return;
@@ -121,8 +120,9 @@ export class OrderFilesComponent {
       });
   }
 
+  /** A file downloads only after a clean scan. */
   protected download(file: Attachment): void {
-    if (this.busyId()) return;
+    if (this.busyId() || file.scanState !== 'clean') return;
     this.busyId.set(file.id);
     this.api.attachmentUrl(file.id).subscribe({
       next: (signed) => {

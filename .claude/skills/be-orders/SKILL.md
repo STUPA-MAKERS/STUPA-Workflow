@@ -64,8 +64,8 @@ the flag `is_approved` of the current state, "with money" is `has_budget` of the
 **Frontend** (`frontend/src/app/pages/applications/orders/`, API in
 `core/api/orders.service.ts`):
 - `orders-section` — the section "Bestellungen" below the details of the Antrag detail:
-  rows (Bezeichnung, Händler, status, real price or planned price with "geplant", signed
-  difference), the sum line, the warning above the approved amount, the ⋮ menu of a row,
+  rows (Bezeichnung, status, Händler, real price or planned price with "Preis geplant",
+  signed difference), the sum line, the warning above the approved amount, the ⋮ menu of a row,
   the delete confirmation. It shows for a type with money or when a Bestellung exists.
   After a change the page reads the timeline again (`changed`).
 - `order-dialog` — the form (kit `app-form`). Picked positions fill the planned price (sum
@@ -81,6 +81,9 @@ the flag `is_approved` of the current state, "with money" is `has_budget` of the
   Antrag detail).
 
 **Traps:**
+- The three frontend components have no stylesheet and no class of their own (ratchet
+  `app-styles`): rows are `app-list-item` in an `app-field-group`, and the host of the section
+  hides itself with the `hidden` attribute.
 - The table has no check "Auslage needs a buyer": the erasure of an account empties the
   buyer, so the rule lives in the service only.
 - A new `AuditAction` needs the frontend list `AUDIT_ACTIONS`, its spec copy and the de/en
