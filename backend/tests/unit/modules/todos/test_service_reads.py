@@ -9,7 +9,6 @@ from typing import Any
 import pytest
 
 from app.modules.auth.principal import Principal
-from app.modules.todos import service as svc_mod
 from app.modules.todos.models import Link
 from app.modules.todos.service import TodoService, berlin_today
 from app.shared.errors import ForbiddenError, NotFoundError, ValidationProblem
@@ -138,7 +137,7 @@ async def test_all_boards_needs_the_scope_and_skips_the_personal_board_without_a
     async def _never(_s: Any, _owner: uuid.UUID) -> bool:
         raise AssertionError("no account, no personal board")
 
-    monkeypatch.setattr(svc_mod, "ensure_personal_board", _never)
+    monkeypatch.setattr("app.modules.todos.service.reads.ensure_personal_board", _never)
     with pytest.raises(ForbiddenError):
         await _svc(ScriptedSession()).all_boards(TOKEN)
     session = ScriptedSession(scalars=[[]])
@@ -155,7 +154,7 @@ async def test_all_boards_lists_every_board_with_all_live_cards(
         ensured.append(owner)
         return True
 
-    monkeypatch.setattr(svc_mod, "ensure_personal_board", _ensure)
+    monkeypatch.setattr("app.modules.todos.service.reads.ensure_personal_board", _ensure)
     personal = board(kind="personal", gremium_id=None, owner_id=ME, name="Meine To-Dos")
     stupa = board(name="StuPa")
     empty = board(name="AStA")

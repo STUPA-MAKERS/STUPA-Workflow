@@ -2,7 +2,7 @@
 id: "002816"
 title: A mail message of an unchecked sender is marked
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:

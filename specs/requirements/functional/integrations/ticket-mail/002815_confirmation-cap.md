@@ -2,7 +2,7 @@
 id: "002815"
 title: A Postfach sends at most 30 confirmations an hour
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:

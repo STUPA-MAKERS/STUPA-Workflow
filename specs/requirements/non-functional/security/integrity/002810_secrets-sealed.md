@@ -2,7 +2,7 @@
 id: "002810"
 title: A secret of an integration is sealed in the database
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:

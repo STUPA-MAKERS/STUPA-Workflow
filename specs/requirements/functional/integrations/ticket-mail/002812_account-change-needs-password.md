@@ -2,7 +2,7 @@
 id: "002812"
 title: A change of a mail account needs its password again
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:

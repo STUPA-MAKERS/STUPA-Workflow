@@ -2,7 +2,7 @@
 id: "002818"
 title: A host allowlist has one check
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:

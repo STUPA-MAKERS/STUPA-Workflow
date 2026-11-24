@@ -2,7 +2,7 @@
 id: "002811"
 title: The key of the sealed secrets comes from the deploy
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:

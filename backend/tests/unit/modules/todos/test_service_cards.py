@@ -11,7 +11,6 @@ import pytest
 from app.modules.auth.people import PersonRef
 from app.modules.files.schemas import MessageAttachmentOut
 from app.modules.tickets.models import TicketEvent
-from app.modules.todos import service as svc_mod
 from app.modules.todos.lexorank import MAX_LENGTH
 from app.modules.todos.links import Resolved
 from app.modules.todos.models import (
@@ -31,6 +30,8 @@ from app.modules.todos.schemas import (
     CheckItemPatch,
 )
 from app.modules.todos.service import TodoMail, TodoService
+from app.modules.todos.service import common as todo_common
+from app.modules.todos.service import ranks as todo_ranks
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 from tests.unit.modules.todos.fakes import (
     ME,
@@ -688,9 +689,9 @@ def test_place_tells_whether_it_respread() -> None:
     col = column(b.id)
     live = [card(b, col, rank="b"), card(b, col, rank="d")]
     moved = card(b, col, rank="")
-    assert svc_mod._place(live, 1, moved) is False
+    assert todo_ranks._place(live, 1, moved) is False
     live[1].rank = "b"
-    assert svc_mod._place(live, 1, moved) is True
+    assert todo_ranks._place(live, 1, moved) is True
 
 
 LONG = "z" * MAX_LENGTH
@@ -720,15 +721,15 @@ def test_append_keeps_short_ranks_and_rebalances_long_ones() -> None:
     col = column(b.id)
     live = [card(b, col, rank="b"), card(b, col, rank="c")]
     new = [card(b, col, rank=""), card(b, col, rank="")]
-    svc_mod._append(live, new)
+    todo_ranks._append(live, new)
     assert [x.rank for x in live] == ["b", "c"]
     assert "c" < new[0].rank < new[1].rank
     live[1].rank = LONG
-    svc_mod._append(live, new)
+    todo_ranks._append(live, new)
     ranks = [x.rank for x in (*live, *new)]
     assert ranks == sorted(ranks) and len(set(ranks)) == 4
     assert all(len(r) <= 2 for r in ranks)
-    svc_mod._append([], new[:1])
+    todo_ranks._append([], new[:1])
     assert new[0].rank == "i"
 
 
@@ -748,7 +749,7 @@ async def test_archive_and_restore_are_idempotent() -> None:
 async def test_restore_in_the_done_column_restarts_the_archive_clock() -> None:
     b = board()
     done = column(b.id, "Erledigt", 1, is_done=True)
-    old = svc_mod._now().replace(year=2020)
+    old = todo_common._now().replace(year=2020)
     c = card(b, done, completed_at=old, archived_at=old)
     session = ScriptedSession()
     session.put(b, done, c)
@@ -934,8 +935,8 @@ async def test_comment_files_bind_list_and_go_with_the_comment(
     async def _bind(_s: object, **kw: Any) -> None:
         calls.append(("bind", kw))
 
-    monkeypatch.setattr(svc_mod, "check_message_drafts", _check)
-    monkeypatch.setattr(svc_mod, "bind_drafts", _bind)
+    monkeypatch.setattr("app.modules.todos.service.comments.check_message_drafts", _check)
+    monkeypatch.setattr("app.modules.todos.service.comments.bind_drafts", _bind)
     session, _b, _col, c, service = _setup()
     files = FakeFiles()
     service.files = files  # type: ignore[assignment]
@@ -972,12 +973,13 @@ def test_mail_skips_the_actor_only() -> None:
 
 
 def test_small_helpers() -> None:
-    assert svc_mod._uuid_of(ME) == ME
-    assert svc_mod._uuid_of(str(ME)) == ME
-    assert svc_mod._uuid_of("nope") is None
-    assert svc_mod._uuid_of(5) is None
-    assert svc_mod._ref_of({"linkKind": "ticket", "targetId": str(TICKET)}) == ("ticket", TICKET)
-    assert svc_mod._ref_of({"linkKind": "ticket"}) is None
-    assert svc_mod._excerpt(" a\n b ") == "a b"
-    assert svc_mod.berlin_today(svc_mod._now()) is not None
-    assert svc_mod._iso_date(None) is None
+    assert todo_common._uuid_of(ME) == ME
+    assert todo_common._uuid_of(str(ME)) == ME
+    assert todo_common._uuid_of("nope") is None
+    assert todo_common._uuid_of(5) is None
+    ref = todo_common._ref_of({"linkKind": "ticket", "targetId": str(TICKET)})
+    assert ref == ("ticket", TICKET)
+    assert todo_common._ref_of({"linkKind": "ticket"}) is None
+    assert todo_common._excerpt(" a\n b ") == "a b"
+    assert todo_common.berlin_today(todo_common._now()) is not None
+    assert todo_common._iso_date(None) is None

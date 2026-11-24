@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.shared.ssrf import SsrfError, assert_allowed_url, pin_url
+from app.shared.ssrf import SsrfError, assert_allowed_url, host_allowed, pin_url
 
 
 def _resolver(*addrs: str):
@@ -18,6 +18,36 @@ def test_public_literal_ok() -> None:
 def test_public_dns_ok() -> None:
     ips = assert_allowed_url("https://example.com/hook", resolver=_resolver("1.1.1.1"))
     assert ips == ["1.1.1.1"]
+
+
+def test_allowlist_takes_a_host_with_its_port() -> None:
+    """A webhook entry with a port permits that port only."""
+    ips = assert_allowed_url(
+        "https://good.com:8443/h",
+        allowlist=[" good.com:8443 "],
+        resolver=_resolver("1.1.1.1"),
+    )
+    assert ips == ["1.1.1.1"]
+    with pytest.raises(SsrfError):
+        assert_allowed_url(
+            "https://good.com/h", allowlist=["good.com:8443"], resolver=_resolver("1.1.1.1")
+        )
+
+
+@pytest.mark.parametrize(
+    ("host", "port", "allowlist", "allowed"),
+    [
+        ("mail.example.org", 143, ["Mail.Example.org"], True),
+        ("SMTP.example.org", 587, [" smtp.example.org:587 "], True),
+        ("smtp.example.org", 465, ["smtp.example.org:587"], False),
+        ("smtp.example.org", None, ["smtp.example.org:587"], False),
+        ("mail.example.org", 993, [], False),
+        ("mail.example.org", 993, [" ", ""], False),
+    ],
+)
+def test_host_allowed(host: str, port: int | None, allowlist: list[str], allowed: bool) -> None:
+    """The one allowlist check takes a host or a host with its port; empty allows none."""
+    assert host_allowed(host, port, allowlist) is allowed
 
 
 @pytest.mark.parametrize(

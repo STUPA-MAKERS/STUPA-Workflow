@@ -7,7 +7,8 @@ owner: frederikbeimgraben
 updated: 2026-11-10
 implementation:
   - backend/app/modules/todos/events.py
-  - backend/app/modules/todos/service.py
+  - backend/app/modules/todos/service/card_events.py
+  - backend/app/modules/todos/service/base.py
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos

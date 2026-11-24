@@ -2,7 +2,7 @@
 id: "002813"
 title: A change of the Paperless address needs the token again
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:

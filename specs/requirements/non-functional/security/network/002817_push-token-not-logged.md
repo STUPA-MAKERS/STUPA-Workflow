@@ -2,7 +2,7 @@
 id: "002817"
 title: An access log holds no token of a path
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:

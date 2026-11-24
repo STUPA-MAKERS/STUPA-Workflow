@@ -8,7 +8,8 @@ updated: 2026-11-16
 tests:
   - "backend/tests/integration/modules/todos/test_todos_free_boards.py:test_a_card_moves_between_a_free_board_and_a_gremium_board"
 implementation:
-  - backend/app/modules/todos/service.py
+  - backend/app/modules/todos/service/cards.py
+  - backend/app/modules/todos/service/ranks.py
 scope:
   - backend/app/modules/todos
   - frontend/src/app/pages/todos

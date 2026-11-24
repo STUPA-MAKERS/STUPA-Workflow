@@ -4909,6 +4909,7 @@
   "activity.loading": "Loading activity",
   "activity.loadMore": "Load more",
   "activity.loadError": "The activity could not be loaded.",
+  "activity.notifications": "Notifications",
   "activity.empty": "No activity yet",
   "activity.emptyBody": "What happens to your applications, to-dos, tickets and meetings shows here.",
   "activity.emptyFiltered": "No activity for this selection",
