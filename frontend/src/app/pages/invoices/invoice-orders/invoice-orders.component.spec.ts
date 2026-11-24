@@ -69,7 +69,7 @@ describe('InvoiceOrdersComponent', () => {
     expect(rows[0]).toContain('B-7K3QX9MD · Beamer');
     expect(rows[0]).toContain('Technik für den Sitzungssaal');
     expect(rows[0]).toMatch(/72,50\s€/);
-    expect(rows[1]).toContain('Ohne tatsächlichen Preis');
+    expect(rows[1]).toContain('Preis offen');
     expect(rows[2]).toBe('Bestellung (kein Zugriff)');
     expect(cmp.rows().map((row: { link: unknown }) => row.link)).toEqual([
       ['/applications', 'a-1'],

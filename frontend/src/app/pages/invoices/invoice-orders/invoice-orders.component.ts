@@ -74,9 +74,13 @@ export class InvoiceOrdersComponent {
         ? {
             key: item.id,
             title: [item.number, item.title].filter(Boolean).join(' · '),
-            sub: item.applicationTitle ?? '',
-            price:
-              this.money(item.actualAmount) || this.i18n.translate('orders.ofInvoice.noPrice'),
+            sub: [
+              item.applicationTitle,
+              item.actualAmount ? null : this.i18n.translate('orders.ofInvoice.noPrice'),
+            ]
+              .filter(Boolean)
+              .join(' · '),
+            price: this.money(item.actualAmount),
             link: ['/applications', item.applicationId],
           }
         : {

@@ -5293,7 +5293,7 @@
   "orders.ofInvoice.noAccess": "Bestellung (kein Zugriff)",
   "orders.ofInvoice.sum": "Summe der Bestellungen",
   "orders.ofInvoice.sumOfGross": "{total} von {gross}",
-  "orders.ofInvoice.noPrice": "Ohne tatsächlichen Preis",
+  "orders.ofInvoice.noPrice": "Preis offen",
   "admin.audit.action.order_create": "Bestellung angelegt",
   "admin.audit.action.order_update": "Bestellung geändert",
   "admin.audit.action.order_status": "Status einer Bestellung geändert",
