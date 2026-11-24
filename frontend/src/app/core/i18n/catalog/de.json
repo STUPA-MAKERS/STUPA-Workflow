@@ -2723,7 +2723,7 @@
   "participant.delegation.substitute": "Stellvertretung",
   "participant.delegation.member": "Mitglied",
   "participant.delegation.external": "Extern",
-  "participant.delegation.votingOn": "Die Vertretung stimmt für dich ab. Du selbst stimmst in dieser Sitzung nicht ab.",
+  "participant.delegation.votingOn": "Die Vertretung stimmt für dich ab.",
   "participant.delegation.withVoting": "mit Stimmrecht",
   "participant.start.cap": "Live-Sitzung",
   "participant.start.at": "Die Sitzung beginnt am {date} um {time}",

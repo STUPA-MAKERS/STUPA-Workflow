@@ -14,9 +14,9 @@ scope:
 
 # The delegation dialog says that the vote moves
 
-Below the list, "Vertretung einrichten" must show one muted line: "Die Vertretung stimmt für dich
-ab. Du selbst stimmst in dieser Sitzung nicht ab." "Vertretung eintragen" must show the same fact
-for the missing member.
+Below the list, "Vertretung einrichten" must show one muted line with one sentence: "Die
+Vertretung stimmt für dich ab." "Vertretung eintragen" must show the same fact for the missing
+member.
 
 Reason: Without the switch the member must still know that the own vote moves (002900).
 

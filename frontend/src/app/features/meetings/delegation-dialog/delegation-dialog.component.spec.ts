@@ -155,9 +155,7 @@ describe('DelegationDialogComponent', () => {
     const submit = () => within(dialog()).getByRole('button', { name: 'Vertretung einrichten' });
     expect(submit()).toBeDisabled();
     expect(within(dialog()).queryByRole('switch')).toBeNull();
-    expect(
-      within(dialog()).getByText('Die Vertretung stimmt für dich ab. Du selbst stimmst in dieser Sitzung nicht ab.'),
-    ).toBeInTheDocument();
+    expect(within(dialog()).getByText('Die Vertretung stimmt für dich ab.')).toBeInTheDocument();
     await userEvent.click(within(dialog()).getByRole('radio', { name: /Emma Vogel/ }));
     await userEvent.click(submit());
     const req = http.expectOne(`${BASE}/delegations`);
