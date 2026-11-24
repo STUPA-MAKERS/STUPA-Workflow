@@ -1,7 +1,6 @@
 @use 'breakpoints' as bp;
 @use 'field' as f;
 @use 'option-menu' as om;
-@use 'scroll-fade' as fade;
 @use '../../../shared/ui/dialog-form' as df;
 @use '../../../shared/ui/pick-rows' as pr;
 
@@ -51,7 +50,8 @@
   gap: var(--space-4);
   min-height: 0;
   overflow-y: auto;
-  @include fade.fade-y(var(--space-5));
+  // No fade at the ends: the box cuts the list hard at its rounded corners (002902).
+  border-radius: var(--radius-lg);
 }
 
 .dd__group {

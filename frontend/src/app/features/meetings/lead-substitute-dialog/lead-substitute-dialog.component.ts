@@ -25,7 +25,6 @@ import {
   IconComponent,
   SearchPillComponent,
   SkeletonComponent,
-  ScrollFadeDirective,
   ToastService,
   TruncatedDirective,
   DialogBodyDirective,
@@ -65,8 +64,7 @@ const SEARCH_ABOVE = 5;
     AvatarComponent,
       DialogComponent,
     IconComponent,
-    ScrollFadeDirective,
-  ],
+    ],
   templateUrl: './lead-substitute-dialog.component.html',
   styleUrl: './lead-substitute-dialog.component.scss',
 })

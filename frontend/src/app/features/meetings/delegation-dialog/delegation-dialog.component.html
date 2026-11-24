@@ -31,7 +31,7 @@
       />
       <div class="dd__slot">
         @if (substitutes().length || others().length) {
-          <div class="dd__list" appScrollFade="y" data-testid="delegation-list">
+          <div class="dd__list" data-testid="delegation-list">
             @if (substitutes().length) {
               <section class="dd__group" [attr.aria-label]="'participant.delegation.yourSubstitutes' | t">
                 <h3 class="dd__cap cap">{{ 'participant.delegation.yourSubstitutes' | t }}</h3>

@@ -39,7 +39,7 @@
         @if (pool() === null) {
           <app-skeleton variant="rows" [count]="3" [label]="'meetings.leadSubstitute.loading' | t" />
         } @else if (shown().length) {
-          <div class="dd__list" appScrollFade="y" data-testid="delegation-list">
+          <div class="dd__list" data-testid="delegation-list">
             <section class="dd__group" [attr.aria-label]="'meetings.leadSubstitute.pool' | t">
               <h3 class="dd__cap cap">{{ 'meetings.leadSubstitute.pool' | t }}</h3>
               <div

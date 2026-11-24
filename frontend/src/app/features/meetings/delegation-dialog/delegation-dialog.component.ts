@@ -29,7 +29,6 @@ import {
   EmptyStateComponent,
   IconComponent,
   liveSearch,
-  ScrollFadeDirective,
   SearchPillComponent,
   ToastService,
   TruncatedDirective,
@@ -76,8 +75,7 @@ const REFUSAL_TEXT: Readonly<Record<string, TranslationKey>> = {
     AvatarComponent,
     DialogComponent,
     IconComponent,
-    ScrollFadeDirective,
-  ],
+    ],
   templateUrl: './delegation-dialog.component.html',
   styleUrl: './delegation-dialog.component.scss',
 })
