@@ -3744,6 +3744,12 @@
           "type": "TEXT"
         },
         {
+          "name": "display_format",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
           "name": "id",
           "nullable": false,
           "primaryKey": true,
