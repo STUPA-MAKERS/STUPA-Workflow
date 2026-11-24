@@ -220,20 +220,18 @@
     margin: 0;
     overflow: hidden;
     border-radius: var(--radius-xl);
-    // A floating box of frosted glass (`frosted-pop`, spec 002010): the dock floats over
-    // the protocol with a small gap above the navigation bar, and a light shadow lifts it
-    // off the protocol.
+    // A floating box of frosted glass (spec 002010): the dock floats over the protocol with a
+    // small gap above the navigation bar, and a light shadow lifts it off the protocol. The
+    // glass is a layer behind the dock (`frosted-layer`), so the bottom sheet of the
+    // minute-taker opens over the whole screen, not inside the dock (spec 002800).
     box-shadow: var(--shadow-md);
-    @include frosted-pop(var(--color-surface-2), 85%, 20px);
+    @include frosted-layer(var(--color-surface-2), 85%, 20px);
   }
   // Before the opening the dock only says "Noch nicht eröffnet", which the status in the
   // head already says, so it shows nothing there (`SessionDockComponent`).
   .mp__dock--quiet {
-    outline: none;
-    background: none;
     box-shadow: none;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
+    @include frosted-layer(var(--color-surface-2), $hide: true);
   }
 }
 
