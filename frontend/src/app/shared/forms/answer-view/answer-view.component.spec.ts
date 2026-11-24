@@ -194,6 +194,36 @@ describe('AnswerViewComponent', () => {
     expect(screen.queryByText(/Ohne Regel/)).not.toBeInTheDocument();
   });
 
+  it('shows a computed value in its format (spec 002964)', async () => {
+    await view(
+      one([
+        { key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung' } },
+        { key: 'foerderhoehe', type: 'funding', label: { de: 'Förderhöhe' } },
+        {
+          key: 'quote',
+          type: 'computed',
+          label: { de: 'Förderquote' },
+          compute: { '/': [{ var: 'foerderhoehe' }, { var: 'costTotal' }] },
+          format: 'percent',
+        },
+        {
+          key: 'eigen',
+          type: 'computed',
+          label: { de: 'Eigenanteil' },
+          compute: { '-': [{ var: 'costTotal' }, { var: 'foerderhoehe' }] },
+          format: 'money',
+        },
+      ]),
+      {
+        kosten: [{ id: 'p-1', label: 'Bus', offers: [{ label: 'A', value: 1200, preferred: true }] }],
+        foerderhoehe: 1000,
+        quote: 0.8333,
+      },
+    );
+    expect(valueOf('Förderquote · berechnet')).toMatch(/^83,3\s%$/);
+    expect(valueOf('Eigenanteil · berechnet')).toMatch(/^200,00\s€$/);
+  });
+
   it('shows no cost line and the files of each position (specs 001632, 001730)', async () => {
     const { container } = await view(
       one([

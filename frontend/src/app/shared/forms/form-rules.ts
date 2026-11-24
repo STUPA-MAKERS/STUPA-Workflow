@@ -7,11 +7,14 @@
  * `form-rules.fixture.json` runs in both test suites, so both sides give the same
  * broken rules. The server checks the rules again and stays the authority.
  */
-import type { FieldType, FormFieldDef, FormRule } from '@core/api/models';
+import type { ComputedFormat, FieldType, FormFieldDef, FormRule } from '@core/api/models';
 import { JsonLogicError, evalJsonLogic } from './jsonlogic';
 
 /** A field as the checks read it: its key, its type and the settings they use. */
 type RuleField = Pick<FormFieldDef, 'key' | 'type' | 'isPromoted' | 'promoteTarget' | 'validation'>;
+
+/** A field as the computation reads it: a rule field with its expression and format. */
+type ComputeField = RuleField & Pick<FormFieldDef, 'compute' | 'format'>;
 
 const NUMERIC: ReadonlySet<FieldType> = new Set<FieldType>(['number', 'currency']);
 
@@ -120,6 +123,70 @@ export function ruleContext(
     amount: promotedAmount(fields, data),
     costTotal: costTotal(fields, data),
   };
+}
+
+/** A number rounded half up (away from 0) to `places` decimal places, as Python's ROUND_HALF_UP. */
+function roundHalfUp(value: number, places: number): number {
+  const abs = Math.round(Number(`${Math.abs(value)}e${places}`)) / 10 ** places;
+  return value < 0 ? -abs : abs;
+}
+
+/**
+ * A computed value rounded for its format (spec 002962), or null when it gives no value:
+ * `money` to cents and `percent` to four decimal places, both only for a number; `number`
+ * keeps any value. A number that is not finite is no value in every format.
+ */
+export function formattedValue(format: ComputedFormat, value: unknown): unknown {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number' && !Number.isFinite(value)) return null;
+  if (format === 'number') return value;
+  if (typeof value !== 'number') return null;
+  return roundHalfUp(value, format === 'money' ? 2 : 4);
+}
+
+/** The format that a computed field shows: the amount is always money (spec 002962). */
+export function computedFormat(f: Pick<FormFieldDef, 'type' | 'isPromoted' | 'promoteTarget' | 'format'>): ComputedFormat {
+  return isComputedAmount(f) ? 'money' : (f.format ?? 'number');
+}
+
+/** One step of `computeValues`: the value of one field, or none. */
+function computeStep(
+  f: ComputeField,
+  fields: readonly RuleField[],
+  base: Readonly<Record<string, unknown>>,
+  values: Readonly<Record<string, unknown>>,
+): unknown {
+  const ctx = ruleContext(fields, { ...base, ...values });
+  try {
+    const value = evalJsonLogic(f.compute ?? null, ctx);
+    if (!isComputedAmount(f)) return formattedValue(f.format ?? 'number', value);
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? toCents(value) : null;
+  } catch (err) {
+    if (err instanceof JsonLogicError) return null;
+    throw err;
+  }
+}
+
+/**
+ * The values of the `computed` fields as the server computes them (`with_computed`,
+ * specs 002960-002962). Each expression reads the answers, `amount` and `costTotal` as a
+ * rule reads them, in field order, with the values computed before it. A value in `data`
+ * for a computed field does not count. A field that cannot be computed has no key.
+ */
+export function computeValues(
+  fields: readonly ComputeField[],
+  data: Readonly<Record<string, unknown>>,
+  extra: Readonly<Record<string, unknown>> = {},
+): Readonly<Record<string, unknown>> {
+  const keys = new Set(fields.filter((f) => f.type === 'computed').map((f) => f.key));
+  const answers = Object.fromEntries(Object.entries(data).filter(([k]) => !keys.has(k)));
+  const base = { ...extra, ...answers };
+  return fields
+    .filter((f) => f.type === 'computed' && f.compute)
+    .reduce<Readonly<Record<string, unknown>>>((values, f) => {
+      const value = computeStep(f, fields, base, values);
+      return value === null || value === undefined ? values : { ...values, [f.key]: value };
+    }, {});
 }
 
 /**

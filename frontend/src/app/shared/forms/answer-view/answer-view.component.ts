@@ -4,11 +4,12 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
 import { formatAnswer, formatFieldValue, isEmptyAnswer } from '../answer-format';
 import { langAttr, resolvedI18nLang, resolveI18n } from '../i18n-text';
-import { evalJsonLogic, isFieldVisible } from '../jsonlogic';
+import { isFieldVisible } from '../jsonlogic';
 import {
   PositionsViewComponent,
   type PositionFile,
 } from '../positions-view/positions-view.component';
+import { computeValues } from '../form-rules';
 import { runs } from '@shared/util/immutable';
 import { FieldGroupComponent, FieldRowComponent, SectionComponent } from '@stupa-makers/ui-kit';
 
@@ -128,7 +129,9 @@ export class AnswerViewComponent {
   readonly blocks = computed<readonly AnswerBlock[]>(() => {
     const lang = this.i18n.uiLocale();
     const data = this.data();
-    const ctx = { ...this.context(), ...data };
+    const fields = this.sections().flatMap((s) => s.fields);
+    const given = Object.fromEntries(Object.entries(data).filter(([, v]) => !isEmptyAnswer(v)));
+    const ctx = { ...this.context(), ...computeValues(fields, data, this.context()), ...given };
     const skip: ReadonlySet<string> = new Set(this.skipKeys());
     const known: ReadonlySet<string> = new Set(
       this.sections().flatMap((s) => s.fields.map((f) => f.key)),
@@ -175,7 +178,7 @@ export class AnswerViewComponent {
     ctx: Readonly<Record<string, unknown>>,
     lang: string,
   ): readonly AnswerPiece[] {
-    const raw = f.type === 'computed' ? this.computedValue(f, data, ctx) : data[f.key];
+    const raw = f.type === 'computed' ? this.computedValue(f, ctx) : data[f.key];
     if (isEmptyAnswer(raw)) return [];
     const label = resolveI18n(f.label, lang);
     const labelLang = langAttr(resolvedI18nLang(f.label, lang), lang);
@@ -237,18 +240,12 @@ export class AnswerViewComponent {
     return langAttr(resolvedI18nLang(option?.label, lang), lang);
   }
 
-  /** The stored value of a computed field, else the value of its rule. */
-  private computedValue(
-    f: FormFieldDef,
-    data: Readonly<Record<string, unknown>>,
-    ctx: Readonly<Record<string, unknown>>,
-  ): unknown {
-    if (!isEmptyAnswer(data[f.key]) || !f.compute) return data[f.key];
-    try {
-      return evalJsonLogic(f.compute, ctx);
-    } catch {
-      return null;
-    }
+  /**
+   * The stored value of a computed field, else its value as the server computes it
+   * (`computeValues`, spec 002960). `ctx` holds both, the stored value first.
+   */
+  private computedValue(f: FormFieldDef, ctx: Readonly<Record<string, unknown>>): unknown {
+    return ctx[f.key];
   }
 }
 

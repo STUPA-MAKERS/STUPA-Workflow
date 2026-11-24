@@ -60,14 +60,23 @@ describe('FormlyDisplayType (rendered)', () => {
 
   it('shows a computed amount as euro in the language of the interface (spec 002842)', async () => {
     await renderField(
-      { key: 'summe', type: 'display', props: { computed: true, money: true } },
+      { key: 'summe', type: 'display', props: { computed: true, format: 'money' } },
       { summe: 29.4 },
     );
     expect(screen.getByText(/29,40\s€/)).toBeInTheDocument();
   });
 
   it('keeps the raw text of a computed amount that is no number', () => {
-    expect(makeType({ computed: true, money: true }, 'abc').text).toBe('abc');
+    expect(makeType({ computed: true, format: 'money' }, 'abc').text).toBe('abc');
+  });
+
+  it('shows a percent with at most one decimal place (spec 002964)', () => {
+    expect(makeType({ computed: true, format: 'percent' }, 0.8333).text).toMatch(/^83,3\s%$/);
+    expect(makeType({ computed: true, format: 'percent' }, 0.5).text).toMatch(/^50\s%$/);
+  });
+
+  it('shows an own share as money (spec 002964)', () => {
+    expect(makeType({ computed: true, format: 'money' }, 1234.5).text).toMatch(/^1\.234,50\s€$/);
   });
 
   it('renders a heading with title and subtitle', async () => {
