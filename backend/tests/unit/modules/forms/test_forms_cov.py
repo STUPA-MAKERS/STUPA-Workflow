@@ -15,7 +15,6 @@ import asyncio
 import uuid
 from collections.abc import Iterable
 from decimal import Decimal
-from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -746,5 +745,5 @@ def test_the_display_format_goes_into_the_row_and_back() -> None:
     )
     kwargs = field_def_to_row_kwargs(fd, 0)
     assert kwargs["display_format"] == "percent"
-    row = SimpleNamespace(**kwargs, order_=0)
+    row = FormField(form_version_id=uuid.uuid4(), **kwargs)
     assert _row_to_field_def(row).display_format == "percent"
